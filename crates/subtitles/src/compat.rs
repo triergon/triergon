@@ -134,7 +134,7 @@ pub mod cc {
     //! FFmpeg's closed-caption receiver.
     //!
     //! [`Decoder`] turns `cc_data` packets into the ASS events and header of
-    //! FFmpeg's `ccaption` decoder, with its `real_time`,
+    //! FFmpeg's `cc_dec` decoder, with its `real_time`,
     //! `real_time_latency_msec` and `data_field` [`Options`].
     //! [`CaptionExtractor`] gives, packet by packet, the caption bytes FFmpeg's
     //! MPEG-2, H.264 and HEVC decoders attach to their output frames, in its

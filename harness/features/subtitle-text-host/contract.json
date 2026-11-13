@@ -10,7 +10,7 @@
   "contract": [
     "20 SubRip and 3 WebVTT documents whose time fields leave the 32-bit range (hours and seconds from 2^31 to beyond 2^64, and below -2^31), read and folded as subtitle-text reads and folds documents: compat::document::Reader on the candidate, FFmpeg's srt and webvtt demuxers on the reference",
     "each case is pinned per target from that target's own reference run; a case passes when the candidate, the reference and the target's pin agree",
-    "the reader follows FFmpeg built with GCC for armv7-unknown-linux-gnueabihf: a SubRip field saturates to the 32-bit signed range, and a WebVTT field's digits stop at 2^32 - 1 and read as a 32-bit signed number; FFmpeg for aarch64-unknown-linux-gnu reads each of these documents otherwise, so every case is open there as a deliberate divergence",
+    "the reader follows FFmpeg built with GCC for 32-bit ARM hard-float: a SubRip field saturates to the 32-bit signed range, and a WebVTT field's digits stop at 2^32 - 1 and read as a 32-bit signed number; FFmpeg for aarch64-unknown-linux-gnu reads each of these documents otherwise, so every case is open there as a deliberate divergence",
     "the documents are written by harness/subtitle_corpus.py; each target's expected folds are recorded independently from that target's reference worker"
   ],
   "required_profiles": [
@@ -40,7 +40,7 @@
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf"
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "iterations": 2000,
   "minimum_pairs": 30,

@@ -191,7 +191,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   whose libass result differs by target, because libass's renderer overflows
   `int` or converts out of its range on the way, are `ass-render-host`'s
   instead, pinned per target like `ass-parse-host`; the renderer follows
-  libass built with GCC for `armv7-unknown-linux-gnueabihf`.
+  libass built with GCC for 32-bit ARM hard-float.
   The parity reference is instrumented: it compiles libass's rendering,
   drawing and parsing sources into itself with checks of its own, so it is
   never timed or measured. Both rendering features name a
@@ -250,7 +250,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   case whose reference result differs between the targets fails there, flagged
   or not, until a feature pinned per target holds it. `subtitle-dvd-host` holds
   the DVD cases the subtitles reference flags. The decoder follows FFmpeg built
-  with GCC for `armv7-unknown-linux-gnueabihf`, and such a case is open on
+  with GCC for 32-bit ARM hard-float, and such a case is open on
   AArch64.
   Pins are recorded with the feature's `worker_operation`, the operation
   `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
@@ -471,6 +471,15 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- Gate results assume the workspace release profile, `lto = "fat"` and
+  `codegen-units = 1`, and a program that depends on these crates matches them only
+  with the same two settings in its own release profile. On ARMv7, building the
+  playback worker without fat LTO, Cargo's default, adds 12.6% user-mode instructions
+  on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times as long;
+  Cargo's default of 16 codegen units adds up to another 2.5%. `panic = "abort"` saves
+  a further 2 to 3% and is safe: no library code catches or relies on unwinding. A
+  program that wraps calls into these crates in `catch_unwind` loses that protection
+  under abort.
 - `report`, `external-vector`, `codecs time` and `capture qualify` time through one
   paired runner. It holds the host-wide benchmark lock, runs and checks one warm-up of
   each worker, observes every pair from the snapshot that closed the one before, proves
@@ -537,12 +546,17 @@ may override that count for diagnostic comparisons.
 
 ### 32-bit ARMv7
 
-The harness runs natively in a 32-bit ARM Linux user space. The same commands
-build xtask, the workers and the FFmpeg references there, and reports name the
-target of the toolchain that built them, `armv7-unknown-linux-gnueabihf`. That
-toolchain's default target has no NEON, while FFmpeg selects its NEON code at run
-time, so on this target the gate build compares Rust built without NEON with
-FFmpeg's NEON paths. An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
+The harness runs natively in a 32-bit ARM Linux user space. The gate target there is
+`thumbv7neon-unknown-linux-gnueabihf`: Thumb-2, as the armhf GCC that builds the FFmpeg
+and libass references compiles by default, and assuming NEON, whose code FFmpeg selects
+at run time on the same cores. Its workers therefore do not run on an ARMv7 core
+without NEON. rustup's host toolchain there, `armv7-unknown-linux-gnueabihf` (A32
+without NEON), builds xtask and the build scripts only: `cargo xtask build-workers`,
+`cargo xtask check` and the comparison commands compile the workers and the tests with
+`--target thumbv7neon-unknown-linux-gnueabihf`, so the workers land in
+`target/thumbv7neon-unknown-linux-gnueabihf/release`, and reports name that target.
+Add it once with `rustup target add thumbv7neon-unknown-linux-gnueabihf`.
+An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
 on its AArch64 kernel; later Graviton generations cannot.
 
 The results in [status](status.md#32-bit-armv7) come from the Ubuntu 24.04 armhf user
@@ -569,7 +583,7 @@ time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home director
 part of the image.
 A user space built the same way later can pick up newer packages; compare its
 `dpkg-query -W` list before treating its results as comparable. Inside, install rustup
-as on any host, and run every command under `setarch linux32`. Record the CPU, kernel
+as on any host, add the gate target, and run every command under `setarch linux32`. Record the CPU, kernel
 and user-space package list with the results. The `subtitles` reference builds libzvbi
 from its source archive, which needs `apt-get install autoconf automake libtool autopoint
 gettext` in the user space first.

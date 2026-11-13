@@ -10,7 +10,7 @@
         "digest": 4331674270210290408,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 42,
         "bytes": 120,
         "digest": 4331674270210290408,
@@ -24,7 +24,7 @@
         "digest": 2758801544890065950,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 44,
         "digest": 7102520413637202956,
@@ -38,7 +38,7 @@
         "digest": 956854100840633194,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 31,
         "digest": 956854100840633194,
@@ -52,7 +52,7 @@
         "digest": 6665314754141197418,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 31,
         "digest": 6665314754141197418,
@@ -66,7 +66,7 @@
         "digest": 17791394752719166305,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 44,
         "digest": 15881649056746129386,
@@ -80,7 +80,7 @@
         "digest": 8185492603997413489,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 27,
         "digest": 8185492603997413489,
@@ -94,7 +94,7 @@
         "digest": 8544013250187682576,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 12,
         "digest": 8544013250187682576,
@@ -108,7 +108,7 @@
         "digest": 6236201623175922093,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 12,
         "digest": 6236201623175922093,
@@ -121,7 +121,7 @@
         "bytes": 332,
         "digest": 16739617371976300571
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 332,
         "digest": 16669471947859856155
@@ -133,7 +133,7 @@
         "bytes": 97,
         "digest": 14772156494427005680
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 4,
         "bytes": 97,
         "digest": 3116554152817474288
@@ -146,7 +146,7 @@
         "digest": 4992240586215293869,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 12,
         "digest": 4992240586215293869,
@@ -160,7 +160,7 @@
         "digest": 14901843017533116151,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 12,
         "digest": 14901843017533116151,
@@ -174,7 +174,7 @@
         "digest": 14920842132671709493,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 12,
         "digest": 14920842132671709493,
@@ -188,7 +188,7 @@
         "digest": 1203054323934508907,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 5,
         "bytes": 12,
         "digest": 1203054323934508907,
@@ -202,7 +202,7 @@
         "digest": 10155893059127458149,
         "host_dependent": true
       },
-      "armv7-unknown-linux-gnueabihf": {
+      "thumbv7neon-unknown-linux-gnueabihf": {
         "packets": 6,
         "bytes": 23,
         "digest": 10155893059127458149,

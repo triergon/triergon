@@ -18,7 +18,7 @@
           "bytes": 1,
           "digest": 9576802471793377844
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -41,7 +41,7 @@
           "bytes": 1,
           "digest": 707959907875735858
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -64,7 +64,7 @@
           "bytes": 1,
           "digest": 6654686160095529233
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -87,7 +87,7 @@
           "bytes": 1,
           "digest": 3128772717689727026
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -110,7 +110,7 @@
           "bytes": 1,
           "digest": 707959907875735858
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -133,7 +133,7 @@
           "bytes": 1,
           "digest": 707959907875735858
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -156,7 +156,7 @@
           "bytes": 1,
           "digest": 707959907875735858
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -179,7 +179,7 @@
           "bytes": 1,
           "digest": 707959907875735858
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 16232587669887438863
@@ -202,7 +202,7 @@
           "bytes": 1,
           "digest": 16232587669887438863
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 9576802471793377844
@@ -225,7 +225,7 @@
           "bytes": 1,
           "digest": 707959907875735858
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 9576802471793377844
@@ -248,7 +248,7 @@
           "bytes": 1,
           "digest": 12430395503298261476
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -271,7 +271,7 @@
           "bytes": 1,
           "digest": 17684970407429437490
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -294,7 +294,7 @@
           "bytes": 1,
           "digest": 7621292767204408210
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -317,7 +317,7 @@
           "bytes": 1,
           "digest": 6654686160095529233
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -340,7 +340,7 @@
           "bytes": 1,
           "digest": 17684970407429437490
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -363,7 +363,7 @@
           "bytes": 1,
           "digest": 17684970407429437490
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -386,7 +386,7 @@
           "bytes": 1,
           "digest": 17684970407429437490
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -409,7 +409,7 @@
           "bytes": 1,
           "digest": 17684970407429437490
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12875867671335584224
@@ -432,7 +432,7 @@
           "bytes": 1,
           "digest": 12875867671335584224
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12430395503298261476
@@ -455,7 +455,7 @@
           "bytes": 1,
           "digest": 17684970407429437490
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 12430395503298261476
@@ -478,7 +478,7 @@
           "bytes": 1,
           "digest": 12149176266633134994
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 6250682457037152306
@@ -501,7 +501,7 @@
           "bytes": 1,
           "digest": 13705469346545345041
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 6250682457037152306
@@ -524,7 +524,7 @@
           "bytes": 1,
           "digest": 12149176266633134994
         },
-        "armv7-unknown-linux-gnueabihf": {
+        "thumbv7neon-unknown-linux-gnueabihf": {
           "packets": 1,
           "bytes": 1,
           "digest": 6250682457037152306

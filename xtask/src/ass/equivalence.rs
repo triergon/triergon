@@ -312,12 +312,15 @@ fn build(workspace: &Path, target: &Path) -> Result<PathBuf, String> {
             "equivalence",
         ])
         .args(["--features", "work-probe"])
+        .args(crate::harness::gate_build::target_args())
         .env("CARGO_INCREMENTAL", "0")
         .env("CARGO_TARGET_DIR", target)
         .current_dir(workspace);
     println!("$ {command:?}");
     run(&mut command)?;
-    Ok(target.join("release/examples/equivalence"))
+    Ok(target
+        .join(crate::harness::gate_build::release_subdir())
+        .join("examples/equivalence"))
 }
 
 /// `line` without what a budget error says the budget had left: the

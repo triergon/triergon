@@ -210,7 +210,9 @@ pub struct Workers {
 impl Workers {
     fn new(root: &Path) -> Self {
         Workers {
-            candidate: root.join("target/release/media-worker"),
+            candidate: root
+                .join(crate::harness::gate_build::release_dir())
+                .join("media-worker"),
             reference: root.join("target/harness/ffmpeg-worker"),
             combined: root.join("target/harness/ffmpeg-combined-worker"),
         }
