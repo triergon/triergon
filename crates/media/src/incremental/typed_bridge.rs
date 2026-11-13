@@ -33,6 +33,30 @@ pub(crate) enum CompactEnvelopeProgress {
     Header(ElementHeader),
     Step(ParseStep<CompactElementEvent>),
 }
+struct CompactDelivery;
+impl super::EnvelopeDelivery for CompactDelivery {
+    type Event = CompactElementEvent;
+    const RETAIN_LEAF: bool = true;
+    fn start(header: ElementHeader) -> Self::Event {
+        CompactElementEvent::Start(header)
+    }
+    fn end(id: u64, offset: u64, generation: u64) -> Self::Event {
+        CompactElementEvent::End {
+            id,
+            offset,
+            generation,
+        }
+    }
+    fn skipped(header: ElementHeader) -> Self::Event {
+        CompactElementEvent::Skipped(header)
+    }
+    fn leaf(body: &mut super::BodyState, bytes: triergon_core::Bytes) -> Self::Event {
+        body.direct = Some(bytes);
+        body.transfer = super::BodyTransfer::Ready;
+        CompactElementEvent::Leaf(body.header)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ReplayLocation {
     checkpoint: ClusterCheckpoint,
@@ -82,7 +106,7 @@ impl ElementReader {
         cancel: &AtomicBool,
     ) -> Result<EnvelopeProgress> {
         let admit = admission.map_or(Admit::Pause, Admit::Epoch);
-        let step = self.step_public(work, cancel, admit)?;
+        let step = self.step_mode::<super::PublicDelivery>(work, cancel, admit)?;
         if let Some(header) = self.awaiting_typed_admission() {
             Ok(EnvelopeProgress::Header(header))
         } else {
@@ -105,7 +129,7 @@ impl ElementReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<CompactEnvelopeProgress> {
-        let step = self.step_after_input_health(work, cancel, admit)?;
+        let step = self.step_after_input_health::<CompactDelivery>(work, cancel, admit)?;
         if matches!(step, ParseStep::Yield)
             && let Some(header) = self.awaiting_typed_admission()
         {
