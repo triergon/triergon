@@ -100,13 +100,50 @@ fn stored(
         .len()
         .checked_add(additional)
         .ok_or(Error::Overflow)?;
+    held(requested, limits)?;
+    reserve_amortised(encoded, additional, declared.min(limits.max_encoded))
+}
+
+/// The RLE bytes one continuation segment can carry: a 16-bit segment length
+/// less the object id, version and sequence flags.
+const CONTINUATION_BYTES: usize = 0xffff - 4;
+
+/// The storage of a first fragment's RLE bytes, with room for one
+/// continuation segment but never past the declared length, so a declared
+/// length is a claim, not an allocation. Under pool pressure only the bytes
+/// themselves are reserved.
+fn first_part(
+    data: &[u8],
+    declared: usize,
+    limits: &DisplayLimits,
+    budget: &Budget,
+) -> Result<BudgetVec<u8>> {
+    held(data.len(), limits)?;
+    let room = declared
+        .min(data.len().saturating_add(CONTINUATION_BYTES))
+        .min(limits.max_encoded);
+    let mut encoded = BudgetVec::new(budget);
+    encoded
+        .try_reserve_exact(room)
+        .or_else(|error| match error {
+            Error::Backpressure { .. } | Error::Limit { .. } if room > data.len() => {
+                encoded.try_reserve_exact(data.len())
+            }
+            error => Err(error),
+        })?;
+    encoded.try_extend_from_slice(data)?;
+    Ok(encoded)
+}
+
+/// `requested` RLE bytes of one object, refused beyond `limits.max_encoded`.
+fn held(requested: usize, limits: &DisplayLimits) -> Result<()> {
     if requested > limits.max_encoded {
         return Err(Error::Limit {
             requested,
             maximum: limits.max_encoded,
         });
     }
-    reserve_amortised(encoded, additional, declared.min(limits.max_encoded))
+    Ok(())
 }
 
 /// The count after one more fragment of an object.
@@ -168,23 +205,25 @@ impl Object {
         if data.is_empty() || width == 0 || height == 0 || width > canvas[0] || height > canvas[1] {
             return Ok(Update::Keep);
         }
-        let mut object = Object {
-            width,
-            height,
-            ..Self::empty(id, budget)
-        };
         let length = usize::from(*l0) << 16 | usize::from(*l1) << 8 | usize::from(*l2);
         let Some(declared) = length.checked_sub(4) else {
-            return Ok(Update::Unallocated(object));
+            return Ok(Update::Unallocated(Object {
+                width,
+                height,
+                ..Self::empty(id, budget)
+            }));
         };
         if data.len() > declared {
             return Ok(Update::Keep);
         }
-        object.fragments = next_fragment(0, limits)?;
-        stored(&mut object.encoded, data.len(), declared, limits)?;
-        object.encoded.try_extend_from_slice(data)?;
-        object.declared = declared;
-        Ok(Update::Replace(object))
+        Ok(Update::Replace(Object {
+            id,
+            width,
+            height,
+            declared,
+            fragments: next_fragment(0, limits)?,
+            encoded: first_part(data, declared, limits, budget)?,
+        }))
     }
 
     /// A continuation fragment's data, accepted while it fits the length the
@@ -517,7 +556,9 @@ mod tests {
             }
             Update::Replace(object) => {
                 assert_eq!(object.fragments, 1);
-                assert!(object.encoded.capacity() <= 16);
+                // Room for a continuation, not for the whole declared length.
+                let room = object.declared.min(fragment.len() - 7 + CONTINUATION_BYTES);
+                assert_eq!(object.encoded.capacity(), room);
                 let data = object.encoded.as_slice();
                 assert_eq!(data, &fragment[7..]);
                 format!("{}x{} {}", object.width, object.height, object.declared)

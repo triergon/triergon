@@ -95,7 +95,15 @@ fn line_end(text: &[u8]) -> Option<usize> {
 /// space right after a non-ASCII byte stays: `"   £ab  "` becomes `"£ab"`,
 /// `"ab£   "` becomes `"ab£ "` and `"ab£ x  "` becomes `"ab£ x"`.
 fn chop(line: &[u8]) -> &[u8] {
-    let start = line.iter().position(|&b| b != b' ').unwrap_or(line.len());
+    // Most rows are blank: skip their spaces eight at a time.
+    let blank = 8 * line
+        .chunks_exact(8)
+        .take_while(|chunk| *chunk == [b' '; 8])
+        .count();
+    let start = line[blank..]
+        .iter()
+        .position(|&b| b != b' ')
+        .map_or(line.len(), |at| blank + at);
     let mut line = &line[start..];
     while let [rest @ .., before, b' '] = line
         && before.is_ascii()
