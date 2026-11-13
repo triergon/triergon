@@ -425,12 +425,11 @@ impl<'a> Mp4IndexJob<'a> {
         let header = movie.header();
         let ticks = header.declared_duration_ticks().unwrap_or(0);
         let duration = Time::from_ticks(i128::from(ticks), header.time_base()?)?;
-        let micros =
-            match duration.to_i64_ticks(TimeBase::new(1, 1_000_000)?, Rounding::NearestAway) {
-                Ok(value) => value,
-                Err(Error::Overflow) => 0,
-                Err(error) => return Err(error),
-            };
+        let micros = match duration.to_i64_ticks(TimeBase::MICROSECONDS, Rounding::NearestAway) {
+            Ok(value) => value,
+            Err(Error::Overflow) => 0,
+            Err(error) => return Err(error),
+        };
         Self::new_inner(
             movie,
             Mp4View::PinnedMov9NoParseNoFillin,
@@ -987,7 +986,7 @@ impl<'a> Mp4IndexJob<'a> {
                                     pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
                                 let micros = row.media_clock.demux_base.rescale(
                                     end,
-                                    TimeBase::new(1, 1_000_000)?,
+                                    TimeBase::MICROSECONDS,
                                     Rounding::NearestAway,
                                 )?;
                                 duration.micros = duration.micros.max(micros);

@@ -1251,6 +1251,23 @@ impl<'a> PacketCursor<'a> {
                                 sample.require_within(extent.clone())?;
                                 continue;
                             }
+                            if self.media.len() > 1
+                                && self.terminal.is_none()
+                                && self.forward_regular.is_none()
+                                && work.try_charge(u64::from(self.media.len().ilog2()) + 3)
+                            {
+                                // Reserve the full partition search and bounds check.
+                                // Small grants use the resumable search below.
+                                let end = self
+                                    .media
+                                    .partition_point(|extent| extent.start <= sample.range.start);
+                                let extent = end
+                                    .checked_sub(1)
+                                    .and_then(|at| self.media.get(at))
+                                    .ok_or(Error::Invalid("native sample outside mdat"))?;
+                                sample.require_within(extent.clone())?;
+                                continue;
+                            }
                             self.checking = Some(sample);
                             self.low = 0;
                             self.high = self.media.len();
