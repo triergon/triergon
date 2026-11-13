@@ -19967,6 +19967,19 @@
     "candidate": "0b3c2db5239da81ab38d7a33f73b70a9f77df464",
     "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
    }
+  },
+  {
+   "name": "aac-s16-floor-f0744418-aarch64",
+   "path": "aac-s16-floor-f0744418-aarch64",
+   "retention": "retained",
+   "reason": "The s16 conversion without floorf on Linux AArch64, the codec gate target, at f0744418 against main at b89e5844 on a c6g.4xlarge: instruction counts of every audio workload in three rounds and of main against itself, the decoder-output equivalence records, the session tests, the conversion checked against the floor over every f32, the downmix disassembly, the aac-lc-stereo profiles, the workers, the scripts, and the CPU, kernel and package list",
+   "key": "evidence/aac-s16-floor-f0744418-aarch64/ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6.tar.gz",
+   "sha256": "ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6",
+   "bytes": 9623793,
+   "source_revisions": {
+    "candidate": "f0744418776dd2e01795c24d06716f54a0aefc2e",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
   }
  ]
 }

@@ -219,6 +219,33 @@ on AArch64 and 0.6 to 3.3 % fewer on ARMv7 (`thumbv7neon-unknown-linux-gnueabihf
 without PS and the frozen `aac-lc-5.1` and `aac-lc-stereo` workloads take at most as many
 as before on both, 0.014 % fewer at most, so the AAC timing rows stand.
 
+The downmix's conversion to s16 (`mix::to_s16`) also runs fewer instructions on AArch64,
+the codec gate target. There the floor was one `frintm`, but the loop clamped in `f32`,
+converted and clamped again, two samples at a time; the integer form folds the scale
+into a fixed-point `fcvtzs`, saturates with `sqsub` and narrows with `sqxtn`, four
+samples at a time. The gate build at `f0744418` against `b89e5844` on a c6g.4xlarge
+(`cargo xtask count`, median of three rounds) runs fewer instructions on every audio
+workload, while `b89e5844` against itself moves by at most 0.01%. The 577 decoder
+outputs are byte-identical and the conversion gives the floor's result for every
+`f32`, so the AArch64 codec timing rows stand:
+
+| Workload | Instructions | Cycles | Instructions, main against main |
+|---|---:|---:|---:|
+| `aac-lc-stereo` | −0.61% | −1.62% | 0.00% |
+| `aac-lc-5.1` | −0.22% | −0.50% | 0.00% |
+| `aac-he-stereo` | −0.18% | −0.57% | 0.00% |
+| `aac-he-5.1` | −0.05% | −0.09% | 0.00% |
+| `aac-hev2-stereo` | −0.19% | −0.56% | 0.00% |
+| `ac3-2.0-192` | −0.47% | −1.04% | 0.00% |
+| `ac3-4.0` | −0.19% | −0.44% | −0.01% |
+| `ac3-5.1-448` | −0.17% | −0.39% | −0.01% |
+| `eac3-stereo-spx` | −0.45% | −1.03% | 0.00% |
+| `eac3-5.1-spx` | −0.15% | −0.30% | +0.01% |
+| `eac3-7.1` | −0.09% | −0.22% | 0.00% |
+| `eac3-5.1-1536` | −0.11% | +0.10% | 0.00% |
+| `dts-core-es-6.1` | −0.09% | −0.29% | +0.01% |
+| `dts-core-7.1-master` | −0.11% | −0.29% | 0.00% |
+
 The rasterising rows on Linux compare the gate build at
 `a7b6635e20cc2dc9d4592a874ba0eecab24f2870` with the libass reference: the four
 features of `cargo xtask raster compare --all` and the SIMD diagnostic, with the font
@@ -440,6 +467,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MPEG-TS ordered PES, plain carriers | `2e28dbc71d323643c4127609821fb61c4a73d7d2` | `b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8` |
 | MPEG-TS, earlier measurement | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | MPEG-TS control-only completion (macOS) | `65eeada0888bcd112d4cbd90e68795fea93fd864` | `d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b` |
+| AArch64: the s16 conversion's instruction counts on every audio workload against `b89e5844`, equivalence and the `aac-lc-stereo` profiles | `f0744418776dd2e01795c24d06716f54a0aefc2e` | `ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6` |
 | ARMv7: the AAC codec timings (AAC-LC, HE-AAC v1 and v2), their instruction counts against `b89e5844`, equivalence and the `aac-he-stereo` profiles | `0b3c2db5239da81ab38d7a33f73b70a9f77df464` | `bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a` |
 | ARMv7: the AC-3, E-AC-3 and DTS codec timings, the s16 conversion's instruction counts against `f3d4935b`, equivalence and the `aac-lc-stereo` profiles | `ddb02a59a7ac8bf1974c14439194430e2b245504` | `52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977` |
 | ARMv7: every other row of the ARMv7 table, the video codec timings | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
