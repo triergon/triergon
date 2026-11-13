@@ -19705,6 +19705,19 @@
     "candidate": "4d81cde0d99d050d4a3997a234e439148d97245c",
     "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
    }
+  },
+  {
+   "name": "subtitles-cc-pair-8b32fa31-armv7",
+   "path": "subtitles-cc-pair-8b32fa31-armv7",
+   "retention": "retained",
+   "reason": "Closed caption receiver at 8b32fa31 against main at 339ec261 in the ARMv7 user space: the subtitle-cc report (201 of 205, the four hevc-eos-ts cases open), the subtitle-cc instruction counts through the chroot, the perf stat -r 5 recounts of the eight cases furthest above main with both workers at paths of equal length, the workers' SHA-256, the reference's decoder listing, and the scripts that ran them.",
+   "key": "evidence/subtitles-cc-pair-8b32fa31-armv7/216b2d535ac2a4b5846858790a50a94d1df5fad42430e9de2268862e766c1cee.tar.gz",
+   "sha256": "216b2d535ac2a4b5846858790a50a94d1df5fad42430e9de2268862e766c1cee",
+   "bytes": 2701028,
+   "source_revisions": {
+    "candidate": "8b32fa310bf21294e28bb9f5c189e34665ba6e8b",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }
