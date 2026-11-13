@@ -2,7 +2,7 @@ use super::{
     Budget, Drive, Error, Event, ID, OFF, PID, PacketInfo, Reader, ReaderEvent, ReaderLimits,
     SourceCapabilities, Step, TraceEvent, Transport, WorkBudget, adts, timestamp,
 };
-use triergon_core::{InputRequest, SourceLocation};
+use triergon_core::{InputRequest, SourceLocation, container::TrackId};
 use triergon_mpegts::compat::adts::PesPolicy;
 use triergon_mpegts::{FaultKind, SourceRange, TransportPacket};
 
@@ -44,23 +44,25 @@ fn before_growth(
     policy: PesPolicy,
     maximum: usize,
     retain_output: bool,
+    selected: bool,
 ) -> (Drive<'_>, Option<TransportPacket>) {
     let pool = Budget::new(maximum).unwrap();
+    let caps = SourceCapabilities {
+        length: None,
+        random_access: false,
+    };
+    let limits = ReaderLimits {
+        adts_pes_policy: policy,
+        ..ReaderLimits::default()
+    };
+    let reader = if selected {
+        Reader::new_with_packet_tracks(&pool, ID, caps, limits, CARRIER, &[TrackId(PID.into())])
+    } else {
+        Reader::new(&pool, ID, caps, limits, CARRIER)
+    }
+    .unwrap();
     let mut drive = Drive {
-        reader: Reader::new(
-            &pool,
-            ID,
-            SourceCapabilities {
-                length: None,
-                random_access: false,
-            },
-            ReaderLimits {
-                adts_pes_policy: policy,
-                ..ReaderLimits::default()
-            },
-            CARRIER,
-        )
-        .unwrap(),
+        reader,
         pool,
         raw,
         chunk: CARRIER,
@@ -130,15 +132,15 @@ fn grow(reader: &mut Reader) -> Result<InputRequest, Error> {
     panic!("header growth did not settle with unit grants");
 }
 
-fn charges(raw: &[u8], policy: PesPolicy) -> (usize, usize) {
-    let (mut drive, _) = before_growth(raw, policy, 1 << 20, false);
+fn charges(raw: &[u8], policy: PesPolicy, selected: bool) -> (usize, usize) {
+    let (mut drive, _) = before_growth(raw, policy, 1 << 20, false, selected);
     let pinned = drive.pool.used();
     let minimum = pinned + REPLACEMENT;
     assert!(drive.pool.peak() < minimum);
     assert_eq!(grow(&mut drive.reader).unwrap().offset, HEADER_END as u64);
     assert_eq!(drive.pool.peak(), minimum);
 
-    let (drive, held) = before_growth(raw, policy, 1 << 20, true);
+    let (drive, held) = before_growth(raw, policy, 1 << 20, true, selected);
     let with_output = drive.pool.used();
     drop(held.unwrap());
     assert_eq!(drive.pool.used(), pinned);
@@ -149,21 +151,23 @@ fn charges(raw: &[u8], policy: PesPolicy) -> (usize, usize) {
 fn split_adts_header_growth_refuses_a_permanent_limit() {
     for policy in [PesPolicy::ReportUnbounded, PesPolicy::Strict] {
         let (raw, _, _) = source(policy);
-        let (minimum, _) = charges(&raw, policy);
-        let maximum = minimum - 1;
-        let (mut drive, _) = before_growth(&raw, policy, maximum, false);
-        let result = grow(&mut drive.reader).unwrap_err();
-        if matches!(result, Error::Backpressure { .. }) {
-            assert_eq!(grow(&mut drive.reader).unwrap_err(), result);
+        for selected in [false, true] {
+            let (minimum, _) = charges(&raw, policy, selected);
+            let maximum = minimum - 1;
+            let (mut drive, _) = before_growth(&raw, policy, maximum, false, selected);
+            let result = grow(&mut drive.reader).unwrap_err();
+            if matches!(result, Error::Backpressure { .. }) {
+                assert_eq!(grow(&mut drive.reader).unwrap_err(), result);
+            }
+            assert_eq!(
+                result,
+                Error::Limit {
+                    requested: minimum,
+                    maximum
+                },
+                "{policy:?}"
+            );
         }
-        assert_eq!(
-            result,
-            Error::Limit {
-                requested: minimum,
-                maximum
-            },
-            "{policy:?}"
-        );
     }
 }
 
@@ -176,9 +180,9 @@ fn split_adts_header_growth_retries_with_the_original_ranges() {
 
 fn retry_header_growth(policy: PesPolicy) {
     let (raw, header, frame) = source(policy);
-    let (minimum, caller_charge) = charges(&raw, policy);
+    let (minimum, caller_charge) = charges(&raw, policy, false);
     assert!(caller_charge > 0);
-    let (mut drive, held) = before_growth(&raw, policy, minimum + caller_charge - 1, true);
+    let (mut drive, held) = before_growth(&raw, policy, minimum + caller_charge - 1, true, false);
     let before = drive.reader.request().unwrap();
     let expected = Error::Backpressure {
         requested: REPLACEMENT,

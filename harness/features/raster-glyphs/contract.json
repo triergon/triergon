@@ -22,7 +22,7 @@
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf"
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "iterations": 1,
   "minimum_pairs": 30,

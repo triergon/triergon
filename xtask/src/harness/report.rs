@@ -240,22 +240,17 @@ const QUALIFIED_TARGETS: [&str; 4] = [
     "aarch64-apple-darwin",
     "aarch64-unknown-linux-gnu",
     "x86_64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf",
+    gate_build::ARM32_TARGET,
 ];
 
-/// The Rust target triple this host qualifies for: the host triple of the
-/// toolchain that builds the workers (`rustc -vV`). A 32-bit ARM user space on an
-/// AArch64 kernel reports `aarch64` or `armv8l` from `uname -m`, so the machine
-/// name cannot tell it apart from a 64-bit one. Any other target, such as ARMv6 or
-/// `thumbv7neon`, is reported as unqualified.
-pub fn host_target() -> String {
-    static HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    HOST.get_or_init(|| {
-        let version = command_output("rustc", &["-vV"]);
-        let host = version.lines().find_map(|line| line.strip_prefix("host: "));
-        qualified(host.unwrap_or("unknown"))
-    })
-    .clone()
+/// The Rust target this host qualifies: the one its workers are compiled for
+/// ([`gate_build::worker_target`]), from the host triple of the toolchain
+/// that builds them (`rustc -vV`). A 32-bit ARM user space on an AArch64 kernel
+/// reports `aarch64` or `armv8l` from `uname -m`, so the machine name cannot tell
+/// it apart from a 64-bit one. Any other target, such as ARMv6 or A32, is reported
+/// as unqualified.
+pub fn gate_target() -> Result<String, String> {
+    gate_build::worker_target().map(qualified)
 }
 
 fn qualified(target: &str) -> String {
@@ -757,7 +752,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest, &host_target())?;
+    let open = open_cases(&contract, &manifest, &gate_target()?)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -772,7 +767,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
-    let target = host_target();
+    let target = gate_target()?;
     let coverage = fate_coverage(
         root,
         &read_json(&root.join("harness/fate/index.json"))?,
@@ -1533,18 +1528,18 @@ mod tests {
     #[test]
     fn only_the_listed_targets_qualify() {
         assert_eq!(
-            qualified("armv7-unknown-linux-gnueabihf"),
-            "armv7-unknown-linux-gnueabihf"
+            qualified("thumbv7neon-unknown-linux-gnueabihf"),
+            "thumbv7neon-unknown-linux-gnueabihf"
         );
         for other in [
             "arm-unknown-linux-gnueabihf",
             "armv6-unknown-linux-gnueabihf",
-            "thumbv7neon-unknown-linux-gnueabihf",
+            "armv7-unknown-linux-gnueabihf",
             "aarch64-unknown-linux-musl",
         ] {
             assert_eq!(qualified(other), format!("unqualified-{other}"));
         }
-        let host = host_target();
+        let host = gate_target().unwrap();
         assert!(
             QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
             "{host}"
