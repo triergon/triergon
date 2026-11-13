@@ -19705,6 +19705,19 @@
     "candidate": "c79ae2da8b8a0d004d37936100eedd7b46e0a589",
     "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
    }
+  },
+  {
+   "name": "subtitles-small-spots-traces-92d1a1c5",
+   "path": "subtitles-small-spots-traces-92d1a1c5",
+   "retention": "retained",
+   "reason": "Subtitle worker traces of the DVD, PGS and teletext cases against main on Linux AArch64 and of six DVD calls on ARMv7, for the crafted size, fragment and trimming cases",
+   "key": "evidence/subtitles-small-spots-traces-92d1a1c5/425c08ba299c60e13c0690b16ef7599bf4fdaade2cfb8ce32b75c547edc7767b.tar.zst",
+   "sha256": "425c08ba299c60e13c0690b16ef7599bf4fdaade2cfb8ce32b75c547edc7767b",
+   "bytes": 21144587,
+   "source_revisions": {
+    "candidate": "92d1a1c5c83b8b39b12ae1ed11b999badbeddc23",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }
