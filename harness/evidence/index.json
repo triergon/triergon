@@ -19943,6 +19943,45 @@
    "source_revision": "ec6afe8635509d7e9007fd3d3c20ce2bf1c25835"
   },
   {
+   "name": "aac-s16-floor-ddb02a59-armv7",
+   "path": "aac-s16-floor-ddb02a59-armv7",
+   "retention": "retained",
+   "reason": "Audio codec timing and the s16 conversion without floorf at ddb02a59 against main at f3d4935b on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of every audio workload for both against the decode reference, instruction counts on the gate target and on A32 with NEON, the aac-lc-stereo profiles, the decoder-output equivalence records, the conversion checked against the floor over every f32, the four conversions compared and their disassembly, the workers, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-ddb02a59-armv7/52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977.tar.gz",
+   "sha256": "52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977",
+   "bytes": 72342434,
+   "source_revisions": {
+    "candidate": "ddb02a59a7ac8bf1974c14439194430e2b245504",
+    "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+   }
+  },
+  {
+   "name": "aac-s16-floor-he-0b3c2db5-armv7",
+   "path": "aac-s16-floor-he-0b3c2db5-armv7",
+   "retention": "retained",
+   "reason": "AAC-LC and HE-AAC v1 and v2 codec timing with the s16 conversion without floorf at 0b3c2db5 (the change merged with main) against main at b89e5844 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of the five AAC workloads for both against the decode reference, instruction counts of every audio workload on the gate target and on A32 with NEON, the aac-he-stereo and aac-lc-stereo profiles, the decoder-output equivalence records, the session tests, the workers, the scripts, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-he-0b3c2db5-armv7/bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a.tar.gz",
+   "sha256": "bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a",
+   "bytes": 62225056,
+   "source_revisions": {
+    "candidate": "0b3c2db5239da81ab38d7a33f73b70a9f77df464",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
+  },
+  {
+   "name": "aac-s16-floor-f0744418-aarch64",
+   "path": "aac-s16-floor-f0744418-aarch64",
+   "retention": "retained",
+   "reason": "The s16 conversion without floorf on Linux AArch64, the codec gate target, at f0744418 against main at b89e5844 on a c6g.4xlarge: instruction counts of every audio workload in three rounds and of main against itself, the decoder-output equivalence records, the session tests, the conversion checked against the floor over every f32, the downmix disassembly, the aac-lc-stereo profiles, the workers, the scripts, and the CPU, kernel and package list",
+   "key": "evidence/aac-s16-floor-f0744418-aarch64/ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6.tar.gz",
+   "sha256": "ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6",
+   "bytes": 9623793,
+   "source_revisions": {
+    "candidate": "f0744418776dd2e01795c24d06716f54a0aefc2e",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
+  },
+  {
    "name": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
    "path": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
    "retention": "retained",

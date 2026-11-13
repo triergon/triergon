@@ -219,6 +219,33 @@ on AArch64 and 0.6 to 3.3 % fewer on ARMv7 (`thumbv7neon-unknown-linux-gnueabihf
 without PS and the frozen `aac-lc-5.1` and `aac-lc-stereo` workloads take at most as many
 as before on both, 0.014 % fewer at most, so the AAC timing rows stand.
 
+The downmix's conversion to s16 (`mix::to_s16`) also runs fewer instructions on AArch64,
+the codec gate target. There the floor was one `frintm`, but the loop clamped in `f32`,
+converted and clamped again, two samples at a time; the integer form folds the scale
+into a fixed-point `fcvtzs`, saturates with `sqsub` and narrows with `sqxtn`, four
+samples at a time. The gate build at `f0744418` against `b89e5844` on a c6g.4xlarge
+(`cargo xtask count`, median of three rounds) runs fewer instructions on every audio
+workload, while `b89e5844` against itself moves by at most 0.01%. The 577 decoder
+outputs are byte-identical and the conversion gives the floor's result for every
+`f32`, so the AArch64 codec timing rows stand:
+
+| Workload | Instructions | Cycles | Instructions, main against main |
+|---|---:|---:|---:|
+| `aac-lc-stereo` | −0.61% | −1.62% | 0.00% |
+| `aac-lc-5.1` | −0.22% | −0.50% | 0.00% |
+| `aac-he-stereo` | −0.18% | −0.57% | 0.00% |
+| `aac-he-5.1` | −0.05% | −0.09% | 0.00% |
+| `aac-hev2-stereo` | −0.19% | −0.56% | 0.00% |
+| `ac3-2.0-192` | −0.47% | −1.04% | 0.00% |
+| `ac3-4.0` | −0.19% | −0.44% | −0.01% |
+| `ac3-5.1-448` | −0.17% | −0.39% | −0.01% |
+| `eac3-stereo-spx` | −0.45% | −1.03% | 0.00% |
+| `eac3-5.1-spx` | −0.15% | −0.30% | +0.01% |
+| `eac3-7.1` | −0.09% | −0.22% | 0.00% |
+| `eac3-5.1-1536` | −0.11% | +0.10% | 0.00% |
+| `dts-core-es-6.1` | −0.09% | −0.29% | +0.01% |
+| `dts-core-7.1-master` | −0.11% | −0.29% | 0.00% |
+
 The rasterising rows on Linux compare the gate build at
 `a7b6635e20cc2dc9d4592a874ba0eecab24f2870` with the libass reference: the four
 features of `cargo xtask raster compare --all` and the SIMD diagnostic, with the font
@@ -441,7 +468,10 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MPEG-TS ordered PES, plain carriers | `2e28dbc71d323643c4127609821fb61c4a73d7d2` | `b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8` |
 | MPEG-TS, earlier measurement | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | MPEG-TS control-only completion (macOS) | `65eeada0888bcd112d4cbd90e68795fea93fd864` | `d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b` |
-| ARMv7: every row of the ARMv7 table, the `aac-lc-stereo` profiles | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
+| AArch64: the s16 conversion's instruction counts on every audio workload against `b89e5844`, equivalence and the `aac-lc-stereo` profiles | `f0744418776dd2e01795c24d06716f54a0aefc2e` | `ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6` |
+| ARMv7: the AAC codec timings (AAC-LC, HE-AAC v1 and v2), their instruction counts against `b89e5844`, equivalence and the `aac-he-stereo` profiles | `0b3c2db5239da81ab38d7a33f73b70a9f77df464` | `bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a` |
+| ARMv7: the AC-3, E-AC-3 and DTS codec timings, the s16 conversion's instruction counts against `f3d4935b`, equivalence and the `aac-lc-stereo` profiles | `ddb02a59a7ac8bf1974c14439194430e2b245504` | `52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977` |
+| ARMv7: every other row of the ARMv7 table, the video codec timings | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
 | Earlier ARMv7, before the page-cache eviction: the container, playback, ASS rendering and capture rows; the A32 and NEON codec comparisons | `22ed8232b28a285f1439772b91713df3aa64ea91` | `abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e` |
 | Earlier ARMv7, A32: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | Earlier ARMv7, A32: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
@@ -519,7 +549,7 @@ diagnostics: no codec contract is gated on this target.
 | HLS segments | 71/71 | 0.5916 (71/71 pass) | heap ≤0.020, total RSS ≤0.8759 (71/71 lower) |
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 0.9996 (972/972 pass) | heap ≤0.274, total RSS ≤0.8143 (972/972 lower) |
 | Packet framing | 125/125 AVC/HEVC reference comparisons | 1.0892 (125/125 pass) | heap ≤0.766 (125/125 lower); total RSS fails: ≤1.0590, 0/125 lower |
-| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 2.2091 (7/17 within the ceiling); the three HE-AAC workloads at `700c2134`: 1.9012 to 2.1091 (0/3 within) | no repository runner for the gate; the three HE-AAC workloads at `700c2134`, not gated: heap ≤0.944, total RSS ≤0.890 (3/3 lower) |
+| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 2.0698 (10/20 within the ceiling; AAC at `0b3c2db5`, other audio at `ddb02a59`) | no repository runner for the gate; the three HE-AAC workloads at `700c2134`, not gated: heap ≤0.944, total RSS ≤0.890 (3/3 lower) |
 | Capture | 0/15: mux and encoder pass on all 15, conversion fails on all 15 (below) | 2.2962 (3/15 pass) | standard bounds: heap ≤0.569, total RSS ≤0.982 (15/15 lower) |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7774 (10/10 pass) | heap ≤0.733 (10/10 lower); total RSS fails: ≤1.2053, 0/10 lower |
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.8793 (97/97 pass) | heap ≤0.091, total RSS ≤0.9076 (97/97 lower) |
@@ -597,16 +627,19 @@ segment metadata) 1.1491, `hevc-irap_repeat` (packet framing) 1.0892,
 `order27-u64-last-scale1000-cat21-native-index-tiny` 0.9996. The raw samples'
 `report.json` lists each bound.
 
-The codec timings, not gated, are above the ceiling for ten of the eleven audio workloads:
-`eac3-stereo-spx` 2.2091, `ac3-2.0-192` 2.0282, `dts-core-7.1-master` 2.0023,
-`dts-core-es-6.1` 1.9544, `aac-lc-stereo` 1.7717, `eac3-5.1-spx` 1.5819, `ac3-5.1-448`
-1.4712, `eac3-7.1` 1.4381, `ac3-4.0` 1.4214 and `aac-lc-5.1` 1.4055; `eac3-5.1-1536` is
-0.9875 and the six video workloads 0.5945 to 1.1236. The three HE-AAC workloads, added at
-`700c2134`, are above it as well: `aac-he-stereo` 2.1091, `aac-hev2-stereo` 2.0488 and
-`aac-he-5.1` 1.9012. The instruction set moves the audio and video workloads in opposite
-directions. At `22ed8232`, built for `armv7-unknown-linux-gnueabihf` (A32 without
-NEON; a comparison build) and timed against the same FFmpeg reference, the codec worker's
-upper bounds are `h264-high-1080p` 1.5231, `aac-lc-stereo` 1.1610, `ac3-2.0-192` 1.5995,
+The codec timings are not gated. On a c6g.4xlarge pinned to CPU 1, in the same user
+space and against the same pinned reference, the AC-3, E-AC-3 and DTS workloads were
+timed at `ddb02a59` and the five AAC workloads at `0b3c2db5`. Ten of the fourteen audio
+workloads are above the ceiling: `dts-core-7.1-master` 2.0698, `dts-core-es-6.1` 2.0338,
+`aac-he-5.1` 1.7656, `aac-he-stereo` 1.7092, `aac-hev2-stereo` 1.6377, `ac3-5.1-448`
+1.3764, `ac3-2.0-192` 1.3716, `eac3-stereo-spx` 1.3684, `eac3-5.1-spx` 1.3292 and
+`eac3-7.1` 1.2933, while `aac-lc-5.1` 1.1423, `ac3-4.0` 1.0948, `eac3-5.1-1536` 0.9794
+and `aac-lc-stereo` 0.9761 are within it. The six video workloads, at `3df7ae6d`, are
+0.5945 to 1.1236. Before `ddb02a59` the instruction set moved audio and video in opposite
+directions. At `22ed8232`, built for
+`armv7-unknown-linux-gnueabihf` (A32 without NEON; a comparison build) and timed against
+the same FFmpeg reference, the codec worker's upper bounds are `h264-high-1080p` 1.5231,
+`aac-lc-stereo` 1.1610, `ac3-2.0-192` 1.5995,
 `eac3-stereo-spx` 1.4897 and `dts-core-es-6.1` 1.7571, against 1.1214, 1.7653, 2.0521,
 2.2204 and 2.0400 in the gate build at that commit: the video decoders gain from the gate
 target, the audio decoders lose. A32 with NEON (`-C target-feature=+neon`) gives 1.1035,
@@ -614,41 +647,59 @@ target, the audio decoders lose. A32 with NEON (`-C target-feature=+neon`) gives
 1.7915, 2.0801, 2.2523 and 1.9084: NEON brings the video gain and the Thumb-2 encoding the
 audio loss. No Rust target compiles A32 with NEON under default flags.
 
-At `3df7ae6d`, 200 decodes of `aac-lc-stereo` take 8.11 s in the gate build and 4.81 s in
-the A32 with NEON build, with the same digest. Recorded with `perf` (user-mode cycles and
-instructions), two functions make up 5.42 G of the 6.34 G cycles between them: `floorf`,
-linked into the worker, takes 5,218 M cycles against 1,821 M while executing 4,278 M
-instructions against 4,937 M, and the stereo downmix (`Downmix::mix`) 2,713 M against 690 M
-for 3,692 M instructions against 2,231 M. The AAC decoder's own functions take 1.0 to 1.45
-times their A32 cycles. The raw samples hold both recordings and the per-symbol reports.
-The ten functions with the most cycles and with the most instructions in either build, in
-millions:
+Most of that audio loss was the downmix's conversion to s16. ARMv7 has no instruction
+for `f32::floor`, so the conversion called the `floorf` linked into the worker, which
+moves each sample from the VFP registers to the core registers and back and, as Thumb-2,
+mispredicts its branches: at `f3d4935b`, 8 decodes of `aac-lc-stereo` miss 7.9 M branches
+in the gate build and 0.83 M in the A32 with NEON build. `mix::to_s16` now converts toward
+zero, steps down where that rounded up and saturates in integers. It gives the floor's
+result for every one of the 2^32 `f32` values, and `cargo xtask codecs equivalence`
+records the same 574 decoder outputs as at `f3d4935b`. On the same host, the gate build
+at `ddb02a59` against `f3d4935b` (instruction and cycle counts with `cargo xtask count`,
+runtime as the upper bound over 30 pairs); built as A32 with NEON, `ddb02a59` likewise
+runs 2.5 to 18.5% fewer instructions than `f3d4935b` on every workload:
 
-| Function | Cycles, gate | Cycles, A32 with NEON | Delta |
-|---|---:|---:|---:|
-| `floorf` | 5,218 | 1,821 | +3,397 |
-| `Downmix::mix` | 2,713 | 690 | +2,023 |
-| `ics::decode_spectrum` | 1,660 | 1,466 | +193 |
-| `fft::radix4_block` | 1,134 | 993 | +141 |
-| `Filterbank::synth` | 1,009 | 891 | +119 |
-| `fft::last_post` | 794 | 783 | +11 |
-| `fft::pre` | 578 | 399 | +179 |
-| `Fft::middle` | 505 | 489 | +16 |
-| `Dct4::run_split` | 486 | 346 | +140 |
-| `InterleavedDigest::update` | 338 | 365 | −27 |
+| Workload | Instructions | Cycles | Runtime, `f3d4935b` | Runtime, `ddb02a59` |
+|---|---:|---:|---:|---:|
+| `aac-lc-stereo` | −20.88% | −45.72% | 1.7788 | 0.9644 |
+| `aac-lc-5.1` | −8.90% | −22.04% | 1.4580 | 1.1380 |
+| `ac3-2.0-192` | −14.26% | −31.47% | 2.0115 | 1.3716 |
+| `ac3-4.0` | −8.82% | −24.34% | 1.4443 | 1.0948 |
+| `ac3-5.1-448` | −5.29% | −8.04% | 1.4936 | 1.3764 |
+| `eac3-stereo-spx` | −15.73% | −37.27% | 2.1990 | 1.3684 |
+| `eac3-5.1-spx` | −6.27% | −17.26% | 1.6029 | 1.3292 |
+| `eac3-7.1` | −3.85% | −11.07% | 1.4502 | 1.2933 |
+| `eac3-5.1-1536` | −3.61% | −3.33% | 1.0104 | 0.9794 |
+| `dts-core-es-6.1` | −2.89% | −6.05% | 2.2072 | 2.0338 |
+| `dts-core-7.1-master` | −3.20% | −7.86% | 2.2418 | 2.0698 |
 
-| Function | Instructions, gate | Instructions, A32 with NEON | Delta |
-|---|---:|---:|---:|
-| `floorf` | 4,278 | 4,937 | −659 |
-| `Downmix::mix` | 3,692 | 2,231 | +1,461 |
-| `ics::decode_spectrum` | 3,631 | 3,387 | +244 |
-| `Filterbank::synth` | 3,080 | 2,841 | +239 |
-| `fft::radix4_block` | 2,577 | 2,576 | +0 |
-| `fft::last_post` | 2,394 | 2,399 | −5 |
-| `Dct4::run_split` | 1,288 | 1,368 | −80 |
-| `fft::pre` | 1,290 | 1,241 | +49 |
-| `Fft::middle` | 1,250 | 1,206 | +44 |
-| `Core::decode_cpe` | 923 | 851 | +73 |
+200 decodes of `aac-lc-stereo` take 4.35 s in the gate build, against 7.57 s at
+`f3d4935b`, and 3.91 s in the A32 with NEON build, against 4.79 s, all with the same
+digest. Recorded with `perf` (user-mode cycles and instructions), `floorf` and
+`Downmix::mix` took 4,555 M and 2,077 M cycles in the gate build at `f3d4935b`;
+`Downmix::mix` now takes 852 M, against 719 M in the A32 with NEON build. The gate
+build takes 8.54 G cycles in all, 11% more than the A32 with NEON build's 7.67 G, against
+14.89 G and 9.50 G before; the rest of the difference is spread over the decoder's
+functions. The raw samples hold the recordings and the per-symbol reports.
+
+The five AAC workloads, HE-AAC v1 and v2 among them, were measured again at `0b3c2db5`,
+which merges `b89e5844` into the change, against `b89e5844` on one host. The 577 decoder
+outputs, which now include the HE-AAC workloads' mixes, are byte-identical. Every audio
+workload runs 2.2 to 20.9% fewer instructions in the gate build, and 1.8 to 18.5% fewer
+built as A32 with NEON. HE-AAC gains less than AAC-LC because SBR is most of its work:
+
+| Workload | Instructions | Cycles | Runtime, `b89e5844` | Runtime, `0b3c2db5` |
+|---|---:|---:|---:|---:|
+| `aac-lc-stereo` | −20.88% | −45.52% | 1.7838 | 0.9761 |
+| `aac-lc-5.1` | −8.90% | −22.01% | 1.4625 | 1.1423 |
+| `aac-he-stereo` | −6.10% | −18.96% | 2.1114 | 1.7092 |
+| `aac-he-5.1` | −2.17% | −6.90% | 1.8979 | 1.7656 |
+| `aac-hev2-stereo` | −6.74% | −20.36% | 2.0549 | 1.6377 |
+
+Recorded with `perf`, 50 decodes of `aac-he-stereo` in the gate build take 13.59 s
+against 16.65 s at `b89e5844`, with the same digest. There `floorf` and `Downmix::mix`
+took 4,620 M and 2,175 M of 32.65 G cycles; `Downmix::mix` now takes 692 M of 26.57 G,
+and `Sbr::process` with the QMF synthesis takes 47%.
 
 Capture conversion must stay within ±1 of FFmpeg's on every sample. On
 `c01-ui-static-960`, Triergon's conversion output is byte-identical on ARMv7 and
