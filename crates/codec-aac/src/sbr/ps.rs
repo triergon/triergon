@@ -116,7 +116,7 @@ impl Header {
 }
 
 /// The parameters of the last PS frame read without error, on the configuration it runs.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct Frame {
     envelopes: usize,
     last_slot: [u8; MAX_ENV],
@@ -249,15 +249,28 @@ fn phasor(i: u8) -> (f64, f64) {
     P[usize::from(i & 7)]
 }
 
+/// A parameter index type (IID and ICC `i8`, IPD/OPD `u8`).
+trait Index: Copy + Default + Into<i32> {
+    /// The mean of `n` indices summing to `sum`, truncated toward zero: an index again.
+    fn mean(sum: i32, n: i32) -> Self;
+}
+
+impl Index for i8 {
+    fn mean(sum: i32, n: i32) -> i8 {
+        (sum / n) as i8
+    }
+}
+
+impl Index for u8 {
+    fn mean(sum: i32, n: i32) -> u8 {
+        (sum / n) as u8
+    }
+}
+
 /// Coded values of `nb` bands onto the configuration run (`big`: 34 bands). Only IPD/OPD
 /// meet 34 coded bands in the 20-band configuration (IID last ran 34 bands, the frame has
 /// IID disabled): band b takes the mean of the 34-band rows `CONV_34_20` lists, truncated.
-fn to_config<T: Copy + Into<i32> + TryFrom<i32> + Default>(
-    src: &[T],
-    nb: usize,
-    big: bool,
-    out: &mut [T; MAX_PAR],
-) {
+fn to_config<T: Index>(src: &[T], nb: usize, big: bool, out: &mut [T; MAX_PAR]) {
     *out = [T::default(); MAX_PAR];
     let mut v20 = [T::default(); 20];
     match nb {
@@ -273,14 +286,14 @@ fn to_config<T: Copy + Into<i32> + TryFrom<i32> + Default>(
         _ => {
             for (v, list) in v20.iter_mut().zip(&t::CONV_34_20) {
                 let sum: i32 = list.iter().map(|&r| src[usize::from(r)].into()).sum();
-                *v = T::try_from(sum / list.len() as i32).unwrap_or_default();
+                *v = T::mean(sum, list.len() as i32);
             }
         }
     }
     if big {
         for (o, &(a, b)) in out.iter_mut().zip(&t::MAP_20_34) {
             let s = v20[a as usize].into() + v20[b as usize].into();
-            *o = T::try_from(s / 2).unwrap_or_default(); // truncates toward zero
+            *o = T::mean(s, 2);
         }
     } else {
         out[..20].copy_from_slice(&v20);
@@ -826,7 +839,7 @@ impl Ps {
 
     /// The frame's per-slot matrices into the synthesis scratch.
     fn matrices(&mut self) {
-        let f = self.frame.clone();
+        let f = self.frame;
         let pars = layouts()[usize::from(f.big)].pars;
         let image_pars = layouts()[usize::from(f.big)].image_pars;
         let table = matrices();

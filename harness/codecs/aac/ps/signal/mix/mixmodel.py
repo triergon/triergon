@@ -20,7 +20,7 @@ IID_FINE = [0, 2, 4, 6, 8, 10, 13, 16, 19, 22, 25, 30, 35, 40, 45, 50]          
 # rho = cos(2 alpha) per ICC index (m04: fitted to 3e-8 from 120 + 248 matrices each).
 ICC_RHO = [1.0, 0.937, 0.84118, 0.60092, 0.36764, 0.0, -0.589, -1.0]
 RHO_MIN_B = 0.05          # second procedure: rho is raised to at least 0.05 (m04)
-IPD_STEP = np.pi / 4      # IPD / OPD index step (earlier pass; m07 exact)
+IPD_STEP = np.pi / 4      # IPD / OPD index step (m06, m07: exact)
 SMOOTH_W = (4.0, 2.0, 1.0)  # weights of the current and two previous envelopes (m07)
 NIPD = {10: 5, 20: 11, 34: 17}   # IPD/OPD bands by the IID band count
 # Hybrid bands whose interpolation starts from the conjugate of the previous matrix
