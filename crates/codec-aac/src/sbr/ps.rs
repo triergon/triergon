@@ -26,9 +26,9 @@
 //! bit, per envelope a dt flag and 5, 11 or 17 IPD codewords (by the last IID mode) and the
 //! same for OPD, then one reserved bit.
 //!
-//! Behaviour over frames, observed behaviour of the reference decoder (probe ids as the
-//! recovery scripts in `harness/codecs/aac/ps/signal` name them; `time/recover_time.py`
-//! reruns the t probes):
+//! Behaviour over frames, observed behaviour of the reference decoder (probe ids as in
+//! `harness/codecs/aac/ps/README.md`; `signal/time/recover_time.py` there reruns the t
+//! probes):
 //! - The decoder runs 34 bands when an enabled IID or ICC mode is 2 or 5, else 20; 10 band
 //!   values apply to two bands each, 20 band values map onto 34 bands by copying or by the
 //!   mean of two indices truncated toward zero (h05, h06, t13, t29).
