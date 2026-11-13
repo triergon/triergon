@@ -207,7 +207,7 @@ pub(super) fn selected_operation<'a>(
 
 /// Verify the primary workers, comparison references and selected sources.
 pub(super) fn current_workers(root: &Path, identity: &Value) -> Result<(PathBuf, PathBuf), String> {
-    let candidate = root.join(gate_build::release_dir()).join("media-worker");
+    let candidate = root.join(gate_build::release_dir()?).join("media-worker");
     let reference = root.join("target/harness/ffmpeg-worker");
     for (role, path) in [("candidate", &candidate), ("reference", &reference)] {
         if linux::file_sha(path)? != hash(field(identity, "binaries")?, role)? {
@@ -250,7 +250,7 @@ pub(super) fn candidate_worker(
         return Err("candidate must name a worker".into());
     }
     let record = field(field(identity, "additional_candidates")?, name)?;
-    let path = root.join(gate_build::release_dir()).join(name);
+    let path = root.join(gate_build::release_dir()?).join(name);
     let actual = linux::file_sha(&path)?;
     if actual != hash(record, "sha256")? {
         return Err(format!("{name} changed since build identity; rebuild"));
@@ -306,7 +306,7 @@ mod tests {
     fn built_workers() -> (TempDir, Value) {
         let directory = TempDir::new(None).unwrap();
         let root = &directory.0;
-        let release = gate_build::release_dir();
+        let release = gate_build::release_dir().unwrap();
         let candidate = format!("{release}/media-worker");
         for path in [release.as_str(), "target/harness", "crates/example/src"] {
             fs::create_dir_all(root.join(path)).unwrap();
@@ -359,7 +359,7 @@ mod tests {
         let (directory, identity) = built_workers();
         let root = &directory.0;
         assert!(current_workers(root, &identity).is_ok());
-        let candidate = format!("{}/media-worker", gate_build::release_dir());
+        let candidate = format!("{}/media-worker", gate_build::release_dir().unwrap());
         for path in [
             candidate.as_str(),
             "target/harness/ffmpeg-worker",
@@ -415,7 +415,9 @@ mod tests {
             }
         }
         let mut changed = identity;
-        let custom = root.join(gate_build::release_dir()).join("custom-worker");
+        let custom = root
+            .join(gate_build::release_dir().unwrap())
+            .join("custom-worker");
         fs::write(&custom, b"custom").unwrap();
         put(
             &mut changed,
@@ -437,7 +439,7 @@ mod tests {
         let (directory, mut identity) = built_workers();
         let root = &directory.0;
         fs::write(root.join("target/harness/other-worker"), b"comparison").unwrap();
-        let candidate = format!("{}/media-worker", gate_build::release_dir());
+        let candidate = format!("{}/media-worker", gate_build::release_dir().unwrap());
         for (path, digest) in [
             ("target/harness/other-worker", "0".repeat(64)),
             (

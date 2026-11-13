@@ -551,8 +551,8 @@ The harness runs natively in a 32-bit ARM Linux user space. The gate target ther
 and libass references compiles by default, and assuming NEON, whose code FFmpeg selects
 at run time on the same cores. Its workers therefore do not run on an ARMv7 core
 without NEON. rustup's host toolchain there, `armv7-unknown-linux-gnueabihf` (A32
-without NEON), builds xtask and the build scripts only: `cargo xtask build-workers`,
-`cargo xtask check` and the comparison commands compile the workers and the tests with
+without NEON), builds xtask only: `cargo xtask build-workers`, `cargo xtask check` and
+the comparison commands compile the workers and every test, xtask's own included, with
 `--target thumbv7neon-unknown-linux-gnueabihf`, so the workers land in
 `target/thumbv7neon-unknown-linux-gnueabihf/release`, and reports name that target.
 Add it once with `rustup target add thumbv7neon-unknown-linux-gnueabihf`.

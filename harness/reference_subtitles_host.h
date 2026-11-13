@@ -1,7 +1,7 @@
 /* The subtitles reference's C library calls whose result can differ between
  * its targets (tooling only), included by reference_subtitles.h.
  *
- * The reference runs on armv7-unknown-linux-gnueabihf and
+ * The reference runs on 32-bit ARM hard-float and on
  * aarch64-unknown-linux-gnu with the same glibc release. C gives `long`,
  * `size_t` and pointers 32 bits on the first and 64 on the second, and leaves
  * a rounding function's result unspecified when it does not fit its type. The

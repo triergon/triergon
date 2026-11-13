@@ -113,7 +113,7 @@ pub fn run(
     cargo_build(root, &["--bin", "capture-worker"], false)?;
     let worker = python::path(
         &root
-            .join(crate::harness::gate_build::release_dir())
+            .join(crate::harness::gate_build::release_dir()?)
             .join("capture-worker"),
     );
     let cases = crate::checks::read_json(&root.join("harness/capture/cases.json"))?;

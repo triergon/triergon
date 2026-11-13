@@ -48,7 +48,7 @@ fn save(path: &Path, value: &Value) -> R<()> {
 fn workers(root: &Path) -> R<(PathBuf, PathBuf, Value)> {
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let (candidate, reference) = (
-        root.join(gate_build::release_dir()).join("media-worker"),
+        root.join(gate_build::release_dir()?).join("media-worker"),
         root.join("target/harness/ffmpeg-worker"),
     );
     let binaries = Value::object([
@@ -177,7 +177,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     }
     let case = Value::object(case);
     let derived = super::validation::external_contract(&contract, &file)?;
-    let target = match gate_target() {
+    let target = match gate_target()? {
         unqualified if unqualified.starts_with("unqualified-") => "unqualified".to_owned(),
         target => target,
     };
@@ -313,7 +313,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         .find(|c| c.0 == case)
         .ok_or_else(|| format!("unsupported FATE case {case}"))?;
     let (candidate, reference) = (
-        root.join(gate_build::release_dir()).join("media-worker"),
+        root.join(gate_build::release_dir()?).join("media-worker"),
         root.join("target/harness/ffmpeg-worker"),
     );
     if demux_only && !(candidate.is_file() && reference.is_file()) {
@@ -686,7 +686,7 @@ fn prefix_traces(
     scratch: &Path,
     verdicts: &mut Vec<(String, Value)>,
 ) -> R<()> {
-    let target = gate_target();
+    let target = gate_target()?;
     for feature in features {
         let reference = feature.reference_worker(root, identity)?;
         for case in &feature.cases {
@@ -868,7 +868,7 @@ mod tests {
             .unwrap();
         }
         if with_workers {
-            let release = root.join(gate_build::release_dir());
+            let release = root.join(gate_build::release_dir().unwrap());
             fs::create_dir_all(&release).unwrap();
             fs::create_dir_all(root.join("target/harness")).unwrap();
             fs::write(release.join("media-worker"), "candidate").unwrap();
