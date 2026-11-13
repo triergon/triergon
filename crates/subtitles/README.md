@@ -61,8 +61,12 @@ did. A DVB receiver rectangle carries its
 region depth's `palette`, as FFmpeg reports it, and `colours`, the colour of
 every pixel value: a region recomposed at a smaller depth without a fill keeps
 larger pixel values, which read as zero, or under the automatic palette as the
-level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
-&cancel)`, then `poll` until `OutputReady` and `take_output`.
+level it ranks them at. With `AutomaticPalette::WithoutClutOnce` (FFmpeg's
+`compute_clut` −2) a region's automatic palette is computed when the region is
+first presented and kept while it lasts: later drawing, filling, resizing or a
+new depth leave it as it was, and only a new epoch computes it afresh. The PGS
+receiver is polled: `push(&mut packet, clock, &cancel)`, then `poll` until
+`OutputReady` and `take_output`.
 
 | Module | Entry points |
 | --- | --- |

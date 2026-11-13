@@ -36,11 +36,17 @@ use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 pub enum AutomaticPalette {
     /// Never: regions keep their CLUT, or the default CLUT.
     Never,
-    /// For regions whose CLUT was never defined.
+    /// For regions whose CLUT was never defined (`compute_clut` −1).
     #[default]
     WithoutClut,
     /// For every region.
     Always,
+    /// For regions whose CLUT was never defined, computed when such a region
+    /// is first presented and kept while the region lasts: drawing, filling,
+    /// resizing or changing its depth leaves the palette as it was, and only
+    /// a new epoch (an acquisition point or a mode change) starts it afresh
+    /// (`compute_clut` −2).
+    WithoutClutOnce,
 }
 
 /// The decoder options that change its output.
@@ -351,7 +357,10 @@ impl ReceiverDecoder {
         Self {
             options,
             pages: Pages::select(configuration, options.service),
-            epoch: Epoch::new(budget),
+            epoch: Epoch::new(
+                budget,
+                options.automatic_palette == AutomaticPalette::WithoutClutOnce,
+            ),
             page: Page {
                 version: None,
                 timeout: 0,
@@ -745,7 +754,9 @@ impl ReceiverDecoder {
     fn automatic(&self, region: &Region) -> bool {
         match self.options.automatic_palette {
             AutomaticPalette::Never => false,
-            AutomaticPalette::WithoutClut => self.epoch.tables(region.clut).is_none(),
+            AutomaticPalette::WithoutClut | AutomaticPalette::WithoutClutOnce => {
+                self.epoch.tables(region.clut).is_none()
+            }
             AutomaticPalette::Always => true,
         }
     }
@@ -908,7 +919,13 @@ mod tests {
     }
 
     fn object() -> Vec<u8> {
-        segment(0x13, &[0, 1, 0, 0, 4, 0, 0, 0x10, 0x6d, 0x00, 0xf0])
+        pixels(0x6d)
+    }
+
+    /// Object 1, one line of four 2-bit pixels coded in `codes` (two bits
+    /// each, the leftmost first), repeated for the bottom field.
+    fn pixels(codes: u8) -> Vec<u8> {
+        segment(0x13, &[0, 1, 0, 0, 4, 0, 0, 0x10, codes, 0x00, 0xf0])
     }
 
     fn clut(id: u8) -> Vec<u8> {
@@ -976,5 +993,69 @@ mod tests {
                 assert_eq!(decoder.retained(), held, "packet {i}, {options:?}");
             }
         }
+    }
+
+    /// The palettes presented for `packets`: one per packet, of its first
+    /// rectangle.
+    fn palettes(options: Options, packets: &[Vec<u8>]) -> Vec<Vec<u32>> {
+        let pool = Budget::new(1 << 22).unwrap();
+        let cancel = AtomicBool::new(false);
+        let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+        packets
+            .iter()
+            .enumerate()
+            .map(|(i, packet)| {
+                let mut work = WorkBudget::new(u64::MAX);
+                let status = decoder
+                    .decode(packet, Some(i as i64 * 1_000_000), &mut work, &cancel)
+                    .unwrap();
+                let rect = status.subtitle().unwrap().rects().next().unwrap();
+                rect.palette.to_vec()
+            })
+            .collect()
+    }
+
+    /// `compute_clut` −2 keeps a region's first automatic palette through a
+    /// redraw, and starts afresh with the region of a new epoch; −1
+    /// recomputes it after the redraw.
+    #[test]
+    fn a_kept_automatic_palette_lasts_until_a_new_epoch() {
+        // Pixels 1 2 3 3, then 2 2 2 2 drawn over them, then 2 2 2 2 in a new
+        // epoch's region.
+        let packets = [
+            [
+                page(0, true, &[0]),
+                region(0, 0, 4, 2, 9, 1),
+                pixels(0x6f),
+                end(),
+            ]
+            .concat(),
+            [
+                page(1, false, &[0]),
+                region(0, 1, 4, 2, 9, 1),
+                pixels(0xaa),
+                end(),
+            ]
+            .concat(),
+            [
+                page(2, true, &[0]),
+                region(0, 0, 4, 2, 9, 1),
+                pixels(0xaa),
+                end(),
+            ]
+            .concat(),
+        ];
+        let options = |automatic_palette| Options {
+            automatic_palette,
+            ..Options::default()
+        };
+        let kept = palettes(options(AutomaticPalette::WithoutClutOnce), &packets);
+        let recomputed = palettes(options(AutomaticPalette::WithoutClut), &packets);
+        assert_eq!(kept[0], recomputed[0]);
+        assert_ne!(kept[0][2], 0);
+        assert_eq!(kept[1], kept[0]);
+        assert_eq!(recomputed[1][2], 0);
+        assert_eq!(kept[2], [0; 4]);
+        assert_eq!(kept[2], recomputed[2]);
     }
 }

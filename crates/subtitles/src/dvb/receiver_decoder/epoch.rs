@@ -27,6 +27,10 @@ pub(super) struct Region {
     /// The automatic palette as last computed, and whether it still holds.
     automatic: [u32; 256],
     automatic_current: bool,
+    /// The automatic palette was computed to be kept for the region's life,
+    /// whatever is drawn later
+    /// ([`WithoutClutOnce`](super::AutomaticPalette::WithoutClutOnce)).
+    automatic_kept: bool,
     /// Every pixel value is below this: the widest depth composed since the
     /// pixels were last cleared.
     values: usize,
@@ -45,6 +49,7 @@ impl Region {
             pixels: BudgetVec::new(budget),
             automatic: [0; 256],
             automatic_current: false,
+            automatic_kept: false,
             values: 1,
         }
     }
@@ -55,9 +60,9 @@ impl Region {
     }
 
     /// The work of presenting the automatic palette: one unit per pixel,
-    /// unless the palette as last computed still holds.
+    /// unless the palette as last computed still holds or is kept.
     pub(super) fn automatic_palette_work(&self) -> u64 {
-        if self.automatic_current {
+        if self.automatic_current || self.automatic_kept {
             0
         } else {
             self.pixels.len() as u64
@@ -163,15 +168,20 @@ pub(super) struct Epoch {
     cluts: BudgetVec<Clut>,
     /// Objects a region composition has referenced.
     objects: ObjectSet,
+    /// Keep each region's first automatic palette while the region lasts.
+    keep_automatic: bool,
     budget: Budget,
 }
 
 impl Epoch {
-    pub(super) fn new(budget: &Budget) -> Self {
+    /// With `keep_automatic`, a region's automatic palette is computed once
+    /// and kept while the region lasts.
+    pub(super) fn new(budget: &Budget, keep_automatic: bool) -> Self {
         Self {
             regions: BudgetVec::new(budget),
             cluts: BudgetVec::new(budget),
             objects: ObjectSet::new(budget),
+            keep_automatic,
             budget: budget.clone(),
         }
     }
@@ -231,14 +241,15 @@ impl Epoch {
     }
 
     /// Region `index`'s automatic palette, recomputed when an object was
-    /// drawn into the region since the last computation.
+    /// drawn into the region since the last computation, unless the epoch
+    /// keeps the first one.
     pub(super) fn automatic_palette(
         &mut self,
         index: usize,
         census: &mut Census,
     ) -> Result<&[u32; 256]> {
         let region = &mut self.regions.as_mut_slice()[index];
-        if !region.automatic_current {
+        if !region.automatic_current && !region.automatic_kept {
             let width = usize::from(region.width);
             palette::automatic(
                 region.pixels.as_slice(),
@@ -247,6 +258,7 @@ impl Epoch {
                 &mut region.automatic,
             )?;
             region.automatic_current = true;
+            region.automatic_kept = self.keep_automatic;
         }
         Ok(&region.automatic)
     }
