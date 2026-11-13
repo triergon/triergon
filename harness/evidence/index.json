@@ -19800,6 +19800,18 @@
     "candidate": "96f660ba99fa33fbc1a2019cda9e73bec6de287d",
     "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
    }
+  },
+  {
+   "name": "subtitles-mov-text-tags-dd395b41-armv7",
+   "path": "subtitles-mov-text-tags-dd395b41-armv7",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at dd395b41 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: the subtitle-text slice of the 13 mov-text-tags cases with parity, 30 timing pairs and 30 kernel-bound memory pairs, the kernel RSS proof made in that checkout, and the CPU, kernel and user-space package list",
+   "key": "evidence/subtitles-mov-text-tags-dd395b41-armv7/f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713.tar.gz",
+   "sha256": "f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713",
+   "bytes": 82035334,
+   "source_revisions": {
+    "candidate": "dd395b41add1b51859be0104ad865de111d7b401"
+   }
   }
  ]
 }

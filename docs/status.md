@@ -386,6 +386,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | Earlier: subtitles, DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
 | Subtitles: text, Linux AArch64; earlier ARMv7, A32 | `6126b759b9b983afe488c3c362c6e37c2d1425a2` | `aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676` |
 | Subtitles: text, the `mov-text-tags` sessions, runtime and memory on Linux AArch64, parity and instruction counts on Linux AArch64 and ARMv7 (A32) | `96f660ba99fa33fbc1a2019cda9e73bec6de287d` | `03a2ee2f02daf3c5371c5c44e183c45b4bc655c30714bc12594fc58c72a56311` |
+| ARMv7: subtitles, text, the `mov-text-tags` sessions, parity, runtime and kernel-bound memory | `dd395b41add1b51859be0104ad865de111d7b401` | `f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713` |
 | Earlier: subtitles, text, the `mov-text-tags` sessions, parity and instruction counts, Linux AArch64 and ARMv7 (A32) | `30fe564a562f0ed73de7c076fe7f4eb0b12f21d6` | `1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
 | MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
@@ -486,7 +487,7 @@ diagnostics: no codec contract is gated on this target.
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 9/53 (the same open cases as on AArch64) | not measured | not measured |
 | Shaping | `shape-libass` 195/201 and `shape-text` 200/201 (the same open cases as on AArch64), `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1 | not measured | not measured |
 | ASS rendering | `ass-render` 78/78 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.7782 (82/82 pass) | heap ≤0.929, total RSS ≤0.911 (82/82 lower) |
-| Subtitles, text | `subtitle-text` 367/367 (the 13 `mov-text-tags` cases at `96f660ba`, built for A32) and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9184 (354/354 pass; the 13 `mov-text-tags` cases added since are not timed: that waits on the Thumb-2 gate target), `subtitle-text-host` 0.0783 (23/23 pass); instructions at `96f660ba`, built for A32, against main at `339ec261`: 0.984 of main's in sum, `subtitle-text-host` 1.000, no case above main beyond the run spread but `mov-text-tags-nul-transitions` (1.0075), whose output is longer | heap ≤0.336 (377/377 lower); total RSS fails: ≤1.0045, 376/377 lower (below); the 13 `mov-text-tags` cases added since are not measured |
+| Subtitles, text | `subtitle-text` 367/367 (the 13 `mov-text-tags` cases at `dd395b41`) and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9184 (354/354 pass), the 13 `mov-text-tags` cases at `dd395b41` 0.9682 (13/13 pass; worst `mov-text-tags-ranges`), `subtitle-text-host` 0.0783 (23/23 pass); instructions at `96f660ba`, built for A32, against main at `339ec261`: 0.984 of main's in sum, `subtitle-text-host` 1.000, no case above main beyond the run spread but `mov-text-tags-nul-transitions` (1.0075), whose output is longer | heap ≤0.336 (377/377 lower); total RSS fails: ≤1.0045, 376/377 lower (below); the 13 `mov-text-tags` cases at `dd395b41`: heap ≤0.333, total RSS ≤0.907 (13/13 lower, kernel-bound) |
 | Subtitles, PGS | 317/317 (`subtitle-pgs`) | 1.0021 (317/317 pass) | heap ≤0.968 (317/317 lower); total RSS fails: ≤1.0051, 316/317 lower (below) |
 | Subtitles, DVB | 229/229 (`subtitle-dvb`) | 0.8021 (229/229 pass) | heap ≤0.992, total RSS ≤0.864 (229/229 lower) |
 | Subtitles, DVD | 224/224 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | 1.0389 (229/229 pass) | heap ≤0.966, total RSS ≤0.887 (229/229 lower) |
@@ -497,6 +498,12 @@ The runtime and memory of fonts and shaping are not verified on ARMv7. The subti
 caption and teletext rows are timed and measured against `ffmpeg-subtitles-plain-native`,
 the subtitles reference built without the wrappers that flag target-dependent results, so
 no flagging code runs in the reference's timed span or memory window.
+
+The 13 `mov-text-tags` text cases were measured at `dd395b41` against `subtitle-text`'s
+reference, `ffmpeg-formats-native`, on a c6g.4xlarge pinned to CPU 1, as a slice of the
+feature: 30 timing pairs, then 30 memory pairs under a kernel RSS proof made in that
+checkout. `cargo xtask grade` does not join a slice, so their bounds come from each run's
+report.
 
 The total RSS gate fails in three subtitle features, in the cases above the reference. The four
 `mpeg2-a53-limit-ts` captions are above it in all 120 of their pairs (1.0720 to 1.0822):
