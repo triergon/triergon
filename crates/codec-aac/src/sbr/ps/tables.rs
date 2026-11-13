@@ -209,13 +209,13 @@ pub(super) const LONG_START: usize = 23;
 /// First QMF band of the one-slot delay.
 pub(super) const SHORT_START: usize = 35;
 
-/// Transient ducking: peak decay (2e-8).
+/// Transient ducking: peak decay (precision 2e-8).
 pub(super) const PEAK_DECAY: f64 = 0.7659283;
 
-/// Smoothing (5e-8).
+/// Smoothing (precision 5e-8).
 pub(super) const SMOOTH: f64 = 0.25;
 
-/// Threshold (fit precision 3e-7).
+/// Threshold (precision 1e-6).
 pub(super) const DUCK_LIMIT: f64 = 1.5;
 
 /// IID grid in dB per index 0..7, negative indices mirroring (precision 1e-5).

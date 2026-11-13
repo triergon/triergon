@@ -18,9 +18,10 @@ A write reuses the steps whose JSON an earlier run left in the work directory
 (`target/aac-ps-tables`, or `--work DIR`); `--check` empties the step directories and
 reruns every step, then compares the books exactly and each fitted value within the
 precision its doc states. Where a fit reports standard errors (the hybrid prototypes,
-the decorrelator's linear constants) or fits a value more than once (the IID levels and
-ICC values of every matrix set), the generator stops unless three standard errors and
-every fit lie within that precision. A full run takes about 11 minutes; it needs Python 3 with numpy.
+the decorrelator's linear and ducking constants) or fits a value more than once (the IID
+levels and ICC values of every matrix set), the generator stops unless three standard
+errors and every fit lie within that precision. A full run takes about 11 minutes; it
+needs Python 3 with numpy.
 
 ## Method
 

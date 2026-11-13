@@ -244,11 +244,10 @@ def tables(sig):
     need(k['SHORT'] == 1, 'one-slot delay above SHORT_START')
     table('LONG_START', 'usize', 'First QMF band of the 14-slot delay.', value='%d' % k['AP_END'])
     table('SHORT_START', 'usize', 'First QMF band of the one-slot delay.', value='%d' % k['SHORT_START'])
-    table('PEAK_DECAY', 'f64', 'Transient ducking: peak decay (2e-8).', value=snap(k['ALPHA'], precision['ALPHA']),
-          precision=precision['ALPHA'])
-    table('SMOOTH', 'f64', 'Smoothing (5e-8).', value=snap(k['BETA'], precision['BETA']), precision=precision['BETA'])
-    table('DUCK_LIMIT', 'f64', 'Threshold (fit precision 3e-7).', value=snap(k['GAMMA'], precision['GAMMA']),
-          precision=precision['GAMMA'])
+    duck = {n: e for n, (_, e) in dec['stages']['5']['ducking constants (20-band noise)'].items()}
+    fitted('PEAK_DECAY', 'f64', 'Transient ducking: peak decay', k['ALPHA'], precision['ALPHA'], [duck['ALPHA']])
+    fitted('SMOOTH', 'f64', 'Smoothing', k['BETA'], precision['BETA'], [duck['BETA']])
+    fitted('DUCK_LIMIT', 'f64', 'Threshold', k['GAMMA'], precision['GAMMA'], [duck['GAMMA']])
 
     # 4. mixing
     # every matrix set (both procedures, coarse and fine grid) fits the levels and ICC values
