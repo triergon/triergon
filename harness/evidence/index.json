@@ -19888,6 +19888,19 @@
    "source_revisions": {
     "candidate": "74155089881341aa7aae67e5f754b35a86e4898b"
    }
+  },
+  {
+   "name": "aac-s16-floor-ddb02a59-armv7",
+   "path": "aac-s16-floor-ddb02a59-armv7",
+   "retention": "retained",
+   "reason": "Audio codec timing and the s16 conversion without floorf at ddb02a59 against main at f3d4935b on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of every audio workload for both against the decode reference, instruction counts on the gate target and on A32 with NEON, the aac-lc-stereo profiles, the decoder-output equivalence records, the conversion checked against the floor over every f32, the four conversions compared and their disassembly, the workers, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-ddb02a59-armv7/52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977.tar.gz",
+   "sha256": "52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977",
+   "bytes": 72342434,
+   "source_revisions": {
+    "candidate": "ddb02a59a7ac8bf1974c14439194430e2b245504",
+    "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+   }
   }
  ]
 }

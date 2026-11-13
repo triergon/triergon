@@ -110,6 +110,9 @@ input).
   Pro Logic II surround encoding) are honoured. A layout without speaker positions
   mixes as FFmpeg's default layout for its channel count, and 16-bit frames (FLAC) mix
   in integers as FFmpeg's resampler mixes them ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)).
+  Float mixes become s16 rounded toward negative infinity and saturated (`mix::to_s16`),
+  with a conversion, a comparison and integer saturation: no `floorf` call on 32-bit
+  ARM, which has no rounding instruction.
 - **Stream selection.** `StreamSelection` names a stream's video codec and its
   audio codec, if any. `StreamSelection::load` starts both sessions with the
   matching decoders; with `audio: None` the audio session stays `Idle`.
