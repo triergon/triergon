@@ -87,8 +87,10 @@ pub(crate) fn expand_measurements(directory: &Path, row: &Value) -> Result<Value
         if crate::sha256::hex(&bytes) != hash(record, "raw_sha256")? {
             return Err("raw measurement changed during report assembly".into());
         }
-        let raw = crate::json::parse(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?;
+        let raw = crate::json::parse_observations(
+            std::str::from_utf8(&bytes).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
         put(&mut expanded, kind, raw)?;
     }
     Ok(expanded)
