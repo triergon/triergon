@@ -89,9 +89,10 @@ caller's reserved PCM planes and reuses them on the next access unit.
   refusal, stays decoded. `Decoder::with_limits(Limits { live_storage_bytes })` sets the
   pool, `Decoder::new_in` charges a caller's `Budget`. An element is a kind and a 4-bit
   tag, so a layout switch, which reuses the elements both layouts have, holds at most 48
-  (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 382 KiB each with
-  SBR, PS and Main prediction, 16 coupling channels of 53 KiB and 93 planes of four SBR
-  raw data blocks (2.9 MiB): 21.6 MiB in all.
+  (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 318 KiB each, the
+  largest element with SBR and Main prediction (a single channel element holds PS's stereo
+  synthesis instead of a second analysed SBR channel), 16 coupling channels of 53 KiB and
+  93 planes of four SBR raw data blocks (2.9 MiB): 18.7 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
