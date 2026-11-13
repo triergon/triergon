@@ -202,6 +202,7 @@ pub(crate) struct Core {
     pub stats_enabled: bool,
     /// Output samples (per channel) still to be dropped (FFmpeg skip_samples behaviour).
     pub skip_samples: usize,
+    pub priming_policy: crate::compat::priming::Policy,
     /// Frames output since the last (re)configuration.
     pub frames_out: u64,
     /// Development aid: bit ranges (relative to the payload) of SBR fill elements of the
@@ -236,6 +237,7 @@ impl Core {
             #[cfg(feature = "inspect")]
             stats_enabled: false,
             skip_samples: 0,
+            priming_policy: crate::compat::priming::Policy::default(),
             #[cfg(feature = "inspect")]
             sbr_fil_ranges: Vec::new(),
             frames_out: 0,
@@ -656,7 +658,12 @@ impl Core {
                         if RAW && matches!(ext, EXT_SBR_DATA | EXT_SBR_DATA_CRC) {
                             return Err(DecodeError::Unsupported(Feature::RawSbr));
                         }
-                        if !RAW && ext == 0 && count * 8 - 4 >= 13 + 7 * 8 {
+                        if !RAW
+                            && ext == 0
+                            && count * 8 - 4 >= 13 + 7 * 8
+                            && self.priming_policy
+                                == crate::compat::priming::Policy::EncoderSignature
+                        {
                             // EXT_FILL carrying an encoder signature. FFmpeg skips the first
                             // 1024 output samples when it reads "libfaac <major>.<minor>" here
                             // (faac encoder delay compensation); replicated for output parity.
