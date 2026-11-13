@@ -161,9 +161,10 @@ The MP4 forward and range results use the gate build at
 30 timing pairs of 50 complete operations and 30 memory pairs. The measured 39 forward
 and 27 range cases match and pass runtime, peak heap and total RSS. Forward
 playback covers encoded edit projection with composition offsets, fragmented
-input and unknown movie duration. The two regular AAC priming and trailing trim
-cases bring forward packet-fold coverage to 41/41 on macOS AArch64. Their Linux
-runtime and memory measurements are pending.
+input and unknown movie duration. Three regular AAC cases cover priming,
+trailing trim and a fractional edit endpoint, bringing forward packet-fold
+coverage to 42/42 on macOS AArch64. Linux runtime and memory measurements
+of these cases are pending.
 
 Regular Opus cases cover edit-list trim, variable packet duration and secondary
 audio alignment on a backward video seek.

@@ -6,7 +6,7 @@
 //! reference folds the same record per `AVPacket` (`harness/reference_*.h`).
 
 use crate::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
-use triergon_core::{Budget, Bytes};
+use triergon_core::{Budget, Bytes, TimeBase};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 
 /// Packet count, payload bytes and the ordered digest of one or more operations.
@@ -32,6 +32,19 @@ pub struct Packet<I> {
 }
 
 impl Work {
+    pub(crate) fn location(&mut self, offset: u64, clock: TimeBase) {
+        fold(&mut self.digest, offset);
+        fold(&mut self.digest, clock.numerator());
+        fold(&mut self.digest, clock.denominator());
+        if self.trace {
+            println!(
+                "source {offset} {}/{}",
+                clock.numerator(),
+                clock.denominator()
+            );
+        }
+    }
+
     pub(crate) fn skip_samples(&mut self, bytes: Option<[u8; 10]>) {
         fold(&mut self.digest, u64::from(bytes.is_some()));
         let Some(bytes) = bytes else {

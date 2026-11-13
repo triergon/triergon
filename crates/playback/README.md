@@ -323,9 +323,13 @@ ffmpeg -nostdin -v error \
 ```
 
 `forward-aac-tail-trim.mp4` keeps the 44,100 Hz movie timescale and sets
-the audio edit to media time zero and duration 16,459. Both fixtures use the
-repository's dual license. The `mp4-forward` corpus records their hashes
-and compares both packet traces with AAC trim included.
+the audio edit to media time zero and duration 16,459.
+`forward-aac-fractional-edit.mp4` sets the movie timescale to 1,000, its
+duration and the video edit's duration to 334, and the audio edit's media
+time and duration to 64 and 45. The audio edit rounds to an end one sample
+into the third packet. All three fixtures use the repository's dual license.
+The `mp4-forward` corpus records their hashes and compares source byte
+offsets, reduced time bases and AAC trim along with the packet data.
 
 Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),

@@ -1014,13 +1014,7 @@ impl<'a> Mp4IndexJob<'a> {
                         row.media_clock = clock;
                     }
                     let mut replay_native_order = p.replay_native_order;
-                    if p.native_front && p.encoded_edits.is_some() {
-                        if p.native_rows.as_slice().last().is_some_and(|previous| {
-                            previous.source.range.end > row.source.range.start
-                        }) {
-                            return Err(Error::Unsupported("forward encoded edits revisit media"));
-                        }
-                    } else if p.native_front && !replay_native_order {
+                    if p.native_front && p.encoded_edits.is_none() && !replay_native_order {
                         let source = p.source_rows.as_slice().get(p.native_rows.len());
                         if source
                             .is_none_or(|s| s.track_id != row.track_id || s.sample != row.source)

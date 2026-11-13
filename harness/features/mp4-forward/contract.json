@@ -13,7 +13,7 @@
     "regular playback with an unknown movie duration derives it from the checked packet clocks",
     "one direct output slot; every track selected; every packet through a clean end of file in native read order",
     "each packet folded with track ID, PTS, DTS and duration in the track time base, packet flags, size and every payload byte",
-    "progressive-edited also folds the presence of skip-sample metadata and, when present, both counts and reasons",
+    "progressive-edited also folds the packet byte offset, reduced time base, and presence of skip-sample metadata with both counts and reasons when present",
     "the expected fold is recorded per case from the pinned reference worker"
   ],
   "required_profiles": [
@@ -57,7 +57,8 @@
     "progressive-unknown-clock-terminal",
     "progressive-first-source-clock-unknown",
     "progressive-aac-priming",
-    "progressive-aac-tail-trim"
+    "progressive-aac-tail-trim",
+    "progressive-aac-fractional-edit"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

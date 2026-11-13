@@ -599,7 +599,7 @@
       "expected": {
         "packets": 21,
         "bytes": 4449,
-        "digest": 5949837062602278102
+        "digest": 11510716438675512981
       }
     },
     {
@@ -614,7 +614,22 @@
       "expected": {
         "packets": 21,
         "bytes": 4449,
-        "digest": 16505855173419668607
+        "digest": 5046906936606270070
+      }
+    },
+    {
+      "id": "progressive-aac-fractional-edit",
+      "profile": "progressive-aac-fractional-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 3034,
+        "digest": 635478357930127229
       }
     }
   ]

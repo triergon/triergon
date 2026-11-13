@@ -522,6 +522,7 @@ pub struct PacketCursor<'a> {
     failed: Option<Error>,
     complete_source: bool,
     front_source: bool,
+    forward_encoded_end: Option<u64>,
     terminal: Option<crate::TerminalMdat>,
     forward_regular: Option<crate::ForwardRegularMdat>,
     check_projections: bool,
@@ -685,6 +686,7 @@ impl<'a> PacketCursor<'a> {
             failed: None,
             complete_source: false,
             front_source: false,
+            forward_encoded_end: None,
             terminal: None,
             forward_regular: None,
             check_projections: false,
@@ -755,11 +757,11 @@ impl<'a> PacketCursor<'a> {
         if plans.len() != tracks.len() {
             return Err(Error::Invalid("encoded edit track coverage"));
         }
-        if media.len() != 1 || tracks.iter().any(|track| !track.fragments.is_empty()) {
+        let [extent] = media else {
             return Err(Error::Unsupported(
                 "front encoded edits require regular tracks and one media extent",
             ));
-        }
+        };
         let mut cursor = Self::new_front_source(
             budget,
             tracks,
@@ -768,7 +770,13 @@ impl<'a> PacketCursor<'a> {
             limits,
             DemuxProfile::NoParseNoFillin,
         )?;
+        if tracks.iter().any(|track| !track.fragments.is_empty()) {
+            return Err(Error::Unsupported(
+                "front encoded edits require regular tracks and one media extent",
+            ));
+        }
         cursor.bind_encoded_edits(budget, plans)?;
+        cursor.forward_encoded_end = Some(extent.start);
         Ok(cursor)
     }
 
@@ -1110,6 +1118,9 @@ impl<'a> PacketCursor<'a> {
         }
         self.recording_seek_checkpoints = false;
         self.check_projections = false;
+        if let (Some(end), [extent]) = (&mut self.forward_encoded_end, self.media) {
+            *end = extent.start;
+        }
         self.at = 0;
         self.generated = 0;
         self.phase = Phase::Initialize;
@@ -1436,7 +1447,18 @@ impl<'a> PacketCursor<'a> {
                         if self.recording_seek_checkpoints {
                             self.record_seek_checkpoint(best);
                         }
-                        self.ready = self.slots.as_mut_slice()[best].head.take();
+                        let occurrence = self.slots.as_mut_slice()[best].head.take();
+                        if let Some(end) = &mut self.forward_encoded_end
+                            && let Some(packet) = &occurrence
+                        {
+                            if *end > packet.source.range.start {
+                                return Err(Error::Unsupported(
+                                    "forward encoded edits revisit media",
+                                ));
+                            }
+                            *end = packet.source.range.end;
+                        }
+                        self.ready = occurrence;
                         self.at = 0;
                         self.phase = Phase::Fill;
                         continue;

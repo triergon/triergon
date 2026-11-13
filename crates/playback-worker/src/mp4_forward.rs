@@ -8,7 +8,7 @@
 //! attachment, which continues through later `moof`/`mdat` pairs and ends only at
 //! the source's actual end. Times are in the track's media time base; the flags are
 //! the native packet flags.
-//! The progressive-edited case also folds the leading and trailing sample trim.
+//! The progressive-edited operation also folds source offsets, time bases and sample trim.
 
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
@@ -103,6 +103,15 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
         let Mp4Event::Packet(packet) = event else {
             return Err("encoded edit packet is incomplete".into());
         };
+        work.location(
+            packet.source.sample.range.start,
+            packet
+                .native
+                .as_ref()
+                .ok_or("encoded edit packet has no media clock")?
+                .media_clock
+                .demux_base,
+        );
         work.skip_samples(packet.encoded_skip_samples);
     }
     Ok(())

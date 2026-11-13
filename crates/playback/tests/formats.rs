@@ -521,6 +521,7 @@ struct Observed {
     inner: ByteSource,
     calls: Arc<Mutex<Vec<Call>>>,
     fail: Arc<AtomicBool>,
+    end: Option<(u64, Arc<AtomicBool>)>,
     sequential: bool,
     next: u64,
     pending: usize,
@@ -551,6 +552,12 @@ impl Source for Observed {
             return Err(C::Invalid(
                 "test sequential source was asked to rewind or skip",
             ));
+        }
+        if let Some((at, release)) = &self.end
+            && r.offset == *at
+            && !release.load(Ordering::Relaxed)
+        {
+            return Ok(SourceReply::Pending);
         }
         let out = self.inner.poll(r, w, c)?;
         if let SourceReply::Data(win) = &out {
@@ -585,6 +592,7 @@ fn observed(
             inner: ByteSource::new(ID, Bytes::copy_from_slice(b, raw).unwrap(), quantum).unwrap(),
             calls: calls.clone(),
             fail: fail.clone(),
+            end: None,
             sequential,
             next: 0,
             pending: 0,
@@ -3160,47 +3168,123 @@ fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
 
 #[test]
 fn forward_encoded_edit_drains_samples_outside_the_presentation() {
-    use triergon_playback::progressive::ProgressiveLimits;
-
     let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
     let audio_edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();
     let duration = &mut raw[audio_edit + 12..audio_edit + 16];
     assert_eq!(duration, &15_435_u32.to_be_bytes());
     duration.copy_from_slice(&4_410_u32.to_be_bytes());
 
-    let (selected, _, calls) = probe(&raw, 37, true);
+    for truncate in [0, 11] {
+        let budget = pool();
+        let bytes = &raw[..raw.len() - truncate];
+        let (mut source, _, _) = observed(&budget, bytes, 37, true);
+        let release = Arc::new(AtomicBool::new(false));
+        source.end = Some((bytes.len() as u64, release.clone()));
+        let selected = SelectedInput {
+            input: InputCursor::new(
+                &budget,
+                ID,
+                SourceCapabilities {
+                    length: None,
+                    random_access: false,
+                },
+                4096,
+            )
+            .unwrap(),
+            source: SourceOwner::new(source),
+            format: Format::Mp4,
+        };
+        let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+        run_open(&mut open, 17).unwrap();
+        let mut opened = open.finish().unwrap();
+        let plans = encoded_plans(&mut opened);
+        let mut index =
+            compat::mov::forward_encoded_edits(&opened.movie, &plans, PlanLimits::default())
+                .unwrap();
+        common::run_index(&mut index, 17).unwrap();
+        let prepared = index.finish().unwrap();
+        assert_eq!(prepared.source_rows().len(), 21);
+        assert_eq!(prepared.rows(), 10);
+        let engine = Engine::mp4_native_terminal_v1(
+            opened.input,
+            prepared,
+            1 << 20,
+            progressive::ProgressiveLimits::default(),
+        )
+        .unwrap();
+        let mut player = Player::new_direct(
+            engine,
+            opened.source,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+        let mut output = None;
+        let mut packets = 0;
+        let request = (0..10_000)
+            .find_map(|_| {
+                let progress = player
+                    .read_output(&mut output, &mut WorkBudget::new(17), &off())
+                    .unwrap();
+                if let Some(event) = output.take() {
+                    packets +=
+                        usize::from(matches!(event.event(), RawEvent::Mp4(Mp4Event::Packet(_))));
+                }
+                assert!(!matches!(progress, Progress::Ended));
+                match progress {
+                    Progress::NeedInput(request) if request.offset == bytes.len() as u64 => {
+                        Some(request)
+                    }
+                    _ => None,
+                }
+            })
+            .unwrap();
+        assert_eq!(packets, 10);
+        let Progress::NeedInput(retry) = player
+            .read_output(&mut output, &mut WorkBudget::new(17), &off())
+            .unwrap()
+        else {
+            panic!("expected the pending end request to be retried");
+        };
+        assert_eq!(retry.token, request.token);
+        assert_eq!(retry.offset, request.offset);
+        assert!(output.is_none());
+        release.store(true, Ordering::Relaxed);
+        let result = common::bounded("edited source end", || {
+            let progress = player.read_output(&mut output, &mut WorkBudget::new(17), &off())?;
+            assert!(output.is_none());
+            Ok(matches!(progress, Progress::Ended))
+        });
+        assert_eq!(
+            result,
+            if truncate == 0 {
+                Ok(())
+            } else {
+                Err(C::Truncated)
+            }
+        );
+    }
+}
+
+#[test]
+fn forward_encoded_edit_order_refusal_survives_repeated_poll() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
+    let audio_offsets = raw.windows(4).rposition(|kind| kind == b"stco").unwrap();
+    // Place the first AAC sample one byte after the first video sample starts.
+    let audio_start = &mut raw[audio_offsets + 12..audio_offsets + 16];
+    assert_eq!(audio_start, &1572_u32.to_be_bytes());
+    audio_start.copy_from_slice(&1749_u32.to_be_bytes());
+
+    let (selected, _, _) = probe(&raw, 37, true);
     let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
     run_open(&mut open, 17).unwrap();
     let mut opened = open.finish().unwrap();
     let plans = encoded_plans(&mut opened);
     let mut index =
         compat::mov::forward_encoded_edits(&opened.movie, &plans, PlanLimits::default()).unwrap();
-    while !index.poll(&mut WorkBudget::new(17), &off()).unwrap() {}
-    let prepared = index.finish().unwrap();
-    assert_eq!(prepared.source_rows().len(), 21);
-    assert_eq!(prepared.rows(), 10);
-    let engine = Engine::mp4_native_terminal_v1(
-        opened.input,
-        prepared,
-        1 << 20,
-        ProgressiveLimits::default(),
-    )
-    .unwrap();
-    let mut player = Player::new_direct(
-        engine,
-        opened.source,
-        Selection::All,
-        PlayerPolicy::default(),
-    )
-    .unwrap();
-    let outputs = collect(&mut player, 17).unwrap();
-    assert_eq!(mp4_packets(&outputs).len(), 10);
-    assert!(
-        calls
-            .lock()
-            .unwrap()
-            .contains(&Call::Poll(raw.len() as u64))
-    );
+    let expected = C::Unsupported("forward encoded edits revisit media");
+    assert_eq!(common::run_index(&mut index, 17), Err(expected));
+    assert_eq!(index.poll(&mut WorkBudget::new(17), &off()), Err(expected));
 }
 
 #[test]

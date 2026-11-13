@@ -6,7 +6,7 @@
  * Each packet is folded with its track ID, PTS, DTS and duration in the track's
  * time base, packet flags and payload. LAYOUT regular reads a seekable input,
  * progressive and progressive-edited read a forward-only input. The edited
- * operation also folds the leading and trailing skip-samples fields. */
+ * operation also folds the source offset, normalized time base and skip samples. */
 
 #include <libavutil/intreadwrite.h>
 
@@ -38,6 +38,17 @@ static int mp4_forward_operation(const uint8_t *data, size_t size, const char *l
                     packet->duration > 0 ? (uint64_t)packet->duration : 0,
                     (uint64_t)packet->flags, packet->data, (size_t)packet->size);
         if (edited) {
+            int time_num, time_den;
+            if (packet->pos < 0 || stream->time_base.num <= 0 || stream->time_base.den <= 0 ||
+                !av_reduce(&time_num, &time_den, stream->time_base.num, stream->time_base.den, INT_MAX)) {
+                rc = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            fold(&work->digest, (uint64_t)packet->pos);
+            fold(&work->digest, (uint64_t)time_num);
+            fold(&work->digest, (uint64_t)time_den);
+            if (work->trace)
+                printf("source %" PRId64 " %d/%d\n", packet->pos, time_num, time_den);
             size_t skip_len = 0;
             const uint8_t *skip = av_packet_get_side_data(packet, AV_PKT_DATA_SKIP_SAMPLES, &skip_len);
             if (skip && skip_len != 10) {
