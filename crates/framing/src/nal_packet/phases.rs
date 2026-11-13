@@ -131,15 +131,14 @@ impl PacketPlan {
         state: &mut PacketState<'_, M>,
         work: &mut WorkBudget,
     ) -> Result<Step> {
-        if let Some(declared) = state.config().hevc_array_type(self.offset) {
-            if !work.try_charge(1) {
-                return Ok(YIELD);
-            }
-            if !matches!(declared, 32 | 33 | 34 | 39 | 40) {
-                return Err(Error::Unsupported("pinned HEVC decoder array type"));
-            }
-            self.offset += 1;
-            return Ok(NEXT);
+        match state
+            .session
+            .configuration
+            .admit_hevc_arrays(&mut self.offset, work)
+        {
+            Ok(true) => {}
+            Ok(false) => return Ok(YIELD),
+            Err(_) => return Err(Error::Unsupported("pinned HEVC decoder array type")),
         }
         self.offset = 0;
         self.phase = if state.length_width.is_some() {
@@ -148,6 +147,38 @@ impl PacketPlan {
             PlanPhase::Scan
         };
         Ok(NEXT)
+    }
+
+    #[inline(never)]
+    fn read_length(
+        &mut self,
+        input: &[u8],
+        width: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        refusal: &mut Option<NalPacketReceiverErrorKind>,
+    ) -> Result<bool> {
+        while self.prefix_read < width {
+            let count = (width - self.prefix_read)
+                .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
+                .min(input.len().saturating_sub(self.offset));
+            if count == 0 {
+                // The failed read costs one unit, including at a partial prefix.
+                if !work.try_charge(1) {
+                    return Ok(false);
+                }
+                *refusal = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
+                return Err(Error::Truncated);
+            }
+            work.take(count as u64);
+            self.length = extend_length(self.length, &input[self.offset..self.offset + count]);
+            self.offset += count;
+            self.prefix_read += count;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+        }
+        Ok(work.try_charge(1))
     }
 
     #[inline]
@@ -173,32 +204,13 @@ impl PacketPlan {
             self.phase = PlanPhase::Scan;
             return Ok(NEXT);
         }
-        if self.prefix_read < width {
-            let count = (width - self.prefix_read)
-                .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
-                .min(source.bytes.len().saturating_sub(self.offset));
-            if count == 0 {
-                // Missing input still consumes the old failed-read
-                // token; exhausted work yields before that refusal.
-                if !work.try_charge(1) {
-                    return Ok(YIELD);
-                }
-                state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
-                return Err(Error::Truncated);
-            }
-            work.take(count as u64);
-            self.length =
-                extend_length(self.length, &source.bytes[self.offset..self.offset + count]);
-            self.offset += count;
-            self.prefix_read += count;
-            if self.prefix_read < width {
-                return Ok(NEXT);
-            }
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-        }
-        if !work.try_charge(1) {
+        if !self.read_length(
+            &source.bytes,
+            width,
+            work,
+            cancel,
+            &mut state.receiver_failure,
+        )? {
             return Ok(YIELD);
         }
         if self.length == 0 {
@@ -265,32 +277,13 @@ impl PacketPlan {
             self.phase = PlanPhase::Reserve;
             return Ok(NEXT);
         }
-        if self.prefix_read < width {
-            let count = (width - self.prefix_read)
-                .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
-                .min(source.bytes.len().saturating_sub(self.offset));
-            if count == 0 {
-                // Missing input still consumes the old failed-read
-                // token; exhausted work yields before that refusal.
-                if !work.try_charge(1) {
-                    return Ok(YIELD);
-                }
-                state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
-                return Err(Error::Truncated);
-            }
-            work.take(count as u64);
-            self.length =
-                extend_length(self.length, &source.bytes[self.offset..self.offset + count]);
-            self.offset += count;
-            self.prefix_read += count;
-            if self.prefix_read < width {
-                return Ok(NEXT);
-            }
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-        }
-        if !work.try_charge(1) {
+        if !self.read_length(
+            &source.bytes,
+            width,
+            work,
+            cancel,
+            &mut state.receiver_failure,
+        )? {
             return Ok(YIELD);
         }
         let end = self

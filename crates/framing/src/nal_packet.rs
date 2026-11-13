@@ -115,11 +115,29 @@ impl NalPacketConfiguration {
             .map(AvcConfiguration::sample_length_size)
             .or_else(|| self.hevc_record().map(HvcConfiguration::length_size))
     }
-    /// Declared HEVC array type, or None past the last array or for non-HEVC.
-    pub(crate) fn hevc_array_type(&self, index: usize) -> Option<u8> {
-        self.hevc_record()?
-            .array(index)
-            .map(|a| a.declared_nal_type())
+    /// Charge the array checks already established by the record parser.
+    /// A refusal still consumes its own unit and is exposed only when reached.
+    pub(crate) fn admit_hevc_arrays(
+        &self,
+        checked: &mut usize,
+        work: &mut WorkBudget,
+    ) -> std::result::Result<bool, u8> {
+        let Some(record) = self.hevc_record() else {
+            return Ok(true);
+        };
+        let (limit, refused) = record.first_unsupported_array().map_or_else(
+            || (record.array_count(), None),
+            |(index, kind)| (usize::from(index), Some(kind)),
+        );
+        *checked += work.take((limit - *checked) as u64) as usize;
+        if *checked < limit {
+            return Ok(false);
+        }
+        match refused {
+            Some(kind) if work.try_charge(1) => Err(kind),
+            Some(_) => Ok(false),
+            None => Ok(true),
+        }
     }
     /// Configuration NAL, or None past the last NAL or for passthrough.
     pub(crate) fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
@@ -230,12 +248,6 @@ impl<'a> ConfigurationRef<'a> {
         match self {
             Self::Current(configuration) => configuration.refusal(),
             Self::Update(update) => update.refusal(),
-        }
-    }
-    fn hevc_array_type(self, index: usize) -> Option<u8> {
-        match self {
-            Self::Current(configuration) => configuration.hevc_array_type(index),
-            Self::Update(_) => None,
         }
     }
     fn config_nal(self, index: usize) -> Option<ConfigNal<'a>> {
