@@ -98,9 +98,10 @@ pub(crate) fn synthesis_dct() -> Dct4 {
 }
 
 impl Analysis {
-    pub(crate) fn new(budget: &Budget) -> Result<Analysis, StorageError> {
+    /// An analysis bank, or with `used` false an empty one that never runs.
+    pub(crate) fn new(budget: &Budget, used: bool) -> Result<Analysis, StorageError> {
         Ok(Analysis {
-            x: BudgetVec::try_filled(budget, 0.0, 640)?,
+            x: BudgetVec::try_filled(budget, 0.0, if used { 640 } else { 0 })?,
             pos: 320,
             t: tables(),
             re: [0.0; 64],
@@ -245,7 +246,7 @@ mod tests {
         let budget = Budget::new(1 << 20).unwrap();
         // analysis (32 bands) -> synthesis (64 bands, upper half zero) is a 2x interpolator
         // with a delay of 578 output samples; residual ripple / aliasing below -60 dB
-        let mut a = Analysis::new(&budget).unwrap();
+        let mut a = Analysis::new(&budget, true).unwrap();
         let mut sy = Synthesis::new(&budget).unwrap();
         let f = 0.1f64;
         let mut x = [Cpx::default(); 64];
@@ -272,7 +273,7 @@ mod tests {
     #[test]
     fn analysis_matches_definition() {
         let budget = Budget::new(1 << 20).unwrap();
-        let mut a = Analysis::new(&budget).unwrap();
+        let mut a = Analysis::new(&budget, true).unwrap();
         let mut s = 7u32;
         let mut rnd = || {
             s = s.wrapping_mul(1664525).wrapping_add(1013904223);

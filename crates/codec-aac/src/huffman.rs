@@ -16,12 +16,64 @@ pub(crate) struct Vlc {
 
 const SUB_FLAG: u32 = 1 << 6;
 
+/// Entries of the lookup table of `codes` indexed by `primary_bits`: the primary table and
+/// one secondary table per primary prefix of the longer codes. A `const fn`, so each book's
+/// size is computed when the crate compiles (`vlc!`).
+pub(crate) const fn table_len(codes: &[(u32, u8)], primary_bits: u32) -> usize {
+    let mut max_len = 1;
+    let mut i = 0;
+    while i < codes.len() {
+        if codes[i].1 as u32 > max_len {
+            max_len = codes[i].1 as u32;
+        }
+        i += 1;
+    }
+    let primary_bits = if primary_bits < max_len {
+        primary_bits
+    } else {
+        max_len
+    };
+    let mut subs = 0;
+    i = 0;
+    while i < codes.len() {
+        if codes[i].1 as u32 > primary_bits {
+            // count each prefix at its first long code
+            let mut j = 0;
+            while j < i
+                && !(codes[j].1 as u32 > primary_bits
+                    && prefix(codes[j], primary_bits) == prefix(codes[i], primary_bits))
+            {
+                j += 1;
+            }
+            if j == i {
+                subs += 1;
+            }
+        }
+        i += 1;
+    }
+    (1usize << primary_bits) + (subs << (max_len - primary_bits))
+}
+
+/// The first `primary_bits` bits of a code longer than that.
+const fn prefix((code, len): (u32, u8), primary_bits: u32) -> u32 {
+    code >> (len as u32 - primary_bits)
+}
+
+/// The lookup table of a static book, sized when the crate compiles.
+macro_rules! vlc {
+    ($codes:expr, $bits:expr) => {
+        Vlc::new(&$codes, $bits, const { table_len(&$codes, $bits) })
+    };
+}
+
 impl Vlc {
-    pub(crate) fn new(codes: &[(u32, u8)], primary_bits: u32) -> Vlc {
+    /// The lookup table of `codes`, `entries` long (`table_len`).
+    pub(crate) fn new(codes: &[(u32, u8)], primary_bits: u32, entries: usize) -> Vlc {
         let max_len = codes.iter().map(|c| c.1 as u32).max().unwrap_or(1);
         let primary_bits = primary_bits.min(max_len);
         let sub_bits = max_len.saturating_sub(primary_bits);
-        let mut table = vec![0u32; 1usize << primary_bits];
+        let mut table = vec![0u32; entries];
+        let mut next = 1usize << primary_bits;
         for (sym, &(code, len)) in codes.iter().enumerate() {
             let len = len as u32;
             if len == 0 {
@@ -37,8 +89,8 @@ impl Vlc {
                 let off = if table[prefix] & SUB_FLAG != 0 {
                     (table[prefix] >> 8) as usize
                 } else {
-                    let off = table.len();
-                    table.resize(off + (1usize << sub_bits), 0);
+                    let off = next;
+                    next += 1usize << sub_bits;
                     table[prefix] = ((off as u32) << 8) | SUB_FLAG;
                     off
                 };
@@ -50,6 +102,7 @@ impl Vlc {
                 }
             }
         }
+        debug_assert_eq!(next, entries, "table_len");
         Vlc {
             primary_bits,
             table,
@@ -105,6 +158,21 @@ pub(crate) struct Books {
     pub(crate) ps: [Vlc; 10],
 }
 
+/// The lookup table sizes of spectral books 1 to 11, computed when the crate compiles.
+const SPECTRAL_ENTRIES: [usize; 11] = [
+    table_len(&t::SPECTRUM_1, 9),
+    table_len(&t::SPECTRUM_2, 9),
+    table_len(&t::SPECTRUM_3, 9),
+    table_len(&t::SPECTRUM_4, 9),
+    table_len(&t::SPECTRUM_5, 9),
+    table_len(&t::SPECTRUM_6, 9),
+    table_len(&t::SPECTRUM_7, 9),
+    table_len(&t::SPECTRUM_8, 9),
+    table_len(&t::SPECTRUM_9, 9),
+    table_len(&t::SPECTRUM_10, 9),
+    table_len(&t::SPECTRUM_11, 9),
+];
+
 fn spectral_book(n: usize) -> SpectralBook {
     let (codes, unsigned, quad, modulo, offset): (&[(u32, u8)], bool, bool, i32, i32) = match n {
         1 => (&t::SPECTRUM_1, false, true, 3, 1),
@@ -143,7 +211,7 @@ fn spectral_book(n: usize) -> SpectralBook {
         .collect();
     let fast = fast_table(codes, &values, unsigned, if quad { 4 } else { 2 });
     SpectralBook {
-        vlc: Vlc::new(codes, 9),
+        vlc: Vlc::new(codes, 9, SPECTRAL_ENTRIES[n.min(11) - 1]),
         values,
         fvalues,
         fast,
@@ -195,7 +263,7 @@ fn fast_table(codes: &[(u32, u8)], values: &[[i8; 4]], unsigned: bool, n: usize)
 pub(crate) fn books() -> &'static Books {
     static BOOKS: OnceLock<Books> = OnceLock::new();
     BOOKS.get_or_init(|| Books {
-        scalefactor: Vlc::new(&t::SCALEFACTOR, 9),
+        scalefactor: vlc!(t::SCALEFACTOR, 9),
         spectral: [
             spectral_book(1),
             spectral_book(2),
@@ -210,28 +278,28 @@ pub(crate) fn books() -> &'static Books {
             spectral_book(11),
         ],
         sbr: [
-            Vlc::new(&t::SBR_T_ENV15, 10),
-            Vlc::new(&t::SBR_F_ENV15, 10),
-            Vlc::new(&t::SBR_T_ENVBAL15, 10),
-            Vlc::new(&t::SBR_F_ENVBAL15, 10),
-            Vlc::new(&t::SBR_T_ENV30, 10),
-            Vlc::new(&t::SBR_F_ENV30, 10),
-            Vlc::new(&t::SBR_T_ENVBAL30, 10),
-            Vlc::new(&probed::SBR_F_ENVBAL30, 10),
-            Vlc::new(&t::SBR_T_NOISE30, 10),
-            Vlc::new(&t::SBR_T_NOISEBAL30, 10),
+            vlc!(t::SBR_T_ENV15, 10),
+            vlc!(t::SBR_F_ENV15, 10),
+            vlc!(t::SBR_T_ENVBAL15, 10),
+            vlc!(t::SBR_F_ENVBAL15, 10),
+            vlc!(t::SBR_T_ENV30, 10),
+            vlc!(t::SBR_F_ENV30, 10),
+            vlc!(t::SBR_T_ENVBAL30, 10),
+            vlc!(probed::SBR_F_ENVBAL30, 10),
+            vlc!(t::SBR_T_NOISE30, 10),
+            vlc!(t::SBR_T_NOISEBAL30, 10),
         ],
         ps: [
-            Vlc::new(&probed::IID_DF, 9),
-            Vlc::new(&probed::IID_DT, 9),
-            Vlc::new(&probed::IID_DF_FINE, 9),
-            Vlc::new(&probed::IID_DT_FINE, 9),
-            Vlc::new(&probed::ICC_DF, 9),
-            Vlc::new(&probed::ICC_DT, 9),
-            Vlc::new(&probed::IPD_DF, 5),
-            Vlc::new(&probed::IPD_DT, 5),
-            Vlc::new(&probed::OPD_DF, 5),
-            Vlc::new(&probed::OPD_DT, 5),
+            vlc!(probed::IID_DF, 9),
+            vlc!(probed::IID_DT, 9),
+            vlc!(probed::IID_DF_FINE, 9),
+            vlc!(probed::IID_DT_FINE, 9),
+            vlc!(probed::ICC_DF, 9),
+            vlc!(probed::ICC_DT, 9),
+            vlc!(probed::IPD_DF, 5),
+            vlc!(probed::IPD_DT, 5),
+            vlc!(probed::OPD_DF, 5),
+            vlc!(probed::OPD_DT, 5),
         ],
     })
 }
@@ -259,7 +327,7 @@ mod tests {
             }
         }
         // Every symbol decodes back to itself.
-        let vlc = Vlc::new(codes, 9);
+        let vlc = Vlc::new(codes, 9, table_len(codes, 9));
         for (sym, &(c, l)) in codes.iter().enumerate() {
             let word = (c as u64) << (40 - l as u32);
             let bytes = word.to_be_bytes();
