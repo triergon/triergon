@@ -25,16 +25,12 @@ impl Tables {
     /// change only the 4-bit table, and with id 20 only the 8-bit one.
     pub(super) fn set(&mut self, id: u8, depths: u8, word: u32) {
         let id = usize::from(id);
-        let entry = [
-            (4, &mut self.two[..]),
-            (2, &mut self.four[..]),
-            (1, &mut self.eight[..]),
-        ]
-        .into_iter()
-        .filter(|(flag, _)| depths & flag != 0)
-        .find_map(|(_, table)| table.get_mut(id));
-        if let Some(entry) = entry {
-            *entry = word;
+        if depths & 4 != 0 && id < 4 {
+            self.two[id] = word;
+        } else if depths & 2 != 0 && id < 16 {
+            self.four[id] = word;
+        } else if depths & 1 != 0 {
+            self.eight[id] = word;
         }
     }
 

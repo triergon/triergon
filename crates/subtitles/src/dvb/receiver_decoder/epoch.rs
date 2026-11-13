@@ -353,10 +353,7 @@ impl Epoch {
         };
         let clut = &mut self.cluts.as_mut_slice()[index];
         clut.version = definition.version;
-        for entry in definition.entries() {
-            let word = palette::ycrcbt(entry.y, entry.cr, entry.cb, entry.t);
-            clut.tables.set(entry.id, entry.depths, word);
-        }
+        store_entries(&mut clut.tables, definition);
         Ok(())
     }
 
@@ -440,5 +437,18 @@ impl Epoch {
             }
         }
         Ok(Flow::Continue)
+    }
+}
+
+/// Convert the entries of `definition` and store them in `tables`. A CLUT
+/// definition is rare next to the pixels a packet draws: out of line and cold,
+/// the entry loop keeps its values in registers, and the packet loop that
+/// inlines [`Epoch::define_clut`] keeps its registers and block layout.
+#[cold]
+#[inline(never)]
+fn store_entries(tables: &mut Tables, definition: &ClutDefinition<'_>) {
+    for entry in definition.entries() {
+        let word = palette::ycrcbt(entry.y, entry.cr, entry.cb, entry.t);
+        tables.set(entry.id, entry.depths, word);
     }
 }
