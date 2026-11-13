@@ -66,6 +66,22 @@
       }
     },
     {
+      "id": "automatic-once-ts",
+      "profile": "automatic-once-ts",
+      "file": "dvb/automatic-once.ts",
+      "sha256": "b9f86f8952fe18d66ed7b9769bbc932b00253f367e60b97f64f4f7fa4bcf6501",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 504,
+        "digest": 11626220220379921382
+      }
+    },
+    {
       "id": "automatic-ranks-ts",
       "profile": "automatic-ranks-ts",
       "file": "dvb/automatic-ranks.ts",
@@ -3310,6 +3326,23 @@
         "packets": 4,
         "bytes": 384,
         "digest": 13843385384704387461
+      }
+    },
+    {
+      "id": "automatic-once--compute_clut--2",
+      "profile": "automatic-once--compute_clut--2",
+      "file": "dvb/automatic-once.ts",
+      "sha256": "b9f86f8952fe18d66ed7b9769bbc932b00253f367e60b97f64f4f7fa4bcf6501",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=-2"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 504,
+        "digest": 10461879788027714957
       }
     },
     {

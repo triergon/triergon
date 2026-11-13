@@ -1106,6 +1106,17 @@ def automatic_cases():
             segs.append(obj(1, 4, rows, version=n))
         sets.append((T0 + n * 90000, pes_data(segs + [eds()])))
     out["automatic-kept-entries"] = single(sets)
+    # compute_clut -2 keeps a region's first automatic palette through redraws,
+    # a resize and a depth change; a new epoch (acquisition point) starts afresh.
+    third = [[9, 9, 3, 3, 3, 3, 9, 9], [9, 3, 3, 9, 9, 3, 3, 9], [3] * 8, [9] * 8]
+    steps = ((0, 8, 4, 4, first), (0, 8, 4, 4, fewer), (0, 4, 2, 4, [[1, 1, 2, 2], [1, 2, 1, 2]]),
+             (0, 8, 4, 2, [[1, 2, 3, 0] * 2, [3, 2, 1, 1] * 2]), (1, 8, 4, 4, fewer), (0, 8, 4, 4, third))
+    sets = []
+    for n, (state, w, h, depth, rows) in enumerate(steps):
+        segs = [pcs(1, 5, n, state, [(0, 40, 40)]), rcs(0, w, h, version=n, depth=depth, clut=9, objects=[(1, 0, 0)]),
+                obj(1, depth, rows, version=n), eds()]
+        sets.append((T0 + n * 90000, pes_data(segs)))
+    out["automatic-once"] = single(sets)
     # A checkerboard of 1280 × 1024 pixels: exposure counts past 2^31 / 1024.
     tile = [[0 if (x + y) % 2 == 0 else (2 if y % 4 == 0 and 4 <= y < 60 and x % 3 == 1 and 4 <= x < 60 else 1)
              for x in range(64)] for y in range(64)]
@@ -1252,6 +1263,7 @@ OPTION_CASES = [
     ("streams-two", ["stream=1"]),
     ("automatic-ranks", ["opt:compute_clut=1"]),
     ("automatic-kept-entries", ["opt:compute_clut=1"]),
+    ("automatic-once", ["opt:compute_clut=-2"]),
 ]
 
 
