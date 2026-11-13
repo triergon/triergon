@@ -1356,7 +1356,7 @@ mod tests {
             ("raw-annex-b", 7),
             ("mpegts-pes", 97),
             ("subtitle-pgs", 317),
-            ("subtitle-dvb", 229),
+            ("subtitle-dvb", 241),
             ("subtitle-dvd", 224),
             ("subtitle-dvd-host", 5),
             ("subtitle-cc", 205),
