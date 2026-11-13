@@ -278,6 +278,10 @@ pub(crate) struct Sbr {
     // scratch
     x: BudgetVec<[Cpx; 64]>,
     x_r: BudgetVec<[Cpx; 64]>,
+    /// Development aid: the 38 QMF slots handed to Parametric Stereo in the last frame
+    /// (re, im interleaved; empty when PS did not run).
+    #[cfg(feature = "inspect")]
+    pub(crate) ps_input: Vec<f32>,
 }
 
 impl Sbr {
@@ -295,6 +299,8 @@ impl Sbr {
             ps_seen: false,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
             x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+            #[cfg(feature = "inspect")]
+            ps_input: Vec::new(),
         })
     }
 
@@ -320,6 +326,8 @@ impl Sbr {
             ps_seen,
             x,
             x_r,
+            #[cfg(feature = "inspect")]
+                ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
         *have_header = false;
@@ -631,6 +639,15 @@ impl Sbr {
                     *row = [Cpx::default(); 64];
                     for k in 0..kx.min(32) {
                         row[k] = ch.xl[k][i + T_HFADJ];
+                    }
+                }
+                #[cfg(feature = "inspect")]
+                {
+                    self.ps_input.clear();
+                    for row in self.x.iter() {
+                        for v in row {
+                            self.ps_input.extend([v.re, v.im]);
+                        }
                     }
                 }
                 // Parametric stereo: mono QMF matrix -> left/right matrices (8.6.4)
