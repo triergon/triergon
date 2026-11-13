@@ -185,13 +185,13 @@ pub(super) const MAP_20_34: [(u8, u8); 34] = [
 /// Decorrelator all-pass coefficients a_m (precision 2e-8).
 pub(super) const DECAY: [f64; 3] = [0.6514391, 0.56471813, 0.48954166];
 
-/// Fractional delays of the sections (1e-8).
+/// Fractional delays of the sections (precision 1e-8).
 pub(super) const FRACT: [f64; 3] = [0.43, 0.75, 0.347];
 
-/// Fractional delay of the lead delay (2e-8).
+/// Fractional delay of the lead delay (precision 2e-8).
 pub(super) const FRACT0: f64 = 0.39;
 
-/// Decrease of the coefficients per QMF band above the split bands (3e-9).
+/// Decrease of the coefficients per QMF band above the split bands (precision 3e-9).
 pub(super) const SLOPE: f64 = 0.05;
 
 /// Section delays in slots.
@@ -218,10 +218,10 @@ pub(super) const SMOOTH: f64 = 0.25;
 /// Threshold (fit precision 3e-7).
 pub(super) const DUCK_LIMIT: f64 = 1.5;
 
-/// IID grids in dB (indices 0..7 and 0..15, negative indices mirror).
+/// IID grid in dB per index 0..7, negative indices mirroring (precision 1e-5).
 pub(super) const IID_COARSE: [f64; 8] = [0.0, 2.0, 4.0, 7.0, 10.0, 14.0, 18.0, 25.0];
 
-/// Fine grid.
+/// Fine IID grid in dB per index 0..15 (precision 1e-5).
 pub(super) const IID_FINE: [f64; 16] = [
     0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 13.0, 16.0, 19.0, 22.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0,
 ];
@@ -229,10 +229,10 @@ pub(super) const IID_FINE: [f64; 16] = [
 /// ICC values per index (precision 1e-7).
 pub(super) const ICC: [f64; 8] = [1.0, 0.937, 0.84118, 0.60092, 0.36764, 0.0, -0.589, -1.0];
 
-/// Floor of the ICC value in the second mixing procedure (1e-7).
+/// Floor of the ICC value in the second mixing procedure (precision 1e-7).
 pub(super) const ICC_FLOOR_B: f64 = 0.05;
 
-/// IPD/OPD phase smoothing weights of the current and two previous envelopes (1e-7).
+/// IPD/OPD phase smoothing weights of the current and two previous envelopes (precision 1e-7).
 pub(super) const PHASE_WEIGHTS: [f64; 3] = [1.0, 0.5, 0.25];
 
 /// Start matrices of a frame whose configuration differs from the previous one. 34 -> 20:

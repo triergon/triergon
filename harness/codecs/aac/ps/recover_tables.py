@@ -12,18 +12,21 @@ Steps (each a scripted probe chain of its own, see harness/codecs/aac/ps/README.
    check stops the run.
 
 FFMPEG (the pinned FFmpeg 9.0.2 decode build) and PS_INPUT (this decoder's ps_input
-example) come from the environment.
+example) come from the environment. A step whose JSON is in WORKDIR from an earlier run is
+not rerun, unless --rerun is given: then every step runs again in an emptied directory.
 
-usage: recover_tables.py WORKDIR OUT.json
+usage: recover_tables.py [--rerun] WORKDIR OUT.json
 """
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SIGNAL = os.path.join(HERE, 'signal')
+STEPS = ('books', 'hyb', 'dec', 'mix', 'time')
 
 
 def run(args, work, env=None):
@@ -139,6 +142,26 @@ def tables(sig):
             t['value'] = value
         out.append(t)
 
+    def established(name, tol, sd=(), fits=()):
+        """The precision tol a table is written to, stated in its doc and used by the check,
+        must be what its fit establishes: three standard errors of the fit (sd) and every
+        independent fit of the values (fits: (fitted, written) pairs) lie within tol."""
+        for s in sd:
+            need(s is None or 3 * s <= tol, '%s: three standard errors within %s' % (name, tol_text(tol)))
+        for v, w in fits:
+            need(abs(v - float(w)) <= tol, '%s: fit %r within %s of %s' % (name, v, tol_text(tol), w))
+
+    def fitted(name, ty, doc, values, tol, sd=(), fits=()):
+        """A fitted table (values a list) or value written within tol, with tol in its doc."""
+        doc = '%s (precision %s).' % (doc, tol_text(tol))
+        if isinstance(values, list):
+            items = [snap(v, tol) for v in values]
+            table(name, ty, doc, items, precision=tol)
+        else:
+            items = [snap(values, tol)]
+            table(name, ty, doc, value=items[0], precision=tol)
+        established(name, tol, sd, [(v, w) for vs in fits for v, w in zip(vs, items)])
+
     # 1. hybrid prototypes
     table1 = {8: ['0.125', '0.11793710567217', '0.09885108575264', '0.07266113929591',
                   '0.04546865930473', '0.02270420949825', '0.00746082949812']}
@@ -146,6 +169,7 @@ def tables(sig):
     for cfg, q, key in ((20, 8, 'PROTO_20_Q8'), (20, 4, 'PROTO_20_Q4'), (34, 12, 'PROTO_34_Q12'),
                         (34, 8, 'PROTO_34_Q8'), (34, 4, 'PROTO_34_Q4')):
         fit = hyb['proto_%d' % cfg][str(q)]['n6_12']
+        established(key, tol, hyb['proto_%d' % cfg][str(q)]['stderr'])
         items = []
         for n, v in enumerate(fit):
             if (cfg, q) == (20, 8):
@@ -206,14 +230,14 @@ def tables(sig):
     # 3. decorrelator
     k = dec['constants']
     precision = {'A': 2e-8, 'QF': 1e-8, 'F0': 2e-8, 'SLOPE': 3e-9, 'ALPHA': 2e-8, 'BETA': 5e-8, 'GAMMA': 1e-6}
-    table('DECAY', '[f64; 3]', 'Decorrelator all-pass coefficients a_m (precision 2e-8).',
-          [snap(v, precision['A']) for v in k['A']], precision=precision['A'])
-    table('FRACT', '[f64; 3]', 'Fractional delays of the sections (1e-8).', [snap(v, precision['QF']) for v in k['QF']],
-          precision=precision['QF'])
-    table('FRACT0', 'f64', 'Fractional delay of the lead delay (2e-8).', value=snap(k['F0'], precision['F0']),
-          precision=precision['F0'])
-    table('SLOPE', 'f64', 'Decrease of the coefficients per QMF band above the split bands (3e-9).',
-          value=snap(k['SLOPE'], precision['SLOPE']), precision=precision['SLOPE'])
+    sd = {n: e for n, (_, e) in dec['stages']['5']['linear constants (20-band tones)'].items()}
+    fitted('DECAY', '[f64; 3]', 'Decorrelator all-pass coefficients a_m', k['A'], precision['A'],
+           [sd['A0'], sd['A1'], sd['A2']])
+    fitted('FRACT', '[f64; 3]', 'Fractional delays of the sections', k['QF'], precision['QF'],
+           [sd['QF0'], sd['QF1'], sd['QF2']])
+    fitted('FRACT0', 'f64', 'Fractional delay of the lead delay', k['F0'], precision['F0'], [sd['F0']])
+    fitted('SLOPE', 'f64', 'Decrease of the coefficients per QMF band above the split bands', k['SLOPE'],
+           precision['SLOPE'], [sd['SLOPE']])
     table('SECTION_DELAY', '[usize; 3]', 'Section delays in slots.', ['%d' % d for d in k['DELAYS']])
     table('LEAD_DELAY', 'usize', 'The lead delay.', value='%d' % k['PRE'])
     table('LONG_DELAY', 'usize', 'The plain delay from `LONG_START`.', value='%d' % k['LONG'])
@@ -227,18 +251,21 @@ def tables(sig):
           precision=precision['GAMMA'])
 
     # 4. mixing
-    lv = mix['B_matrices']['A_coarse']['iid_level_db_per_index']
-    table('IID_COARSE', '[f64; 8]', 'IID grids in dB (indices 0..7 and 0..15, negative indices mirror).',
-          [snap(v, 1e-5) for v in lv], precision=1e-5)
-    lv = mix['B_matrices']['A_fine']['iid_level_db_per_index']
-    table('IID_FINE', '[f64; 16]', 'Fine grid.', [snap(v, 1e-5) for v in lv], precision=1e-5)
-    table('ICC', '[f64; 8]', 'ICC values per index (precision 1e-7).', [snap(v, 1e-7) for v in mix['icc_rho']],
-          precision=1e-7)
-    table('ICC_FLOOR_B', 'f64', 'Floor of the ICC value in the second mixing procedure (1e-7).',
-          value=snap(mix['rho_floor_second_procedure'], 1e-7), precision=1e-7)
+    # every matrix set (both procedures, coarse and fine grid) fits the levels and ICC values
+    m = mix['B_matrices']
+    level = lambda s: m[s]['iid_level_db_per_index']
+    fitted('IID_COARSE', '[f64; 8]', 'IID grid in dB per index 0..7, negative indices mirroring',
+           level('A_coarse'), 1e-5, fits=[level('B_coarse')])
+    fitted('IID_FINE', '[f64; 16]', 'Fine IID grid in dB per index 0..15', level('A_fine'), 1e-5,
+           fits=[level('B_fine')])
+    floor = mix['rho_floor_second_procedure']
+    rho = [m[s]['rho_fitted'] for s in ('A_coarse', 'A_fine')]
+    rho += [[r for r in m[s]['rho_fitted'] if r > floor + 1e-7] for s in ('B_coarse', 'B_fine')]
+    fitted('ICC', '[f64; 8]', 'ICC values per index', mix['icc_rho'], 1e-7, fits=rho)
+    fitted('ICC_FLOOR_B', 'f64', 'Floor of the ICC value in the second mixing procedure', floor, 1e-7)
     w = mix['C_phase_time']['smoothing_weights_rel_current']
-    table('PHASE_WEIGHTS', '[f64; 3]', 'IPD/OPD phase smoothing weights of the current and two previous envelopes (1e-7).',
-          [snap(v, 1e-7) for v in w], precision=1e-7)
+    fitted('PHASE_WEIGHTS', '[f64; 3]', 'IPD/OPD phase smoothing weights of the current and two previous envelopes',
+           w, 1e-7)
     for v in mix['C_phase_time']['phase_step_from_steady']:
         need(abs(v - math.pi / 4) < 1e-7, 'IPD/OPD step pi/4')
 
@@ -256,8 +283,13 @@ def tables(sig):
 
 
 def main():
-    work, out = sys.argv[1], sys.argv[2]
+    args = sys.argv[1:]
+    rerun = '--rerun' in args
+    work, out = [a for a in args if a != '--rerun']
     os.makedirs(work, exist_ok=True)
+    if rerun:
+        for step in STEPS:
+            shutil.rmtree(os.path.join(work, step), ignore_errors=True)
     b = books(work)
     s = signal(work)
     res = {

@@ -7,9 +7,11 @@
 //! tables and writes them as JSON: the Huffman books (exact) and the signal tables, each
 //! with its values as Rust expressions and the precision its fit established. This
 //! command writes `crates/codec-aac/src/huffman_probed.rs` and
-//! `crates/codec-aac/src/sbr/ps/tables.rs` from that JSON. With `--check` it compares
-//! them with the committed files instead: the books and every non-numeric token exactly,
-//! each fitted number within its table's precision (a refit moves the last digits).
+//! `crates/codec-aac/src/sbr/ps/tables.rs` from that JSON. A write reuses the steps whose
+//! JSON an earlier run left in the work directory. With `--check` every step runs again
+//! from an emptied directory, and the result is compared with the committed files instead
+//! of written: the books and every non-numeric token exactly, each fitted number within
+//! its table's precision, the precision its doc states (a refit moves the last digits).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -77,14 +79,17 @@ pub(super) fn main(root: &Path, opts: &Options) -> Result<i32, String> {
     fs::copy(target.join("release/examples/ps_input"), &ps_input)
         .map_err(|e| format!("{}: {e}", ps_input.display()))?;
     let out = work.join("tables.json");
-    run(Command::new(&opts.python)
+    let mut recover = Command::new(&opts.python);
+    recover
         .current_dir(root)
         .env("FFMPEG", &ffmpeg)
         .env("PS_INPUT", &ps_input)
         .arg("-s")
-        .arg(root.join("harness/codecs/aac/ps/recover_tables.py"))
-        .arg(&work)
-        .arg(&out))?;
+        .arg(root.join("harness/codecs/aac/ps/recover_tables.py"));
+    if opts.check {
+        recover.arg("--rerun");
+    }
+    run(recover.arg(&work).arg(&out))?;
     let text = fs::read_to_string(&out).map_err(|e| format!("{}: {e}", out.display()))?;
     let value = json::parse(&text).map_err(|e| format!("{}: {e:?}", out.display()))?;
     let books = render_books(&value)?;
