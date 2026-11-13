@@ -22,5 +22,10 @@
    "bytes": 8263,
    "sha256": "e22e5c0730680743e810384f56ad31a68cf993ecab119b21de506dedb88c30a3"
   }
+ ],
+ "open_cases": [
+  "ps-open-change-while-off.adts",
+  "ps-open-ipd-after-iid34.adts",
+  "ps-open-no-sbr-element.adts"
  ]
 }

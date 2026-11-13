@@ -41,7 +41,8 @@ binary.
   `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`;
   `--check` compares them. Not recovered: the three open cases of
   [ps-open-manifest.json](ps-open-manifest.json), graded with `codecs grade` like the
-  other manifests (see the crate's known differences).
+  other manifests and listed in its `open_cases`, so `codecs summarize` fails once one
+  of them matches (see the crate's known differences).
 
 Confirmed black-box: PNS noise LCG (1664525, 1013904223, seed `0x1f2e3d4c`), PCE speaker
 mapping (`tools/probe_layout.py`), the libfaac fill-element skip, the implicit PS stereo

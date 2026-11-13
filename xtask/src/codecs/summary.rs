@@ -6,6 +6,11 @@
 //! selected decoders take (DTS without a core substream). Everything else that
 //! is not a pass at both levels is a failure and is listed with its numbers;
 //! known dispositions are attached, never used to drop a row.
+//!
+//! A row of a vector its manifest lists in `open_cases` (`"open_case": true`)
+//! must fail, and is counted as `open`; it needs a disposition saying what is
+//! not recovered. A listed vector that no longer fails fails the summary, so
+//! the list only shrinks.
 
 use std::fs;
 use std::path::Path;
@@ -56,13 +61,13 @@ fn disposition(key: &str) -> Option<&'static str> {
             "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/aac/STATUS.md)"
         }
         "ps-open-change-while-off.adts" => {
-            "open: a 20/34-band change registered while Parametric Stereo is off after an error, then a frame that runs; not recovered (harness/codecs/aac/ps/README.md)"
+            "a 20/34-band change registered while Parametric Stereo is off after an error, then a frame that runs; not recovered (harness/codecs/aac/ps/README.md)"
         }
         "ps-open-no-sbr-element.adts" => {
-            "open: a Parametric Stereo frame without its SBR element; the difference from FFmpeg's output lies in QMF bands 31..35 of that frame (harness/codecs/aac/ps/README.md)"
+            "a Parametric Stereo frame without its SBR element; the difference from FFmpeg's output lies in QMF bands 31..35 of that frame (harness/codecs/aac/ps/README.md)"
         }
         "ps-open-ipd-after-iid34.adts" => {
-            "open: IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands; steady frames match (harness/codecs/aac/ps/README.md)"
+            "IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands; steady frames match (harness/codecs/aac/ps/README.md)"
         }
         "ac3" | "eac3" => {
             "AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (harness/codecs/STATUS.md)"
@@ -172,8 +177,22 @@ fn numbers(section: &Value, keys: &[&str]) -> Value {
     )
 }
 
+/// The class of a row: [`classify`]'s, or `open` for a listed open case that
+/// fails. A listed case that does not fail is returned as `Err` with its class.
+fn class_of(row: &Value, lane: &str) -> Result<String, String> {
+    let c = classify(row, lane);
+    if !get(row, "open_case").is_some_and(Value::truthy) {
+        Ok(c)
+    } else if c == "FAIL" {
+        Ok("open".into())
+    } else {
+        Err(c)
+    }
+}
+
 /// `summarize RUN.jsonl OUT.json`: classify every row, write the summary and
-/// print the per-lane counts and each failure.
+/// print the per-lane counts and each failure. Fails when a listed open case
+/// does not fail or has no disposition.
 pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
     let source = fs::read_to_string(run).map_err(|e| format!("{run}: {e}"))?;
     let mut rows = Vec::new();
@@ -183,9 +202,14 @@ pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
     let mut per_lane: Vec<(String, Vec<(String, i64)>)> = Vec::new();
     let mut failures = Vec::new();
     let mut listed = Vec::new();
+    let mut closed = Vec::new();
     for row in &rows {
         let lane = text(get(row, "lane")).ok_or("row without lane")?.to_owned();
-        let c = classify(row, &lane);
+        let name = get(row, "name").cloned().unwrap_or(Value::Null);
+        let c = class_of(row, &lane).unwrap_or_else(|c| {
+            closed.push(format!("{} ({c})", python::str(&name)));
+            c
+        });
         let class = c.split(" (").next().unwrap_or_default().to_owned();
         let at = per_lane
             .iter()
@@ -203,11 +227,16 @@ pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
         let decoder = get(row, "decoder").unwrap_or(&empty);
         let output = get(row, "output").unwrap_or(&empty);
         let status = |v: &Value| get(v, "status").cloned().unwrap_or(Value::Null);
-        let name = get(row, "name").cloned().unwrap_or(Value::Null);
-        if c == "FAIL" {
+        if c == "FAIL" || c == "open" {
             let disposition = text(Some(&name))
                 .and_then(disposition)
                 .or_else(|| disposition(&lane));
+            if c == "open" && disposition.is_none() {
+                return Err(format!(
+                    "open case {} has no disposition",
+                    python::str(&name)
+                ));
+            }
             failures.push(Value::object([
                 ("lane", Value::str(lane.as_str())),
                 ("name", name.clone()),
@@ -247,6 +276,7 @@ pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
                     ),
                 ),
                 ("disposition", disposition.map_or(Value::Null, Value::str)),
+                ("open_case", Value::Bool(c == "open")),
             ]));
         }
         listed.push(Value::object([
@@ -295,14 +325,22 @@ pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
             .take(60)
             .collect();
         let field = |k: &str| python::str(get(f, k).unwrap_or(&Value::Null));
+        let open = get(f, "open_case").is_some_and(Value::truthy);
         println!(
-            "FAIL {} {} {} {} {} {disposition}",
+            "{} {} {} {} {} {} {disposition}",
+            if open { "OPEN" } else { "FAIL" },
             field("lane"),
             field("name"),
             field("decoder"),
             field("output"),
             python::str(&worst),
         );
+    }
+    if !closed.is_empty() {
+        return Err(format!(
+            "listed open cases no longer fail; remove them from the manifest's open_cases: {}",
+            closed.join(", ")
+        ));
     }
     Ok(())
 }
@@ -359,5 +397,36 @@ mod tests {
             classify(&row(r#"{"status": "input-hash-mismatch"}"#), "aac"),
             "FAIL"
         );
+    }
+
+    #[test]
+    fn open_cases_must_keep_failing() {
+        let open =
+            r#"{"open_case": true, "decoder": {"status": "fail"}, "output": {"status": "pass"}}"#;
+        assert_eq!(class_of(&row(open), "aac").unwrap(), "open");
+        let passing =
+            r#"{"open_case": true, "decoder": {"status": "pass"}, "output": {"status": "pass"}}"#;
+        assert_eq!(class_of(&row(passing), "aac").unwrap_err(), "pass");
+        let unlisted = r#"{"decoder": {"status": "fail"}, "output": {"status": "pass"}}"#;
+        assert_eq!(class_of(&row(unlisted), "aac").unwrap(), "FAIL");
+    }
+
+    #[test]
+    fn summary_fails_when_an_open_case_passes() {
+        let dir = std::env::temp_dir().join(format!("summary-open-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let run = dir.join("run.jsonl");
+        let out = dir.join("summary.json");
+        let line = |status: &str| {
+            format!(
+                r#"{{"lane": "aac", "name": "ps-open-no-sbr-element.adts", "open_case": true, "decoder": {{"status": "{status}"}}, "output": {{"status": "pass"}}}}"#
+            )
+        };
+        fs::write(&run, line("fail") + "\n").unwrap();
+        summarize(run.to_str().unwrap(), &out).unwrap();
+        fs::write(&run, line("pass") + "\n").unwrap();
+        let error = summarize(run.to_str().unwrap(), &out).unwrap_err();
+        assert!(error.contains("no longer fail"), "{error}");
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -48,6 +48,10 @@ cargo xtask codecs readers --manifest harness/codecs/reader-manifest.json --root
 `mp3`, `mp2`, `mp1`, `vorbis` and `opus` lanes, which read their file through the
 container readers and apply its trims as the CLI does. Every run checks each input
 against its manifest SHA-256 and writes one row per input, whatever its outcome.
+A manifest may list `open_cases`, names of its vectors that fail today. `summarize`
+counts such a row as `open` when it fails and needs a disposition for it; it fails
+when a listed vector no longer fails, so the list only shrinks, as a contract's open
+cases do ([docs/quality.md](../../docs/quality.md)).
 
 The [AAC MOV manifest](aac/mov-manifest.json) uses the same `codecs grade` command
 with the `audio-decode` example. It compares all PCM from the neutral reader's
@@ -150,5 +154,6 @@ observation per workload and `summary.json`.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).
 - `ps-open-*.adts` ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open
-  Parametric Stereo cases, crafted streams of paths the probes did not recover; their
+  Parametric Stereo cases, the manifest's `open_cases`: crafted streams of paths the
+  probes did not recover, which `summarize` requires to keep failing; their
   numbers are in the known differences of [crates/codec-aac](../../crates/codec-aac/README.md).
