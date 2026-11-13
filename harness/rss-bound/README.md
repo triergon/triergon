@@ -50,13 +50,19 @@ same layout through the module's 32-bit ioctl entry point. For such a user space
    nothing missed, at least 2,048 positive pages);
 4. writes `OUT/RSS-PROOF.json`.
 
-The module must be unloaded during timing runs. It is loaded only for memory
-collection.
+The module must be unloaded during timing runs. It is loaded for memory collection
+and for grading: `cargo xtask grade` checks every kernel-bound result against the
+loaded module's build-id, and grades it unproven without it, so grade before unloading.
+The same module binary can be loaded again on the same boot without a new proof
+(`sudo insmod target/rss-bound/triergon_rss_bound.ko`, then
+`sudo chown "$(id -u):$(id -g)" /dev/triergon_rss_bound`).
 
 ```sh
 cargo xtask build-workers
+cargo xtask report --benchmark --contract … --manifest … --corpus … --output TIMING
 harness/rss-bound/prove.sh REVIEW .research/rss-bound
 TRIERGON_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
-TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask report --memory --contract … --manifest … --corpus …
+TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask report --memory --contract … --manifest … --corpus … --output MEMORY
+cargo xtask grade TIMING/report.json MEMORY/report.json --contract … --manifest … --output GRADED
 sudo rmmod triergon_rss_bound
 ```

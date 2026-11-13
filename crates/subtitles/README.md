@@ -23,43 +23,24 @@ resumable states. Rejected input is handed back unchanged.
 
 ```rust
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
-use triergon_subtitles::text::{Encoding, Event, Extractor, Format, Input, Limits, Status, Timing};
+use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_subtitles::compat::document::{Limits, Reader, Status, Syntax};
 
 let pool = Budget::new(1 << 20)?;
 let cancel = AtomicBool::new(false);
-let srt = b"1\n00:00:01,000 --> 00:00:02,500\nHello\n\n";
-let input = Input {
-    format: Format::SubRip,
-    encoding: Encoding::Utf8, // stated by the caller, never guessed
-    payload: Bytes::copy_from_slice(&pool, srt)?,
-    codec_id: None,
-    codec_private: None,
-    charset_label: None,
-    addition: None,
-    timing: Timing::unknown(), // a whole document carries its own cue times
-    source_id: SourceId(1),
-    generation: 0,
-    sequence: 0,
-    configuration_epoch: 0,
-    container_position: None,
-};
-let mut extractor = Extractor::new(&pool, Limits::default(), 0);
-extractor.provide(input).map_err(|rejected| rejected.error)?; // one complete document or sample
-extractor.finish_input();
+let srt = Bytes::copy_from_slice(&pool, b"1\n00:00:01,000 --> 00:00:02,500\nHello\n\n")?;
+let mut reader = Reader::new(&pool, srt, Syntax::SubRip, Limits::default())?;
 let mut cues = Vec::new();
 loop {
-    match extractor.step(&mut WorkBudget::new(4096), &cancel)? {
-        Status::Event(Event::Cue(cue)) => cues.push(cue),
-        Status::Event(Event::Metadata(_)) | Status::Yield => {}
-        Status::NeedOutput => { /* release held output, then step again */ }
-        Status::NeedInput | Status::Finished => break,
+    match reader.poll(&mut WorkBudget::new(4096), &cancel)? {
+        Status::Cue(cue) => cues.push(cue),
+        Status::Yield => {}
+        Status::Finished => break,
     }
 }
 assert_eq!(cues.len(), 1);
-assert_eq!(cues[0].start, Some(Time::new(1, 1)?));
-assert_eq!(cues[0].end, Some(Time::new(5, 2)?));
-assert_eq!(cues[0].decoded_utf8.as_deref(), Some(&b"Hello"[..]));
+assert_eq!((cues[0].start_ms, cues[0].duration_ms), (1000, 1500));
+assert_eq!(cues[0].text.as_ref(), b"Hello");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -80,12 +61,16 @@ did. A DVB receiver rectangle carries its
 region depth's `palette`, as FFmpeg reports it, and `colours`, the colour of
 every pixel value: a region recomposed at a smaller depth without a fill keeps
 larger pixel values, which read as zero, or under the automatic palette as the
-level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
-&cancel)`, then `poll` until `OutputReady` and `take_output`.
+level it ranks them at. With `AutomaticPalette::WithoutClutOnce` (FFmpeg's
+`compute_clut` −2) a region's automatic palette is computed when the region is
+first presented and kept while it lasts: later drawing, filling, resizing or a
+new depth leave it as it was, and only a new epoch computes it afresh. The PGS
+receiver is polled: `push(&mut packet, clock, &cancel)`, then `poll` until
+`OutputReady` and `take_output`.
 
 | Module | Entry points |
 | --- | --- |
-| `text` | `Extractor`, `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
+| `text` | `Extractor` (packets), `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
 | `dvb` | `SourceConfiguration`, `DvbPacket`: a service's configuration and its packets with their original clocks |
 | `pgs` | `SegmentIter`: segments of a packet or SUP stream; `DisplayLimits`, `DisplayConfig` and the outputs of the PGS receiver |
 | `dvd` | `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
@@ -97,14 +82,34 @@ level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
 | `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |
 | `compat::teletext` | `Decoder`, `Options`, `Format`, `PageSelection` |
 | `compat::charset` | `AssPacketJob`, `receiver_charset` |
+| `compat::ass` | `Decoder`: ASS packet to the subtitle the decode call returns, with `sub_charenc` conversion |
 | `compat::mov_text` | `Decoder`: tx3g sample to ASS event |
+| `compat::document` | `Reader`: SubRip or WebVTT document to the cues FFmpeg's `srt` and `webvtt` demuxers read |
 
 ## Supported
 
 **Receivers.** One receiver per format in `compat` reproduces the output of the
 pinned FFmpeg build (git `d32b387f` on the 9.0 branch; teletext with libzvbi
-0.2.46), including its tolerances of malformed input. Text also has operations that
-follow the specification and keep every original byte.
+0.2.46), including its tolerances of malformed input. Text packets also have operations
+that follow the specification and keep every original byte.
+
+`compat::document::Reader` reads a SubRip or WebVTT document as FFmpeg's demuxers
+do, which is not what the specifications say: SubRip cue numbers are optional and
+recognised by position, cue text runs to the next timing line with its empty lines
+left out, time fields have no range and the fraction counts milliseconds, the
+duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cue's
+`-->` may be on a later line, a cue that does not read ends the document. Cues are
+sorted by start time, one that ends before it starts lasts until the next, and one
+whose start, duration and text repeat the cue before it is dropped. Time fields that
+overflow read as FFmpeg reads them on 32-bit ARMv7: a SubRip field saturates to the
+32-bit signed range, and a WebVTT field's digits stop at 2³² − 1 and read as a 32-bit
+signed number. FFmpeg for AArch64 reads some of them otherwise (a SubRip hour of 2³¹ as
+−2³¹, a WebVTT field of 2³² as 0); the `subtitle-text-host` cases pin both targets. A
+UTF-16 SubRip document is converted as FFmpeg converts it, the first byte of some
+characters after a line break included. A document in another charset is FFmpeg's
+`sub_charenc` case: each cue's text converts on its own with `charset::CharsetJob`
+and the receiver repertoire, so a cue the charset refuses has no text and the
+others keep theirs.
 
 **Comparison-only projections.** The non-default `reference-trace` feature adds
 `reference_trace`: the text `carriage` session that reproduces FFmpeg's demuxer
@@ -115,8 +120,6 @@ absent from default builds.
 
 | Format | `text::Format` | What is decoded | What is passed through |
 | --- | --- | --- | --- |
-| SubRip | `SubRip` | Cue numbers, exact times, multi-line text, CRLF/LF/CR framing | Raw cue byte ranges |
-| WebVTT file | `WebVtt` | Header, cue identifiers, times, settings, payload; NOTE/STYLE/REGION blocks in order | Settings and payload as raw text (no CSS, no cue-text parsing) |
 | WebVTT in Matroska | `MatroskaWebVtt` | Block-addition fields: settings, identifier, comments | `CodecPrivate`, unknown additions, block-relative inline times |
 | tx3g / mov_text | `Tx3g` | Text length, UTF-8 or UTF-16BE text; optional style/effect resolution and FFmpeg-compatible ASS output (below) | Modifier boxes in original order |
 | UTF-8 packet | `Utf8Packet` | Strict UTF-8 validation | The payload itself |
@@ -128,6 +131,10 @@ resolves all defined sample modifiers into style runs, highlight, karaoke,
 hyperlink, blink, wrap, scroll and disparity intents; see
 [TX3G-SEMANTICS.md](src/text/TX3G-SEMANTICS.md). `compat::mov_text::Decoder`
 converts a sample to the ASS event and header FFmpeg's mov_text decoder emits.
+Where a style record or the highlight starts or ends it writes FFmpeg's override
+tags in FFmpeg's order and digits, also at a NUL that ends the visible text but
+not at the end of the text; a font name it would write that is not UTF-8, or
+holds U+FFFE, refuses the sample as such text does.
 
 **Charsets.** Selected explicitly with `text::Encoding` or a label resolver;
 there is no detection from content, language or file name.
@@ -149,19 +156,19 @@ bytes are errors; nothing is replaced with U+FFFD.
 | --- | --- | --- |
 | DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | FFmpeg's subtitles: indexed planes and ARGB palettes, with its display window, region order, automatic palette and `compute_edt`, `compute_clut`, `dvb_substream` |
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
-| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette, the canvas of the configuration's `size:` line, and `forced_subs_only` |
+| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette (a list's numbers as observed in FFmpeg built for 32-bit ARMv7: each wraps modulo 2³² and one beyond 32 bits is white), the canvas of the configuration's `size:` line (refused unless both sides are positive and (width + 128) × (height + 128) is below 2²⁸, the sizes FFmpeg also keeps for a PGS presentation; a number beyond ±(2³¹ − 1) refuses it, as observed there), the `.idx` `delay:` line with the values observed there (its fields saturate at 2³¹ − 1 and −2³¹), and `forced_subs_only`; FFmpeg for AArch64 keeps the low 32 bits of such numbers instead |
 
 ### Closed captions and teletext
 
 | Format | Decoded | Output |
 | --- | --- | --- |
-| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `ccaption` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
+| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `cc_dec` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
 | DVB teletext (EN 300 472, EN 300 706) | Data units, Hamming 8/4 and 24/18, parity, headers and rows, parallel and serial magazines, subpages, national option subsets and G0/G1/G2/G3 sets, X/26 enhancements and local objects (active, adaptive, passive), X/28 and M/29 designations and colour tables | Receiver: libzvbi's subtitle pages as FFmpeg's `libzvbi_teletextdec` presents them in its `text` and `ass` formats, with its page selection and options |
 
 ## Behaviour and limits
 
-- **Input.** Text operations take one complete document or demuxed sample per
-  `provide`. Bitmap, caption and teletext decoders take complete packets; PES/TS
+- **Input.** `text::Extractor` takes one demuxed sample per `provide`, and
+  `compat::document::Reader` one whole document. Bitmap, caption and teletext decoders take complete packets; PES/TS
   reassembly is upstream (`triergon-mpegts`; `compat::dvb::PesParser` cuts a DVB
   PES data field into codec packets as FFmpeg's demuxer does).
   An empty packet is an event, not end of stream; only `finish_input` ends input.
@@ -177,8 +184,8 @@ bytes are errors; nothing is replaced with U+FFFD.
   the next packet and nothing is rounded to microseconds except in named native
   fields.
 - **Text normalisation.** `decoded_utf8` is a strict character conversion only:
-  no Unicode, line-ending, whitespace, entity or markup rewriting. A UTF-8 BOM is
-  framing in a document and content in a demuxed packet.
+  no Unicode, line-ending, whitespace, entity or markup rewriting. A UTF-8 BOM in
+  a demuxed packet is content.
 - **Not handled.** DVB character-coded and progressive objects, depth-reduction
   modes and disparity (FFmpeg drops them too, and the receiver does as it does);
   DVD colour-change commands (the control sequence ends there, as in FFmpeg);
@@ -218,4 +225,6 @@ pinned FFmpeg build, and case by case against the build itself through the
 subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every operation is also exercised at several work quanta,
 under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
-in [docs/status.md](../../docs/status.md).
+in [docs/status.md](../../docs/status.md). The text conversions (`subtitle-text`
+and `subtitle-text-host`) were measured at `6126b759b9b983afe488c3c362c6e37c2d1425a2`
+on Linux AArch64, and every subtitle feature at `3df7ae6d` in the ARMv7 user space.

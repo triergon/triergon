@@ -168,24 +168,63 @@ fn entity_input_failure(
     if args.next().is_some() {
         return Err("worker entity argument has no input pin".into());
     }
-    for entity in following {
-        let file = Path::new(s(entity, "file").ok_or("entity without input path")?);
+    auxiliary_input_failure(
+        corpus,
+        following,
+        "entity",
+        "missing-entity",
+        "entity-hash-mismatch",
+    )
+}
+
+fn auxiliary_input_failure(
+    corpus: &Path,
+    inputs: &[Value],
+    kind: &str,
+    missing: &'static str,
+    changed: &'static str,
+) -> Result<Option<&'static str>, String> {
+    for input in inputs {
+        let file = Path::new(s(input, "file").ok_or_else(|| format!("{kind} without input path"))?);
         if file.as_os_str().is_empty()
             || file
                 .components()
                 .any(|c| !matches!(c, std::path::Component::Normal(_)))
         {
-            return Err("entity input escapes corpus".into());
+            return Err(format!("{kind} input escapes corpus"));
         }
         let path = corpus.join(file);
         if !path.is_file() {
-            return Ok(Some("missing-entity"));
+            return Ok(Some(missing));
         }
-        if digest(&path)? != s(entity, "sha256").ok_or("entity without input hash")? {
-            return Ok(Some("entity-hash-mismatch"));
+        if digest(&path)?
+            != s(input, "sha256").ok_or_else(|| format!("{kind} without input hash"))?
+        {
+            return Ok(Some(changed));
         }
     }
     Ok(None)
+}
+
+fn additional_input_failure(
+    corpus: &Path,
+    case: &Value,
+    prefix: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    let failure = entity_input_failure(corpus, case, matches!(prefix, Some("ts-" | "ts-au-")))?;
+    if failure.is_some() {
+        return Ok(failure);
+    }
+    let Some(companions) = case.get("companions") else {
+        return Ok(None);
+    };
+    auxiliary_input_failure(
+        corpus,
+        companions.as_array().ok_or("expected a companion list")?,
+        "companion",
+        "missing-companion",
+        "companion-hash-mismatch",
+    )
 }
 
 fn command_output(program: &str, args: &[&str]) -> String {
@@ -201,22 +240,17 @@ const QUALIFIED_TARGETS: [&str; 4] = [
     "aarch64-apple-darwin",
     "aarch64-unknown-linux-gnu",
     "x86_64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf",
+    gate_build::ARM32_TARGET,
 ];
 
-/// The Rust target triple this host qualifies for: the host triple of the
-/// toolchain that builds the workers (`rustc -vV`). A 32-bit ARM user space on an
-/// AArch64 kernel reports `aarch64` or `armv8l` from `uname -m`, so the machine
-/// name cannot tell it apart from a 64-bit one. Any other target, such as ARMv6 or
-/// `thumbv7neon`, is reported as unqualified.
-pub fn host_target() -> String {
-    static HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
-    HOST.get_or_init(|| {
-        let version = command_output("rustc", &["-vV"]);
-        let host = version.lines().find_map(|line| line.strip_prefix("host: "));
-        qualified(host.unwrap_or("unknown"))
-    })
-    .clone()
+/// The Rust target this host qualifies: the one its workers are compiled for
+/// ([`gate_build::worker_target`]), from the host triple of the toolchain
+/// that builds them (`rustc -vV`). A 32-bit ARM user space on an AArch64 kernel
+/// reports `aarch64` or `armv8l` from `uname -m`, so the machine name cannot tell
+/// it apart from a 64-bit one. Any other target, such as ARMv6 or A32, is reported
+/// as unqualified.
+pub fn gate_target() -> Result<String, String> {
+    gate_build::worker_target().map(qualified)
 }
 
 fn qualified(target: &str) -> String {
@@ -421,6 +455,47 @@ pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
         .collect()
 }
 
+/// Rebase DVD palette options onto the same corpus used to check companion pins.
+pub(super) fn resolved_case_arguments(
+    corpus: &Path,
+    case: &Value,
+    mut arguments: Vec<std::ffi::OsString>,
+) -> Result<Vec<std::ffi::OsString>, String> {
+    const OPTION: &str = "opt:ifo_palette=";
+    for argument in &mut arguments {
+        let Some(declared) = argument.to_str().and_then(|text| text.strip_prefix(OPTION)) else {
+            continue;
+        };
+        let relative = Path::new(declared)
+            .strip_prefix(".research/subtitle-corpus")
+            .map_err(|_| "IFO palette input is outside the subtitle corpus")?;
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err("IFO palette input escapes corpus".into());
+        }
+        let path = corpus.join(relative);
+        let pinned = case
+            .get("companions")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .iter()
+            .any(|pin| s(pin, "file").map(Path::new) == Some(relative));
+        if !pinned && path.try_exists().map_err(|error| error.to_string())? {
+            return Err(format!(
+                "IFO palette input has no pin: {}",
+                relative.display()
+            ));
+        }
+        let mut resolved = std::ffi::OsString::from(OPTION);
+        resolved.push(&path);
+        *argument = resolved;
+    }
+    Ok(arguments)
+}
+
 /// The directory a corpus manifest records for its cases' files, relative to the
 /// repository root.
 pub fn recorded_corpus(root: &Path, manifest: &Value) -> Option<PathBuf> {
@@ -494,14 +569,30 @@ impl PrefixFeature {
 
     /// Every registered feature (`harness/features/<id>`) whose contract runs
     /// `candidate` through a worker operation prefix, in id order.
-    pub fn registered(root: &Path, candidate: &str) -> Result<Vec<Self>, String> {
-        super::features::discover(root)?
-            .iter()
+    pub fn registered(
+        root: &Path,
+        candidate: &str,
+        corpora: &BTreeMap<String, PathBuf>,
+    ) -> Result<Vec<Self>, String> {
+        let contracts: Vec<_> = super::features::discover(root)?
+            .into_iter()
             .filter(|contract| {
                 contract.document.get("worker_operation").is_some()
                     && contract.candidate() == Some(candidate)
             })
-            .map(|contract| Self::load(root, &contract.path, &contract.manifest(), None))
+            .collect();
+        if let Some(id) = corpora
+            .keys()
+            .find(|id| !contracts.iter().any(|contract| contract.id == id.as_str()))
+        {
+            return Err(format!("{candidate} has no registered prefix feature {id}"));
+        }
+        contracts
+            .iter()
+            .map(|contract| {
+                let corpus = corpora.get(&contract.id).map(PathBuf::as_path);
+                Self::load(root, &contract.path, &contract.manifest(), corpus)
+            })
             .collect()
     }
 
@@ -509,15 +600,23 @@ impl PrefixFeature {
     pub fn workers(&self, root: &Path) -> Result<(PathBuf, PathBuf), String> {
         let identity = read_json(&root.join("target/harness/identity.json"))?;
         let candidate = validation::candidate_worker(root, &identity, &self.candidate)?;
-        let record = super::comparison::reference_named(&identity, &self.reference)?;
-        let reference = root.join(s(&record, "path").unwrap_or_default());
-        if Some(super::linux::file_sha(&reference)?.as_str()) != s(&record, "sha256") {
+        Ok((candidate, self.reference_worker(root, &identity)?))
+    }
+
+    pub(super) fn reference_worker(
+        &self,
+        root: &Path,
+        identity: &Value,
+    ) -> Result<PathBuf, String> {
+        let record = super::comparison::reference_named(identity, &self.reference)?;
+        let reference = root.join(validation::text(&record, "path")?);
+        if super::linux::file_sha(&reference)? != validation::hash(&record, "sha256")? {
             return Err(format!(
                 "{} changed since build identity; rebuild",
                 self.reference
             ));
         }
-        Ok((candidate, reference))
+        Ok(reference)
     }
 
     /// A case's input file, which may not escape the corpus directory.
@@ -531,6 +630,18 @@ impl PrefixFeature {
             return Err(format!("{}: input escapes corpus", self.id));
         }
         Ok(self.corpus.join(file))
+    }
+
+    pub(super) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
+        let path = self.input(case)?;
+        if digest(&path)? != validation::hash(case, "sha256")? {
+            return Err(format!("input changed: {}", path.display()));
+        }
+        if let Some(status) = additional_input_failure(&self.corpus, case, Some(&self.prefix))? {
+            let id = s(case, "id").unwrap_or_default();
+            return Err(format!("{}/{id}: {status}", self.id));
+        }
+        Ok(path)
     }
 }
 
@@ -641,7 +752,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest, &host_target())?;
+    let open = open_cases(&contract, &manifest, &gate_target()?)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -656,7 +767,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
-    let target = host_target();
+    let target = gate_target()?;
     let coverage = fate_coverage(
         root,
         &read_json(&root.join("harness/fate/index.json"))?,
@@ -737,14 +848,12 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
-        } else if let Some(status) = entity_input_failure(
-            &corpus,
-            case,
-            matches!(worker_operation.as_deref(), Some("ts-" | "ts-au-")),
-        )? {
+        } else if let Some(status) =
+            additional_input_failure(&corpus, case, worker_operation.as_deref())?
+        {
             Value::object([("status", Value::str(status))])
         } else if let Some(prefix) = &worker_operation {
-            let arguments = case_arguments(case);
+            let arguments = resolved_case_arguments(&corpus, case, case_arguments(case))?;
             row.push(("input_sha256", Value::str(sha)));
             if let Some(entities) = case.get("entities") {
                 row.push(("input_entities", entities.clone()));
@@ -864,7 +973,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 if digest(&input)? != sha {
                     return Ok(Some("input-hash-mismatch"));
                 }
-                entity_input_failure(&corpus, case, false)
+                let failure = additional_input_failure(&corpus, case, worker_operation.as_deref())?;
+                if failure.is_none() && worker_operation.is_some() {
+                    resolved_case_arguments(&corpus, case, case_arguments(case))?;
+                }
+                Ok(failure)
             };
             if options.benchmark {
                 let timing = measure_pinned(check_inputs, || {
@@ -1078,6 +1191,7 @@ mod prefix_tests {
         recorded_corpus, reviewed_inputs, rights_reviewed, s,
     };
     use crate::json::{Value, parse};
+    use std::collections::BTreeMap;
     use std::path::Path;
 
     #[test]
@@ -1237,9 +1351,77 @@ mod prefix_tests {
     }
 
     #[test]
+    fn registered_prefix_features_use_supplied_corpus_directories() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let mut corpora = BTreeMap::from([
+            ("hls-segments".to_owned(), root.join("harness/fixtures/hls")),
+            (
+                "matroska-startup-seek".to_owned(),
+                root.join(".research/startup-seek-fixtures"),
+            ),
+            (
+                "mp4-range".to_owned(),
+                root.join(".research/mp4-range-fixtures"),
+            ),
+            (
+                "progressive-ts188".to_owned(),
+                root.join("harness/features/progressive-ts188/inputs"),
+            ),
+        ]);
+        let features = PrefixFeature::registered(root, "playback-worker", &corpora).unwrap();
+        for (id, directory) in &corpora {
+            let feature = features.iter().find(|feature| feature.id == *id).unwrap();
+            assert_eq!(&feature.corpus, directory);
+            assert!(!feature.cases.is_empty());
+        }
+        corpora.insert("unused".to_owned(), root.to_path_buf());
+        assert!(
+            PrefixFeature::registered(root, "playback-worker", &corpora)
+                .err()
+                .unwrap()
+                .contains("no registered prefix feature unused")
+        );
+    }
+
+    #[test]
+    fn dvd_palette_options_use_the_selected_corpus_and_keep_absence() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let manifest = read_json(&root.join("harness/features/subtitle-dvd/corpus.json")).unwrap();
+        let cases = manifest.get("cases").and_then(Value::as_array).unwrap();
+        let case = |id| cases.iter().find(|case| s(case, "id") == Some(id)).unwrap();
+        let scratch = crate::walk::scratch("dvd-ifo");
+        let corpus = scratch.join("relocated");
+        std::fs::create_dir_all(corpus.join("dvd")).unwrap();
+        let resolve = |id| {
+            let case = case(id);
+            super::resolved_case_arguments(&corpus, case, super::case_arguments(case))
+        };
+        let palette = corpus.join("dvd/VTS_01_0.IFO");
+        std::fs::write(&palette, b"palette").unwrap();
+        let arguments = resolve("vobsub-ifo-palette-vts").unwrap();
+        assert_eq!(
+            arguments[1],
+            format!("opt:ifo_palette={}", palette.display()).as_str()
+        );
+
+        let missing = corpus.join("dvd/VTS_99_0.IFO");
+        let arguments = resolve("vobsub-ifo-palette-missing").unwrap();
+        assert_eq!(
+            arguments[1],
+            format!("opt:ifo_palette={}", missing.display()).as_str()
+        );
+        std::fs::write(&missing, b"unexpected palette").unwrap();
+        assert_eq!(
+            resolve("vobsub-ifo-palette-missing").unwrap_err(),
+            "IFO palette input has no pin: dvd/VTS_99_0.IFO"
+        );
+        std::fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[test]
     fn the_font_features_are_registered_prefix_features() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let features = PrefixFeature::registered(root, "font-worker").unwrap();
+        let features = PrefixFeature::registered(root, "font-worker", &BTreeMap::new()).unwrap();
         let found: Vec<(&str, &str, usize)> = features
             .iter()
             .map(|f| (f.id.as_str(), f.prefix.as_str(), f.cases.len()))
@@ -1346,18 +1528,18 @@ mod tests {
     #[test]
     fn only_the_listed_targets_qualify() {
         assert_eq!(
-            qualified("armv7-unknown-linux-gnueabihf"),
-            "armv7-unknown-linux-gnueabihf"
+            qualified("thumbv7neon-unknown-linux-gnueabihf"),
+            "thumbv7neon-unknown-linux-gnueabihf"
         );
         for other in [
             "arm-unknown-linux-gnueabihf",
             "armv6-unknown-linux-gnueabihf",
-            "thumbv7neon-unknown-linux-gnueabihf",
+            "armv7-unknown-linux-gnueabihf",
             "aarch64-unknown-linux-musl",
         ] {
             assert_eq!(qualified(other), format!("unqualified-{other}"));
         }
-        let host = host_target();
+        let host = gate_target().unwrap();
         assert!(
             QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
             "{host}"

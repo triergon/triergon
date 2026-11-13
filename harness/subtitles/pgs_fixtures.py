@@ -32,6 +32,7 @@ CASES = [
     "rx-forced-empty-rects-ts", "rx-forced-empty-rects-only-ts", "rx-presentation-after-display-ts",
     "rx-epoch-states-ts", "rx-rejected-canvas-ts", "rx-ods-declared-length-ts",
     "rx-clock-before-composition-ts", "rx-rle-plane-ts", "many-objects-sup", "canvas-sizes-sup",
+    "rx-canvas-bounds-ts", "rx-ods-first-fragment-ts",
 ]
 
 

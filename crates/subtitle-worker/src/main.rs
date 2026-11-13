@@ -15,12 +15,17 @@
 //! Preparation (reading the file, demuxing, extracting caption data, creating the
 //! decoder's pool) is outside the timed interval and memory window. The operation
 //! creates the decoder, decodes every prepared packet in order, drains it, folds
-//! every output subtitle into the canonical [`sink`] form and drops everything.
+//! every output subtitle into the canonical [`sink`] form and drops everything. A
+//! decoder that refuses to open, as the reference's does with the same input,
+//! ends the operation with that result ([`Sink::refused_open`]).
 //! `sub-fold`, `sub-bench` and `sub-memory` print one JSON line with the event
 //! count, folded bytes and digest (`triergon-harness-runner`); `sub-trace` prints
 //! the header line and one line per event instead.
 //! `sub-input` prints the prepared packets as the reference's `sub-input` does:
 //! a header line with the time base and configuration, then one line per packet.
+//!
+//! The `subtitle-text-` modes ([`text`]) are the text subtitle operations of
+//! the formats build of the reference worker (`harness/reference_subtitle_text.h`).
 #![forbid(unsafe_code)]
 
 mod cc;
@@ -30,6 +35,13 @@ mod dvd;
 mod pgs;
 mod sink;
 mod teletext;
+mod text;
+// The repository's JSON reader, for tests that read a corpus; the parts they
+// do not call are unused here.
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../../xtask/src/json.rs"]
+mod json;
 
 use container::Result;
 use sink::Sink;
@@ -176,7 +188,11 @@ fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
 
 fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
-    match run(&words) {
+    let result = match words.first() {
+        Some(mode) if mode.starts_with(text::PREFIX) => text::run(&words),
+        _ => run(&words),
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("subtitle-worker: {error}");

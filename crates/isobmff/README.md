@@ -44,12 +44,16 @@ flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 in an existing shared input window. The view retains the window's budget charge.
 Random access can reuse bytes already supplied in the same generation. Samples
 split across windows use a bounded packet buffer.
-Complete indexed sources can check all packet projections by track before
-rewinding for merged playback.
+Complete indexed sources can check all packet projections and find the latest
+presentation end by track before rewinding for merged playback. Rewinding
+reuses the existing edit cursors.
+Optional seek restarts are allocated after the required cursors.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
 Complete fragment-only tracks can also retain a restart for backward seek
-when their projected decode times increase and each run begins at a sync sample.
+when their projected decode times increase. Non-sync run starts can retain
+restarts at fragment boundaries. A small number of additional restarts at
+short intervals and fragment boundaries reduce replay work for nearby seeks.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -308,15 +312,30 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  A front-metadata cursor can project checked encoded edits for regular tracks
+  within one finite media extent. The forward playback index checks the
+  projected byte order before delivering any packet.
   `SampleTable::has_composition_offsets` reports a regular table's `ctts`
   presence before reading its samples.
+  A regular video edit starting on the first decoded sample's presentation
+  tick keeps the initial non-sync samples with their original flags when
+  there is no sync sample at or before that tick. A
+  backward seek on that track requires a preceding sync sample. Secondary
+  tracks can replay their verified prefix when the primary lands earlier.
+  A zero-origin edit covering the decode span can retain reordered non-sync
+  packets past its presentation end and marks them for discard.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
   The regular range view also establishes a 1024-sample clock for indexed AAC-LC
   configurations 11, 12 and 14 when the media timescale matches the core rate.
-  The compatible view of a complete fragmented file supports one open-ended
-  rate-one initialization edit. Packet clocks and backward seek queries share
-  the edit's offset. AAC leading trim uses the configured audio sample rate.
+  The compatible view of a fragmented file supports one open-ended rate-one
+  media edit after an optional leading empty edit. The empty edit
+  delays packet clocks by its duration, rounded to the track time base.
+  A front movie with fragment defaults establishes the same edit before the
+  track's first fragment, even when that fragment follows other media.
+  Backward seek queries subtract the media start. AAC leading trim for
+  a single initialization edit uses the declared AAC object type and
+  configured audio sample rate.
   Regular Opus range playback retains the `dOps` record and exposes its canonical
   identification header. The MOV policy projects leading and trailing edit trim
   and retains up to one second of history plus the preceding sample for a long

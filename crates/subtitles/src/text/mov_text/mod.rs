@@ -6,6 +6,7 @@ mod config;
 mod packet;
 mod write;
 
+pub use super::decoded::{Clock, Subtitle};
 use super::{Format, Input, ProvideError, unicode::cancelled};
 use config::Configuration;
 use packet::PacketJob;
@@ -42,42 +43,6 @@ impl Default for Limits {
             maximum_ass_bytes: 4 * 1024 * 1024,
             maximum_work: 64 * 1024 * 1024,
         }
-    }
-}
-
-/// Native packet clocks are explicit and separate from the original exact
-/// Source Timing. Unknown and known zero duration remain distinct here.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Clock {
-    pub pts: Option<i64>,
-    pub dts: Option<i64>,
-    pub duration: Option<i64>,
-}
-
-/// Complete emitted AVSubtitle/ASS facts for this decoder's one ASS rectangle.
-/// Its geometry/flags are zero, rectangle type is ASS (3), format is text (1).
-#[derive(Debug)]
-pub struct Subtitle {
-    pub pts_microseconds: Option<i64>,
-    pub start_display_ms: u32,
-    pub end_display_ms: u32,
-    pub ass: Bytes,
-}
-impl Subtitle {
-    pub const fn format(&self) -> u16 {
-        1
-    }
-    pub const fn rectangle_type(&self) -> u8 {
-        3
-    }
-    pub const fn geometry(&self) -> [i32; 4] {
-        [0; 4]
-    }
-    pub const fn flags(&self) -> u32 {
-        0
-    }
-    pub const fn palette_entries(&self) -> u32 {
-        0
     }
 }
 

@@ -18,7 +18,7 @@ pub(crate) struct AtscCaptions<'a> {
     /// `cc_count` as sent.
     pub cc_count: u8,
     pub em_data: u8,
-    /// The constructs present, at most `cc_count` (see [`cc_data::triplets`](super::cc_data::triplets)).
+    /// The constructs present, at most `cc_count` (see [`cc_data::constructs`](super::cc_data::constructs)).
     pub cc_data: &'a [u8],
 }
 

@@ -92,8 +92,20 @@ pub fn fragment_runs(
     origin: Option<u64>,
     runs: &[&[u32]],
 ) -> FragmentIndex {
+    fragment_track(pool, 7, first, base, description, origin, runs)
+}
+
+pub fn fragment_track(
+    pool: &Budget,
+    track_id: u32,
+    first: u64,
+    base: u64,
+    description: u32,
+    origin: Option<u64>,
+    runs: &[&[u32]],
+) -> FragmentIndex {
     let mut header = vec![0, 0, 0, 0x3b];
-    header.extend(7u32.to_be_bytes());
+    header.extend(track_id.to_be_bytes());
     header.extend(base.to_be_bytes());
     header.extend(description.to_be_bytes());
     header.extend(10u32.to_be_bytes());
@@ -121,7 +133,7 @@ pub fn fragment_runs(
     let mut builder = FragmentBuilder::new(
         raw,
         Trex {
-            track_id: 7,
+            track_id,
             description_index: 1,
             duration: 0,
             size: 0,

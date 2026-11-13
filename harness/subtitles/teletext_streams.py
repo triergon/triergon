@@ -682,6 +682,31 @@ def case_colour_tables():
     return s.bytes()
 
 
+def case_chop():
+    """Text lines trimmed of spaces: national characters (non-ASCII) before the
+    trailing spaces, mosaics in the 41st column that run a row on into the
+    next, the last row and a character without a Unicode form ending the print."""
+    s = Stream()
+    pages = [
+        [(20, "   Hello  world   "), (21, "   "), (22, "\x01Red\x02Green\x03")],
+        [(20, " " * 39 + "#"), (21, " " * 38 + "#"), (22, "ab# x"), (23, "   #ab")],
+        [(20, "ab[   "), (21, "x\\  "), (22, "a# # "), (23, " a\\b{c} ")],
+        [(20, "\x11" + " " * 37 + "\x7f\x7f"), (22, "next")],
+        [(20, "\x11" + " " * 38 + "\x7f"), (21, "\x11\x7f\x7f\x07 ab "), (22, "next")],
+        [(21, "kept"), (22, "\x11" + " " * 37 + "\x7f\x7f"), (23, "joined")],
+        [(22, "kept"), (23, "\x11" + " " * 37 + "\x7f\x7f"), (24, "bottom  ")],
+        [(20, "x" * 40), (22, " " * 39 + "z")],
+    ]
+    for i, rows in enumerate(pages):
+        s.send(CLOCK * (2 + i), subtitle_page(8, 0x88, rows))
+    s.send(CLOCK * 12, subtitle_page(8, 0x88, [(20, "  \x7b\x7c\x7d  ")], national=4))
+    x26 = enhancement_packet(8, 0, [triplet(40 + 20, 0x04, 0), triplet(2, 0x12, 0x71)])
+    s.send(CLOCK * 13, [header_packet(8, 0x88, "", **SUBTITLE), x26]
+           + [row_packet(8, r, t) for r, t in ((18, BOX + "before"), (20, BOX + "xyz"), (22, BOX + "after"))]
+           + [header_packet(8, 0xFF, "")])
+    return s.bytes()
+
+
 def case_random(seed):
     """Random rows, attributes and enhancements on a few pages."""
     import random
@@ -731,6 +756,7 @@ CASES = {
     "subcodes": case_subcodes,
     "level25": case_level25,
     "colour-tables": case_colour_tables,
+    "chop": case_chop,
     "random-1": lambda: case_random(1),
     "random-2": lambda: case_random(2),
 }
@@ -759,6 +785,7 @@ VARIANTS = {
     "subcodes": [("", [])],
     "level25": [("", []), ("header", ["opt:txt_chop_top=0"])],
     "colour-tables": [("", [])],
+    "chop": [("", [])],
     "random-1": [("", [])],
     "random-2": [("", [])],
 }

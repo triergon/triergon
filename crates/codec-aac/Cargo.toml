@@ -23,6 +23,10 @@ name = "sbr_mute"
 required-features = ["inspect"]
 
 [[example]]
+name = "ps_input"
+required-features = ["inspect"]
+
+[[example]]
 name = "stats"
 required-features = ["inspect"]
 

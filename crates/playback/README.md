@@ -170,11 +170,26 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
-Range playback derives the duration from packet end times when the movie
-header's duration is unknown or exceeds the presentation clock.
-Complete fragmented files with an open-ended rate-one initialization edit
-apply the same edit clocks on startup and seek. The first AAC packet carries
-leading trim in `Mp4Packet::encoded_skip_samples`.
+When the movie header's duration is unknown or exceeds the presentation clock,
+range playback finds the latest packet end while checking projections. It scans
+in merged order when the seek restarts could reach their count or storage limit.
+Fragmented files support an open-ended rate-one media edit. Forward playback
+applies it from the front movie, including tracks first seen in later fragments. A
+leading empty subtitle edit delays the subtitle packet clocks. When video
+seeks before the first sync packet of a secondary fragment track, range
+playback replays that track from its first packet. An AAC track with a
+single initialization edit carries leading trim in the first packet's
+`Mp4Packet::encoded_skip_samples`. A recovered short first packet carries its
+leading trim in `Mp4NativeShortPacket::encoded_skip_samples`. The MPEG-4 object
+type identifies AAC. An edited MP3 track has the projected clocks without AAC
+trim. Source sample
+clocks and byte ranges stay literal while the compatibility packet clocks
+reflect the edit.
+For regular front-metadata input with one finite media extent,
+`compat::mov::forward_encoded_edits` accepts checked encoded edit plans
+and delivers projected packets in source byte order. AAC packets include the
+decoder priming and end-of-edit trim needed for PCM playback. The index refuses
+edits that require revisiting media bytes.
 `Mp4RangePlayer::prepare_seek_with_opus_recovery` includes the regular
 Opus track's declared preroll. Decode from the reported first sample and
 present PCM from the video landing through the track's edited end. A refused
@@ -310,6 +325,36 @@ with FFprobe 9.0.2, and where FFprobe refused the header it requires the run
 to refuse while opening, before any packet. With `Mp4Open::new_recovery`
 499/499 rows pass: 497 identical packet lists and 2 matching header refusals.
 With `Mp4Open::new` 446/499 pass; the test pins the other 53 outcomes.
+
+The synthetic `forward-aac-priming.mp4` fixture uses a 64 × 48 AVC test
+pattern at 12 fps and a 440 Hz mono AAC tone at 44.1 kHz. To reproduce it with
+FFmpeg 9.0.2 and libx264, run:
+
+```sh
+ffmpeg -nostdin -v error \
+  -f lavfi -i 'testsrc2=s=64x48:r=12' -f lavfi -i 'sine=f=440:r=44100' \
+  -t 0.35 -map 0:v:0 -map 1:a:0 -c:v libx264 -threads:v 1 -profile:v baseline \
+  -pix_fmt yuv420p -g 2 -bf 0 -c:a aac -b:a 40k -movflags +faststart forward-aac-priming.mp4
+```
+
+`forward-aac-tail-trim.mp4` keeps the 44,100 Hz movie timescale and sets
+the audio edit to media time zero and duration 16,459.
+`forward-aac-fractional-edit.mp4` sets the movie timescale to 1,000, its
+duration and the video edit's duration to 334, and the audio edit's media
+time and duration to 64 and 45. The audio edit rounds to an end one sample
+into the third packet. All three fixtures use the repository's dual license.
+The four fragmented fixtures also use the repository's dual license.
+`forward-fragment-aac-edit.mp4` and `forward-fragment-aac-late-track.mp4`
+use an FFmpeg-generated AVC test pattern and mono AAC tone. Both carry an
+open-ended audio initialization edit. The latter starts with a video-only
+fragment. `forward-fragment-aac-short.mp4` truncates an authored AVC/AAC
+fragment inside its first AAC packet. `forward-fragment-mp3-edit.mp4` uses a
+generated mono MP3 tone with an initialization edit to exercise the same clock
+projection for a different MPEG-4 audio object type. The
+[`mp4-forward` corpus](../../harness/features/mp4-forward/corpus.json) records
+their hashes and compares source byte offsets, reduced time bases and AAC trim
+along with the packet data.
+
 Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
 [Dolby clocks](tests/fixtures/dolby-clock/README.md),

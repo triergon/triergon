@@ -24,6 +24,7 @@ mod error;
 mod fft;
 mod filterbank;
 mod huffman;
+mod huffman_probed;
 mod huffman_tables;
 mod ics;
 mod ltp;
@@ -39,8 +40,21 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
 
-/// Optional policies for configured AAC.
+/// Optional AAC decoding policies.
 pub mod compat {
+    /// Handling of in-band delay signatures when a container provides priming.
+    pub mod priming {
+        /// Source of leading PCM discard for ADTS.
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+        pub enum Policy {
+            /// Apply the default delay signalled by a recognised encoder signature.
+            #[default]
+            EncoderSignature,
+            /// Leave leading discard to the caller's container edit.
+            Container,
+        }
+    }
+
     /// Channel mappings for fixed AAC-LC access units.
     ///
     /// `ConventionalSurround` reproduces the default AAC decoder of FFmpeg 9.0.2
@@ -109,6 +123,15 @@ impl Decoder {
         }
     }
 
+    /// Configure how this ADTS decoder handles an encoder delay signature.
+    /// The policy persists across discontinuities.
+    #[must_use]
+    pub fn with_priming_policy(mut self, policy: compat::priming::Policy) -> Self {
+        self.core.priming_policy = policy;
+        self.core.skip_samples = 0;
+        self
+    }
+
     /// Decode exactly one ADTS frame (header included). `out` is cleared and refilled with
     /// this frame's output (1024 or, with SBR, 2048 samples per raw_data_block). On error
     /// `out` is left empty; the decoder stays usable for the next frame.
@@ -131,6 +154,17 @@ impl Decoder {
     #[cfg(feature = "inspect")]
     pub fn enable_stats(&mut self) {
         self.core.stats_enabled = true;
+    }
+
+    /// Development aid: the QMF slots the Parametric Stereo tool received in the last
+    /// frame, 38 rows of 64 bands, re and im interleaved (empty without PS).
+    #[cfg(feature = "inspect")]
+    pub fn ps_input(&self) -> &[f32] {
+        self.core
+            .elements
+            .iter()
+            .find_map(|e| e.sbr.as_ref().filter(|s| !s.ps_input.is_empty()))
+            .map_or(&[], |s| &s.ps_input)
     }
 
     /// Development statistics of the last decoded block (unstable format).

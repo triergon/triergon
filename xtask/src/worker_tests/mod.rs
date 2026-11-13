@@ -143,7 +143,7 @@ pub fn run(root: &Path, filter: Option<&str>) -> Result<(), String> {
     if selected.is_empty() {
         return Err(format!("no worker test matches {}", filter.unwrap_or("")));
     }
-    let workers = Workers::new(root);
+    let workers = Workers::new(root)?;
     if let Some(missing) = workers.all().iter().find(|w| !w.is_file()) {
         return Err(format!(
             "{} is missing; run `cargo xtask build-workers` first",
@@ -208,12 +208,14 @@ pub struct Workers {
 }
 
 impl Workers {
-    fn new(root: &Path) -> Self {
-        Workers {
-            candidate: root.join("target/release/media-worker"),
+    fn new(root: &Path) -> Result<Self, String> {
+        Ok(Workers {
+            candidate: root
+                .join(crate::harness::gate_build::release_dir()?)
+                .join("media-worker"),
             reference: root.join("target/harness/ffmpeg-worker"),
             combined: root.join("target/harness/ffmpeg-combined-worker"),
-        }
+        })
     }
 
     fn all(&self) -> [&Path; 3] {

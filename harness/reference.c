@@ -25,7 +25,9 @@
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
  *                                 (TRIERGON_COMBINED_REFERENCE) variants, and
  *                                 the subtitle decoders (TRIERGON_SUBTITLE_REFERENCE,
- *                                 reference_subtitles.h). */
+ *                                 reference_subtitles.h, with the flagging wrappers of
+ *                                 reference_subtitles_host.h; TRIERGON_SUBTITLE_PLAIN_REFERENCE
+ *                                 without them, for timing and memory). */
 #if defined(TRIERGON_DECODE_REFERENCE)
 #include "reference_decode.h"
 #elif defined(TRIERGON_CAPTURE_REFERENCE)
@@ -240,7 +242,7 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #include "reference_pgs.h"
 #include "reference_subtitle_text.h"
 #endif
-#ifdef TRIERGON_SUBTITLE_REFERENCE
+#if defined(TRIERGON_SUBTITLE_REFERENCE) || defined(TRIERGON_SUBTITLE_PLAIN_REFERENCE)
 #include "reference_subtitles.h"
 #endif
 int main(int argc,char **argv){
@@ -256,7 +258,7 @@ int main(int argc,char **argv){
 #ifdef TRIERGON_HLS_REFERENCE
     if(!strncmp(argv[1],"progressive-",12))return progressive_main(argc,argv);
 #endif
-#ifdef TRIERGON_SUBTITLE_REFERENCE
+#if defined(TRIERGON_SUBTITLE_REFERENCE) || defined(TRIERGON_SUBTITLE_PLAIN_REFERENCE)
     if(!strncmp(argv[1],"sub-",4))return sub_main(argc,argv);
 #endif
     FILE *file=fopen(argv[2],"rb");if(!file)return 2;

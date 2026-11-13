@@ -516,10 +516,65 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             (102, 54_337, 7_863_734_754_543_817_612),
         ),
     ]);
+    for (name, hash, folds) in [
+        (
+            "fragmented-subtitles",
+            "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+            [
+                (229, 47_344, 17_268_720_163_590_035_113),
+                (229, 47_344, 17_268_720_163_590_035_113),
+                (172, 35_623, 9_383_543_265_607_670_677),
+                (60, 11_998, 2_935_735_271_173_150_781),
+            ],
+        ),
+        (
+            "fragmented-subtitle-edit",
+            "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+            [
+                (228, 47_342, 4_913_362_454_912_207_988),
+                (228, 47_342, 4_913_362_454_912_207_988),
+                (173, 35_629, 17_500_664_033_615_905_035),
+                (61, 12_004, 15_718_313_594_074_699_357),
+            ],
+        ),
+    ] {
+        let file = format!("{name}.mp4");
+        let source = paths
+            .root
+            .join("crates/playback/tests/fixtures/mp4")
+            .join(&file);
+        let bytes = fs::read(&source).map_err(|error| format!("{}: {error}", source.display()))?;
+        if sha256::hex(&bytes) != hash {
+            return Err(format!("Fragmented subtitle range seed changed: {file}"));
+        }
+        write(&output.join(&file), &bytes)?;
+        for ((operation, target), expected) in [
+            ("open", None),
+            ("seek-start", Some("0")),
+            ("seek-during-cue", Some("24576")),
+            ("seek-after-cue", Some("60000")),
+        ]
+        .into_iter()
+        .zip(folds)
+        {
+            cases.push(mp4_range_case(
+                &format!("{name}-{operation}"),
+                &file,
+                &bytes,
+                target,
+                expected,
+            ));
+        }
+    }
+    cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
-        &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
+        &Value::object([
+            ("schema", Value::int(1)),
+            ("directory", Value::str(".research/mp4-range-fixtures")),
+            ("cases", Value::Array(cases)),
+        ]),
     )?;
     Ok(format!("MP4 range corpus: {count} playback comparisons"))
 }
@@ -558,7 +613,7 @@ fn mp4_range_case<'a>(
     file: &str,
     data: &[u8],
     arguments: impl IntoIterator<Item = &'a str>,
-    (packets, bytes, digest): (u32, u32, u64),
+    expected: (u32, u32, u64),
 ) -> Value {
     authored(
         id,
@@ -566,16 +621,55 @@ fn mp4_range_case<'a>(
         data,
         vec![
             ("arguments", Value::strings(arguments)),
-            (
-                "expected",
-                Value::object([
-                    ("packets", Value::int(packets)),
-                    ("bytes", Value::int(bytes)),
-                    ("digest", Value::int(digest)),
-                ]),
-            ),
+            ("expected", mp4_range_expected(expected)),
         ],
     )
+}
+
+fn mp4_range_expected((packets, bytes, digest): (u32, u32, u64)) -> Value {
+    Value::object([
+        ("packets", Value::int(packets)),
+        ("bytes", Value::int(bytes)),
+        ("digest", Value::int(digest)),
+    ])
+}
+
+fn mp4_range_fate_cases(root: &Path) -> Result<[Value; 2], String> {
+    const FILE: &str = "mov/mp4-init-nonkeyframe.mp4";
+    let registry = crate::checks::read_json(&root.join("harness/fate/samples.json"))?;
+    let path = format!("fate/{FILE}");
+    let sha256 = registry
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .find(|sample| sample.get("path").and_then(Value::as_str) == Some(&path))
+        .and_then(|sample| sample.get("sha256").and_then(Value::as_str))
+        .ok_or("missing FATE non-sync prefix input hash")?;
+    let case = |id, target, expected| {
+        Value::object([
+            ("id", Value::str(id)),
+            ("profile", Value::str(id)),
+            ("file", Value::str(FILE)),
+            ("sha256", Value::str(sha256)),
+            ("rights", Value::str("fetched-not-redistributed")),
+            ("source", Value::str(format!("fate-suite/{FILE}"))),
+            ("arguments", Value::strings(target)),
+            ("expected", mp4_range_expected(expected)),
+        ])
+    };
+    Ok([
+        case(
+            "fate-non-sync-prefix-open",
+            None,
+            (293, 1158487, 4548821196215711946),
+        ),
+        case(
+            "fate-non-sync-prefix-seek",
+            Some("91091"),
+            (72, 317984, 3463143097373344921),
+        ),
+    ])
 }
 
 fn mp4_range_entries(paths: &Paths, output: &Path) -> Result<Vec<Value>, String> {

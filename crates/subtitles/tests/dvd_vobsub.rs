@@ -52,7 +52,6 @@ fn a_malformed_timestamp_is_an_error() {
         &b"timestamp: -00:00:01:000, filepos: 0"[..],
         b"timestamp: 00:00:01, filepos: 0",
         b"timestamp: 00:00:01:000",
-        b"delay: soon",
         b"id: en, index: 300",
     ] {
         assert!(lines(line)[0].is_err(), "{}", String::from_utf8_lossy(line));
@@ -88,6 +87,68 @@ fn streams_are_created_by_their_first_timestamp() {
     assert_eq!(times(0), [2000, 4000]);
     assert_eq!(times(1), [1000]);
     assert_eq!(times(2), [3000]);
+}
+
+/// `delay:` values as observed in the pinned FFmpeg build for 32-bit ARMv7:
+/// spaces then an optional `-` for the whole delay, up to four decimal fields
+/// saturating at 2³¹ − 1 and −2³¹, missing fields zero, never an error.
+#[test]
+fn delays_are_read_as_32_bit_arm_reads_them() {
+    let delay = |value: &str| match lines(format!("delay:{value}").as_bytes())[..] {
+        [Ok(Line::Delay(milliseconds))] => milliseconds,
+        ref other => panic!("{value:?}: {other:?}"),
+    };
+    for (value, milliseconds) in [
+        (" 00:00:01:000", 1000),
+        (" -00:00:00:500", -500),
+        ("-00:00:01:000", -1000),
+        ("  -00:00:01:000", -1000),
+        (" +00:00:01:000", 1000),
+        ("  +00:00:01:000", 1000),
+        // Only spaces come before the sign; the first field reads the rest.
+        ("\t-00:00:01:000", 1000),
+        (" --00:00:01:000", -1000),
+        (" - -00:00:01:000", -1000),
+        (" - 00:00:01:000", -1000),
+        (" -+00:00:01:000", -1000),
+        (" 0:0:0:-500", -500),
+        (" -0:0:0:-500", 500),
+        (" 00:00:-01:000", -1000),
+        (" 00: 00:01:000", 1000),
+        // Fields it does not reach are zero.
+        (" 00:00:01", 1000),
+        (" 9", 32_400_000),
+        (" 9:8", 32_880_000),
+        (" 00 :00:01:000", 0),
+        (" 0x10:0:0:0", 0),
+        (" garbage", 0),
+        ("", 0),
+        (" 00:00:01:000x", 1000),
+        (" 1:2:3:4:5", 3_723_004),
+        // Each field saturates at `int`; the sum has 64 bits.
+        (" 596:31:23:648", 2_147_483_648),
+        (" 1193:0:0:0", 4_294_800_000),
+        (" 0:35791394:0:0", 2_147_483_640_000),
+        (" 0:0:0:2147483648", 2_147_483_647),
+        (" 0:0:0:4294967296", 2_147_483_647),
+        (" 0:0:0:99999999999999999999", 2_147_483_647),
+        (" 0:0:0:-2147483649", -2_147_483_648),
+        (" -0:0:0:2147483648", -2_147_483_647),
+        (" -0:0:0:-2147483649", 2_147_483_648),
+        (" 4294967296:0:0:0", 7_730_941_129_200_000),
+        (" -2147483648:0:0:0", -7_730_941_129_200_000),
+        (" -4294967297:0:0:0", -7_730_941_129_200_000),
+    ] {
+        assert_eq!(delay(value), milliseconds, "{value:?}");
+    }
+    // Each line replaces the delay, whatever it says.
+    let budget = Budget::new(1 << 16).unwrap();
+    let text = b"id: en, index: 0\ndelay: 00:00:05:000\ndelay: garbage\n\
+        timestamp: 00:00:01:000, filepos: 0\ndelay: 1:2:3:4\ndelay: 00:00:07\n\
+        timestamp: 00:00:01:000, filepos: 800\n";
+    let index = VobSubIndex::parse(&budget, text).unwrap();
+    let times: Vec<_> = index.entries(0).map(|e| e.milliseconds).collect();
+    assert_eq!(times, [1000, 8000]);
 }
 
 #[test]

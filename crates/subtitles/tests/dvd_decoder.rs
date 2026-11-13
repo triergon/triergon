@@ -507,7 +507,7 @@ fn configuration_and_options_select_the_palette() {
     assert_eq!(
         options.palette.unwrap()[..9],
         [
-            0x112233, 0x445566, 0x778899, 0xaabbcc, 0xddeeff, 0xabcdef, 0x102030, 0x334455, 0
+            0x112233, 0x445566, 0x778899, 0xaabbcc, 0xddeeff, 0xabcdef, 0x102030, 0xffffff, 0
         ]
     );
     options.apply_palette_option(b"zz,445566");
@@ -517,8 +517,35 @@ fn configuration_and_options_select_the_palette() {
     assert_eq!(options.palette, None);
 }
 
-/// The canvas of the `size:` line, read as the reference's `sscanf("%dx%d")`
-/// and refused where the reference cannot open its decoder.
+/// Palette numbers as observed in FFmpeg built for 32-bit ARMv7: beyond 32
+/// bits a number is white, whatever its sign or leading zeros; within them a
+/// minus negates modulo 2³².
+#[test]
+fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
+    let mut options = Settings::default();
+    options.apply_palette_option(
+        b"1122334455,100000000,ffffffff,-1,-100000000,-ffffffff,80000000,-80000001,\
+          8000000000000000,10000000000000000,0x1122334455,00000000000000001122334455",
+    );
+    assert_eq!(
+        options.palette.unwrap()[..12],
+        [
+            0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0x000001, 0x000000, 0xffffff,
+            0xffffff, 0xffffff, 0xffffff, 0xffffff
+        ]
+    );
+    options.apply_palette_option(b"-0x100000000,ffffffff0,-ffffffff0,fedcba98,-fedcba98,-0,1");
+    assert_eq!(
+        options.palette.unwrap()[..7],
+        [0xffffff, 0xffffff, 0xffffff, 0xdcba98, 0x234568, 0, 1]
+    );
+    // The configuration's `palette:` line is read the same way.
+    let read = Settings::from_configuration(b"palette: 1122334455, 100000000, -100000000\n");
+    assert_eq!(read.unwrap().palette.unwrap()[..3], [0xffffff; 3]);
+}
+
+/// The canvas of the `size:` line: two numbers separated by an `x`, refused
+/// where the reference cannot open its decoder.
 #[test]
 fn the_size_line_sets_the_canvas() {
     let canvas = |text: &[u8]| Settings::from_configuration(text).map(|s| s.canvas);
@@ -566,8 +593,16 @@ fn the_size_line_sets_the_canvas() {
     // The largest square the reference accepts, and one past it.
     assert_eq!(canvas(b"size: 16255x16255"), Ok(Some([16255, 16255])));
     assert!(canvas(b"size: 16256x16256").is_err());
-    // A number keeps its low 32 bits, as the reference stores it in an `int`.
-    assert_eq!(canvas(b"size: 4294968016x480"), Ok(Some([720, 480])));
+    // A number beyond 2³¹ − 1 or below −2³¹ refuses the size, as observed in
+    // FFmpeg built for 32-bit ARMv7.
+    for beyond in [
+        &b"size: 4294968016x480"[..],
+        b"size: 2147483648x480",
+        b"size: 720x-4294966816",
+        b"size: 99999999999999999999x480",
+    ] {
+        assert!(canvas(beyond).is_err(), "{beyond:?}");
+    }
 }
 
 #[test]

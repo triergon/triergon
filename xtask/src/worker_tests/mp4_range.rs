@@ -34,7 +34,12 @@ pub(super) fn opus_recovery_refuses_invalid_roll_maps(cx: &mut Context<'_>) -> O
     parameter[2910..2914].copy_from_slice(b"free");
     let parameter = scratch.file("parameterised-roll.mp4", &parameter)?;
     for (binary, refusal) in [
-        (cx.root.join("target/release/playback-worker"), 2),
+        (
+            cx.root
+                .join(crate::harness::gate_build::release_dir()?)
+                .join("playback-worker"),
+            2,
+        ),
         (cx.root.join("target/harness/ffmpeg-formats-worker"), 1),
     ] {
         let args: &[&dyn std::fmt::Display] = &[&32_000, &"opus-roll"];

@@ -113,14 +113,20 @@ fn reserve_amortised<T>(items: &mut BudgetVec<T>, additional: usize, bound: usiz
         .max(4)
         .min(bound)
         .max(needed);
-    items
-        .try_reserve_exact(target - items.len())
-        .or_else(|error| match error {
-            Error::Backpressure { .. } | Error::Limit { .. } if target > needed => {
-                items.try_reserve_exact(additional)
-            }
-            error => Err(error),
-        })
+    reserve_room(items, additional, target)
+}
+
+/// Room for `additional` more items in `items`, `target` in all (at least what
+/// is needed) where the pool allows; under pool pressure the exact request is
+/// tried instead.
+fn reserve_room<T>(items: &mut BudgetVec<T>, additional: usize, target: usize) -> Result<()> {
+    let room = target - items.len();
+    items.try_reserve_exact(room).or_else(|error| match error {
+        Error::Backpressure { .. } | Error::Limit { .. } if room > additional => {
+            items.try_reserve_exact(additional)
+        }
+        error => Err(error),
+    })
 }
 
 /// Why the receiver refused a packet, as the reference's decode call fails.

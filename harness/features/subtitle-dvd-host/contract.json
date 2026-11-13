@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "id": "subtitle-dvd-host",
+  "operation": "subtitle-decode",
+  "candidate": "subtitle-worker",
+  "worker_operation": "sub-",
+  "reference": "ffmpeg-subtitles-native",
+  "measurement_reference": "ffmpeg-subtitles-plain-native",
+  "pinned_per_target": true,
+  "contract": [
+    "the DVD subpicture cases whose FFmpeg result depends on the target, decoded and folded as subtitle-dvd decodes and folds them: cases the reference flags because they reach a C library result that differs between 32-bit ARM and AArch64 for the same arguments (harness/reference_subtitles_host.h)",
+    "each case is pinned per target from that target's own reference run, with the reference's flag; a case passes when the candidate, the reference and the target's pin agree",
+    "the decoder follows FFmpeg built with GCC for 32-bit ARM hard-float; where FFmpeg for aarch64-unknown-linux-gnu gives another result, the case is open there as a deliberate divergence",
+    "preparation outside the timed operation: open the input, select the subpicture stream and its configuration, and copy its packets in demux order",
+    "one timed operation: create and open the decoder with the stream's configuration, packet time base and options (a decoder that refuses to open folds as no subtitles and the word 2^64 - 1 in both workers), decode every prepared packet with one call each, drain, fold every output subtitle and free it, free the decoder"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "pending_module_requirements": [
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu decodes the palette option's 1122334455, a number beyond 32 bits, as its low bits (0x334455), where FFmpeg built for 32-bit ARM gives 0xffffff; the decoder follows 32-bit ARM",
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: width 4294968016, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: height -4294966816, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+    "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads delay: fields beyond 2^31 - 1 or below -2^31 as their low 32 bits, where FFmpeg built for 32-bit ARM saturates them at 2^31 - 1 and -2^31, so the subtitles are shown at other times there; the decoder follows 32-bit ARM"
+  ],
+  "open_cases": [
+    {
+      "id": "vobsub-palette-option",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu decodes the palette option's 1122334455, a number beyond 32 bits, as its low bits (0x334455), where FFmpeg built for 32-bit ARM gives 0xffffff; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "vobsub-idx-size-beyond-32-bits",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: width 4294968016, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "vobsub-idx-size-negative-beyond-32-bits",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads the size: height -4294966816, beyond 2^31 - 1, as its low 32 bits and opens a 720x480 canvas, where FFmpeg built for 32-bit ARM refuses to open the decoder; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "vobsub-idx-delay-beyond-32-bits",
+      "requirement": "a deliberate divergence, target-dependent by design: FFmpeg built for aarch64-unknown-linux-gnu reads delay: fields beyond 2^31 - 1 or below -2^31 as their low 32 bits, where FFmpeg built for 32-bit ARM saturates them at 2^31 - 1 and -2^31, so the subtitles are shown at other times there; the decoder follows 32-bit ARM",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

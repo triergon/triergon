@@ -5,56 +5,46 @@
 //! (bits 0 and 1): types 0 and 1 are CEA-608 byte pairs of field 1 and field 2,
 //! types 2 and 3 carry DTVCC (CEA-708) packet data, 3 starting a packet.
 
-/// What a construct carries.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum CcType {
-    /// A CEA-608 byte pair of field 1 (CC1, CC2, T1, T2).
-    Field1,
-    /// A CEA-608 byte pair of field 2 (CC3, CC4, T3, T4, XDS).
-    Field2,
-    /// Two bytes continuing a DTVCC packet.
-    DtvccData,
-    /// The first two bytes of a DTVCC packet.
-    DtvccStart,
+/// The bits of a flag byte that say whether a construct is a CEA-608 byte pair
+/// of a field: `cc_valid` and `cc_type`.
+const SELECTION: u8 = 0b111;
+
+/// Whether a construct with flag byte `flags` is a valid CEA-608 byte pair of
+/// `field` (0 or 1): `cc_valid` set and `cc_type` equal to the field.
+#[must_use]
+pub(crate) const fn is_field_pair(flags: u8, field: u8) -> bool {
+    flags & SELECTION == 0b100 | field
 }
 
-impl CcType {
-    /// The type of a flag byte.
-    #[must_use]
-    pub(crate) const fn of(flags: u8) -> Self {
-        match flags & 3 {
-            0 => Self::Field1,
-            1 => Self::Field2,
-            2 => Self::DtvccData,
-            _ => Self::DtvccStart,
+/// The constructs of `cc_data`, in order: flag byte and two data bytes each. A
+/// trailing partial construct is not one.
+#[must_use]
+pub(crate) fn constructs(cc_data: &[u8]) -> &[[u8; 3]] {
+    cc_data.as_chunks().0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_field_pair_is_valid_and_of_that_field() {
+        for flags in 0..=u8::MAX {
+            for field in [0, 1] {
+                let valid = flags & 4 != 0;
+                let cc_type = flags & 3;
+                assert_eq!(
+                    is_field_pair(flags, field),
+                    valid && cc_type == field,
+                    "{flags:#x}"
+                );
+            }
         }
     }
-}
 
-/// One construct.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct Triplet {
-    /// The flag byte as sent, marker bits included.
-    pub flags: u8,
-    pub data: [u8; 2],
-}
-
-impl Triplet {
-    #[must_use]
-    pub(crate) const fn valid(self) -> bool {
-        self.flags & 4 != 0
+    #[test]
+    fn a_trailing_partial_construct_is_dropped() {
+        assert_eq!(constructs(&[0xfc, 1, 2, 0xfd, 3]), &[[0xfc, 1, 2]]);
+        assert!(constructs(&[0xfc, 1]).is_empty());
     }
-
-    #[must_use]
-    pub(crate) const fn kind(self) -> CcType {
-        CcType::of(self.flags)
-    }
-}
-
-/// The constructs of `cc_data`, in order; a trailing partial construct is not one.
-pub(crate) fn triplets(cc_data: &[u8]) -> impl ExactSizeIterator<Item = Triplet> + Clone + '_ {
-    cc_data.chunks_exact(3).map(|c| Triplet {
-        flags: c[0],
-        data: [c[1], c[2]],
-    })
 }

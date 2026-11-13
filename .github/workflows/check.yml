@@ -38,6 +38,8 @@ jobs:
           touch "$RUNNER_TEMP/downloads-start"
       - name: Prepare pinned reference and fixtures
         run: cargo xtask prepare-check || cargo xtask prepare-check
+      - name: Verify the committed MP4 range manifest
+        run: git diff --exit-code -- harness/features/mp4-range/corpus.json
       - name: Verify workspace
         run: cargo xtask check
       - name: Keep only the downloads this run used

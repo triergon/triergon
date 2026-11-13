@@ -19,7 +19,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
 
 mod range_seek;
 use range_seek::Checkpoints;
@@ -142,12 +142,12 @@ pub(crate) struct PreviousClock {
     pub(crate) duration: u32,
     pub(crate) source_known: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct Slot<'a> {
     resume_remaining: u64,
     track: DemuxTrack<'a>,
     cursor: TrackSampleCursor<'a>,
-    edited: Option<EditCursor<'a>>,
+    edited: Option<BudgetVec<EditCursor<'a>>>,
     encoded_edit: Option<&'a crate::EncodedEditPlan>,
     head: Option<PacketOccurrence>,
     clock: Option<MediaClock>,
@@ -155,7 +155,8 @@ struct Slot<'a> {
     append_run: Option<(usize, usize)>,
     discard_boundary: Option<i128>,
     fragment_cto_minimum: i64,
-    fragment_media_start: Option<i64>,
+    fragment_edit: Option<FragmentEdit>,
+    front_fragment: bool,
     previous_clock: Option<PreviousClock>,
     saw_fragment: bool,
     starts_fragment_run: bool,
@@ -179,7 +180,8 @@ impl<'a> Slot<'a> {
             append_run: None,
             discard_boundary: None,
             fragment_cto_minimum: 0,
-            fragment_media_start: None,
+            fragment_edit: None,
+            front_fragment: false,
             previous_clock: None,
             saw_fragment: false,
             starts_fragment_run: false,
@@ -190,6 +192,51 @@ impl<'a> Slot<'a> {
     fn clock(&self) -> Result<MediaClock> {
         self.clock
             .ok_or(Error::Invalid("missing projected media clock"))
+    }
+
+    fn try_clone(&self) -> Result<Self> {
+        self.try_clone_with_edit_storage(None)
+    }
+
+    fn try_clone_with_edit_storage(
+        &self,
+        storage: Option<BudgetVec<EditCursor<'a>>>,
+    ) -> Result<Self> {
+        let edited = match (&self.edited, storage) {
+            (None, _) => None,
+            (Some(source), Some(mut storage)) => {
+                storage.as_mut_slice()[0].clone_from(&source.as_slice()[0]);
+                Some(storage)
+            }
+            (Some(source), None) => Some(source.try_clone()?),
+        };
+        Ok(Self {
+            resume_remaining: self.resume_remaining,
+            track: self.track,
+            cursor: self.cursor.clone(),
+            edited,
+            encoded_edit: self.encoded_edit,
+            head: self.head.clone(),
+            clock: self.clock,
+            shift: self.shift,
+            append_run: self.append_run,
+            discard_boundary: self.discard_boundary,
+            fragment_cto_minimum: self.fragment_cto_minimum,
+            fragment_edit: self.fragment_edit,
+            front_fragment: self.front_fragment,
+            previous_clock: self.previous_clock,
+            saw_fragment: self.saw_fragment,
+            starts_fragment_run: self.starts_fragment_run,
+            ended: self.ended,
+        })
+    }
+
+    fn fragment_edit_offset(&self) -> i64 {
+        self.fragment_edit.map_or(0, |edit| edit.packet_offset)
+    }
+
+    fn fragment_seek_offset(&self) -> i64 {
+        self.fragment_edit.map_or(0, |edit| edit.media_start)
     }
 
     fn source(&self) -> Result<SourceTrack<'a>> {
@@ -221,7 +268,7 @@ impl<'a> Slot<'a> {
                 .ok_or(Error::Overflow)?;
             // Keep decode accumulation in media ticks. The index checks the
             // witness against the projected DTS of the two adjacent packets.
-            let edit_start = i128::from(self.fragment_media_start.unwrap_or_default());
+            let edit_start = i128::from(self.fragment_edit_offset());
             let predecessor_dts = previous
                 .dts
                 .checked_sub(edit_start)
@@ -279,7 +326,8 @@ impl<'a> Slot<'a> {
                 media_clock: clock,
                 scheduling_clock: SchedulingClock::SingleTrack,
             }
-        } else if let Some(cursor) = &mut self.edited {
+        } else if let Some(edited) = &mut self.edited {
+            let cursor = &mut edited.as_mut_slice()[0];
             match cursor.poll(work)? {
                 CursorStatus::Ready => {
                     let occurrence = cursor.take_occurrence()?;
@@ -324,7 +372,7 @@ impl<'a> Slot<'a> {
                 )
             };
             let mut demux = if sample.fragment_flags.is_some() {
-                let offset = i128::from(self.fragment_media_start.unwrap_or_default());
+                let offset = i128::from(self.fragment_edit_offset());
                 let presentation_dts = dts.checked_sub(offset).ok_or(Error::Overflow)?;
                 view.project_fragment(&sample, presentation_dts, self.fragment_cto_minimum)?
             } else {
@@ -365,11 +413,7 @@ impl<'a> Slot<'a> {
                     source_known: sample.dts_ticks.is_some(),
                 });
             }
-            let edit = self.fragment_media_start.map(|_| EditIdentity {
-                sequence: sample.ordinal,
-                edit_ordinal: 1,
-                duration_basis: DurationBasis::FragmentDecodeDelta,
-            });
+            let edit = self.fragment_edit.map(|edit| edit.identity(sample.ordinal));
             PacketOccurrence {
                 track_id: self.track.track_id,
                 source: sample,
@@ -477,29 +521,80 @@ pub struct PacketCursor<'a> {
     failed: Option<Error>,
     complete_source: bool,
     front_source: bool,
+    forward_encoded_end: Option<u64>,
     terminal: Option<crate::TerminalMdat>,
     forward_regular: Option<crate::ForwardRegularMdat>,
     check_projections: bool,
+    checked_duration_us: Option<i64>,
+    duration_checkpoints: usize,
     projection: TrackProjection,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
 }
 
 pub(crate) fn fragment_media_start(edits: &EditList) -> Result<i64> {
-    let unsupported = Error::Unsupported("fragment edit must be one open-ended rate-one entry");
     if edits.len() != 1 {
-        return Err(unsupported);
+        return Err(UNSUPPORTED_FRAGMENT_EDIT);
     }
-    let edit = edits.entry(0)?;
+    fragment_media_start_at(edits, 0)
+}
+
+const UNSUPPORTED_FRAGMENT_EDIT: Error =
+    Error::Unsupported("fragment edit needs open-ended rate-one media");
+
+fn fragment_media_start_at(edits: &EditList, at: u32) -> Result<i64> {
+    let edit = edits.entry(at)?;
     // An initialization edit with zero duration spans every later fragment.
     if edit.segment_duration != 0
         || edit.media_time < 0
         || edit.rate_integer != 1
         || edit.rate_fraction != 0
     {
-        return Err(unsupported);
+        return Err(UNSUPPORTED_FRAGMENT_EDIT);
     }
     Ok(edit.media_time)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FragmentEdit {
+    pub(crate) packet_offset: i64,
+    media_start: i64,
+    leading_empty: bool,
+}
+
+impl FragmentEdit {
+    fn new(edits: &EditList, movie_base: TimeBase, media_base: TimeBase) -> Result<Self> {
+        let (at, delay) = match edits.len() {
+            1 => (0, 0),
+            2 => {
+                let empty = edits.entry(0)?;
+                if !empty.is_empty() || empty.rate_integer != 1 || empty.rate_fraction != 0 {
+                    return Err(UNSUPPORTED_FRAGMENT_EDIT);
+                }
+                // The empty interval is in movie ticks. Project its duration
+                // once onto the track clock before applying the media start.
+                let delay = empty
+                    .duration(movie_base)?
+                    .to_i64_ticks(media_base, Rounding::NearestAway)?;
+                (1, delay)
+            }
+            _ => return Err(UNSUPPORTED_FRAGMENT_EDIT),
+        };
+        let media_start = fragment_media_start_at(edits, at)?;
+        Ok(Self {
+            packet_offset: media_start.checked_sub(delay).ok_or(Error::Overflow)?,
+            media_start,
+            leading_empty: at != 0,
+        })
+    }
+
+    pub(crate) fn identity(self, sequence: u64) -> EditIdentity {
+        EditIdentity {
+            sequence,
+            edit_ordinal: 1 + u32::from(self.leading_empty),
+            duration_basis: DurationBasis::FragmentDecodeDelta,
+        }
+    }
 }
 
 fn count(value: u64, maximum: u64) -> Result<()> {
@@ -516,8 +611,7 @@ impl<'a> PacketCursor<'a> {
         self.slots
             .as_slice()
             .first()
-            .and_then(|slot| slot.fragment_media_start)
-            .unwrap_or_default()
+            .map_or(0, Slot::fragment_seek_offset)
     }
 
     pub fn new(
@@ -577,6 +671,32 @@ impl<'a> PacketCursor<'a> {
         Ok(cursor)
     }
 
+    /// Project initialization edits for tracks declared by the front movie's
+    /// fragment defaults, including tracks whose first fragment arrives later.
+    pub fn new_front_fragmented(
+        budget: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        terminal: Option<crate::TerminalMdat>,
+        defaults: &[crate::Trex],
+        limits: PacketLimits,
+    ) -> Result<Self> {
+        let mut cursor = Self::new_front_source(
+            budget,
+            tracks,
+            media,
+            terminal,
+            limits,
+            DemuxProfile::NoParseNoFillin,
+        )?;
+        for slot in cursor.slots.as_mut_slice() {
+            slot.front_fragment = defaults
+                .iter()
+                .any(|entry| entry.track_id == slot.track.track_id);
+        }
+        Ok(cursor)
+    }
+
     fn from_slots(
         slots: BudgetVec<Slot<'a>>,
         media: &'a [Range<u64>],
@@ -601,9 +721,12 @@ impl<'a> PacketCursor<'a> {
             failed: None,
             complete_source: false,
             front_source: false,
+            forward_encoded_end: None,
             terminal: None,
             forward_regular: None,
             check_projections: false,
+            checked_duration_us: None,
+            duration_checkpoints: 0,
             projection: TrackProjection::default(),
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
@@ -658,6 +781,42 @@ impl<'a> PacketCursor<'a> {
         cursor.terminal = terminal;
         Ok(cursor)
     }
+
+    /// Project validated regular edits in ascending source order. All sample
+    /// declarations must belong to the media extent already found by the opener.
+    pub fn new_front_with_encoded_edits(
+        budget: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+        plans: &'a [Option<crate::EncodedEditPlan>],
+    ) -> Result<Self> {
+        if plans.len() != tracks.len() {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
+        let [extent] = media else {
+            return Err(Error::Unsupported(
+                "front encoded edits require regular tracks and one media extent",
+            ));
+        };
+        let mut cursor = Self::new_front_source(
+            budget,
+            tracks,
+            media,
+            None,
+            limits,
+            DemuxProfile::NoParseNoFillin,
+        )?;
+        if tracks.iter().any(|track| !track.fragments.is_empty()) {
+            return Err(Error::Unsupported(
+                "front encoded edits require regular tracks and one media extent",
+            ));
+        }
+        cursor.bind_encoded_edits(budget, plans)?;
+        cursor.forward_encoded_end = Some(extent.start);
+        Ok(cursor)
+    }
+
     /// Project unedited regular declarations for a forward-only front movie.
     /// An occurrence outside the first extent still needs actual later media
     /// admission before it may carry a packet payload.
@@ -704,7 +863,7 @@ impl<'a> PacketCursor<'a> {
             slot.previous_clock,
             slot.fragment_cto_minimum,
             slot.track.table.sample_count(),
-            slot.edited.is_some(),
+            slot.fragment_edit,
         ))
     }
     /// Explicit encoded edit admission; the default/demux-source constructors
@@ -816,6 +975,24 @@ impl<'a> PacketCursor<'a> {
         }
         self.check_projections = true;
         Ok(())
+    }
+
+    /// During the complete projection check, collect the latest packet
+    /// presentation end. The maximum is independent of inter-track order.
+    /// Preserve merged order if seek restarts can reach a count or storage limit.
+    pub fn check_duration_before_replay(&mut self) -> Result<()> {
+        self.check_projections_before_replay()?;
+        self.checked_duration_us = Some(0);
+        Ok(())
+    }
+
+    /// Return the checked presentation end in microseconds after the scan.
+    pub fn checked_duration_us(&self) -> Option<i64> {
+        if matches!(self.phase, Phase::End) && self.failed.is_none() {
+            self.checked_duration_us
+        } else {
+            None
+        }
     }
     /// Reconstruct each track's real demux state up to its checked occurrence
     /// position before the existing global selector begins delivery. Full source
@@ -996,6 +1173,10 @@ impl<'a> PacketCursor<'a> {
         }
         self.recording_seek_checkpoints = false;
         self.check_projections = false;
+        self.checked_duration_us = None;
+        if let (Some(end), [extent]) = (&mut self.forward_encoded_end, self.media) {
+            *end = extent.start;
+        }
         self.at = 0;
         self.generated = 0;
         self.phase = Phase::Initialize;
@@ -1060,6 +1241,12 @@ impl<'a> PacketCursor<'a> {
                             if !work.try_charge(1) {
                                 return Ok(CursorStatus::Yield);
                             }
+                            if self.checked_duration_us.is_some() {
+                                let points =
+                                    range_seek::track_checkpoint_bound(slot, self.previous_ordinal);
+                                self.duration_checkpoints =
+                                    self.duration_checkpoints.saturating_add(points);
+                            }
                             self.at += 1;
                             self.previous_ordinal = 0;
                         }
@@ -1090,6 +1277,23 @@ impl<'a> PacketCursor<'a> {
                                 if sample.range.start < extent.start {
                                     return Err(Error::Invalid("native sample outside mdat"));
                                 }
+                                sample.require_within(extent.clone())?;
+                                continue;
+                            }
+                            if self.media.len() > 1
+                                && self.terminal.is_none()
+                                && self.forward_regular.is_none()
+                                && work.try_charge(u64::from(self.media.len().ilog2()) + 3)
+                            {
+                                // Reserve the full partition search and bounds check.
+                                // Small grants use the resumable search below.
+                                let end = self
+                                    .media
+                                    .partition_point(|extent| extent.start <= sample.range.start);
+                                let extent = end
+                                    .checked_sub(1)
+                                    .and_then(|at| self.media.get(at))
+                                    .ok_or(Error::Invalid("native sample outside mdat"))?;
                                 sample.require_within(extent.clone())?;
                                 continue;
                             }
@@ -1142,9 +1346,6 @@ impl<'a> PacketCursor<'a> {
                         if !projection.is_all() {
                             // The clock pass charged one unit for visiting each slot.
                             projection.retain(&mut self.slots);
-                            if self.recording_seek_checkpoints {
-                                self.initialize_range_seek_checkpoints();
-                            }
                         }
                         self.at = 0;
                         self.phase = Phase::Initialize;
@@ -1173,6 +1374,19 @@ impl<'a> PacketCursor<'a> {
                 }
                 Phase::Initialize => {
                     if self.at == self.slots.len() {
+                        if self.recording_seek_checkpoints {
+                            // Reserve optional restarts after initializing the required cursors.
+                            self.initialize_range_seek_checkpoints();
+                            if self.recording_seek_checkpoints
+                                && self.checked_duration_us.is_some()
+                                && !range_seek::can_record_by_track(
+                                    self.duration_checkpoints,
+                                    self.slots.budget(),
+                                )
+                            {
+                                self.check_projections = false;
+                            }
+                        }
                         self.at = 0;
                         self.phase = if self.check_projections {
                             Phase::CheckProjections
@@ -1184,6 +1398,7 @@ impl<'a> PacketCursor<'a> {
                     if !work.try_charge(1) {
                         return Ok(CursorStatus::Yield);
                     }
+                    let budget = self.slots.budget().clone();
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.saw_fragment && slot.track.table.sample_count() != 0 {
                         return Err(Error::Unsupported(
@@ -1193,22 +1408,31 @@ impl<'a> PacketCursor<'a> {
                     slot.edited = if slot.encoded_edit.is_some() {
                         None
                     } else if let Some((edits, movie_base)) = slot.track.edits {
-                        if slot.saw_fragment {
-                            if !self.complete_source || self.front_source {
-                                return Err(Error::Unsupported(
-                                    "fragment edit needs a complete source",
-                                ));
-                            }
-                            slot.fragment_media_start = Some(fragment_media_start(edits)?);
+                        if (slot.saw_fragment && self.complete_source)
+                            || (slot.front_fragment && slot.track.table.sample_count() == 0)
+                        {
+                            slot.fragment_edit =
+                                Some(FragmentEdit::new(edits, movie_base, slot.track.media_base)?);
                             None
+                        } else if slot.saw_fragment {
+                            return Err(Error::Unsupported(
+                                "fragment edit needs a complete source",
+                            ));
                         } else {
-                            Some(EditCursor::new(
+                            let cursor = EditCursor::new(
                                 slot.track.table,
                                 edits,
                                 slot.track.media_base,
                                 movie_base,
                                 self.limits.edit,
-                            )?)
+                            )?;
+                            // The checked replay keeps its edit cursor allocation.
+                            if let Some(mut storage) = slot.edited.take() {
+                                storage.as_mut_slice()[0] = cursor;
+                                Some(storage)
+                            } else {
+                                Some(BudgetVec::try_filled(&budget, cursor, 1)?)
+                            }
                         }
                     } else {
                         None
@@ -1241,6 +1465,13 @@ impl<'a> PacketCursor<'a> {
                     }
                     self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                     count(self.generated, self.limits.max_occurrences)?;
+                    if let Some(duration) = &mut self.checked_duration_us {
+                        let row = slot
+                            .head
+                            .as_ref()
+                            .ok_or(Error::Invalid("missing projected packet"))?;
+                        record_duration(duration, row)?;
+                    }
                     if self.recording_seek_checkpoints {
                         self.record_seek_checkpoint(self.at);
                     }
@@ -1312,7 +1543,27 @@ impl<'a> PacketCursor<'a> {
                         if self.recording_seek_checkpoints {
                             self.record_seek_checkpoint(best);
                         }
-                        self.ready = self.slots.as_mut_slice()[best].head.take();
+                        let occurrence = self.slots.as_mut_slice()[best].head.take();
+                        if let Some(end) = &mut self.forward_encoded_end
+                            && let Some(packet) = &occurrence
+                        {
+                            if *end > packet.source.range.start {
+                                return Err(Error::Unsupported(
+                                    "forward encoded edits revisit media",
+                                ));
+                            }
+                            *end = packet.source.range.end;
+                        }
+                        if let Some(duration) = &mut self.checked_duration_us {
+                            let row = occurrence
+                                .as_ref()
+                                .ok_or(Error::Invalid("missing projected packet"))?;
+                            record_duration(duration, row)?;
+                            self.at = 0;
+                            self.phase = Phase::Fill;
+                            continue;
+                        }
+                        self.ready = occurrence;
                         self.at = 0;
                         self.phase = Phase::Fill;
                         continue;
@@ -1346,4 +1597,19 @@ impl<'a> PacketCursor<'a> {
             }
         }
     }
+}
+
+fn record_duration(duration: &mut i64, packet: &PacketOccurrence) -> Result<()> {
+    if let Some(pts) = packet.demux.pts {
+        let end = pts
+            .checked_add(packet.demux.duration)
+            .ok_or(Error::Overflow)?;
+        let micros = packet.media_clock.demux_base.rescale(
+            end,
+            TimeBase::MICROSECONDS,
+            Rounding::NearestAway,
+        )?;
+        *duration = (*duration).max(micros);
+    }
+    Ok(())
 }

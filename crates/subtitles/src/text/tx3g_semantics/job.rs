@@ -1,5 +1,5 @@
 use super::super::{
-    Encoding, Event, Extractor, Format, Input, Status,
+    Encoding, Extractor, Format, Input, Status,
     charset::{Charset, CharsetJob, CharsetStatus},
     tx3g_config::{ConfigJob, ConfigLayout, ConfigStatus},
     unicode::{Cursor, Poll, cancelled},
@@ -369,7 +369,7 @@ impl SemanticJob {
                 {
                     Status::Yield => return Ok(SemanticStatus::Pending),
                     Status::NeedOutput => return Ok(SemanticStatus::NeedOutput),
-                    Status::Event(Event::Cue(cue)) => {
+                    Status::Cue(cue) => {
                         self.cue = Some(cue);
                         self.extractor = None;
                         self.phase = Phase::Config;

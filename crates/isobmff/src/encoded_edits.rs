@@ -396,7 +396,9 @@ pub struct EncodedEditJob<'a> {
     opus_first: u64,
     opus_first_tick: i128,
     opus_durations: BudgetVec<OpusDurationRun>,
-    preserve_aac_media_durations: bool,
+    range_playback: bool,
+    non_sync_prefix: bool,
+    sync_after_edit: bool,
     aac_program: Option<Box<Charged<AacAscParser>>>,
     dts_scale: Option<u32>,
     dolby_config: Option<Ac3ConfigParser>,
@@ -500,6 +502,7 @@ impl<'a> EncodedEditJob<'a> {
     /// and DTS. DTS also supports a leading empty edit before the media edit.
     /// AAC uses the sample durations in `stts` and the coded frame length for trim.
     /// Opus uses the edit list for priming and keeps each source duration.
+    /// A regular video edit can begin on the presentation tick of a non-sync sample at decode origin.
     pub fn new_range_playback(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -508,7 +511,7 @@ impl<'a> EncodedEditJob<'a> {
     ) -> Result<Self> {
         crate::encoded_configs::validate_range_configs(context.table, configs, input.budget())?;
         let mut job = Self::new_recovery_bound(context, input, limits, configs.len())?;
-        job.preserve_aac_media_durations = true;
+        job.range_playback = true;
         let stream = job.context.stream;
         let kind = match stream.kind() {
             EncodedEntryKind::Aac => {
@@ -682,7 +685,9 @@ impl<'a> EncodedEditJob<'a> {
             opus_first: 1,
             opus_first_tick: 0,
             opus_durations: BudgetVec::new(input.budget()),
-            preserve_aac_media_durations: false,
+            range_playback: false,
+            non_sync_prefix: false,
+            sync_after_edit: false,
             aac_program: None,
             dts_scale,
             dolby_config: None,
@@ -820,7 +825,11 @@ impl<'a> EncodedEditJob<'a> {
                 return Ok(CursorStatus::Yield);
             }
             let duration = self.entry.duration(self.context.movie_base)?;
-            let rounding = if self.dts_scale.is_some() {
+            let rounding = if self.dts_scale.is_some()
+                || self.context.stream.kind() == EncodedEntryKind::Aac
+            {
+                // The MOV view rounds AAC edit duration to the nearest media
+                // tick. This also determines which packet carries the tail trim.
                 Rounding::NearestAway
             } else {
                 Rounding::Floor
@@ -853,11 +862,11 @@ impl<'a> EncodedEditJob<'a> {
                     let c = *b.get(1).ok_or(Error::Truncated)?;
                     let index = ((a & 7) << 1) | (c >> 7);
                     let channel_configuration = (c >> 3) & 15;
-                    let program = self.preserve_aac_media_durations && channel_configuration == 0;
+                    let program = self.range_playback && channel_configuration == 0;
                     if a >> 3 != 2
                         || c & 7 != 0
                         || (!program && aac_fixed_channel_count(channel_configuration).is_none())
-                        || (!self.preserve_aac_media_durations && channel_configuration > 7)
+                        || (!self.range_playback && channel_configuration > 7)
                         || indexed_aac_frequency(index).map(u64::from)
                             != Some(self.context.media_base.denominator())
                         || self.context.media_base.numerator() != 1
@@ -968,7 +977,13 @@ impl<'a> EncodedEditJob<'a> {
                         .checked_sub(i128::from(self.entry.media_time))
                         .ok_or(Error::Overflow)?;
                     self.end = anchor.checked_add(duration).ok_or(Error::Overflow)?;
-                    if self.maximum_cts.is_some_and(|x| x >= self.end) {
+                    // Reordered non-sync packets beyond a zero-origin edit
+                    // can still be needed to decode the complete edit.
+                    let keeps_reordered_tail = self.range_playback
+                        && anchor == 0
+                        && self.end == self.source_end
+                        && !self.sync_after_edit;
+                    if !keeps_reordered_tail && self.maximum_cts.is_some_and(|x| x >= self.end) {
                         return Err(Error::Unsupported(
                             "encoded video tail selection not established",
                         ));
@@ -1046,8 +1061,14 @@ impl<'a> EncodedEditJob<'a> {
                 let c = s
                     .cts_ticks
                     .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
-                if self.count == 0 && (d != 0 || !s.is_container_sync()) {
-                    return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                if self.count == 0 {
+                    let allows_non_sync = self.range_playback
+                        && self.context.stream.kind().is_video()
+                        && c == i128::from(self.entry.media_time);
+                    self.non_sync_prefix = !s.is_container_sync();
+                    if d != 0 || (!allows_non_sync && self.non_sync_prefix) {
+                        return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
                 }
                 if d != self.source_end {
                     return Err(Error::Invalid("encoded edit source decode continuity"));
@@ -1084,9 +1105,7 @@ impl<'a> EncodedEditJob<'a> {
                                 "encoded Dolby source packet clock profile",
                             ));
                         }
-                    } else if c != d
-                        || (s.duration_ticks > self.frame && !self.preserve_aac_media_durations)
-                    {
+                    } else if c != d || (s.duration_ticks > self.frame && !self.range_playback) {
                         return Err(Error::Unsupported(
                             "encoded AAC source packet clock profile",
                         ));
@@ -1099,10 +1118,22 @@ impl<'a> EncodedEditJob<'a> {
                         self.opus_first = s.ordinal;
                         self.opus_first_tick = d;
                     }
-                } else if c >= i128::from(self.entry.media_time) {
-                    self.anchor = Some(self.anchor.map_or(c, |prior| prior.min(c)));
+                } else {
+                    let media_start = i128::from(self.entry.media_time);
+                    // A reordered sync sample at the edit start can replace
+                    // the prefix even when decoded after its first sample.
+                    if self.non_sync_prefix && c <= media_start && s.is_container_sync() {
+                        return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
+                    if c >= media_start && self.anchor.is_none_or(|prior| c < prior) {
+                        self.anchor = Some(c);
+                    }
+                    // The presentation anchor can only extend the scan's end.
+                    if c >= self.end {
+                        self.maximum_cts = Some(self.maximum_cts.map_or(c, |prior| prior.max(c)));
+                        self.sync_after_edit |= s.is_container_sync();
+                    }
                 }
-                self.maximum_cts = Some(self.maximum_cts.map_or(c, |prior| prior.max(c)));
                 self.source_end = d
                     .checked_add(i128::from(s.duration_ticks))
                     .ok_or(Error::Overflow)?;

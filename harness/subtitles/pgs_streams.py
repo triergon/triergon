@@ -672,6 +672,42 @@ def receiver_cases():
     add("rx-rle-plane", [(T * (i + 1), T * (i + 1), [small(state=0x80, number=i), pds(0, 0, pal),
                                                      *ods_parts(1, 0, 4, 2, data), END])
                          for i, data in enumerate(rle_cases)])
+    # Canvas sizes at the boundary the receiver keeps: each PCS of the probed
+    # size places object 1 at x 0 after a 16x4 one placed it at x 3, so the
+    # display shows whether the composition was taken.
+    sizes = [(65535, 1), (1, 65535), (63422, 4096), (63423, 4096), (16255, 16257), (16256, 16256),
+             (3960, 65535), (3961, 65535), (65535, 65535), (0, 480), (720, 0)]
+    units = [(T, T, [small(), pds(0, 0, pal), *obj(), END])]
+    for n, (w, h) in enumerate(sizes):
+        units += [(T * (2 * n + 2), T * (2 * n + 2), [small(state=0, number=2 * n + 1), END]),
+                  (T * (2 * n + 3), T * (2 * n + 3), [pcs(w, h, 2 * n + 2, 0, [(1, 0, 0, 0, False, None)]), END])]
+    add("rx-canvas-bounds", units)
+    # First fragments of object 1 (2x1, pixels 1 1 before each) on the 16x4
+    # canvas: sizes against the canvas, data lengths against the declared
+    # length, fragments without RLE bytes, and size fields cut short, last
+    # followed by bytes that would read as a 2x1 size.
+    def first(declared, w, h, data):
+        return segment(0x15, b"\x00\x01\x00\xc0" + declared.to_bytes(3, "big") + struct.pack(">HH", w, h) + data)
+    two = b"\x02\x02\x00\x00"
+    whole = rle([[2] * 16] * 4)
+    probes = [first(4 + len(whole), 16, 4, whole), first(8, 17, 1, two), first(8, 1, 5, two),
+              first(8, 0, 1, two), first(3, 2, 1, b""), first(4, 2, 1, two), first(7, 2, 1, two),
+              first(8, 2, 1, two + b"\x01\x01"), first(8, 2, 1, b"\x02\x02"), first(9, 2, 1, two),
+              first(0xffffff, 2, 1, two), first(2, 2, 1, two),
+              segment(0x15, b"\x00\x01\x00\xc0\x00\x00\x08"), segment(0x15, b"\x00\x01\x00\xc0" + b"\x00" * 6),
+              segment(0x15, b"\x00\x01\x00\xc0\x00\x00\x08"), segment(0x00, b"\x01" + b"\x00" * 511)]
+    # Each probe follows an epoch start that defines object 1 without a
+    # display; the refused packet is followed by a display of what it left.
+    units, t = [], 1
+    restore = [pds(0, 0, pal), *obj(data=b"\x01\x01\x00\x00")]
+    for n, probe in enumerate(probes[:-2] + [b"".join(probes[-2:])]):
+        units += [(T * t, T * t, [small(number=2 * n), *restore]),
+                  (T * (t + 1), T * (t + 1), [small(state=0, number=2 * n + 1), probe, END])]
+        t += 2
+        if probe == probes[11]:
+            units.append((T * t, T * t, [small(state=0, number=99), END]))
+            t += 1
+    add("rx-ods-first-fragment", units)
     return cases
 
 # --------------------------------------------------------------- gold inputs

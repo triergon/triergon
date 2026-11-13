@@ -1315,6 +1315,214 @@
       }
     },
     {
+      "id": "mov-text-tags-colour-against-alpha",
+      "profile": "mov-text-tags-colour-against-alpha",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/colour-against-alpha.cap",
+      "sha256": "ea14df7e4b60751ba645655c1624978b340e70bac4eb7a02da16073b404db46c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 84,
+        "digest": 11720423603967855458
+      }
+    },
+    {
+      "id": "mov-text-tags-face-against-all",
+      "profile": "mov-text-tags-face-against-all",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/face-against-all.cap",
+      "sha256": "e2fa522b17e06139322946e1fd2b54e6d70e9f667f4a03f487613f7736e1c4b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 115,
+        "digest": 46088934793810341
+      }
+    },
+    {
+      "id": "mov-text-tags-face-against-bold",
+      "profile": "mov-text-tags-face-against-bold",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/face-against-bold.cap",
+      "sha256": "3302bea92da29452c9a0f8b26a2d7f27ee285c3ffa91edf70d15bc98210da48c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 237,
+        "digest": 2203742073017237035
+      }
+    },
+    {
+      "id": "mov-text-tags-font-long-names",
+      "profile": "mov-text-tags-font-long-names",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/font-long-names.cap",
+      "sha256": "aaba2e6d91b4a5c7b7d48fc3cf8f35cc547b1bb2ab88dd7d9c2df52cbdc11ec9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4950,
+        "digest": 501791086152800159
+      }
+    },
+    {
+      "id": "mov-text-tags-font-table",
+      "profile": "mov-text-tags-font-table",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/font-table.cap",
+      "sha256": "2574d1a6387d2e465ec077529ad3b60cdcf05ac4f9a096c951df567bef3d9216",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 372,
+        "digest": 16052345856706520078
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-coincident",
+      "profile": "mov-text-tags-highlight-coincident",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-coincident.cap",
+      "sha256": "f946713cfd4a52550d93a94e22ec46c7398eb516dfcf7e4ea34bdf2345453ed5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 755,
+        "digest": 4413207065898473148
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-coloured-default",
+      "profile": "mov-text-tags-highlight-coloured-default",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-coloured-default.cap",
+      "sha256": "9651a547298f2ed9f6c27b385cc3faa58d0e9e0120c9deb78b812da1a096acb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 226,
+        "digest": 14241997220781762068
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-ranges",
+      "profile": "mov-text-tags-highlight-ranges",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-ranges.cap",
+      "sha256": "2b1b937b76cd72d2a3879585ede91ad6feebb0fd1e9abb6211fc76ba8b708646",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 312,
+        "digest": 861062206201301589
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-style-colour",
+      "profile": "mov-text-tags-highlight-style-colour",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-style-colour.cap",
+      "sha256": "2e31ccaf8654b82871a5009e368f713bc134c7bc87016d7b76a5e4a8f837e919",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1147,
+        "digest": 3939604460560203965
+      }
+    },
+    {
+      "id": "mov-text-tags-no-description",
+      "profile": "mov-text-tags-no-description",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/no-description.cap",
+      "sha256": "113db06b45116e09e42df92474876e4b7da02f8247e19468ec87edd3802c7a1c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 92,
+        "digest": 6230602117039309394
+      }
+    },
+    {
+      "id": "mov-text-tags-nul-transitions",
+      "profile": "mov-text-tags-nul-transitions",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/nul-transitions.cap",
+      "sha256": "a9817919391ec293852cab6593ea540af76394c1dd6f9d7afcdda2d1a8187a8f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 468,
+        "digest": 7051577844635059823
+      }
+    },
+    {
+      "id": "mov-text-tags-ranges",
+      "profile": "mov-text-tags-ranges",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/ranges.cap",
+      "sha256": "2cda795ad8eb16d54d2c197a2f24b81dd32cfc567ec5f6b2f069dbb66990dd5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 493,
+        "digest": 9496644628636016008
+      }
+    },
+    {
+      "id": "mov-text-tags-size-colour-alpha",
+      "profile": "mov-text-tags-size-colour-alpha",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/size-colour-alpha.cap",
+      "sha256": "2b8dc2fb3759bb6f261a684fcf42825b7e872fd1e413cd1ca7688b3e673adb5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 366,
+        "digest": 10650368244521889567
+      }
+    },
+    {
       "id": "tx3g-adjacent_style_runs_remain_distinct_source_records",
       "profile": "tx3g-adjacent_style_runs_remain_distinct_source_records",
       "group": "tx3g",
@@ -2608,8 +2816,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-big5-invalid-trail",
@@ -2817,8 +3024,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-cp932-extension-boundary",
@@ -2930,8 +3136,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-cp949-invalid-trail",
@@ -3027,8 +3232,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-cp950-extension-boundary",
@@ -3252,8 +3456,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-euc-kr-invalid-trail",
@@ -3349,8 +3552,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-gbk-extension-boundary",
@@ -3414,6 +3616,22 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-iso-8859-1-c1-controls",
+      "profile": "charset-iso-8859-1-c1-controls",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/iso-8859-1-c1-controls.cap",
+      "sha256": "f7c4a58c93acdae3999bb1c8831864a15d85875d63dbfd9aec9697b2a3e1d899",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 276,
+        "digest": 11557859050126654104
       }
     },
     {
@@ -3673,6 +3891,22 @@
       }
     },
     {
+      "id": "charset-latin1-c1-controls",
+      "profile": "charset-latin1-c1-controls",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/latin1-c1-controls.cap",
+      "sha256": "a869de49689b7417b4df554519f1aa26ae6a7aece503847ad63f23d09fdfef4c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 276,
+        "digest": 11557859050126654104
+      }
+    },
+    {
       "id": "charset-shift_jis-ascii",
       "profile": "charset-shift_jis-ascii",
       "group": "charset",
@@ -3702,8 +3936,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "charset-shift_jis-invalid-trail",
@@ -3770,6 +4003,86 @@
       }
     },
     {
+      "id": "charset-windows-1251-text",
+      "profile": "charset-windows-1251-text",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1251-text.cap",
+      "sha256": "81212bb2c978c88f40eef8c269edb7294bd939b577b898c12244dc1d5c68102d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 304,
+        "digest": 2885039401792661522
+      }
+    },
+    {
+      "id": "charset-windows-1251-undefined",
+      "profile": "charset-windows-1251-undefined",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1251-undefined.cap",
+      "sha256": "d6b45180c42c09c6100f312ed0d4bf668dcc4df60094bfe46139a73067d4f4c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "charset-windows-1252-text",
+      "profile": "charset-windows-1252-text",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1252-text.cap",
+      "sha256": "e21976b73b183e13b0ab675a1778b6b90225b82d843bc1d1e6c361ae0e4b604a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 283,
+        "digest": 4559709250147832810
+      }
+    },
+    {
+      "id": "charset-windows-1252-undefined",
+      "profile": "charset-windows-1252-undefined",
+      "group": "charset",
+      "file": "harness/fixtures/subtitle-text/charset/windows-1252-undefined.cap",
+      "sha256": "e6ac09d432147e7442bfea05b9c0ab26ae9ecb1e05a04df1f0ffd715420a5d6c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "ass-above-unicode",
+      "profile": "ass-above-unicode",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/above-unicode.cap",
+      "sha256": "fee8553912760013387d77bac60f3a174271d72f744dc7837cc2893d9d882022",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
       "id": "ass-ass-empty-not-clear",
       "profile": "ass-ass-empty-not-clear",
       "group": "ass",
@@ -3783,8 +4096,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "an empty packet is an event in Triergon (text README, Behaviour and limits); avcodec_decode_subtitle2 does not decode a zero-size packet, so the reference publishes nothing"
+      }
     },
     {
       "id": "ass-ass-invalid-utf8-unvalidated",
@@ -3800,8 +4112,7 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "the opaque ASS profile (OpaqueAss1) carries the packet bytes unvalidated and unconverted; the reference refuses decoded text that is not UTF-8"
+      }
     },
     {
       "id": "ass-ass-known-duration-unknown-start",
@@ -3897,8 +4208,135 @@
         "packets": 0,
         "bytes": 0,
         "digest": 1187239612686556087
-      },
-      "difference": "the opaque ASS profile (OpaqueAss1) carries the packet bytes unvalidated and unconverted; the reference refuses decoded text that is not UTF-8"
+      }
+    },
+    {
+      "id": "ass-largest-scalar",
+      "profile": "ass-largest-scalar",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/largest-scalar.cap",
+      "sha256": "52411ae4e09886e5948adf98a90c0d80b2c25a7ad1b0662a35485c1caccdfe4f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 9980262981333385442
+      }
+    },
+    {
+      "id": "ass-noncharacter-fffe",
+      "profile": "ass-noncharacter-fffe",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/noncharacter-fffe.cap",
+      "sha256": "7055eacdef768e09abd833b91a2b7e7179f5f867f27865cf07fdaafa0564b1a5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "ass-noncharacter-ffff",
+      "profile": "ass-noncharacter-ffff",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/noncharacter-ffff.cap",
+      "sha256": "f8ddaf1db0e37a0fcd486c9695f6f8c89b769df8d5e79bee3d1b84447d16d130",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3945857798899479817
+      }
+    },
+    {
+      "id": "ass-nul-only",
+      "profile": "ass-nul-only",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/nul-only.cap",
+      "sha256": "dd29fdfb798316bb886aa404dff394a0e4d88eb02f9372721ef56858c3872e8c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7024858309155678580
+      }
+    },
+    {
+      "id": "ass-overlong",
+      "profile": "ass-overlong",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/overlong.cap",
+      "sha256": "ba3a661b6cbbde3d27150653420beef913506a71b210ea53889b784eab328bf4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "ass-surrogate",
+      "profile": "ass-surrogate",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/surrogate.cap",
+      "sha256": "79c72cd8e59065cc0f9de159b454dc82b8434dce737424cfe5d76b58b81dc2c9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "ass-truncated",
+      "profile": "ass-truncated",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/truncated.cap",
+      "sha256": "7b62a43c606f0b3c7b7fceedd8a6ed1e70a5fe0152f024a57ba15c5b29ace468",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1187239612686556087
+      }
+    },
+    {
+      "id": "ass-utf8-after-nul",
+      "profile": "ass-utf8-after-nul",
+      "group": "ass",
+      "file": "harness/fixtures/subtitle-text/ass/utf8-after-nul.cap",
+      "sha256": "51daa30e3df7ba012f7322bcc65b1fe777ac5b9e8e5f9187a914b577b96ad486",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 2142952480649964889
+      }
     },
     {
       "id": "srt-basic",
@@ -3908,8 +4346,7 @@
       "sha256": "eb76b517850126016cf5a62e374f7b3be51421d42566fb474019f5c61db464ee",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
@@ -3925,15 +4362,13 @@
       "sha256": "d099500ba0c8f9172cb26dcfe047613de215954df81bd2c391484a1529358ed6",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 29,
         "digest": 11366091855304890572
-      },
-      "difference": "Triergon keeps CRLF line ends in cue text (no line-ending rewriting); the srt demuxer rewrites them to LF"
+      }
     },
     {
       "id": "srt-unicode-no-normalization",
@@ -3943,8 +4378,7 @@
       "sha256": "29b48fe08c5be739edd75953531faf6c8f3973a75f220b41a85f9c6b928ab1a9",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
@@ -3960,8 +4394,7 @@
       "sha256": "49c46b05b0602426d5605a9ed79a53478e2ef92ed8a86fc43d30efa80ce4ff00",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 2,
@@ -3977,8 +4410,7 @@
       "sha256": "2a56fdba61b89a9a88e75f671db30ac4661147f9500ee0ee5464c5b2118b2f01",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
@@ -3994,8 +4426,7 @@
       "sha256": "6573ba98370605bd4026eedd71e13e6d3b441bd0b4ab9ea36bffd21705d81328",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
@@ -4011,15 +4442,13 @@
       "sha256": "b851cdf0dfbf9510728bd99620e17bd8ff5a0428d84cc8ffe546ca179060ba01",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf16-bom"
+        "srt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 9,
         "digest": 11911668358411309887
-      },
-      "difference": "the reference's UTF-16 SubRip reader keeps one byte of the first character of the cue text (U+00C5 becomes 0xC3); Triergon decodes the character. Only the comparison-only reference_trace::carriage view reproduces the reference"
+      }
     },
     {
       "id": "srt-utf16le-bom",
@@ -4029,8 +4458,7 @@
       "sha256": "559208cd17429a3b5b205840c31ef8395a624300e4c98d2df688531a20ddac80",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf16-bom"
+        "srt"
       ],
       "expected": {
         "packets": 1,
@@ -4046,15 +4474,13 @@
       "sha256": "5578104f1a0ae5d7426e2e7ee6973e4b0ce0ab7a203a3a04bddc9f19c86f56df",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf16be"
+        "srt"
       ],
       "expected": {
         "packets": 0,
         "bytes": 0,
         "digest": 90
-      },
-      "difference": "the caller states UTF-16BE without a byte-order mark; the srt demuxer has no stated encoding and reads no cue"
+      }
     },
     {
       "id": "srt-end-before-start",
@@ -4064,15 +4490,13 @@
       "sha256": "8f0ae3c58538f52bf5c2e74b53f9c2e18bf879fb40cf994d7ad4fb1fe999ab33",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 1,
         "digest": 2583582430350829759
-      },
-      "difference": "the strict SubRip profile (SubRipStrict1) refuses an end time before the start time; the srt demuxer accepts it"
+      }
     },
     {
       "id": "srt-sequence-missing",
@@ -4082,15 +4506,13 @@
       "sha256": "0b1cf8badb03223a3e6e063c046a589431bea7aa450c600b81fc1f792f8dfcc0",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 1,
         "digest": 6654686160095530938
-      },
-      "difference": "the strict SubRip profile (SubRipStrict1) refuses a cue without its number; the srt demuxer accepts it"
+      }
     },
     {
       "id": "srt-fraction-width",
@@ -4100,15 +4522,13 @@
       "sha256": "ad720cec55eee37bf8b369376c34f61872d201e69ae3a9270b454ca84548a036",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 1,
         "digest": 6654686160095530938
-      },
-      "difference": "the strict SubRip profile (SubRipStrict1) refuses a two-digit millisecond field; the srt demuxer accepts it"
+      }
     },
     {
       "id": "srt-overlong-utf8",
@@ -4118,15 +4538,13 @@
       "sha256": "ba7c4b492405226c2314bc9851c4e0c4c811a01e6ebcc6aa4ebd48cfa070c6f2",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf8"
+        "srt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 2,
         "digest": 3381086153043966900
-      },
-      "difference": "the strict SubRip profile (SubRipStrict1) refuses an overlong UTF-8 sequence; the srt demuxer accepts it"
+      }
     },
     {
       "id": "srt-lone-surrogate",
@@ -4136,15 +4554,13 @@
       "sha256": "8ffa30095970c40325afdca59ed8e227bfcb7571600ae8b11e3b7379199e0644",
       "rights": "authored-synthetic",
       "arguments": [
-        "srt",
-        "utf16-bom"
+        "srt"
       ],
       "expected": {
         "packets": 0,
         "bytes": 0,
         "digest": 90
-      },
-      "difference": "Triergon refuses a lone UTF-16 surrogate; the srt demuxer reads no cue and reports success"
+      }
     },
     {
       "id": "vtt-short-timestamps",
@@ -4154,8 +4570,7 @@
       "sha256": "bda08cf15c66270919846f0c82320f0da7a8bf86b00d163756121daa9fa6113a",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4171,8 +4586,7 @@
       "sha256": "9aa539e04fbb6ca7f90e4089de42493a129638f9d6d7e38bc6914717ea239e1a",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4188,8 +4602,7 @@
       "sha256": "c48fd31db91413808e701814a874d4f208f7e54b387daf99d9befe0b2b9dbc34",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4205,15 +4618,13 @@
       "sha256": "e4ebe7b2f6c566438221d6d3d6db70a9bfe8539e8ecd15b3273d72769e64606e",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 0,
         "bytes": 0,
         "digest": 90
-      },
-      "difference": "WebVTT allows CR line ends and Triergon reads the cue; the webvtt demuxer finds no cue"
+      }
     },
     {
       "id": "vtt-utf8-bom",
@@ -4223,8 +4634,7 @@
       "sha256": "7b4fcbf612a215073a61b9fa41e0de9f472fefbca80de091f63a0675a0e3c9b3",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4240,8 +4650,7 @@
       "sha256": "d9511cd1f8ba58b388ec83d6c021d356f1c1e46b9e1ce17244e4c39d388338f5",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4257,8 +4666,7 @@
       "sha256": "c1136c769ca77d9d99b097c671d018ea233f54f11bdfa15a3577a62fa296f58c",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4274,8 +4682,7 @@
       "sha256": "e1c30f52405e94de9bc97b4ee0ac62abc6ef3778512b25ef05b95f8fb54a9989",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 2,
@@ -4291,8 +4698,7 @@
       "sha256": "a4d69cff890e0fe6a5f11e0cf6d7bcf5aa286f7c53000c644607b421abfab2a8",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4308,8 +4714,7 @@
       "sha256": "357b50c1f70f4c3617449b56d2556084a56585014c82ec4d4f048d562f2a3ba8",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4325,8 +4730,7 @@
       "sha256": "2ea388faa253ed163075c518322bea519a49355c2683a7e2ec1142a835d237bb",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 2,
@@ -4342,8 +4746,7 @@
       "sha256": "075969584e6a73345184657e50bb371cb1cc65e88d42038c4c19057ab8a936ed",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
@@ -4359,8 +4762,7 @@
       "sha256": "8eb5aec53542eaedb7502b22fb677161abba1e265b1338f1af1369a1f689837c",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 0,
@@ -4376,15 +4778,13 @@
       "sha256": "eff1f830c4b52eb0a99e82c2240fafec31baaf4397e0fb36ecf9cdc139faec94",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 0,
         "bytes": 0,
         "digest": 90
-      },
-      "difference": "the strict WebVTT profile (WebVttSourceStrict1) refuses a signature line other than WEBVTT; the webvtt demuxer reports an empty document"
+      }
     },
     {
       "id": "vtt-utf16-refused",
@@ -4394,15 +4794,13 @@
       "sha256": "7ce21f5762f7297870b54a675997b1527c1896013d6d523b2e9f97a2e3c54cba",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf16be"
+        "vtt"
       ],
       "expected": {
         "packets": 0,
         "bytes": 0,
         "digest": 90
-      },
-      "difference": "the strict WebVTT profile (WebVttSourceStrict1) refuses a UTF-16 document; the webvtt demuxer reports an empty document"
+      }
     },
     {
       "id": "vtt-zero-interval-strict",
@@ -4412,15 +4810,13 @@
       "sha256": "a2fe71feaab7832f92c9e1c71e4421793b88a43f6413c68a728f9f8485a10ddb",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 1,
         "digest": 7248179777694232351
-      },
-      "difference": "the strict WebVTT profile refuses a zero-length cue; the webvtt demuxer keeps it"
+      }
     },
     {
       "id": "vtt-surrogate-utf8",
@@ -4430,15 +4826,13 @@
       "sha256": "d8c985f3e3e3eefc2307774a0c82b9e65e8ed21e4f5c55d04fbbb6c2aa1ec562",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 1,
         "bytes": 3,
         "digest": 6492616397464317955
-      },
-      "difference": "Triergon refuses an encoded surrogate as invalid UTF-8; the webvtt demuxer passes the bytes through"
+      }
     },
     {
       "id": "vtt-missing-fraction",
@@ -4448,15 +4842,1037 @@
       "sha256": "5c05bd07053f44b5ff3496514c86ea26a84b6647538d0cfe4bf7d981f476aa18",
       "rights": "authored-synthetic",
       "arguments": [
-        "vtt",
-        "utf8"
+        "vtt"
       ],
       "expected": {
         "packets": 0,
         "bytes": 0,
         "digest": 90
-      },
-      "difference": "the strict WebVTT profile (WebVttSourceStrict1) refuses a timestamp without milliseconds; the webvtt demuxer reports an empty document"
+      }
+    },
+    {
+      "id": "srt-sorted",
+      "profile": "srt-sorted",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-sorted.srt",
+      "sha256": "062a72a03f02aff7cd49ae3adf3d07b8d3a9d67b3d9c8176516f459576fdf913",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 12200062637886634775
+      }
+    },
+    {
+      "id": "srt-equal-start-order",
+      "profile": "srt-equal-start-order",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-equal-start-order.srt",
+      "sha256": "eecfdfbc0ed83eb42524e8188027649c6fda28714fc05c9641ea9e8fa89492f6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 10762453024393385155
+      }
+    },
+    {
+      "id": "srt-lines-before-first-cue",
+      "profile": "srt-lines-before-first-cue",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-lines-before-first-cue.srt",
+      "sha256": "585f59a4854c85f4bbb3b1fe987011b0ed4de2e833c40d99bb80c640aee6eae5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-text-across-blank-lines",
+      "profile": "srt-text-across-blank-lines",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-text-across-blank-lines.srt",
+      "sha256": "06356bdfa8fc744539500fbe3907047b18b0638dc63fb42a43ca9d1b6ead2603",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12,
+        "digest": 4557783852975952049
+      }
+    },
+    {
+      "id": "srt-number-without-blank-line",
+      "profile": "srt-number-without-blank-line",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-number-without-blank-line.srt",
+      "sha256": "fb78080e0d62d4f757028339319d3b1b0c41b294e1951da68a5d9444d369b312",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 8170214914897136863
+      }
+    },
+    {
+      "id": "srt-number-blank-then-timing",
+      "profile": "srt-number-blank-then-timing",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-number-blank-then-timing.srt",
+      "sha256": "db50ff2c04387a0a2307b542a932a2fd2673fed92c396696a79ca988c6d2ff11",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 8170214914897136863
+      }
+    },
+    {
+      "id": "srt-number-prefix",
+      "profile": "srt-number-prefix",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-number-prefix.srt",
+      "sha256": "4151546d1432e6cf64e7e9abd1ff62943ffd9b8afff2d99d330e45790b205511",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 8170214914897136863
+      }
+    },
+    {
+      "id": "srt-negative-number-is-text",
+      "profile": "srt-negative-number-is-text",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-negative-number-is-text.srt",
+      "sha256": "9d9f4a7125ab266094726330ff842bc02aad2e39e47ba66c939d856e59b39f31",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 2728079846480851492
+      }
+    },
+    {
+      "id": "srt-number-not-last-is-text",
+      "profile": "srt-number-not-last-is-text",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-number-not-last-is-text.srt",
+      "sha256": "9af79d0e6e072f1f367564cc11a85eccd88f040deae25f503e39ab5de0cab308",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 6,
+        "digest": 5252322823521416264
+      }
+    },
+    {
+      "id": "srt-only-line-whole-number",
+      "profile": "srt-only-line-whole-number",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-only-line-whole-number.srt",
+      "sha256": "fd13c800289a47f7967d729861f49874498d1ec8c4dab478e1a58a1354674c0c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 10684533883085027176
+      }
+    },
+    {
+      "id": "srt-only-line-number-prefix",
+      "profile": "srt-only-line-number-prefix",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-only-line-number-prefix.srt",
+      "sha256": "3c333a0c8ae22faedc39cde6e849e5409cf45d8f87643817cb67cbdb1e6fd214",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 6,
+        "digest": 410529200727688016
+      }
+    },
+    {
+      "id": "srt-empty-cue-dropped",
+      "profile": "srt-empty-cue-dropped",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-empty-cue-dropped.srt",
+      "sha256": "b050998366cf7bdd576c347e9b17b3782aaca000ffd3e74120db5708b2cd973e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 10684533883085027176
+      }
+    },
+    {
+      "id": "srt-coordinates",
+      "profile": "srt-coordinates",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-coordinates.srt",
+      "sha256": "79d441eee7874d336ab5884babc08275e093d31ae586fbd4b7544c90f3c6a8ab",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-short-fields",
+      "profile": "srt-short-fields",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-short-fields.srt",
+      "sha256": "46dabdaa613576798375dd0ea131857c5ae59bc76e8857065fefeed83a72ecfe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 5620209130152406680
+      }
+    },
+    {
+      "id": "srt-unbounded-fields",
+      "profile": "srt-unbounded-fields",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-unbounded-fields.srt",
+      "sha256": "75c84a225c40bbc322de3064adebdc6a6c896d2a7ca2a48723d36ed4909f9599",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 4643697430777065266
+      }
+    },
+    {
+      "id": "srt-wide-fraction",
+      "profile": "srt-wide-fraction",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-wide-fraction.srt",
+      "sha256": "48422f9cd41883fa8be1ef2f1d86c22d335ae1e035d6f7804bed02104a868876",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 3559124214519221810
+      }
+    },
+    {
+      "id": "srt-dot-separator",
+      "profile": "srt-dot-separator",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-dot-separator.srt",
+      "sha256": "777f76f4d88d9f00dd7a8dcf5681908f2ba7d6ae18468991478b23206caf798f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-no-space-around-arrow",
+      "profile": "srt-no-space-around-arrow",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-no-space-around-arrow.srt",
+      "sha256": "61c94e34f2b6345b82f52f7cdca95f2840dca44345d62f920d7de773bd0ffde7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-signed-fields",
+      "profile": "srt-signed-fields",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-signed-fields.srt",
+      "sha256": "74676ff2fb765c5702475585ba0f330420e0e115191e5fa0e4beae077e05bbfb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-no-fraction",
+      "profile": "srt-no-fraction",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-no-fraction.srt",
+      "sha256": "7bad27cc61457347fded496655b7bc7b486574cc0daf381fc1d38a6a269be0da",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "srt-single-dash",
+      "profile": "srt-single-dash",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-single-dash.srt",
+      "sha256": "00791eb2df76474a4815f761c159a7949e19fee9f94d2f8487921efcdf0b0ee6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "srt-cr-lines",
+      "profile": "srt-cr-lines",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-cr-lines.srt",
+      "sha256": "a941d3ded849609dfb7ba6f0cae9248f41beafbf965404201de3e2a0b9b93298",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-no-final-line-end",
+      "profile": "srt-no-final-line-end",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-no-final-line-end.srt",
+      "sha256": "d2f881ab3e85a4d22f81da90da90e904ff0a3231ba161cfa0e7f076df2577e61",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-nul-ends-document",
+      "profile": "srt-nul-ends-document",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-nul-ends-document.srt",
+      "sha256": "e9f6989c6134f76fb45828ca943ae6928419ace5e6f0da1a18af6bf2d532ac1f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "srt-nul-in-only-line",
+      "profile": "srt-nul-in-only-line",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-nul-in-only-line.srt",
+      "sha256": "89cc566c995d1b66f1f65a627a3a2e0e6cbd5ecdf7320d79c32d65a75b7e5e6e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "srt-duration-wraps",
+      "profile": "srt-duration-wraps",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-duration-wraps.srt",
+      "sha256": "3e6df54e9c00e8395b01101387e7b377c474b13c153fc42714d99c72a449d6d9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 1571779735123409098
+      }
+    },
+    {
+      "id": "srt-negative-duration-until-next",
+      "profile": "srt-negative-duration-until-next",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-negative-duration-until-next.srt",
+      "sha256": "0ed3d25bf8cf1aeae97c96ac91f5845aeba9f5b72d2e9522d86993bb83254510",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 3,
+        "digest": 8708601496725288242
+      }
+    },
+    {
+      "id": "srt-negative-duration-last",
+      "profile": "srt-negative-duration-last",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-negative-duration-last.srt",
+      "sha256": "1c9702b59cf32381327e1ce098402f65ae892db758a4e21529da8cebb61db447",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 10973210027352942640
+      }
+    },
+    {
+      "id": "srt-zero-duration-kept",
+      "profile": "srt-zero-duration-kept",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-zero-duration-kept.srt",
+      "sha256": "91358c2225fedf54a0bb4cc5c096d07152943ca9e594e55ba3c8aaeccab0fa93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 1973114399810974324
+      }
+    },
+    {
+      "id": "srt-repeat-dropped",
+      "profile": "srt-repeat-dropped",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-repeat-dropped.srt",
+      "sha256": "7936449f4604fb44a6ad8a7d3e8fffd912625a6378ee027fb56b5ec71f17dd15",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 12200062637886634775
+      }
+    },
+    {
+      "id": "srt-repeat-apart-kept",
+      "profile": "srt-repeat-apart-kept",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-repeat-apart-kept.srt",
+      "sha256": "d0bb3a2fa17efa7ca1685ab52ed3a2be4eb8657e9f7942b2392002968b75d0b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 3,
+        "digest": 11391954540265373598
+      }
+    },
+    {
+      "id": "srt-repeat-after-completion",
+      "profile": "srt-repeat-after-completion",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-repeat-after-completion.srt",
+      "sha256": "cc1bbe367adcd24338d9a0b91920f4358e4e51a050726ae3a3473401a476c93e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 3,
+        "digest": 10009754445828030342
+      }
+    },
+    {
+      "id": "srt-utf16-line-start-cut",
+      "profile": "srt-utf16-line-start-cut",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-utf16-line-start-cut.srt",
+      "sha256": "ddd9c16de0f95e557a136f92cbaff51c0a61521d43f50a72fd278359d0619692",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5,
+        "digest": 6715022197565478307
+      }
+    },
+    {
+      "id": "srt-utf16-crlf-no-cut",
+      "profile": "srt-utf16-crlf-no-cut",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-utf16-crlf-no-cut.srt",
+      "sha256": "71320d940f7d2b0a98a259608d177a41c26296414c3f8aab186334f407bcce5b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 15273467104102102442
+      }
+    },
+    {
+      "id": "srt-utf16-cr-cut",
+      "profile": "srt-utf16-cr-cut",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-utf16-cr-cut.srt",
+      "sha256": "678c9bdd4b0610afad0432f0f6d5f16053e31b4d20963c4ac52bb6493bbbc8a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5,
+        "digest": 6715022198567498592
+      }
+    },
+    {
+      "id": "srt-utf16-blank-line-pairs",
+      "profile": "srt-utf16-blank-line-pairs",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-utf16-blank-line-pairs.srt",
+      "sha256": "c5d13292f1bcd42aa5cd441f9d31f2e8cf8a2a648f60902982e726207926be92",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8,
+        "digest": 13096426978243556268
+      }
+    },
+    {
+      "id": "srt-utf16-surrogate-ends",
+      "profile": "srt-utf16-surrogate-ends",
+      "group": "srt",
+      "file": "harness/fixtures/subtitle-text/documents/srt-utf16-surrogate-ends.srt",
+      "sha256": "8467dbf7e07fb7bb73539e1d272564d1b529101332c7ea54a676ffdcf195358b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "srt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 6654686160095529233
+      }
+    },
+    {
+      "id": "vtt-sorted",
+      "profile": "vtt-sorted",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-sorted.vtt",
+      "sha256": "e49ae1e61b59acbf1e0d20b01906f92fbb8707ce413754297224b010490a810c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 17047283902138091287
+      }
+    },
+    {
+      "id": "vtt-header-without-blank-line",
+      "profile": "vtt-header-without-blank-line",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-header-without-blank-line.vtt",
+      "sha256": "ca01199c4e633c63722bdf33681b97d70bc19f98be0c6cfe20cbee38d1d689c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "vtt-no-header",
+      "profile": "vtt-no-header",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-no-header.vtt",
+      "sha256": "c2b755d2e1ddeb4234abf1ce268f0775e8575f890bacf7ea5a562a61682bd010",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 12385019106880786655
+      }
+    },
+    {
+      "id": "vtt-two-identifier-lines",
+      "profile": "vtt-two-identifier-lines",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-two-identifier-lines.vtt",
+      "sha256": "6aa462f344b0dd70e74d40035aff438a9735a4394a833e767cda6324578aca8b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "vtt-skipped-block-prefixes",
+      "profile": "vtt-skipped-block-prefixes",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-skipped-block-prefixes.vtt",
+      "sha256": "404d6a5ac69cb75565768255c35fee85df94776c22fbc7d486bec9e450079e6f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 18367760581424810344
+      }
+    },
+    {
+      "id": "vtt-byte-order-mark-not-skipped",
+      "profile": "vtt-byte-order-mark-not-skipped",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-byte-order-mark-not-skipped.vtt",
+      "sha256": "cb7d369395f2797dc33d3b4526456b61701618f5c370586de3029752a5c96c99",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "vtt-short-fraction",
+      "profile": "vtt-short-fraction",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-short-fraction.vtt",
+      "sha256": "31f2709eafeb56d820013a7328058a01f09996ae4f8ef069d087abf9488aa2bb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 13297230135492767249
+      }
+    },
+    {
+      "id": "vtt-three-digit-hours",
+      "profile": "vtt-three-digit-hours",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-three-digit-hours.vtt",
+      "sha256": "c37be92eb55ee8f26bb042ee63e6262dcab11990f87d6e01d62cf07408a50549",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 118911867135407370
+      }
+    },
+    {
+      "id": "vtt-comma-fraction",
+      "profile": "vtt-comma-fraction",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-comma-fraction.vtt",
+      "sha256": "b54f78c19eb473a8c5fcb2eae85014f4e302d2bf0b504cecbd3b9454f245b1db",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 90
+      }
+    },
+    {
+      "id": "vtt-arrow-on-later-line",
+      "profile": "vtt-arrow-on-later-line",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-arrow-on-later-line.vtt",
+      "sha256": "8911583108e69244060c4ba4241070eeea98bc9551c5ee0908b16395c169bac4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 17901539450261810536
+      }
+    },
+    {
+      "id": "vtt-end-on-next-line",
+      "profile": "vtt-end-on-next-line",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-end-on-next-line.vtt",
+      "sha256": "2df64f4471f1bf713d8723a33f33c2db27efcb0274eb6e0e5c6e205b122d73a8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 13,
+        "digest": 5561920386029512350
+      }
+    },
+    {
+      "id": "vtt-settings-after-end-word",
+      "profile": "vtt-settings-after-end-word",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-settings-after-end-word.vtt",
+      "sha256": "68c3e67a6378b8a6387098e3171314d92feaa5bdafe18e4656cbfb7e8e51d6b6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 11860845750367262192
+      }
+    },
+    {
+      "id": "vtt-settings-end-at-cr",
+      "profile": "vtt-settings-end-at-cr",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-settings-end-at-cr.vtt",
+      "sha256": "d2d34f985ca0b84fd84cb06ffab70b344ac44709cc05942924f0a189f0569788",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 3,
+        "digest": 14136096963435347707
+      }
+    },
+    {
+      "id": "vtt-timing-in-payload",
+      "profile": "vtt-timing-in-payload",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-timing-in-payload.vtt",
+      "sha256": "72bb38fc0cf0ac4e2442f842245e34eb274becca045b49888de925a72ed350c8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 27,
+        "digest": 10543883588283366860
+      }
+    },
+    {
+      "id": "vtt-empty-payload",
+      "profile": "vtt-empty-payload",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-empty-payload.vtt",
+      "sha256": "167963e975e361aaee71766ad4d503a844c9b44227580c383798036d59bdd21a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1,
+        "digest": 17670508505667633359
+      }
+    },
+    {
+      "id": "vtt-cr-cr-lf-ends-block",
+      "profile": "vtt-cr-cr-lf-ends-block",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-cr-cr-lf-ends-block.vtt",
+      "sha256": "ad552ff7f0f7d7a04d44b534dbe7e4898bd84c6661e02845989138bf4c0dc5a0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 15001556908912016723
+      }
+    },
+    {
+      "id": "vtt-cr-then-crlf-ends-block",
+      "profile": "vtt-cr-then-crlf-ends-block",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-cr-then-crlf-ends-block.vtt",
+      "sha256": "f152eb3e8474bd740202b28e65469bc51f6305bc392f13ac04fa743f6635c01b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 4,
+        "digest": 3517434848771630087
+      }
+    },
+    {
+      "id": "vtt-lone-cr-kept",
+      "profile": "vtt-lone-cr-kept",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-lone-cr-kept.vtt",
+      "sha256": "866d8454efe72d095080d8cdcff4037d63d765703570303763c5f16bcea5c186",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 9,
+        "digest": 12549782939443896071
+      }
+    },
+    {
+      "id": "vtt-cr-only-lines",
+      "profile": "vtt-cr-only-lines",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-cr-only-lines.vtt",
+      "sha256": "02cd1d82a94744098c6dc65c2cc253e18ef9aceb6fcd23f7e3e0564ec35f5a55",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 12385019106880786655
+      }
+    },
+    {
+      "id": "vtt-leading-line-breaks-skipped",
+      "profile": "vtt-leading-line-breaks-skipped",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-leading-line-breaks-skipped.vtt",
+      "sha256": "2cc72728c684531e64a58869ddc38e876e85d7e88da67a47eb92781ad7de558f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 18429156827790959000
+      }
+    },
+    {
+      "id": "vtt-nul-ends-block",
+      "profile": "vtt-nul-ends-block",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-nul-ends-block.vtt",
+      "sha256": "cf1e8d1b956f402df0b06f5b1c6b7fb70a033377e651baab80c90789489950a4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 12385019106880786655
+      }
+    },
+    {
+      "id": "vtt-nul-mid-line",
+      "profile": "vtt-nul-mid-line",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-nul-mid-line.vtt",
+      "sha256": "6e049646d0716db1aed4c361cc862513363c58a6588091935bde9f7593c81fb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 13705469346545345041
+      }
+    },
+    {
+      "id": "vtt-nul-starts-identifier",
+      "profile": "vtt-nul-starts-identifier",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-nul-starts-identifier.vtt",
+      "sha256": "86376248a3a4830fb52d9cec007b3f99a8d6c041d403f40f13f3e97f146a9c04",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 15001556909541858045
+      }
+    },
+    {
+      "id": "vtt-nul-after-block-ends-document",
+      "profile": "vtt-nul-after-block-ends-document",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-nul-after-block-ends-document.vtt",
+      "sha256": "14753979800a8425f7f1afeed3e035eb2dd43401fda492c87dd798e932f8e9d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 13705469346545345041
+      }
+    },
+    {
+      "id": "vtt-negative-duration-until-next",
+      "profile": "vtt-negative-duration-until-next",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-negative-duration-until-next.vtt",
+      "sha256": "0a376ebeb376f213bd2cd5c85af7fee6a0e2178717e5f6ef4cdafcc1193a80e1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 14425426771604336515
+      }
+    },
+    {
+      "id": "vtt-long-duration",
+      "profile": "vtt-long-duration",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-long-duration.vtt",
+      "sha256": "a9ae3f055393ebc2bdbf136470dad25227326af2ab29b6a2ba1ce410fe000ee6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1,
+        "digest": 17080421276621312266
+      }
+    },
+    {
+      "id": "vtt-repeat-dropped",
+      "profile": "vtt-repeat-dropped",
+      "group": "vtt",
+      "file": "harness/fixtures/subtitle-text/documents/vtt-repeat-dropped.vtt",
+      "sha256": "ace474461fa11a5d0e60f4fbb54b8c6a7c9d4dedd65f1229229294bd001e59c3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "vtt"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 2,
+        "digest": 6718903878212944200
+      }
     }
   ]
 }

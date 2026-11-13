@@ -423,7 +423,7 @@ pub(crate) fn candidate_worker(root: &Path, identity: &Value, name: &str) -> R<P
         .get("additional_candidates")
         .and_then(|workers| workers.get(name))
         .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
-    let path = root.join(format!("target/release/{name}"));
+    let path = root.join(gate_build::release_dir()?).join(name);
     if record.get("sha256").and_then(Value::as_str) != Some(sha(&path)?.as_str()) {
         return Err(format!("{name} changed since build identity; rebuild"));
     }
@@ -471,6 +471,7 @@ fn additional_candidates(
             "--target-dir".into(),
             root.join("target").display().to_string(),
         ]);
+        command.extend(gate_build::target_args()?);
         if let Some(example) = spec.example {
             command.extend(["--example".into(), example.into()]);
         }
@@ -488,8 +489,10 @@ fn additional_candidates(
         }
         if let Some(example) = spec.example {
             fs::copy(
-                root.join(format!("target/release/examples/{example}")),
-                root.join(format!("target/release/{}", spec.name)),
+                root.join(gate_build::release_dir()?)
+                    .join("examples")
+                    .join(example),
+                root.join(gate_build::release_dir()?).join(spec.name),
             )
             .map_err(|error| format!("{}: {error}", spec.name))?;
         }
@@ -501,7 +504,7 @@ fn additional_candidates(
 fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
     let mut candidates = Vec::new();
     for (name, command) in built {
-        let path = format!("target/release/{name}");
+        let path = format!("{}/{name}", gate_build::release_dir()?);
         candidates.push((
             *name,
             Value::object([
@@ -532,6 +535,10 @@ struct ProfileReference {
     packages: &'static [&'static str],
     /// Compiler options before the source file.
     options: &'static [&'static str],
+    /// C library functions linked with `--wrap`: the source defines each
+    /// `__wrap_` entry point, and every call of the function in the source and
+    /// the pinned archives goes through it.
+    wrapped: &'static [&'static str],
     /// Whether the build answers `identity -` (the container builds do; the
     /// decode, capture and font builds record their configuration in the profile's
     /// `build.json` instead).
@@ -584,6 +591,7 @@ const REFERENCE: ProfileReference = ProfileReference {
     libraries: "",
     packages: &[],
     options: RELEASE_OPTIONS,
+    wrapped: &[],
     identity: false,
     prepared: None,
     generated: None,
@@ -601,7 +609,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 13] = [
+const PROFILE_REFERENCES: [ProfileReference; 14] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -633,6 +641,36 @@ const PROFILE_REFERENCES: [ProfileReference; 13] = [
         record: "ffmpeg-subtitles-native",
         kind: "pinned FFmpeg subtitle decoders with libzvbi and the video decoders closed captions need; subtitle decode operations",
         libraries: "subtitles_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        // The calls whose result can differ between the targets, so that the
+        // worker flags the folds that reach such a result
+        // (`harness/reference_subtitles_host.h`).
+        wrapped: &[
+            "strtol",
+            "strtoul",
+            "__isoc23_strtol",
+            "__isoc23_strtoul",
+            "__isoc99_sscanf",
+            "lrint",
+            "lrintf",
+            "lround",
+            "llrint",
+            "llrintf",
+        ],
+        identity: true,
+        // Its wrappers run inside the timed operation, so it is never timed or
+        // measured; `ffmpeg-subtitles-plain-native` is.
+        instrumented: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-subtitles-plain-worker",
+        define: Some("-DTRIERGON_SUBTITLE_PLAIN_REFERENCE=1"),
+        record: "ffmpeg-subtitles-plain-native",
+        kind: "the subtitles reference without its flagging wrappers; the timing and memory reference of the subtitle decode features",
+        libraries: "subtitles_plain_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
         identity: true,
@@ -809,6 +847,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         "--target-dir".into(),
         root.join("target").display().to_string(),
     ]);
+    candidate_command.extend(gate_build::target_args()?);
     let status = Command::new("cargo")
         .args(&candidate_command[1..])
         .env("CARGO_INCREMENTAL", "0")
@@ -897,6 +936,12 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         if let Some(define) = reference.define {
             command.push(define.into());
         }
+        command.extend(
+            reference
+                .wrapped
+                .iter()
+                .map(|name| format!("-Wl,--wrap={name}")),
+        );
         if let Some(generate) = reference.generated {
             // A system directory, as the pinned tree's own is: libass's code is
             // compiled with its own warnings.
@@ -923,7 +968,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         ("observer_sha256".to_owned(), Value::str(sha(&observer)?)),
         ("probe_sha256".to_owned(), Value::str(sha(&probe)?)),
     ];
-    let candidate = root.join("target/release/media-worker");
+    let candidate = root.join(gate_build::release_dir()?).join("media-worker");
     let mut libraries: Vec<(String, Value)> = Vec::new();
     if linux {
         for (name, path) in [
@@ -1353,6 +1398,11 @@ mod tests {
         let error =
             |reference, measurement| measurement_reference_error(&contract(reference, measurement));
         assert_eq!(error("libass-ass-native", "libass-player-native"), None);
+        assert_eq!(
+            error("ffmpeg-subtitles-native", "ffmpeg-subtitles-plain-native"),
+            None
+        );
+        assert!(error("ffmpeg-subtitles-plain-native", "ffmpeg-subtitles-native").is_some());
         assert!(error("libass-ass-native", "libass-ass-native").is_some());
         assert!(error("libass-native", "libass-player-native").is_some());
         assert!(error("libass-ass-native", "freetype-native").is_some());
@@ -1452,9 +1502,10 @@ mod tests {
     fn primary_only_identity_does_not_adopt_stale_additional_binaries() {
         let root = std::env::temp_dir().join(format!("worker-build-stale-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(root.join("target/release")).unwrap();
+        let release = root.join(gate_build::release_dir().unwrap());
+        fs::create_dir_all(&release).unwrap();
         for spec in &ADDITIONAL_CANDIDATES {
-            fs::write(root.join("target/release").join(spec.name), b"stale").unwrap();
+            fs::write(release.join(spec.name), b"stale").unwrap();
         }
         let candidates = candidate_records(&root, &[]).unwrap();
         assert!(matches!(&candidates, Value::Object(records) if records.is_empty()));

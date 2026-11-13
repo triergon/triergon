@@ -910,14 +910,37 @@ fn timeout_row(argv: Vec<String>) -> Value {
     ])
 }
 
+/// The vector names a manifest lists in `open_cases`: vectors that fail today and
+/// that `summarize` requires to keep failing. Every name must be a vector of it.
+fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>, String> {
+    let mut open = Vec::new();
+    for case in manifest
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let name = case.as_str().ok_or("an open case is a vector name")?;
+        if !vectors
+            .iter()
+            .any(|v| v.get("name").and_then(Value::as_str) == Some(name))
+        {
+            return Err(format!("open case {name}: not a vector of the manifest"));
+        }
+        open.push(name);
+    }
+    Ok(open)
+}
+
 /// Grade every manifest vector (or those `--only` selects), appending one JSON
-/// row per vector to `--out` and printing one line per vector.
+/// row per vector to `--out` and printing one line per vector. A row of a
+/// vector the manifest lists in `open_cases` carries `"open_case": true`.
 pub fn grade(a: &Grade) -> Result<(), String> {
     let manifest = crate::checks::read_json(&a.manifest)?;
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)
         .ok_or("manifest has no vectors")?;
+    let open = open_cases(&manifest, vectors)?;
     let only: Option<Vec<&str>> = a.only.as_deref().map(|o| o.split(',').collect());
     let mut out = fs::OpenOptions::new()
         .create(true)
@@ -950,6 +973,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 v.get("sha256").cloned().unwrap_or(Value::Null),
             ),
         ];
+        if open.contains(&name.as_str()) {
+            row.push(("open_case".into(), Value::Bool(true)));
+        }
         if Some(file_sha(Path::new(&path))?.as_str()) != v.get("sha256").and_then(Value::as_str) {
             row.push(("status".into(), Value::str("input-hash-mismatch")));
         } else {
