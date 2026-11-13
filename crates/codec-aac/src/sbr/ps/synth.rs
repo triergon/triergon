@@ -3,15 +3,18 @@
 //! decorrelated signal into two channels, and the hybrid synthesis.
 //!
 //! Structure (H. Purnhagen, "Low complexity parametric stereo coding in MPEG-4", DAFx
-//! 2004, sections 3.2, 3.3 and 4; 3GPP TS 26.405 V19.0.0 section 5.2.2): the lowest QMF
+//! 2004, sections 3.2, 3.3 and 4.1; 3GPP TS 26.405 V19.0.0 section 5.2.2): the lowest QMF
 //! bands are split by 13-tap complex-modulated filters G(n) = g(n) exp(j 2 pi / Q (q + 1/2)
 //! (n - 6)) whose delay of 6 slots is taken up by the 6 look-ahead slots SBR hands over,
 //! so every band is processed at zero delay; synthesis adds the sub-bands of a QMF band.
 //! The decorrelator runs a chain of three all-pass sections of 3, 4 and 5 slots with
 //! fractional delays (phase rotations at each band's frequency) below QMF band 23, a delay
-//! of 14 slots up to band 34 and of one slot above; a transient detector per parameter
-//! band attenuates the decorrelated signal after power drops. The constants, prototypes,
-//! band maps and the ducking rule are recovered from the reference decoder's output
+//! of 14 slots up to band 34 and of one slot above. Observed behaviour, given by no
+//! available text and documented with its probes where it is implemented: the lead delay
+//! and phase before the sections ([`Kind::AllPass`]), the taper of the coefficients over
+//! the QMF bands ([`layout`]) and the transient ducking, which attenuates the decorrelated
+//! signal per parameter band after power drops ([`Synth::ducking`]). The constants,
+//! prototypes and band maps are recovered from the reference decoder's output
 //! (`harness/codecs/aac/ps`, tables in `tables.rs`).
 
 use super::tables as t;
@@ -37,10 +40,17 @@ pub(super) const MAX_PAR: usize = 34;
 /// How one hybrid band is decorrelated.
 #[derive(Clone, Copy, Debug)]
 enum Kind {
-    /// Lead phase and per section the fractional-delay phase and the coefficient.
+    /// A lead delay, then three all-pass sections.
     AllPass {
+        /// Phase factor exp(-i pi `FRACT0` f) of the lead delay of `LEAD_DELAY` slots.
+        /// Observed behaviour, given by no available text (Purnhagen section 4.1 has the
+        /// sections only): probes d06 (a lead of 2 slots fits to -114 dB, of 1 or 3 slots to
+        /// -46 dB), d08, d10 and d25 (`FRACT0`), rerun by `signal/dec/recover_dec.py` in
+        /// `harness/codecs/aac/ps`, stages 1 and 5.
         lead: Cpx,
+        /// Per section the fractional-delay phase exp(-i pi `FRACT[m]` f).
         frac: [Cpx; 3],
+        /// Per section the coefficient a_m, tapered over the QMF bands (see [`layout`]).
         decay: [f32; 3],
     },
     Delay(usize),
@@ -78,6 +88,10 @@ fn cis(x: f64) -> Cpx {
     Cpx::new(x.cos() as f32, x.sin() as f32)
 }
 
+/// The hybrid bands of one configuration. Above the split bands the all-pass coefficients
+/// taper as a_m (1 - `SLOPE` (k - split)) in QMF band k: observed behaviour, given by no
+/// available text; probes d08, d10, d14 and d16 (slope, start at the first QMF band not
+/// split, none in the split bands), rerun by `signal/dec/recover_dec.py` stages 1, 2 and 5.
 fn layout(big: bool) -> Layout {
     use std::f64::consts::PI;
     let (low, qmf_par, split): (&[LowBand], &[(u8, u8)], usize) = if big {
@@ -135,6 +149,7 @@ fn layout(big: bool) -> Layout {
         } else if k >= t::LONG_START {
             Kind::Delay(t::LONG_DELAY)
         } else {
+            // the observed coefficient taper (see above)
             all_pass(k as f64 + 0.5, 1.0 - t::SLOPE * (k - split) as f64)
         };
         bands.push(Band {

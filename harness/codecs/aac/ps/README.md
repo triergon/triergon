@@ -44,6 +44,36 @@ fresh streams, and writes its results as JSON.
 | `mix` | the first mixing procedure (Purnhagen 2004 eq. 5 with eq. 8) and ICC values; the second procedure (Breebaart 2005 rotation and scale, ICC floored at 0.05, mu rounded to single precision); IPD/OPD as row phases, smoothed as arg(u0 + u1/2 + u2/4), their bands and on/off rules; per-envelope storage; image sub-bands that ramp from the conjugated matrix | every index pair, both procedures; random streams at -129 dB |
 | `time` | envelope borders, entry-wise linear ramps, start matrices, the first PS frame (ramps from zero), frames without PS (repeat the last), headers, value storage across band counts, error frames (mono, state kept), 20 <-> 34 changes (start conversion, decorrelator restart) | composed model of all parts on random streams with every frame kind: 1.3e-8 rms |
 
+## Sources by element
+
+The form of each element comes from a publication where one gives it ("paper"), else from
+probes alone ("probes"); the probes establish every value. Publications: H. Purnhagen,
+"Low complexity parametric stereo coding in MPEG-4", DAFx 2004; J. Breebaart, S. van de
+Par, A. Kohlrausch, E. Schuijers, "Parametric coding of stereo audio", EURASIP JASP
+2005:9; 3GPP TS 26.405 V19.0.0. Probe ids: d, h, m and t are the probes of the `dec`,
+`hyb`, `mix` and `time` parts, which the stages of `signal/*/recover_*.py` name and
+repeat; e are probes of the syntax pass, p probes of the decoder's interface and of the
+open cases. The probe scripts and their outputs are in the evidence set
+`codec-aac-parametric-stereo-560f2225` (`cargo xtask evidence fetch
+codec-aac-parametric-stereo-560f2225`).
+
+| Element | Form | Paper | Probes |
+|---|---|---|---|
+| Hybrid split 8/4/4 (20 bands) | paper | Purnhagen §3.2 eq. 11, Fig. 4; TS 26.405 §5.2.2, Table 1; Breebaart §7 eq. 35, Table 2 | h01, h02 (maps, Q = 4 prototype; Table 1 g0 confirmed to 4e-9); d15, d16 (QMF-0 sub-bands 0, 1, 6, 7 kept apart) |
+| Hybrid split 12/8/4/4/4 (34 bands) | paper | Purnhagen §3.2; Breebaart §7 Table 2 | h03, h04 (maps, prototypes); d26, d27 (all 32 sub-bands apart) |
+| Zero-delay alignment, 6 look-ahead slots | paper | TS 26.405 §5.2.2 | e12, p02 |
+| Decorrelator lead delay (2 slots) and phase factor | probes | none | d06, d08, d10, d25 |
+| Three all-pass links of 3, 4, 5 slots with fractional delays | paper | Purnhagen §4.1 | d06–d08 (form), d08, d25 (values), d16, d26, d27 (band frequencies) |
+| Coefficient taper 1 − 0.05 (k − split) | probes | none | d08, d10, d14, d16 |
+| Plain-delay borders (all-pass below QMF 23, 14 slots to 34, 1 slot above) | paper | Purnhagen §4.1; Breebaart §7 | e16, d10–d12 |
+| Transient ducking | re-derived by probes, see `Synth::ducking` | Purnhagen §4.2 names transient reduction in the decoder, no form | d20–d25 |
+| Mixing, ICC modes 0..2 | paper | Purnhagen §2.2 eq. 4–6 with eq. 8; Breebaart §6 eq. 31 | m02–m04 (eq. 8, not eq. 7; ICC values) |
+| Mixing, ICC modes 3..5 | paper | Breebaart §6 eq. 24–30 | m04, m05 (ICC floor 0.05; the output matches μ² and μ rounded to single precision) |
+| IPD/OPD as row phases OPD and OPD − IPD | paper | Breebaart §6 eq. 32 | m06–m09, m21, m29; p07, p08, p12 |
+| IPD/OPD smoothing arg(u₀ + u₁/2 + u₂/4) | probes | none | m07, m27, m28, m30, m31 |
+| Envelope ramps | paper | Purnhagen §3.3; Breebaart §7 | t02, t03, t07, t09, t21, t23; m20, m26 |
+| Behaviour over frames (first frame, repeats, error frames, start index, 20 ↔ 34 changes) | probes | none | t01–t33, v_rust |
+
 ## Not recovered
 
 - A change between 20 and 34 bands registered while PS is off after an error (by a

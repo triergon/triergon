@@ -131,13 +131,16 @@ caller's reserved PCM planes and reuses them on the next access unit.
 
 - Specifications: ISO/IEC 14496-3 (subpart 4 AAC, 4.6.18 SBR); QMF window from ETSI TS 101
   980 Annex I Table I.1; QMF flowcharts from 3GPP TS 26.404 Figure 6 and TS 26.405 Figure 4.
-  PS: H. Purnhagen, DAFx 2004 (mixing, hybrid filterbank, decorrelator structure,
-  transient reduction), J. Breebaart et al., EURASIP JASP 2005:9 (the mixing for ICC modes
-  3..5, IPD/OPD phases) and 3GPP TS 26.405 (hybrid prototype Table 1, 20-band map Table 2);
-  the `ps_data()` syntax, the Huffman books and every table and rule they do not print are
-  recovered from FFmpeg's output by scripted probes
+  PS: H. Purnhagen, DAFx 2004 (mixing, hybrid filterbank, decorrelator structure),
+  J. Breebaart et al., EURASIP JASP 2005:9 (the mixing for ICC modes 3..5, IPD/OPD phases)
+  and 3GPP TS 26.405 (hybrid prototype Table 1, 20-band map Table 2); the `ps_data()`
+  syntax, the Huffman books and every table and rule they do not print are recovered from
+  FFmpeg's output by scripted probes
   ([harness/codecs/aac/ps](../../harness/codecs/aac/ps/README.md)), regenerated and checked
-  by `cargo xtask codecs aac-ps-tables [--check]`.
+  by `cargo xtask codecs aac-ps-tables [--check]`. Observed behaviour, given by no
+  available text: the decorrelator's lead delay and coefficient taper, the transient
+  ducking (Purnhagen names transient reduction but gives no form), the IPD/OPD smoothing
+  and the behaviour over frames; the code names the probes of each.
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
   remuxed to ADTS). Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and

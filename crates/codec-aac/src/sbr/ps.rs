@@ -2,14 +2,19 @@
 //! over frames, and the stereo synthesis of the mono QMF matrix (in `ps/synth.rs`).
 //!
 //! Sources: H. Purnhagen, "Low complexity parametric stereo coding in MPEG-4", DAFx 2004
-//! (the mixing matrix of eq. 4-8, the hybrid filterbank, the decorrelator structure and
-//! transient reduction); J. Breebaart et al., "Parametric coding of stereo audio", EURASIP
-//! JASP 2005:9 (the rotation-and-scale mixing used for ICC modes 3..5); 3GPP TS 26.405
-//! V19.0.0 (hybrid prototypes Table 1, the 20-band map Table 2). ISO/IEC 14496-3 is not
-//! available: the `ps_data()` syntax, the Huffman books and every table and rule these
-//! documents do not print were recovered from the FFmpeg 9.0.2 decoder's output on crafted
-//! streams by the scripts in `harness/codecs/aac/ps` (regenerated and checked with
-//! `cargo xtask codecs aac-ps-tables`).
+//! (the mixing matrix of eq. 4-8, the hybrid filterbank, the decorrelator structure and the
+//! linear interpolation of the matrices); J. Breebaart et al., "Parametric coding of stereo
+//! audio", EURASIP JASP 2005:9 (the rotation-and-scale mixing used for ICC modes 3..5,
+//! IPD/OPD as row phases); 3GPP TS 26.405 V19.0.0 (hybrid prototypes Table 1, the 20-band
+//! map Table 2). ISO/IEC 14496-3 is not available: the `ps_data()` syntax, the Huffman
+//! books and every table and rule these documents do not print were recovered from the
+//! FFmpeg 9.0.2 decoder's output on crafted streams by the scripts in
+//! `harness/codecs/aac/ps` (regenerated and checked with `cargo xtask codecs
+//! aac-ps-tables`). Rules that no available text gives are observed behaviour, documented
+//! with the probes that establish them: the behaviour over frames below, the IPD/OPD
+//! smoothing (`Ps::smooth`), the decorrelator's lead delay and coefficient taper
+//! (`synth.rs`) and the transient ducking (`Synth::ducking`; Purnhagen section 4.2 names
+//! transient reduction in the decoder but gives no form).
 //!
 //! Syntax: `enable_ps_header` (1); with it `enable_iid` (1) and `iid_mode` (3),
 //! `enable_icc` (1) and `icc_mode` (3), `enable_ext` (1). Then `frame_class` (1) and
@@ -21,23 +26,31 @@
 //! bit, per envelope a dt flag and 5, 11 or 17 IPD codewords (by the last IID mode) and the
 //! same for OPD, then one reserved bit.
 //!
-//! Behaviour over frames, as the reference decoder shows it:
+//! Behaviour over frames, observed behaviour of the reference decoder (probe ids as the
+//! recovery scripts in `harness/codecs/aac/ps/signal` name them; `time/recover_time.py`
+//! reruns the t probes):
 //! - The decoder runs 34 bands when an enabled IID or ICC mode is 2 or 5, else 20; 10 band
 //!   values apply to two bands each, 20 band values map onto 34 bands by copying or by the
-//!   mean of two indices truncated toward zero.
+//!   mean of two indices truncated toward zero (h05, h06, t13, t29).
 //! - The matrix entries ramp linearly over each envelope from the previous target to the
 //!   envelope's target, reached at its last slot (class 0: slot 32(e + 1)/n - 1; class 1:
 //!   the coded border, with one more envelope to slot 31 when the last border is lower). A
 //!   frame starts from the target stored at the index of the previous frame's last
-//!   envelope; the first PS frame starts from the zero matrix.
+//!   envelope; the first PS frame starts from the zero matrix (t01..t03, t07, t09, t21,
+//!   t23).
 //! - IPD/OPD apply to 11 of 20 or 17 of 34 bands; above them the stored imaginary parts of
 //!   the matrices are kept. Values coded for 34 bands in a 20-band frame (IID last ran 34
-//!   bands) take the truncated means of the 34-band rows the start conversion averages.
+//!   bands) take the truncated means of the 34-band rows the start conversion averages
+//!   (m09, m21, m29, p07, p08, p12).
 //! - A frame without PS data repeats the last PS frame; a header-less frame uses the last
-//!   header; a header with IID or ICC disabled resets those values to index 0.
+//!   header; a header with IID or ICC disabled resets those values to index 0 (t04..t07,
+//!   t12, t17..t19).
 //! - A frame with an invalid value, a decreasing border, a reserved mode or more data than
 //!   its extension holds outputs the mono signal on both channels, keeps the signal state
-//!   and resets the values; PS stays off until the next header.
+//!   and resets the values; PS stays off until the next header (t08, t09, t11, t20, t21).
+//! - A frame whose configuration differs from that of the frame read before it converts
+//!   its start matrices to the new layout and restarts the decorrelator (t13, t14,
+//!   t25..t27).
 
 mod synth;
 mod tables;
@@ -903,6 +916,13 @@ impl Ps {
     }
 
     /// Smoothed row phases (cos, sin) of envelope `e`; advances the smoothing history.
+    ///
+    /// Observed behaviour, given by no available text: each IPD and OPD phase applied is
+    /// arg(u0 + u1 / 2 + u2 / 4) of the unit phasors of the envelope's index and of the two
+    /// envelopes before it (`PHASE_WEIGHTS`); the history runs across frames, starts at
+    /// index 0 and does not advance in envelopes without IPD/OPD. Probes m07 (weights),
+    /// m27, m28, m30 and m31 (history, on/off, storage); `signal/mix/recover_mix.py` in
+    /// `harness/codecs/aac/ps` refits the weights (step C) and checks the model (step F).
     fn smooth(&mut self, e: usize, pars: usize, big: bool) -> (Phases, Phases) {
         let mut out = [[(1.0, 0.0); MAX_PAR]; 2];
         let mut unit = [[(1.0, 0.0); MAX_PAR]; 2];
