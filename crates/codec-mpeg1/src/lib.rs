@@ -816,18 +816,21 @@ impl Encoder {
                     1 => &input.cb(),
                     _ => &input.cr(),
                 };
-                let mut magnitude = 0u32;
+                // Residuals and their per-column magnitudes in 16-bit lanes
+                // (a column sums at most 8 × 255).
+                let mut columns = [0u16; 8];
                 for r in 0..8 {
                     let row: &[u8; 8] = src[(y + r) * stride + x..(y + r) * stride + x + 8]
                         .try_into()
                         .unwrap();
                     let p: &[u8; 8] = pred[b][r * 8..r * 8 + 8].try_into().unwrap();
                     for c in 0..8 {
-                        let d = row[c] as i32 - p[c] as i32;
-                        coeffs[r * 8 + c] = d;
-                        magnitude += d.unsigned_abs();
+                        let d = i16::from(row[c]) - i16::from(p[c]);
+                        coeffs[r * 8 + c] = i32::from(d);
+                        columns[c] += d.unsigned_abs();
                     }
                 }
+                let magnitude: u32 = columns.iter().map(|&m| u32::from(m)).sum();
                 if self.quant.inter_is_zero(magnitude, s.target_q) {
                     continue;
                 }
@@ -996,15 +999,19 @@ fn block_origin(
 
 /// Σx² − (Σx)²/256 over a 16×16 block: 256 × its variance.
 fn variance256(block: &[u8], stride: usize) -> u32 {
-    let (mut sum, mut squares) = ([0u32; 16], [0u32; 16]);
+    // Per lane: at most 16 × 255 in the sum, 16 × 255² in the squares, each
+    // square formed in 16 bits.
+    let (mut sum, mut squares) = ([0u16; 16], [0u32; 16]);
     for r in 0..16 {
         let row: &[u8; 16] = block[r * stride..r * stride + 16].try_into().unwrap();
         for i in 0..16 {
-            sum[i] += row[i] as u32;
-            squares[i] += row[i] as u32 * row[i] as u32;
+            let v = u16::from(row[i]);
+            sum[i] += v;
+            squares[i] += u32::from(v * v);
         }
     }
-    let (sum, squares): (u32, u32) = (sum.iter().sum(), squares.iter().sum());
+    let sum: u32 = sum.iter().map(|&v| u32::from(v)).sum();
+    let squares: u32 = squares.iter().sum();
     squares - (sum * sum) / 256
 }
 

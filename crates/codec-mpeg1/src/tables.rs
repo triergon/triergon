@@ -356,6 +356,18 @@ pub(crate) const SCAN_INDEX: [usize; 64] = {
     inverse
 };
 
+/// Raster index → its bit in a zig-zag scan mask (`1 << SCAN_INDEX[p]`), so
+/// no 64-bit shift is needed per coefficient.
+pub(crate) const SCAN_BIT: [u64; 64] = {
+    let mut bits = [0u64; 64];
+    let mut p = 0;
+    while p < 64 {
+        bits[p] = 1 << SCAN_INDEX[p];
+        p += 1;
+    }
+    bits
+};
+
 /// Default intra quantiser matrix, raster order.
 pub(crate) const INTRA_MATRIX: [u16; 64] = [
     8, 16, 19, 22, 26, 27, 29, 34, //
