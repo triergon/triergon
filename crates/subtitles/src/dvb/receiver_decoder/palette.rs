@@ -2,10 +2,9 @@
 //! clause 10), CLUT entries converted to ARGB words, and the automatic palette
 //! (`compute_clut`).
 //!
-//! The automatic palette is a grey ramp ranked from the region's index plane.
-//! Each pixel value is a node; the region's edge counts as already ranked.
-//! The value most exposed to what is ranked takes the next level up, so the
-//! values touching the edge rank first and those enclosed by others last.
+//! The automatic palette gives each value a region holds one level, from
+//! transparent black up to `0xff7fff7f`, ranking the values from the region's
+//! edge inwards ([`automatic`]).
 use crate::dvb::Depth;
 use triergon_core::{Budget, BudgetVec, Result};
 
@@ -144,187 +143,252 @@ pub(super) fn ycrcbt(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
     )
 }
 
-/// The automatic palette's working storage: for the `n` values a region
-/// uses, the `n × n` matrix of sides where a pixel of one meets a pixel of
-/// the other, then each value's exposed sides and counted pixels. It is
-/// allocated through the budget and kept for the next region.
+/// Values a pixel can hold.
+const VALUES: usize = 256;
+
+/// The automatic palette's working storage, charged to the decoder's budget: one
+/// table of words holding each value's counted pixels, exposure and score (256
+/// words each), then the sides between each ordered pair of values below the
+/// region's stride (4, 16 or 256), `stride²` words. Between regions every word
+/// is zero: [`automatic`] clears each word as it reads it, so a region costs no
+/// clearing beyond the words its own values touch.
 #[derive(Debug)]
 pub(super) struct Census {
-    words: BudgetVec<u32>,
+    table: BudgetVec<u32>,
 }
 
 impl Census {
     pub(super) fn new(budget: &Budget) -> Self {
         Self {
-            words: BudgetVec::new(budget),
+            table: BudgetVec::new(budget),
         }
     }
 
-    /// The bytes the census holds now.
+    /// Bytes the census holds now.
     pub(super) fn bytes(&self) -> usize {
-        self.words.capacity() * size_of::<u32>()
+        self.table.capacity() * size_of::<u32>()
     }
 
-    /// The most [`automatic`] allocates for a region whose pixel values are
-    /// all below `values`.
+    /// The most the census allocates for a region whose pixel values are all below
+    /// `values` (4, 16 or 256).
     pub(super) fn bytes_for(values: usize) -> usize {
-        Self::words_for(values) * size_of::<u32>()
-    }
-
-    fn words_for(values: usize) -> usize {
-        values * values + 2 * values
-    }
-
-    /// `len` zeroed words. Growing frees the old storage before the new one
-    /// is allocated, so the census never holds more than its largest size.
-    fn zeroed(&mut self, len: usize) -> Result<&mut [u32]> {
-        if len > self.words.capacity() {
-            let budget = self.words.budget().clone();
-            self.words = BudgetVec::new(&budget);
-            self.words = BudgetVec::try_filled(&budget, 0, len)?;
-        } else {
-            self.words.clear();
-            self.words.try_resize(len, 0)?;
-        }
-        Ok(self.words.as_mut_slice())
+        words(stride(values)) * size_of::<u32>()
     }
 }
 
-/// The automatic palette of a region's index plane, `pixels` row by row and
-/// `width` per row, written to the entries of the values it uses; the other
-/// entries of `out` keep their values, as in the reference.
+/// The pair table's stride for pixel values below `values`.
+fn stride(values: usize) -> usize {
+    match values {
+        0..=4 => 4,
+        5..=16 => 16,
+        _ => VALUES,
+    }
+}
+
+/// The census words a region of `stride` uses.
+fn words(stride: usize) -> usize {
+    3 * VALUES + stride * stride
+}
+
+/// The automatic palette (`compute_clut`) of a region: `pixels` row by row, `width`
+/// per row, into `out`. Entries of values no pixel holds keep their words.
 ///
-/// - A pixel counts unless all four of its neighbours lie inside the region
-///   and have its value. Each counted pixel has four sides; a side is exposed
-///   when it lies on the region's edge or faces a pixel of a ranked value.
-/// - A value's exposure is its counted pixels' exposed sides per counted
-///   pixel, in 1/1024 steps rounded down.
-/// - Values are ranked one at a time from the bottom: the most exposed value
-///   next, the lower value first among equals.
-/// - The `k`-th of `n` ranked values gets level `255 × k / (n − 1)` rounded
-///   down (0 when the region has one value), and the word with alpha and green
-///   at that level and red and blue at half of it, rounded down.
+/// The values the region holds are ranked, and the `n`-th of `m` (from 0) gets the
+/// level `255 × n / (m − 1)` rounded down, presented as the word with alpha and
+/// green at the level and red and blue at half of it: with three values 0,
+/// `0x7f3f7f3f` and `0xff7fff7f`; with eight, levels 0, 36, 72, 109, 145, 182, 218
+/// and 255. The first value ranked, the background, is transparent black; a
+/// region of one value is all background.
 ///
-/// The work is one pass over the pixels and up to `n²` steps for the ranking.
-/// A refused allocation is an error and leaves `out` as it was.
+/// A value's *counted* pixels are those on the region's edge or with a
+/// 4-neighbour of another value; pixels enclosed by their own value do not count.
+/// Its *exposure* starts as its pixels' sides on the region's edge (a corner pixel
+/// has two; in a region one pixel high every pixel has two and the ends three).
+/// Each step ranks the
+/// value with the highest score, exposure × 1024 / counted pixels rounded down,
+/// the smaller value on a tie; then every value still unranked adds to its
+/// exposure its sides against the pixels of the value just ranked, as if those
+/// pixels were the edge. So the background is the value most exposed on the edge,
+/// and the ranks peel inwards from it:
+/// - the row 1 2 3 ranks 1 2 3: 1 and 3 tie at 3072 (three sides on the edge each)
+///   and 1 ranks first; then 2, with two sides on the edge and one against 1, ties
+///   with 3 and ranks before it;
+/// - the row 1 1 2 3 ranks 3 2 1: 3 scores 3072 against 1's 2560;
+/// - the row 2 1 3 1 ranks 2 1 3: once 2 is ranked, 1 has six sides on two pixels;
+/// - in a 5 × 5 region of 1, a 2 at a corner ranks first (2048 against 1's 18 sides
+///   on 15 counted pixels, 1228), and a 2 at the middle of an edge ranks after 1
+///   (1024 against 19 sides on 16 pixels, 1216), though counting every pixel of 1
+///   would put 2 first;
+/// - two rows, 600 columns of 5 then 680 of 3, rank 3 first: both score 1025,
+///   though 5's exact ratio is the greater; with 505 columns of 5 and 520 of 3, 5
+///   scores 1026 and ranks first.
+///
+/// Every depth follows the same rule, with no limit from the width or height up
+/// to 1280 × 1024: a 1/2 checkerboard there, framed in 1, gives 2 an exposure
+/// above 2³¹ / 1024 once 1 is ranked, and 2 still ranks before a 3 × 3 block of 3.
+/// Entries no pixel uses keep the words of the region's last palette across
+/// redrawing, resizing, a new depth or a display set without the region; a new
+/// epoch (a mode change or an acquisition point) starts its regions from
+/// transparent black.
+///
+/// The work is linear in the pixels, plus at most 256² steps for the ranking.
 pub(super) fn automatic(
     pixels: &[u8],
     width: usize,
     census: &mut Census,
     out: &mut [u32; 256],
 ) -> Result<()> {
+    let Some(&max) = pixels.iter().max() else {
+        return Ok(());
+    };
     if width == 0 {
         return Ok(());
     }
-    let pixels = &pixels[..pixels.len() / width * width];
-    // Dense indices in ascending value order, so that the lower index is the
-    // lower value.
-    let mut index = [0u8; 256];
-    for &value in pixels {
-        index[usize::from(value)] = 1;
+    let stride = stride(usize::from(max) + 1);
+    let needed = words(stride);
+    if census.table.len() < needed {
+        census.table.try_resize(needed, 0)?;
     }
-    let mut values = [0u8; 256];
-    let mut count = 0;
-    for value in 0..256 {
-        if index[value] != 0 {
-            index[value] = count as u8;
-            values[count] = value as u8;
-            count += 1;
-        }
+    let (counted, rest) = census.table.as_mut_slice().split_at_mut(VALUES);
+    let (exposure, rest) = rest.split_at_mut(VALUES);
+    let (score, pairs) = rest.split_at_mut(VALUES);
+    let mut tally = Tally {
+        stride,
+        counted,
+        exposure,
+        score,
+        pairs: &mut pairs[..stride * stride],
+    };
+    let mut rows = pixels.chunks_exact(width);
+    let mut up = None;
+    let mut row = rows.next();
+    while let Some(current) = row {
+        let down = rows.next();
+        tally.row(up, current, down);
+        up = Some(current);
+        row = down;
     }
-    if count == 0 {
-        return Ok(());
-    }
-    let words = census.zeroed(Census::words_for(count))?;
-    let (sides, rest) = words.split_at_mut(count * count);
-    let (exposed, counted) = rest.split_at_mut(count);
-    tally(pixels, width, &index, count, sides, exposed, counted);
-    rank(count, sides, exposed, counted, |rank, id| {
-        let level = (255 * rank).checked_div(count - 1).unwrap_or(0) as u32;
-        out[usize::from(values[id])] = argb(level, level >> 1, level, level >> 1);
-    });
+    tally.rank(out);
     Ok(())
 }
 
-/// One pass over the pixels: the sides where values meet (`sides[a × n + b]`
-/// for dense indices `a` and `b`), and each value's counted pixels and their
-/// sides on the region's edge.
-fn tally(
-    pixels: &[u8],
-    width: usize,
-    index: &[u8; 256],
-    count: usize,
-    sides: &mut [u32],
-    exposed: &mut [u32],
-    counted: &mut [u32],
-) {
-    let mut lines = pixels.chunks_exact(width).peekable();
-    let mut above: Option<&[u8]> = None;
-    while let Some(line) = lines.next() {
-        let below = lines.peek().copied();
-        for (x, &value) in line.iter().enumerate() {
-            let a = usize::from(index[usize::from(value)]);
-            let neighbours = [
-                x.checked_sub(1).map(|x| line[x]),
-                line.get(x + 1).copied(),
-                above.map(|above| above[x]),
-                below.map(|below| below[x]),
-            ];
-            let mut edge = 0;
-            let mut differs = false;
-            for neighbour in neighbours {
-                match neighbour {
-                    None => edge += 1,
-                    Some(other) => differs |= other != value,
+/// The census of one region as it is counted and ranked.
+struct Tally<'a> {
+    stride: usize,
+    counted: &'a mut [u32],
+    exposure: &'a mut [u32],
+    score: &'a mut [u32],
+    /// Sides between unlike neighbours, at `left or upper × stride + right or
+    /// lower`.
+    pairs: &'a mut [u32],
+}
+
+impl Tally<'_> {
+    fn pair(&mut self, a: u8, b: u8) {
+        if a != b {
+            self.pairs[usize::from(a) * self.stride + usize::from(b)] += 1;
+        }
+    }
+
+    /// Count one row, between the rows above and below it if the region has them.
+    fn row(&mut self, up: Option<&[u8]>, row: &[u8], down: Option<&[u8]>) {
+        let last = row.len() - 1;
+        // Sides on the edge: the row's ends, and all of the first and last rows.
+        self.exposure[usize::from(row[0])] += 1;
+        self.exposure[usize::from(row[last])] += 1;
+        let edges = u32::from(up.is_none()) + u32::from(down.is_none());
+        if edges > 0 {
+            for &v in row {
+                self.exposure[usize::from(v)] += edges;
+            }
+        }
+        match (up, down) {
+            (Some(up), Some(down)) if last > 1 => {
+                self.counted[usize::from(row[0])] += 1;
+                self.counted[usize::from(row[last])] += 1;
+                self.pair(row[0], row[1]);
+                self.pair(row[0], down[0]);
+                self.pair(row[last], down[last]);
+                for ((window, &u), &d) in row.windows(3).zip(&up[1..]).zip(&down[1..]) {
+                    let (l, v, r) = (window[0], window[1], window[2]);
+                    self.pair(v, r);
+                    self.pair(v, d);
+                    self.counted[usize::from(v)] += u32::from(l != v || r != v || u != v || d != v);
                 }
             }
-            if edge != 0 || differs {
-                counted[a] += 1;
-                exposed[a] += edge;
-            }
-            // Each meeting of two values once, from its left or upper pixel.
-            for other in [neighbours[1], neighbours[3]].into_iter().flatten() {
-                if other != value {
-                    let b = usize::from(index[usize::from(other)]);
-                    sides[a * count + b] += 1;
-                    sides[b * count + a] += 1;
+            // The first or last row, or a region at most two wide: every pixel is
+            // on the edge.
+            _ => {
+                for &v in row {
+                    self.counted[usize::from(v)] += 1;
+                }
+                for window in row.windows(2) {
+                    self.pair(window[0], window[1]);
+                }
+                for (&a, &b) in down.into_iter().flat_map(|down| row.iter().zip(down)) {
+                    self.pair(a, b);
                 }
             }
         }
-        above = Some(line);
+    }
+
+    /// Rank the counted values into `out`, clearing the census behind them.
+    fn rank(self, out: &mut [u32; 256]) {
+        let Self {
+            stride,
+            counted,
+            exposure,
+            score,
+            pairs,
+        } = self;
+        // The values still to rank, in ascending order.
+        let mut left = [0u8; VALUES];
+        let mut len = 0;
+        for v in (0..=u8::MAX).take(stride) {
+            let i = usize::from(v);
+            if counted[i] > 0 {
+                left[len] = v;
+                len += 1;
+                score[i] = ratio(exposure[i], counted[i]);
+            }
+        }
+        // At least 1, so that a region of one value ranks it at level 0.
+        let top = len.saturating_sub(1).max(1);
+        for rank in 0..len {
+            let remaining = len - rank;
+            let mut at = 0;
+            for i in 1..remaining {
+                if score[usize::from(left[i])] > score[usize::from(left[at])] {
+                    at = i;
+                }
+            }
+            let best = usize::from(left[at]);
+            left.copy_within(at + 1..remaining, at);
+            let level = (255 * rank / top) as u32;
+            out[best] = argb(level, level >> 1, level, level >> 1);
+            counted[best] = 0;
+            exposure[best] = 0;
+            score[best] = 0;
+            for &v in &left[..remaining - 1] {
+                let v = usize::from(v);
+                let sides = std::mem::take(&mut pairs[best * stride + v])
+                    + std::mem::take(&mut pairs[v * stride + best]);
+                if sides > 0 {
+                    exposure[v] += sides;
+                    score[v] = ratio(exposure[v], counted[v]);
+                }
+            }
+        }
     }
 }
 
-/// Rank the `count` values bottom up, calling `place(rank, id)` for each. A
-/// ranked value's count is cleared; every value has a counted pixel before,
-/// as its topmost pixel lies on the edge or below another value.
-fn rank(
-    count: usize,
-    sides: &[u32],
-    exposed: &mut [u32],
-    counted: &mut [u32],
-    mut place: impl FnMut(usize, usize),
-) {
-    for rank in 0..count {
-        let mut best: Option<(usize, u64)> = None;
-        for (id, (&edges, &pixels)) in exposed.iter().zip(counted.iter()).enumerate() {
-            if pixels == 0 {
-                continue;
-            }
-            let share = (u64::from(edges) << 10) / u64::from(pixels);
-            if best.is_none_or(|(_, top)| share > top) {
-                best = Some((id, share));
-            }
-        }
-        let Some((next, _)) = best else {
-            return;
-        };
-        counted[next] = 0;
-        place(rank, next);
-        let meets = &sides[next * count..(next + 1) * count];
-        for (exposed, &meet) in exposed.iter_mut().zip(meets) {
-            *exposed += meet;
-        }
+/// A score: `exposure` sides per counted pixel in 1024ths, rounded down. A value's
+/// exposed sides belong to its counted pixels, at most four each, so the score is
+/// at most 4096.
+fn ratio(exposure: u32, counted: u32) -> u32 {
+    match exposure.checked_mul(1024) {
+        Some(scaled) => scaled / counted,
+        None => (u64::from(exposure) * 1024 / u64::from(counted)) as u32,
     }
 }
 
@@ -332,28 +396,267 @@ fn rank(
 mod tests {
     use super::*;
 
-    /// The levels of `values` in the automatic palette of `rows`.
-    fn levels(rows: &[&[u8]], values: &[u8]) -> Vec<u32> {
+    /// The automatic palette of `rows` over `out`.
+    fn palette_over(rows: &[Vec<u8>], out: &mut [u32; 256]) {
         let budget = Budget::new(1 << 20).unwrap();
         let mut census = Census::new(&budget);
-        let mut out = [0; 256];
         let pixels: Vec<u8> = rows.concat();
-        automatic(&pixels, rows[0].len(), &mut census, &mut out).unwrap();
-        values.iter().map(|&v| out[usize::from(v)] >> 24).collect()
+        automatic(&pixels, rows[0].len(), &mut census, out).unwrap();
     }
 
-    /// A sea of value 1 with the given cells set.
-    fn sea(width: usize, height: usize, cells: &[(usize, usize, u8)]) -> Vec<Vec<u8>> {
-        let mut rows = vec![vec![1; width]; height];
-        for &(y, x, value) in cells {
-            rows[y][x] = value;
-        }
+    fn palette(rows: &[Vec<u8>]) -> [u32; 256] {
+        let mut out = [0; 256];
+        palette_over(rows, &mut out);
+        out
+    }
+
+    /// The entries `out` holds other than 0.
+    fn entries(out: &[u32; 256]) -> Vec<(usize, u32)> {
+        out.iter()
+            .copied()
+            .enumerate()
+            .filter(|&(_, word)| word != 0)
+            .collect()
+    }
+
+    /// The values of `rows` from the background up, as their levels rank them.
+    fn order(rows: &[Vec<u8>]) -> Vec<u8> {
+        let out = palette(rows);
+        let mut values: Vec<u8> = rows.concat();
+        values.sort_unstable();
+        values.dedup();
+        values.sort_by_key(|&v| out[usize::from(v)] >> 24);
+        values
+    }
+
+    fn row(values: &[u8]) -> Vec<Vec<u8>> {
+        vec![values.to_vec()]
+    }
+
+    /// `count` rows of `values`.
+    fn stripes(values: &[u8], count: usize) -> Vec<Vec<u8>> {
+        vec![values.to_vec(); count]
+    }
+
+    /// A 5 × 5 region of 1 with a 2 at (`x`, `y`).
+    fn dot(x: usize, y: usize) -> Vec<Vec<u8>> {
+        let mut rows = vec![vec![1; 5]; 5];
+        rows[y][x] = 2;
         rows
     }
 
-    fn sea_levels(rows: &[Vec<u8>], values: &[u8]) -> Vec<u32> {
-        let rows: Vec<&[u8]> = rows.iter().map(Vec::as_slice).collect();
-        levels(&rows, values)
+    #[test]
+    fn levels_rise_evenly_from_the_background() {
+        // Columns 0 to 7, four rows: 0 and 7 tie at the ends, the rest tie
+        // between them, so the values rank in order.
+        let out = palette(&stripes(&[0, 1, 2, 3, 4, 5, 6, 7], 4));
+        assert_eq!(
+            out[..8],
+            [
+                0, 0x24122412, 0x48244824, 0x6d366d36, 0x91489148, 0xb65bb65b, 0xda6dda6d,
+                0xff7fff7f
+            ]
+        );
+        assert_eq!(entries(&out).len(), 7);
+        // Columns 1 to 15 then 0: 0 and 1 tie at the ends, 0 first; levels step
+        // by 17.
+        let mut values: Vec<u8> = (1..16).collect();
+        values.push(0);
+        let out = palette(&stripes(&values, 4));
+        for v in 0..16 {
+            let level = 17 * v as u32;
+            assert_eq!(out[v], argb(level, level >> 1, level, level >> 1), "{v}");
+        }
+    }
+
+    #[test]
+    fn a_region_of_one_value_is_transparent() {
+        for (rows, v) in [
+            (stripes(&[5; 4], 4), 5),
+            (row(&[3]), 3),
+            (stripes(&[255; 16], 16), 255),
+        ] {
+            let mut out = [7; 256];
+            palette_over(&rows, &mut out);
+            assert_eq!(out[v], 0);
+            assert_eq!(out.iter().filter(|&&word| word == 7).count(), 255);
+        }
+    }
+
+    #[test]
+    fn ties_go_to_the_smaller_value() {
+        assert_eq!(order(&row(&[1, 2])), [1, 2]);
+        assert_eq!(order(&row(&[2, 1])), [1, 2]);
+        assert_eq!(order(&row(&[1, 2, 3])), [1, 2, 3]);
+        assert_eq!(order(&row(&[3, 2, 1])), [1, 2, 3]);
+        assert_eq!(order(&row(&[1, 2, 1, 2])), [1, 2]);
+        assert_eq!(order(&row(&[2, 1, 2, 1])), [1, 2]);
+    }
+
+    #[test]
+    fn values_rank_by_exposure_per_counted_pixel() {
+        // One row: every pixel is counted and on the edge above and below.
+        assert_eq!(order(&row(&[1, 1, 2, 3])), [3, 2, 1]);
+        assert_eq!(order(&row(&[1, 2, 2, 3])), [1, 3, 2]);
+        assert_eq!(order(&row(&[1, 2, 1])), [1, 2]);
+        assert_eq!(order(&row(&[2, 1, 2])), [2, 1]);
+        assert_eq!(order(&row(&[5, 9, 5, 9, 5])), [5, 9]);
+        assert_eq!(order(&row(&[1, 1, 1, 2, 2, 3])), [3, 2, 1]);
+        // A column ranks as the row does.
+        let column: Vec<Vec<u8>> = [1, 1, 2, 3].iter().map(|&v| vec![v]).collect();
+        assert_eq!(order(&column), [3, 2, 1]);
+        // Four rows: the middle of 1's three columns is enclosed in rows 1 and 2.
+        assert_eq!(order(&stripes(&[1, 1, 1, 2, 2, 3], 4)), [3, 1, 2]);
+        assert_eq!(order(&stripes(&[1, 1, 2, 3], 4)), [3, 2, 1]);
+        assert_eq!(order(&stripes(&[1, 2, 2, 3], 4)), [1, 3, 2]);
+    }
+
+    #[test]
+    fn ranked_values_expose_their_neighbours() {
+        // 2 ranks first; then each 1 has a side against it or the edge.
+        assert_eq!(order(&row(&[2, 1, 3, 1])), [2, 1, 3]);
+        assert_eq!(order(&row(&[1, 2, 1, 3])), [3, 1, 2]);
+        assert_eq!(order(&row(&[3, 1, 2, 1])), [3, 1, 2]);
+        // A frame of 1 around 2 around a 3 ranks from the outside in.
+        let mut rows = vec![vec![1; 7]; 7];
+        for line in &mut rows[1..6] {
+            line[1..6].fill(2);
+        }
+        rows[3][3] = 3;
+        assert_eq!(order(&rows), [1, 2, 3]);
+    }
+
+    #[test]
+    fn enclosed_pixels_do_not_count() {
+        // A corner 2 has two sides on the edge (2048); 1 has 18 on its 15 counted
+        // pixels (1228).
+        assert_eq!(order(&dot(0, 0)), [2, 1]);
+        // At the middle of the top edge 2 has one (1024); 1 has 19 on 16 counted
+        // pixels (1216), though 19 sides on all 24 of its pixels would be 810.
+        assert_eq!(order(&dot(2, 0)), [1, 2]);
+        assert_eq!(order(&dot(2, 2)), [1, 2]);
+    }
+
+    #[test]
+    fn scores_are_1024ths_rounded_down() {
+        // Two rows, `a` columns of `left` then `b` of `right`: scores
+        // 1024 + 1024 / a and 1024 + 1024 / b, rounded down.
+        let first = |a: usize, left: u8, b: usize, right: u8| {
+            let mut line = vec![left; a];
+            line.resize(a + b, right);
+            order(&stripes(&line, 2))[0]
+        };
+        // 1025 each, though 5's exposure per pixel is the greater.
+        assert_eq!(first(600, 5, 680, 3), 3);
+        assert_eq!(first(731, 3, 549, 5), 3);
+        assert_eq!(first(700, 3, 560, 5), 3);
+        assert_eq!(first(100, 5, 101, 3), 3);
+        // 1026 against 1025.
+        assert_eq!(first(505, 5, 520, 3), 5);
+        assert_eq!(first(512, 5, 513, 3), 5);
+        assert_eq!(first(513, 3, 512, 5), 5);
+    }
+
+    #[test]
+    fn every_depth_ranks_alike() {
+        let two = palette(&[
+            vec![1, 1, 2, 2],
+            vec![1, 1, 2, 2],
+            vec![1, 1, 1, 1],
+            vec![2, 2, 2, 2],
+        ]);
+        assert_eq!(entries(&two), [(1, 0xff7fff7f)]);
+        let eight = palette(&[
+            vec![10, 10, 20, 20],
+            vec![10, 30, 30, 20],
+            vec![10, 10, 20, 20],
+            vec![30, 30, 30, 30],
+        ]);
+        assert_eq!(entries(&eight), [(20, 0xff7fff7f), (30, 0x7f3f7f3f)]);
+    }
+
+    #[test]
+    fn unused_entries_keep_their_words() {
+        let mut out = [0; 256];
+        palette_over(
+            &[
+                vec![1, 1, 2, 2],
+                vec![1, 3, 3, 2],
+                vec![1, 1, 2, 2],
+                vec![3, 3, 3, 3],
+            ],
+            &mut out,
+        );
+        palette_over(
+            &[
+                vec![4, 4, 5, 5],
+                vec![4, 4, 5, 5],
+                vec![4, 4, 4, 4],
+                vec![5, 5, 5, 5],
+            ],
+            &mut out,
+        );
+        assert_eq!(
+            entries(&out),
+            [(2, 0xff7fff7f), (3, 0x7f3f7f3f), (4, 0xff7fff7f)]
+        );
+    }
+
+    #[test]
+    fn a_large_exposure_still_ranks() {
+        // 1280 × 1024: a frame of 1 around a 1/2 checkerboard with a 3 × 3 block
+        // of 3 in the middle. Once 1 is ranked, 2 has about 2.6 million exposed
+        // sides, beyond 2^31 / 1024, and still ranks before 3.
+        let (width, height) = (1280, 1024);
+        let rows: Vec<Vec<u8>> = (0..height)
+            .map(|y| {
+                (0..width)
+                    .map(|x| {
+                        if x == 0 || y == 0 || x == width - 1 || y == height - 1 {
+                            1
+                        } else if (511..514).contains(&y) && (639..642).contains(&x) {
+                            3
+                        } else {
+                            1 + ((x + y) % 2) as u8
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+        assert_eq!(palette(&rows)[..4], [0, 0, 0x7f3f7f3f, 0xff7fff7f]);
+    }
+
+    #[test]
+    fn the_census_stays_within_its_plan() {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut census = Census::new(&budget);
+        assert_eq!(census.bytes(), 0);
+        let mut out = [0; 256];
+        // The census keeps its largest table, and leaves it clear.
+        for (max, held) in [(3, 4), (15, 16), (2, 16), (255, 256), (9, 256)] {
+            automatic(&[0, max, 1, max], 2, &mut census, &mut out).unwrap();
+            assert_eq!(census.bytes(), Census::bytes_for(held), "{max}");
+            assert_eq!(
+                budget.used(),
+                Budget::control_storage_bytes() + census.bytes()
+            );
+            assert!(census.table.iter().all(|&word| word == 0));
+        }
+        assert_eq!(Census::bytes_for(4), (768 + 16) * 4);
+        assert_eq!(Census::bytes_for(16), (768 + 256) * 4);
+        assert_eq!(Census::bytes_for(256), (768 + 65536) * 4);
+    }
+
+    #[test]
+    fn a_refused_census_is_an_error() {
+        let budget = Budget::new(Budget::control_storage_bytes() + Census::bytes_for(16)).unwrap();
+        let mut census = Census::new(&budget);
+        let mut out = [9; 256];
+        assert!(automatic(&[200, 1, 1, 1], 2, &mut census, &mut out).is_err());
+        assert_eq!(out, [9; 256]);
+        automatic(&[15, 1, 1, 1], 2, &mut census, &mut out).unwrap();
+        assert_eq!(out[1], 0);
+        assert_eq!(out[15], 0xff7fff7f);
     }
 
     #[test]
@@ -441,109 +744,5 @@ mod tests {
         assert_eq!(tables.get(Depth::Eight)[20], 9);
         assert_eq!(tables.get(Depth::Eight)[30], DEFAULT.get(Depth::Eight)[30]);
         assert_eq!(tables.get(Depth::Four), DEFAULT.get(Depth::Four));
-    }
-
-    #[test]
-    fn a_value_at_both_ends_ranks_first() {
-        assert_eq!(levels(&[&[1, 2, 1]], &[1, 2]), [0, 255]);
-    }
-
-    #[test]
-    fn distinct_values_peel_from_the_edge() {
-        // Each value is one pixel: the fewest unranked neighbours goes next.
-        assert_eq!(
-            levels(&[&[0, 2, 4, 1, 3]], &[0, 1, 2, 3, 4]),
-            [0, 191, 63, 127, 255]
-        );
-        assert_eq!(
-            levels(
-                &[&[0, 1, 2], &[3, 4, 5], &[6, 7, 8]],
-                &[0, 1, 2, 3, 4, 5, 6, 7, 8]
-            ),
-            [0, 31, 63, 95, 159, 191, 127, 223, 255]
-        );
-        assert_eq!(levels(&[&[1], &[2], &[2], &[3]], &[1, 2, 3]), [0, 255, 127]);
-        assert_eq!(levels(&[&[1, 1], &[1, 2]], &[1, 2]), [0, 255]);
-    }
-
-    #[test]
-    fn runs_rank_by_their_exposed_sides() {
-        let row = [[2; 6].as_slice(), &[1; 4], &[4; 10], &[3; 8]].concat();
-        assert_eq!(levels(&[&row], &[1, 2, 3, 4]), [85, 0, 170, 255]);
-    }
-
-    #[test]
-    fn enclosed_pixels_do_not_count() {
-        // A plus of 2 against a pair of 3: with its centre left out, the plus
-        // is as exposed as the pair, and the lower value ranks first.
-        let rows = sea(
-            9,
-            7,
-            &[
-                (1, 2, 2),
-                (2, 1, 2),
-                (2, 2, 2),
-                (2, 3, 2),
-                (3, 2, 2),
-                (5, 5, 3),
-                (5, 6, 3),
-            ],
-        );
-        assert_eq!(sea_levels(&rows, &[1, 2, 3]), [0, 127, 255]);
-    }
-
-    #[test]
-    fn exposure_is_compared_in_1024ths() {
-        // 2: 64 exposed sides over 51 pixels; 3: 54 over 43, slightly more
-        // but the same in 1/1024 steps, so the lower value ranks first.
-        let mut cells = Vec::new();
-        cells.extend((2..9).map(|x| (1, x, 2)));
-        cells.extend((2..24).flat_map(|x| [(3, x, 2), (4, x, 2)]));
-        cells.extend((2..7).map(|x| (6, x, 3)));
-        cells.extend((2..21).flat_map(|x| [(8, x, 3), (9, x, 3)]));
-        assert_eq!(sea_levels(&sea(26, 11, &cells), &[1, 2, 3]), [0, 127, 255]);
-    }
-
-    #[test]
-    fn a_value_only_on_the_edge_can_rank_below_the_background() {
-        let rows = sea(8, 5, &[(0, 3, 2), (2, 3, 3), (2, 4, 3)]);
-        assert_eq!(sea_levels(&rows, &[1, 2, 3]), [127, 0, 255]);
-    }
-
-    #[test]
-    fn unused_entries_keep_their_words() {
-        let budget = Budget::new(1 << 20).unwrap();
-        let mut census = Census::new(&budget);
-        let mut out = [0x1234; 256];
-        automatic(&[5, 5, 5, 5], 2, &mut census, &mut out).unwrap();
-        assert_eq!(out[5], 0);
-        assert!(out.iter().enumerate().all(|(i, &w)| i == 5 || w == 0x1234));
-        automatic(&[1, 2], 2, &mut census, &mut out).unwrap();
-        assert_eq!((out[1], out[2], out[3]), (0, 0xff7fff7f, 0x1234));
-    }
-
-    #[test]
-    fn the_census_stays_within_its_plan() {
-        let budget = Budget::new(1 << 20).unwrap();
-        let base = budget.used();
-        let mut census = Census::new(&budget);
-        let mut out = [0; 256];
-        let small: Vec<u8> = (0..64).map(|i| (i * 7 % 16) as u8).collect();
-        automatic(&small, 8, &mut census, &mut out).unwrap();
-        assert!(census.bytes() <= Census::bytes_for(16));
-        let all: Vec<u8> = (0..=255).collect();
-        automatic(&all, 16, &mut census, &mut out).unwrap();
-        assert!(census.bytes() <= Census::bytes_for(256));
-        assert_eq!(budget.used() - base, census.bytes());
-    }
-
-    #[test]
-    fn a_refused_census_is_an_error() {
-        let budget = Budget::new(64).unwrap();
-        let mut census = Census::new(&budget);
-        let mut out = [7; 256];
-        let all: Vec<u8> = (0..=255).collect();
-        assert!(automatic(&all, 16, &mut census, &mut out).is_err());
-        assert_eq!(out, [7; 256]);
     }
 }
