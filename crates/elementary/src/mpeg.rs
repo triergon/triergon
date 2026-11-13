@@ -9,7 +9,7 @@
 //! # Gapless trim (`compat::mpeg`)
 //!
 //! A LAME extension written by LAME or by FFmpeg (encoder string starting `LAME`,
-//! `Lavf` or `Lavc`) trims the stream as FFmpeg 9.0 does: the first packet drops
+//! `Lavf` or `Lavc`) trims the stream as FFmpeg 9.0.2 does: the first packet drops
 //! `encoder delay + 529` samples (the decoder delay of 528 plus one), and the packet
 //! with frame index `frames - 1` drops `encoder padding - 529` samples when that is
 //! positive. The end trim is withheld, as FFmpeg withholds it, when the source's length

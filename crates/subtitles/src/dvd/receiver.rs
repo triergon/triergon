@@ -154,18 +154,11 @@ fn scan_size(text: &[u8]) -> Option<[i32; 2]> {
     Some([width, height])
 }
 
-/// A size the reference opens a decoder with: both dimensions positive, and
-/// eight bytes per pixel plus 128 pixels of padding each way below 2³¹ − 1
-/// bytes.
+/// A `size:` line's canvas, refused unless both numbers are positive and the
+/// reference accepts the size ([`crate::canvas::accepts`]).
 fn checked_canvas([width, height]: [i32; 2]) -> Result<[u32; 2]> {
-    let limit = u64::from(i32::MAX.unsigned_abs());
     match (u32::try_from(width), u32::try_from(height)) {
-        (Ok(w @ 1..), Ok(h @ 1..))
-            if 8 * (u64::from(w) + 128) < limit
-                && 8 * (u64::from(w) + 128) * (u64::from(h) + 128) < limit =>
-        {
-            Ok([w, h])
-        }
+        (Ok(width), Ok(height)) if crate::canvas::accepts(width, height) => Ok([width, height]),
         _ => Err(Error::Invalid("DVD configuration size")),
     }
 }

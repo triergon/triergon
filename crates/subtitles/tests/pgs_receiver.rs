@@ -164,4 +164,6 @@ fixtures! {
     the_run_length_plane_has_one_cursor => "rx-rle-plane-ts",
     objects_beyond_the_cache_limit_are_ignored => "many-objects-sup",
     canvas_sizes_and_colour_matrices => "canvas-sizes-sup",
+    canvases_at_the_padded_area_bound => "rx-canvas-bounds-ts",
+    first_fragments_against_canvas_and_declared_length => "rx-ods-first-fragment-ts",
 }

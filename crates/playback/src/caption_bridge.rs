@@ -6,7 +6,7 @@
 //! Matroska sample, a TS PES payload, a framing bridge's Annex B output) or
 //! MPEG-2 PES payloads. FFmpeg's caption extraction ([`CaptionExtractor`])
 //! hands out the captioned frames in FFmpeg's output order and FFmpeg's
-//! `ccaption` receiver ([`Decoder`]) decodes them. Every event line becomes
+//! `cc_dec` receiver ([`Decoder`]) decodes them. Every event line becomes
 //! an opaque ASS [`TextSource`] for the
 //! [`TextBridge`](crate::text_bridge::TextBridge), so captions arrive as the
 //! cues of a Matroska ASS track do.
