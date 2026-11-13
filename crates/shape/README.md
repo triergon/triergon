@@ -297,7 +297,7 @@ conformance files check UAX #9 itself.
 MIT or Apache-2.0, at your option, with HarfBuzz 14.6.0's "Old MIT" licence and libass
 0.17.5's ISC licence for the modules derived from them: the shaping pipeline, layout
 tables, script shapers and their generated tables are translated from HarfBuzz, and the
-sized font functions and `@` font rotations follow libass. [LICENSE](LICENSE) holds the
+sized font functions and `@` font rotations follow libass. `LICENSE` holds the
 notices, including the Unicode data notices described in
 [THIRD-PARTY.md](THIRD-PARTY.md), and
 [docs/provenance.md](../../docs/provenance.md#triergon-shape) lists the modules.

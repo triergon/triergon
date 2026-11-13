@@ -189,5 +189,5 @@ in [docs/quality.md](../../docs/quality.md#reference-and-corpus).
 
 MIT or Apache-2.0, at your option, with libass 0.17.5's ISC licence: the outline,
 stroking, rasterising, blur, composition and clipping stages are translated from
-libass. [LICENSE](LICENSE) holds the notice, and
+libass. `LICENSE` holds the notice, and
 [docs/provenance.md](../../docs/provenance.md#triergon-raster) lists the modules.
