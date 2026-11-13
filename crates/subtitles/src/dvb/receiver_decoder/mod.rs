@@ -32,10 +32,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// When a region's palette is replaced by the automatic one (`compute_clut`).
-///
-/// The automatic palette ranks a region's pixel values from its edge inwards,
-/// whatever its depth, and gives them evenly spaced grey-green levels from
-/// transparent to opaque.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AutomaticPalette {
     /// Never: regions keep their CLUT, or the default CLUT.
@@ -537,7 +533,7 @@ impl ReceiverDecoder {
             + bytes(&self.page.placements)
             + bytes(&self.slots)
             + slots
-            + self.census.capacity() * size_of::<u32>()
+            + self.census.bytes()
             + bytes(&self.held_packet)
             + bytes(&self.planned)
     }

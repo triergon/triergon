@@ -13,6 +13,7 @@ use super::epoch::{
     CLUT_BYTES, Epoch, Holdings, MAX_REGION_PIXELS, OBJECT_SET_BYTES, PLACEMENT_BYTES,
     REGION_BYTES, RegionHoldings,
 };
+use super::palette::Census;
 use super::segment::{PageComposition, Placement, RegionComposition, Segments};
 use super::{AutomaticPalette, Parsed, ReceiverDecoder, Slot, push};
 use triergon_core::{BudgetVec, Result};
@@ -72,6 +73,7 @@ struct Plan<'a> {
     listed: (usize, usize),
     listed_ids: [u64; 4],
     slots: (usize, usize),
+    /// Bytes the automatic palette's census holds.
     census: usize,
     automatic: bool,
     /// Pixels of a presentation not yet copied out of its regions.
@@ -119,11 +121,10 @@ impl Plan<'_> {
             });
         // The census grows for each automatic palette between the slots
         // added: hold its largest size, and its old one, while they grow.
-        // One count per pixel value and neighbour class.
-        let words = (values + 1) * values;
-        let census = self.automatic && words > self.census;
+        let bytes = Census::bytes_for(values);
+        let census = self.automatic && bytes > self.census;
         if census {
-            self.tally.allocate(words * size_of::<u32>());
+            self.tally.allocate(bytes);
         }
         // One slot per listed region at most, each added on its own.
         while self.slots.0 < self.listed.0 {
@@ -133,8 +134,8 @@ impl Plan<'_> {
             self.slots.0 = target;
         }
         if census {
-            self.tally.free(self.census * size_of::<u32>());
-            self.census = words;
+            self.tally.free(self.census);
+            self.census = bytes;
         }
         self.presented = Some(pixels);
         self.shown = true;
@@ -290,7 +291,7 @@ impl ReceiverDecoder {
             listed: (self.page.placements.len(), self.page.placements.capacity()),
             listed_ids,
             slots: (self.slots.len(), self.slots.capacity()),
-            census: self.census.capacity(),
+            census: self.census.bytes(),
             automatic: self.options.automatic_palette != AutomaticPalette::Never,
             presented: None,
             shown: false,

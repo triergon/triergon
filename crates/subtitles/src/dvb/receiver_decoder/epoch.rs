@@ -24,9 +24,7 @@ pub(super) struct Region {
     drawn: bool,
     objects: BudgetVec<ObjectPlacement>,
     pixels: BudgetVec<u8>,
-    /// The automatic palette as last computed. The receiver recomputes it only
-    /// after an object is drawn into the region, and a recomputation rewrites
-    /// only the colours it ranks; the rest keep earlier values.
+    /// The automatic palette as last computed, and whether it still holds.
     automatic: [u32; 256],
     automatic_current: bool,
     /// Every pixel value is below this: the widest depth composed since the
