@@ -458,7 +458,7 @@ impl Epoch {
 #[inline(never)]
 fn store_entries(tables: &mut Tables, definition: &ClutDefinition<'_>) {
     for entry in definition.entries() {
-        let word = palette::ycrcbt(entry.y, entry.cr, entry.cb, entry.t);
+        let word = palette::entry_word(entry.y, entry.cr, entry.cb, entry.t);
         tables.set(entry.id, entry.depths, word);
     }
 }

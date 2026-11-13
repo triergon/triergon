@@ -127,7 +127,7 @@ const fn default_eight() -> [u32; 256] {
 /// subtitle palettes ([`YcbcrMatrix`]), and alpha `255 − T`, or 0 for Y = 0,
 /// which EN 300 743 makes fully transparent. The colour of such an entry
 /// still follows Y = 0.
-pub(super) fn ycrcbt(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
+pub(super) fn entry_word(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
     // As a product rather than a branch, the conversion stays one path.
     let alpha = (255 - t) * u8::from(y != 0);
     YcbcrMatrix::BT601.argb(y, cr, cb, alpha, ChannelRounding::Nearest)
@@ -938,7 +938,7 @@ mod tests {
             (0, 129, 166, 101, 0x0000003a),
             (0, 224, 39, 51, 0x00870000),
         ] {
-            assert_eq!(ycrcbt(y, cr, cb, t), word, "{y} {cr} {cb} {t}");
+            assert_eq!(entry_word(y, cr, cb, t), word, "{y} {cr} {cb} {t}");
         }
     }
 
