@@ -1857,3 +1857,101 @@ fn pcr_discontinuity_with_pusi_admits_a_fresh_adts_pes_in_the_same_carrier() {
     assert_eq!(clock.key.pcr_pid, PID);
     assert!(!clock.quarantined);
 }
+
+#[test]
+fn packet_track_selection_requires_distinct_elementary_pids() {
+    let pool = Budget::new(32 * 1024 * 1024).unwrap();
+    let select = |tracks: &[TrackId]| {
+        Reader::new_with_packet_tracks(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            ReaderLimits::default(),
+            4096,
+            tracks,
+        )
+    };
+
+    for tracks in [
+        &[TrackId(0)][..],
+        &[TrackId(0x000f)],
+        &[TrackId(0x1fff)],
+        &[TrackId(u64::MAX)],
+        &[TrackId(0x0010), TrackId(0x1ffe), TrackId(0x0010)],
+    ] {
+        assert!(
+            matches!(
+                select(tracks),
+                Err(Error::Invalid("MPEG-TS packet track selection"))
+            ),
+            "selection {tracks:?}"
+        );
+    }
+    assert!(select(&[TrackId(0x1ffe), TrackId(0x0010)]).is_ok());
+    assert!(select(&[]).is_ok());
+    let mut reader = select(&[TrackId(0x1ffe), TrackId(0x0010)]).unwrap();
+    reader.close();
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+    assert!(matches!(reader.reset(), Err(Error::Closed)));
+}
+
+#[test]
+fn packet_track_selection_keeps_source_events_and_survives_reset() {
+    const OTHER_PID: u16 = PID + 1;
+    let complete = adts(&[1, 2, 3, 4]);
+    let mut source = Transport::new();
+    source.tables(&[(0x0f, PID, &[]), (0x0f, OTHER_PID, &[])], 0);
+    source.pes(PID, 0xc0, &complete, Some(90_000), None);
+    source.pes(OTHER_PID, 0xc0, &complete[..8], Some(90_000), None);
+
+    let limits = ReaderLimits::default();
+    let mut all = Drive::new(&source.bytes, limits, 1536, 2048);
+    loop {
+        match all.next() {
+            Err(Error::Truncated) => break,
+            Ok(Some(_)) => {}
+            result => panic!("expected the unselected frame to be incomplete: {result:?}"),
+        }
+    }
+
+    let mut selected = Drive::new(&source.bytes, limits, 187, 128);
+    selected.reader = Reader::new_with_packet_tracks(
+        &selected.pool,
+        ID,
+        selected.reader.capabilities(),
+        limits,
+        4096,
+        &[TrackId(u64::from(PID))],
+    )
+    .unwrap();
+
+    for round in 0..2 {
+        let mut payloads = 0;
+        let mut source_pids = Vec::new();
+        while let Some(event) = selected.next().unwrap() {
+            match event {
+                Event::Packet(packet) => {
+                    assert_eq!(packet.track(), TrackId(u64::from(PID)));
+                    assert_eq!(packet.payload(), complete);
+                    payloads += 1;
+                }
+                Event::Other(ReaderEvent::Source(event)) => {
+                    if let TraceEvent::Pes(pes) = event.event() {
+                        source_pids.push(pes.pid);
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(payloads, 1);
+        assert_eq!(source_pids, [PID, OTHER_PID]);
+        assert_eq!(selected.reader.track_count(), 2);
+        if round == 0 {
+            assert_eq!(selected.reader.reset().unwrap().offset, 0);
+            selected.catalogue.clear();
+        }
+    }
+}

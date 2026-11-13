@@ -41,7 +41,7 @@
   ],
   "deferred_targets": [
     "x86_64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf"
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "target_scope": "qualification runs on native Linux ARM64; runtime and memory gates follow harness/policy.json",
   "minimum_pairs": 30,
