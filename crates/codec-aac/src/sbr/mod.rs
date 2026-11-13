@@ -525,10 +525,7 @@ impl Sbr {
                 left -= 2;
                 if id == 2 {
                     // EXTENSION_ID_PS
-                    let before = br.position();
-                    let used = self.ps.parse(br, left as usize)?;
-                    let _ = used;
-                    left -= (br.position() - before) as isize;
+                    left -= self.ps.parse(br, left as usize) as isize;
                     ps = true;
                     self.ps_seen = true;
                 } else {
@@ -652,7 +649,7 @@ impl Sbr {
                 }
                 // Parametric stereo: mono QMF matrix -> left/right matrices (8.6.4)
                 if self.ps_seen {
-                    self.ps.apply(&mut self.x, &mut self.x_r, ready);
+                    self.ps.apply(&mut self.x, &mut self.x_r);
                 } else {
                     // no PS data yet: both outputs carry the mono signal
                     for i in 0..32 {

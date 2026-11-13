@@ -390,13 +390,10 @@ impl Ps {
         self.frame = Frame::new();
     }
 
-    /// Read one PS extension of `bits_left` bits; returns the bits it takes.
+    /// Read one PS extension of `bits_left` bits and leave `br` after it; returns the bits
+    /// it takes. Malformed data makes an error frame, never an error.
     #[inline(never)] // kept out of the SBR loops, which run without PS too
-    pub(crate) fn parse(
-        &mut self,
-        br: &mut CachedBitReader<'_>,
-        bits_left: usize,
-    ) -> Result<usize> {
+    pub(crate) fn parse(&mut self, br: &mut CachedBitReader<'_>, bits_left: usize) -> usize {
         let start = br.position();
         let raw = self.read(br);
         let used = br.position() - start;
@@ -423,7 +420,7 @@ impl Ps {
             }
         };
         br.seek(start + taken);
-        Ok(taken)
+        taken
     }
 
     /// Read the fields of `ps_data()`; `None` for a reserved mode.
@@ -800,12 +797,7 @@ impl Ps {
 
     /// Run the PS on one frame: `x` (38 slots) becomes the left channel, `x_r` the right.
     #[inline(never)] // kept out of the SBR loops, which run without PS too
-    pub(crate) fn apply(
-        &mut self,
-        x: &mut BudgetVec<[Cpx; 64]>,
-        x_r: &mut BudgetVec<[Cpx; 64]>,
-        _ready: bool,
-    ) {
+    pub(crate) fn apply(&mut self, x: &mut BudgetVec<[Cpx; 64]>, x_r: &mut BudgetVec<[Cpx; 64]>) {
         let status = std::mem::replace(&mut self.status, Status::Absent);
         let run = match status {
             Status::Run => true,
