@@ -979,7 +979,7 @@ impl<'a> PacketCursor<'a> {
 
     /// During the complete projection check, collect the latest packet
     /// presentation end. The maximum is independent of inter-track order.
-    /// Preserve merged order if the seek restarts can reach their shared limit.
+    /// Preserve merged order if seek restarts can reach a count or storage limit.
     pub fn check_duration_before_replay(&mut self) -> Result<()> {
         self.check_projections_before_replay()?;
         self.checked_duration_us = Some(0);
@@ -1374,17 +1374,18 @@ impl<'a> PacketCursor<'a> {
                 }
                 Phase::Initialize => {
                     if self.at == self.slots.len() {
-                        if self.checked_duration_us.is_some()
-                            && self.recording_seek_checkpoints
-                            && self.duration_checkpoints > range_seek::EXTRA_CHECKPOINT_LIMIT
-                        {
-                            // Larger sources can reach the shared restart cap.
-                            // Keep merged order for the same restart choices.
-                            self.check_projections = false;
-                        }
                         if self.recording_seek_checkpoints {
                             // Reserve optional restarts after initializing the required cursors.
                             self.initialize_range_seek_checkpoints();
+                            if self.recording_seek_checkpoints
+                                && self.checked_duration_us.is_some()
+                                && !range_seek::can_record_by_track(
+                                    self.duration_checkpoints,
+                                    self.slots.budget(),
+                                )
+                            {
+                                self.check_projections = false;
+                            }
                         }
                         self.at = 0;
                         self.phase = if self.check_projections {

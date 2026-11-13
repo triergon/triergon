@@ -18,7 +18,16 @@ const SHORT_CHECKPOINT_INTERVAL: u64 = 32;
 const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
 const MAX_FRAGMENT_CHECKPOINTS_PER_TRACK: usize = 8;
 const MAX_CHECKPOINTS: usize = 256;
-pub(super) const EXTRA_CHECKPOINT_LIMIT: usize = MAX_CHECKPOINTS / 2;
+const EXTRA_CHECKPOINT_LIMIT: usize = MAX_CHECKPOINTS / 2;
+
+pub(super) fn can_record_by_track(points: usize, budget: &Budget) -> bool {
+    // A growing vector keeps its old allocation until the new one is charged.
+    // Allow for spare capacity and that overlap so early extras cannot crowd
+    // out another track's first restart.
+    const SLOTS_PER_POINT: usize = 4;
+    points <= EXTRA_CHECKPOINT_LIMIT
+        && points * SLOTS_PER_POINT * size_of::<Checkpoint<'_>>() <= budget.available()
+}
 
 pub(super) fn track_checkpoint_bound(slot: &Slot<'_>, last_source_ordinal: u64) -> usize {
     // The first periodic point is at zero. Fragment extras stop at eight

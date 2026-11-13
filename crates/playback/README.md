@@ -163,16 +163,18 @@ accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
 When the movie header's duration is unknown or exceeds the presentation clock,
-range playback finds the latest packet end during the per-track projection check.
+range playback finds the latest packet end while checking projections. It scans
+in merged order when the seek restarts could reach their count or storage limit.
 Fragmented files support an open-ended rate-one media edit. Forward playback
 applies it from the front movie, including tracks first seen in later fragments. A
 leading empty subtitle edit delays the subtitle packet clocks. When video
 seeks before the first sync packet of a secondary fragment track, range
 playback replays that track from its first packet. An AAC track with a
 single initialization edit carries leading trim in the first packet's
-`Mp4Packet::encoded_skip_samples`, including on the actual prefix of a
-recovered short first packet. The MPEG-4 object type identifies AAC. An
-edited MP3 track has the projected clocks without AAC trim. Source sample
+`Mp4Packet::encoded_skip_samples`. A recovered short first packet carries its
+leading trim in `Mp4NativeShortPacket::encoded_skip_samples`. The MPEG-4 object
+type identifies AAC. An edited MP3 track has the projected clocks without AAC
+trim. Source sample
 clocks and byte ranges stay literal while the compatibility packet clocks
 reflect the edit.
 For regular front-metadata input with one finite media extent,
@@ -333,8 +335,17 @@ the audio edit to media time zero and duration 16,459.
 duration and the video edit's duration to 334, and the audio edit's media
 time and duration to 64 and 45. The audio edit rounds to an end one sample
 into the third packet. All three fixtures use the repository's dual license.
-The `mp4-forward` corpus records their hashes and compares source byte
-offsets, reduced time bases and AAC trim along with the packet data.
+The four fragmented fixtures also use the repository's dual license.
+`forward-fragment-aac-edit.mp4` and `forward-fragment-aac-late-track.mp4`
+use an FFmpeg-generated AVC test pattern and mono AAC tone. Both carry an
+open-ended audio initialization edit. The latter starts with a video-only
+fragment. `forward-fragment-aac-short.mp4` truncates an authored AVC/AAC
+fragment inside its first AAC packet. `forward-fragment-mp3-edit.mp4` uses a
+generated mono MP3 tone with an initialization edit to exercise the same clock
+projection for a different MPEG-4 audio object type. The
+[`mp4-forward` corpus](../../harness/features/mp4-forward/corpus.json) records
+their hashes and compares source byte offsets, reduced time bases and AAC trim
+along with the packet data.
 
 Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
