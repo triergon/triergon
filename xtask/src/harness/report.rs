@@ -249,8 +249,8 @@ const QUALIFIED_TARGETS: [&str; 4] = [
 /// reports `aarch64` or `armv8l` from `uname -m`, so the machine name cannot tell
 /// it apart from a 64-bit one. Any other target, such as ARMv6 or A32, is reported
 /// as unqualified.
-pub fn gate_target() -> String {
-    qualified(gate_build::worker_target())
+pub fn gate_target() -> Result<String, String> {
+    gate_build::worker_target().map(qualified)
 }
 
 fn qualified(target: &str) -> String {
@@ -752,7 +752,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest, &gate_target())?;
+    let open = open_cases(&contract, &manifest, &gate_target()?)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -767,7 +767,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
-    let target = gate_target();
+    let target = gate_target()?;
     let coverage = fate_coverage(
         root,
         &read_json(&root.join("harness/fate/index.json"))?,
@@ -1539,7 +1539,7 @@ mod tests {
         ] {
             assert_eq!(qualified(other), format!("unqualified-{other}"));
         }
-        let host = gate_target();
+        let host = gate_target().unwrap();
         assert!(
             QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
             "{host}"
