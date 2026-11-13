@@ -12,12 +12,9 @@
 /// width and height against 37 other dimensions from 1 to 65,535 on both
 /// paths, and 6 more up to 2³¹ − 1 on the DVD path; no other offsets in
 /// `(width + a)(height + a) < k` with `a` up to 4,096 fit those points.
-///
-/// Generic so that each caller's own integer width is checked as it is: the
-/// PGS sizes are 16 bits, whose product cannot overflow.
-pub(crate) fn accepts<T: Into<u64>>(width: T, height: T) -> bool {
+pub(crate) fn accepts(width: u32, height: u32) -> bool {
     const AREA: u64 = 1 << 28;
-    let (width, height) = (width.into(), height.into());
+    let (width, height) = (u64::from(width), u64::from(height));
     // Each side below 2²⁸ first, so the product cannot overflow.
     width > 0
         && height > 0
@@ -68,10 +65,10 @@ mod tests {
 
     #[test]
     fn takes_common_sizes_and_refuses_the_largest() {
-        assert!(accepts(1_u32, 1));
-        assert!(accepts(720_u32, 480));
-        assert!(accepts(65_535_u16, 2048));
-        assert!(!accepts(65_535_u16, 65_535));
+        assert!(accepts(1, 1));
+        assert!(accepts(720, 480));
+        assert!(accepts(65_535, 2048));
+        assert!(!accepts(65_535, 65_535));
         assert!(!accepts(u32::MAX, u32::MAX));
         assert!(!accepts(u32::MAX, 1));
     }

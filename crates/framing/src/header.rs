@@ -46,12 +46,12 @@ pub mod hevc {
     ///
     /// H.265 §7.4.2.4.4 starts it with a VPS, SPS, PPS, access unit
     /// delimiter, prefix SEI, a reserved type 41 to 44 or an unspecified type
-    /// 48 to 55. FFmpeg's parser also starts it with an end of sequence (36)
-    /// or end of bitstream (37), which the specification places last in the
-    /// access unit they end. Every other non-VCL type, the suffix SEI (40)
-    /// and the reserved and unspecified types 38, 45 to 47 and 56 to 63
-    /// included, stays in the access unit before it, as do the reserved VCL
-    /// types. A slice ([`is_slice`]) starts a picture by its
+    /// 48 to 55. With each type 0 to 63 inserted after a picture, raw and in
+    /// TS, the reference also starts it with an end of sequence (36) or end
+    /// of bitstream (37), which the specification places last in the access
+    /// unit they end. Every other non-VCL type stays in the access unit before
+    /// it: filler data (38), the suffix SEI (40), the reserved types 45 to 47
+    /// and the unspecified types 56 to 63, as do the reserved VCL types. A slice ([`is_slice`]) starts a picture by its
     /// `first_slice_segment_in_pic_flag` instead, and is `false` here.
     #[inline]
     pub const fn begins_access_unit(t: u8) -> bool {

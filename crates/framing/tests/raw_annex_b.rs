@@ -271,11 +271,12 @@ fn hevc_retains_prefix_suffix_other_layer_and_padding_at_literal_boundaries() {
 }
 
 #[test]
-fn hevc_nal_types_after_a_picture_split_access_units_as_the_raw_demuxer_does() {
+fn only_base_layer_types_32_to_37_39_41_to_44_and_48_to_55_start_an_access_unit() {
     // Every type 0 to 63 between an IRAP picture and the next picture's first
-    // slice, in the base layer and in layer 1. FFmpeg's hevc demuxer starts
-    // the next access unit with these base-layer types only: H.265 §7.4.2.4.4's
-    // and the end of sequence and of bitstream (36, 37).
+    // slice, in the base layer and in layer 1. The reference, probed with each
+    // type inserted after a picture, raw and in TS, starts the next access
+    // unit with these base-layer types only: H.265 §7.4.2.4.4's and the end
+    // of sequence and of bitstream (36, 37).
     let starts = |kind: u8| matches!(kind, 32..=37 | 39 | 41..=44 | 48..=55);
     for layer in [0, 1] {
         for kind in 0..64 {

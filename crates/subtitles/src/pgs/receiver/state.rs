@@ -6,7 +6,9 @@
 //! (composition objects, palette entries, object data) stop at the segment end.
 
 use super::super::{CompositionObject, Crop};
-use super::{DisplayLimits, PacketClock, ReceiverObservations, Refusal, reserve_amortised};
+use super::{
+    DisplayLimits, PacketClock, ReceiverObservations, Refusal, reserve_amortised, reserve_room,
+};
 use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -21,13 +23,6 @@ fn byte(raw: &[u8], at: usize) -> u8 {
 
 fn word(raw: &[u8], at: usize) -> u16 {
     u16::from_be_bytes([byte(raw, at), byte(raw, at + 1)])
-}
-
-/// Whether the receiver takes a PCS's video size as its canvas
-/// ([`crate::canvas::accepts`]): 65,535 × 1 and 63,422 × 4,096 are taken,
-/// 0 × 0, 63,423 × 4,096 and 65,535 × 65,535 are not.
-fn valid_canvas(width: u16, height: u16) -> bool {
-    crate::canvas::accepts(width, height)
 }
 
 /// A packet's PTS in microseconds, as the receiver rescales it: `None` when
@@ -123,14 +118,7 @@ fn first_part(
         .min(data.len().saturating_add(CONTINUATION_BYTES))
         .min(limits.max_encoded);
     let mut encoded = BudgetVec::new(budget);
-    encoded
-        .try_reserve_exact(room)
-        .or_else(|error| match error {
-            Error::Backpressure { .. } | Error::Limit { .. } if room > data.len() => {
-                encoded.try_reserve_exact(data.len())
-            }
-            error => Err(error),
-        })?;
+    reserve_room(&mut encoded, data.len(), room)?;
     encoded.try_extend_from_slice(data)?;
     Ok(encoded)
 }
@@ -340,7 +328,7 @@ impl Receiver {
         self.presentation = subtitle_pts;
         let at = body.start;
         let (width, height) = (word(raw, at), word(raw, at + 2));
-        if !valid_canvas(width, height) {
+        if !crate::canvas::accepts(width.into(), height.into()) {
             self.canvas = [0, 0];
             return Ok(());
         }
