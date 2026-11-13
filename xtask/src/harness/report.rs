@@ -1165,10 +1165,21 @@ pub(crate) fn collect(
     {
         reject_controls(proof, error)?;
     }
-    if let Some(error) = source_identity_error(root, &identity).or(control_error)
-        && let Value::Object(fields) = &mut verdict
-    {
-        for (key, value) in fields.iter_mut() {
+    let identity_error = source_identity_error(root, &identity)
+        .or_else(|| validation::current_workers(root, &identity).err())
+        .or_else(|| {
+            if candidate_name == "media-worker" {
+                None
+            } else {
+                validation::candidate_worker(root, &identity, &candidate_name).err()
+            }
+        });
+    let identity_valid = identity_error.is_none();
+    for error in [identity_error, control_error].into_iter().flatten() {
+        let Value::Object(fields) = &mut verdict else {
+            return Err("acceptance verdict must be an object".into());
+        };
+        for (key, value) in fields {
             match (key.as_str(), value) {
                 ("accepted" | "slice_accepted", v) => *v = Value::Bool(false),
                 ("reasons" | "slice_reasons", Value::Array(list)) => list.push(Value::str(&error)),
@@ -1179,6 +1190,13 @@ pub(crate) fn collect(
     let mut report = base;
     report.extend([
         ("collection_status", Value::str("complete")),
+        (
+            "summary",
+            Value::object([(
+                "source_and_workers_unchanged",
+                Value::Bool(identity_valid && controls_valid),
+            )]),
+        ),
         ("acceptance", verdict.clone()),
     ]);
     if measures {
@@ -1220,7 +1238,9 @@ pub(crate) fn collect(
         return Ok(2);
     }
     let parity_matches = ratchet(&label, &rows, &open);
-    Ok(i32::from(!parity_matches || !controls_valid))
+    Ok(i32::from(
+        !parity_matches || !controls_valid || !identity_valid,
+    ))
 }
 
 fn publish_measurements(
@@ -1891,17 +1911,29 @@ mod tests {
     }
 
     #[test]
-    fn failed_final_controls_remain_failed_in_both_report_forms() {
+    fn final_validation_failures_are_written_in_both_report_forms() {
         let output = Output::new();
         let mut proof = Value::object([
             ("passed", Value::Bool(true)),
             ("path", Value::str("controls/report.json")),
         ]);
         reject_controls(&mut proof, "functional control proof hash mismatch").unwrap();
-        let header = Value::object([("functional_controls", proof)]);
+        let header = Value::object([
+            ("functional_controls", proof),
+            (
+                "summary",
+                Value::object([("source_and_workers_unchanged", Value::Bool(false))]),
+            ),
+        ]);
         publish_measurements(&output.0, header, &[Value::int(1)], |case| Ok(case.clone())).unwrap();
         for name in ["collection.json", "report.json"] {
             let report = read_json(&output.0.join(name)).unwrap();
+            assert_eq!(
+                report
+                    .get("summary")
+                    .and_then(|summary| summary.get("source_and_workers_unchanged")),
+                Some(&Value::Bool(false))
+            );
             let proof = report.get("functional_controls").unwrap();
             assert_eq!(proof.get("passed"), Some(&Value::Bool(false)));
             assert_eq!(
