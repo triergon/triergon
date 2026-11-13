@@ -19863,6 +19863,31 @@
    "source_revisions": {
     "candidate": "dd395b41add1b51859be0104ad865de111d7b401"
    }
+  },
+  {
+   "name": "subtitles-dvb-palettes-aebbe582",
+   "path": "subtitles-dvb-palettes-aebbe582",
+   "retention": "retained",
+   "reason": "DVB palettes: the default CLUTs, the CLUT entry conversion and the automatic palette at aebbe582 against main at 339ec261; the subtitle-dvb gate on Linux AArch64 and in the armv7-userland user space, the instruction counts of every case on both targets, the runtime and kernel-bound memory of the 10 new cases on a c8g.xlarge (at edd4e8c8 and aebbe582), both derivations' notes and probes, the scripts that ran them and a bundle of the branch.",
+   "key": "evidence/subtitles-dvb-palettes-aebbe582/d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3.tar.gz",
+   "sha256": "d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3",
+   "bytes": 186258324,
+   "source_revisions": {
+    "candidate": "aebbe5827b1b2ae8f1dcf53a1be67053c850a279",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-dvb-palettes-74155089-armv7",
+   "path": "subtitles-dvb-palettes-74155089-armv7",
+   "retention": "retained",
+   "reason": "Subtitles, DVB palettes at 74155089 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: a subtitle-dvb slice of the 12 crafted cases and the three sequence cases with parity, 30 timing pairs and 30 kernel-bound memory pairs, the kernel RSS proof made in that checkout, and the CPU, kernel and user-space package list",
+   "key": "evidence/subtitles-dvb-palettes-74155089-armv7/63453697efcbf39e4af583c5f546d1f366e2e49c4b6a9c97df3e867ca1293646.tar.gz",
+   "sha256": "63453697efcbf39e4af583c5f546d1f366e2e49c4b6a9c97df3e867ca1293646",
+   "bytes": 92315031,
+   "source_revisions": {
+    "candidate": "74155089881341aa7aae67e5f754b35a86e4898b"
+   }
   }
  ]
 }
