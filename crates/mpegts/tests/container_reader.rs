@@ -1859,6 +1859,46 @@ fn pcr_discontinuity_with_pusi_admits_a_fresh_adts_pes_in_the_same_carrier() {
 }
 
 #[test]
+fn packet_track_selection_requires_distinct_elementary_pids() {
+    let pool = Budget::new(32 * 1024 * 1024).unwrap();
+    let select = |tracks: &[TrackId]| {
+        Reader::new_with_packet_tracks(
+            &pool,
+            ID,
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            ReaderLimits::default(),
+            4096,
+            tracks,
+        )
+    };
+
+    for tracks in [
+        &[TrackId(0)][..],
+        &[TrackId(0x000f)],
+        &[TrackId(0x1fff)],
+        &[TrackId(u64::MAX)],
+        &[TrackId(0x0010), TrackId(0x1ffe), TrackId(0x0010)],
+    ] {
+        assert!(
+            matches!(
+                select(tracks),
+                Err(Error::Invalid("MPEG-TS packet track selection"))
+            ),
+            "selection {tracks:?}"
+        );
+    }
+    assert!(select(&[TrackId(0x1ffe), TrackId(0x0010)]).is_ok());
+    assert!(select(&[]).is_ok());
+    let mut reader = select(&[TrackId(0x1ffe), TrackId(0x0010)]).unwrap();
+    reader.close();
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
+    assert!(matches!(reader.reset(), Err(Error::Closed)));
+}
+
+#[test]
 fn packet_track_selection_keeps_source_events_and_survives_reset() {
     const OTHER_PID: u16 = PID + 1;
     let complete = adts(&[1, 2, 3, 4]);

@@ -136,7 +136,8 @@ returns `Error::Unsupported` without changing reader state.
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce
 packet events. Track metadata, original PES, and transport diagnostics remain
-visible for every stream. The selection persists across reset.
+visible for every stream. Reset keeps the selection until the reader is closed.
+A closed reader with a selection needs to be constructed again.
 
 Repeated sections that match the active PAT or PMT retain each occurrence's
 source ranges. The reader reuses the accepted table when the bytes match.

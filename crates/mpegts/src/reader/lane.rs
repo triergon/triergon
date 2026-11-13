@@ -502,10 +502,15 @@ impl StorageScan {
     }
 
     fn start(reader: &super::Reader, start: StorageCursor, total: usize) -> Result<Self> {
+        let selection = match &reader.packet_tracks {
+            super::PacketTracks::Selected(tracks) => table_storage(tracks)?,
+            _ => 0,
+        };
         let total = total
             .checked_add(table_storage(&reader.lanes)?)
             .and_then(|n| n.checked_add(table_storage(&reader.tracks).ok()?))
             .and_then(|n| n.checked_add(table_storage(&reader.staged_tracks).ok()?))
+            .and_then(|n| n.checked_add(selection))
             .ok_or(Error::Overflow)?;
         Ok(Self {
             start,
@@ -1684,9 +1689,10 @@ mod tests;
 mod incomplete_audio_tests {
     use super::*;
     use crate::{Reader, ReaderEvent};
-    use triergon_core::container::{Event, PacketInfo};
+    use triergon_core::container::{Event, PacketInfo, TrackId};
 
     const HEADER: [u8; 7] = [0xff, 0xf1, 0x4c, 0x80, 3, 0x7f, 0xfc];
+    const ADTS_PID: TrackId = TrackId(257);
 
     fn transport() -> Vec<u8> {
         // Keep the authored fixture's PAT, PMT and PES header. Only the finite
@@ -1721,20 +1727,21 @@ mod incomplete_audio_tests {
         raw
     }
 
-    fn reader(pool: &Budget) -> Reader {
-        Reader::new(
-            pool,
-            SourceId(309),
-            SourceCapabilities {
-                length: None,
-                random_access: false,
-            },
-            ReaderLimits {
-                audio_eof_policy: AudioEofPolicy::ReportIncomplete,
-                ..ReaderLimits::default()
-            },
-            4096,
-        )
+    fn reader(pool: &Budget, selected: bool) -> Reader {
+        let source = SourceId(309);
+        let caps = SourceCapabilities {
+            length: None,
+            random_access: false,
+        };
+        let limits = ReaderLimits {
+            audio_eof_policy: AudioEofPolicy::ReportIncomplete,
+            ..ReaderLimits::default()
+        };
+        if selected {
+            Reader::new_with_packet_tracks(pool, source, caps, limits, 4096, &[ADTS_PID])
+        } else {
+            Reader::new(pool, source, caps, limits, 4096)
+        }
         .unwrap()
     }
 
@@ -1785,7 +1792,7 @@ mod incomplete_audio_tests {
     fn fragment_copy_freeze_origins_and_publication_retry_transactionally() {
         let raw = transport();
         let pool = Budget::new(32 << 20).unwrap();
-        let mut reader = reader(&pool);
+        let mut reader = reader(&pool, false);
         let cancel = AtomicBool::new(false);
         let mut reached = 0;
         let mut fragment = None;
@@ -1841,7 +1848,7 @@ mod incomplete_audio_tests {
         let raw = transport();
         for target in 0..5 {
             let pool = Budget::new(32 << 20).unwrap();
-            let mut reader = reader(&pool);
+            let mut reader = reader(&pool, false);
             let cancel = AtomicBool::new(false);
             let mut reached = false;
             for _ in 0..1_000_000 {
@@ -1879,7 +1886,7 @@ mod incomplete_audio_tests {
         let raw = split_transport();
         for chunk in [7, 4096] {
             let pool = Budget::new(32 << 20).unwrap();
-            let mut reader = reader(&pool);
+            let mut reader = reader(&pool, false);
             let cancel = AtomicBool::new(false);
             let external = pool.reserve(19_937).unwrap();
             let mut reached = false;
@@ -1947,10 +1954,15 @@ mod incomplete_audio_tests {
         }
     }
 
-    fn tight_split_run(limit: usize, profile: bool, external_pressure: bool) -> (usize, usize) {
+    fn tight_split_run(
+        limit: usize,
+        profile: bool,
+        external_pressure: bool,
+        selected: bool,
+    ) -> (usize, usize) {
         let raw = split_transport();
         let pool = Budget::new(limit).unwrap();
-        let mut reader = reader(&pool);
+        let mut reader = reader(&pool, selected);
         let cancel = AtomicBool::new(false);
         let mut baseline = None;
         let mut minimum = 0;
@@ -2031,10 +2043,15 @@ mod incomplete_audio_tests {
 
     #[test]
     fn seven_byte_adts_header_in_seven_validated_pes_terminates_across_tight_budgets() {
-        let (prefix_peak, minimum) = tight_split_run(32 << 20, true, false);
-        for limit in prefix_peak..=prefix_peak.max(minimum) + 32 {
-            assert_eq!(tight_split_run(limit, false, false), (prefix_peak, minimum));
+        for selected in [false, true] {
+            let (prefix_peak, minimum) = tight_split_run(32 << 20, true, false, selected);
+            for limit in prefix_peak..=prefix_peak.max(minimum) + 32 {
+                assert_eq!(
+                    tight_split_run(limit, false, false, selected),
+                    (prefix_peak, minimum)
+                );
+            }
+            tight_split_run(prefix_peak.max(minimum) + 1, false, true, selected);
         }
-        tight_split_run(prefix_peak.max(minimum) + 1, false, true);
     }
 }

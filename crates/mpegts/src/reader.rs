@@ -127,6 +127,12 @@ enum Phase {
     Publish,
 }
 
+enum PacketTracks {
+    All,
+    Selected(BudgetVec<u16>),
+    Closed,
+}
+
 /// Incremental TS188/M2TS192 reader delivering complete source AUs, separately
 /// from every original transport event. This performs no I/O or decoder-feed
 /// injection. Unsupported carriages retain source facts and report a typed gap.
@@ -136,7 +142,7 @@ pub struct Reader {
     caps: SourceCapabilities,
     window: usize,
     limits: ReaderLimits,
-    packet_tracks: Option<BudgetVec<TrackId>>,
+    packet_tracks: PacketTracks,
     input: Option<InputCursor>,
     stream: Option<TransportStream>,
     lanes: BudgetVec<Lane>,
@@ -248,7 +254,7 @@ impl Reader {
             caps,
             window: input_window,
             limits,
-            packet_tracks: None,
+            packet_tracks: PacketTracks::All,
             input: Some(input),
             stream: Some(stream),
             lanes: BudgetVec::new(pool),
@@ -276,7 +282,7 @@ impl Reader {
     ///
     /// All track metadata and original transport events remain available,
     /// including diagnostics and PES on unselected PIDs. An empty selection
-    /// reads source events only. The selection persists across reader resets.
+    /// reads source events only. Reset keeps the selection until the reader closes.
     ///
     /// # Errors
     ///
@@ -295,27 +301,32 @@ impl Reader {
             return Err(crate::limit(tracks.len(), limits.transport.streams));
         }
         let mut selection = BudgetVec::new(pool);
-        selection.try_extend_from_slice(tracks)?;
+        selection.try_reserve_exact(tracks.len())?;
+        for track in tracks {
+            let pid = u16::try_from(track.0)
+                .ok()
+                .filter(|pid| crate::ELEMENTARY_PID_RANGE.contains(pid))
+                .ok_or(Error::Invalid("MPEG-TS packet track selection"))?;
+            selection.try_push(pid).map_err(|rejected| rejected.error)?;
+        }
         selection.as_mut_slice().sort_unstable();
-        if selection.iter().any(|id| !(1..=0x1ffe).contains(&id.0))
-            || selection
-                .as_slice()
-                .windows(2)
-                .any(|pair| pair[0] == pair[1])
+        if selection
+            .as_slice()
+            .windows(2)
+            .any(|pair| pair[0] == pair[1])
         {
             return Err(Error::Invalid("MPEG-TS packet track selection"));
         }
-        reader.packet_tracks = Some(selection);
+        reader.packet_tracks = PacketTracks::Selected(selection);
         Ok(reader)
     }
 
     fn frames_track(&self, pid: u16) -> bool {
-        self.packet_tracks.as_ref().is_none_or(|selection| {
-            selection
-                .as_slice()
-                .binary_search(&TrackId(u64::from(pid)))
-                .is_ok()
-        })
+        match &self.packet_tracks {
+            PacketTracks::All => true,
+            PacketTracks::Selected(selection) => selection.as_slice().binary_search(&pid).is_ok(),
+            PacketTracks::Closed => false,
+        }
     }
 
     pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
@@ -406,15 +417,23 @@ impl Reader {
         });
         Ok(())
     }
-    /// Release reader-owned state. Previously returned packets/events remain valid.
+    /// Release reader-owned state, including the packet selection. Previously
+    /// returned packets and events remain valid.
     pub fn close(&mut self) {
         self.stop(Error::Closed);
+        if matches!(self.packet_tracks, PacketTracks::Selected(_)) {
+            self.packet_tracks = PacketTracks::Closed;
+        }
     }
     /// Restart the current entity with fresh transport state and a new generation.
+    /// A closed reader with an explicit packet selection cannot be reset.
     pub fn reset(&mut self) -> Result<InputRequest> {
+        if matches!(self.packet_tracks, PacketTracks::Closed) {
+            return Err(Error::Closed);
+        }
         let mut next = Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
         let request = next.request()?;
-        next.packet_tracks = self.packet_tracks.take();
+        std::mem::swap(&mut next.packet_tracks, &mut self.packet_tracks);
         *self = next;
         Ok(request)
     }
