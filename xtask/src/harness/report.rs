@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use super::acceptance::acceptance;
+use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
@@ -651,6 +651,27 @@ fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
+fn store_measurement(
+    output: &Path,
+    case: usize,
+    kind: &str,
+    measurement: &Value,
+) -> Result<Value, String> {
+    let name = format!("measurements/{case:04}-{kind}.json");
+    let path = output.join(&name);
+    let data = json::canonical(measurement) + "\n";
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .and_then(|mut file| file.write_all(data.as_bytes()))
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Value::object([
+        ("raw", Value::str(name)),
+        ("raw_sha256", Value::str(sha256::hex(data.as_bytes()))),
+    ]))
+}
+
 /// Stream canonical report JSON, retaining at most one case from the iterator.
 /// Publish a complete report without replacing an existing destination.
 pub(crate) fn write_case_report(
@@ -767,6 +788,20 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
+    let measures = options.benchmark || options.memory;
+    if measures {
+        for name in ["partial.json", "report.json", "collection.json"] {
+            let path = options.output.join(name);
+            if path.exists() {
+                return Err(format!(
+                    "{} already exists; use a new --output directory",
+                    path.display()
+                ));
+            }
+        }
+        let samples = options.output.join("measurements");
+        fs::create_dir(&samples).map_err(|e| format!("{}: {e}", samples.display()))?;
+    }
     let target = gate_target()?;
     let coverage = fate_coverage(
         root,
@@ -774,7 +809,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         &read_json(&root.join("harness/fate/map.json"))?,
         options.fate_cache.as_deref(),
     )?;
-    let base = vec![
+    let mut base = vec![
         ("schema", Value::int(1)),
         ("target", Value::str(&target)),
         ("identity", identity.clone()),
@@ -795,6 +830,9 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         ("fate_coverage", Value::Array(coverage.clone())),
         ("additional_cases", Value::Array(additional.clone())),
     ];
+    if measures {
+        base.push(("case_storage", Value::str("sha256-files")));
+    }
     let corpus = options
         .corpus
         .canonicalize()
@@ -991,7 +1029,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                         &operation,
                     )
                 })?;
-                row.push(("timing", timing));
+                row.push((
+                    "timing",
+                    store_measurement(&options.output, rows.len(), "timing", &timing)?,
+                ));
             }
             if options.memory {
                 let memory = measure_pinned(check_inputs, || {
@@ -1008,7 +1049,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                         &operation,
                     )
                 })?;
-                row.push(("memory", memory));
+                row.push((
+                    "memory",
+                    store_measurement(&options.output, rows.len(), "memory", &memory)?,
+                ));
             }
         }
         rows.push(object(row));
@@ -1028,10 +1072,17 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         ]);
         save_json(&options.output.join("partial.json"), &object(partial))?;
     }
-    let mut verdict = acceptance(
+    let load_case = |row: &Value| {
+        if measures {
+            validation::expand_measurements(&options.output, row)
+        } else {
+            Ok(row.clone())
+        }
+    };
+    let mut verdict = acceptance_iter(
         root,
         &contract,
-        &rows,
+        rows.iter().map(load_case),
         &identity,
         &target,
         &coverage,
@@ -1051,10 +1102,19 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let mut report = base;
     report.extend([
         ("collection_status", Value::str("complete")),
-        ("cases", Value::Array(rows.clone())),
         ("acceptance", verdict.clone()),
     ]);
-    save_json(&options.output.join("report.json"), &object(report))?;
+    if measures {
+        let mut header = object(report);
+        validation::put(&mut header, "case_storage", Value::str("inline"))?;
+        write_case_report(&options.output, &header, rows.iter().map(load_case))?;
+        validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
+        validation::put(&mut header, "cases", Value::Array(rows.clone()))?;
+        save_json(&options.output.join("collection.json"), &header)?;
+    } else {
+        report.push(("cases", Value::Array(rows.clone())));
+        save_json(&options.output.join("report.json"), &object(report))?;
+    }
     let reasons = |key: &str| {
         verdict
             .get(key)
@@ -1565,6 +1625,55 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn measured_checkpoint_keeps_samples_separate_and_checks_their_digest() {
+        let output = Output::new();
+        fs::create_dir(output.0.join("measurements")).unwrap();
+        let timing = json::parse_strict(
+            r#"{"ratio":{"upper_95":1.01234567890123456789},"samples":[18446744073709551615]}"#,
+        )
+        .unwrap();
+        let memory =
+            json::parse_strict(r#"{"status":"qualified","samples":[9007199254740993]}"#).unwrap();
+        let row = Value::object([
+            ("id", Value::str("sample")),
+            (
+                "timing",
+                store_measurement(&output.0, 0, "timing", &timing).unwrap(),
+            ),
+            (
+                "memory",
+                store_measurement(&output.0, 0, "memory", &memory).unwrap(),
+            ),
+        ]);
+        let checkpoint = Value::object([
+            ("collection_status", Value::str("partial")),
+            ("case_storage", Value::str("sha256-files")),
+            ("cases", Value::Array(vec![row.clone()])),
+        ]);
+        let path = output.0.join("partial.json");
+        save_json(&path, &checkpoint).unwrap();
+        let text = fs::read_to_string(path).unwrap();
+        assert!(!text.contains("samples"));
+        assert!(!output.0.join("report.json").exists());
+        let expanded = validation::expand_measurements(&output.0, &row).unwrap();
+        assert_eq!(
+            json::canonical(expanded.get("timing").unwrap()),
+            json::canonical(&timing)
+        );
+        assert_eq!(
+            json::canonical(expanded.get("memory").unwrap()),
+            json::canonical(&memory)
+        );
+        assert!(store_measurement(&output.0, 0, "memory", &timing).is_err());
+        fs::write(output.0.join("measurements/0000-memory.json"), b"{}\n").unwrap();
+        assert!(
+            validation::expand_measurements(&output.0, &row)
+                .unwrap_err()
+                .contains("raw measurement changed")
+        );
     }
 
     #[test]
