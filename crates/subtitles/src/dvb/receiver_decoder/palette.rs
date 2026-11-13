@@ -282,58 +282,111 @@ pub(super) fn automatic(
     Ok(())
 }
 
-/// The rows of `pixels`, each with the row below it if the region has one.
-fn rows(pixels: &[u8], width: usize) -> impl Iterator<Item = (&[u8], Option<&[u8]>)> {
-    let rows = pixels.chunks_exact(width);
-    let below = rows.clone().skip(1).map(Some).chain([None]);
-    rows.zip(below)
+/// What a walk over a region's pixels visits.
+trait Walker {
+    /// Each row before its pixels, with whether rows lie above and below it;
+    /// `false` ends the walk.
+    fn row(&mut self, _row: &[u8], _up: bool, _down: bool) -> bool {
+        true
+    }
+
+    /// Each pixel, with whether it is counted: on the region's edge or with a
+    /// 4-neighbour of another value.
+    fn pixel(&mut self, _value: u8, _counted: bool) {}
+
+    /// Each pair of 4-neighbours with unlike values, left then right or upper then
+    /// lower.
+    fn pair(&mut self, a: u8, b: u8);
 }
 
-/// Pairs of 4-neighbours with unlike values, left then right and upper then lower.
-fn each_unlike(pixels: &[u8], width: usize, mut side: impl FnMut(u8, u8)) {
-    for (row, down) in rows(pixels, width) {
-        for window in row.windows(2) {
-            if window[0] != window[1] {
-                side(window[0], window[1]);
+/// Walk the pixels of a region, `width` per row: the one walk over its rows,
+/// pixels and unlike pairs that sizing the lists, their degrees and the count
+/// share.
+fn walk(pixels: &[u8], width: usize, walker: &mut impl Walker) {
+    fn pair_if_unlike(walker: &mut impl Walker, a: u8, b: u8) {
+        if a != b {
+            walker.pair(a, b);
+        }
+    }
+    // Each row with the rows above and below it, if the region has them.
+    let mut rows = pixels.chunks_exact(width);
+    let mut up: Option<&[u8]> = None;
+    let mut next = rows.next();
+    while let Some(row) = next {
+        let down = rows.next();
+        next = down;
+        if !walker.row(row, up.is_some(), down.is_some()) {
+            return;
+        }
+        let last = row.len() - 1;
+        match (up, down) {
+            (Some(up), Some(down)) if last > 1 => {
+                walker.pixel(row[0], true);
+                walker.pixel(row[last], true);
+                pair_if_unlike(walker, row[0], row[1]);
+                pair_if_unlike(walker, row[0], down[0]);
+                pair_if_unlike(walker, row[last], down[last]);
+                for ((window, &u), &d) in row.windows(3).zip(&up[1..]).zip(&down[1..]) {
+                    let (l, v, r) = (window[0], window[1], window[2]);
+                    pair_if_unlike(walker, v, r);
+                    pair_if_unlike(walker, v, d);
+                    walker.pixel(v, l != v || r != v || u != v || d != v);
+                }
+            }
+            // The first or last row, or a region at most two wide: every pixel is
+            // on the edge.
+            _ => {
+                for &v in row {
+                    walker.pixel(v, true);
+                }
+                for window in row.windows(2) {
+                    pair_if_unlike(walker, window[0], window[1]);
+                }
+                for (&a, &b) in down.into_iter().flat_map(|down| row.iter().zip(down)) {
+                    pair_if_unlike(walker, a, b);
+                }
             }
         }
-        for (&a, &b) in down.into_iter().flat_map(|down| row.iter().zip(down)) {
-            if a != b {
-                side(a, b);
-            }
-        }
+        up = Some(row);
     }
 }
 
-/// The words of neighbour lists for `pixels`, 257 starts and two per unlike pair,
-/// or `usize::MAX` when they would not be smaller than `table` words. Pairs are
-/// counted only when lists for every pair being unlike would not be smaller; then
-/// the lists are sized for that.
+/// The words of neighbour lists for `pairs` pairs: 257 starts and two per pair.
+fn list_words_for(pairs: usize) -> usize {
+    VALUES + 1 + 2 * pairs
+}
+
+/// The words of neighbour lists for `pixels`, or `usize::MAX` when they would not
+/// be smaller than `table` words. Pairs are counted only when lists for every pair
+/// being unlike would not be smaller; then the lists are sized for that.
 fn list_words(pixels: &[u8], width: usize, table: usize) -> usize {
     let height = pixels.len() / width;
     let every = (width - 1) * height + width * height.saturating_sub(1);
-    let words = |pairs| VALUES + 1 + 2 * pairs;
-    if words(every) < table {
-        return words(every);
+    if list_words_for(every) < table {
+        return list_words_for(every);
     }
-    unlike(pixels, width, table).map_or(usize::MAX, words)
+    unlike(pixels, width, table).map_or(usize::MAX, list_words_for)
 }
 
-/// The number of pairs [`each_unlike`] visits, or `None` once lists for them could
-/// not be smaller than `table` words.
+/// The number of unlike pairs in `pixels`, or `None` once lists for them would not
+/// be smaller than `table` words.
 fn unlike(pixels: &[u8], width: usize, table: usize) -> Option<usize> {
-    let limit = table.saturating_sub(VALUES + 1) / 2;
-    let mut pairs = 0;
-    for (row, down) in rows(pixels, width) {
-        pairs += row.windows(2).filter(|w| w[0] != w[1]).count();
-        pairs += down.map_or(0, |down| {
-            row.iter().zip(down).filter(|(a, b)| a != b).count()
-        });
-        if pairs >= limit {
-            return None;
+    struct Unlike {
+        pairs: usize,
+        table: usize,
+    }
+    impl Walker for Unlike {
+        fn row(&mut self, _row: &[u8], _up: bool, _down: bool) -> bool {
+            list_words_for(self.pairs) < self.table
+        }
+
+        fn pair(&mut self, _a: u8, _b: u8) {
+            self.pairs += 1;
         }
     }
-    Some(pairs)
+    let mut unlike = Unlike { pairs: 0, table };
+    walk(pixels, width, &mut unlike);
+    (list_words_for(unlike.pairs) < table).then_some(unlike.pairs)
 }
 
 /// Where the sides between unlike neighbours are counted, and how a ranked value's
@@ -383,10 +436,14 @@ impl<'a> Lists<'a> {
     /// Lists sized for the sides of `pixels`: `starts` holds where each value's
     /// list ends, and [`Sides::side`] fills it from there down to its start.
     fn new(pixels: &[u8], width: usize, starts: &'a mut [u32], neighbours: &'a mut [u32]) -> Self {
-        each_unlike(pixels, width, |a, b| {
-            starts[usize::from(a)] += 1;
-            starts[usize::from(b)] += 1;
-        });
+        struct Degrees<'s>(&'s mut [u32]);
+        impl Walker for Degrees<'_> {
+            fn pair(&mut self, a: u8, b: u8) {
+                self.0[usize::from(a)] += 1;
+                self.0[usize::from(b)] += 1;
+            }
+        }
+        walk(pixels, width, &mut Degrees(starts));
         let mut end = 0;
         for start in starts.iter_mut() {
             end += *start;
@@ -434,72 +491,37 @@ fn count<S: Sides>(
         exposure: &mut exposure[..VALUES],
         sides,
     };
-    let mut rows = pixels.chunks_exact(width);
-    let mut up = None;
-    let mut row = rows.next();
-    while let Some(current) = row {
-        let down = rows.next();
-        tally.row(up, current, down);
-        up = Some(current);
-        row = down;
-    }
+    walk(pixels, width, &mut tally);
     tally.sides
 }
 
-/// The tallies of one region as its rows are counted.
+/// The tallies of one region as its pixels are walked.
 struct Tally<'a, S> {
     counted: &'a mut [u32],
     exposure: &'a mut [u32],
     sides: S,
 }
 
-impl<S: Sides> Tally<'_, S> {
-    fn pair(&mut self, a: u8, b: u8) {
-        if a != b {
-            self.sides.side(a, b);
-        }
-    }
-
-    /// Count one row, between the rows above and below it if the region has them.
-    fn row(&mut self, up: Option<&[u8]>, row: &[u8], down: Option<&[u8]>) {
-        let last = row.len() - 1;
-        // Sides on the edge: the row's ends, and all of the first and last rows.
+impl<S: Sides> Walker for Tally<'_, S> {
+    /// Sides on the edge: the row's ends, and all of the first and last rows.
+    fn row(&mut self, row: &[u8], up: bool, down: bool) -> bool {
         self.exposure[usize::from(row[0])] += 1;
-        self.exposure[usize::from(row[last])] += 1;
-        let edges = u32::from(up.is_none()) + u32::from(down.is_none());
+        self.exposure[usize::from(row[row.len() - 1])] += 1;
+        let edges = u32::from(!up) + u32::from(!down);
         if edges > 0 {
             for &v in row {
                 self.exposure[usize::from(v)] += edges;
             }
         }
-        match (up, down) {
-            (Some(up), Some(down)) if last > 1 => {
-                self.counted[usize::from(row[0])] += 1;
-                self.counted[usize::from(row[last])] += 1;
-                self.pair(row[0], row[1]);
-                self.pair(row[0], down[0]);
-                self.pair(row[last], down[last]);
-                for ((window, &u), &d) in row.windows(3).zip(&up[1..]).zip(&down[1..]) {
-                    let (l, v, r) = (window[0], window[1], window[2]);
-                    self.pair(v, r);
-                    self.pair(v, d);
-                    self.counted[usize::from(v)] += u32::from(l != v || r != v || u != v || d != v);
-                }
-            }
-            // The first or last row, or a region at most two wide: every pixel is
-            // on the edge.
-            _ => {
-                for &v in row {
-                    self.counted[usize::from(v)] += 1;
-                }
-                for window in row.windows(2) {
-                    self.pair(window[0], window[1]);
-                }
-                for (&a, &b) in down.into_iter().flat_map(|down| row.iter().zip(down)) {
-                    self.pair(a, b);
-                }
-            }
-        }
+        true
+    }
+
+    fn pixel(&mut self, value: u8, counted: bool) {
+        self.counted[usize::from(value)] += u32::from(counted);
+    }
+
+    fn pair(&mut self, a: u8, b: u8) {
+        self.sides.side(a, b);
     }
 }
 
@@ -859,6 +881,20 @@ mod tests {
                     .collect()
             })
             .collect()
+    }
+
+    #[test]
+    fn lists_are_kept_while_smaller_than_the_table() {
+        // One row of 40,000 pixels alternating 16 and 17 for its first `changes`
+        // steps: lists for 32,639 unlike pairs take 257 + 65,278 = 65,535 words,
+        // one under the 65,536-word table; for 32,640 they would take 65,537.
+        let row = |changes: usize| -> Vec<u8> {
+            (0..40_000usize)
+                .map(|x| 16 + (x.min(changes) % 2) as u8)
+                .collect()
+        };
+        assert_eq!(unlike(&row(32_639), 40_000, VALUES * VALUES), Some(32_639));
+        assert_eq!(unlike(&row(32_640), 40_000, VALUES * VALUES), None);
     }
 
     #[test]
