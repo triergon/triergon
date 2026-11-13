@@ -27,7 +27,7 @@ fn word(raw: &[u8], at: usize) -> u16 {
 /// ([`crate::canvas::accepts`]): 65,535 × 1 and 63,422 × 4,096 are taken,
 /// 0 × 0, 63,423 × 4,096 and 65,535 × 65,535 are not.
 fn valid_canvas(width: u16, height: u16) -> bool {
-    crate::canvas::accepts(width.into(), height.into())
+    crate::canvas::accepts(width, height)
 }
 
 /// A packet's PTS in microseconds, as the receiver rescales it: `None` when
