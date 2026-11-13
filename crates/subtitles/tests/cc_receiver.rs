@@ -1,4 +1,4 @@
-//! The `ccaption`-compatible receiver against FFmpeg's recorded events.
+//! The receiver against the events FFmpeg's `cc_dec` decoder recorded.
 //!
 //! The SCC fixtures under `tests/cc/` are authored by
 //! `harness/subtitles/cc_streams.py`, which also records the reference's events
