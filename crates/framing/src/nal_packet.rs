@@ -126,14 +126,14 @@ impl NalPacketConfiguration {
         if let Some(c) = self.avc_record() {
             c.nal(index).map(|n| ConfigNal {
                 kind: Some(n.array_kind()),
-                owner: c.source_bytes(),
+                storage: c.source_bytes(),
                 range: n.source_range(),
             })
         } else {
             let c = self.hevc_record()?;
             c.nal(index).map(|n| ConfigNal {
                 kind: None,
-                owner: c.source_bytes(),
+                storage: c.source_bytes(),
                 range: n.source_range(),
             })
         }
@@ -245,7 +245,7 @@ impl<'a> ConfigurationRef<'a> {
                 let record = update.record();
                 record.nal(index).map(|nal| ConfigNal {
                     kind: Some(nal.array_kind()),
-                    owner: record.source_bytes(),
+                    storage: record.source_bytes(),
                     range: nal.source_range(),
                 })
             }
@@ -264,14 +264,14 @@ pub(crate) struct ConfigNal<'a> {
     /// AVC array kind; HEVC records select every NAL.
     pub(crate) kind: Option<AvcConfigArrayKind>,
     /// The raw record, whose `range` addresses the NAL.
-    pub(crate) owner: &'a Bytes,
+    pub(crate) storage: &'a Bytes,
     pub(crate) range: Range<usize>,
 }
 
 impl<'a> ConfigNal<'a> {
     /// The NAL payload. The parser validated its range against the same record.
     pub(crate) fn payload(&self) -> &'a [u8] {
-        &self.owner[self.range.clone()]
+        &self.storage[self.range.clone()]
     }
 }
 
@@ -971,7 +971,7 @@ impl<M> PacketState<'_, M> {
 }
 
 impl PacketPlan {
-    // Known owner/capacity lower bound, deduplicating raw caller aliases. A
+    // Known storage capacity lower bound, deduplicating raw caller aliases. A
     // larger allocator replacement peak may still require retryable pressure.
     // All terms are non-negative, so summing the job-invariant terms first
     // overflows exactly when the original left-to-right sum overflowed.

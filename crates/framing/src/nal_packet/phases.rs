@@ -42,7 +42,7 @@ impl<M> NalPacketJob<'_, M> {
             if let Some(status) = plan.advance(&mut self.state, work, cancel)? {
                 return Ok(status);
             }
-            // No owner or allocation lives in the discarded preparation scratch.
+            // Preparation scratch contains no allocations.
             // The next emission loop performs the original Reserve cancel check.
             self.phase = PacketPhase::Emit(PacketEmission::new());
         }
