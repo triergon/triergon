@@ -219,4 +219,4 @@ under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
 in [docs/status.md](../../docs/status.md). The text conversions (`subtitle-text`
 and `subtitle-text-host`) were measured at `6126b759b9b983afe488c3c362c6e37c2d1425a2`
-on Linux AArch64 and in the ARMv7 user space.
+on Linux AArch64, and every subtitle feature at `3df7ae6d` in the ARMv7 user space.

@@ -19685,6 +19685,26 @@
    "bytes": 30959392
   },
   {
+   "name": "armv7-thumb2-linux-armv7",
+   "path": "armv7-thumb2-linux-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 rows of docs/status.md for the gate target thumbv7neon-unknown-linux-gnueabihf at 22ed8232, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: the workspace, worker, core arithmetic, raster and ASS tests; the fonts, shaping, raster and ASS comparisons; codec conformance grading; 30 timing pairs of every report contract, external-vector, isobmff-bench, framing, codecs time and capture qualify; the kernel proof and 30 kernel-bound memory pairs of every report contract, external-vector, isobmff-bench and framing; cargo xtask grade of the playback and ASS rendering rows; codecs time of the A32, A32 with NEON and Thumb-2 without NEON codec workers (comparison builds); every measured worker binary and the reference workers' sizes and demuxers; build identities, scripts, CPU, kernel and user-space package list. The capture comparison's decoded and converted YUV planes and the generated capture inputs are left out: they are regenerated from the kept streams, the input generator and the archived workers.",
+   "key": "evidence/armv7-thumb2-linux-armv7/abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e.tar.gz",
+   "sha256": "abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e",
+   "bytes": 7848319723,
+   "source_revision": "22ed8232b28a285f1439772b91713df3aa64ea91"
+  },
+  {
+   "name": "armv7-thumb2-3df7ae6d-linux-armv7",
+   "path": "armv7-thumb2-3df7ae6d-linux-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 rows of docs/status.md for the gate target thumbv7neon-unknown-linux-gnueabihf at 3df7ae6d, on two c6g.4xlarge hosts in the armv7-userland user space pinned to CPU 1, with byte-identical workers (a/ and b/ hold each host's results): the workspace, worker, core arithmetic, raster and ASS tests; the fonts, shaping, raster, ASS and subtitle comparisons; codec conformance grading; 30 timing pairs of every report contract, external-vector, isobmff-bench, framing, codecs time and capture qualify; the kernel proofs and 30 kernel-bound memory pairs, from an empty page cache, of every report contract, external-vector, isobmff-bench and framing; cargo xtask grade of every graded row with the module loaded; the second memory collections of TS program and ISO BMFF and of the two subtitle cases above the reference, beside the first, with the hosts' reclaim counters; perf recordings and per-symbol reports of aac-lc-stereo for the gate and A32 with NEON codec workers; every measured worker binary and the reference workers; build identities, scripts, a bundle of the measured commit, CPU, kernel and user-space package list. Left out: the capture comparison's decoded and converted YUV planes and the generated capture inputs (regenerated from the kept streams, the input generator and the archived workers), and the reports of the gradings made with the module unloaded and of a memory collection that could not open the module's device (their logs are kept).",
+   "key": "evidence/armv7-thumb2-3df7ae6d-linux-armv7/65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd.tar.gz",
+   "sha256": "65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd",
+   "bytes": 20846847117,
+   "source_revision": "3df7ae6d504d67e054ffe9a54901620c134ba2c6"
+  },
+  {
    "name": "mp4-range-fate-prefix-e35e3584-aarch64",
    "path": "mp4-range-fate-prefix-e35e3584-aarch64",
    "retention": "retained",

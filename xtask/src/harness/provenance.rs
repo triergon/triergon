@@ -114,17 +114,7 @@ pub(crate) fn cargo_metadata_with_features(
     root: &Path,
     features: &[String],
 ) -> Result<Value, String> {
-    let rustc = Command::new("rustc")
-        .arg("-Vv")
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("rustc: {e}"))?;
-    let version = String::from_utf8_lossy(&rustc.stdout).into_owned();
-    let host = version
-        .lines()
-        .find_map(|l| l.strip_prefix("host: "))
-        .ok_or("rustc reports no host")?
-        .to_owned();
+    let target = super::gate_build::worker_target();
     let mut command = Command::new("cargo");
     command.args([
         "metadata",
@@ -133,7 +123,7 @@ pub(crate) fn cargo_metadata_with_features(
         "--locked",
         "--offline",
         "--filter-platform",
-        &host,
+        target,
     ]);
     if !features.is_empty() {
         command.arg("--features").arg(features.join(","));
