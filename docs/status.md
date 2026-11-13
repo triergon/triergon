@@ -434,6 +434,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | Earlier: `@` fonts, Linux AArch64 and ARMv7 | `a6e984526d20029e75b48650e9cc317f192da776` | `d5b68414a5a9db73c98b0cab8f49919980da2d7754e46fcb84cf7cc6f8039f0a` |
 | AAC Parametric Stereo from publications and probes: aac lane gates, open cases, table generator runs and instruction counts, Linux AArch64 and ARMv7 | `560f222594f3b8767d7454ee1fa5752573020112` | `b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708` |
 | AAC Parametric Stereo review: the transient ducking's re-derivation by probes, aac lane gates, open cases, table generator checks, fuzzing and instruction counts, Linux AArch64 and ARMv7 (`thumbv7neon`) | `81cb8bf9ac9499fe036d2f186a8fdca365e13820` | `25cd8fa2e8d359ae096328c21d46ab0322654a7d93016b17f822134db25d8560` |
+| ARMv7: subtitles, DVB palettes, the 12 crafted cases and the three `sequence` cases, parity, runtime and kernel-bound memory | `74155089881341aa7aae67e5f754b35a86e4898b` | `63453697efcbf39e4af583c5f546d1f366e2e49c4b6a9c97df3e867ca1293646` |
 | Subtitles, DVB palettes: the 10 new cases' runtime and memory, instructions on both targets | `aebbe5827b1b2ae8f1dcf53a1be67053c850a279` | `d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3` |
 
 ## Platforms
@@ -485,7 +486,7 @@ diagnostics: no codec contract is gated on this target.
 | ASS rendering | `ass-render` 78/78 and `ass-render-host` 4/4 pass; the crate's tests pass | 0.7782 (82/82 pass) | heap ≤0.929, total RSS ≤0.911 (82/82 lower) |
 | Subtitles, text | `subtitle-text` 354/354 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9184 (354/354 pass), `subtitle-text-host` 0.0783 (23/23 pass) | heap ≤0.336 (377/377 lower); total RSS fails: ≤1.0045, 376/377 lower (below) |
 | Subtitles, PGS | 317/317 (`subtitle-pgs`) | 1.0021 (317/317 pass) | heap ≤0.968 (317/317 lower); total RSS fails: ≤1.0051, 316/317 lower (below) |
-| Subtitles, DVB | 241/241 (`subtitle-dvb`, at `74155089`) | 0.8021 (229/229 pass; the 12 cases added since are not timed); instructions at `74155089` against main at `2de40661`: 0.8460 of main's in sum, median of the cases 1.0000; above main beyond its run spread of 0.029% are the three `sequence` cases (`sequence-mkv`, `sequence-ts`, `sequence--compute_edt-1`), by 639 to 787 instructions of about 1.99 million (+0.033% to +0.040%) | heap ≤0.992, total RSS ≤0.864 (229/229 lower); the 12 cases added since are not measured |
+| Subtitles, DVB | 241/241 (`subtitle-dvb`, at `74155089`) | 0.8021 (229/229 pass); the 12 cases added since and the three `sequence` cases at `74155089`: 0.9127 (15/15 pass; worst `automatic-large-exposure-ts`, the `sequence` cases 0.3225 to 0.3489); instructions at `74155089` against main at `2de40661`: 0.8460 of main's in sum, median of the cases 1.0000; above main beyond its run spread of 0.029% are the three `sequence` cases (`sequence-mkv`, `sequence-ts`, `sequence--compute_edt-1`), by 639 to 787 instructions of about 1.99 million (+0.033% to +0.040%) | heap ≤0.992, total RSS ≤0.864 (229/229 lower); the 12 cases added since and the three `sequence` cases at `74155089`: heap ≤0.459, total RSS ≤0.839 (15/15 lower, kernel-bound) |
 | Subtitles, DVD | 224/224 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | 1.0389 (229/229 pass) | heap ≤0.966, total RSS ≤0.887 (229/229 lower) |
 | Closed captions | 201/205 (`subtitle-cc`; the 4 open `hevc-eos-ts` cases, as on AArch64) | 0.7911 (201/201 pass); instructions at `4d81cde0` against main at `339ec261`: 0.9941 of main's in sum, median of the cases 0.9986, no case above main but `hevc-cra-ts` (1.0013) and `hevc-reserved-ts` (1.0012), whose difference follows the input path's length in the ARMv7 chroot, not the code: main's count steps up with a longer path and the candidate's stays flat | heap ≤0.127 (201/201 lower); total RSS fails: ≤1.0822, 197/201 lower (below) |
 | Teletext | 70/70 (`subtitle-teletext`) | 0.5255 (70/70 pass) | heap ≤0.626, total RSS ≤0.804 (70/70 lower) |
@@ -506,6 +507,11 @@ it in 9 and 16 of their 30 pairs; their median peaks are within 16 pages of the 
 host from an empty page cache, they give 0.9752 (above in 3 pairs) and 1.0012 (above in 8);
 the host reclaimed no memory during either collection. The causes are not established; the
 table keeps the first collection, and the raw samples hold both.
+
+The 12 cases added to `subtitle-dvb`, with the three `sequence` cases, were measured on the
+gate target at `74155089` on a c6g.4xlarge pinned to CPU 1, as a slice of the feature: 30
+timing pairs, then 30 memory pairs under a kernel RSS proof made in that checkout. `cargo
+xtask grade` does not join a slice, so their bounds come from each run's report.
 
 The DVD decoder gives the numbers of a VobSub configuration and of the `palette` option the
 values observed in FFmpeg built for ARMv7: a colour list's numbers (the `palette` option and
