@@ -65,6 +65,8 @@ pub struct Mp4NativeShortPacket {
     pub prefix: ShortSample,
     pub configuration: Mp4Configuration,
     pub native: PacketOccurrence,
+    /// Decoder trim attached to the recovered occurrence.
+    pub encoded_skip_samples: Option<[u8; 10]>,
 }
 /// The first native read has a positive declaration starting at or beyond the
 /// confirmed physical end. The view ends without emitting a packet.
@@ -1166,6 +1168,27 @@ impl Mp4Engine {
         self.plan.tracks.as_slice()[at_track].configuration(description, revision)
     }
 
+    fn skip_samples(
+        &self,
+        at_track: usize,
+        occurrence: &PacketOccurrence,
+    ) -> Result<Option<[u8; 10]>> {
+        if occurrence.source.fragment_flags.is_some() && occurrence.source.ordinal == 1 {
+            let samples = self.plan.tracks.as_slice()[at_track].fragment_aac_trim;
+            return Ok((samples != 0).then(|| {
+                let mut trim = [0; 10];
+                trim[..4].copy_from_slice(&samples.to_le_bytes());
+                trim
+            }));
+        }
+        match &self.plan.encoded_edits {
+            Some(plans) => plans.as_slice()[at_track]
+                .as_ref()
+                .map_or(Ok(None), |plan| plan.skip_samples(&occurrence.source)),
+            None => Ok(None),
+        }
+    }
+
     fn emit_packet(
         &mut self,
         at_track: usize,
@@ -1177,24 +1200,9 @@ impl Mp4Engine {
             Some(cursor) => Some(cursor.take_occurrence()?),
             None => self.plan.native(self.row).cloned(),
         };
-        let encoded_skip_samples = if let Some(occurrence) = &native {
-            if occurrence.source.fragment_flags.is_some() && occurrence.source.ordinal == 1 {
-                let samples = self.plan.tracks.as_slice()[at_track].fragment_aac_trim;
-                (samples != 0).then(|| {
-                    let mut trim = [0; 10];
-                    trim[..4].copy_from_slice(&samples.to_le_bytes());
-                    trim
-                })
-            } else if let Some(plans) = &self.plan.encoded_edits {
-                plans.as_slice()[at_track]
-                    .as_ref()
-                    .map_or(Ok(None), |plan| plan.skip_samples(&occurrence.source))?
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let encoded_skip_samples = native.as_ref().map_or(Ok(None), |occurrence| {
+            self.skip_samples(at_track, occurrence)
+        })?;
         if native.is_some() && source.sample.range.is_empty() {
             self.native_boundary_observed =
                 self.plan
@@ -1327,6 +1335,7 @@ impl Mp4Engine {
                     .ok_or(Error::Invalid("short packet needs native occurrence"))?
                     .clone();
                 native.demux.flags |= 2;
+                let encoded_skip_samples = self.skip_samples(at_track, &native)?;
                 self.packet = None;
                 self.native_recovery_end = true;
                 Ok(BackendStep::Event(RawEvent::Mp4(
@@ -1334,6 +1343,7 @@ impl Mp4Engine {
                         prefix,
                         configuration,
                         native,
+                        encoded_skip_samples,
                     }),
                 )))
             }

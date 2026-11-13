@@ -250,7 +250,7 @@ impl PreparedMp4 {
         Some(previous.max(end))
     }
     pub fn rows(&self) -> usize {
-        if self.native_front && !self.replay_native_order {
+        if self.native_front && !self.replay_native_order && self.encoded_edits.is_none() {
             return self.source_rows.len();
         }
         match self.view {
@@ -259,7 +259,7 @@ impl PreparedMp4 {
         }
     }
     pub fn row(&self, at: usize) -> Option<SourceRow> {
-        if self.native_front && !self.replay_native_order {
+        if self.native_front && !self.replay_native_order && self.encoded_edits.is_none() {
             return self.source_rows.as_slice().get(at).cloned();
         }
         match self.view {
@@ -353,6 +353,38 @@ impl<'a> Mp4IndexJob<'a> {
     pub fn new(movie: &'a Movie, view: Mp4View, limits: PlanLimits) -> Result<Self> {
         Self::new_inner(movie, view, limits, false, None, None)
     }
+    pub(crate) fn for_forward_encoded_edits(
+        movie: &'a Movie,
+        plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
+        limits: PlanLimits,
+    ) -> Result<Self> {
+        if plans.len() != movie.tracks().len() {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
+        if movie.native_recovery()
+            || !matches!(
+                movie.read_scope(),
+                crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+            )
+            || movie.media().len() != 1
+            || movie.terminal_mdat().is_some()
+            || !movie.trex().is_empty()
+            || !plans.iter().any(Option::is_some)
+        {
+            return Err(Error::Unsupported(
+                "forward encoded edits require regular front media",
+            ));
+        }
+        Self::new_inner(
+            movie,
+            Mp4View::PinnedMov9NoParseNoFillin,
+            limits,
+            true,
+            Some(plans),
+            None,
+        )
+    }
+
     /// Build the native range view with explicitly validated encoded edits.
     /// The retained plans also govern seeks on this exact range index.
     pub fn new_native_encoded_range(
@@ -393,12 +425,11 @@ impl<'a> Mp4IndexJob<'a> {
         let header = movie.header();
         let ticks = header.declared_duration_ticks().unwrap_or(0);
         let duration = Time::from_ticks(i128::from(ticks), header.time_base()?)?;
-        let micros =
-            match duration.to_i64_ticks(TimeBase::new(1, 1_000_000)?, Rounding::NearestAway) {
-                Ok(value) => value,
-                Err(Error::Overflow) => 0,
-                Err(error) => return Err(error),
-            };
+        let micros = match duration.to_i64_ticks(TimeBase::MICROSECONDS, Rounding::NearestAway) {
+            Ok(value) => value,
+            Err(Error::Overflow) => 0,
+            Err(error) => return Err(error),
+        };
         Self::new_inner(
             movie,
             Mp4View::PinnedMov9NoParseNoFillin,
@@ -564,6 +595,14 @@ impl<'a> Mp4IndexJob<'a> {
                     encoded_edits,
                     |index| include_media_track(movie, index),
                 )?
+            } else if let Some(plans) = encoded_edits.filter(|_| native_front) {
+                PacketCursor::new_front_with_encoded_edits(
+                    b,
+                    native.as_slice(),
+                    movie.media(),
+                    native_limits,
+                    plans,
+                )?
             } else if let Some(plans) = encoded_edits {
                 PacketCursor::new_encoded_regular(
                     b,
@@ -581,6 +620,15 @@ impl<'a> Mp4IndexJob<'a> {
                     bounds,
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
+                )?
+            } else if native_front && !movie.trex().is_empty() {
+                PacketCursor::new_front_fragmented(
+                    b,
+                    native.as_slice(),
+                    movie.media(),
+                    movie.terminal_mdat(),
+                    movie.trex(),
+                    native_limits,
                 )?
             } else if native_front {
                 PacketCursor::new_front_source(
@@ -697,11 +745,6 @@ impl<'a> Mp4IndexJob<'a> {
                             return Ok(false);
                         }
                         let h = t.header();
-                        let fragment_aac_trim = if p.view == Mp4View::PinnedMov9NoParseNoFillin {
-                            FragmentAacTrimJob::new(self.movie, self.track)?
-                        } else {
-                            None
-                        };
                         let (base, native_catalogue) = if h.timescale == 0 {
                             (
                                 SourceTimeBase::UNAVAILABLE,
@@ -757,16 +800,8 @@ impl<'a> Mp4IndexJob<'a> {
                                     .transpose()?,
                             },
                         )?;
-                        self.fragment_aac_trim = fragment_aac_trim;
                         self.description = 1;
                         return Ok(false);
-                    }
-                    if let Some(job) = &mut self.fragment_aac_trim {
-                        let Some(samples) = job.poll(w, c)? else {
-                            return Ok(false);
-                        };
-                        p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
-                        self.fragment_aac_trim = None;
                     }
                     if let Some(d) = t.table().descriptions().get(self.description - 1) {
                         if !w.try_charge(1) {
@@ -811,7 +846,9 @@ impl<'a> Mp4IndexJob<'a> {
                 } else {
                     self.phase = if let Some(duration) = &self.range_duration {
                         if let Some(cursor) = &mut self.native {
-                            if !duration.scan {
+                            if duration.scan {
+                                cursor.check_duration_before_replay()?;
+                            } else {
                                 cursor.check_projections_before_replay()?;
                             }
                             cursor.enable_range_seek_checkpoints();
@@ -940,27 +977,21 @@ impl<'a> Mp4IndexJob<'a> {
                         .native
                         .as_mut()
                         .ok_or(Error::Invalid("missing native range cursor"))?;
-                    loop {
-                        match cursor.poll(w, c)? {
-                            CursorStatus::Yield => return Ok(false),
-                            CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
-                            CursorStatus::Ready => {
-                                let row = cursor.take_occurrence()?;
-                                let Some(pts) = row.demux.pts else { continue };
-                                let end =
-                                    pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
-                                let micros = row.media_clock.demux_base.rescale(
-                                    end,
-                                    TimeBase::new(1, 1_000_000)?,
-                                    Rounding::NearestAway,
-                                )?;
-                                duration.micros = duration.micros.max(micros);
+                    match cursor.poll(w, c)? {
+                        CursorStatus::Yield => return Ok(false),
+                        CursorStatus::Ready => {
+                            return Err(Error::Invalid("range check yielded a packet"));
+                        }
+                        CursorStatus::End => {
+                            if duration.scan {
+                                duration.micros = cursor
+                                    .checked_duration_us()
+                                    .ok_or(Error::Invalid("range duration scan incomplete"))?;
                             }
-                            CursorStatus::End => {
-                                cursor.rewind_at_end()?;
-                                self.ready = true;
-                                return Ok(true);
-                            }
+                            cursor.rewind_at_end()?;
+                            self.track = 0;
+                            self.phase = 5;
+                            return Ok(false);
                         }
                     }
                 }
@@ -974,7 +1005,7 @@ impl<'a> Mp4IndexJob<'a> {
                         row.media_clock = clock;
                     }
                     let mut replay_native_order = p.replay_native_order;
-                    if p.native_front && !replay_native_order {
+                    if p.native_front && p.encoded_edits.is_none() && !replay_native_order {
                         let source = p.source_rows.as_slice().get(p.native_rows.len());
                         if source
                             .is_none_or(|s| s.track_id != row.track_id || s.sample != row.source)
@@ -1038,7 +1069,41 @@ impl<'a> Mp4IndexJob<'a> {
                     self.phase = 5;
                 }
             }
-            5 if p.native_front && self.track < p.tracks.len() => {
+            5 => {
+                if p.view == Mp4View::PinnedMov9NoParseNoFillin && self.track < p.tracks.len() {
+                    if self.fragment_aac_trim.is_none() {
+                        if !w.try_charge(1) {
+                            return Ok(false);
+                        }
+                        self.fragment_aac_trim = FragmentAacTrimJob::new(self.movie, self.track)?;
+                    }
+                    if let Some(job) = &mut self.fragment_aac_trim {
+                        let samples = match job.poll(w, c) {
+                            Ok(Some(samples)) => samples,
+                            Ok(None) => return Ok(false),
+                            Err(Error::Backpressure { .. })
+                                if self.range_duration.is_some()
+                                    && self
+                                        .native
+                                        .as_mut()
+                                        .is_some_and(PacketCursor::discard_seek_checkpoints) =>
+                            {
+                                // The configuration is required. Resume its parser on
+                                // the next poll after releasing optional seek state.
+                                return Ok(false);
+                            }
+                            Err(error) => return Err(error),
+                        };
+                        p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
+                        self.fragment_aac_trim = None;
+                    }
+                    self.track += 1;
+                } else {
+                    self.track = 0;
+                    self.phase = 6;
+                }
+            }
+            6 if p.native_front && self.track < p.tracks.len() => {
                 if !w.try_charge(1) {
                     return Ok(false);
                 }
@@ -1049,10 +1114,6 @@ impl<'a> Mp4IndexJob<'a> {
                     .front_track(self.track)?;
                 push(&mut p.front_tracks, state)?;
                 self.track += 1;
-            }
-            5 if p.native_front => {
-                self.ready = true;
-                return Ok(true);
             }
             _ => {
                 self.ready = true;
