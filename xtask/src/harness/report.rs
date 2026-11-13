@@ -645,10 +645,36 @@ impl PrefixFeature {
     }
 }
 
-fn save_json(path: &Path, value: &Value) -> Result<(), String> {
+fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Publish a complete JSON document without replacing another result.
+pub(crate) fn publish_json(path: &Path, text: &str) -> Result<(), String> {
+    publish(path, |writer| writer.write_all(text.as_bytes()))
+}
+
+fn publish(
+    destination: &Path,
+    write: impl FnOnce(&mut BufWriter<fs::File>) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let temporary = destination.with_extension("json.tmp");
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .map_err(|error| format!("{}: {error}", temporary.display()))?;
+    let result = (|| -> std::io::Result<()> {
+        let mut writer = BufWriter::new(file);
+        write(&mut writer)?;
+        writer.flush()?;
+        drop(writer);
+        fs::hard_link(&temporary, destination)
+    })();
+    let _ = fs::remove_file(&temporary);
+    result.map_err(|error| format!("{}: {error}", destination.display()))
 }
 
 fn store_measurement(
@@ -714,15 +740,7 @@ fn stream_report(
     if canonical {
         fields.sort_unstable_by_key(|(key, _)| *key);
     }
-    let temporary = output.join("report.json.tmp");
-    let destination = output.join("report.json");
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temporary)
-        .map_err(|error| format!("{}: {error}", temporary.display()))?;
-    let result = (|| -> std::io::Result<()> {
-        let mut writer = BufWriter::new(file);
+    publish(&output.join("report.json"), |writer| {
         let mut rows = rows;
         write!(writer, "{{")?;
         for (index, (key, value)) in fields.into_iter().enumerate() {
@@ -740,13 +758,8 @@ fn stream_report(
                 write!(writer, "{}", serialize(value))?;
             }
         }
-        writeln!(writer, "}}")?;
-        writer.flush()?;
-        drop(writer);
-        fs::hard_link(&temporary, &destination)
-    })();
-    let _ = fs::remove_file(&temporary);
-    result.map_err(|error| format!("{}: {error}", destination.display()))
+        writeln!(writer, "}}")
+    })
 }
 
 fn object(pairs: Vec<(&str, Value)>) -> Value {
@@ -1133,7 +1146,7 @@ pub(crate) fn collect(
                 ]),
             ),
         ]);
-        save_json(&options.output.join("partial.json"), &object(partial))?;
+        save_checkpoint(&options.output.join("partial.json"), &object(partial))?;
     }
     let mut unavailable = None;
     let load_case = |row: &Value| {
@@ -1203,7 +1216,10 @@ pub(crate) fn collect(
         publish_measurements(&options.output, object(report), &rows, load_case)?;
     } else {
         report.push(("cases", Value::Array(rows.clone())));
-        save_json(&options.output.join("report.json"), &object(report))?;
+        publish_json(
+            &options.output.join("report.json"),
+            &(json::to_python(&object(report), Some(2)) + "\n"),
+        )?;
     }
     let reasons = |key: &str| {
         verdict
@@ -1251,7 +1267,10 @@ fn publish_measurements(
 ) -> Result<(), String> {
     validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
     validation::put(&mut header, "cases", Value::Array(rows.to_vec()))?;
-    save_json(&output.join("collection.json"), &header)?;
+    publish_json(
+        &output.join("collection.json"),
+        &(json::to_python(&header, Some(2)) + "\n"),
+    )?;
     validation::put(&mut header, "case_storage", Value::str("inline"))?;
     write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
@@ -1762,7 +1781,7 @@ mod tests {
             ("cases", Value::Array(vec![row.clone()])),
         ]);
         let path = output.0.join("partial.json");
-        save_json(&path, &checkpoint).unwrap();
+        save_checkpoint(&path, &checkpoint).unwrap();
         let text = fs::read_to_string(path).unwrap();
         assert!(!text.contains("samples"));
         assert!(!output.0.join("report.json").exists());
@@ -1890,6 +1909,16 @@ mod tests {
             .is_err()
         );
         assert_eq!(fs::read(&destination).unwrap(), b"existing report\n");
+        assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn complete_json_keeps_existing_destination() {
+        let output = Output::new();
+        let destination = output.0.join("report.json");
+        fs::write(&destination, b"existing grade\n").unwrap();
+        assert!(publish_json(&destination, "{}\n").is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"existing grade\n");
         assert!(!output.0.join("report.json.tmp").exists());
     }
 

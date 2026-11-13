@@ -447,8 +447,8 @@ SHA-256 in `partial.json`. After validating the complete collection it publishes
 the compact `collection.json`, then streams the self-contained `report.json`.
 Pass `collection.json` and keep its `measurements/` directory alongside it to grade
 large collections with one case's samples in memory at a time. Use a new `--output`
-directory for each invocation of `report` or `progressive` so earlier measurements
-and traces remain available.
+directory for each invocation of `report`, `progressive` or `grade` so earlier
+measurements, traces and grades remain available.
 
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.
