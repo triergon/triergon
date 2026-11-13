@@ -1,6 +1,6 @@
 # Timing and memory workloads
 
-The 17 workloads in `WORKLOADS.json` (input hashes, operation and iterations) are
+The 20 workloads in `WORKLOADS.json` (input hashes, operation and iterations) are
 generated with FFmpeg 9.0.2 (x264, x265 and native AAC encoders) from deterministic
 lavfi sources:
 
@@ -14,7 +14,14 @@ lavfi sources:
 AAC-LC 5.1 (384 kbit/s) and stereo come from sine sources (`-f adts`). The two DTS
 workloads are the cores of FATE `dts_es.dts` and `master_audio_7.1_24bit.dts`
 (`-bsf:a dca_core`); the AC-3 and E-AC-3 workloads are FATE vectors used as they are.
-Media stays outside git (`.research/codec-inputs`, `.research/fate-samples`).
+The three HE-AAC workloads are the AAC lane's ADTS copies of FATE conformance vectors,
+the same streams `correctness-manifest.json` hashes: `aac-he-stereo` and `aac-he-5.1` are
+HE-AAC v1 (SBR, `al_sbr_cm_48_2` and `al_sbr_cm_48_5.1`) and `aac-hev2-stereo` is
+HE-AAC v2 (SBR and Parametric Stereo, `al_sbr_ps_06_new`), each copied out of its MP4
+with `-map 0:a:0 -c:a copy -f adts`.
+Media stays outside git (`.research/codec-inputs`, `.research/fate-samples`). The inputs
+under `.research/codec-inputs` are archived as they are under `evidence/codec-workload-inputs/`
+in the evidence archive; fetch them rather than encode them again.
 
 ## FLAC, MPEG audio, Vorbis and Opus
 

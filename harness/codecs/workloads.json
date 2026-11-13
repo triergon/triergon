@@ -1,6 +1,6 @@
 {
  "schema": "triergon.codecs.workloads.v1",
- "frozen_utc": "2026-11-03T01:30:00Z",
+ "frozen_utc": "2026-11-13T17:25:00Z",
  "frozen_before_grading": true,
  "root": "worktree root (paths relative)",
  "gates": [
@@ -81,6 +81,33 @@
    "operation": "audio-aac",
    "iterations": 8,
    "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "aac-he-stereo",
+   "path": ".research/codec-inputs/al_sbr_cm_48_2.adts",
+   "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+   "bytes": 198304,
+   "operation": "audio-aac",
+   "iterations": 4,
+   "origin": "FATE aac/al_sbr_cm_48_2 (rights unreviewed), HE-AAC v1 (SBR) stereo at 48 kHz, ADTS copied out with the decode profile's ffmpeg (-map 0:a:0 -c:a copy -f adts): the AAC lane's correctness vector of the same hash"
+  },
+  {
+   "id": "aac-he-5.1",
+   "path": ".research/codec-inputs/al_sbr_cm_48_5.1.adts",
+   "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8",
+   "bytes": 520018,
+   "operation": "audio-aac",
+   "iterations": 2,
+   "origin": "FATE aac/al_sbr_cm_48_5.1 (rights unreviewed), HE-AAC v1 (SBR) 5.1 at 48 kHz, ADTS copied out with the decode profile's ffmpeg (-map 0:a:0 -c:a copy -f adts): the AAC lane's correctness vector of the same hash"
+  },
+  {
+   "id": "aac-hev2-stereo",
+   "path": ".research/codec-inputs/al_sbr_ps_06_new.adts",
+   "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87",
+   "bytes": 55767,
+   "operation": "audio-aac",
+   "iterations": 8,
+   "origin": "FATE aac/al_sbr_ps_06_new (rights unreviewed), HE-AAC v2 (SBR and Parametric Stereo), ADTS copied out with the decode profile's ffmpeg (-map 0:a:0 -c:a copy -f adts): the AAC lane's correctness vector of the same hash"
   },
   {
    "id": "dts-core-es-6.1",

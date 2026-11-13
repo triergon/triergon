@@ -75,9 +75,9 @@ impl ChannelState {
     }
 }
 
-/// SBR state for an element at core sampling-frequency index `sf_index`.
-fn new_sbr(budget: &Budget, sf_index: usize) -> Result<Charged<Box<sbr::Sbr>>> {
-    let s = sbr::Sbr::new(SAMPLE_RATES[sf_index], budget)?;
+/// SBR state for an element of `kind` at core sampling-frequency index `sf_index`.
+fn new_sbr(budget: &Budget, sf_index: usize, kind: u8) -> Result<Charged<Box<sbr::Sbr>>> {
+    let s = sbr::Sbr::new(SAMPLE_RATES[sf_index], kind == ID_CPE, budget)?;
     Ok(Charged::boxed(budget, s)?)
 }
 
@@ -391,7 +391,7 @@ impl Core {
             }
             let mut e = ElementState::new(&self.budget, aot, s.kind, s.tag)?;
             if sbr {
-                e.sbr = Some(new_sbr(&self.budget, self.sf_index)?);
+                e.sbr = Some(new_sbr(&self.budget, self.sf_index, s.kind)?);
             }
             elements.push(Charged::boxed(&self.budget, e)?);
         }
@@ -831,7 +831,7 @@ impl Core {
             let mut sbr = Vec::with_capacity(self.elements.len());
             for e in &self.elements {
                 sbr.push(match e.sbr {
-                    None => Some(new_sbr(&self.budget, self.sf_index)?),
+                    None => Some(new_sbr(&self.budget, self.sf_index, e.kind)?),
                     Some(_) => None,
                 });
             }
@@ -1433,7 +1433,7 @@ pub(crate) mod tests {
             for kind in [ID_SCE, ID_CPE] {
                 let fresh = || {
                     let mut e = ElementState::new(&budget, aot, kind, 3).unwrap();
-                    e.sbr = Some(new_sbr(&budget, 4).unwrap());
+                    e.sbr = Some(new_sbr(&budget, 4, kind).unwrap());
                     e
                 };
                 let mut e = fresh();
@@ -1452,16 +1452,24 @@ pub(crate) mod tests {
     fn the_default_limit_holds_a_switch_between_the_largest_layouts() {
         // An element is a kind and a 4-bit tag, so a PCE can list 45 CPEs but has at most
         // 16 distinct ones, and two layouts together hold at most 48 elements (16 SCEs, 16
-        // CPEs, 16 LFEs): a switch reuses what both have. Each element here carries SBR and
-        // PS in the profile with the largest channel state.
-        let element = [AOT_MAIN, AOT_LTP].map(|aot| {
-            charge_of(|b| {
-                let mut e = Charged::boxed(b, ElementState::new(b, aot, ID_CPE, 0)?)?;
-                e.sbr = Some(Charged::boxed(b, sbr::Sbr::new(48_000, b)?)?);
-                Ok(e)
+        // CPEs, 16 LFEs): a switch reuses what both have. Each element here is the largest
+        // one: it carries SBR (with PS's synthesis where it applies) in the kind and profile
+        // with the largest state.
+        let element = [AOT_MAIN, AOT_LTP]
+            .into_iter()
+            .flat_map(|aot| [ID_SCE, ID_CPE].map(|kind| (aot, kind)))
+            .map(|(aot, kind)| {
+                charge_of(|b| {
+                    let mut e = Charged::boxed(b, ElementState::new(b, aot, kind, 0)?)?;
+                    e.sbr = Some(Charged::boxed(
+                        b,
+                        sbr::Sbr::new(48_000, kind == ID_CPE, b)?,
+                    )?);
+                    Ok(e)
+                })
             })
-        });
-        let element = element[0].max(element[1]);
+            .max()
+            .unwrap();
         let cce = charge_of(|b| Ok(Charged::boxed(b, CceState::new(b, 0)?)?));
         // Four raw data blocks of 2048 samples (SBR) in each plane.
         let output = charge_of(|b| {
