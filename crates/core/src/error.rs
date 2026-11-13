@@ -159,68 +159,74 @@ mod tests {
         Closed,
     }
 
+    /// The derived twin of `error`. The match is exhaustive, so a variant added
+    /// to [`Error`] fails to compile here until its twin is added.
+    fn twin(error: Error) -> Derived {
+        match error {
+            Error::Invalid(reason) => Derived::Invalid(reason),
+            Error::Limit { requested, maximum } => Derived::Limit { requested, maximum },
+            Error::Policy(limit) => Derived::Policy(limit),
+            Error::Backpressure {
+                requested,
+                available,
+            } => Derived::Backpressure {
+                requested,
+                available,
+            },
+            Error::Allocation => Derived::Allocation,
+            Error::Overflow => Derived::Overflow,
+            Error::Truncated => Derived::Truncated,
+            Error::Transport => Derived::Transport,
+            Error::Cancelled => Derived::Cancelled,
+            Error::StaleGeneration { expected, received } => {
+                Derived::StaleGeneration { expected, received }
+            }
+            Error::StaleRequest { expected, received } => {
+                Derived::StaleRequest { expected, received }
+            }
+            Error::ForeignPool => Derived::ForeignPool,
+            Error::SourceMismatch => Derived::SourceMismatch,
+            Error::Unsupported(feature) => Derived::Unsupported(feature),
+            Error::Io(kind) => Derived::Io(kind),
+            Error::Closed => Derived::Closed,
+        }
+    }
+
     #[test]
     fn debug_is_the_derived_format() {
-        let pairs = [
-            (Error::Invalid("a \"b\""), Derived::Invalid("a \"b\"")),
-            (
-                Error::Limit {
-                    requested: 1,
-                    maximum: 2,
-                },
-                Derived::Limit {
-                    requested: 1,
-                    maximum: 2,
-                },
-            ),
-            (Error::Policy("depth"), Derived::Policy("depth")),
-            (
-                Error::Backpressure {
-                    requested: 3,
-                    available: 4,
-                },
-                Derived::Backpressure {
-                    requested: 3,
-                    available: 4,
-                },
-            ),
-            (Error::Allocation, Derived::Allocation),
-            (Error::Overflow, Derived::Overflow),
-            (Error::Truncated, Derived::Truncated),
-            (Error::Transport, Derived::Transport),
-            (Error::Cancelled, Derived::Cancelled),
-            (
-                Error::StaleGeneration {
-                    expected: 5,
-                    received: 6,
-                },
-                Derived::StaleGeneration {
-                    expected: 5,
-                    received: 6,
-                },
-            ),
-            (
-                Error::StaleRequest {
-                    expected: 7,
-                    received: u64::MAX,
-                },
-                Derived::StaleRequest {
-                    expected: 7,
-                    received: u64::MAX,
-                },
-            ),
-            (Error::ForeignPool, Derived::ForeignPool),
-            (Error::SourceMismatch, Derived::SourceMismatch),
-            (Error::Unsupported("x"), Derived::Unsupported("x")),
-            (
-                Error::Io(ErrorKind::UnexpectedEof),
-                Derived::Io(ErrorKind::UnexpectedEof),
-            ),
-            (Error::Closed, Derived::Closed),
+        let errors = [
+            Error::Invalid("a \"b\""),
+            Error::Limit {
+                requested: 1,
+                maximum: 2,
+            },
+            Error::Policy("depth"),
+            Error::Backpressure {
+                requested: 3,
+                available: 4,
+            },
+            Error::Allocation,
+            Error::Overflow,
+            Error::Truncated,
+            Error::Transport,
+            Error::Cancelled,
+            Error::StaleGeneration {
+                expected: 5,
+                received: 6,
+            },
+            Error::StaleRequest {
+                expected: 7,
+                received: u64::MAX,
+            },
+            Error::ForeignPool,
+            Error::SourceMismatch,
+            Error::Unsupported("x"),
+            Error::Io(ErrorKind::UnexpectedEof),
+            Error::Closed,
         ];
-        for (error, derived) in pairs {
-            assert_eq!(format!("{error:?}"), format!("{derived:?}"));
-            assert_eq!(format!("{error:#?}"), format!("{derived:#?}"));
+        for error in errors {
+            assert_eq!(format!("{error:?}"), format!("{:?}", twin(error)));
+            assert_eq!(format!("{error:#?}"), format!("{:#?}", twin(error)));
         }
     }
 }
