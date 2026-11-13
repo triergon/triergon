@@ -1058,4 +1058,52 @@ mod tests {
         assert_eq!(kept[2], [0; 4]);
         assert_eq!(kept[2], recomputed[2]);
     }
+
+    /// Under `compute_clut` −2 a fill without a drawing keeps the region's
+    /// palette, as every mode does, and so does a drawing after it; a mode
+    /// change starts a new epoch whose region computes its palette afresh.
+    #[test]
+    fn a_kept_automatic_palette_lasts_through_a_fill_until_a_mode_change() {
+        // Region 0 filled with pixel code 0 and no object placed.
+        let fill = {
+            let mut body = vec![0, 1 << 4 | 1 << 3];
+            body.extend(4u16.to_be_bytes());
+            body.extend(2u16.to_be_bytes());
+            body.extend([1 << 5 | 1 << 2, 9, 0, 0]);
+            segment(0x11, &body)
+        };
+        // Page version 3 at a mode change.
+        let mode_change = segment(0x10, &[5, 3 << 4 | 2 << 2, 0, 0, 0, 10, 0, 10]);
+        let packets = [
+            [
+                page(0, true, &[0]),
+                region(0, 0, 4, 2, 9, 1),
+                pixels(0x6f),
+                end(),
+            ]
+            .concat(),
+            [page(1, false, &[0]), fill, end()].concat(),
+            [
+                page(2, false, &[0]),
+                region(0, 2, 4, 2, 9, 1),
+                pixels(0xaa),
+                end(),
+            ]
+            .concat(),
+            [mode_change, region(0, 0, 4, 2, 9, 1), pixels(0xaa), end()].concat(),
+        ];
+        let options = |automatic_palette| Options {
+            automatic_palette,
+            ..Options::default()
+        };
+        let kept = palettes(options(AutomaticPalette::WithoutClutOnce), &packets);
+        let recomputed = palettes(options(AutomaticPalette::WithoutClut), &packets);
+        assert_ne!(kept[0][2], 0);
+        assert_eq!(kept[1], kept[0]);
+        assert_eq!(recomputed[1], kept[0]);
+        assert_eq!(kept[2], kept[0]);
+        assert_eq!(recomputed[2][2], 0);
+        assert_eq!(kept[3], [0; 4]);
+        assert_eq!(kept[3], recomputed[3]);
+    }
 }
