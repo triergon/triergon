@@ -4,10 +4,11 @@
 //! The plan follows the packet's segments over what the decoder holds, with
 //! the regions they change listed apart: region and CLUT slots, each
 //! region's pixels and object placements, the page's region list, the output
-//! slots and the automatic palette's census. A vector that grows holds its old and new allocation while it
-//! copies, and a new epoch frees the regions of the old one. Where a segment's
-//! effect depends on more than its own fields (an object's regions, which
-//! regions are drawn), the plan takes the most it could allocate.
+//! slots and the automatic palette's census. A vector that grows holds its
+//! old and new allocation while it copies, and a new epoch frees the regions
+//! of the old one. Where a segment's effect depends on more than its own
+//! fields (an object's regions, which regions are drawn), the plan takes the
+//! most it could allocate.
 
 use super::epoch::{
     CLUT_BYTES, Epoch, Holdings, MAX_REGION_PIXELS, OBJECT_SET_BYTES, PLACEMENT_BYTES,

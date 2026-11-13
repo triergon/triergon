@@ -7,6 +7,7 @@
 //! edge inwards ([`automatic`]).
 use crate::dvb::Depth;
 use triergon_core::{Budget, BudgetVec, Result};
+use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 
 /// A CLUT's tables for 2-, 4- and 8-bit regions, as ARGB words
 /// (`0xAARRGGBB`).
@@ -21,8 +22,9 @@ impl Tables {
     /// Store `word` at entry `id` of one table: the first, in the order 2-,
     /// 4-, 8-bit, whose flag is set in `depths` (bit 2: 2-bit, bit 1: 4-bit,
     /// bit 0: 8-bit) and that has entry `id`. EN 300 743 applies an entry to
-    /// every flagged CLUT; the reference stores it once, so flags 3 with id 1
-    /// change only the 4-bit table, and with id 20 only the 8-bit one.
+    /// every CLUT it flags; the reference applies it to one table only: flags
+    /// 3 with id 1 change only the 4-bit table, and with id 20 only the 8-bit
+    /// one.
     pub(super) fn set(&mut self, id: u8, depths: u8, word: u32) {
         let id = usize::from(id);
         if depths & 4 != 0 && id < 4 {
@@ -120,23 +122,15 @@ const fn default_eight() -> [u32; 256] {
     table
 }
 
-/// One CLUT entry (8-bit Y, Cr, Cb, T) as the reference presents it. Colour
-/// follows ITU-R BT.601 in 1/1024 steps: with `l = 1192 × (Y − 16)`, red is
-/// `l + 1634 × (Cr − 128)`, green `l − 832 × (Cr − 128) − 401 × (Cb − 128)`
-/// and blue `l + 2066 × (Cb − 128)`, each plus 512, shifted right by 10 and
-/// clamped to 0–255. Alpha is `255 − T`, and 0 for Y = 0, which EN 300 743
-/// makes fully transparent; the colour of such an entry still follows Y = 0.
+/// One CLUT entry (8-bit Y, Cr, Cb, T) as the reference presents it: the
+/// colour by ITU-R BT.601 in 1/1024 steps rounded to nearest, as other
+/// subtitle palettes ([`YcbcrMatrix`]), and alpha `255 − T`, or 0 for Y = 0,
+/// which EN 300 743 makes fully transparent. The colour of such an entry
+/// still follows Y = 0.
 pub(super) fn ycrcbt(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
-    let luma = 1192 * (i32::from(y) - 16);
-    let (cr, cb) = (i32::from(cr) - 128, i32::from(cb) - 128);
-    let channel = |value: i32| ((value + 512) >> 10).clamp(0, 255) as u32;
-    let alpha = if y == 0 { 0 } else { 255 - u32::from(t) };
-    argb(
-        alpha,
-        channel(luma + 1634 * cr),
-        channel(luma - 832 * cr - 401 * cb),
-        channel(luma + 2066 * cb),
-    )
+    // As a product rather than a branch, the conversion stays one path.
+    let alpha = (255 - t) * u8::from(y != 0);
+    YcbcrMatrix::BT601.argb(y, cr, cb, alpha, ChannelRounding::Nearest)
 }
 
 /// Values a pixel can hold.
