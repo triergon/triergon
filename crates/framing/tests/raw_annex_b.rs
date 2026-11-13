@@ -271,6 +271,51 @@ fn hevc_retains_prefix_suffix_other_layer_and_padding_at_literal_boundaries() {
 }
 
 #[test]
+fn hevc_nal_types_after_a_picture_split_access_units_as_the_raw_demuxer_does() {
+    // Every type 0 to 63 between an IRAP picture and the next picture's first
+    // slice, in the base layer and in layer 1. FFmpeg's hevc demuxer starts
+    // the next access unit with these base-layer types only: H.265 §7.4.2.4.4's
+    // and the end of sequence and of bitstream (36, 37).
+    let starts = |kind: u8| matches!(kind, 32..=37 | 39 | 41..=44 | 48..=55);
+    for layer in [0, 1] {
+        for kind in 0..64 {
+            let mut input = Vec::new();
+            hevc_nal(&mut input, 2, 32, 0, 0x55);
+            hevc_nal(&mut input, 2, 19, 0, 0x80);
+            let inserted = input.len();
+            // A slice of this type would continue the picture (first slice flag 0).
+            hevc_nal(&mut input, 2, kind, layer, 0x01);
+            let after = input.len();
+            hevc_nal(&mut input, 2, 1, 0, 0x80);
+            let second = if layer == 0 && starts(kind) {
+                inserted
+            } else {
+                after
+            };
+            let pool = Budget::new(1 << 20).unwrap();
+            let source = Bytes::copy_from_slice(&pool, &input).unwrap();
+            let mut drive = Drive::new(
+                &pool,
+                Codec::Hevc,
+                &source,
+                7,
+                false,
+                RawAnnexBLimits::default(),
+            );
+            for range in [0..second, second..input.len()] {
+                let unit = drive.next(64).unwrap().unwrap();
+                assert_eq!(
+                    unit.range,
+                    range.start as u64..range.end as u64,
+                    "type {kind} in layer {layer}"
+                );
+            }
+            assert!(drive.next(64).unwrap().is_none());
+        }
+    }
+}
+
+#[test]
 fn starvation_transport_and_limits_never_publish_a_partial_access_unit() {
     let (input, _) = authored_hevc();
     let pool = Budget::new(1 << 20).unwrap();
