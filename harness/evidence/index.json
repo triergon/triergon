@@ -19921,6 +19921,46 @@
     "candidate": "700c2134a123d8c9566c1cdccdeb3a0b3b0399c0",
     "baseline": "5c4fe25232e54ea1280b258c7f99a04fa3f4bf93"
    }
+  },
+  {
+   "name": "matroska-legacy-aac",
+   "path": "matroska-legacy-aac",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC-LC measurements in docs/status.md.",
+   "key": "evidence/matroska-legacy-aac/df02366d06af85e3ca8438bb0d43533af81d0831861591f1e5982e32735e5896.tar.gz",
+   "sha256": "df02366d06af85e3ca8438bb0d43533af81d0831861591f1e5982e32735e5896",
+   "bytes": 30110990,
+   "source_revision": "0a75c52c22f7a71017c2b60ef9dd9c6f2c8383e8"
+  },
+  {
+   "name": "matroska-legacy-aac-initial",
+   "path": "matroska-legacy-aac-initial",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC-LC measurements in docs/status.md.",
+   "key": "evidence/matroska-legacy-aac-initial/ba57ce40639a9213f1f9a4e971e235018822522734ea6c3327b04ba72e643197.tar.gz",
+   "sha256": "ba57ce40639a9213f1f9a4e971e235018822522734ea6c3327b04ba72e643197",
+   "bytes": 26540027,
+   "source_revision": "8ab2594976cd4925230f84dfb55c331925d7414a"
+  },
+  {
+   "name": "matroska-legacy-aac-current",
+   "path": "matroska-legacy-aac-current",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC parity, runtime, heap, and resident peak comparisons",
+   "key": "evidence/matroska-legacy-aac-current/176e926c723851e4a2c41bf2ddee547d4485a93e5ae28a8fd1480ed41143258b.tar.gz",
+   "sha256": "176e926c723851e4a2c41bf2ddee547d4485a93e5ae28a8fd1480ed41143258b",
+   "bytes": 99000725,
+   "source_revision": "d100a1225d9fadcef101d89acffec307694e9ce9"
+  },
+  {
+   "name": "matroska-legacy-aac-main-baseline",
+   "path": "matroska-legacy-aac-main-baseline",
+   "retention": "retained",
+   "reason": "Matroska legacy AAC-LC packet parity, paired runtime, peak heap and total resident peak on current reader sources",
+   "key": "evidence/matroska-legacy-aac-main-baseline/927caece428d577611be77b2da58cc5e57fff6025e903e2a814b679fec825547.tar.gz",
+   "sha256": "927caece428d577611be77b2da58cc5e57fff6025e903e2a814b679fec825547",
+   "bytes": 44395856,
+   "source_revision": "46efc86fdc121a0f5bfcc9129f00599c24e291dc"
   }
  ]
 }

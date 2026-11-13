@@ -910,6 +910,7 @@ fn prepare_check() -> Task {
     for step in [
         &["prepare-ffmpeg"][..],
         &["prepare-ffmpeg", "--profile", "formats"],
+        &["prepare-ffmpeg", "--profile", "video"],
         &["fixtures"],
         &["fetch-vectors"],
         &["fonts", "prepare"],

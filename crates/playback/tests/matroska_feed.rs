@@ -146,7 +146,10 @@ fn collect(player: &mut Player<ByteSource>) -> Vec<Output> {
     collect_with_work(player, 17)
 }
 
-fn collect_with_work(player: &mut Player<ByteSource>, work_units: u64) -> Vec<Output> {
+fn collect_with_work<S: triergon_playback::Source>(
+    player: &mut Player<S>,
+    work_units: u64,
+) -> Vec<Output> {
     let cancel = AtomicBool::new(false);
     let mut events = Vec::new();
     for _ in 0..100_000 {
@@ -162,6 +165,145 @@ fn collect_with_work(player: &mut Player<ByteSource>, work_units: u64) -> Vec<Ou
         }
     }
     panic!("read stalled")
+}
+
+#[test]
+fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
+    use triergon_core::container::{CodecId, TrackInfo};
+    use triergon_playback::matroska_feed::{
+        MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
+    };
+
+    for (input, codec) in [
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg2-lc.mkv").as_slice(),
+            b"A_AAC/MPEG2/LC",
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc.mkv").as_slice(),
+            b"A_AAC/MPEG4/LC",
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv").as_slice(),
+            b"A_AAC/MPEG2/LC",
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv").as_slice(),
+            b"A_AAC/MPEG4/LC",
+        ),
+    ] {
+        let (engine, source, pool) = matroska_source(
+            input,
+            7,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        );
+        let cancel = AtomicBool::new(false);
+        let mut discovery = MatroskaDiscovery::new(
+            engine,
+            source,
+            Selection::All,
+            PlayerPolicy::default(),
+            MatroskaDiscoveryLimits::default(),
+        )
+        .unwrap();
+        let cutoff = (0..10_000)
+            .find_map(
+                |_| match discovery.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+                    MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
+                    MatroskaDiscoveryStep::Progress(_) => None,
+                },
+            )
+            .expect("legacy AAC discovery stalled");
+        assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
+        let mut discovered = discovery.finish().unwrap();
+        let tail = collect_with_work(&mut discovered.player, 1);
+        let mut feed = None;
+        let mut gold = include_bytes!("fixtures/mkv-feed/aac-lc.feed").as_slice();
+        let mut count = 0;
+        for output in discovered.prefix.as_slice().iter().chain(&tail) {
+            match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => {
+                    let track = &configuration.tracks()[0];
+                    assert_eq!(track.codec(), CodecId::Aac);
+                    assert_eq!(track.codec_tag(), codec);
+                    assert!(!track.has_codec_private());
+                    assert!(track.configuration().is_empty());
+                    assert_eq!(
+                        triergon_playback::compat::matroska::legacy_aac_lc_initialization(
+                            configuration,
+                            0
+                        )
+                        .unwrap(),
+                        Some([0x11, 0x90])
+                    );
+                    feed = Some(setup(&pool, configuration, 0));
+                }
+                RawEvent::Matroska(Event::Packet(packet)) => {
+                    let output = frame(feed.as_ref().unwrap(), output);
+                    let MatroskaFeedPayload::Aac { header, raw } = output.payload else {
+                        panic!("legacy AAC did not produce ADTS");
+                    };
+                    assert!(std::ptr::eq(raw, packet.packet.data.as_ref()));
+                    let (want, rest) = gold.split_at(header.len() + raw.len());
+                    assert_eq!(&want[..header.len()], header.as_slice());
+                    assert_eq!(&want[header.len()..], raw);
+                    gold = rest;
+                    count += 1;
+                }
+                _ => (),
+            }
+        }
+        assert_eq!(count, 8);
+        assert!(gold.is_empty());
+    }
+}
+
+#[test]
+fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
+    use triergon_playback::compat::matroska::legacy_aac_lc_initialization;
+
+    for (input, private_present) in [
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv").as_slice(),
+            true,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv").as_slice(),
+            false,
+        ),
+    ] {
+        let (mut player, pool) = player_with_input(input, 7);
+        let events = collect(&mut player);
+        let configuration = events
+            .iter()
+            .find_map(|output| match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            configuration.tracks()[0].has_codec_private(),
+            private_present
+        );
+        if private_present {
+            assert_eq!(
+                legacy_aac_lc_initialization(configuration, 0).unwrap(),
+                None
+            );
+        } else {
+            assert!(matches!(
+                legacy_aac_lc_initialization(configuration, 0),
+                Err(Error::Unsupported("legacy Matroska AAC channel layout"))
+            ));
+        }
+        if let Ok(mut setup) = MatroskaFeedSetup::new(&pool, ID, configuration, 0, LIMITS) {
+            assert!(
+                setup
+                    .step(&mut WorkBudget::new(1024), &AtomicBool::new(false))
+                    .is_err()
+            );
+        }
+    }
 }
 
 #[test]

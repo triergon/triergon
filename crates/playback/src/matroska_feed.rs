@@ -8,6 +8,7 @@ mod hevc_dolby;
 mod probe_clock;
 mod video_clock;
 mod video_seek;
+use crate::compat::matroska::legacy_aac_lc_parameters;
 use crate::{Delivery, Output, RawEvent, Result};
 pub use bitmap::{
     MatroskaBitmapCodec, MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
@@ -34,7 +35,10 @@ use triergon_framing::{
     AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigParser,
     AvcConfigSource, BuildStep,
 };
-use triergon_matroska::typed::{Configuration, Event, Packet};
+use triergon_matroska::{
+    matroska::LegacyAacProfile,
+    typed::{Configuration, Event, Packet},
+};
 pub use video_clock::MatroskaAvcClock;
 pub use video_seek::MatroskaVideoSeekGate;
 
@@ -92,12 +96,19 @@ impl Association {
 
 enum Parser {
     Avc(AvcConfigParser),
-    Aac(AacAscParser),
+    DerivedAac(AacAdtsParameters),
+    Aac {
+        parser: AacAscParser,
+        infer_duration: bool,
+    },
 }
 
 enum FeedCodec {
     Avc(AvcAnnexBConfig),
-    Aac(AacAdtsParameters),
+    Aac {
+        params: AacAdtsParameters,
+        infer_duration: bool,
+    },
 }
 
 /// Prepare a feed from the selected track's effective initialization. A later
@@ -125,49 +136,64 @@ impl MatroskaFeedSetup {
             .get(track)
             .ok_or(Error::Invalid("Matroska feed track index"))?;
         let codec = descriptor.codec.as_str();
-        let maximum_record_bytes = match (descriptor.kind, codec) {
-            (1, "V_MPEG4/ISO/AVC") => limits.avc_config.maximum_record_bytes,
-            (2, "A_AAC") => limits.aac_config.maximum_record_bytes,
+        let (maximum_record_bytes, legacy_aac) = match (descriptor.kind, codec) {
+            (1, "V_MPEG4/ISO/AVC") => (limits.avc_config.maximum_record_bytes, false),
+            (2, "A_AAC") => (limits.aac_config.maximum_record_bytes, false),
+            (2, _) if descriptor.legacy_aac_profile() == Some(LegacyAacProfile::LowComplexity) => {
+                (limits.aac_config.maximum_record_bytes, true)
+            }
             _ => return Err(Error::Unsupported("Matroska feed codec")),
+        };
+        let derived = if legacy_aac {
+            legacy_aac_lc_parameters(configuration, track)?
+        } else {
+            None
         };
         let init = configuration
             .initialization(track)
             .ok_or(Error::Invalid("missing Matroska initialization"))?;
-        if init.data.len() > maximum_record_bytes {
-            return Err(Error::Limit {
-                requested: init.data.len(),
-                maximum: maximum_record_bytes,
-            });
-        }
-        let record = match configuration.initialization_bytes(track) {
-            Some(record) => record,
-            None => Bytes::copy_from_slice(pool, init.data)?,
-        };
-        let parser = if codec == "V_MPEG4/ISO/AVC" {
-            Parser::Avc(AvcConfigParser::new(
-                pool,
-                AvcConfigSource {
-                    source,
-                    generation: init.generation,
-                    offset: 0,
-                },
-                record,
-                limits.avc_config,
-            )?)
-        } else {
+        let parser = if let Some(params) = derived {
+            check_limit(2, maximum_record_bytes)?;
             if limits.aac_output_bytes < 7 {
                 return Err(Error::Invalid("Matroska AAC output limit"));
             }
-            Parser::Aac(AacAscParser::new(
-                pool,
-                AacSource {
-                    source,
-                    generation: init.generation,
-                    offset: 0,
-                },
-                record,
-                limits.aac_config,
-            )?)
+            Parser::DerivedAac(params)
+        } else {
+            check_limit(init.data.len(), maximum_record_bytes)?;
+            let record = match configuration.initialization_bytes(track) {
+                Some(record) => record,
+                None => Bytes::copy_from_slice(pool, init.data)?,
+            };
+            if codec == "V_MPEG4/ISO/AVC" {
+                Parser::Avc(AvcConfigParser::new(
+                    pool,
+                    AvcConfigSource {
+                        source,
+                        generation: init.generation,
+                        offset: 0,
+                    },
+                    record,
+                    limits.avc_config,
+                )?)
+            } else {
+                if limits.aac_output_bytes < 7 {
+                    return Err(Error::Invalid("Matroska AAC output limit"));
+                }
+                Parser::Aac {
+                    parser: AacAscParser::new(
+                        pool,
+                        AacSource {
+                            source,
+                            generation: init.generation,
+                            offset: 0,
+                        },
+                        record,
+                        limits.aac_config,
+                    )?,
+                    // The reference leaves missing legacy durations unknown.
+                    infer_duration: !legacy_aac,
+                }
+            }
         };
         Ok(Self {
             pending: Some((
@@ -227,7 +253,22 @@ fn parse(
             BuildStep::Yield => BuildStep::Yield,
             BuildStep::Complete => BuildStep::Complete,
         }),
-        Parser::Aac(parser) => Ok(match parser.step(work, cancel)? {
+        Parser::DerivedAac(params) => {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(BuildStep::Yield);
+            }
+            Ok(BuildStep::Ready(FeedCodec::Aac {
+                params: *params,
+                infer_duration: false,
+            }))
+        }
+        Parser::Aac {
+            parser,
+            infer_duration,
+        } => Ok(match parser.step(work, cancel)? {
             BuildStep::Ready(config) => {
                 let params = AacAdtsParameters::from_asc(config.facts())?;
                 if params.channel_configuration == 0 {
@@ -235,7 +276,10 @@ fn parse(
                         "Matroska AAC feed with program configuration element",
                     ));
                 }
-                BuildStep::Ready(FeedCodec::Aac(params))
+                BuildStep::Ready(FeedCodec::Aac {
+                    params,
+                    infer_duration: *infer_duration,
+                })
             }
             BuildStep::Yield => BuildStep::Yield,
             BuildStep::Complete => BuildStep::Complete,
@@ -265,7 +309,7 @@ impl MatroskaTrackFeed {
             FeedCodec::Avc(config) => {
                 PacketJob::Avc(AvcAnnexBJob::new(config, payload, self.limits.avc_packet)?)
             }
-            FeedCodec::Aac(params) => {
+            FeedCodec::Aac { params, .. } => {
                 if payload.is_empty() {
                     return Err(Error::Invalid("empty AAC access unit"));
                 }

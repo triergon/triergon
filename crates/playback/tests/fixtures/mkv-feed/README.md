@@ -45,6 +45,30 @@ AAC-LC tracks and one each of AC-3 and E-AC-3. The damaged control uses
 the same Dolby tracks and replaces the first AC-3 packet's initial sync
 byte with zero. Its declared sample rate and channel count remain intact.
 
+`aac-mpeg2-lc.mkv` and `aac-mpeg4-lc.mkv` wrap the same eight stereo
+AAC-LC packets at 48 kHz with their respective deprecated CodecID and no
+CodecPrivate. The packets were encoded from a synthetic 660 Hz sine. The
+MPEG-2 laced variant packs the first three packets into a Xiph lace. The
+MPEG-4 timed variant adds DefaultDuration of 21,333,333 ns. The ADTS
+reference `aac-lc.feed` is identical for all four files. Two MPEG-4
+controls write an empty CodecPrivate or declare seven channels with no
+channel layout.
+
+FFmpeg 9.0.2 supplies the AAC frames and the ADTS reference.
+
+```sh
+ffmpeg -f lavfi -i sine=frequency=660:sample_rate=48000 -c:a aac -ac 2 \
+  -frames:a 8 -f adts encoded.aac
+ffmpeg -i aac-mpeg4-lc.mkv -map 0:a:0 -c:a copy -f adts aac-lc.feed
+```
+
+To author the Matroska files, strip each seven-byte ADTS header from the
+first eight frames of `encoded.aac`. Write a Matroska v4 EBML header and a
+Segment with TimestampScale 1,000,000 ns and an audio TrackEntry numbered 1.
+Write SimpleBlocks at timestamps 0, 21, 43, 64, 85, 107, 128 and 149 in a
+Cluster with timestamp zero. The Xiph-laced file replaces the first three
+blocks with one laced block at zero.
+
 `avc-reordered-discovery.mkv` contains twelve 64×48 pictures at 24 fps
 from `testsrc2`, encoded with libx264 High profile and one B picture.
 `hevc-no-default-duration-discovery.mkv` encodes the same synthetic
