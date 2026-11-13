@@ -3,8 +3,10 @@
 //! `source=packets` reads an SCC file as FFmpeg's `scc` demuxer does.
 //! `source=video` (the default) takes the caption data of the Nth video stream
 //! without decoding it: MPEG-2 video from a raw elementary stream or MPEG-TS,
-//! H.264 and HEVC from MPEG-TS, Matroska or MP4, the containers read through
-//! [`container::read_file_video_track`]. Each output frame carrying
+//! H.264 and HEVC from MPEG-TS, Matroska or MP4. A raw stream and MPEG-TS are
+//! fed to the extractor as they are read ([`ts::for_each_packet`]); Matroska
+//! and MP4 tracks are read through [`container::read_file_video_track`]. Each
+//! output frame carrying
 //! caption data becomes one packet, in FFmpeg's output order and with its
 //! times, from a [`CaptionExtractor`] fed packet by packet.
 
@@ -109,15 +111,15 @@ fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
         }
     }
     if let Some(format) = PacketFormat::detect(&head) {
+        let start = |stream: &ts::Stream| {
+            Extraction::new(coding(stream.codec, &stream.configuration)?, (1, 90_000))
+        };
         let mut extraction = None;
         let stream =
             ts::for_each_packet(file, format, Selection::Video, ordinal, &mut |stream, p| {
                 let extraction = match &mut extraction {
                     Some(extraction) => extraction,
-                    None => extraction.insert(Extraction::new(
-                        coding(stream.codec, &stream.configuration)?,
-                        (1, 90_000),
-                    )?),
+                    None => extraction.insert(start(stream)?),
                 };
                 extraction.push(VideoPacket {
                     data: &p.data,
@@ -128,7 +130,7 @@ fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
             })?;
         return match extraction {
             Some(extraction) => extraction,
-            None => Extraction::new(coding(stream.codec, &stream.configuration)?, (1, 90_000))?,
+            None => start(&stream)?,
         }
         .finish();
     }

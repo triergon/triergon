@@ -30,9 +30,8 @@ use triergon_subtitles::compat::dvb::{PesParser, PesProgress};
 /// The largest window handed to the framer at once.
 const WINDOW: usize = 64 * 1024;
 
-/// The `ordinal`th stream (from 0) the selection counts in a transport stream
-/// of `format` packets, on a 90 kHz clock, with the codec the demuxer opens
-/// for it.
+/// The packets [`for_each_packet`] hands over, as a track, with the codec the
+/// demuxer opens for the stream.
 pub fn read(
     file: &Path,
     format: PacketFormat,
@@ -59,9 +58,10 @@ pub struct Stream {
     pub configuration: Vec<u8>,
 }
 
-/// Hands each packet of the stream [`read`] selects to `packet_sink` as it is cut,
-/// with the stream, and returns the stream. Only the packet being cut stays
-/// resident.
+/// Hands each packet of the `ordinal`th stream (from 0) the selection counts in
+/// a transport stream of `format` packets to `packet_sink` as it is cut, with
+/// the stream, on a 90 kHz clock, and returns the stream. Only the packet being
+/// cut stays resident.
 pub fn for_each_packet(
     file: &Path,
     format: PacketFormat,
