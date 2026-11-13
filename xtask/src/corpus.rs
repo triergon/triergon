@@ -566,10 +566,15 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             ));
         }
     }
+    cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
-        &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
+        &Value::object([
+            ("schema", Value::int(1)),
+            ("directory", Value::str(".research/mp4-range-fixtures")),
+            ("cases", Value::Array(cases)),
+        ]),
     )?;
     Ok(format!("MP4 range corpus: {count} playback comparisons"))
 }
@@ -608,7 +613,7 @@ fn mp4_range_case<'a>(
     file: &str,
     data: &[u8],
     arguments: impl IntoIterator<Item = &'a str>,
-    (packets, bytes, digest): (u32, u32, u64),
+    expected: (u32, u32, u64),
 ) -> Value {
     authored(
         id,
@@ -616,16 +621,55 @@ fn mp4_range_case<'a>(
         data,
         vec![
             ("arguments", Value::strings(arguments)),
-            (
-                "expected",
-                Value::object([
-                    ("packets", Value::int(packets)),
-                    ("bytes", Value::int(bytes)),
-                    ("digest", Value::int(digest)),
-                ]),
-            ),
+            ("expected", mp4_range_expected(expected)),
         ],
     )
+}
+
+fn mp4_range_expected((packets, bytes, digest): (u32, u32, u64)) -> Value {
+    Value::object([
+        ("packets", Value::int(packets)),
+        ("bytes", Value::int(bytes)),
+        ("digest", Value::int(digest)),
+    ])
+}
+
+fn mp4_range_fate_cases(root: &Path) -> Result<[Value; 2], String> {
+    const FILE: &str = "mov/mp4-init-nonkeyframe.mp4";
+    let registry = crate::checks::read_json(&root.join("harness/fate/samples.json"))?;
+    let path = format!("fate/{FILE}");
+    let sha256 = registry
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .find(|sample| sample.get("path").and_then(Value::as_str) == Some(&path))
+        .and_then(|sample| sample.get("sha256").and_then(Value::as_str))
+        .ok_or("missing FATE non-sync prefix input hash")?;
+    let case = |id, target, expected| {
+        Value::object([
+            ("id", Value::str(id)),
+            ("profile", Value::str(id)),
+            ("file", Value::str(FILE)),
+            ("sha256", Value::str(sha256)),
+            ("rights", Value::str("fetched-not-redistributed")),
+            ("source", Value::str(format!("fate-suite/{FILE}"))),
+            ("arguments", Value::strings(target)),
+            ("expected", mp4_range_expected(expected)),
+        ])
+    };
+    Ok([
+        case(
+            "fate-non-sync-prefix-open",
+            None,
+            (293, 1158487, 4548821196215711946),
+        ),
+        case(
+            "fate-non-sync-prefix-seek",
+            Some("91091"),
+            (72, 317984, 3463143097373344921),
+        ),
+    ])
 }
 
 fn mp4_range_entries(paths: &Paths, output: &Path) -> Result<Vec<Value>, String> {

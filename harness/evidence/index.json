@@ -19703,6 +19703,51 @@
    "sha256": "65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd",
    "bytes": 20846847117,
    "source_revision": "3df7ae6d504d67e054ffe9a54901620c134ba2c6"
+  },
+  {
+   "name": "mp4-range-fate-prefix-e35e3584-aarch64",
+   "path": "mp4-range-fate-prefix-e35e3584-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range startup and seek with an initial non-sync prefix",
+   "key": "evidence/mp4-range-fate-prefix-e35e3584-aarch64/35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063.tar.zst",
+   "sha256": "35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063",
+   "bytes": 50059794
+  },
+  {
+   "name": "subtitles-cc-pair-4d81cde0",
+   "path": "subtitles-cc-pair-4d81cde0",
+   "retention": "retained",
+   "reason": "Closed caption receiver's per-pair decode at 4d81cde0 against main at 339ec261: the probes of the reference's decoder behind the repetition and reporting rules; the instruction-count fix (block counts of its own builds by uprobes, every variant tried, crafted streams); on AArch64 the subtitle-cc report (201 of 205, the four hevc-eos-ts cases open), the crate tests and the subtitle-cc instruction counts of two runs with their perf stat -r 10 recounts; in the ARMv7 user space the subtitle-cc report and counts, the -r 10 recounts of the two cases above main and the runs that show their difference follows the length of the command line, not the code; host and package lists, and a bundle of the measured source.",
+   "key": "evidence/subtitles-cc-pair-4d81cde0/494e74b751c132019ad7fc5a2ee49e14e48feddd83f2a832a62bbca7b830e5c3.tar.gz",
+   "sha256": "494e74b751c132019ad7fc5a2ee49e14e48feddd83f2a832a62bbca7b830e5c3",
+   "bytes": 8843957,
+   "source_revisions": {
+    "candidate": "4d81cde0d99d050d4a3997a234e439148d97245c",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-cc-pair-8b32fa31-armv7",
+   "path": "subtitles-cc-pair-8b32fa31-armv7",
+   "retention": "retained",
+   "reason": "Closed caption receiver at 8b32fa31 against main at 339ec261 in the ARMv7 user space: the subtitle-cc report (201 of 205, the four hevc-eos-ts cases open), the subtitle-cc instruction counts through the chroot, the perf stat -r 5 recounts of the eight cases furthest above main with both workers at paths of equal length, the workers' SHA-256, the reference's decoder listing, and the scripts that ran them.",
+   "key": "evidence/subtitles-cc-pair-8b32fa31-armv7/216b2d535ac2a4b5846858790a50a94d1df5fad42430e9de2268862e766c1cee.tar.gz",
+   "sha256": "216b2d535ac2a4b5846858790a50a94d1df5fad42430e9de2268862e766c1cee",
+   "bytes": 2701028,
+   "source_revisions": {
+    "candidate": "8b32fa310bf21294e28bb9f5c189e34665ba6e8b",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "mpegts-selected-packet-tracks-linux-arm64",
+   "path": "mpegts-selected-packet-tracks-linux-arm64",
+   "retention": "retained",
+   "reason": "MPEG-TS access-unit measurements cited in docs/status.md.",
+   "key": "evidence/mpegts-selected-packet-tracks-linux-arm64/a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697.tar.gz",
+   "sha256": "a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697",
+   "bytes": 100014048,
+   "source_revision": "230d1314464d34a04f5f2614298e5b7009292f0c"
   }
  ]
 }
