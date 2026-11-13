@@ -293,15 +293,21 @@ fn observe(
                 ])
             });
         }
-        let data =
-            json::parse(&String::from_utf8_lossy(&raw.unwrap())).map_err(|e| e.to_string())?;
-        let last = String::from_utf8(stdout)
-            .map_err(|e| e.to_string())?
-            .lines()
-            .last()
-            .map(str::to_owned)
-            .ok_or("list index out of range")?;
-        let output = json::parse(&last).map_err(|e| e.to_string())?;
+        let raw = raw.unwrap();
+        let receipt = String::from_utf8_lossy(&raw);
+        let work = std::str::from_utf8(&stdout)
+            .ok()
+            .and_then(|text| text.lines().last())
+            .and_then(|line| json::parse_observations(line).ok());
+        let data = json::parse_observations(&receipt);
+        let (Ok(data), Some(output)) = (data, work) else {
+            return Ok(obj(vec![
+                ("status", Value::str("observer-invalid")),
+                ("receipt_raw", Value::str(receipt)),
+                ("stdout", Value::str(String::from_utf8_lossy(&stdout))),
+                ("stderr", Value::str(String::from_utf8_lossy(&stderr))),
+            ]));
+        };
         let sha = linux::file_sha(library)?;
         if !matches!(output, Value::Object(_)) {
             return Ok(obj(vec![

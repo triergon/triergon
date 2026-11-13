@@ -317,7 +317,7 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
     }
     let data = std::str::from_utf8(&finished.stdout)
         .ok()
-        .and_then(|text| json::parse(text).ok());
+        .and_then(|text| json::parse_observations(text).ok());
     match data {
         Some(data @ Value::Object(_)) => Value::object([
             ("status", Value::str("ok")),
@@ -327,7 +327,13 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
                 Value::int(started.elapsed().as_nanos() as i64),
             ),
         ]),
-        _ => Value::object([("status", Value::str("invalid-worker-output"))]),
+        _ => Value::object([
+            ("status", Value::str("invalid-worker-output")),
+            (
+                "stdout",
+                Value::str(String::from_utf8_lossy(&finished.stdout)),
+            ),
+        ]),
     }
 }
 
@@ -407,7 +413,9 @@ mod tests {
     fn classifies_outcomes() {
         let ok = execute(&sh("echo '{\"a\": 1.50}'"), DEFAULT_TIMEOUT);
         assert_eq!(status(&ok), "ok");
-        assert_eq!(data(&ok).get("a"), Some(&Value::float(1.5)));
+        let value = data(&ok).get("a").unwrap();
+        assert_eq!(value.as_f64(), Some(1.5));
+        assert_eq!(json::observations(value), "1.50");
         let failed = execute(&sh("echo bad >&2; exit 3"), DEFAULT_TIMEOUT);
         assert_eq!(failed.get("exit_code"), Some(&Value::int(3)));
         assert_eq!(failed.get("stderr").and_then(Value::as_str), Some("bad\n"));
@@ -424,6 +432,23 @@ mod tests {
         assert_eq!(
             slow.get("argv").and_then(Value::as_array).map(<[_]>::len),
             Some(3)
+        );
+    }
+
+    #[test]
+    fn duplicate_worker_fields_are_retained_as_failed_stdout() {
+        let output = execute(
+            &sh("echo '{\"elapsed_ns\": 1, \"elapsed_ns\": NaN}'"),
+            DEFAULT_TIMEOUT,
+        );
+        assert_eq!(status(&output), "invalid-worker-output");
+        assert_eq!(
+            output.get("stdout").and_then(Value::as_str),
+            Some("{\"elapsed_ns\": 1, \"elapsed_ns\": NaN}\n")
+        );
+        assert_eq!(
+            json::parse_observations(&json::observations(&output)),
+            Ok(output)
         );
     }
 }

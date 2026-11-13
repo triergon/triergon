@@ -1063,7 +1063,28 @@ fn check_features(root: &Path) -> Task {
             output.display()
         ));
     }
-    std::fs::remove_dir_all(&output).map_err(|error| format!("{}: {error}", output.display()))?;
+    let passed = contracts.iter().all(|contract| {
+        checks::read_json(&output.join(&contract.id).join("report.json"))
+            .ok()
+            .and_then(|report| {
+                report
+                    .get("cases")
+                    .and_then(json::Value::as_array)
+                    .map(|cases| {
+                        !cases.is_empty() && cases.iter().all(harness::acceptance::parity_passes)
+                    })
+            })
+            == Some(true)
+    });
+    if passed {
+        std::fs::remove_dir_all(&output)
+            .map_err(|error| format!("{}: {error}", output.display()))?;
+    } else {
+        println!(
+            "Feature reports with unresolved parity in {}",
+            output.display()
+        );
+    }
     for generator in generators::GENERATORS {
         smoke_campaigns(root, generator.smoke.iter().copied())?;
     }

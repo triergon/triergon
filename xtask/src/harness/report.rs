@@ -753,6 +753,11 @@ fn object(pairs: Vec<(&str, Value)>) -> Value {
     Value::Object(pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect())
 }
 
+fn reject_controls(proof: &mut Value, error: &str) -> Result<(), String> {
+    validation::put(proof, "passed", Value::Bool(false))?;
+    validation::put(proof, "error", Value::str(error))
+}
+
 /// Reserve a new directory before emitting any report, traces or observations.
 pub(crate) fn create_output(path: &Path) -> Result<(), String> {
     if let Some(parent) = path
@@ -1153,6 +1158,13 @@ pub(crate) fn collect(
     }
     let control_error = validate_controls(&header).err();
     let controls_valid = controls.is_none() || control_error.is_none();
+    if let Some(error) = &control_error
+        && let Some((_, proof)) = base
+            .iter_mut()
+            .find(|(key, _)| *key == "functional_controls")
+    {
+        reject_controls(proof, error)?;
+    }
     if let Some(error) = source_identity_error(root, &identity).or(control_error)
         && let Value::Object(fields) = &mut verdict
     {
@@ -1170,12 +1182,7 @@ pub(crate) fn collect(
         ("acceptance", verdict.clone()),
     ]);
     if measures {
-        let mut header = object(report);
-        validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
-        validation::put(&mut header, "cases", Value::Array(rows.clone()))?;
-        save_json(&options.output.join("collection.json"), &header)?;
-        validation::put(&mut header, "case_storage", Value::str("inline"))?;
-        write_observed_case_report(&options.output, &header, rows.iter().map(load_case))?;
+        publish_measurements(&options.output, object(report), &rows, load_case)?;
     } else {
         report.push(("cases", Value::Array(rows.clone())));
         save_json(&options.output.join("report.json"), &object(report))?;
@@ -1214,6 +1221,19 @@ pub(crate) fn collect(
     }
     let parity_matches = ratchet(&label, &rows, &open);
     Ok(i32::from(!parity_matches || !controls_valid))
+}
+
+fn publish_measurements(
+    output: &Path,
+    mut header: Value,
+    rows: &[Value],
+    load_case: impl FnMut(&Value) -> Result<Value, String>,
+) -> Result<(), String> {
+    validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
+    validation::put(&mut header, "cases", Value::Array(rows.to_vec()))?;
+    save_json(&output.join("collection.json"), &header)?;
+    validation::put(&mut header, "case_storage", Value::str("inline"))?;
+    write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
 
 /// A contract's `open_cases` on `target`: case ids that fail today, each tied to
@@ -1868,5 +1888,26 @@ mod tests {
         );
         assert_eq!(fs::read(&temporary).unwrap(), b"in progress\n");
         assert!(!output.0.join("report.json").exists());
+    }
+
+    #[test]
+    fn failed_final_controls_remain_failed_in_both_report_forms() {
+        let output = Output::new();
+        let mut proof = Value::object([
+            ("passed", Value::Bool(true)),
+            ("path", Value::str("controls/report.json")),
+        ]);
+        reject_controls(&mut proof, "functional control proof hash mismatch").unwrap();
+        let header = Value::object([("functional_controls", proof)]);
+        publish_measurements(&output.0, header, &[Value::int(1)], |case| Ok(case.clone())).unwrap();
+        for name in ["collection.json", "report.json"] {
+            let report = read_json(&output.0.join(name)).unwrap();
+            let proof = report.get("functional_controls").unwrap();
+            assert_eq!(proof.get("passed"), Some(&Value::Bool(false)));
+            assert_eq!(
+                s(proof, "error"),
+                Some("functional control proof hash mismatch")
+            );
+        }
     }
 }
