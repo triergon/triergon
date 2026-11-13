@@ -19980,6 +19980,15 @@
     "candidate": "f0744418776dd2e01795c24d06716f54a0aefc2e",
     "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
    }
+  },
+  {
+   "name": "packet-framing-memory-clock-ee052323-aarch64",
+   "path": "packet-framing-memory-clock-ee052323-aarch64",
+   "retention": "retained",
+   "reason": "Records the packet framing comparison with the clock read confined to timing and the associated resident mapping measurements.",
+   "key": "evidence/packet-framing-memory-clock-ee052323-aarch64/f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183.tar.zst",
+   "sha256": "f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183",
+   "bytes": 42091880
   }
  ]
 }
