@@ -57,13 +57,9 @@ pub fn main(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         println!("TRIERGON_BEGIN_V1");
         io::stdout().flush()?;
     }
-    let start = Instant::now();
+    let start = timing.then(Instant::now);
     let total = execute(&case, iterations)?;
-    let elapsed = if timing {
-        start.elapsed().as_nanos()
-    } else {
-        0
-    };
+    let elapsed = start.map_or(0, |start| start.elapsed().as_nanos());
     if memory {
         println!("TRIERGON_END_V1");
         io::stdout().flush()?;
