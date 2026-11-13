@@ -17,7 +17,7 @@ pub use model::{
 };
 use model::{ClockContext, Shared};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};
+use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest, TrackId};
 use triergon_core::{
     Backpressure, Budget, BudgetVec, Error, InputCursor, InputRequest, InputToken, InputWindow,
     Result, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
@@ -136,6 +136,7 @@ pub struct Reader {
     caps: SourceCapabilities,
     window: usize,
     limits: ReaderLimits,
+    packet_tracks: Option<BudgetVec<TrackId>>,
     input: Option<InputCursor>,
     stream: Option<TransportStream>,
     lanes: BudgetVec<Lane>,
@@ -247,6 +248,7 @@ impl Reader {
             caps,
             window: input_window,
             limits,
+            packet_tracks: None,
             input: Some(input),
             stream: Some(stream),
             lanes: BudgetVec::new(pool),
@@ -270,6 +272,52 @@ impl Reader {
             storage: None,
         })
     }
+    /// Frame access units only for the supplied elementary PIDs.
+    ///
+    /// All track metadata and original transport events remain available,
+    /// including diagnostics and PES on unselected PIDs. An empty selection
+    /// reads source events only. The selection persists across reader resets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid or duplicate PID, invalid reader
+    /// limits, or insufficient storage for the bounded selection.
+    pub fn new_with_packet_tracks(
+        pool: &Budget,
+        source: SourceId,
+        caps: SourceCapabilities,
+        limits: ReaderLimits,
+        input_window: usize,
+        tracks: &[TrackId],
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, source, caps, limits, input_window)?;
+        if tracks.len() > limits.transport.streams {
+            return Err(crate::limit(tracks.len(), limits.transport.streams));
+        }
+        let mut selection = BudgetVec::new(pool);
+        selection.try_extend_from_slice(tracks)?;
+        selection.as_mut_slice().sort_unstable();
+        if selection.iter().any(|id| !(1..=0x1ffe).contains(&id.0))
+            || selection
+                .as_slice()
+                .windows(2)
+                .any(|pair| pair[0] == pair[1])
+        {
+            return Err(Error::Invalid("MPEG-TS packet track selection"));
+        }
+        reader.packet_tracks = Some(selection);
+        Ok(reader)
+    }
+
+    fn frames_track(&self, pid: u16) -> bool {
+        self.packet_tracks.as_ref().is_none_or(|selection| {
+            selection
+                .as_slice()
+                .binary_search(&TrackId(u64::from(pid)))
+                .is_ok()
+        })
+    }
+
     pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
         Some((self.input.as_ref()?, self.stream.as_ref()))
     }
@@ -364,8 +412,9 @@ impl Reader {
     }
     /// Restart the current entity with fresh transport state and a new generation.
     pub fn reset(&mut self) -> Result<InputRequest> {
-        let next = Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
+        let mut next = Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
         let request = next.request()?;
+        next.packet_tracks = self.packet_tracks.take();
         *self = next;
         Ok(request)
     }
@@ -731,7 +780,9 @@ impl Reader {
                                 self.lanes.as_mut_slice()[position].track = track.clone();
                                 position
                             } else {
-                                let mut lane = Lane::new(&self.pool, track.clone(), self.limits)?;
+                                let frame = self.frames_track(track.stream().pid);
+                                let mut lane =
+                                    Lane::new(&self.pool, track.clone(), self.limits, frame)?;
                                 if let Some(start) = pending_header {
                                     lane.run = PesRun::BeforeBoundary(start);
                                 }
@@ -761,7 +812,8 @@ impl Reader {
                                 cause: self.pending.as_ref().expect("pending PES").clone(),
                             }
                         });
-                        let mut lane = Lane::new(&self.pool, track, self.limits)?;
+                        let frame = self.frames_track(track.stream().pid);
+                        let mut lane = Lane::new(&self.pool, track, self.limits, frame)?;
                         // A clock fault can restart framing while the transport
                         // still holds the PES that began before the program change.
                         if let PesRun::BeforeBoundary(start) = previous.run

@@ -1033,15 +1033,24 @@ pub(super) struct Lane {
 }
 
 impl Lane {
-    pub(super) fn new(pool: &Budget, track: Track, limits: ReaderLimits) -> Result<Self> {
-        let (framer, unsupported, residue) = match Framer::new(pool, &track, limits) {
-            Ok(framer) => (Some(framer), None, None),
-            Err(error @ Error::Unsupported(_)) => {
-                let residue =
-                    unframed_audio::Scan::for_track(&track, limits)?.map(ResidueScan::Audio);
-                (None, residue.is_none().then_some(error), residue)
+    pub(super) fn new(
+        pool: &Budget,
+        track: Track,
+        limits: ReaderLimits,
+        frame: bool,
+    ) -> Result<Self> {
+        let (framer, unsupported, residue) = if frame {
+            match Framer::new(pool, &track, limits) {
+                Ok(framer) => (Some(framer), None, None),
+                Err(error @ Error::Unsupported(_)) => {
+                    let residue =
+                        unframed_audio::Scan::for_track(&track, limits)?.map(ResidueScan::Audio);
+                    (None, residue.is_none().then_some(error), residue)
+                }
+                Err(error) => return Err(error),
             }
-            Err(error) => return Err(error),
+        } else {
+            (None, None, None)
         };
         Ok(Self {
             track,
