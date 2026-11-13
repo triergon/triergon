@@ -40,8 +40,21 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
 
-/// Optional policies for configured AAC.
+/// Optional AAC decoding policies.
 pub mod compat {
+    /// Handling of in-band delay signatures when a container provides priming.
+    pub mod priming {
+        /// Source of leading PCM discard for ADTS.
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+        pub enum Policy {
+            /// Apply the default delay signalled by a recognised encoder signature.
+            #[default]
+            EncoderSignature,
+            /// Leave leading discard to the caller's container edit.
+            Container,
+        }
+    }
+
     /// Channel mappings for fixed AAC-LC access units.
     ///
     /// `ConventionalSurround` reproduces the default AAC decoder of FFmpeg 9.0.2
@@ -108,6 +121,15 @@ impl Decoder {
         Decoder {
             core: decoder::Core::new(budget),
         }
+    }
+
+    /// Configure how this ADTS decoder handles an encoder delay signature.
+    /// The policy persists across discontinuities.
+    #[must_use]
+    pub fn with_priming_policy(mut self, policy: compat::priming::Policy) -> Self {
+        self.core.priming_policy = policy;
+        self.core.skip_samples = 0;
+        self
     }
 
     /// Decode exactly one ADTS frame (header included). `out` is cleared and refilled with
