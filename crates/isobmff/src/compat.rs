@@ -59,7 +59,8 @@ pub mod mov {
         //! [`EditCursor`] repeats, trims and shifts one track's samples as the demuxer
         //! applies its edit list. Encoded tracks go through [`EncodedEditJob`], which
         //! scans the track's metadata once and returns an [`EncodedEditPlan`] for
-        //! [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular).
+        //! [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular)
+        //! or [`PacketCursor::new_front_with_encoded_edits`](super::packets::PacketCursor::new_front_with_encoded_edits).
         pub use crate::encoded_edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
             EncodedEditProfile, fragment_aac::FragmentAacTrimJob,
