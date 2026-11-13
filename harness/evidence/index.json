@@ -19888,6 +19888,16 @@
    "source_revisions": {
     "candidate": "74155089881341aa7aae67e5f754b35a86e4898b"
    }
+  },
+  {
+   "name": "adts-priming-96232af7-aarch64",
+   "path": "adts-priming-96232af7-aarch64",
+   "retention": "retained",
+   "reason": "ADTS AAC priming policy and both AAC-LC decoder workloads",
+   "key": "evidence/adts-priming-96232af7-aarch64/a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe.tar.zst",
+   "sha256": "a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe",
+   "bytes": 38661043,
+   "source_revision": "96232af7d9431c2285c6b6d248aa38a133b85fe3"
   }
  ]
 }
