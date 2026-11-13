@@ -5,7 +5,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::checks::read_json;
-use crate::corpus::write_json;
 use crate::harness::report::{self, Options};
 use crate::harness::{build, comparison, diff, provenance, worker};
 use crate::json::{self, Value};
@@ -546,9 +545,9 @@ fn trace_outcome(
 }
 
 fn check_controls(root: &Path, selected: &Options) -> Result<Option<Value>, String> {
-    let before = context(root, selected)?;
     let output = selected.output.join("controls");
-    fs::create_dir_all(&output).map_err(|e| e.to_string())?;
+    report::create_output(&output)?;
+    let before = context(root, selected)?;
     let manifest = read_json(&root.join(FEATURE).join("controls.json"))?;
     let mut results = Vec::new();
     let mut passed = true;
@@ -609,7 +608,7 @@ fn check_controls(root: &Path, selected: &Options) -> Result<Option<Value>, Stri
         ("passed", Value::Bool(passed)),
     ]);
     let path = output.join("report.json");
-    write_json(&path, &report)?;
+    report::publish_json(&path, &(json::to_python(&report, Some(2)) + "\n"))?;
     if !passed {
         return Ok(None);
     }
@@ -650,6 +649,20 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    #[test]
+    fn progressive_controls_keep_an_existing_grade() {
+        let directory = Temporary::new();
+        let mut selected = options(root(), &[]).unwrap();
+        selected.output = directory.0.clone();
+        let controls = directory.0.join("controls");
+        fs::create_dir(&controls).unwrap();
+        let grade = controls.join("report.json");
+        fs::write(&grade, b"existing grade\n").unwrap();
+        let error = check_controls(root(), &selected).unwrap_err();
+        assert!(error.contains("use a new output directory"));
+        assert_eq!(fs::read(&grade).unwrap(), b"existing grade\n");
     }
 
     fn set(value: &mut Value, key: &str, replacement: Value) -> Result<(), String> {
