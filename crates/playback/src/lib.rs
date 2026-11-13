@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+pub mod compat;
 mod engines;
 pub mod io;
 mod mp4_native_replay;

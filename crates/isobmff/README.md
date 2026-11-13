@@ -44,8 +44,9 @@ flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 in an existing shared input window. The view retains the window's budget charge.
 Random access can reuse bytes already supplied in the same generation. Samples
 split across windows use a bounded packet buffer.
-Complete indexed sources can check all packet projections by track before
-rewinding for merged playback. Rewinding reuses the existing edit cursors.
+Complete indexed sources can check all packet projections and find the latest
+presentation end by track before rewinding for merged playback. Rewinding
+reuses the existing edit cursors.
 Optional seek restarts are allocated after the required cursors.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
@@ -311,6 +312,9 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  A front-metadata cursor can project checked encoded edits for regular tracks
+  within one finite media extent. The forward playback index checks the
+  projected byte order before delivering any packet.
   `SampleTable::has_composition_offsets` reports a regular table's `ctts`
   presence before reading its samples.
   A regular video edit starting on the first decoded sample's presentation
@@ -324,11 +328,14 @@ rejects boxes extending past the source.
   durations longer than one coded frame. Trim counts use the coded frame length.
   The regular range view also establishes a 1024-sample clock for indexed AAC-LC
   configurations 11, 12 and 14 when the media timescale matches the core rate.
-  The compatible view of a complete fragmented file supports one open-ended
-  rate-one media edit after an optional leading empty edit. The empty edit
+  The compatible view of a fragmented file supports one open-ended rate-one
+  media edit after an optional leading empty edit. The empty edit
   delays packet clocks by its duration, rounded to the track time base.
+  A front movie with fragment defaults establishes the same edit before the
+  track's first fragment, even when that fragment follows other media.
   Backward seek queries subtract the media start. AAC leading trim for
-  a single initialization edit uses the configured audio sample rate.
+  a single initialization edit uses the declared AAC object type and
+  configured audio sample rate.
   Regular Opus range playback retains the `dOps` record and exposes its canonical
   identification header. The MOV policy projects leading and trailing edit trim
   and retains up to one second of history plus the preceding sample for a long
