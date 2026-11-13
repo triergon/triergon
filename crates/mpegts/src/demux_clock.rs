@@ -80,24 +80,32 @@ pub struct EncodedTimeView {
     pub origin: ClockOrigin,
 }
 
-/// The window of PERIOD90 ticks the program's timestamps are read in, set by
-/// its first reference timestamp (the first DTS, or the PTS without one).
+/// The window of 2³³ ticks the demuxer places every timestamp of a program in,
+/// opened by the program's first 33-bit timestamp `reference`.
+///
+/// FFmpeg's mpegts demuxer reports each later timestamp as the one value
+/// congruent to it modulo 2³³ in the window, which starts 60 s (5,400,000
+/// ticks) before `reference`, as observed with first timestamps from 0 to
+/// 2³³ − 1 and followers on either side of them:
+///
+/// - below 5,400,000 the window starts at 0: after a first timestamp of 1 a
+///   later 0 stays 0, and after a first 0 a later 2³³ − 1 stays
+///   8,589,934,591;
+/// - from 5,400,000 to 2³³ − 5,400,001 it starts 60 s earlier: with
+///   5,400,001 first, a later 1 stays 1 and a later 0 becomes 2³³;
+/// - from 2³³ − 5,400,000 up it starts 60 s before `reference` − 2³³, so the
+///   first timestamp itself comes out negative: 2³³ − 5,400,000 as
+///   −5,400,000 and 2³³ − 1 as −1, with a later 0 as 0.
 fn initial_interval(reference: u64) -> ClockOrigin {
-    // The window starts 60 s (5,400,000 ticks) before the first reference, or
-    // at 0 when that is earlier, and one period lower when the first reference
-    // lies within the last 60 s before 2^33, which then reads as negative.
-    // Later timestamps never move it. Observed: after a first 10,000,000,
-    // 4,600,000 reads as itself and 4,599,999 as 8,594,534,591; a first
-    // 2^33 - 5,400,000 reads as -5,400,000, then 0 as 0, 2^33 - 10,800,000 as
-    // -10,800,000 and 2^33 - 10,800,001 as itself; a first 2^33 - 5,400,001
-    // reads as itself, then 0 as 2^33; after a first 1,000, 2^33 - 1,000 reads
-    // as itself.
     const LEAD90: i128 = 60 * 90_000;
     let reference90 = i128::from(reference);
     let candidate = reference90 - LEAD90;
     let interval_origin90 = if reference90 >= PERIOD90 - LEAD90 {
+        // Within 60 s of the wrap: the window takes the first timestamp
+        // as negative, so that the wrapped ones after it continue from 0.
         candidate - PERIOD90
     } else {
+        // Within 60 s of zero the window does not start below 0.
         candidate.max(0)
     };
     ClockOrigin {
