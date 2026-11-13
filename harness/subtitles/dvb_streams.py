@@ -1018,6 +1018,138 @@ def cases():
                                                rcs(0, 600, 50, version=i, depth=4, clut=9, objects=[(1, 0, 0)]),
                                                obj(1, 4, tl, version=i), eds()])))
     out["long-default-clut"] = single(sets)
+    out.update(automatic_cases())
+    out.update(conversion_cases())
+    return out
+
+
+def page_of(regions, depth, clut=9, x0=20, y0=20, version=0, cds_segments=()):
+    """One display set: each grid of `regions` in a region of its own, one
+    object each, laid out left to right in rows."""
+    placements, segs, objs = [], [], []
+    x, y, row_h = x0, y0, 0
+    for i, rows in enumerate(regions):
+        h, w = len(rows), len(rows[0])
+        if x + w > 700:
+            x, y, row_h = x0, y + row_h + 4, 0
+        placements.append((i, x, y))
+        segs.append(rcs(i, w, h, version=version, depth=depth, clut=clut, objects=[(i + 1, 0, 0)]))
+        objs.append(obj(i + 1, depth, rows, version=version))
+        x, row_h = x + w + 4, max(row_h, h)
+    return pes_data([pcs(1, 5, version, 0, placements)] + segs + list(cds_segments) + objs + [eds()])
+
+
+def sea(w, h, cells, value=1):
+    rows = [[value] * w for _ in range(h)]
+    for y, x, v in cells:
+        rows[y][x] = v
+    return rows
+
+
+def run_rows(a_runs, b_runs, width):
+    """Runs of 2 then runs of 3, one per row, in a sea of 1."""
+    rows = [[1] * width]
+    for value, runs in ((2, a_runs), (3, b_runs)):
+        for n in runs:
+            rows.append([1, 1] + [value] * n + [1] * (width - 2 - n))
+            rows.append([1] * width)
+    return rows
+
+
+def split_runs(count, total):
+    return [total // count + (1 if i < total % count else 0) for i in range(count)]
+
+
+def automatic_cases():
+    """Automatic palettes (the regions' CLUT is never defined): ranking from
+    the region's edge, ties, unused values, every depth, kept entries."""
+    out = {}
+    block = [(y, x, 2) for y in (3, 4) for x in range(2, 24)] + [(1, x, 2) for x in range(2, 9)]
+    block += [(y, x, 3) for y in (8, 9) for x in range(2, 21)] + [(6, x, 3) for x in range(2, 7)]
+    ranks = [
+        [[1, 2, 1]],                                   # a value at both ends ranks first
+        [[0, 2, 4, 1, 3]],                             # distinct values peel from the ends
+        [[0, 1, 2], [3, 4, 5], [6, 7, 8]],
+        [[8, 1, 5], [0, 7, 4], [3, 6, 2]],
+        [[1], [2], [2], [3]],
+        [[1, 1], [1, 2]],
+        [[2] * 6 + [1] * 4 + [4] * 10 + [3] * 8],      # runs by exposed sides
+        sea(9, 7, [(1, 2, 2), (2, 1, 2), (2, 2, 2), (2, 3, 2), (3, 2, 2), (5, 5, 3), (5, 6, 3)]),
+        sea(8, 5, [(0, 3, 2), (2, 3, 3), (2, 4, 3)]),  # a value only on the edge
+        sea(26, 11, block),                            # equal in 1/1024 steps
+        [[5] * 6] * 3,                                 # one value
+        [[0, 0, 15, 15], [0, 9, 9, 15]],               # unused values between
+    ]
+    out["automatic-ranks"] = single([(T0, page_of(ranks, 4))])
+    # 1/1024 steps at scale: 64 exposed sides per 32.3 pixels against 32.2, equal
+    # in steps; 2.0399 against 2.0404, apart.
+    steps = [run_rows([578], split_runs(5, 2648), 582), run_rows([521], split_runs(5, 2324), 525)]
+    out["automatic-steps"] = single([(T0, page_of(steps, 4, x0=0, y0=0))])
+    two = [pattern(40, 9, [0, 1, 2, 3], seed=71), text_like(48, 12, fg=3, outline=1, bg=2, seed=5),
+           pattern(30, 6, [0, 3], seed=72), sea(12, 6, [(2, 4, 0), (2, 5, 0), (3, 4, 3)], value=2), [[3, 0, 3]]]
+    out["automatic-depth2"] = single([(T0, page_of(two, 2))])
+    eight = [[[(i * 97 + 13) % 256 for i in range(r * 16, r * 16 + 16)] for r in range(16)],
+             [list(range(r * 16, r * 16 + 16)) for r in range(16)],
+             text_like(60, 14, fg=90, outline=17, bg=200, seed=9),
+             pattern(64, 10, list(range(0, 256, 6)), seed=73),
+             pattern(20, 20, [250, 3, 77], seed=74)]
+    out["automatic-depth8"] = single([(T0, page_of(eight, 8))])
+    # Entries of values a later drawing does not use keep their levels; a
+    # fill without drawing keeps the palette; a partial drawing recomputes it.
+    first = [[1, 1, 2, 2, 3, 3, 4, 4], [1, 2, 3, 4, 5, 6, 7, 8], [8, 8, 8, 1, 1, 1, 2, 2], [5, 5, 6, 6, 7, 7, 8, 8]]
+    fewer = [[1] * 8, [1, 2] * 4, [1] * 8, [2] * 8]
+    sets = []
+    for n, (rows, fill) in enumerate(((first, False), (fewer, False), (None, True), ([[9, 9], [9, 10]], False))):
+        segs = [pcs(1, 5, n, 0, [(0, 40, 40)]),
+                rcs(0, 8, 4, version=n, depth=4, clut=9, fill=fill, bg=(0, 3, 0), objects=[(1, 0, 0)])]
+        if rows:
+            segs.append(obj(1, 4, rows, version=n))
+        sets.append((T0 + n * 90000, pes_data(segs + [eds()])))
+    out["automatic-kept-entries"] = single(sets)
+    # compute_clut -2 keeps a region's first automatic palette through redraws,
+    # a resize and a depth change; a new epoch (acquisition point) starts afresh.
+    third = [[9, 9, 3, 3, 3, 3, 9, 9], [9, 3, 3, 9, 9, 3, 3, 9], [3] * 8, [9] * 8]
+    steps = ((0, 8, 4, 4, first), (0, 8, 4, 4, fewer), (0, 4, 2, 4, [[1, 1, 2, 2], [1, 2, 1, 2]]),
+             (0, 8, 4, 2, [[1, 2, 3, 0] * 2, [3, 2, 1, 1] * 2]), (1, 8, 4, 4, fewer), (0, 8, 4, 4, third))
+    sets = []
+    for n, (state, w, h, depth, rows) in enumerate(steps):
+        segs = [pcs(1, 5, n, state, [(0, 40, 40)]), rcs(0, w, h, version=n, depth=depth, clut=9, objects=[(1, 0, 0)]),
+                obj(1, depth, rows, version=n), eds()]
+        sets.append((T0 + n * 90000, pes_data(segs)))
+    out["automatic-once"] = single(sets)
+    # A checkerboard of 1280 × 1024 pixels: exposure counts past 2^31 / 1024.
+    tile = [[0 if (x + y) % 2 == 0 else (2 if y % 4 == 0 and 4 <= y < 60 and x % 3 == 1 and 4 <= x < 60 else 1)
+             for x in range(64)] for y in range(64)]
+    tiles = [(1, x, y) for y in range(0, 1024, 64) for x in range(0, 1280, 64)]
+    segs = [pcs(1, 5, 0, 0, [(0, 0, 0)]), rcs(0, 1280, 1024, depth=4, clut=9, objects=tiles), obj(1, 4, tile), eds()]
+    out["automatic-large-exposure"] = single([(T0, pes_data(segs))])
+    return out
+
+
+def conversion_cases():
+    """CLUT entries across the conversion's extremes, and entry flags that
+    name several CLUTs."""
+    out = {}
+    grid = [(y, cr, cb, t) for y in (0, 1, 16, 17, 128, 235, 236, 255) for cr in (0, 16, 128, 240, 255)
+            for cb in (0, 16, 128, 240, 255) for t in (0, 255)]
+    grid += [(y, 128, 128, 0) for y in range(512 - len(grid))]
+    cluts = [cds(c + 1, [(i, 1) + grid[c * 256 + i] + (True,) for i in range(256)]) for c in range(2)]
+    rows = [list(range(r * 16, r * 16 + 16)) for r in range(16)]
+    segs = [pcs(1, 5, 0, 0, [(0, 40, 40), (1, 80, 40)]),
+            rcs(0, 16, 16, depth=8, clut=1, objects=[(1, 0, 0)]), rcs(1, 16, 16, depth=8, clut=2, objects=[(1, 0, 0)])]
+    out["clut-conversion-grid"] = single([(T0, pes_data(segs + cluts + [obj(1, 8, rows), eds()]))])
+    # Entry ids 1, 5 and 20 with every flag combination, in one CLUT each,
+    # read back at every depth.
+    segs, regions, placements = [], [], []
+    for flags in range(1, 8):
+        segs.append(cds(flags, [(i, flags, 60 + 20 * flags + i, 90, 160, 0, True) for i in (1, 5, 20)]))
+        for k, depth in enumerate((2, 4, 8)):
+            rid = (flags - 1) * 3 + k
+            placements.append((rid, 30 * k, 30 * flags))
+            regions.append(rcs(rid, 24, 1, depth=depth, clut=flags, objects=[(k + 1, 0, 0)]))
+    objs = [obj(1, 2, [[0, 1, 2, 3] * 6]), obj(2, 4, [list(range(16)) + [5, 1, 5, 1, 5, 1, 5, 1]]),
+            obj(3, 8, [[0, 1, 5, 20] * 6])]
+    out["clut-flags-ranges"] = single([(T0, pes_data([pcs(1, 5, 0, 0, placements)] + regions + segs + objs + [eds()]))])
     return out
 
 
@@ -1129,6 +1261,9 @@ OPTION_CASES = [
     ("services-two-ordered", ["opt:dvb_substream=1"]),
     ("services-two-ordered", ["opt:dvb_substream=0"]),
     ("streams-two", ["stream=1"]),
+    ("automatic-ranks", ["opt:compute_clut=1"]),
+    ("automatic-kept-entries", ["opt:compute_clut=1"]),
+    ("automatic-once", ["opt:compute_clut=-2"]),
 ]
 
 

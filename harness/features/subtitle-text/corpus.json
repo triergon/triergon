@@ -1315,6 +1315,214 @@
       }
     },
     {
+      "id": "mov-text-tags-colour-against-alpha",
+      "profile": "mov-text-tags-colour-against-alpha",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/colour-against-alpha.cap",
+      "sha256": "ea14df7e4b60751ba645655c1624978b340e70bac4eb7a02da16073b404db46c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 84,
+        "digest": 11720423603967855458
+      }
+    },
+    {
+      "id": "mov-text-tags-face-against-all",
+      "profile": "mov-text-tags-face-against-all",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/face-against-all.cap",
+      "sha256": "e2fa522b17e06139322946e1fd2b54e6d70e9f667f4a03f487613f7736e1c4b4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 115,
+        "digest": 46088934793810341
+      }
+    },
+    {
+      "id": "mov-text-tags-face-against-bold",
+      "profile": "mov-text-tags-face-against-bold",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/face-against-bold.cap",
+      "sha256": "3302bea92da29452c9a0f8b26a2d7f27ee285c3ffa91edf70d15bc98210da48c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 237,
+        "digest": 2203742073017237035
+      }
+    },
+    {
+      "id": "mov-text-tags-font-long-names",
+      "profile": "mov-text-tags-font-long-names",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/font-long-names.cap",
+      "sha256": "aaba2e6d91b4a5c7b7d48fc3cf8f35cc547b1bb2ab88dd7d9c2df52cbdc11ec9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4950,
+        "digest": 501791086152800159
+      }
+    },
+    {
+      "id": "mov-text-tags-font-table",
+      "profile": "mov-text-tags-font-table",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/font-table.cap",
+      "sha256": "2574d1a6387d2e465ec077529ad3b60cdcf05ac4f9a096c951df567bef3d9216",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 372,
+        "digest": 16052345856706520078
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-coincident",
+      "profile": "mov-text-tags-highlight-coincident",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-coincident.cap",
+      "sha256": "f946713cfd4a52550d93a94e22ec46c7398eb516dfcf7e4ea34bdf2345453ed5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 755,
+        "digest": 4413207065898473148
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-coloured-default",
+      "profile": "mov-text-tags-highlight-coloured-default",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-coloured-default.cap",
+      "sha256": "9651a547298f2ed9f6c27b385cc3faa58d0e9e0120c9deb78b812da1a096acb4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 226,
+        "digest": 14241997220781762068
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-ranges",
+      "profile": "mov-text-tags-highlight-ranges",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-ranges.cap",
+      "sha256": "2b1b937b76cd72d2a3879585ede91ad6feebb0fd1e9abb6211fc76ba8b708646",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 312,
+        "digest": 861062206201301589
+      }
+    },
+    {
+      "id": "mov-text-tags-highlight-style-colour",
+      "profile": "mov-text-tags-highlight-style-colour",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/highlight-style-colour.cap",
+      "sha256": "2e31ccaf8654b82871a5009e368f713bc134c7bc87016d7b76a5e4a8f837e919",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 1147,
+        "digest": 3939604460560203965
+      }
+    },
+    {
+      "id": "mov-text-tags-no-description",
+      "profile": "mov-text-tags-no-description",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/no-description.cap",
+      "sha256": "113db06b45116e09e42df92474876e4b7da02f8247e19468ec87edd3802c7a1c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 92,
+        "digest": 6230602117039309394
+      }
+    },
+    {
+      "id": "mov-text-tags-nul-transitions",
+      "profile": "mov-text-tags-nul-transitions",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/nul-transitions.cap",
+      "sha256": "a9817919391ec293852cab6593ea540af76394c1dd6f9d7afcdda2d1a8187a8f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 468,
+        "digest": 7051577844635059823
+      }
+    },
+    {
+      "id": "mov-text-tags-ranges",
+      "profile": "mov-text-tags-ranges",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/ranges.cap",
+      "sha256": "2cda795ad8eb16d54d2c197a2f24b81dd32cfc567ec5f6b2f069dbb66990dd5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 14,
+        "bytes": 493,
+        "digest": 9496644628636016008
+      }
+    },
+    {
+      "id": "mov-text-tags-size-colour-alpha",
+      "profile": "mov-text-tags-size-colour-alpha",
+      "group": "mov-text-tags",
+      "file": "harness/fixtures/subtitle-text/mov-text-tags/size-colour-alpha.cap",
+      "sha256": "2b8dc2fb3759bb6f261a684fcf42825b7e872fd1e413cd1ca7688b3e673adb5f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "packets"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 366,
+        "digest": 10650368244521889567
+      }
+    },
+    {
       "id": "tx3g-adjacent_style_runs_remain_distinct_source_records",
       "profile": "tx3g-adjacent_style_runs_remain_distinct_source_records",
       "group": "tx3g",

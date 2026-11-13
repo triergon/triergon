@@ -4,7 +4,7 @@ use super::{
     write::{Fixed, Writer},
 };
 use crate::text::unicode::cancelled;
-use std::{fmt::Write, ops::Range, sync::atomic::AtomicBool};
+use std::{ffi::CStr, fmt::Write, ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -93,6 +93,13 @@ impl Configuration {
             writer: Writer::new(pool),
         })
     }
+    /// The index of the first font table entry with font ID `id` or a higher
+    /// one: the table is sorted by ID once read, so a style's entries follow
+    /// it, in table order.
+    pub(super) fn first_font(&self, id: u16) -> usize {
+        self.fonts.as_slice().partition_point(|font| font.id < id)
+    }
+    /// The name of font table entry `index` up to its first NUL.
     pub(super) fn font_name(&self, index: usize) -> Result<&[u8]> {
         let font = self
             .fonts
@@ -107,7 +114,7 @@ impl Configuration {
             .as_ref()
             .get(font.name.clone())
             .ok_or(Error::Truncated)?;
-        Ok(&name[..name.iter().position(|&v| v == 0).unwrap_or(name.len())])
+        Ok(until_nul(name))
     }
     fn fallback(&mut self) {
         self.fallback = true;
@@ -174,6 +181,19 @@ impl Configuration {
                 }
                 Phase::Fonts => {
                     if self.read == self.count {
+                        // Sorted by ID, and by position within one ID, so
+                        // a style's entries are found by binary search; a
+                        // unit per entry and comparison level.
+                        let n = self.fonts.len();
+                        let levels = usize::try_from(usize::BITS - n.leading_zeros())
+                            .map_err(|_| Error::Overflow)?;
+                        if !funding.pay(1 + n * levels, caller)? {
+                            return Ok(false);
+                        }
+                        self.fonts
+                            .as_mut_slice()
+                            .sort_unstable_by_key(|font| (font.id, font.name.start));
+                        funding.commit();
                         self.phase = Phase::Header;
                         continue;
                     }
@@ -285,7 +305,7 @@ impl Configuration {
                 .as_ref()
                 .ok_or(Error::Invalid("native default font owner"))?;
             let bytes = &raw.as_ref()[range.clone()];
-            h.append(&bytes[..bytes.iter().position(|&v| v == 0).unwrap_or(bytes.len())])?;
+            h.append(until_nul(bytes))?;
         } else {
             h.append(b"Arial")?;
         }
@@ -293,4 +313,8 @@ impl Configuration {
                -i32::from(style.face&1!=0),-i32::from(style.face&2!=0),-i32::from(style.face&4!=0),align).map_err(|_|Error::Overflow)?;
         Ok(h)
     }
+}
+/// The bytes before the first NUL, or all of them.
+pub(super) fn until_nul(bytes: &[u8]) -> &[u8] {
+    CStr::from_bytes_until_nul(bytes).map_or(bytes, CStr::to_bytes)
 }

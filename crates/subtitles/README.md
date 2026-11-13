@@ -61,8 +61,12 @@ did. A DVB receiver rectangle carries its
 region depth's `palette`, as FFmpeg reports it, and `colours`, the colour of
 every pixel value: a region recomposed at a smaller depth without a fill keeps
 larger pixel values, which read as zero, or under the automatic palette as the
-level it ranks them at. The PGS receiver is polled: `push(&mut packet, clock,
-&cancel)`, then `poll` until `OutputReady` and `take_output`.
+level it ranks them at. With `AutomaticPalette::WithoutClutOnce` (FFmpeg's
+`compute_clut` −2) a region's automatic palette is computed when the region is
+first presented and kept while it lasts: later drawing, filling, resizing or a
+new depth leave it as it was, and only a new epoch computes it afresh. The PGS
+receiver is polled: `push(&mut packet, clock, &cancel)`, then `poll` until
+`OutputReady` and `take_output`.
 
 | Module | Entry points |
 | --- | --- |
@@ -127,6 +131,10 @@ resolves all defined sample modifiers into style runs, highlight, karaoke,
 hyperlink, blink, wrap, scroll and disparity intents; see
 [TX3G-SEMANTICS.md](src/text/TX3G-SEMANTICS.md). `compat::mov_text::Decoder`
 converts a sample to the ASS event and header FFmpeg's mov_text decoder emits.
+Where a style record or the highlight starts or ends it writes FFmpeg's override
+tags in FFmpeg's order and digits, also at a NUL that ends the visible text but
+not at the end of the text; a font name it would write that is not UTF-8, or
+holds U+FFFE, refuses the sample as such text does.
 
 **Charsets.** Selected explicitly with `text::Encoding` or a label resolver;
 there is no detection from content, language or file name.
@@ -148,13 +156,13 @@ bytes are errors; nothing is replaced with U+FFFD.
 | --- | --- | --- |
 | DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | FFmpeg's subtitles: indexed planes and ARGB palettes, with its display window, region order, automatic palette and `compute_edt`, `compute_clut`, `dvb_substream` |
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
-| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette (a list's numbers as observed in FFmpeg built for 32-bit ARMv7: each wraps modulo 2³² and one beyond 32 bits is white), the canvas of the configuration's `size:` line (a number beyond ±(2³¹ − 1) refuses it, as observed there), the `.idx` `delay:` line with the values observed there (its fields saturate at 2³¹ − 1 and −2³¹), and `forced_subs_only`; FFmpeg for AArch64 keeps the low 32 bits of such numbers instead |
+| DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette (a list's numbers as observed in FFmpeg built for 32-bit ARMv7: each wraps modulo 2³² and one beyond 32 bits is white), the canvas of the configuration's `size:` line (refused unless both sides are positive and (width + 128) × (height + 128) is below 2²⁸, the sizes FFmpeg also keeps for a PGS presentation; a number beyond ±(2³¹ − 1) refuses it, as observed there), the `.idx` `delay:` line with the values observed there (its fields saturate at 2³¹ − 1 and −2³¹), and `forced_subs_only`; FFmpeg for AArch64 keeps the low 32 bits of such numbers instead |
 
 ### Closed captions and teletext
 
 | Format | Decoded | Output |
 | --- | --- | --- |
-| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `ccaption` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
+| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `cc_dec` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
 | DVB teletext (EN 300 472, EN 300 706) | Data units, Hamming 8/4 and 24/18, parity, headers and rows, parallel and serial magazines, subpages, national option subsets and G0/G1/G2/G3 sets, X/26 enhancements and local objects (active, adaptive, passive), X/28 and M/29 designations and colour tables | Receiver: libzvbi's subtitle pages as FFmpeg's `libzvbi_teletextdec` presents them in its `text` and `ass` formats, with its page selection and options |
 
 ## Behaviour and limits
@@ -219,4 +227,4 @@ under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
 in [docs/status.md](../../docs/status.md). The text conversions (`subtitle-text`
 and `subtitle-text-host`) were measured at `6126b759b9b983afe488c3c362c6e37c2d1425a2`
-on Linux AArch64 and in the ARMv7 user space.
+on Linux AArch64, and every subtitle feature at `3df7ae6d` in the ARMv7 user space.

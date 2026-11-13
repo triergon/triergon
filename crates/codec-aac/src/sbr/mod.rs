@@ -133,7 +133,10 @@ pub(crate) struct Chan {
 }
 
 impl Chan {
-    fn new(budget: &Budget) -> Result<Chan> {
+    /// A channel's state. Without `analysed` it holds only the synthesis bank: the right
+    /// output of a single channel element, which Parametric Stereo synthesises from the left.
+    fn new(budget: &Budget, analysed: bool) -> Result<Chan> {
+        let rows = |n: usize| if analysed { n } else { 0 };
         Ok(Chan {
             frame_class: 0,
             num_env: 0,
@@ -159,19 +162,19 @@ impl Chan {
             prev_num_env: 0,
             prev_t_env_last: NUM_TIME_SLOTS,
             l_a_prev: -1,
-            analysis: qmf::Analysis::new(budget)?,
+            analysis: qmf::Analysis::new(budget, analysed)?,
             synthesis: qmf::Synthesis::new(budget)?,
-            xl: BudgetVec::try_filled(budget, [Cpx::default(); XL_LEN], 32)?,
-            y_prev: BudgetVec::try_filled(budget, [Cpx::default(); 64], 8)?,
+            xl: BudgetVec::try_filled(budget, [Cpx::default(); XL_LEN], rows(32))?,
+            y_prev: BudgetVec::try_filled(budget, [Cpx::default(); 64], rows(8))?,
             g_hist: [[0.0; 64]; 4],
             q_hist: [[0.0; 64]; 4],
             index_noise: 0,
             index_sine: 0,
             kx_prev: 32,
             m_prev: 0,
-            xa: BudgetVec::try_filled(budget, [Cpx::default(); 32], 32)?,
-            xh: BudgetVec::try_filled(budget, [Cpx::default(); 40], 64)?,
-            y: BudgetVec::try_filled(budget, [Cpx::default(); 64], 40)?,
+            xa: BudgetVec::try_filled(budget, [Cpx::default(); 32], rows(32))?,
+            xh: BudgetVec::try_filled(budget, [Cpx::default(); 40], rows(64))?,
+            y: BudgetVec::try_filled(budget, [Cpx::default(); 64], rows(40))?,
         })
     }
 
@@ -278,10 +281,16 @@ pub(crate) struct Sbr {
     // scratch
     x: BudgetVec<[Cpx; 64]>,
     x_r: BudgetVec<[Cpx; 64]>,
+    /// Development aid: the 38 QMF slots handed to Parametric Stereo in the last frame
+    /// (re, im interleaved; empty when PS did not run).
+    #[cfg(feature = "inspect")]
+    pub(crate) ps_input: Vec<f32>,
 }
 
 impl Sbr {
-    pub(crate) fn new(core_rate: u32, budget: &Budget) -> Result<Sbr> {
+    /// SBR state of a channel pair (`pair`) or of a single channel element, which holds
+    /// what Parametric Stereo needs instead of a second analysed channel.
+    pub(crate) fn new(core_rate: u32, pair: bool, budget: &Budget) -> Result<Sbr> {
         Ok(Sbr {
             fs: core_rate * 2,
             hdr: Header::default(),
@@ -289,12 +298,14 @@ impl Sbr {
             reset: false,
             ft: FreqTables::default(),
             coupling: false,
-            ch: [Chan::new(budget)?, Chan::new(budget)?],
+            ch: [Chan::new(budget, true)?, Chan::new(budget, pair)?],
             data_ok: false,
-            ps: ps::Ps::new(budget)?,
+            ps: ps::Ps::new(budget, !pair)?,
             ps_seen: false,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
-            x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+            x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], if pair { 0 } else { 38 })?,
+            #[cfg(feature = "inspect")]
+            ps_input: Vec::new(),
         })
     }
 
@@ -320,6 +331,8 @@ impl Sbr {
             ps_seen,
             x,
             x_r,
+            #[cfg(feature = "inspect")]
+                ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
         *have_header = false;
@@ -517,10 +530,7 @@ impl Sbr {
                 left -= 2;
                 if id == 2 {
                     // EXTENSION_ID_PS
-                    let before = br.position();
-                    let used = self.ps.parse(br, left as usize)?;
-                    let _ = used;
-                    left -= (br.position() - before) as isize;
+                    left -= self.ps.parse(br, left as usize) as isize;
                     ps = true;
                     self.ps_seen = true;
                 } else {
@@ -633,9 +643,18 @@ impl Sbr {
                         row[k] = ch.xl[k][i + T_HFADJ];
                     }
                 }
-                // Parametric stereo: mono QMF matrix -> left/right matrices (8.6.4)
+                #[cfg(feature = "inspect")]
+                {
+                    self.ps_input.clear();
+                    for row in self.x.iter() {
+                        for v in row {
+                            self.ps_input.extend([v.re, v.im]);
+                        }
+                    }
+                }
+                // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
-                    self.ps.apply(&mut self.x, &mut self.x_r, ready);
+                    self.ps.apply(&mut self.x, &mut self.x_r);
                 } else {
                     // no PS data yet: both outputs carry the mono signal
                     for i in 0..32 {
@@ -1329,29 +1348,37 @@ mod tests {
     #[test]
     fn renew_returns_an_sbr_to_its_new_state() {
         let budget = Budget::new(1 << 30).unwrap();
-        let fresh = || Sbr::new(44_100, &budget).unwrap();
-        let mut s = fresh();
-        let header = Header {
-            start_freq: 2,
-            stop_freq: 14,
-            freq_scale: 0,
-            alter_scale: false,
-            noise_bands: 1,
-            ..Header::default()
-        };
-        s.ft = freq::compute(&header, 48_000).unwrap();
-        s.hdr = header;
-        (s.have_header, s.reset, s.coupling, s.data_ok, s.ps_seen) = (true, true, true, true, true);
-        for c in &mut s.ch {
-            (c.num_env, c.l_a, c.kx_prev, c.index_sine) = (2, 1, 9, 3);
-            c.g_hist[1][3] = 1.0;
-            c.xa[3][4] = Cpx { re: 1.0, im: -1.0 };
-            c.xl[0][0].re = 2.0;
+        for pair in [false, true] {
+            let fresh = || Sbr::new(44_100, pair, &budget).unwrap();
+            let mut s = fresh();
+            let header = Header {
+                start_freq: 2,
+                stop_freq: 14,
+                freq_scale: 0,
+                alter_scale: false,
+                noise_bands: 1,
+                ..Header::default()
+            };
+            s.ft = freq::compute(&header, 48_000).unwrap();
+            s.hdr = header;
+            (s.have_header, s.reset, s.coupling, s.data_ok, s.ps_seen) =
+                (true, true, true, true, true);
+            for c in &mut s.ch {
+                (c.num_env, c.l_a, c.kx_prev, c.index_sine) = (2, 1, 9, 3);
+                c.g_hist[1][3] = 1.0;
+                // a single channel element's second channel only synthesises
+                if let Some(row) = c.xa.get_mut(3) {
+                    row[4] = Cpx { re: 1.0, im: -1.0 };
+                }
+                if let Some(row) = c.xl.get_mut(0) {
+                    row[0].re = 2.0;
+                }
+            }
+            s.x[2][5].re = 3.0;
+            s.renew();
+            let without_pools = crate::decoder::tests::without_pools;
+            assert_eq!(without_pools(&s), without_pools(&fresh()), "pair {pair}");
         }
-        s.x[2][5].re = 3.0;
-        s.renew();
-        let without_pools = crate::decoder::tests::without_pools;
-        assert_eq!(without_pools(&s), without_pools(&fresh()));
     }
 
     #[test]
@@ -1368,7 +1395,7 @@ mod tests {
         assert_eq!(*bands.lim, [10, 12, 18]);
         assert_eq!(bands.kx + bands.m, 20);
 
-        let mut channel = Chan::new(&Budget::new(1 << 20).unwrap()).unwrap();
+        let mut channel = Chan::new(&Budget::new(1 << 20).unwrap(), true).unwrap();
         channel.num_env = 1;
         channel.num_noise = 1;
         channel.t_env[1] = NUM_TIME_SLOTS;

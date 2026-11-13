@@ -7,8 +7,9 @@
         the samples the tx3g semantic tests build, recorded with
         TRIERGON_TX3G_SAMPLES=TX3G_SAMPLES, see
         crates/subtitles/tests/text_tx3g_semantics.rs, the recorded charset
-        receiver cases and the ASS packets of the text fixtures), and the ASS
-        packets and SubRip and WebVTT documents authored here.
+        receiver cases and the ASS packets of the text fixtures), and the
+        mov_text sessions, ASS packets and SubRip and WebVTT documents
+        authored here.
 
     subtitle_corpus.py record FEATURE REFERENCE
         Write harness/features/FEATURE/corpus.json (subtitle-text or
@@ -69,6 +70,147 @@ SINGLE_BYTE_PACKETS = {
     "latin1-c1-controls": (b"latin1", LINE + bytes(range(0x80, 0x100))),
     "iso-8859-1-c1-controls": (b"iso-8859-1", LINE + bytes(range(0x80, 0x100))),
 }
+
+
+# mov_text sessions authored here for the override tags the decoder writes
+# where a style record (TS 26.245 StyleRecord) or the highlight starts or ends:
+# a sample description (TextSampleEntry body) or None, then samples.
+def tx3g_box(kind, body):
+    return struct.pack(">I", len(body) + 8) + kind + body
+
+
+def tx3g_style(start, end, font=1, face=0, size=16, rgb=(255, 255, 255), alpha=255):
+    return struct.pack(">HHHBB", start, end, font, face, size) + bytes(rgb) + bytes([alpha])
+
+
+def tx3g_styl(*records):
+    return tx3g_box(b"styl", struct.pack(">H", len(records)) + b"".join(records))
+
+
+def tx3g_hlit(start, end):
+    return tx3g_box(b"hlit", struct.pack(">HH", start, end))
+
+
+def tx3g_hclr(r, g, b, a=255):
+    return tx3g_box(b"hclr", bytes([r, g, b, a]))
+
+
+def tx3g_sample(text, *boxes):
+    text = text.encode() if isinstance(text, str) else text
+    return struct.pack(">H", len(text)) + text + b"".join(boxes)
+
+
+def tx3g_description(face=0, rgb=(255, 255, 255), alpha=255, fonts=((1, b"Arial"),)):
+    """Display flags, justification, background, text box, a default style of
+    font 1 at size 16, and the font table."""
+    head = struct.pack(">IbbBBBB", 0, 0, -1, 0, 0, 0, 255) + bytes(8)
+    table = struct.pack(">H", len(fonts)) + b"".join(struct.pack(">HB", i, len(n)) + n for i, n in fonts)
+    return head + tx3g_style(0, 0, 1, face, 16, rgb, alpha) + tx3g_box(b"ftab", table)
+
+
+def tx3g_sessions():
+    s, st, hl, hc = tx3g_sample, tx3g_style, tx3g_hlit, tx3g_hclr
+
+    def one(text, *records, extra=()):
+        return s(text, tx3g_styl(*records), *extra)
+
+    plain = tx3g_description()
+    red, green = (0x11, 0x22, 0x33), (0x44, 0x55, 0x66)
+    fonts = tx3g_description(fonts=(
+        (1, b"Arial"), (2, b"Two"), (3, b""), (2, b"Deux"), (4, b"Sp ace,{x}"), (5, b"X\0Y"),
+        (6, b"\xff\xfe"), (7, b"A\xef\xbf\xbe"), (8, b"A\xef\xbf\xbf"), (9, b"A\xc3"),
+    ))
+    long_names = tx3g_description(fonts=((1, b"Arial"),) + tuple((7, bytes([0x41 + i]) * 200) for i in range(24)))
+    return {
+        # Face flags written where they differ from the default's, set or clear.
+        "face-against-bold": (tx3g_description(face=1), [
+            one("abcdef", st(1, 3, face=f)) for f in (0, 2, 4, 6, 7)
+        ] + [one("abcdef", st(1, 3, face=1, size=20))]),
+        "face-against-all": (tx3g_description(face=7), [one("abcdef", st(1, 3, face=f)) for f in (0, 3, 5)]),
+        # Size, colour and alpha: decimal, BGR without leading zeros, 255 - alpha in two digits.
+        "size-colour-alpha": (plain, [
+            one("abcdef", st(1, 3, size=0)), one("abcdef", st(1, 3, size=255)),
+            one("abcdef", st(1, 3, rgb=(0x0A, 0, 0))), one("abcdef", st(1, 3, rgb=(0, 0, 0x0A))),
+            one("abcdef", st(1, 3, alpha=0xFE)), one("abcdef", st(1, 3, alpha=0xF0)),
+            one("abcdef", st(1, 3, rgb=red, alpha=0x80)),
+            one("abcdef", st(1, 3, font=2, face=7, size=30, rgb=red, alpha=0x10)),
+        ]),
+        "colour-against-alpha": (tx3g_description(rgb=red, alpha=0x40), [
+            one("abcdef", st(1, 3, rgb=red, alpha=0x41)), one("abcdef", st(1, 3, rgb=(0x11, 0x22, 0x34), alpha=0x40)),
+        ]),
+        # Without a sample description the default style is all zeros.
+        "no-description": (None, [one("abcdef", st(1, 3, font=3, face=1)), one("abcdef", st(1, 3, font=0, size=0, rgb=(0, 0, 0), alpha=0))]),
+        # Every entry with the style's font ID, in table order; none for a
+        # missing ID; a name up to its NUL; a name that is not UTF-8 or holds
+        # U+FFFE refuses the sample and still takes a read order.
+        "font-table": (fonts, [
+            one("abcdef", st(1, 3, font=f)) for f in (2, 3, 4, 5, 10, 0)
+        ] + [one("abcdef", st(1, 3, font=1, face=1)), one("abcdef", st(1, 3, font=6)), s("abcdef"),
+             one("abcdef", st(1, 3, font=7)), one("abcdef", st(1, 3, font=8)), one("abcdef", st(1, 3, font=9)),
+             one("abcdef", st(1, 3, font=2))]),
+        "font-long-names": (long_names, [one("abcdef", st(1, 3, font=7))]),
+        # Record ranges: beyond the text, gaps, adjacent records, records equal
+        # to the default or empty, unsorted and overlapping records.
+        "ranges": (plain, [
+            one("abcd", st(2, 9, face=1)), one("abcd", st(4, 6, face=1)), one("abcd", st(0, 4, face=1)),
+            one("abcd", st(0, 1, face=1), st(2, 3, face=2)),
+            one("abcd", st(0, 1, face=1), st(1, 2, face=2), st(2, 3, face=4)),
+            one("abcd", st(0, 1, face=1), st(1, 2), st(2, 3, face=1)),
+            one("abcd", st(0, 1, face=1), st(1, 1, face=2), st(1, 2, face=1)),
+            one("abcd", st(2, 3, face=1), st(0, 1, face=2)),
+            one("abcd", st(0, 3), st(1, 2, face=1)), one("abcd", st(2, 2, face=2), st(1, 3, face=1)),
+            one("abcd", st(0, 2, face=1), st(2, 4, face=1, size=20)),
+            one("abcd", st(1, 3, font=9)), one("a\nb\r\nc", st(1, 4, face=1)),
+            one("Å水z\U0001f600q", st(1, 3, face=1)),
+        ]),
+        # The transitions at a NUL that ends the visible text are written;
+        # those at the end of the text and after the NUL are not.
+        "nul-transitions": (fonts, [
+            one(b"ab\0cd", st(0, 2, face=1)), one(b"ab\0cd", st(2, 3, face=1)), one(b"ab\0cd", st(2, 3, font=2)),
+            s(b"ab\0cd", hl(2, 2)), s(b"ab\0cd", hl(1, 2)), one(b"ab\0cd", st(3, 4, face=1)),
+            one(b"ab\0cd", st(3, 4, font=6)), one(b"ab\0", st(0, 2, face=1)), one(b"\0ab", st(0, 2, face=1)),
+            one(b"ab\0\xffd", st(2, 3, face=1)), one(b"ab", st(0, 2, face=1), extra=[hl(2, 2)]),
+            one(b"ab", st(2, 3, font=6)), one(b"ab\0cd", st(0, 2, face=1), st(2, 5, face=2)),
+            one(b"ab\0cd", st(2, 3, font=6)),
+        ]),
+        # A highlight end restores the colour of the style in effect.
+        "highlight-style-colour": (plain, [
+            one("abcd", st(0, 4, rgb=red), extra=[hl(1, 2)]),
+            one("abcd", st(0, 4, rgb=red), extra=[hl(1, 2), hc(0xAA, 0xBB, 0xCC)]),
+            one("abcd", st(0, 4, alpha=0x20), extra=[hl(1, 2)]),
+            one("abcd", st(0, 2, rgb=red), extra=[hl(1, 3)]),
+            one("abcd", st(0, 2, rgb=red), extra=[hl(1, 3), hc(0xAA, 0xBB, 0xCC)]),
+            one("abcd", st(2, 5, rgb=red), extra=[hl(1, 3)]),
+            one("abcd", st(2, 5, rgb=red), extra=[hl(1, 3), hc(0xAA, 0xBB, 0xCC)]),
+            one("abcd", st(0, 2, rgb=red), st(2, 4, rgb=green), extra=[hl(1, 3)]),
+            one("abcd", st(0, 2, rgb=red), st(2, 4, rgb=green), extra=[hl(1, 3), hc(1, 2, 3)]),
+            one("abcd", st(0, 2, rgb=red), st(2, 4, rgb=green), extra=[hl(1, 2)]),
+            one("abcd", st(0, 2, rgb=red), st(2, 4, rgb=green), extra=[hl(2, 3)]),
+            one("abcd", st(0, 4, rgb=red), extra=[hl(1, 2), hc(0xFF, 0xFF, 0xFF)]),
+            s("abcd", hl(1, 2)),
+        ]),
+        # At one character: the style end, the style start, then the
+        # highlight start and end.
+        "highlight-coincident": (plain, [
+            one("abcd", st(1, 3, face=1, rgb=red), extra=[hl(1, 3)]),
+            one("abcd", st(1, 3, face=1, rgb=red), extra=[hl(1, 3), hc(0xAA, 0xBB, 0xCC)]),
+            one("abcd", st(0, 2, rgb=red), extra=[hl(2, 4)]),
+            one("abcd", st(2, 4, rgb=red), extra=[hl(0, 2)]),
+            one("abcd", st(2, 4, rgb=red), extra=[hl(0, 2), hc(0xAA, 0xBB, 0xCC)]),
+            one("abcd", st(1, 2, face=1), extra=[hl(1, 1)]), one("abcd", st(1, 2, face=1), extra=[hl(2, 2)]),
+            s("abcd", hl(0, 0)), one("abcd", st(1, 2, face=1), extra=[hl(0, 3)]),
+        ]),
+        # Inverted, partly and wholly outside, the last box, colour box first.
+        "highlight-ranges": (plain, [
+            s("abcd", hl(3, 1)), s("abcd", hl(2, 9)), s("abcd", hl(5, 6)), s("abcd", hl(4, 4)),
+            s("abcd", hl(0, 1), hl(2, 3)), s("abcd", hc(0xAA, 0xBB, 0xCC, 0x80), hl(1, 3)),
+        ]),
+        "highlight-coloured-default": (tx3g_description(rgb=red, alpha=0x40), [
+            s("abcd", hl(1, 2)), s("abcd", hl(1, 2), hc(1, 2, 3)),
+            one("abcd", st(0, 4, rgb=green, alpha=0x40), extra=[hl(1, 2)]),
+        ]),
+    }
+
 
 T1 = "00:00:01,000 --> 00:00:02,000"
 T2 = "00:00:03,000 --> 00:00:04,000"
@@ -204,6 +346,16 @@ def mov_text():
     return len(cases)
 
 
+def mov_text_tags():
+    num, den, pts, duration = ASS_CLOCK
+    sessions = tx3g_sessions()
+    for name, (description, samples) in sessions.items():
+        ops = [open_op(num, den, extradata=description)]
+        ops += [packet_op(pts, duration, sample) for sample in samples]
+        write("mov-text-tags", name, capsule(1, b"", ops))
+    return len(sessions)
+
+
 def tx3g(samples):
     count = 0
     for path in sorted(Path(samples).iterdir()):
@@ -287,7 +439,7 @@ def documents():
 
 
 def text_inputs():
-    for group in ["mov-text", "tx3g", "charset", "ass"]:
+    for group in ["mov-text", "mov-text-tags", "tx3g", "charset", "ass"]:
         for path in sorted((OUT / group).glob("*.cap")):
             yield f"{group}-{path.stem}", group, str(path.relative_to(ROOT)), ["packets"]
     yield from documents()
@@ -357,8 +509,8 @@ def record(feature, reference, target=None):
 
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "capsules":
-        counts = [mov_text(), tx3g(sys.argv[2]), charset(), ass(), authored()]
-        print("mov-text %d, tx3g %d, charset %d, ass %d, authored %d" % tuple(counts))
+        counts = [mov_text(), mov_text_tags(), tx3g(sys.argv[2]), charset(), ass(), authored()]
+        print("mov-text %d, mov-text-tags %d, tx3g %d, charset %d, ass %d, authored %d" % tuple(counts))
     elif len(sys.argv) == 4 and sys.argv[1] == "record" and sys.argv[2] != "subtitle-text-host":
         record(sys.argv[2], sys.argv[3])
     elif len(sys.argv) == 5 and sys.argv[1] == "record" and sys.argv[2] == "subtitle-text-host":
