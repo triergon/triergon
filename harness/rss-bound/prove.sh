@@ -73,6 +73,12 @@ sudo -n chown "$(id -u):$(id -g)" /dev/triergon_rss_bound
 sudo -n cat /sys/kernel/debug/kprobes/enabled > "$out/fresh-armed.stdout"
 [ "$(cat "$out/fresh-armed.stdout")" = 1 ]
 measure "$build/kernel-check" > "$out/positive.stdout"
+# Concurrent sessions: four processes held open side by side, each bound on its own.
+for n in 1 2 3; do measure "$build/kernel-check hold" > "$out/concurrent-$n.stdout" & done
+measure "$build/kernel-check hold" > "$out/concurrent-4.stdout"
+wait
+for n in 1 2 3 4; do grep -q '"missed":0,"errors":0,' "$out/concurrent-$n.stdout"; done
+cat "$out"/concurrent-[1-4].stdout > "$out/concurrent.stdout"
 
 pin() { printf '"%s": {"path": "%s", "sha256": "%s"}' "$1" "$2" "$(sha "$2")"; }
 note=/sys/module/triergon_rss_bound/notes/.note.gnu.build-id
@@ -99,8 +105,8 @@ note=/sys/module/triergon_rss_bound/notes/.note.gnu.build-id
     printf '    "full_thp_disabled_before_open": true,\n'
     printf '    "lifecycle": "constructor-open-to-END-ioctl",\n'
     printf '    "review_artifact": {"path": "%s", "sha256": "%s"}\n  },\n' "$review" "$(sha "$review")"
-    printf '  "deployment": {"armed_sha256": "%s", "positive_sha256": "%s", "negative_sha256": "%s"},\n' \
-        "$(sha "$out/fresh-armed.stdout")" "$(sha "$out/positive.stdout")" "$(sha "$out/negative-invalidate.stdout")"
+    printf '  "deployment": {"armed_sha256": "%s", "positive_sha256": "%s", "concurrent_sha256": "%s", "negative_sha256": "%s"},\n' \
+        "$(sha "$out/fresh-armed.stdout")" "$(sha "$out/positive.stdout")" "$(sha "$out/concurrent.stdout")" "$(sha "$out/negative-invalidate.stdout")"
     printf '  "numeric_qualification": false\n}\n'
 } > "$out/RSS-PROOF.json"
 echo "$out/RSS-PROOF.json"
