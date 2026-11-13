@@ -58,7 +58,8 @@ Par, A. Kohlrausch, E. Schuijers, "Parametric coding of stereo audio", EURASIP J
 2005:9; 3GPP TS 26.405 V19.0.0. Probe ids: d, h, m and t are the probes of the `dec`,
 `hyb`, `mix` and `time` parts, which the stages of `signal/*/recover_*.py` name and
 repeat; e are probes of the syntax pass, p probes of the decoder's interface and of the
-open cases. The probe scripts and their outputs are in the evidence set
+open cases, duck-p those of the transient ducking (below). The probe scripts and their
+outputs are in the evidence set
 `codec-aac-parametric-stereo-560f2225` (`cargo xtask evidence fetch
 codec-aac-parametric-stereo-560f2225`).
 
@@ -71,13 +72,70 @@ codec-aac-parametric-stereo-560f2225`).
 | Three all-pass links of 3, 4, 5 slots with fractional delays | paper | Purnhagen §4.1 | d06–d08 (form), d08, d25 (values), d16, d26, d27 (band frequencies) |
 | Coefficient taper 1 − 0.05 (k − split) | probes | none | d08, d10, d14, d16 |
 | Plain-delay borders (all-pass below QMF 23, 14 slots to 34, 1 slot above) | paper | Purnhagen §4.1; Breebaart §7 | e16, d10–d12 |
-| Transient ducking | re-derived by probes, see `Synth::ducking` | Purnhagen §4.2 names transient reduction in the decoder, no form | d20–d25 |
+| Transient ducking | probes: per parameter band K = max(a K′, P), E = E′ + c (P − E′), Q = Q′ + c (K − P − Q′), g = E / (γ Q) when γ Q > E, else 1; a = exp(−4/15), c = 1/4, γ = 3/2 (see Transient ducking below) | Purnhagen §4.2 names transient reduction in the decoder, no form | duck-p01–duck-p13; d20–d25 |
 | Mixing, ICC modes 0..2 | paper | Purnhagen §2.2 eq. 4–6 with eq. 8; Breebaart §6 eq. 31 | m02–m04 (eq. 8, not eq. 7; ICC values) |
 | Mixing, ICC modes 3..5 | paper | Breebaart §6 eq. 24–30 | m04, m05 (ICC floor 0.05; the output matches μ² and μ rounded to single precision) |
 | IPD/OPD as row phases OPD and OPD − IPD | paper | Breebaart §6 eq. 32 | m06–m09, m21, m29; p07, p08, p12 |
 | IPD/OPD smoothing arg(u₀ + u₁/2 + u₂/4) | probes | none | m07, m27, m28, m30, m31 |
 | Envelope ramps | paper | Purnhagen §3.3; Breebaart §7 | t02, t03, t07, t09, t21, t23; m20, m26 |
 | Behaviour over frames (first frame, repeats, error frames, start index, 20 ↔ 34 changes) | probes | none | t01–t33, v_rust |
+
+## Transient ducking
+
+The decoder attenuates the decorrelated signal after a fall in level. For each parameter
+band b and QMF slot t, with P the power of the PS input summed over b's decorrelator
+bands (hybrid bands below the split, QMF bands above it) and the state zero at the first
+PS frame and after a 20 <-> 34 restart:
+
+- K = max(a K', P), a decaying peak;
+- E = E' + c (P - E'), the smoothed power;
+- Q = Q' + c (K - P - Q'), the smoothed excess of the peak over the power;
+- g = E / (γ Q) when γ Q > E, else 1, multiplying the decorrelated output of b's bands
+  (all-pass and delay regions alike) in the same slot.
+
+| Constant | Fit | Precision (step that doubles the residual energy) | Value |
+|---|---|---|---|
+| a | 0.7659282906 | ±4.7e-7 | exp(−4/15) = 0.7659283384 |
+| c | 0.2499999672 | ±4e-7 | 1/4 |
+| γ | 1.500001033 | ±5e-6 | 3/2 |
+
+The three closed forms together give 1.0032 times the residual energy of the free fit. A
+five-constant fit (separate smoothing for E and Q, an exponent on the gain) converges back
+to this form. With it the model matches the reference to the float floor on tones, noise,
+steps, bursts, clicks, gated and amplitude-modulated signals in both configurations (the
+probe kit's streams at 3e-7 to 1e-6 relative). `Synth::ducking` implements it in single precision.
+
+Probes (duck-p): p01 gains per parameter band, real and at most 1; p02 per-slot gains of
+one band under tone envelopes; p03 fits of every candidate; p04 two tones in one or in two
+parameter bands; p05 further level steps, modulations and bands; p06 the form against every
+stream, with variants; p07 the residual on noise; p08 the last frame and deep ducks; p09
+the constants' precision and extra freedoms; p10 every stream, 20 and 34 bands; p11 the
+floor of deep ducks; p12 the closed forms in single precision; p13 per-slot residuals
+around a 40 dB drop.
+
+| Rejected candidate | Ruled out by |
+|---|---|
+| Instantaneous ratio γ (P / K)^p | p03: best 6.7e-2, p02 burst 0.15; the measured dip deepens over 23 slots, the ratio is deepest at once |
+| Attack/release envelope follower against the smoothed power | p03: best 7.5e-3; p02 down4, down100, burst about 1e-2 |
+| Fast smoother against slow smoother | p03: best 8.6e-3; p02 down4, down100, burst 1.1e-2 to 1.4e-2 |
+| Smoothed power over smoothed peak | p03: best 1.8e-3; p02 burst 3.7e-3 |
+| Gain one slot late or early | p03: 4.7e-3 and 4.0e-3 after a refit; kit down-100 1.7e-2 with the constants kept |
+| Power of the decorrelator output instead of its input | p06: as far off as no ducking (burst 0.34) |
+| Power per decorrelator band or per QMF band | p04: two tones in one parameter band, 7.2e-2; noise streams 0.12 |
+| QMF-0 mirror sub-band pairs summed before squaring | p07: noise streams 3e-3 |
+| Separate smoothing constants for E and Q, or an exponent on the gain | p09: c_E = c_Q within 1.6e-6 relative, exponent 1 within 5e-6 |
+| Square-root gain, or the amplitude sum instead of the power | p09: residual energy 6.5e9 and 1e9 times the fit's |
+| Constants rounded to 4 or 5 digits | p09: residual energy 3,500 and 13 times the fit's |
+
+Without ducking the same streams are off by 7e-3 to 6.5. A steady tone in the same
+parameter band as a falling one is not ducked; rises and slow decays are not ducked.
+
+Recall: both derivations of this form, the first synthesis pass (d20–d25) and a later
+re-derivation from probes alone (duck-p01–duck-p13), remembered FFmpeg's reducer of this
+kind with roughly these constants. Neither seeded a fit with them; the re-derivation's
+fits started from a = 0.9, c = 0.5, γ = 1 and random starts. The memory may have put the
+form on the candidate list. The form rests on the probes: they reject every other
+candidate, and this form fits every probe to the float floor.
 
 ## Not recovered
 

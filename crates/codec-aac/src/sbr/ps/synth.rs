@@ -319,6 +319,26 @@ impl Synth {
     }
 
     /// Ducking gains per slot and parameter band from the power of the input.
+    ///
+    /// Observed behaviour, given by no available text (Purnhagen section 4.2 names transient
+    /// reduction in the decoder without a form). Per parameter band b and QMF slot t, with
+    /// P the power of the PS input summed over b's decorrelator bands and the state zero at
+    /// the first PS frame and after a restart:
+    /// - K = max(a K', P), a decaying peak;
+    /// - E = E' + c (P - E'), the smoothed power;
+    /// - Q = Q' + c (K - P - Q'), the smoothed excess of the peak over the power;
+    /// - g = E / (γ Q) when γ Q > E, else 1, multiplying the decorrelated signal of b's
+    ///   bands in the same slot.
+    ///
+    /// a = exp(-4/15) (fit 0.7659282906 ± 4.7e-7; `PEAK_DECAY`), c = 1/4 (`SMOOTH`) and
+    /// γ = 3/2 (`DUCK_LIMIT`). Probes duck-p01 to duck-p13 establish the form: gains per
+    /// parameter band (p01, p04), fits of the candidates on tone envelopes (p02, p03, p05),
+    /// the form against every stream (p06, p10, both configurations), its details (p07,
+    /// p08, p11 to p13) and the constants (p09). Eleven other candidates are rejected, each
+    /// by a probe (`harness/codecs/aac/ps/README.md`). Both derivations of this form
+    /// remembered a reducer of this kind in FFmpeg with roughly these constants; neither
+    /// seeded a fit with them, and the memory may have put the form among the candidates.
+    /// The form rests on the probes.
     fn ducking(&mut self, lay: &Layout, x: &[[Cpx; 64]], live: &[bool; MAX_HYBRID]) {
         let peak_decay = t::PEAK_DECAY as f32;
         let smooth = t::SMOOTH as f32;
