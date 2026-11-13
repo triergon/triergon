@@ -378,6 +378,7 @@ impl Ps {
     }
 
     /// Read one PS extension of `bits_left` bits; returns the bits it takes.
+    #[inline(never)] // kept out of the SBR loops, which run without PS too
     pub(crate) fn parse(
         &mut self,
         br: &mut CachedBitReader<'_>,
@@ -785,6 +786,7 @@ impl Ps {
     }
 
     /// Run the PS on one frame: `x` (38 slots) becomes the left channel, `x_r` the right.
+    #[inline(never)] // kept out of the SBR loops, which run without PS too
     pub(crate) fn apply(
         &mut self,
         x: &mut BudgetVec<[Cpx; 64]>,
