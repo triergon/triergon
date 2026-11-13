@@ -616,9 +616,10 @@ fn check_controls(root: &Path, selected: &Options) -> Result<i32, String> {
     Ok(i32::from(!passed))
 }
 
-fn report_paths(selected: &Options) -> [PathBuf; 2] {
+fn report_paths(selected: &Options) -> [PathBuf; 3] {
     [
         selected.output.join("report.json"),
+        selected.output.join("collection.json"),
         selected.output.join("parity/report.json"),
     ]
 }
@@ -1099,24 +1100,25 @@ mod tests {
         let directory = Temporary::new();
         let mut selected = options(&directory.0, &[]).unwrap();
         selected.output = directory.0.join("output");
-        write_json(
-            &selected.output.join("report.json"),
-            &Value::object([(
-                "acceptance",
-                Value::object([("accepted", Value::Bool(true))]),
-            )]),
-        )
-        .unwrap();
+        let accepted = Value::object([(
+            "acceptance",
+            Value::object([("accepted", Value::Bool(true))]),
+        )]);
+        for name in ["report.json", "collection.json"] {
+            write_json(&selected.output.join(name), &accepted).unwrap();
+        }
         let args = args(&["--output", selected.output.to_str().unwrap()]);
         assert!(main(&directory.0, &args).is_err());
-        assert_eq!(
-            read_json(&selected.output.join("report.json"))
-                .unwrap()
-                .get("acceptance")
-                .unwrap()
-                .get("accepted"),
-            Some(&Value::Bool(false))
-        );
+        for name in ["report.json", "collection.json"] {
+            assert_eq!(
+                read_json(&selected.output.join(name))
+                    .unwrap()
+                    .get("acceptance")
+                    .unwrap()
+                    .get("accepted"),
+                Some(&Value::Bool(false))
+            );
+        }
     }
 
     #[test]
