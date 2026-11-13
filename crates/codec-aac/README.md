@@ -89,9 +89,9 @@ caller's reserved PCM planes and reuses them on the next access unit.
   refusal, stays decoded. `Decoder::with_limits(Limits { live_storage_bytes })` sets the
   pool, `Decoder::new_in` charges a caller's `Budget`. An element is a kind and a 4-bit
   tag, so a layout switch, which reuses the elements both layouts have, holds at most 48
-  (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 493 KiB each with
+  (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 382 KiB each with
   SBR, PS and Main prediction, 16 coupling channels of 53 KiB and 93 planes of four SBR
-  raw data blocks (2.9 MiB): 26.8 MiB in all.
+  raw data blocks (2.9 MiB): 21.6 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
@@ -108,18 +108,39 @@ caller's reserved PCM planes and reuses them on the next access unit.
 
 - A configuration-2 frame that carries a single SCE: FFmpeg leaves FR unwritten, so it
   holds stale buffer contents. This decoder outputs silence on FR.
-- Some SBR and PS tables (SBR noise and Huffman tables, PS Huffman tables, the 12/8/4-band
-  hybrid prototypes, the k-to-i maps) are not transcribed from a document. They are
-  validated by the conformance vectors only; codewords and paths no vector reaches are
-  unverified: SBR Huffman table tails, fine-resolution IID, PS mixing B, IPD/OPD in the
-  34-band or 5-band configuration. Provenance:
+- Some SBR tables (the noise table and the Huffman books other than SBR_F_ENVBAL30) are not
+  transcribed from a document. They are validated by the conformance vectors only;
+  codewords no vector reaches are unverified. Provenance:
   [harness/codecs/aac/STATUS.md](../../harness/codecs/aac/STATUS.md).
+- Parametric Stereo: three crafted streams of
+  [harness/codecs/aac/ps-open-manifest.json](../../harness/codecs/aac/ps-open-manifest.json)
+  are open cases, outside the numeric rules (worst channel RMS / max against FFmpeg):
+  - a change between 20 and 34 bands registered while PS is off after an error, followed
+    by a frame that runs (`ps-open-change-while-off`): 1.4e-3 / 4.7e-2. FFmpeg differs in
+    the next frames; this decoder converts the start matrices and restarts the
+    decorrelator only when a frame's configuration differs from that of the frame read
+    before it;
+  - a PS frame without its SBR element (`ps-open-no-sbr-element`): 1.7e-5 / 5.2e-4, in
+    that frame only, where the difference from FFmpeg's output lies in QMF bands 31..35.
+    An HE-AAC v1 stream with the same frame matches FFmpeg;
+  - IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands
+    (`ps-open-ipd-after-iid34`): 3.4e-3 / 3.9e-2, in the change frame and the three after
+    it; later frames match.
 
 ## Conformance
 
-- Specifications: ISO/IEC 14496-3 (subpart 4 AAC, 4.6.18 SBR, subpart 8 PS); QMF window
-  from ETSI TS 101 980 Annex I Table I.1; QMF flowcharts from 3GPP TS 26.404 Figure 6 and
-  TS 26.405 Figure 4.
+- Specifications: ISO/IEC 14496-3 (subpart 4 AAC, 4.6.18 SBR); QMF window from ETSI TS 101
+  980 Annex I Table I.1; QMF flowcharts from 3GPP TS 26.404 Figure 6 and TS 26.405 Figure 4.
+  PS: H. Purnhagen, DAFx 2004 (mixing, hybrid filterbank, decorrelator structure),
+  J. Breebaart et al., EURASIP JASP 2005:9 (the mixing for ICC modes 3..5, IPD/OPD phases)
+  and 3GPP TS 26.405 (hybrid prototype Table 1, 20-band map Table 2); the `ps_data()`
+  syntax, the Huffman books and every table and rule they do not print are recovered from
+  FFmpeg's output by scripted probes
+  ([harness/codecs/aac/ps](../../harness/codecs/aac/ps/README.md)), regenerated and checked
+  by `cargo xtask codecs aac-ps-tables [--check]`. Observed behaviour, given by no
+  available text: the decorrelator's lead delay and coefficient taper, the transient
+  ducking (Purnhagen names transient reduction but gives no form), the IPD/OPD smoothing
+  and the behaviour over frames; the code names the probes of each.
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
   remuxed to ADTS). Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and

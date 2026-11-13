@@ -278,6 +278,10 @@ pub(crate) struct Sbr {
     // scratch
     x: BudgetVec<[Cpx; 64]>,
     x_r: BudgetVec<[Cpx; 64]>,
+    /// Development aid: the 38 QMF slots handed to Parametric Stereo in the last frame
+    /// (re, im interleaved; empty when PS did not run).
+    #[cfg(feature = "inspect")]
+    pub(crate) ps_input: Vec<f32>,
 }
 
 impl Sbr {
@@ -295,6 +299,8 @@ impl Sbr {
             ps_seen: false,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
             x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+            #[cfg(feature = "inspect")]
+            ps_input: Vec::new(),
         })
     }
 
@@ -320,6 +326,8 @@ impl Sbr {
             ps_seen,
             x,
             x_r,
+            #[cfg(feature = "inspect")]
+                ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
         *have_header = false;
@@ -517,10 +525,7 @@ impl Sbr {
                 left -= 2;
                 if id == 2 {
                     // EXTENSION_ID_PS
-                    let before = br.position();
-                    let used = self.ps.parse(br, left as usize)?;
-                    let _ = used;
-                    left -= (br.position() - before) as isize;
+                    left -= self.ps.parse(br, left as usize) as isize;
                     ps = true;
                     self.ps_seen = true;
                 } else {
@@ -633,9 +638,18 @@ impl Sbr {
                         row[k] = ch.xl[k][i + T_HFADJ];
                     }
                 }
-                // Parametric stereo: mono QMF matrix -> left/right matrices (8.6.4)
+                #[cfg(feature = "inspect")]
+                {
+                    self.ps_input.clear();
+                    for row in self.x.iter() {
+                        for v in row {
+                            self.ps_input.extend([v.re, v.im]);
+                        }
+                    }
+                }
+                // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
-                    self.ps.apply(&mut self.x, &mut self.x_r, ready);
+                    self.ps.apply(&mut self.x, &mut self.x_r);
                 } else {
                     // no PS data yet: both outputs carry the mono signal
                     for i in 0..32 {
