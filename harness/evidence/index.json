@@ -19888,6 +19888,16 @@
    "source_revisions": {
     "candidate": "74155089881341aa7aae67e5f754b35a86e4898b"
    }
+  },
+  {
+   "name": "progressive-report-stream-855bfea3-aarch64",
+   "path": "progressive-report-stream-855bfea3-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with identical grades from compact and self-contained reports",
+   "key": "evidence/progressive-report-stream-855bfea3-aarch64/23a105fa6608a9b83936824a82f47e94630ca0f64f54e32ff5a4bc566ebd33f9.tar.zst",
+   "sha256": "23a105fa6608a9b83936824a82f47e94630ca0f64f54e32ff5a4bc566ebd33f9",
+   "bytes": 33776295,
+   "source_revision": "855bfea306ee7c2f7a933505cb18cde287f91a7c"
   }
  ]
 }
