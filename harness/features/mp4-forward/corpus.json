@@ -586,6 +586,36 @@
         "bytes": 108,
         "digest": 11753693190476751358
       }
+    },
+    {
+      "id": "progressive-aac-priming",
+      "profile": "progressive-aac-priming",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 5949837062602278102
+      }
+    },
+    {
+      "id": "progressive-aac-tail-trim",
+      "profile": "progressive-aac-tail-trim",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 16505855173419668607
+      }
     }
   ]
 }

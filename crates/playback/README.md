@@ -170,6 +170,11 @@ seeks before the first sync packet of a secondary fragment track, range
 playback replays that track from its first packet. An AAC track with a
 single initialization edit carries leading trim in the first packet's
 `Mp4Packet::encoded_skip_samples`.
+For regular front-metadata input with one finite media extent,
+`compat::mov::forward_encoded_edits` accepts checked encoded edit plans
+and delivers projected packets in source byte order. AAC packets include the
+decoder priming and end-of-edit trim needed for PCM playback. The index refuses
+edits that require revisiting media bytes.
 `Mp4RangePlayer::prepare_seek_with_opus_recovery` includes the regular
 Opus track's declared preroll. Decode from the reported first sample and
 present PCM from the video landing through the track's edited end. A refused
@@ -305,6 +310,23 @@ with FFprobe 9.0.2, and where FFprobe refused the header it requires the run
 to refuse while opening, before any packet. With `Mp4Open::new_recovery`
 499/499 rows pass: 497 identical packet lists and 2 matching header refusals.
 With `Mp4Open::new` 446/499 pass; the test pins the other 53 outcomes.
+
+The synthetic `forward-aac-priming.mp4` fixture uses a 64 × 48 AVC test
+pattern at 12 fps and a 440 Hz mono AAC tone at 44.1 kHz. To reproduce it with
+FFmpeg 9.0.2 and libx264, run:
+
+```sh
+ffmpeg -nostdin -v error \
+  -f lavfi -i 'testsrc2=s=64x48:r=12' -f lavfi -i 'sine=f=440:r=44100' \
+  -t 0.35 -map 0:v:0 -map 1:a:0 -c:v libx264 -threads:v 1 -profile:v baseline \
+  -pix_fmt yuv420p -g 2 -bf 0 -c:a aac -b:a 40k -movflags +faststart forward-aac-priming.mp4
+```
+
+`forward-aac-tail-trim.mp4` keeps the 44,100 Hz movie timescale and sets
+the audio edit to media time zero and duration 16,459. Both fixtures use the
+repository's dual license. The `mp4-forward` corpus records their hashes
+and compares both packet traces with AAC trim included.
+
 Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
 [Dolby clocks](tests/fixtures/dolby-clock/README.md),

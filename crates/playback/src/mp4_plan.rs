@@ -250,7 +250,7 @@ impl PreparedMp4 {
         Some(previous.max(end))
     }
     pub fn rows(&self) -> usize {
-        if self.native_front && !self.replay_native_order {
+        if self.native_front && !self.replay_native_order && self.encoded_edits.is_none() {
             return self.source_rows.len();
         }
         match self.view {
@@ -259,7 +259,7 @@ impl PreparedMp4 {
         }
     }
     pub fn row(&self, at: usize) -> Option<SourceRow> {
-        if self.native_front && !self.replay_native_order {
+        if self.native_front && !self.replay_native_order && self.encoded_edits.is_none() {
             return self.source_rows.as_slice().get(at).cloned();
         }
         match self.view {
@@ -353,6 +353,38 @@ impl<'a> Mp4IndexJob<'a> {
     pub fn new(movie: &'a Movie, view: Mp4View, limits: PlanLimits) -> Result<Self> {
         Self::new_inner(movie, view, limits, false, None, None)
     }
+    pub(crate) fn for_forward_encoded_edits(
+        movie: &'a Movie,
+        plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
+        limits: PlanLimits,
+    ) -> Result<Self> {
+        if plans.len() != movie.tracks().len() {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
+        if movie.native_recovery()
+            || !matches!(
+                movie.read_scope(),
+                crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+            )
+            || movie.media().len() != 1
+            || movie.terminal_mdat().is_some()
+            || !movie.trex().is_empty()
+            || !plans.iter().any(Option::is_some)
+        {
+            return Err(Error::Unsupported(
+                "forward encoded edits require regular front media",
+            ));
+        }
+        Self::new_inner(
+            movie,
+            Mp4View::PinnedMov9NoParseNoFillin,
+            limits,
+            true,
+            Some(plans),
+            None,
+        )
+    }
+
     /// Build the native range view with explicitly validated encoded edits.
     /// The retained plans also govern seeks on this exact range index.
     pub fn new_native_encoded_range(
@@ -563,6 +595,14 @@ impl<'a> Mp4IndexJob<'a> {
                     native_limits,
                     encoded_edits,
                     |index| include_media_track(movie, index),
+                )?
+            } else if let Some(plans) = encoded_edits.filter(|_| native_front) {
+                PacketCursor::new_front_with_encoded_edits(
+                    b,
+                    native.as_slice(),
+                    movie.media(),
+                    native_limits,
+                    plans,
                 )?
             } else if let Some(plans) = encoded_edits {
                 PacketCursor::new_encoded_regular(
@@ -974,7 +1014,13 @@ impl<'a> Mp4IndexJob<'a> {
                         row.media_clock = clock;
                     }
                     let mut replay_native_order = p.replay_native_order;
-                    if p.native_front && !replay_native_order {
+                    if p.native_front && p.encoded_edits.is_some() {
+                        if p.native_rows.as_slice().last().is_some_and(|previous| {
+                            previous.source.range.end > row.source.range.start
+                        }) {
+                            return Err(Error::Unsupported("forward encoded edits revisit media"));
+                        }
+                    } else if p.native_front && !replay_native_order {
                         let source = p.source_rows.as_slice().get(p.native_rows.len());
                         if source
                             .is_none_or(|s| s.track_id != row.track_id || s.sample != row.source)

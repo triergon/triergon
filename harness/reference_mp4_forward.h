@@ -5,14 +5,18 @@
  * or timestamp fill-in, every packet of every track through the end of the input.
  * Each packet is folded with its track ID, PTS, DTS and duration in the track's
  * time base, packet flags and payload. LAYOUT regular reads a seekable input,
- * progressive a forward-only one. */
+ * progressive and progressive-edited read a forward-only input. The edited
+ * operation also folds the leading and trailing skip-samples fields. */
+
+#include <libavutil/intreadwrite.h>
 
 #define MP4_FORWARD_QUANTUM (32 * 1024)
 
 static int mp4_forward_operation(const uint8_t *data, size_t size, const char *layout, PacketWork *work)
 {
     const int regular = !strcmp(layout, "regular");
-    if (!regular && strcmp(layout, "progressive"))
+    const int edited = !strcmp(layout, "progressive-edited");
+    if (!regular && !edited && strcmp(layout, "progressive"))
         return AVERROR(EINVAL);
     PacketInput in = {data, (int64_t)size, 0, MP4_FORWARD_QUANTUM};
     AVFormatContext *format = NULL;
@@ -33,6 +37,24 @@ static int mp4_forward_operation(const uint8_t *data, size_t size, const char *l
                     packet->dts == AV_NOPTS_VALUE ? INT64_MIN : packet->dts,
                     packet->duration > 0 ? (uint64_t)packet->duration : 0,
                     (uint64_t)packet->flags, packet->data, (size_t)packet->size);
+        if (edited) {
+            size_t skip_len = 0;
+            const uint8_t *skip = av_packet_get_side_data(packet, AV_PKT_DATA_SKIP_SAMPLES, &skip_len);
+            if (skip && skip_len != 10) {
+                rc = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            fold(&work->digest, skip != NULL);
+            if (skip) {
+                fold_bytes(&work->digest, skip, skip_len);
+                if (work->trace)
+                    printf("skip %" PRIu32 " %" PRIu32 " %u %u\n",
+                           AV_RL32(skip), AV_RL32(skip + 4),
+                           (unsigned)skip[8], (unsigned)skip[9]);
+            } else if (work->trace) {
+                puts("skip -");
+            }
+        }
         av_packet_unref(packet);
     }
     if (rc == AVERROR_EOF)

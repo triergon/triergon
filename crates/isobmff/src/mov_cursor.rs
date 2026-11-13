@@ -742,6 +742,36 @@ impl<'a> PacketCursor<'a> {
         cursor.terminal = terminal;
         Ok(cursor)
     }
+
+    /// Project validated regular edits in ascending source order. All sample
+    /// declarations must belong to the media extent already found by the opener.
+    pub fn new_front_with_encoded_edits(
+        budget: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+        plans: &'a [Option<crate::EncodedEditPlan>],
+    ) -> Result<Self> {
+        if plans.len() != tracks.len() {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
+        if media.len() != 1 || tracks.iter().any(|track| !track.fragments.is_empty()) {
+            return Err(Error::Unsupported(
+                "front encoded edits require regular tracks and one media extent",
+            ));
+        }
+        let mut cursor = Self::new_front_source(
+            budget,
+            tracks,
+            media,
+            None,
+            limits,
+            DemuxProfile::NoParseNoFillin,
+        )?;
+        cursor.bind_encoded_edits(budget, plans)?;
+        Ok(cursor)
+    }
+
     /// Project unedited regular declarations for a forward-only front movie.
     /// An occurrence outside the first extent still needs actual later media
     /// admission before it may carry a packet payload.

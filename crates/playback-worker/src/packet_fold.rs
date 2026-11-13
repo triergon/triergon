@@ -32,6 +32,22 @@ pub struct Packet<I> {
 }
 
 impl Work {
+    pub(crate) fn skip_samples(&mut self, bytes: Option<[u8; 10]>) {
+        fold(&mut self.digest, u64::from(bytes.is_some()));
+        let Some(bytes) = bytes else {
+            if self.trace {
+                println!("skip -");
+            }
+            return;
+        };
+        fold_bytes(&mut self.digest, &bytes);
+        if self.trace {
+            let leading = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+            let trailing = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+            println!("skip {leading} {trailing} {} {}", bytes[8], bytes[9]);
+        }
+    }
+
     /// Fold track, PTS, DTS, duration, flags, size and every payload byte.
     pub fn packet<'a, I: IntoIterator<Item = &'a [u8]>>(
         &mut self,

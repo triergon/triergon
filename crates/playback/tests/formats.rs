@@ -3081,6 +3081,129 @@ fn bounded_timing_accepts_forward_index_with_finite_media() {
 }
 
 #[test]
+fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
+    use triergon_playback::progressive::ProgressiveLimits;
+
+    let raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4");
+    let (selected, budget, calls) = probe(raw, 37, true);
+    let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+    run_open(&mut open, 17).unwrap();
+    let mut opened = open.finish().unwrap();
+    let plans = encoded_plans(&mut opened);
+    let limits = PlanLimits::default();
+    let mut index = compat::mov::forward_encoded_edits(&opened.movie, &plans, limits).unwrap();
+    while !index.poll(&mut WorkBudget::new(17), &off()).unwrap() {}
+    let engine = Engine::mp4_native_terminal_v1(
+        opened.input,
+        index.finish().unwrap(),
+        1 << 20,
+        ProgressiveLimits::default(),
+    )
+    .unwrap();
+    let mut player = Player::new_direct(
+        engine,
+        opened.source,
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    let out = collect(&mut player, 17).unwrap();
+    let packets = mp4_packets(&out);
+    assert!(
+        packets
+            .windows(2)
+            .all(|rows| { rows[0].source.sample.range.end <= rows[1].source.sample.range.start })
+    );
+    let audio: Vec<_> = packets
+        .iter()
+        .filter(|packet| packet.configuration.track.handler == *b"soun")
+        .collect();
+    let trim = |packet: &Mp4Packet| {
+        let data = packet.encoded_skip_samples.unwrap();
+        (
+            u32::from_le_bytes(data[..4].try_into().unwrap()),
+            u32::from_le_bytes(data[4..8].try_into().unwrap()),
+        )
+    };
+    assert_eq!(
+        audio.first().unwrap().native.as_ref().unwrap().demux.pts,
+        Some(-1024)
+    );
+    assert_eq!(trim(audio.first().unwrap()), (1024, 0));
+    assert_eq!(trim(audio.last().unwrap()), (0, 949));
+    for packet in packets {
+        let range = &packet.source.sample.range;
+        assert_eq!(
+            packet.source.payload.as_ref(),
+            &raw[range.start as usize..range.end as usize]
+        );
+    }
+    let offsets: Vec<_> = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|call| {
+            if let Call::Poll(offset) = call {
+                Some(*offset)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(offsets.windows(2).all(|rows| rows[0] < rows[1]));
+    drop(out);
+    drop(player);
+    drop(plans);
+    drop(opened.movie);
+    assert_eq!(budget.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn forward_encoded_edit_drains_samples_outside_the_presentation() {
+    use triergon_playback::progressive::ProgressiveLimits;
+
+    let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
+    let audio_edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();
+    let duration = &mut raw[audio_edit + 12..audio_edit + 16];
+    assert_eq!(duration, &15_435_u32.to_be_bytes());
+    duration.copy_from_slice(&4_410_u32.to_be_bytes());
+
+    let (selected, _, calls) = probe(&raw, 37, true);
+    let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+    run_open(&mut open, 17).unwrap();
+    let mut opened = open.finish().unwrap();
+    let plans = encoded_plans(&mut opened);
+    let mut index =
+        compat::mov::forward_encoded_edits(&opened.movie, &plans, PlanLimits::default()).unwrap();
+    while !index.poll(&mut WorkBudget::new(17), &off()).unwrap() {}
+    let prepared = index.finish().unwrap();
+    assert_eq!(prepared.source_rows().len(), 21);
+    assert_eq!(prepared.rows(), 10);
+    let engine = Engine::mp4_native_terminal_v1(
+        opened.input,
+        prepared,
+        1 << 20,
+        ProgressiveLimits::default(),
+    )
+    .unwrap();
+    let mut player = Player::new_direct(
+        engine,
+        opened.source,
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    let outputs = collect(&mut player, 17).unwrap();
+    assert_eq!(mp4_packets(&outputs).len(), 10);
+    assert!(
+        calls
+            .lock()
+            .unwrap()
+            .contains(&Call::Poll(raw.len() as u64))
+    );
+}
+
+#[test]
 fn bounded_timing_range_playback_preserves_packets_and_seeks() {
     use triergon_isobmff::{TimingRunPolicy, TimingRunSurplus};
 
@@ -3555,11 +3678,18 @@ fn encoded_range_open(
     mp4_open::OpenedMp4<ByteSource>,
     Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>>,
 ) {
+    let (mut opened, _) = open(raw, 97, 4096).unwrap();
+    let plans = encoded_plans(&mut opened);
+    (opened, plans)
+}
+
+fn encoded_plans<S: triergon_playback::Source>(
+    opened: &mut mp4_open::OpenedMp4<S>,
+) -> Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>> {
     use triergon_isobmff::compat::mov::{
         edits::{EncodedEditContext, EncodedEditJob},
         packets::CursorStatus,
     };
-    let (mut opened, _) = open(raw, 97, 4096).unwrap();
     let cancel = off();
     let mut plans = Vec::new();
     for track in opened.movie.tracks() {
@@ -3569,11 +3699,15 @@ fn encoded_range_open(
             plans.push(None);
             continue;
         }
+        let Some(edits) = track.edits() else {
+            plans.push(None);
+            continue;
+        };
         let configs = range_configs(track, opened.movie.major_brand(), &mut opened.input);
         let mut edit = EncodedEditJob::new_range_playback(
             EncodedEditContext {
                 table: track.table(),
-                edits: track.edits().unwrap(),
+                edits,
                 stream: &configs[0],
                 media_base: track.header().time_base().unwrap(),
                 movie_base: opened.movie.header().time_base().unwrap(),
@@ -3590,7 +3724,7 @@ fn encoded_range_open(
         {}
         plans.push(Some(edit.take(&mut opened.input, &cancel).unwrap()));
     }
-    (opened, plans)
+    plans
 }
 
 const RTP_HINTS: &[u8] = include_bytes!("fixtures/mp4/avc-aac-rtp-hints.mp4");

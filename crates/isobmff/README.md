@@ -311,6 +311,9 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  A front-metadata cursor can project checked encoded edits for regular tracks
+  within one finite media extent. The forward playback index checks the
+  projected byte order before delivering any packet.
   `SampleTable::has_composition_offsets` reports a regular table's `ctts`
   presence before reading its samples.
   A regular video edit starting on the first decoded sample's presentation
