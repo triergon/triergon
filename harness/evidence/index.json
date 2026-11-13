@@ -19890,6 +19890,98 @@
    }
   },
   {
+   "name": "mp4-forward-edits-f5453ef9-aarch64",
+   "path": "mp4-forward-edits-f5453ef9-aarch64",
+   "retention": "retained",
+   "reason": "MP4 forward and range playback with checked AAC edits and bounded seek restarts",
+   "key": "evidence/mp4-forward-edits-f5453ef9-aarch64/bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223.tar.zst",
+   "sha256": "bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223",
+   "bytes": 67830097,
+   "source_revision": "f5453ef9d88712777aa5b6383250875456e9f334"
+  },
+  {
+   "name": "adts-priming-96232af7-aarch64",
+   "path": "adts-priming-96232af7-aarch64",
+   "retention": "retained",
+   "reason": "ADTS AAC priming policy and both AAC-LC decoder workloads",
+   "key": "evidence/adts-priming-96232af7-aarch64/a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe.tar.zst",
+   "sha256": "a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe",
+   "bytes": 38661043,
+   "source_revision": "96232af7d9431c2285c6b6d248aa38a133b85fe3"
+  },
+  {
+   "name": "codec-he-aac-workloads-700c2134",
+   "path": "codec-he-aac-workloads-700c2134",
+   "retention": "retained",
+   "reason": "Codecs: the HE-AAC v1 and v2 timing workloads (aac-he-stereo, aac-he-5.1, aac-hev2-stereo) on one c6g.4xlarge, Linux AArch64 and ARMv7 (thumbv7neon-unknown-linux-gnueabihf) pinned to CPU 1: their inputs; the heap failure at 5c4fe252 and the heap profiles that located it; at 700c2134 against 5c4fe252 the crate and FATE tests, worker outputs on 68 AAC inputs on both targets, instruction counts, 30-pair AArch64 timing and memory (HE and LC) and 30-pair ARMv7 timing and memory (HE)",
+   "key": "evidence/codec-he-aac-workloads-700c2134/838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239.tar.gz",
+   "sha256": "838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239",
+   "bytes": 37234479,
+   "source_revisions": {
+    "candidate": "700c2134a123d8c9566c1cdccdeb3a0b3b0399c0",
+    "baseline": "5c4fe25232e54ea1280b258c7f99a04fa3f4bf93"
+   }
+  },
+  {
+   "name": "progressive-report-stream-855bfea3-aarch64",
+   "path": "progressive-report-stream-855bfea3-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with identical grades from compact and self-contained reports",
+   "key": "evidence/progressive-report-stream-855bfea3-aarch64/d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a.tar.gz",
+   "sha256": "d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a",
+   "bytes": 34538077,
+   "source_revision": "855bfea306ee7c2f7a933505cb18cde287f91a7c"
+  },
+  {
+   "name": "progressive-report-stream-ec6afe86-aarch64",
+   "path": "progressive-report-stream-ec6afe86-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with matching compact and self-contained grades and preserved case outputs",
+   "key": "evidence/progressive-report-stream-ec6afe86-aarch64/f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f.tar.gz",
+   "sha256": "f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f",
+   "bytes": 34423896,
+   "source_revision": "ec6afe8635509d7e9007fd3d3c20ce2bf1c25835"
+  },
+  {
+   "name": "aac-s16-floor-ddb02a59-armv7",
+   "path": "aac-s16-floor-ddb02a59-armv7",
+   "retention": "retained",
+   "reason": "Audio codec timing and the s16 conversion without floorf at ddb02a59 against main at f3d4935b on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of every audio workload for both against the decode reference, instruction counts on the gate target and on A32 with NEON, the aac-lc-stereo profiles, the decoder-output equivalence records, the conversion checked against the floor over every f32, the four conversions compared and their disassembly, the workers, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-ddb02a59-armv7/52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977.tar.gz",
+   "sha256": "52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977",
+   "bytes": 72342434,
+   "source_revisions": {
+    "candidate": "ddb02a59a7ac8bf1974c14439194430e2b245504",
+    "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+   }
+  },
+  {
+   "name": "aac-s16-floor-he-0b3c2db5-armv7",
+   "path": "aac-s16-floor-he-0b3c2db5-armv7",
+   "retention": "retained",
+   "reason": "AAC-LC and HE-AAC v1 and v2 codec timing with the s16 conversion without floorf at 0b3c2db5 (the change merged with main) against main at b89e5844 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of the five AAC workloads for both against the decode reference, instruction counts of every audio workload on the gate target and on A32 with NEON, the aac-he-stereo and aac-lc-stereo profiles, the decoder-output equivalence records, the session tests, the workers, the scripts, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-he-0b3c2db5-armv7/bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a.tar.gz",
+   "sha256": "bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a",
+   "bytes": 62225056,
+   "source_revisions": {
+    "candidate": "0b3c2db5239da81ab38d7a33f73b70a9f77df464",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
+  },
+  {
+   "name": "aac-s16-floor-f0744418-aarch64",
+   "path": "aac-s16-floor-f0744418-aarch64",
+   "retention": "retained",
+   "reason": "The s16 conversion without floorf on Linux AArch64, the codec gate target, at f0744418 against main at b89e5844 on a c6g.4xlarge: instruction counts of every audio workload in three rounds and of main against itself, the decoder-output equivalence records, the session tests, the conversion checked against the floor over every f32, the downmix disassembly, the aac-lc-stereo profiles, the workers, the scripts, and the CPU, kernel and package list",
+   "key": "evidence/aac-s16-floor-f0744418-aarch64/ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6.tar.gz",
+   "sha256": "ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6",
+   "bytes": 9623793,
+   "source_revisions": {
+    "candidate": "f0744418776dd2e01795c24d06716f54a0aefc2e",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
+  },
+  {
    "name": "capture-armv7-conversion-dcf51398-armv7",
    "path": "capture-armv7-conversion-dcf51398-armv7",
    "retention": "retained",

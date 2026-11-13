@@ -14,6 +14,81 @@ use triergon_isobmff::{
 };
 
 #[test]
+fn duration_scan_preserves_seek_restarts_with_a_tight_pool() {
+    use triergon_isobmff::compat::mov::packets::{
+        CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits,
+    };
+    let metadata = Budget::new(1 << 20).unwrap();
+    let table = fragment_sample_table(&metadata);
+    let fragments = std::array::from_fn::<_, 3, _>(|track| {
+        std::array::from_fn::<_, 33, _>(|at| {
+            let ordinal = at as u64 + 1;
+            let start = 1000 + at as u64 * 6 + track as u64 * 2;
+            fixture::fragment_track(
+                &metadata,
+                track as u32 + 7,
+                ordinal,
+                start,
+                1,
+                Some(at as u64 * 10),
+                &[&[0]],
+            )
+        })
+    });
+    let base = TimeBase::new(1, 1000).unwrap();
+    let tracks = std::array::from_fn::<_, 3, _>(|at| DemuxTrack {
+        track_id: at as u32 + 7,
+        table: &table,
+        fragments: &fragments[at],
+        media_base: base,
+        edits: None,
+    });
+    let extent = 1000..1300;
+    let media = std::slice::from_ref(&extent);
+    let cancel = AtomicBool::new(false);
+    let keeps_restarts = |limit, duration| {
+        let pool = Budget::new(limit).unwrap();
+        let Ok(mut cursor) = PacketCursor::new_complete_source(
+            &pool,
+            &tracks,
+            media,
+            PacketLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        ) else {
+            return false;
+        };
+        if duration {
+            cursor.check_duration_before_replay().unwrap();
+        }
+        cursor.enable_range_seek_checkpoints();
+        loop {
+            match cursor.poll(&mut WorkBudget::new(128), &cancel).unwrap() {
+                CursorStatus::Ready => {
+                    cursor.take_occurrence().unwrap();
+                }
+                CursorStatus::Yield => {}
+                CursorStatus::End => break,
+            }
+        }
+        if duration {
+            assert_eq!(cursor.checked_duration_us(), Some(330_000));
+        }
+        cursor.discard_seek_checkpoints()
+    };
+
+    // The merged order admits the first point from every track before extras.
+    // Compare retention across the allocation thresholds on this target.
+    let mut retained = false;
+    for limit in (1024..1 << 14).step_by(8) {
+        if keeps_restarts(limit, false) {
+            retained = true;
+            assert!(keeps_restarts(limit, true), "allocation budget {limit}");
+        }
+    }
+    assert!(retained);
+}
+
+#[test]
 fn complete_fragment_edit_offsets_the_packet_and_resume_clocks() {
     use triergon_isobmff::compat::mov::packets::{
         CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, ResumePoint,

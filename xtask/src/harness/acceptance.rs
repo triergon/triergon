@@ -410,7 +410,7 @@ fn grade_case_with_runtime(
     }
 }
 
-pub(super) fn parity_passes(row: &Value) -> bool {
+pub(crate) fn parity_passes(row: &Value) -> bool {
     row.get("parity").is_some_and(|proof| {
         s(proof, "status") == Some("pass") && s(proof, "source_timing_status") == Some("pass")
     })

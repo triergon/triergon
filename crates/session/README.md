@@ -48,6 +48,10 @@ and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
 SIMD kernels.
 
+For ADTS packets carrying an explicit container priming edit, use
+`compat::aac::adts_decoder(PrimingPolicy::Container)` and apply the edit to
+the decoded PCM. The default AAC decoder uses the encoder signature.
+
 Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
 AudioSpecificConfig with a fixed layout or a Program Configuration Element.
 `TrackDecoder::aac_access_units_with_layout_in` accepts
@@ -110,6 +114,9 @@ input).
   Pro Logic II surround encoding) are honoured. A layout without speaker positions
   mixes as FFmpeg's default layout for its channel count, and 16-bit frames (FLAC) mix
   in integers as FFmpeg's resampler mixes them ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)).
+  Float mixes become s16 rounded toward negative infinity and saturated (`mix::to_s16`),
+  with a conversion, a comparison and integer saturation: no `floorf` call on 32-bit
+  ARM, which has no rounding instruction.
 - **Stream selection.** `StreamSelection` names a stream's video codec and its
   audio codec, if any. `StreamSelection::load` starts both sessions with the
   matching decoders; with `audio: None` the audio session stays `Idle`.

@@ -103,6 +103,34 @@ fn block(cpe: bool) -> Vec<u8> {
 }
 
 #[test]
+fn an_explicit_container_edit_supersedes_the_adts_delay_signature() {
+    let mut bits = Bw::new();
+    bits.put(6, 3); // ID_FIL
+    bits.put(15, 4);
+    bits.put(1, 8); // escape count, 15 + 1 - 1
+    bits.put(0, 4); // EXT_FILL
+    bits.put(0, 13);
+    for byte in b"libfaac 1.23" {
+        bits.put(u32::from(*byte), 8);
+    }
+    bits.put(0, 7); // remainder of the fill element
+    silent_block(&mut bits, false);
+    let packet = adts(1, 3, 1, &[bits.bytes()], false);
+
+    let mut pcm = AudioFrame::default();
+    Decoder::new().decode(&packet, &mut pcm).unwrap();
+    assert_eq!(pcm.samples_per_channel, 0);
+
+    let mut decoder =
+        Decoder::new().with_priming_policy(triergon_codec_aac::compat::priming::Policy::Container);
+    decoder.decode(&packet, &mut pcm).unwrap();
+    assert_eq!((pcm.sample_rate, pcm.samples_per_channel), (48_000, 1024));
+    decoder.reset();
+    decoder.decode(&packet, &mut pcm).unwrap();
+    assert_eq!(pcm.samples_per_channel, 1024);
+}
+
+#[test]
 fn raw_fixed_layouts_follow_the_speaker_configuration() {
     use Speaker::{
         BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight,

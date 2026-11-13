@@ -21,14 +21,14 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1488 (44/44 pass) | heap ≤0.4038, total RSS ≤0.9202 (44/44 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 29 of 44 cases | FATE mapping |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.1408 (10/10 pass) | heap ≤0.8103, total RSS ≤0.9875 (10/10 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 10 of 10 cases | audio seek and FATE coverage |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8854 (972/972 pass) | heap ≤0.4132, total RSS ≤0.7260 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
-| MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, including regular AVC with an initial non-sync prefix, fragmented AVC/AAC with open-ended edits, timed text and DVD subpictures including a leading empty subpicture edit, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with fixed and program configurations, including regular version-2 descriptions and fragmented version-1 descriptions, and media playback in the presence of RTP hint tracks | 51 matching open and backward-seek comparisons (`mp4-range`), 7,190 packets on AArch64 Linux | 1.1865 (51/51 pass) | heap ≤0.9956, total RSS ≤0.9683 (51/51 lower) | Additional range playback profiles |
+| MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, including regular AVC with an initial non-sync prefix, fragmented AVC/AAC with open-ended edits, timed text and DVD subpictures including a leading empty subpicture edit, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with fixed and program configurations, including regular version-2 descriptions and fragmented version-1 descriptions, and media playback in the presence of RTP hint tracks | 51 matching open and backward-seek comparisons (`mp4-range`), 7,190 packets on AArch64 Linux | 1.1523 (51/51 pass) | heap ≤0.9956, total RSS ≤0.9682 (51/51 lower) | Additional range playback profiles |
 | AAC in MOV | Raw AAC-LC access units with 1024 samples per plane and all thirteen indexed rates. Supports fixed configurations 1–7, 11, 12 and 14 and out-of-band programs assigning up to eight distinct speaker positions. | The [configured decoder comparison](../harness/features/aac-access-units/contract.json) covers 34 clips, 3,544 access units and 15,575,040 PCM samples. Two fixed-layout QuickTime clips compare the surround pair in the same plane positions with side or back labels. Every other clip compares exact speaker order. | 0.8262 (34/34 pass) | heap ≤0.8066, total RSS ≤0.4586 (34/34 lower) | 960-sample frames and SBR in raw access units |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus and FLAC mappings with canonical configurations, granule timing, pre-skip and end trims, bisection seeking | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`) on 21 FATE Vorbis files and 13 generated Opus, Vorbis and FLAC files (multiplexed, chained, damaged, truncated), in two views: the FFmpeg-compatible `compat::clock` 31/34 pass, 3 differ only by reviewed FFmpeg behaviours; the reader's own timing 7/34 pass, 25 differ only where `compat::clock` reproduces FFmpeg, 2 by reviewed behaviours ([reader rules](../harness/codecs/reader-rules.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; Theora and Speex untimed; chained seeks not compared with FFmpeg |
 | Audio elementary streams | Native FLAC (with or without `fLaC`), MPEG audio with ID3v2/ID3v1/APE tags, Xing/Info/VBRI and LAME gapless trims, ADTS, AC-3/E-AC-3; one shared frame-stream engine | Packets as the readers emit them against the pinned `ffprobe` on 271 FLAC, MPEG audio, ADTS, AC-3 and E-AC-3 files (the IETF FLAC testbench, MP3 conformance, generated and crafted damaged streams): 253/271 pass, 16 differ only by reviewed FFmpeg behaviours, 2 refused by both (testbench faulty `06 - missing streaminfo metadata block`, `07 - other metadata blocks preceding streaminfo metadata block`) | within the codec workloads | within the codec workloads | FLAC `flac_s20_rate768k`, `06 - samplerate 768kHz` (no durations at 768 kHz), `01 - changing samplerate`, `27 - old format variable blocksize file created with Flake 0.11`, `11 - file starting with unparsable data`, `11 - incorrect metadata block length`, `08 - blocksize 65536`, `09 - blocksize 1`; crafted `ac3_tags`, `adts_mid_junk`, `flac_corrupt`, `flac_id3`, `flac_mid_junk`, `mp3_foreign_frame`, `mp3_mid_junk_falsesync`; MP3 `he_free` (free format, refused by FFmpeg); E-AC-3 dependent substreams on real files; ADTS and AC-3 seek cost |
 | MPEG-TS | PSI, continuity, PES assembly and ordered TS188/M2TS192 entities with control-only and bounded fault completion, with format-owned track classification | 97/97 PES compatibility-view comparisons across all 272 requests | 0.9413 (97/97 pass) | heap ≤0.065330, total RSS ≤0.891584 (97/97 lower) | strict source clocks, full FATE mapping |
 | MPEG-TS access units | `ContainerReader` and `AnyReader` for TS188 and M2TS192, with AVC, HEVC, ADTS AAC-LC, LATM in LOAS, signalled AC-3 and E-AC-3, DVB subtitle segments and ordered entities; `Reader` can frame selected PIDs while retaining all source events | 169/169 transport compatibility folds for all tracks in the chosen program, including LATM PES and opaque observations, with all 272 original request associations; explicit PID selection has separate reader tests | 1.1861 (169/169 pass) | heap ≤0.088210, total RSS ≤0.911429 (169/169 lower) | additional carriages, seeking and full FATE mapping |
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 1.0267 (35/35 pass) | heap ≤0.087743, total RSS ≤0.867077 (35/35 lower) | additional program and carriage profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1185 (3/3 pass) | heap ≤0.015079, total RSS ≤0.723530 (3/3 lower) | broader transport and codec profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1256 (3/3 pass) | heap ≤0.015079, total RSS ≤0.724510 (3/3 lower) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.0336 (71/71 pass) | heap ≤0.020733, total RSS ≤0.808122 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 125 of 125 cases | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 0.8573 (354/354 pass; worst `tx3g-known_box_trailing_bytes_and_short_bodies_are_errors`, median of the cases 0.383); the 13 `mov-text-tags` cases at `96f660ba`: 0.9860 (13/13 pass; worst `mov-text-tags-ranges`, median of the cases 0.797); instructions at `96f660ba` against main at `339ec261`: 0.916 of main's in sum, `subtitle-text-host` 1.000, no case above main beyond the run spread but `mov-text-tags-nul-transitions` (1.031), whose output is longer | heap ≤0.336, total RSS ≤0.911 (354/354 lower); the 13 `mov-text-tags` cases at `96f660ba`: heap ≤0.336, total RSS ≤0.860 (13/13 lower, kernel-bound); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 1 of 377 cases | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; FATE coverage |
@@ -37,8 +37,8 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 233 cases: `subtitle-dvd` 228/228 on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), the 4 cases added at `c79ae2da` on A32 there, and `subtitle-dvd-host`'s 5, pinned per target, 5/5 on ARMv7 and 1/5 on AArch64 | 0.8595 (225/225 pass); the 4 cases `vobsub-idx-size-largest`, `-past-largest`, `-widest` and `-past-widest` at `c79ae2da`: 0.1713 (4/4 pass; worst `vobsub-idx-size-widest`); instructions at `c79ae2da` against main at `339ec261`: 0.99995 of main's in sum, `subtitle-dvd-host` 0.99991, no case above main beyond the run spread | heap ≤0.959, total RSS ≤0.869 (225/225 lower); the 4 cases at `c79ae2da`: heap ≤0.0029, total RSS ≤0.751 (4/4 lower, kernel-bound) | FATE coverage; on AArch64, `subtitle-dvd-host`'s 4 open cases, target-dependent by design: FFmpeg there reads numbers of a VobSub configuration and of the `palette` option beyond 32 bits with 64, and the decoder follows FFmpeg on 32-bit ARM |
 | Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 201/205 cases (`subtitle-cc`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); the other 4 are the open `hevc-eos-ts` cases | 0.5724 (201/201 pass); instructions at `4d81cde0` against main at `339ec261`: 0.9996 of main's in sum, median of the cases 0.9997, no case above main beyond the run spread (the four `h264-dtvcc-mkv` cases +0.014% to +0.016%) | heap ≤0.123, total RSS ≤0.967 (201/201 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 4 of 201 cases | FATE coverage; HEVC picture output at a new sequence (open case `hevc-eos-ts`: no DPB output model, so `no_output_of_prior_pics` after an end of sequence is not applied) |
 | Teletext | DVB teletext pages to text and ASS, as FFmpeg's libzvbi 0.2.46 decoder emits them | 72/72 cases (`subtitle-teletext`), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), the 2 cases added at `c79ae2da` on A32 there | 0.4388 (70/70 pass); the 2 cases `teletext-chop-text` and `teletext-chop-ass` at `c79ae2da`: 0.4192 (2/2 pass; worst `teletext-chop-ass`); instructions at `c79ae2da` against main at `339ec261`: 0.99268 of main's in sum, no case above main beyond the run spread | heap ≤0.622, total RSS ≤0.662 (70/70 lower); the 2 cases at `c79ae2da`: heap ≤0.129, total RSS ≤0.654 (2/2 lower, kernel-bound) | FATE coverage |
-| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 39/39 (`mp4-forward`), 566 packets, TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 0.9911 (39/39 pass), TS program 1.1621 (35/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤0.5590, total RSS ≤0.9975 (39/39 lower); TS program heap ≤0.1008, total RSS ≤0.9090 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails for MP4 forward, above the reference in 39 of 39 cases | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC |
-| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2 (Parametric Stereo from open publications and probes); AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths; three open AAC Parametric Stereo cases (`harness/codecs/aac/ps-open-manifest.json`); AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
+| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | MP4 terminal-media matrix against recorded FFprobe 9.0.2 output (evidence set `playback-terminal-matrix-ffprobe`): 39 inputs in 13 source geometries (12 nonseekable for every input, 1 seekable for the 31 original inputs), 499 rows, each run in debug and in release. `Mp4Open::new_recovery` 499/499 pass: 497 identical packet lists, and 2 seekable reads of a zero-size fragment sample that the opener refuses in the header, where FFprobe also refuses. `Mp4Open::new` 446/499 pass. Packet folds: MP4 forward 46/46 (`mp4-forward`), 673 packets, TS program 35/35 (`ts-program`), raw Annex B 6/6 (`raw-annex-b`) | MP4 forward 0.9921 (46/46 pass), TS program 1.1621 (35/35 pass), raw Annex B 1.0810 (6/6 pass) | MP4 forward heap ≤0.6710, total RSS ≤0.9570 (46/46 lower); TS program heap ≤0.1008, total RSS ≤0.9090 (35/35 lower); raw Annex B heap ≤0.127, total RSS ≤0.901 (6/6 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails for MP4 forward, above the reference in 39 of 39 cases | other profiles; legacy Matroska `A_AAC/MPEG4/*` codec IDs are not read as AAC |
+| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2 (Parametric Stereo from open publications and probes); AC-3 and E-AC-3; DTS core with XCh and X96; storage charged to a budget | 417/417 comparable conformance and FATE vectors | 1.0551 (17/17 pass); the three HE-AAC workloads at `700c2134`, on a c6g.4xlarge: 1.0300 (3/3 pass; worst `aac-he-stereo`) | heap 0.92, RSS 0.82; at `700c2134`, the HE-AAC workloads heap ≤0.941, total RSS ≤0.899, and AAC-LC heap ≤0.605, total RSS ≤0.887 (5/5 lower) | error concealment, unverified tool paths; three open AAC Parametric Stereo cases (`harness/codecs/aac/ps-open-manifest.json`); AAC charges in-band reconfiguration when it appears, and a refused access unit leaves the decoder unchanged unless an earlier raw data block or Main-prediction element of it was decoded |
 | Audio codecs in files | FLAC (RFC 9639, 4 to 32 bits, 1 to 8 channels); Opus (RFC 6716 and 8251: SILK, CELT, hybrid, families 0, 1 and 255); Vorbis I; MPEG-1, 2 and 2.5 audio Layer I, II and III | 315/321 pass through the container readers (FATE Vorbis, Opus and MP3 conformance, the IETF FLAC testbench, generated streams): FLAC bit-exact, the others within the [numeric rules](../harness/codecs/numeric-rules.json) | 1.0834 (10/10 pass) | heap ≤0.904, total RSS ≤0.966 (10/10) | FLAC `01 - changing samplerate`, `02 - increasing number of channels`, `03 - decreasing number of channels` and MP3 `he_mode` change format mid-stream, which the CLI converts; FLAC `flac_3ch_odd_mask`, whose layout FFmpeg refuses on its stereo output; MP3 `he_free` (free format: FFmpeg finds no two consecutive frames, and the decoder refuses free-format frames), refused by both; runtime toward the target for Opus music (1.0301) and 5.1 (1.0834), Vorbis 5.1 (0.9356) and stereo (0.8423) and Opus speech (0.8719); Opus families 2 and 3 |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix; container track decoding with trims and start delays | with the codecs | 1.0551 (17/17 pass) | with the codecs | — |
 | Fonts | sfnt and collections; `head`, `hhea`, `maxp`, `hmtx`, `vhea`, `vmtx`, `OS/2`, `name`; `cmap` formats 0, 2, 4, 6, 8, 10, 12, 13, and the glyph-name and encoding charmaps FreeType adds to CFF faces, in its charmap order; `glyf`/`loca`; CFF and CFF2 at the default instance; `kern` format 0; loading at a size as libass does with hinting off (unhinted outlines, synthetic bold and oblique, size metrics, kerning, decoration bands, default-load advances where hinting cannot move them, and the vertical advances libass draws and shapes the glyphs of `@` fonts with); FreeType's default load of CFF, CFF2 and CID-keyed glyphs, hinted by Adobe's hinter as FreeType's CFF driver hints them, and of TrueType glyphs without bytecode, through FreeType's auto-hinter with its Latin and dummy writing systems, with the grid-fitted metrics of each; face matching with libass's rules (compared through the renderer's `ass-render` feature) | The gate covers libass's default configuration (hinting off). All 70 faces of 53 corpus files (TrueType including Arabic, Hebrew, Indic and Thai fonts, name-keyed and CID-keyed CFF, CFF2, a 10-face collection, six authored fonts, among them a face for each way FreeType reads vertical metrics and a CFF face with each charmap FreeType adds; 836,345 glyphs) identical to FreeType: names, every charmap FreeType lists with its mappings, libass's text charmap, the kerning of every listed pair, advances and unscaled outlines (`font-outlines` 53/53); at 256 pixels, size metrics, kerning, every glyph's unhinted outline with its synthetic styles, default-load advances, and its linear and scaled vertical advances unhinted and of the default load (`font-hinting-none` 159/159); at that size, every glyph's default-load metrics and hinted outline, which libass's shaper reads for advances, extents and contour points (`font-hinting-default` 9/53: every CFF, CFF2 and CID-keyed face and the auto-hinted authored-cmap-formats; 44 TrueType files open, DejaVuMathTeXGyre under the auto-hinter's CJK writing system and 43 under the TrueType interpreter); Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), each with its own FreeType build, and macOS AArch64 before the vertical cases | not measured | not measured | libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL): their nine other sizes are measured, not gated (`font-hinting-modes` 900/918 before the fifth and sixth authored fonts: unhinted outlines 459/459, default-load advances 441/459), and the hinted outlines those modes draw are not compared; the auto-hinter's CJK and Indic writing systems, for the hinted outlines of the glyphs they style, which leave DejaVuMathTeXGyre open in `font-hinting-default` (its advances match); the TrueType interpreter, so the default-load extents and contour points of instructed TrueType faces, which HarfBuzz reads to position marks in fonts without GPOS mark positioning, are open (`font-hinting-default`); tricky fonts and instruction-control programs; `cmap` format 14; runtime and memory |
@@ -94,6 +94,12 @@ pairs of 50 operations and 30 memory pairs under the kernel RSS proof.
 All five progressive functional inputs pass their ten outcomes. Each HLS
 video unit passes through `contiguous_feed` inside the measured operation.
 
+The progressive report comparison uses the gate build at
+`ec6afe8635509d7e9007fd3d3c20ce2bf1c25835` on a c8g.large pinned to CPU 1.
+All three cases and ten functional outcomes pass with 30 timing pairs of 50
+operations and 30 memory pairs. Grading compact and self-contained reports
+gives the same results.
+
 The MPEG-TS access-unit comparison uses the gate build at
 `230d1314464d34a04f5f2614298e5b7009292f0c` on a c8g.xlarge pinned to CPU 1.
 All 169 cases frame all tracks in the chosen program and pass parity, runtime,
@@ -147,7 +153,14 @@ pairs and 30 memory pairs under the kernel RSS proof, run as a slice of the feat
 `cargo xtask grade` does not join the two runs, because the slice's contract differs from
 the registered feature's, so their per-case results come from each run's report.
 
-Codec and decode-session memory await gate-build measurement with repository runners.
+The ADTS AAC decoder can leave priming to a caller with an explicit container
+edit. The default still applies the encoder delay signature. The stereo and
+5.1 AAC-LC workloads use the gate build at `96232af7d9431c2285c6b6d248aa38a133b85fe3`
+on a c8g.large pinned to CPU 1, with 30 timing pairs and 30 memory pairs
+per case. Both match the reference PCM within the decoder's numeric rules.
+The upper runtime bound is at most 0.7587, peak heap at most 0.7034, and
+total RSS at most 0.4219 of the reference. Other codec and decode-session
+memory comparisons await gate-build measurement with repository runners.
 
 ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 `--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
@@ -159,12 +172,17 @@ samples. `cargo xtask grade` cannot join them, because FFmpeg's log lines carry 
 addresses that differ between runs.
 
 The MP4 forward and range results use the gate build at
-`a41648dd4de2933d526415cce86a9ebbd1d4444b` on a c8g.large pinned to CPU 1, with
-30 timing pairs of 50 complete operations and 30 memory pairs. All 39 forward
-and 27 range cases match and pass runtime, peak heap and total RSS. Forward
-playback covers encoded edit projection with composition offsets, fragmented
-input and unknown movie duration. Regular Opus cases cover edit-list trim,
-variable packet duration and secondary audio alignment on a backward video seek.
+`f5453ef9d88712777aa5b6383250875456e9f334` on a c8g.large pinned to CPU 1, with
+30 timing pairs of 50 complete operations and 30 memory pairs per case.
+All 46 forward and 51 range cases match and pass runtime, peak heap and
+total RSS. Forward playback covers encoded edit projection with composition
+offsets, fragmented input and unknown movie duration. Three regular AAC cases
+cover priming, trailing trim and a fractional edit endpoint. The fragmented
+cases cover a priming edit with audio in the first or a later fragment, a
+recovered short first AAC packet and an edited MP3 track.
+
+Regular Opus cases cover edit-list trim, variable packet duration and secondary
+audio alignment on a backward video seek.
 The five source-roll cases compare the video landing, both audio ordinals and
 decoder preroll. Broader profile and FATE coverage remain pending.
 
@@ -200,6 +218,33 @@ counts against the previous decoder (perf stat totals): the PS vectors take 7 to
 on AArch64 and 0.6 to 3.3 % fewer on ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`); HE-AAC
 without PS and the frozen `aac-lc-5.1` and `aac-lc-stereo` workloads take at most as many
 as before on both, 0.014 % fewer at most, so the AAC timing rows stand.
+
+The downmix's conversion to s16 (`mix::to_s16`) also runs fewer instructions on AArch64,
+the codec gate target. There the floor was one `frintm`, but the loop clamped in `f32`,
+converted and clamped again, two samples at a time; the integer form folds the scale
+into a fixed-point `fcvtzs`, saturates with `sqsub` and narrows with `sqxtn`, four
+samples at a time. The gate build at `f0744418` against `b89e5844` on a c6g.4xlarge
+(`cargo xtask count`, median of three rounds) runs fewer instructions on every audio
+workload, while `b89e5844` against itself moves by at most 0.01%. The 577 decoder
+outputs are byte-identical and the conversion gives the floor's result for every
+`f32`, so the AArch64 codec timing rows stand:
+
+| Workload | Instructions | Cycles | Instructions, main against main |
+|---|---:|---:|---:|
+| `aac-lc-stereo` | −0.61% | −1.62% | 0.00% |
+| `aac-lc-5.1` | −0.22% | −0.50% | 0.00% |
+| `aac-he-stereo` | −0.18% | −0.57% | 0.00% |
+| `aac-he-5.1` | −0.05% | −0.09% | 0.00% |
+| `aac-hev2-stereo` | −0.19% | −0.56% | 0.00% |
+| `ac3-2.0-192` | −0.47% | −1.04% | 0.00% |
+| `ac3-4.0` | −0.19% | −0.44% | −0.01% |
+| `ac3-5.1-448` | −0.17% | −0.39% | −0.01% |
+| `eac3-stereo-spx` | −0.45% | −1.03% | 0.00% |
+| `eac3-5.1-spx` | −0.15% | −0.30% | +0.01% |
+| `eac3-7.1` | −0.09% | −0.22% | 0.00% |
+| `eac3-5.1-1536` | −0.11% | +0.10% | 0.00% |
+| `dts-core-es-6.1` | −0.09% | −0.29% | +0.01% |
+| `dts-core-7.1-master` | −0.11% | −0.29% | 0.00% |
 
 The rasterising rows on Linux compare the gate build at
 `a7b6635e20cc2dc9d4592a874ba0eecab24f2870` with the libass reference: the four
@@ -332,6 +377,8 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MPEG-TS PES | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
 | MPEG-TS access units | `230d1314464d34a04f5f2614298e5b7009292f0c` | `a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697` |
 | MPEG-TS program playback | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
+| MPEG-TS progressive playback, compact and self-contained reports | `ec6afe8635509d7e9007fd3d3c20ce2bf1c25835` | `f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f` |
+| MPEG-TS progressive playback, earlier report comparison | `855bfea306ee7c2f7a933505cb18cde287f91a7c` | `d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a` |
 | MPEG-TS progressive playback | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
 | HLS segments | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
 | MPEG-TS progressive playback, preceding comparison | `23f68766543bcd57a96e88bfe5350095236ff88c` | `a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc` |
@@ -363,6 +410,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MP4 range playback, fragments | `a690f0f7fe7db02b64c2506e57e7a1526b3f092a` | `48a28a728709ff0354a588a73e511ae6db3e0e3b01b362a352e407fd31da38aa` |
 | MP4 range playback, fragments | `777279863f4eb9909ae51a4c3f88fad344e01061` | `824850eeab7e00345aff8892ef0d92633e52f1487ddbef83550404946fe936da` |
 | MP4 range playback, earlier comparison | `90ecdb3f85f92402df9d7ecbec17f023535a5bf5` | `78e5d64743203173b7dfd8beed2dc4ab750d137e6fe3b00df321536b15057f05` |
+| Codecs: the HE-AAC v1 and v2 workloads, timing, memory and instruction counts, Linux AArch64 and ARMv7 | `700c2134a123d8c9566c1cdccdeb3a0b3b0399c0` | `838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239` |
 | Codecs and decode sessions, runtime | `add6b272cb622bae0d921dc3fbbf0812958c2023` | `ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929` |
 | Audio codecs in files | `ccff5b5734c113c1d88160b84825157508c701c0` | `0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53` |
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
@@ -370,6 +418,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | ARMv7: capture, the conversion probes, parity, runtime and standard-bound memory | `dcf51398e97c781d517c2c577194a9d92f8c7f15` | `1b48bb701d74e5bc17a0e930ecf08e1061454b94e98b519b092573d9d24e0d99` |
 | Capture on Linux AArch64: parity with the conversion open, tests and instruction counts against main | `dcf51398e97c781d517c2c577194a9d92f8c7f15` | `016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2` |
 | Codec and capture timing, earlier and shared runner | `c21176e03328f26e0f49d6870dad0a55dd7c5e76` | `9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf` |
+| MP4 forward and range playback, AAC edits | `f5453ef9d88712777aa5b6383250875456e9f334` | `bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223` |
 | MP4 forward and range playback | `a41648dd4de2933d526415cce86a9ebbd1d4444b` | `32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977` |
 | MP4 range playback with data tracks | `90944404d8236a6da47d414f67a0652f2fc232c2` | `b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2` |
 | MP4 range playback with QuickTime AAC | `5fd3f0244849f11685fdf42a75c4c71847001bf9` | `018969e71e508093b8b1200f0df59505ffd7420d8a707250f7a7a088a752bdb1` |
@@ -380,6 +429,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MP4 range playback with QuickTime AAC, earlier preload | `4c59b8121079719a3c988835c1cef6e65eae1719` | `b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2` |
 | AAC in MOV PCM | `63f5e8e5626ed5dac0bbeb9c0e742e0eec6146e6` | `100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556` |
 | AAC in MOV and fragmented QuickTime host comparisons | `9559dae0b89dfd2df2b08b9a97267bc75711be65` | `0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2` |
+| ADTS AAC priming | `96232af7d9431c2285c6b6d248aa38a133b85fe3` | `a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe` |
 | AAC access-unit decoder | `907ac3dce61c98bd05f52bfa3ff92497efdd141d` | `b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0` |
 | AAC access-unit decoder, fixed layouts and indexed rates | `3d422610316d79665c80b48ab8a27a8a57880efe` | `5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949` |
 | AAC access-unit decoder with program configurations | `0a51b7c3746c882b3ca5127ad047162130c01ea6` | `86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf` |
@@ -419,7 +469,10 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MPEG-TS ordered PES, plain carriers | `2e28dbc71d323643c4127609821fb61c4a73d7d2` | `b9cfbecdde7ae92f6af342db61f254934b9e1733ad23591bfa5467de2f1424b8` |
 | MPEG-TS, earlier measurement | `090c856df65f9247d24ea9f1c927e35cf5d528e8` | `6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1` |
 | MPEG-TS control-only completion (macOS) | `65eeada0888bcd112d4cbd90e68795fea93fd864` | `d31f3bd8c76faf5d1b0a6e3ebe3756b8f71f3fb452fbc1d1ec38bfdb63048e1b` |
-| ARMv7: every row of the ARMv7 table, the `aac-lc-stereo` profiles | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
+| AArch64: the s16 conversion's instruction counts on every audio workload against `b89e5844`, equivalence and the `aac-lc-stereo` profiles | `f0744418776dd2e01795c24d06716f54a0aefc2e` | `ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6` |
+| ARMv7: the AAC codec timings (AAC-LC, HE-AAC v1 and v2), their instruction counts against `b89e5844`, equivalence and the `aac-he-stereo` profiles | `0b3c2db5239da81ab38d7a33f73b70a9f77df464` | `bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a` |
+| ARMv7: the AC-3, E-AC-3 and DTS codec timings, the s16 conversion's instruction counts against `f3d4935b`, equivalence and the `aac-lc-stereo` profiles | `ddb02a59a7ac8bf1974c14439194430e2b245504` | `52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977` |
+| ARMv7: every other row of the ARMv7 table, the video codec timings | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
 | Earlier ARMv7, before the page-cache eviction: the container, playback, ASS rendering and capture rows; the A32 and NEON codec comparisons | `22ed8232b28a285f1439772b91713df3aa64ea91` | `abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e` |
 | Earlier ARMv7, A32: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | Earlier ARMv7, A32: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
@@ -497,7 +550,7 @@ diagnostics: no codec contract is gated on this target.
 | HLS segments | 71/71 | 0.5916 (71/71 pass) | heap ≤0.020, total RSS ≤0.8759 (71/71 lower) |
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 0.9996 (972/972 pass) | heap ≤0.274, total RSS ≤0.8143 (972/972 lower) |
 | Packet framing | 125/125 AVC/HEVC reference comparisons | 1.0892 (125/125 pass) | heap ≤0.766 (125/125 lower); total RSS fails: ≤1.0590, 0/125 lower |
-| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 2.2091 (7/17 within the ceiling) | no repository runner |
+| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 2.0698 (10/20 within the ceiling; AAC at `0b3c2db5`, other audio at `ddb02a59`) | no repository runner for the gate; the three HE-AAC workloads at `700c2134`, not gated: heap ≤0.944, total RSS ≤0.890 (3/3 lower) |
 | Capture | 15/15 at `dcf51398`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1536 at `dcf51398` (15/15 pass; worst `c13-motion-960-6m`, then `c14-motion-960-rate255` 1.1528) | standard bounds at `dcf51398`: heap ≤0.609, total RSS ≤0.982 (14/15 lower); `c05-noise-960` has no memory result: FFmpeg's run under the RSS observer outlasts the 30 s worker limit in all 30 pairs |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7774 (10/10 pass) | heap ≤0.733 (10/10 lower); total RSS fails: ≤1.2053, 0/10 lower |
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.8793 (97/97 pass) | heap ≤0.091, total RSS ≤0.9076 (97/97 lower) |
@@ -571,14 +624,19 @@ segment metadata) 1.1491, `hevc-irap_repeat` (packet framing) 1.0892,
 `order27-u64-last-scale1000-cat21-native-index-tiny` 0.9996. The raw samples'
 `report.json` lists each bound.
 
-The codec timings, not gated, are above the ceiling for ten of the eleven audio workloads:
-`eac3-stereo-spx` 2.2091, `ac3-2.0-192` 2.0282, `dts-core-7.1-master` 2.0023,
-`dts-core-es-6.1` 1.9544, `aac-lc-stereo` 1.7717, `eac3-5.1-spx` 1.5819, `ac3-5.1-448`
-1.4712, `eac3-7.1` 1.4381, `ac3-4.0` 1.4214 and `aac-lc-5.1` 1.4055; `eac3-5.1-1536` is
-0.9875 and the six video workloads 0.5945 to 1.1236. The instruction set moves them in
-opposite directions. At `22ed8232`, built for `armv7-unknown-linux-gnueabihf` (A32 without
-NEON; a comparison build) and timed against the same FFmpeg reference, the codec worker's
-upper bounds are `h264-high-1080p` 1.5231, `aac-lc-stereo` 1.1610, `ac3-2.0-192` 1.5995,
+The codec timings are not gated. On a c6g.4xlarge pinned to CPU 1, in the same user
+space and against the same pinned reference, the AC-3, E-AC-3 and DTS workloads were
+timed at `ddb02a59` and the five AAC workloads at `0b3c2db5`. Ten of the fourteen audio
+workloads are above the ceiling: `dts-core-7.1-master` 2.0698, `dts-core-es-6.1` 2.0338,
+`aac-he-5.1` 1.7656, `aac-he-stereo` 1.7092, `aac-hev2-stereo` 1.6377, `ac3-5.1-448`
+1.3764, `ac3-2.0-192` 1.3716, `eac3-stereo-spx` 1.3684, `eac3-5.1-spx` 1.3292 and
+`eac3-7.1` 1.2933, while `aac-lc-5.1` 1.1423, `ac3-4.0` 1.0948, `eac3-5.1-1536` 0.9794
+and `aac-lc-stereo` 0.9761 are within it. The six video workloads, at `3df7ae6d`, are
+0.5945 to 1.1236. Before `ddb02a59` the instruction set moved audio and video in opposite
+directions. At `22ed8232`, built for
+`armv7-unknown-linux-gnueabihf` (A32 without NEON; a comparison build) and timed against
+the same FFmpeg reference, the codec worker's upper bounds are `h264-high-1080p` 1.5231,
+`aac-lc-stereo` 1.1610, `ac3-2.0-192` 1.5995,
 `eac3-stereo-spx` 1.4897 and `dts-core-es-6.1` 1.7571, against 1.1214, 1.7653, 2.0521,
 2.2204 and 2.0400 in the gate build at that commit: the video decoders gain from the gate
 target, the audio decoders lose. A32 with NEON (`-C target-feature=+neon`) gives 1.1035,
@@ -586,41 +644,59 @@ target, the audio decoders lose. A32 with NEON (`-C target-feature=+neon`) gives
 1.7915, 2.0801, 2.2523 and 1.9084: NEON brings the video gain and the Thumb-2 encoding the
 audio loss. No Rust target compiles A32 with NEON under default flags.
 
-At `3df7ae6d`, 200 decodes of `aac-lc-stereo` take 8.11 s in the gate build and 4.81 s in
-the A32 with NEON build, with the same digest. Recorded with `perf` (user-mode cycles and
-instructions), two functions make up 5.42 G of the 6.34 G cycles between them: `floorf`,
-linked into the worker, takes 5,218 M cycles against 1,821 M while executing 4,278 M
-instructions against 4,937 M, and the stereo downmix (`Downmix::mix`) 2,713 M against 690 M
-for 3,692 M instructions against 2,231 M. The AAC decoder's own functions take 1.0 to 1.45
-times their A32 cycles. The raw samples hold both recordings and the per-symbol reports.
-The ten functions with the most cycles and with the most instructions in either build, in
-millions:
+Most of that audio loss was the downmix's conversion to s16. ARMv7 has no instruction
+for `f32::floor`, so the conversion called the `floorf` linked into the worker, which
+moves each sample from the VFP registers to the core registers and back and, as Thumb-2,
+mispredicts its branches: at `f3d4935b`, 8 decodes of `aac-lc-stereo` miss 7.9 M branches
+in the gate build and 0.83 M in the A32 with NEON build. `mix::to_s16` now converts toward
+zero, steps down where that rounded up and saturates in integers. It gives the floor's
+result for every one of the 2^32 `f32` values, and `cargo xtask codecs equivalence`
+records the same 574 decoder outputs as at `f3d4935b`. On the same host, the gate build
+at `ddb02a59` against `f3d4935b` (instruction and cycle counts with `cargo xtask count`,
+runtime as the upper bound over 30 pairs); built as A32 with NEON, `ddb02a59` likewise
+runs 2.5 to 18.5% fewer instructions than `f3d4935b` on every workload:
 
-| Function | Cycles, gate | Cycles, A32 with NEON | Delta |
-|---|---:|---:|---:|
-| `floorf` | 5,218 | 1,821 | +3,397 |
-| `Downmix::mix` | 2,713 | 690 | +2,023 |
-| `ics::decode_spectrum` | 1,660 | 1,466 | +193 |
-| `fft::radix4_block` | 1,134 | 993 | +141 |
-| `Filterbank::synth` | 1,009 | 891 | +119 |
-| `fft::last_post` | 794 | 783 | +11 |
-| `fft::pre` | 578 | 399 | +179 |
-| `Fft::middle` | 505 | 489 | +16 |
-| `Dct4::run_split` | 486 | 346 | +140 |
-| `InterleavedDigest::update` | 338 | 365 | −27 |
+| Workload | Instructions | Cycles | Runtime, `f3d4935b` | Runtime, `ddb02a59` |
+|---|---:|---:|---:|---:|
+| `aac-lc-stereo` | −20.88% | −45.72% | 1.7788 | 0.9644 |
+| `aac-lc-5.1` | −8.90% | −22.04% | 1.4580 | 1.1380 |
+| `ac3-2.0-192` | −14.26% | −31.47% | 2.0115 | 1.3716 |
+| `ac3-4.0` | −8.82% | −24.34% | 1.4443 | 1.0948 |
+| `ac3-5.1-448` | −5.29% | −8.04% | 1.4936 | 1.3764 |
+| `eac3-stereo-spx` | −15.73% | −37.27% | 2.1990 | 1.3684 |
+| `eac3-5.1-spx` | −6.27% | −17.26% | 1.6029 | 1.3292 |
+| `eac3-7.1` | −3.85% | −11.07% | 1.4502 | 1.2933 |
+| `eac3-5.1-1536` | −3.61% | −3.33% | 1.0104 | 0.9794 |
+| `dts-core-es-6.1` | −2.89% | −6.05% | 2.2072 | 2.0338 |
+| `dts-core-7.1-master` | −3.20% | −7.86% | 2.2418 | 2.0698 |
 
-| Function | Instructions, gate | Instructions, A32 with NEON | Delta |
-|---|---:|---:|---:|
-| `floorf` | 4,278 | 4,937 | −659 |
-| `Downmix::mix` | 3,692 | 2,231 | +1,461 |
-| `ics::decode_spectrum` | 3,631 | 3,387 | +244 |
-| `Filterbank::synth` | 3,080 | 2,841 | +239 |
-| `fft::radix4_block` | 2,577 | 2,576 | +0 |
-| `fft::last_post` | 2,394 | 2,399 | −5 |
-| `Dct4::run_split` | 1,288 | 1,368 | −80 |
-| `fft::pre` | 1,290 | 1,241 | +49 |
-| `Fft::middle` | 1,250 | 1,206 | +44 |
-| `Core::decode_cpe` | 923 | 851 | +73 |
+200 decodes of `aac-lc-stereo` take 4.35 s in the gate build, against 7.57 s at
+`f3d4935b`, and 3.91 s in the A32 with NEON build, against 4.79 s, all with the same
+digest. Recorded with `perf` (user-mode cycles and instructions), `floorf` and
+`Downmix::mix` took 4,555 M and 2,077 M cycles in the gate build at `f3d4935b`;
+`Downmix::mix` now takes 852 M, against 719 M in the A32 with NEON build. The gate
+build takes 8.54 G cycles in all, 11% more than the A32 with NEON build's 7.67 G, against
+14.89 G and 9.50 G before; the rest of the difference is spread over the decoder's
+functions. The raw samples hold the recordings and the per-symbol reports.
+
+The five AAC workloads, HE-AAC v1 and v2 among them, were measured again at `0b3c2db5`,
+which merges `b89e5844` into the change, against `b89e5844` on one host. The 577 decoder
+outputs, which now include the HE-AAC workloads' mixes, are byte-identical. Every audio
+workload runs 2.2 to 20.9% fewer instructions in the gate build, and 1.8 to 18.5% fewer
+built as A32 with NEON. HE-AAC gains less than AAC-LC because SBR is most of its work:
+
+| Workload | Instructions | Cycles | Runtime, `b89e5844` | Runtime, `0b3c2db5` |
+|---|---:|---:|---:|---:|
+| `aac-lc-stereo` | −20.88% | −45.52% | 1.7838 | 0.9761 |
+| `aac-lc-5.1` | −8.90% | −22.01% | 1.4625 | 1.1423 |
+| `aac-he-stereo` | −6.10% | −18.96% | 2.1114 | 1.7092 |
+| `aac-he-5.1` | −2.17% | −6.90% | 1.8979 | 1.7656 |
+| `aac-hev2-stereo` | −6.74% | −20.36% | 2.0549 | 1.6377 |
+
+Recorded with `perf`, 50 decodes of `aac-he-stereo` in the gate build take 13.59 s
+against 16.65 s at `b89e5844`, with the same digest. There `floorf` and `Downmix::mix`
+took 4,620 M and 2,175 M of 32.65 G cycles; `Downmix::mix` now takes 692 M of 26.57 G,
+and `Sbr::process` with the QMF synthesis takes 47%.
 
 Capture conversion must stay within ±1 of FFmpeg's on every sample. FFmpeg's ARMv7 and
 AArch64 builds convert RGBA differently at the capture widths: for a width of at least 16
