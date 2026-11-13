@@ -746,11 +746,6 @@ impl<'a> Mp4IndexJob<'a> {
                             return Ok(false);
                         }
                         let h = t.header();
-                        let fragment_aac_trim = if p.view == Mp4View::PinnedMov9NoParseNoFillin {
-                            FragmentAacTrimJob::new(self.movie, self.track)?
-                        } else {
-                            None
-                        };
                         let (base, native_catalogue) = if h.timescale == 0 {
                             (
                                 SourceTimeBase::UNAVAILABLE,
@@ -806,16 +801,8 @@ impl<'a> Mp4IndexJob<'a> {
                                     .transpose()?,
                             },
                         )?;
-                        self.fragment_aac_trim = fragment_aac_trim;
                         self.description = 1;
                         return Ok(false);
-                    }
-                    if let Some(job) = &mut self.fragment_aac_trim {
-                        let Some(samples) = job.poll(w, c)? else {
-                            return Ok(false);
-                        };
-                        p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
-                        self.fragment_aac_trim = None;
                     }
                     if let Some(d) = t.table().descriptions().get(self.description - 1) {
                         if !w.try_charge(1) {
@@ -1007,8 +994,9 @@ impl<'a> Mp4IndexJob<'a> {
                             }
                             CursorStatus::End => {
                                 cursor.rewind_at_end()?;
-                                self.ready = true;
-                                return Ok(true);
+                                self.track = 0;
+                                self.phase = 5;
+                                return Ok(false);
                             }
                         }
                     }
@@ -1087,7 +1075,28 @@ impl<'a> Mp4IndexJob<'a> {
                     self.phase = 5;
                 }
             }
-            5 if p.native_front && self.track < p.tracks.len() => {
+            5 => {
+                if p.view == Mp4View::PinnedMov9NoParseNoFillin && self.track < p.tracks.len() {
+                    if self.fragment_aac_trim.is_none() {
+                        if !w.try_charge(1) {
+                            return Ok(false);
+                        }
+                        self.fragment_aac_trim = FragmentAacTrimJob::new(self.movie, self.track)?;
+                    }
+                    if let Some(job) = &mut self.fragment_aac_trim {
+                        let Some(samples) = job.poll(w, c)? else {
+                            return Ok(false);
+                        };
+                        p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
+                        self.fragment_aac_trim = None;
+                    }
+                    self.track += 1;
+                } else {
+                    self.track = 0;
+                    self.phase = 6;
+                }
+            }
+            6 if p.native_front && self.track < p.tracks.len() => {
                 if !w.try_charge(1) {
                     return Ok(false);
                 }
@@ -1098,10 +1107,6 @@ impl<'a> Mp4IndexJob<'a> {
                     .front_track(self.track)?;
                 push(&mut p.front_tracks, state)?;
                 self.track += 1;
-            }
-            5 if p.native_front => {
-                self.ready = true;
-                return Ok(true);
             }
             _ => {
                 self.ready = true;

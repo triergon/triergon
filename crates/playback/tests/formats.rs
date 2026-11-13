@@ -3245,6 +3245,42 @@ fn forward_fragment_edits_keep_source_clocks_and_trim_once() {
 }
 
 #[test]
+fn forward_fragment_ranges_are_checked_before_initialization_edit_support() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").to_vec();
+    let edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();
+    assert_eq!(&raw[edit + 12..edit + 16], &0u32.to_be_bytes());
+    raw[edit + 12..edit + 16].copy_from_slice(&1u32.to_be_bytes());
+    let index_error = |bytes: &[u8]| {
+        let (selected, _, _) = probe(bytes, 37, true);
+        let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+        run_open(&mut open, 17).unwrap();
+        let opened = open.finish().unwrap();
+        let mut index =
+            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+        for _ in 0..100_000 {
+            match index.poll(&mut WorkBudget::new(17), &off()) {
+                Err(error) => return error,
+                Ok(false) => {}
+                Ok(true) => panic!("the edited source was accepted"),
+            }
+        }
+        panic!("the index did not finish")
+    };
+    assert_eq!(
+        index_error(&raw),
+        C::Unsupported("fragment edit needs open-ended rate-one media")
+    );
+
+    let run = raw.windows(4).position(|kind| kind == b"trun").unwrap();
+    assert_eq!(raw[run + 7] & 1, 1);
+    raw[run + 12..run + 16].copy_from_slice(&0i32.to_be_bytes());
+    assert_eq!(
+        index_error(&raw),
+        C::Invalid("sample outside self-contained mdat")
+    );
+}
+
+#[test]
 fn forward_encoded_edit_drains_samples_outside_the_presentation() {
     let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
     let audio_edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();

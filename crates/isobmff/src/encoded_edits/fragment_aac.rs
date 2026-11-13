@@ -1,14 +1,15 @@
 use crate::{
-    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
+    ConfigurationLimits,
+    encoded_stream::{AudioDescription, AudioDescriptionStep},
     mov_cursor::fragment_media_start,
     open::{MetadataReadScope, Movie},
 };
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Result, Rounding, TimeBase, WorkBudget};
 use triergon_framing::{AacAscParser, AacConfigLimits, AacSource, BuildStep};
 
 enum Phase {
-    Description(AacConfigurationJob),
+    Description(AudioDescription),
     Audio(AacAscParser),
 }
 
@@ -52,16 +53,20 @@ impl FragmentAacTrimJob {
         if media_start == 0 {
             return Ok(None);
         }
-        let [description] = track.table().descriptions() else {
+        let descriptions = track.table().descriptions();
+        if descriptions
+            .iter()
+            .all(|description| description.format != *b"mp4a")
+        {
+            return Ok(None);
+        }
+        let [description] = descriptions else {
             return Err(Error::Unsupported(
                 "fragment audio edit requires one description",
             ));
         };
-        if description.format != *b"mp4a" {
-            return Ok(None);
-        }
         Ok(Some(Self {
-            phase: Phase::Description(AacConfigurationJob::new(
+            phase: Phase::Description(AudioDescription::new(
                 description,
                 ConfigurationLimits::default(),
             )?),
@@ -77,15 +82,16 @@ impl FragmentAacTrimJob {
     }
 
     /// Return the leading sample count, yielding with `None` until the
-    /// configuration is ready. Stop polling after receiving the count.
+    /// configuration is ready. A non-AAC description yields zero.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<u32>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
         if let Phase::Description(job) = &mut self.phase {
-            let config = match job.poll(work, cancel)? {
-                AacConfigurationStep::Yield => return Ok(None),
-                AacConfigurationStep::Ready(config) => config,
-                AacConfigurationStep::End => {
-                    return Err(Error::Invalid("fragment AAC description already read"));
-                }
+            let config = match job.poll(work)? {
+                AudioDescriptionStep::Yield => return Ok(None),
+                AudioDescriptionStep::Aac(config) => config,
+                AudioDescriptionStep::Other => return Ok(Some(0)),
             };
             self.phase = Phase::Audio(AacAscParser::new(
                 &self.pool,

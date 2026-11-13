@@ -170,8 +170,11 @@ leading empty subtitle edit delays the subtitle packet clocks. When video
 seeks before the first sync packet of a secondary fragment track, range
 playback replays that track from its first packet. An AAC track with a
 single initialization edit carries leading trim in the first packet's
-`Mp4Packet::encoded_skip_samples`. Source sample clocks and byte ranges stay
-literal while the compatibility packet clocks reflect the edit.
+`Mp4Packet::encoded_skip_samples`, including on the actual prefix of a
+recovered short first packet. The MPEG-4 object type identifies AAC. An
+edited MP3 track has the projected clocks without AAC trim. Source sample
+clocks and byte ranges stay literal while the compatibility packet clocks
+reflect the edit.
 For regular front-metadata input with one finite media extent,
 `compat::mov::forward_encoded_edits` accepts checked encoded edit plans
 and delivers projected packets in source byte order. AAC packets include the

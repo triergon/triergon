@@ -10,10 +10,11 @@
     "regular inputs validate source extents and projected packets through the checked range index and play through Engine::mp4; progressive front-moov inputs forward-only through the native front plan and Engine::mp4_native_terminal_v1, continuing through later moof/mdat pairs",
     "complete regular sources with edits over composition offsets use checked encoded edit plans before indexing",
     "progressive-edited uses checked encoded edit plans for regular front metadata and one finite media extent, or an open-ended rate-one initialization edit for a fragmented track; packets are delivered in ascending source order",
+    "progressive-edited-recovery uses the same fragmented edit projection and delivers the actual prefix of a corrupt final packet on a confirmed source end",
     "regular playback with an unknown movie duration derives it from the checked packet clocks",
-    "one direct output slot; every track selected; every packet through a clean end of file in native read order",
+    "one direct output slot; every track selected; every packet through end of file in native read order",
     "each packet folded with track ID, PTS, DTS and duration in the track time base, packet flags, size and every payload byte",
-    "progressive-edited also folds the packet byte offset, reduced time base, and presence of skip-sample metadata with both counts and reasons when present",
+    "progressive-edited and progressive-edited-recovery also fold the packet byte offset, reduced time base, and presence of skip-sample metadata with both counts and reasons when present",
     "the expected fold is recorded per case from the pinned reference worker"
   ],
   "required_profiles": [
@@ -60,7 +61,9 @@
     "progressive-aac-tail-trim",
     "progressive-aac-fractional-edit",
     "progressive-fragment-aac-edit",
-    "progressive-fragment-aac-late-track"
+    "progressive-fragment-aac-late-track",
+    "progressive-fragment-aac-short",
+    "progressive-fragment-mp3-edit"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

@@ -37,6 +37,7 @@ enum Layout {
     Regular,
     Progressive,
     ProgressiveEdited,
+    ProgressiveEditedRecovery,
 }
 
 fn open(
@@ -59,7 +60,12 @@ fn open(
         source: SourceOwner::new(ByteSource::new(id, raw.clone(), WINDOW)?),
         format: Format::Mp4,
     };
-    let mut open = Mp4Open::new(selected, OpenLimits::default())?;
+    let limits = OpenLimits::default();
+    let mut open = if layout == Layout::ProgressiveEditedRecovery {
+        Mp4Open::new_recovery(selected, limits)?
+    } else {
+        Mp4Open::new(selected, limits)?
+    };
     while !matches!(
         open.advance(&mut WorkBudget::new(WORK), cancel)?,
         OpenProgress::Ready
@@ -68,30 +74,31 @@ fn open(
 }
 
 fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<()> {
-    let (track, demux, payload) = match event {
+    let (native, payload, skip) = match event {
         Mp4Event::Packet(packet) => {
             let native = packet
                 .native
                 .as_ref()
                 .ok_or("source packet without a native occurrence")?;
             (
-                native.track_id,
-                &native.demux,
+                native,
                 packet.source.payload.as_ref(),
+                packet.encoded_skip_samples,
             )
         }
         Mp4Event::NativeShortPacket(short) => (
-            short.native.track_id,
-            &short.native.demux,
+            &short.native,
             short.prefix.payload.as_ref(),
+            short.encoded_skip_samples,
         ),
         Mp4Event::NativeEmptyPacket(_) | Mp4Event::NativeMissingSample(_) => {
             return Err("native packet without a track".into());
         }
         Mp4Event::Configuration(_) => return Ok(()),
     };
+    let demux = &native.demux;
     work.packet(Packet {
-        track: u64::from(track),
+        track: u64::from(native.track_id),
         pts: demux.pts,
         dts: demux.dts,
         duration: u64::try_from(demux.duration).unwrap_or(0),
@@ -100,19 +107,8 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
         payload: [payload],
     })?;
     if INCLUDE_TRIM {
-        let Mp4Event::Packet(packet) = event else {
-            return Err("encoded edit packet is incomplete".into());
-        };
-        work.location(
-            packet.source.sample.range.start,
-            packet
-                .native
-                .as_ref()
-                .ok_or("encoded edit packet has no media clock")?
-                .media_clock
-                .demux_base,
-        );
-        work.skip_samples(packet.encoded_skip_samples);
+        work.location(native.source.range.start, native.media_clock.demux_base);
+        work.skip_samples(skip);
     }
     Ok(())
 }
@@ -181,8 +177,8 @@ fn operation(pool: &Budget, raw: &Bytes, layout: Layout, work: Work) -> Result<W
                 player.read_output(pending, &mut WorkBudget::new(WORK), &cancel)
             })
         }
-        Layout::Progressive | Layout::ProgressiveEdited => {
-            let include_trim = layout == Layout::ProgressiveEdited;
+        Layout::Progressive | Layout::ProgressiveEdited | Layout::ProgressiveEditedRecovery => {
+            let include_trim = layout != Layout::Progressive;
             let mut plans = BudgetVec::new(pool);
             let limits = PlanLimits::default();
             let mut index = if include_trim && movie.trex().is_empty() {
@@ -227,8 +223,8 @@ fn operation(pool: &Budget, raw: &Bytes, layout: Layout, work: Work) -> Result<W
 }
 
 /// `mp4-forward-fold FILE LAYOUT`, `mp4-forward-bench FILE ITERATIONS LAYOUT` or
-/// `mp4-forward-memory FILE LAYOUT`; LAYOUT is `regular`, `progressive` or
-/// `progressive-edited`.
+/// `mp4-forward-memory FILE LAYOUT`; LAYOUT is `regular`, `progressive`,
+/// `progressive-edited` or `progressive-edited-recovery`.
 pub fn run(args: &[String]) -> Result<()> {
     drive(args, PREFIX, OPERATION, operate)
 }
@@ -239,6 +235,7 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, work: Work) -> Result
         "regular" => Layout::Regular,
         "progressive" => Layout::Progressive,
         "progressive-edited" => Layout::ProgressiveEdited,
+        "progressive-edited-recovery" => Layout::ProgressiveEditedRecovery,
         _ => return Err("expected regular, progressive or progressive-edited".into()),
     };
     operation(pool, raw, layout, work)

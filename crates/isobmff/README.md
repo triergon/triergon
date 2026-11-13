@@ -333,7 +333,8 @@ rejects boxes extending past the source.
   A front movie with fragment defaults establishes the same edit before the
   track's first fragment, even when that fragment follows other media.
   Backward seek queries subtract the media start. AAC leading trim for
-  a single initialization edit uses the configured audio sample rate.
+  a single initialization edit uses the declared AAC object type and
+  configured audio sample rate.
   Regular Opus range playback retains the `dOps` record and exposes its canonical
   identification header. The MOV policy projects leading and trailing edit trim
   and retains up to one second of history plus the preceding sample for a long

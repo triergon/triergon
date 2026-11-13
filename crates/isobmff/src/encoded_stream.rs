@@ -125,6 +125,7 @@ enum DescriptorPhase {
 enum EsdsProfile {
     Aac,
     AacDescription,
+    AudioDescription,
     RangeAudio,
     ObjectType,
     /// Any object type of any stream type: an `mp4s` system stream entry.
@@ -208,7 +209,10 @@ impl EsdsWalk {
                     // ISO/IEC 14496-14 §6.7.2 gives esds one ES descriptor.
                     if self.depth == 0
                         && (tag != 3 || self.rows != 1)
-                        && matches!(self.profile, EsdsProfile::AacDescription)
+                        && matches!(
+                            self.profile,
+                            EsdsProfile::AacDescription | EsdsProfile::AudioDescription
+                        )
                     {
                         return Err(Error::Invalid("AAC elementary stream descriptor root"));
                     }
@@ -276,7 +280,9 @@ impl EsdsWalk {
                             let allowed = match self.profile {
                                 EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
                                 EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
-                                EsdsProfile::ObjectType | EsdsProfile::SystemStream => true,
+                                EsdsProfile::AudioDescription
+                                | EsdsProfile::ObjectType
+                                | EsdsProfile::SystemStream => true,
                             };
                             if !allowed {
                                 return Err(Error::Unsupported(
@@ -367,6 +373,39 @@ pub enum AacConfigurationStep {
     End,
 }
 
+pub(crate) enum AudioDescriptionStep {
+    Yield,
+    Aac(AacConfiguration),
+    Other,
+}
+
+pub(crate) struct AudioDescription(EsdsDescriptionWalk);
+
+impl AudioDescription {
+    pub(crate) fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
+        EsdsDescriptionWalk::with_profile(entry, limits, EsdsProfile::AudioDescription).map(Self)
+    }
+
+    pub(crate) fn poll(&mut self, work: &mut WorkBudget) -> Result<AudioDescriptionStep> {
+        if !self.0.scan_configuration(work)? {
+            return Ok(AudioDescriptionStep::Yield);
+        }
+        let (_, walker) = self
+            .0
+            .esds
+            .as_ref()
+            .ok_or(Error::Invalid("missing elementary stream descriptor"))?;
+        match walker.object_type {
+            Some(0x40) => self
+                .0
+                .take_aac_configuration()
+                .map(AudioDescriptionStep::Aac),
+            Some(1..) => Ok(AudioDescriptionStep::Other),
+            _ => Err(Error::Invalid("missing or forbidden decoder object type")),
+        }
+    }
+}
+
 /// Extracts AudioSpecificConfig from an `mp4a` description independently
 /// of its sample table. Supports ISO sound entries and the selected
 /// QuickTime sound layout with a `wave` container.
@@ -432,22 +471,8 @@ impl AacConfigurationJob {
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        let (base, walker) = walk
-            .esds
-            .as_mut()
-            .ok_or(Error::Invalid("missing AAC elementary stream descriptor"))?;
-        let (relative, bytes) = walker
-            .dsi
-            .take()
-            .ok_or(Error::Invalid("missing AAC decoder-specific bytes"))?;
-        if bytes.is_empty() {
-            return Err(Error::Invalid("empty AAC decoder-specific bytes"));
-        }
-        let offset = base.checked_add(relative as u64).ok_or(Error::Overflow)?;
-        Ok(AacConfigurationStep::Ready(AacConfiguration {
-            offset,
-            bytes,
-        }))
+        walk.take_aac_configuration()
+            .map(AacConfigurationStep::Ready)
     }
 }
 
@@ -491,6 +516,22 @@ struct EsdsDescriptionWalk {
 }
 
 impl EsdsDescriptionWalk {
+    fn take_aac_configuration(&mut self) -> Result<AacConfiguration> {
+        let (base, walker) = self
+            .esds
+            .as_mut()
+            .ok_or(Error::Invalid("missing AAC elementary stream descriptor"))?;
+        let (relative, bytes) = walker
+            .dsi
+            .take()
+            .ok_or(Error::Invalid("missing AAC decoder-specific bytes"))?;
+        if bytes.is_empty() {
+            return Err(Error::Invalid("empty AAC decoder-specific bytes"));
+        }
+        let offset = base.checked_add(relative as u64).ok_or(Error::Overflow)?;
+        Ok(AacConfiguration { offset, bytes })
+    }
+
     fn with_profile(
         entry: &SampleDescription,
         limits: ConfigurationLimits,

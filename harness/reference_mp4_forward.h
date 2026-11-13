@@ -15,7 +15,8 @@
 static int mp4_forward_operation(const uint8_t *data, size_t size, const char *layout, PacketWork *work)
 {
     const int regular = !strcmp(layout, "regular");
-    const int edited = !strcmp(layout, "progressive-edited");
+    const int edited = !strcmp(layout, "progressive-edited") ||
+                       !strcmp(layout, "progressive-edited-recovery");
     if (!regular && !edited && strcmp(layout, "progressive"))
         return AVERROR(EINVAL);
     PacketInput in = {data, (int64_t)size, 0, MP4_FORWARD_QUANTUM};
