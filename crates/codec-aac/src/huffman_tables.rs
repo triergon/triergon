@@ -1,6 +1,7 @@
 //! Huffman code tables (codeword, length) indexed by symbol, transcribed from
-//! ISO/IEC 14496-3 Annex 4.A (AAC spectral / scalefactor), Annex 4.A.6.1 (SBR) and
-//! Annex 8.B (Parametric Stereo) from the implementer's knowledge of the standard.
+//! ISO/IEC 14496-3 Annex 4.A (AAC spectral / scalefactor) and Annex 4.A.6.1 (SBR) from the
+//! implementer's knowledge of the standard. The Parametric Stereo books and SBR_F_ENVBAL30
+//! are recovered by probes of the reference decoder and live in `huffman_probed.rs`.
 //! Every table is checked by unit tests for Kraft equality and the prefix property;
 //! codebook 1 and some SBR balance-table tails were reconstructed and then validated
 //! against the oracle.
@@ -1934,10 +1935,6 @@ pub(crate) static SBR_T_ENVBAL30: [(u32, u8); 25] = [
     (0x3ffe, 14),
     (0x3fff, 14),
 ];
-
-/// SBR 3.0 dB frequency-direction balance book: recovered by probes of the reference
-/// decoder (`harness/codecs/aac/ps/recover_sbr_envbal.py`).
-pub(crate) use crate::huffman_probed::SBR_F_ENVBAL30;
 
 /// ISO/IEC 14496-3 SBR Huffman table t_huffman_noise_3_0dB (Table 4.A.86).
 pub(crate) static SBR_T_NOISE30: [(u32, u8); 63] = [

@@ -647,7 +647,7 @@ impl Sbr {
                         }
                     }
                 }
-                // Parametric stereo: mono QMF matrix -> left/right matrices (8.6.4)
+                // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
                     self.ps.apply(&mut self.x, &mut self.x_r);
                 } else {

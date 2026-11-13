@@ -217,7 +217,7 @@ pub(crate) fn books() -> &'static Books {
             Vlc::new(&t::SBR_T_ENV30, 10),
             Vlc::new(&t::SBR_F_ENV30, 10),
             Vlc::new(&t::SBR_T_ENVBAL30, 10),
-            Vlc::new(&t::SBR_F_ENVBAL30, 10),
+            Vlc::new(&probed::SBR_F_ENVBAL30, 10),
             Vlc::new(&t::SBR_T_NOISE30, 10),
             Vlc::new(&t::SBR_T_NOISEBAL30, 10),
         ],
@@ -320,7 +320,7 @@ mod tests {
             &t::SBR_T_ENV30,
             &t::SBR_F_ENV30,
             &t::SBR_T_ENVBAL30,
-            &t::SBR_F_ENVBAL30,
+            &probed::SBR_F_ENVBAL30,
             &t::SBR_T_NOISE30,
             &t::SBR_T_NOISEBAL30,
         ] {
