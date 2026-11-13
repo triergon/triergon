@@ -19908,6 +19908,19 @@
    "sha256": "a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe",
    "bytes": 38661043,
    "source_revision": "96232af7d9431c2285c6b6d248aa38a133b85fe3"
+  },
+  {
+   "name": "codec-he-aac-workloads-700c2134",
+   "path": "codec-he-aac-workloads-700c2134",
+   "retention": "retained",
+   "reason": "Codecs: the HE-AAC v1 and v2 timing workloads (aac-he-stereo, aac-he-5.1, aac-hev2-stereo) on one c6g.4xlarge, Linux AArch64 and ARMv7 (thumbv7neon-unknown-linux-gnueabihf) pinned to CPU 1: their inputs; the heap failure at 5c4fe252 and the heap profiles that located it; at 700c2134 against 5c4fe252 the crate and FATE tests, worker outputs on 68 AAC inputs on both targets, instruction counts, 30-pair AArch64 timing and memory (HE and LC) and 30-pair ARMv7 timing and memory (HE)",
+   "key": "evidence/codec-he-aac-workloads-700c2134/838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239.tar.gz",
+   "sha256": "838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239",
+   "bytes": 37234479,
+   "source_revisions": {
+    "candidate": "700c2134a123d8c9566c1cdccdeb3a0b3b0399c0",
+    "baseline": "5c4fe25232e54ea1280b258c7f99a04fa3f4bf93"
+   }
   }
  ]
 }

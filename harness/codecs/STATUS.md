@@ -15,7 +15,7 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
 | `correctness-manifest.json` | The 775 correctness vectors: 454 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
 | `reader-manifest.json`, `reader-rules.json`, `reader-differences.json` | The 305 reader comparison inputs; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
-| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 17 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
+| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 20 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
 | `downmix-*.json`, [downmix-integer.md](downmix-integer.md) | Observed stereo downmix (`-ac 2`) rules, for float and for integer decoder output |
