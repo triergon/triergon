@@ -1,5 +1,6 @@
 //! Table-driven Huffman decoding (two-level lookup) for all AAC / SBR / PS codebooks.
 
+use crate::huffman_probed as probed;
 use crate::huffman_tables as t;
 use std::sync::OnceLock;
 use triergon_bitstream::CachedBitReader;
@@ -99,6 +100,8 @@ pub(crate) struct Books {
     pub(crate) scalefactor: Vlc,
     pub(crate) spectral: [SpectralBook; 11],
     pub(crate) sbr: [Vlc; 10],
+    /// PS books in the order IID df, IID dt, fine IID df, fine IID dt, ICC df, ICC dt,
+    /// IPD df, IPD dt, OPD df, OPD dt.
     pub(crate) ps: [Vlc; 10],
 }
 
@@ -214,21 +217,21 @@ pub(crate) fn books() -> &'static Books {
             Vlc::new(&t::SBR_T_ENV30, 10),
             Vlc::new(&t::SBR_F_ENV30, 10),
             Vlc::new(&t::SBR_T_ENVBAL30, 10),
-            Vlc::new(&t::SBR_F_ENVBAL30, 10),
+            Vlc::new(&probed::SBR_F_ENVBAL30, 10),
             Vlc::new(&t::SBR_T_NOISE30, 10),
             Vlc::new(&t::SBR_T_NOISEBAL30, 10),
         ],
         ps: [
-            Vlc::new(&t::PS_IID_DF1, 10),
-            Vlc::new(&t::PS_IID_DT1, 10),
-            Vlc::new(&t::PS_IID_DF0, 10),
-            Vlc::new(&t::PS_IID_DT0, 10),
-            Vlc::new(&t::PS_ICC_DF, 10),
-            Vlc::new(&t::PS_ICC_DT, 10),
-            Vlc::new(&t::PS_IPD_DF, 10),
-            Vlc::new(&t::PS_IPD_DT, 10),
-            Vlc::new(&t::PS_OPD_DF, 10),
-            Vlc::new(&t::PS_OPD_DT, 10),
+            Vlc::new(&probed::IID_DF, 9),
+            Vlc::new(&probed::IID_DT, 9),
+            Vlc::new(&probed::IID_DF_FINE, 9),
+            Vlc::new(&probed::IID_DT_FINE, 9),
+            Vlc::new(&probed::ICC_DF, 9),
+            Vlc::new(&probed::ICC_DT, 9),
+            Vlc::new(&probed::IPD_DF, 5),
+            Vlc::new(&probed::IPD_DT, 5),
+            Vlc::new(&probed::OPD_DF, 5),
+            Vlc::new(&probed::OPD_DT, 5),
         ],
     })
 }
@@ -267,25 +270,23 @@ mod tests {
     }
 
     #[test]
-    fn sbr_frequency_balance_3db_reads_the_complete_outer_branches() {
-        let vlc = &books().sbr[7];
-        // Read actual wire words with nonzero trailing bits. Checking the
-        // cursor catches an incorrect long leaf even if its symbol agrees.
-        for (wire, len, delta) in [
-            (0b11111111100_u16, 11, -5),
-            (0b111111111010, 12, 5),
-            (0b1111111110110, 13, 6),
-            (0b1111111110111, 13, -12),
-            (0b1111111111011, 13, -8),
-            (0b11111111111000, 14, -7),
-            (0b11111111111001, 14, -6),
-            (0b11111111111010, 14, 7),
-            (0b11111111111111, 14, 12),
-        ] {
+    fn probed_books_decode_the_reference_values() {
+        // (book, wire word, length, value) observed from the reference decoder by
+        // harness/codecs/aac/ps (recover_huff.py, recover_ipdopd.py,
+        // recover_sbr_envbal.py); the symbol is the value plus the book's offset
+        let cases: [(&Vlc, u32, usize, i32, i32); 6] = [
+            (&books().sbr[7], 0b1111111110111, 13, -12, 12),
+            (&books().sbr[7], 0b11111111111111, 14, 12, 12),
+            (&books().sbr[7], 0b0, 1, 0, 12),
+            (&books().ps[6], 0b0111, 4, 7, 0),
+            (&books().ps[7], 0b00011, 5, 3, 0),
+            (&books().ps[8], 0b01111, 5, 4, 0),
+        ];
+        for (vlc, wire, len, value, offset) in cases {
             let trailing = u16::MAX >> len;
-            let bytes = ((wire << (16 - len)) | trailing).to_be_bytes();
+            let bytes = (((wire as u16) << (16 - len)) | trailing).to_be_bytes();
             let mut reader = CachedBitReader::new(&bytes);
-            assert_eq!(vlc.decode(&mut reader), Some((delta + 12) as u32));
+            assert_eq!(vlc.decode(&mut reader), Some((value + offset) as u32));
             assert_eq!(reader.position(), len);
         }
     }
@@ -319,23 +320,23 @@ mod tests {
             &t::SBR_T_ENV30,
             &t::SBR_F_ENV30,
             &t::SBR_T_ENVBAL30,
-            &t::SBR_F_ENVBAL30,
+            &probed::SBR_F_ENVBAL30,
             &t::SBR_T_NOISE30,
             &t::SBR_T_NOISEBAL30,
         ] {
             check("sbr", c);
         }
         for c in [
-            &t::PS_IID_DF1[..],
-            &t::PS_IID_DT1,
-            &t::PS_IID_DF0,
-            &t::PS_IID_DT0,
-            &t::PS_ICC_DF,
-            &t::PS_ICC_DT,
-            &t::PS_IPD_DF,
-            &t::PS_IPD_DT,
-            &t::PS_OPD_DF,
-            &t::PS_OPD_DT,
+            &probed::IID_DF[..],
+            &probed::IID_DT,
+            &probed::IID_DF_FINE,
+            &probed::IID_DT_FINE,
+            &probed::ICC_DF,
+            &probed::ICC_DT,
+            &probed::IPD_DF,
+            &probed::IPD_DT,
+            &probed::OPD_DF,
+            &probed::OPD_DT,
         ] {
             check("ps", c);
         }

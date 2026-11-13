@@ -19748,6 +19748,32 @@
    "sha256": "a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697",
    "bytes": 100014048,
    "source_revision": "230d1314464d34a04f5f2614298e5b7009292f0c"
+  },
+  {
+   "name": "codec-aac-parametric-stereo-560f2225",
+   "path": "codec-aac-parametric-stereo-560f2225",
+   "retention": "retained",
+   "reason": "AAC Parametric Stereo from open publications and probes: the recovery of the PS syntax, Huffman books, SBR_F_ENVBAL30 and every signal table and rule by scripted probes of FFmpeg 9.0.2, with the notes and probes of both passes and the source texts; the table generator's write and --check runs from empty work directories; the aac lane's gates for 560f2225 and 339ec261 on AArch64 and in the ARMv7 user space (crate tests, fate_vectors with AAC_REF_DIR, per-vector numbers, conformance s16, codecs grade), the equivalence records and the three open cases on both builds and targets; instruction counts of the PS, HE-AAC and frozen AAC-LC workloads against 339ec261 on both targets; the scripts that ran them. Raw PCM outputs are left out.",
+   "key": "evidence/codec-aac-parametric-stereo-560f2225/b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708.tar.gz",
+   "sha256": "b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708",
+   "bytes": 64872808,
+   "source_revisions": {
+    "candidate": "560f222594f3b8767d7454ee1fa5752573020112",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "codec-aac-parametric-stereo-81cb8bf9",
+   "path": "codec-aac-parametric-stereo-81cb8bf9",
+   "retention": "retained",
+   "reason": "Review of AAC Parametric Stereo at 81cb8bf9 (the review commits with main merged at f426ea65): the transient ducking's re-derivation from probes alone (its brief, probe kit, probes p01-p13 with their logs and streams, notes and report, every rejected candidate); on AArch64 against main's build at 339ec261, whose AAC code f426ea65 keeps, the crate and xtask tests, fate_vectors with AAC_REF_DIR, the byte comparison of all 36 decoder outputs with the 560f2225 build, conformance s16, codecs grade, the open-case summaries, the equivalence record, the table generator's --check from an empty and from a seeded work directory and after the ducking precision change, and instruction counts of the PS, HE-AAC and frozen AAC-LC workloads; in the ARMv7 user space against main at f426ea65, both built for thumbv7neon-unknown-linux-gnueabihf, the same parity checks and counts; the two fuzz campaigns' reports, manifests and identities without case inputs; the scripts that ran them. Raw PCM outputs are left out.",
+   "key": "evidence/codec-aac-parametric-stereo-81cb8bf9/25cd8fa2e8d359ae096328c21d46ab0322654a7d93016b17f822134db25d8560.tar.gz",
+   "sha256": "25cd8fa2e8d359ae096328c21d46ab0322654a7d93016b17f822134db25d8560",
+   "bytes": 3971907,
+   "source_revisions": {
+    "candidate": "81cb8bf9ac9499fe036d2f186a8fdca365e13820",
+    "baseline": "f426ea659a9e34882a102262aa1ab99aa881969b"
+   }
   }
  ]
 }
