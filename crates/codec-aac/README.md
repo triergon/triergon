@@ -103,7 +103,9 @@ caller's reserved PCM planes and reuses them on the next access unit.
 - Dynamic range control data is parsed and not applied, as FFmpeg does by default.
 - FFmpeg-compatible behaviour: the PNS noise generator (LCG, seed `0x1f2e3d4c`); two SCEs
   in configuration 2 map to FL then FR; a CPE in configuration 1 switches to stereo;
-  the libfaac fill-element signature skips the first 1024 samples.
+  the libfaac fill-element signature skips the first 1024 samples by default.
+  Select `compat::priming::Policy::Container` with `Decoder::with_priming_policy`
+  to leave that discard to an explicit container edit.
 
 ## Known differences from FFmpeg
 
