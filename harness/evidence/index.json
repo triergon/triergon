@@ -19692,6 +19692,19 @@
    "key": "evidence/mp4-range-fate-prefix-e35e3584-aarch64/35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063.tar.zst",
    "sha256": "35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063",
    "bytes": 50059794
+  },
+  {
+   "name": "subtitles-mov-text-tags-30fe564a",
+   "path": "subtitles-mov-text-tags-30fe564a",
+   "retention": "90 days",
+   "reason": "Subtitles, text: the mov_text override tags at 30fe564a, natively on Linux AArch64 and in the ARMv7 user space; the subtitle-text and subtitle-text-host gates against 339ec261's on both targets, the crate and worker tests, a fuzz campaign of subtitle-text; instruction counts of every subtitle-text and subtitle-text-host case against 339ec261 on both targets, with the 13 mov-text-tags sessions split per sample on AArch64; the probes the tag rules were derived from with the reference's output, the clean-room brief, rules and notes, the scripts that ran them and a bundle of the measured commits.",
+   "key": "qualification/subtitles-mov-text-tags-30fe564a/1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc.tar.gz",
+   "sha256": "1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc",
+   "bytes": 31099225,
+   "source_revisions": {
+    "candidate": "30fe564a562f0ed73de7c076fe7f4eb0b12f21d6",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }
