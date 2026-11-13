@@ -163,6 +163,22 @@ impl NalPacketConfiguration {
             .or_else(|| self.hevc_record().map(HvcConfiguration::nal_count))
             .unwrap_or(0)
     }
+    /// The materialized configuration size and the sizing walk's work charge.
+    pub(crate) fn annex_b_configuration_extent(&self) -> Option<(usize, u64)> {
+        if let Some(record) = self.avc_record() {
+            Some((
+                record.annex_b_configuration_len(),
+                record.nal_count() as u64 + 1,
+            ))
+        } else if let Some(record) = self.hevc_record() {
+            Some((
+                record.annex_b_configuration_len()?,
+                record.nal_count() as u64 + 1,
+            ))
+        } else {
+            Some((self.bytes().len(), 2))
+        }
+    }
 }
 
 /// These are the only strict-source configuration refusals carried by the

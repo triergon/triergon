@@ -733,6 +733,14 @@ impl AvcConfiguration {
         let last = &self.arrays[self.array_count() - 1];
         usize::from(last.first_nal) + usize::from(last.nal_count)
     }
+    pub(crate) fn annex_b_configuration_len(&self) -> usize {
+        let picture = &self.arrays[1];
+        let count = picture.nal_indices().end;
+        // The first two arrays occupy the bytes after the six-byte header,
+        // plus the picture count. Replace each two-byte length with four
+        // start-code bytes. The extension array is never emitted here.
+        picture.range.end as usize - 7 + 2 * count
+    }
     pub const fn array_count(&self) -> usize {
         if self.fields.extension.is_some() {
             3

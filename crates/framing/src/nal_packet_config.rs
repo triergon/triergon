@@ -157,6 +157,18 @@ impl<'a> NalPacketConfigWriter<'a> {
                     }
                 },
                 1 => {
+                    // A successful full sizing pass can use the validated extent.
+                    // Keep the incremental walk for short work budgets and to
+                    // report the first NAL that crosses the output limit.
+                    if self.index == 0
+                        && let Some((len, charge)) = self.config.annex_b_configuration_extent()
+                        && len <= self.maximum
+                        && work.try_charge(charge)
+                    {
+                        self.total = len;
+                        self.phase = 2;
+                        continue;
+                    }
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
