@@ -801,7 +801,7 @@ fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
     }
     // A case may name another case's parent directory. Reserve the parent
     // first without changing the order of the report rows.
-    directories.sort_unstable();
+    directories.sort_unstable_by_key(|&path| (path.components().count(), path));
     for relative in directories {
         create_output(&output.join(relative))?;
     }
@@ -1964,11 +1964,13 @@ mod tests {
 
     #[test]
     fn case_outputs_reserve_nested_cases_in_either_order() {
-        for ids in [["nested/child", "nested"], ["nested", "nested/child"]] {
-            let output = Output::new();
-            let cases = ids.map(|id| Value::object([("id", Value::str(id))]));
-            reserve_case_outputs(&output.0, &cases).unwrap();
-            assert!(output.0.join("nested/child").is_dir());
+        for child in ["nested/child", "Nested/child"] {
+            for ids in [[child, "nested"], ["nested", child]] {
+                let output = Output::new();
+                let cases = ids.map(|id| Value::object([("id", Value::str(id))]));
+                reserve_case_outputs(&output.0, &cases).unwrap();
+                assert!(output.0.join(child).is_dir());
+            }
         }
     }
 
