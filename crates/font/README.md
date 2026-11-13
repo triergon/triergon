@@ -502,4 +502,4 @@ lists the modules. Software that includes this crate credits FreeType in its
 documentation:
 
 > Portions of this software are copyright © 2026 The FreeType Project
-> (https://freetype.org). All rights reserved.
+> (<https://freetype.org>). All rights reserved.
