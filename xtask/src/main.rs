@@ -477,12 +477,7 @@ fn fate_run(root: &Path, args: &[String]) -> ExitCode {
 }
 
 fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
-    let (mut output, mut compare, mut candidate) = (
-        None,
-        None,
-        root.join(harness::gate_build::release_dir())
-            .join("media-worker"),
-    );
+    let (mut output, mut compare, mut candidate) = (None, None, None);
     let mut corpora = std::collections::BTreeMap::new();
     let mut rest = args.iter();
     let parsed = (|| -> Task {
@@ -491,7 +486,7 @@ fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
             match flag.as_str() {
                 "--output" => output = Some(PathBuf::from(value)),
                 "--compare" => compare = Some(PathBuf::from(value)),
-                "--candidate" => candidate = PathBuf::from(value),
+                "--candidate" => candidate = Some(PathBuf::from(value)),
                 "--corpus" => {
                     let (feature, directory) = value
                         .split_once('=')
@@ -511,6 +506,12 @@ fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
     })();
     exit(parsed.and_then(|()| {
         let output = output.ok_or("--output is required")?;
+        let candidate = match candidate {
+            Some(candidate) => candidate,
+            None => root
+                .join(harness::gate_build::release_dir()?)
+                .join("media-worker"),
+        };
         harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref(), &corpora)
     }))
 }
@@ -859,13 +860,21 @@ fn cargo(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
         .current_dir(root))
 }
 
-/// `cargo ARGS` compiled for the worker target, for the steps that build or test
-/// what the workers run.
+/// `cargo SUBCOMMAND ARGS` compiled for the worker target, for the steps that build or
+/// test what the workers run. The target follows the subcommand, ahead of any `--`.
 fn cargo_for_workers(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
-    let target = harness::gate_build::target_args();
-    let mut args = args.to_vec();
-    args.extend(target.iter().map(String::as_str));
-    cargo(root, toolchain, &args)
+    let target = harness::gate_build::target_args()?;
+    cargo(root, toolchain, &with_target(args, &target))
+}
+
+fn with_target<'a>(args: &[&'a str], target: &'a [String]) -> Vec<&'a str> {
+    let (subcommand, rest) = args.split_at(args.len().min(1));
+    subcommand
+        .iter()
+        .copied()
+        .chain(target.iter().map(String::as_str))
+        .chain(rest.iter().copied())
+        .collect()
 }
 
 /// Run with the pinned FFmpeg reference first on `PATH`, as the harness expects.
@@ -927,7 +936,7 @@ fn check_simd(root: &Path) -> Task {
             "--component",
             "clippy",
         ])
-        .args(harness::gate_build::target_args()))?;
+        .args(harness::gate_build::target_args()?))?;
     let toolchain = format!("+{NIGHTLY}");
     let features = "triergon-codec-hevc/simd,codec-worker/simd";
     cargo(
@@ -1187,8 +1196,9 @@ fn check(root: &Path) -> Task {
     check_links(root)?;
     check_revisions(root)?;
     let mut core_time = Command::new("python3");
-    core_time.arg("tools/test-core-time.py");
-    if let [_, target] = harness::gate_build::target_args().as_slice() {
+    core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
+    let target = harness::gate_build::worker_target()?;
+    if target != harness::gate_build::host()? {
         core_time.args(["--target", target]);
     }
     run(core_time.current_dir(root))
@@ -1196,9 +1206,27 @@ fn check(root: &Path) -> Task {
 
 #[cfg(test)]
 mod tests {
-    use super::shell_library_path;
+    use super::{shell_library_path, with_target};
     use std::ffi::OsStr;
     use std::path::Path;
+
+    #[test]
+    fn the_worker_target_follows_the_subcommand() {
+        let target = ["--target".to_owned(), "t".to_owned()];
+        assert_eq!(
+            with_target(&["clippy", "--workspace", "--", "-D", "warnings"], &target),
+            [
+                "clippy",
+                "--target",
+                "t",
+                "--workspace",
+                "--",
+                "-D",
+                "warnings"
+            ]
+        );
+        assert_eq!(with_target(&["test"], &[]), ["test"]);
+    }
 
     #[test]
     fn cargo_library_entries_are_dropped_and_others_kept() {

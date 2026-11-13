@@ -36,7 +36,7 @@ pub(super) fn opus_recovery_refuses_invalid_roll_maps(cx: &mut Context<'_>) -> O
     for (binary, refusal) in [
         (
             cx.root
-                .join(crate::harness::gate_build::release_dir())
+                .join(crate::harness::gate_build::release_dir()?)
                 .join("playback-worker"),
             2,
         ),

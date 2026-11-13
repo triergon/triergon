@@ -348,7 +348,7 @@ impl Generator {
         let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
         self.record_with(
             root,
-            &crate::harness::report::gate_target(),
+            &crate::harness::report::gate_target()?,
             false,
             |name| {
                 let reference = crate::harness::comparison::reference_named(&identity, name)?;

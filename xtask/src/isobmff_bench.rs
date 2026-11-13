@@ -894,7 +894,7 @@ fn measure(
             contract,
             &evidence,
             &build.identity,
-            &report::gate_target(),
+            &report::gate_target()?,
         );
         let pass = verdict.timing_pass && sampling_matches(&raw, options.pairs, options.seed);
         let digest = write_json(&directory.join("timing.json"), &raw)?;
@@ -954,7 +954,7 @@ fn measure(
             contract,
             &evidence,
             &build.identity,
-            &report::gate_target(),
+            &report::gate_target()?,
         );
         let pass =
             verdict.memory_pass && sampling_matches(&raw, options.memory_pairs, options.seed);
@@ -1170,7 +1170,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         ("schema", Value::int(1)),
         ("contract", Value::str("isobmff-open-index")),
         ("contract_id", Value::str("isobmff-open-index")),
-        ("target", Value::str(report::gate_target())),
+        ("target", Value::str(report::gate_target()?)),
         ("counts", counts()),
         ("contract_sha256", Value::str(CONTRACT_SHA)),
         ("corpus_sha256", Value::str(CORPUS_SHA)),
@@ -1318,7 +1318,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         &suite.contract,
         observations.chain(errors),
         &build.identity,
-        &report::gate_target(),
+        &report::gate_target()?,
         &[],
         &[],
     );
@@ -1926,7 +1926,9 @@ mod tests {
             fs::create_dir(&directory).unwrap();
             let result = trace(
                 &root,
-                &root.join(gate_build::release_dir()).join("isobmff-worker"),
+                &root
+                    .join(gate_build::release_dir().unwrap())
+                    .join("isobmff-worker"),
                 &root.join("target/harness/ffmpeg-isobmff-worker"),
                 case,
                 &directory,
