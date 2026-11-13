@@ -292,6 +292,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     if observer != Value::str(file_sha(&root.join("target/harness/allocations.so"))?) {
         return Err("capture requires the observer built in target/harness".into());
     }
+    let open = open_cases(root)?;
     let gate = policy::Runtime::load(root)?;
     let refusals =
         gate_build::pair_refusals(root, Path::new(&a.candidate), Path::new(&a.reference));
@@ -393,6 +394,12 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             )])
         };
         record.push(("correctness_summary".into(), correctness.clone()));
+        let open_on_target = open.contains(&id);
+        if open_on_target && correctness.get("conversion").is_some_and(Value::truthy) {
+            return Err(format!(
+                "{id}: listed open case now passes; remove it from open_cases"
+            ));
+        }
         let outputs = correctness.get("outputs");
         let iterations = u32::try_from(a.iterations).map_err(|e| e.to_string())?;
         let mut timed = runtime(
@@ -491,6 +498,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             ("heap_gate".to_owned(), Value::Bool(heap_gate)),
             ("rss_gate".to_owned(), Value::Bool(rss_gate)),
             ("memory_status".to_owned(), memory_status),
+            ("open_on_target".to_owned(), Value::Bool(open_on_target)),
             (
                 "all_gates".to_owned(),
                 Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
@@ -516,6 +524,34 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         &a.out.join("summary.json"),
         json::to_python(&Value::Array(summary), Some(1)),
     )
+}
+
+/// The cases `harness/capture/contract.json` lists in `open_cases` for this
+/// host's worker target: their conversion is compared and reported, and fails.
+fn open_cases(root: &Path) -> Result<Vec<String>, String> {
+    let path = root.join("harness/capture/contract.json");
+    let contract =
+        crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    let target = gate_build::worker_target()?;
+    let Some(entries) = contract.get("open_cases") else {
+        return Ok(Vec::new());
+    };
+    let entries = entries.as_array().ok_or("open_cases is not a list")?;
+    let mut open = Vec::new();
+    for entry in entries {
+        let id = entry
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or("open case without id")?;
+        let targets = entry
+            .get("targets")
+            .and_then(Value::as_array)
+            .ok_or("open case without targets")?;
+        if targets.iter().any(|t| t.as_str() == Some(target)) {
+            open.push(id.to_owned());
+        }
+    }
+    Ok(open)
 }
 
 #[cfg(test)]
