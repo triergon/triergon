@@ -41,14 +41,17 @@ struct Cursor {
     charset: Charset,
 }
 
+// In this order (`repr(C)`), the state every pair reads comes before the
+// 4.8 kB of screens, where a load's immediate offset reaches it.
 #[derive(Debug)]
+#[repr(C)]
 pub(super) struct Memory {
-    screens: [Screen; 2],
     shown: usize,
-    mode: Mode,
     /// The rows a carriage return scrolls, set by the last roll-up command.
     roll_rows: usize,
     cursor: Cursor,
+    mode: Mode,
+    screens: [Screen; 2],
 }
 
 impl Default for Memory {

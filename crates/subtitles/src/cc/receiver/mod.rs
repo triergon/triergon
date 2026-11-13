@@ -204,21 +204,17 @@ impl Digits {
     }
 }
 
-/// Two captured screens. Captures alternate between them in pop-on mode, so
-/// the capture before the latest stays available.
+/// Two captured screens. A pop-on report swaps them, so the capture before
+/// the latest stays available.
 #[derive(Debug)]
 struct Snapshots {
-    text: [Text; 2],
-    current: usize,
+    /// The screen the next capture replaces.
+    current: Text,
+    /// The pop-on capture waiting to be reported.
+    waiting: Text,
     /// When the previous and the latest snapshot were reported, microseconds
     /// (`i64::MIN` when a packet time was unknown).
     times: [i64; 2],
-}
-
-impl Snapshots {
-    fn current(&mut self) -> &mut Text {
-        &mut self.text[self.current]
-    }
 }
 
 /// When a packet is presented.
@@ -239,9 +235,9 @@ pub struct Decoder {
     field: Option<u8>,
     memory: Memory,
     snapshots: Snapshots,
-    /// The control code of the last pair, ignored while it repeats; zero
-    /// after any other pair.
-    last_control: [u8; 2],
+    /// The control code of the last pair (first byte low), ignored while it
+    /// repeats; zero after any other pair.
+    last_control: u16,
     /// Characters were written to the displayed screen since the last
     /// report.
     touched: bool,
@@ -264,11 +260,11 @@ impl Decoder {
             },
             memory: Memory::default(),
             snapshots: Snapshots {
-                text: [Text::new(pool), Text::new(pool)],
-                current: 0,
+                current: Text::new(pool),
+                waiting: Text::new(pool),
                 times: [0; 2],
             },
-            last_control: [0; 2],
+            last_control: 0,
             touched: false,
             last_real_time: 0,
             read_order: 0,
@@ -340,7 +336,7 @@ impl Decoder {
                 let hi = if odd_parity(hi) { hi & 0x7f } else { 0x7f };
                 // Padding is a null pair under a standard flag byte; under
                 // another flag byte a null pair counts as a code.
-                if matches!(flags, 0xfa | 0xfc | 0xfd) && hi == 0 && lo & 0x7f == 0 {
+                if hi == 0 && lo & 0x7f == 0 && matches!(flags, 0xfa | 0xfc | 0xfd) {
                     continue;
                 }
                 self.pair(hi, lo & 0x7f, now, out)?;
@@ -358,9 +354,8 @@ impl Decoder {
         {
             self.last_real_time = at;
             self.touched = false;
-            self.memory.capture(self.snapshots.current())?;
-            let text = &self.snapshots.text[self.snapshots.current];
-            out.push(self.read_order, text.as_bytes())?;
+            self.memory.capture(&mut self.snapshots.current)?;
+            out.push(self.read_order, self.snapshots.current.as_bytes())?;
             self.read_order = self.read_order.wrapping_add(1);
             out.end_ms = u32::MAX;
         }
@@ -381,13 +376,13 @@ impl Decoder {
     /// Only when the budget cannot hold the text.
     pub fn drain(&mut self, out: &mut Subtitle) -> Result<bool> {
         out.clear(None);
-        let waiting = 1 - self.snapshots.current;
-        if self.options.real_time || self.snapshots.text[waiting].is_empty() {
+        let waiting = &mut self.snapshots.waiting;
+        if self.options.real_time || waiting.is_empty() {
             return Ok(false);
         }
-        out.push(self.read_order, self.snapshots.text[waiting].as_bytes())?;
+        out.push(self.read_order, waiting.as_bytes())?;
         self.read_order = self.read_order.wrapping_add(1);
-        self.snapshots.text[waiting].clear();
+        waiting.clear();
         let [start, end] = self.snapshots.times;
         out.pts = known(end);
         out.end_ms = milliseconds(end.wrapping_sub(start));
@@ -397,19 +392,19 @@ impl Decoder {
     /// Decodes one pair of the selected field, parity removed, received at
     /// `now` (microseconds, `i64::MIN` when unknown).
     fn pair(&mut self, hi: u8, lo: u8, now: i64, out: &mut Subtitle) -> Result<()> {
-        let control = matches!(hi, 0x10..=0x1f);
-        if control && self.last_control == [hi, lo] {
-            return Ok(());
+        if matches!(hi, 0x10..=0x1f) {
+            let code = u16::from_le_bytes([hi, lo]);
+            if self.last_control == code {
+                return Ok(());
+            }
+            self.last_control = code;
+        } else {
+            // No control code has a first byte of 0.
+            self.last_control = 0;
         }
-        // No control code has a first byte of 0, so this ends the repetition.
-        self.last_control = if control { [hi, lo] } else { [0; 2] };
-        let taken = self.snapshots.current;
-        let effect = self.memory.apply(
-            hi,
-            lo,
-            self.options.real_time,
-            &mut self.snapshots.text[taken],
-        )?;
+        let effect =
+            self.memory
+                .apply(hi, lo, self.options.real_time, &mut self.snapshots.current)?;
         match effect {
             Effect::None => {}
             Effect::Touched => self.touched = true,
@@ -420,31 +415,29 @@ impl Decoder {
 
     /// Reports the snapshot just taken at `now`. Its event starts at the
     /// snapshot before it.
+    // Out of line, a report (rare next to pairs) leaves the registers of the
+    // pair loop to the loop.
+    #[inline(never)]
     fn report(&mut self, now: i64, out: &mut Subtitle) -> Result<()> {
         let start = self.snapshots.times[1];
         self.snapshots.times = [start, now];
         self.touched = false;
-        let taken = self.snapshots.current;
-        let reported = if self.options.real_time {
+        if self.options.real_time {
             self.last_real_time = start;
             out.end_ms = u32::MAX;
-            taken
         } else {
             // A pop-on caption is reported when it leaves the screen, so the
             // capture before this one is reported and this one waits.
-            let shown = if self.memory.is_pop_on() {
-                self.snapshots.current = 1 - taken;
-                1 - taken
-            } else {
-                taken
-            };
-            if self.snapshots.text[shown].is_empty() {
+            let snapshots = &mut self.snapshots;
+            if self.memory.is_pop_on() {
+                std::mem::swap(&mut snapshots.current, &mut snapshots.waiting);
+            }
+            if snapshots.current.is_empty() {
                 return Ok(());
             }
             out.end_ms = milliseconds(now.wrapping_sub(start));
-            shown
-        };
-        out.push(self.read_order, self.snapshots.text[reported].as_bytes())?;
+        }
+        out.push(self.read_order, self.snapshots.current.as_bytes())?;
         out.pts = known(start);
         self.read_order = self.read_order.wrapping_add(1);
         Ok(())
