@@ -1,7 +1,7 @@
 //! Incremental native-view box selection and forward ASS emission.
 use super::{
     Clock, Funding, Limits, Options, Output, Subtitle,
-    config::{Configuration, Style},
+    config::{Configuration, Style, until_nul},
     write::{Fixed, Writer},
 };
 use crate::text::{Input, unicode::cancelled};
@@ -340,9 +340,9 @@ impl PacketJob {
                     }
                     funding.commit();
                     let text = &self.bytes()[self.at..self.text_end];
-                    let visible = text.iter().position(|&b| b == 0).unwrap_or(text.len());
-                    if is_valid_text(&text[..visible]) {
-                        self.visible_end = self.at + visible;
+                    let visible = until_nul(text);
+                    if is_valid_text(visible) {
+                        self.visible_end = self.at + visible.len();
                         self.advance = true;
                         self.phase = Phase::Prefix;
                     } else {
@@ -439,25 +439,23 @@ impl PacketJob {
         let bytes = self.input.payload.as_ref();
         while self.character < boundary && self.text_at < self.visible_end {
             let rest = &bytes[self.text_at..self.visible_end];
-            let (output, length, count): (&[u8], usize, usize) = match rest[0] {
-                b'\n' => (b"\\N", 1, 1),
-                b'\r' => (b"", 1, 1),
-                _ => {
-                    let most = boundary - self.character;
-                    let (mut length, mut count) = (0, 0);
-                    for &b in rest {
-                        // Each character ends the step at its first byte;
-                        // the visible text is UTF-8, so none is split.
-                        if b & 0xc0 != 0x80 {
-                            if count == most || b == b'\n' || b == b'\r' || length >= RUN_BYTES {
-                                break;
-                            }
-                            count += 1;
+            let (output, length, count) = if let Some(output) = line_break(rest[0]) {
+                (output, 1, 1)
+            } else {
+                let most = boundary - self.character;
+                let (mut length, mut count) = (0, 0);
+                for &b in rest {
+                    // Each character ends the step at its first byte; the
+                    // visible text is UTF-8, so none is split.
+                    if b & 0xc0 != 0x80 {
+                        if count == most || line_break(b).is_some() || length >= RUN_BYTES {
+                            break;
                         }
-                        length += 1;
+                        count += 1;
                     }
-                    (&rest[..length], length, count)
+                    length += 1;
                 }
+                (&rest[..length], length, count)
             };
             if !funding.pay(7 * count + output.len(), caller)? {
                 return Ok(false);
@@ -476,8 +474,9 @@ impl PacketJob {
             .filter(|s| usize::from(s.start) == self.character)
             .map(|s| s.style)
     }
-    /// Writes one [`Stage`] at a character where a style or the highlight
-    /// starts or ends, in this order, each tag in its own braces:
+    /// Writes the [`Stage`]s at a character where a style or the highlight
+    /// starts or ends, in this order, each tag in its own braces, then the
+    /// character:
     ///
     /// - `{\r}` where the selected style ends. The colour a highlight end
     ///   restores returns to the default's.
@@ -503,8 +502,8 @@ impl PacketJob {
     ///
     /// A font name that is not UTF-8 or holds U+FFFE refuses the sample with
     /// -1094995529, as such text does; the call still takes a read order.
-    /// U+FFFF is written. Each stage, and each font table entry it examines,
-    /// is funded on its own: one unit and one per byte it writes.
+    /// U+FFFF is written. Each stage, and each font table entry it writes, is
+    /// funded on its own: one unit and one per byte it writes.
     fn render_transition(
         &mut self,
         config: &Configuration,
@@ -522,11 +521,9 @@ impl PacketJob {
                 .get(self.selected)
                 .is_some_and(|span| usize::from(span.end) == self.character);
             tags.clear();
-            // While the font stage has entries to examine: whether this one
-            // has the starting style's font ID.
-            let mut font = None;
+            // In the font stage, the name of the next entry with the starting
+            // style's font ID.
             let mut name = None;
-            let mut ascii = true;
             let mut width = 0;
             match self.stage {
                 Stage::Reset => {
@@ -552,16 +549,11 @@ impl PacketJob {
                     }
                 }
                 Stage::Font => {
-                    font = starting
-                        .filter(|style| style.font != default.font)
-                        .and_then(|style| {
-                            let font = config.fonts.as_slice().get(self.font_at)?;
-                            Some(font.id == style.font)
-                        });
-                    if font == Some(true) {
-                        let found;
-                        (found, ascii) = config.font_name(self.font_at)?;
-                        name = Some(found);
+                    let next = config.fonts.as_slice().get(self.font_at);
+                    if starting.is_some_and(|style| {
+                        style.font != default.font && next.is_some_and(|font| font.id == style.font)
+                    }) {
+                        name = Some(config.font_name(self.font_at)?);
                     }
                 }
                 Stage::Colour => {
@@ -610,15 +602,12 @@ impl PacketJob {
             if !funding.pay(1 + size, caller)? {
                 return Ok(false);
             }
-            if name.is_some_and(|name| !ascii && !is_valid_text(name)) {
+            if name.is_some_and(|name| !is_valid_text(name)) {
                 funding.commit();
                 self.refuse(true);
                 return Ok(true);
             }
-            if size > 0 {
-                self.writer
-                    .push_parts(&parts, size, limits.maximum_ass_bytes)?;
-            }
+            self.writer.push_parts(&parts, limits.maximum_ass_bytes)?;
             self.stage = match self.stage {
                 Stage::Reset => {
                     if ends {
@@ -628,15 +617,17 @@ impl PacketJob {
                     Stage::Face
                 }
                 Stage::Face => Stage::Size,
-                Stage::Size => Stage::Font,
-                Stage::Font if font.is_some() => {
+                Stage::Size => {
+                    if let Some(style) = starting {
+                        self.font_at = config.first_font(style.font);
+                    }
+                    Stage::Font
+                }
+                Stage::Font if name.is_some() => {
                     self.font_at += 1;
                     Stage::Font
                 }
-                Stage::Font => {
-                    self.font_at = 0;
-                    Stage::Colour
-                }
+                Stage::Font => Stage::Colour,
                 Stage::Colour => {
                     if let Some(style) = starting {
                         self.color = style.color;
@@ -713,16 +704,22 @@ fn decimal(tags: &mut Fixed<64>, value: u8) -> Result<()> {
 fn is_valid_text(bytes: &[u8]) -> bool {
     bytes.is_ascii() || std::str::from_utf8(bytes).is_ok_and(|text| !text.contains('\u{fffe}'))
 }
-/// The output of the character at `at` and its width in bytes: a line feed
-/// writes `\N` and a carriage return nothing.
+/// What a line break writes: `\N` for a line feed and nothing for a carriage
+/// return; `None` for any other byte.
+fn line_break(b: u8) -> Option<&'static [u8]> {
+    match b {
+        b'\n' => Some(b"\\N"),
+        b'\r' => Some(b""),
+        _ => None,
+    }
+}
+/// The output of the character at `at` and its width in bytes.
 fn written(bytes: &[u8], at: usize) -> (&[u8], usize) {
     let width = utf8_width(bytes[at]);
-    let output: &[u8] = match bytes[at] {
-        b'\n' => b"\\N",
-        b'\r' => b"",
-        _ => &bytes[at..at + width],
-    };
-    (output, width)
+    (
+        line_break(bytes[at]).unwrap_or(&bytes[at..at + width]),
+        width,
+    )
 }
 fn utf8_width(b: u8) -> usize {
     match b {

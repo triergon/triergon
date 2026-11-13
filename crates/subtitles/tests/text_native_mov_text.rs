@@ -802,6 +802,45 @@ fn font_tags_name_every_table_entry_with_the_id_and_refuse_names_that_are_not_te
 }
 
 #[test]
+fn font_lookups_cost_work_in_the_entries_written_not_the_table_size() {
+    // 16,384 entries in descending ID order, and 1,000 style starts, each
+    // with a font ID one entry has.
+    let names: Vec<(u16, &[u8])> = (2..=16_385u16).rev().map(|id| (id, &b"f"[..])).collect();
+    let mut fonts = vec![(1, &b"Arial"[..])];
+    fonts.extend(names);
+    let config = description(PLAIN, &fonts);
+    let records: Vec<_> = (0..1000u16)
+        .map(|i| Record {
+            font: 2 + 16 * i,
+            ..at(2 * i, 2 * i + 1)
+        })
+        .collect();
+    let bytes = styled(&[b'a'; 2000], &records, &[]);
+    let pool = Budget::new(4 << 20).unwrap();
+    let extra = Bytes::copy_from_slice(&pool, &config).unwrap();
+    let mut d = Decoder::new(
+        &pool,
+        Some(&extra),
+        Options::default(),
+        Limits::default(),
+        6,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    while d.poll(&mut WorkBudget::new(1 << 20), &cancel).unwrap() != Status::NeedInput {}
+    let configured = d.work_spent();
+    d.provide(input(&pool, &bytes), Clock::default()).unwrap();
+    let ass = finish(&mut d, 1 << 20).subtitle.unwrap().ass;
+    let text = String::from_utf8(ass.as_ref().to_vec()).unwrap();
+    assert_eq!(text.matches(r"{\fnf}").count(), 1000);
+    assert!(text.ends_with(r"{\fnf}a{\r}a"));
+    // Linear in the sample and its output: each style start finds its entry
+    // by binary search instead of examining all 16,384.
+    let spent = d.work_spent() - configured;
+    assert!(spent < 200_000, "{spent} units for the sample");
+}
+
+#[test]
 fn font_tags_longer_than_the_pending_buffer_are_written_in_stages() {
     let names: Vec<_> = (0..24u8).map(|i| vec![b'A' + i; 200]).collect();
     let mut fonts: Vec<(u16, &[u8])> = vec![(1, b"Arial")];

@@ -87,35 +87,26 @@ impl Writer {
     pub(super) fn reserve(&mut self, additional: usize) -> Result<()> {
         self.data.try_reserve_exact(additional)
     }
-    /// Appends `bytes` to the output, once [`drain`](Self::drain) has moved
-    /// what is pending; the output never grows beyond `maximum` bytes.
+    /// Appends `bytes` to the output, as [`push_parts`](Self::push_parts).
     pub(super) fn push(&mut self, bytes: &[u8], maximum: usize) -> Result<()> {
-        if self.data.len().saturating_add(bytes.len()) > maximum {
-            return Err(Error::Limit {
-                requested: maximum.saturating_add(1),
-                maximum,
-            });
-        }
-        // Amortised growth: an exact reservation per run would copy the
-        // output again for every run.
-        self.data.try_reserve(bytes.len())?;
-        self.data.try_extend_from_slice(bytes)
+        self.push_parts(&[bytes], maximum)
     }
-    /// Appends `parts`, `size` bytes in all, in one step, once
-    /// [`drain`](Self::drain) has moved what is pending: the output never grows
-    /// beyond `maximum` bytes, and a refused reservation appends nothing.
-    pub(super) fn push_parts(
-        &mut self,
-        parts: &[&[u8]],
-        size: usize,
-        maximum: usize,
-    ) -> Result<()> {
+    /// Appends `parts` to the output in one step, once [`drain`](Self::drain)
+    /// has moved what is pending: the output never grows beyond `maximum`
+    /// bytes, and a refused reservation appends nothing.
+    pub(super) fn push_parts(&mut self, parts: &[&[u8]], maximum: usize) -> Result<()> {
+        let size = parts.iter().map(|part| part.len()).sum::<usize>();
+        if size == 0 {
+            return Ok(());
+        }
         if self.data.len().saturating_add(size) > maximum {
             return Err(Error::Limit {
                 requested: maximum.saturating_add(1),
                 maximum,
             });
         }
+        // Amortised growth: an exact reservation per step would copy the
+        // output again for every step.
         self.data.try_reserve(size)?;
         for part in parts {
             self.data.try_extend_from_slice(part)?;

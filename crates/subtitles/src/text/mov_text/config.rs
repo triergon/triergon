@@ -4,7 +4,7 @@ use super::{
     write::{Fixed, Writer},
 };
 use crate::text::unicode::cancelled;
-use std::{fmt::Write, ops::Range, sync::atomic::AtomicBool};
+use std::{ffi::CStr, fmt::Write, ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -93,9 +93,14 @@ impl Configuration {
             writer: Writer::new(pool),
         })
     }
-    /// The name of font table entry `index` up to its first NUL, and whether
-    /// those bytes are all ASCII.
-    pub(super) fn font_name(&self, index: usize) -> Result<(&[u8], bool)> {
+    /// The index of the first font table entry with font ID `id` or a higher
+    /// one: the table is sorted by ID once read, so a style's entries follow
+    /// it, in table order.
+    pub(super) fn first_font(&self, id: u16) -> usize {
+        self.fonts.as_slice().partition_point(|font| font.id < id)
+    }
+    /// The name of font table entry `index` up to its first NUL.
+    pub(super) fn font_name(&self, index: usize) -> Result<&[u8]> {
         let font = self
             .fonts
             .as_slice()
@@ -176,6 +181,19 @@ impl Configuration {
                 }
                 Phase::Fonts => {
                     if self.read == self.count {
+                        // Sorted by ID, and by position within one ID, so
+                        // a style's entries are found by binary search; a
+                        // unit per entry and comparison level.
+                        let n = self.fonts.len();
+                        let levels = usize::try_from(usize::BITS - n.leading_zeros())
+                            .map_err(|_| Error::Overflow)?;
+                        if !funding.pay(1 + n * levels, caller)? {
+                            return Ok(false);
+                        }
+                        self.fonts
+                            .as_mut_slice()
+                            .sort_unstable_by_key(|font| (font.id, font.name.start));
+                        funding.commit();
                         self.phase = Phase::Header;
                         continue;
                     }
@@ -287,7 +305,7 @@ impl Configuration {
                 .as_ref()
                 .ok_or(Error::Invalid("native default font owner"))?;
             let bytes = &raw.as_ref()[range.clone()];
-            h.append(&bytes[..bytes.iter().position(|&v| v == 0).unwrap_or(bytes.len())])?;
+            h.append(until_nul(bytes))?;
         } else {
             h.append(b"Arial")?;
         }
@@ -296,27 +314,7 @@ impl Configuration {
         Ok(h)
     }
 }
-/// The bytes before the first NUL and whether they are all ASCII, eight bytes
-/// a step until a word holds a NUL or a byte above 0x7f.
-fn until_nul(bytes: &[u8]) -> (&[u8], bool) {
-    const ONES: u64 = 0x0101_0101_0101_0101;
-    const HIGH: u64 = 0x8080_8080_8080_8080;
-    let (words, _) = bytes.as_chunks::<8>();
-    // A byte of 0 borrows into its high bit; one above 0x7f has it set.
-    let plain = words
-        .iter()
-        .take_while(|word| {
-            let x = u64::from_ne_bytes(**word);
-            (x.wrapping_sub(ONES) | x) & HIGH == 0
-        })
-        .count();
-    let at = plain * 8;
-    let mut ascii = true;
-    for (i, &b) in bytes[at..].iter().enumerate() {
-        if b == 0 {
-            return (&bytes[..at + i], ascii);
-        }
-        ascii &= b.is_ascii();
-    }
-    (bytes, ascii)
+/// The bytes before the first NUL, or all of them.
+pub(super) fn until_nul(bytes: &[u8]) -> &[u8] {
+    CStr::from_bytes_until_nul(bytes).map_or(bytes, CStr::to_bytes)
 }
