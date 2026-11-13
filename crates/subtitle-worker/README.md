@@ -3,7 +3,7 @@
 Subtitle decode measurement worker for the harness. It decodes one subtitle stream
 through the FFmpeg-compatible receivers of [triergon-subtitles](../subtitles/README.md),
 as the subtitles build of the reference worker (`harness/reference_subtitles.h`) does
-with FFmpeg's `pgssub`, `dvbsub`, `dvdsub`, `libzvbi_teletextdec` and `ccaption`
+with FFmpeg's `pgssub`, `dvbsub`, `dvdsub`, `libzvbi_teletextdec` and `cc_dec`
 decoders, and reads text subtitles as the formats build
 (`harness/reference_subtitle_text.h`) does with its `mov_text` and `ass` decoders
 and `srt` and `webvtt` demuxers. It is tooling (`publish = false`), not part of the

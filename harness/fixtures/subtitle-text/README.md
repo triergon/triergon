@@ -3,12 +3,13 @@
 Inputs of the `subtitle-text` and `subtitle-text-host` features
 (`harness/features/subtitle-text/`, `harness/features/subtitle-text-host/`), written by
 `harness/subtitle_corpus.py capsules SAMPLES`. The session capsules are derived byte
-for byte from authored-synthetic fixtures already in the repository, except the ASS
-packets and documents the script authors itself:
+for byte from authored-synthetic fixtures already in the repository, except the
+mov_text sessions, ASS packets and documents the script authors itself:
 
 | Directory | Source |
 | --- | --- |
 | `mov-text/` | `crates/subtitles/tests/native-mov-text-fixtures/`: each case's extradata, packets, flushes, time base, frame size and clock from `PROVENANCE.json` |
+| `mov-text-tags/` | the sessions `tx3g_sessions` authors, one per rule of the override tags the decoder writes where a style record or the highlight starts or ends: a sample description and samples with chosen `styl`, `hlit` and `hclr` boxes; clock 1/1000, PTS 1000, duration 2000 |
 | `tx3g/` | the samples and configurations each test in `crates/subtitles/tests/text_tx3g_semantics.rs` builds, recorded by running that test with `TRIERGON_TX3G_SAMPLES=SAMPLES`; consecutive repeats are folded into one packet, and each packet uses the tests' clock (1/90000, PTS 0, duration 135000) |
 | `charset/` | the label and packet of each case in `crates/subtitles/tests/receiver-mapping-data/cases74.rs`, clock 1/1000, PTS 1000, duration 2000 |
 | `ass/` | the `OpaqueAss` cases of `crates/subtitles/tests/text-fixtures/fixtures/manifest.json` with their codec private data (`ass-*.cap`), and the packets `ASS_PACKETS` authors for the decode call's UTF-8 check; same clock |

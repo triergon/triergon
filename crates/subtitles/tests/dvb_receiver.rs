@@ -59,6 +59,7 @@ fn cases() -> Vec<Case> {
             let automatic_palette = match r.u8() as i8 {
                 0 => AutomaticPalette::Never,
                 1 => AutomaticPalette::Always,
+                -2 => AutomaticPalette::WithoutClutOnce,
                 _ => AutomaticPalette::WithoutClut,
             };
             let service = usize::try_from(r.u8() as i8).ok();

@@ -80,17 +80,32 @@ pub struct EncodedTimeView {
     pub origin: ClockOrigin,
 }
 
+/// The window of 2³³ ticks the demuxer places every timestamp of a program in,
+/// opened by the program's first 33-bit timestamp `reference`.
+///
+/// FFmpeg's mpegts demuxer reports each later timestamp as the one value
+/// congruent to it modulo 2³³ in the window, which starts 60 s (5,400,000
+/// ticks) before `reference`, as observed with first timestamps from 0 to
+/// 2³³ − 1 and followers on either side of them:
+///
+/// - below 5,400,000 the window starts at 0: after a first timestamp of 1 a
+///   later 0 stays 0, and after a first 0 a later 2³³ − 1 stays
+///   8,589,934,591;
+/// - from 5,400,000 to 2³³ − 5,400,001 it starts 60 s earlier: with
+///   5,400,001 first, a later 1 stays 1 and a later 0 becomes 2³³;
+/// - from 2³³ − 5,400,000 up it starts 60 s before `reference` − 2³³, so the
+///   first timestamp itself comes out negative: 2³³ − 5,400,000 as
+///   −5,400,000 and 2³³ − 1 as −1, with a later 0 as 0.
 fn initial_interval(reference: u64) -> ClockOrigin {
-    // The fixed 90-kHz behavioural profile admits one congruent representative
-    // in an interval of width PERIOD90. Its 60-second lead is contract data.
-    // At this timebase the near-end window is narrower than an eighth period.
-    // No observed peer timestamp is an input to this interval construction.
     const LEAD90: i128 = 60 * 90_000;
     let reference90 = i128::from(reference);
     let candidate = reference90 - LEAD90;
     let interval_origin90 = if reference90 >= PERIOD90 - LEAD90 {
+        // Within 60 s of the wrap: the window takes the first timestamp
+        // as negative, so that the wrapped ones after it continue from 0.
         candidate - PERIOD90
     } else {
+        // Within 60 s of zero the window does not start below 0.
         candidate.max(0)
     };
     ClockOrigin {

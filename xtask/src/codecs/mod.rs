@@ -3,6 +3,7 @@
 //! against the pinned FFmpeg decoders.
 
 mod aac_access_units;
+mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
 pub mod equivalence;
@@ -18,6 +19,9 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
   aac-access-units --out DIR [--record]
                  prepare the configured AAC-LC workloads and compare every native PCM plane
+  aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
+                 rerun the Parametric Stereo table recovery against the pinned FFmpeg 9.0.2
+                 decoder and write, or with --check compare, the generated PS tables
   aac-sources --out DIR
                  author the fixed-layout and indexed-rate AAC-LC sources
   manifest --out M.json LANE=DIR[,DIR...]...
@@ -128,6 +132,18 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         "aac-access-units" => {
             let a = Args::parse(rest, &["out"], &["record"])?;
             aac_access_units::run(root, &a.path("out")?, a.get("record").is_some())?;
+        }
+        "aac-ps-tables" => {
+            let a = Args::parse(rest, &["ffmpeg", "python", "work"], &["check"])?;
+            return aac_ps_tables::main(
+                root,
+                &aac_ps_tables::Options {
+                    check: a.get("check").is_some(),
+                    ffmpeg: a.get("ffmpeg").map(PathBuf::from),
+                    python: a.get("python").unwrap_or("python3").to_owned(),
+                    work: a.get("work").map(PathBuf::from),
+                },
+            );
         }
         "aac-sources" => {
             let a = Args::parse(rest, &["out"], &[])?;

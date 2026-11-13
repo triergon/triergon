@@ -1063,9 +1063,12 @@ def index_variants(out, case):
             case("vobsub-" + name + suffix, file, *arguments)
 
     # size: numbers beyond 32 bits and sizes the decoder refuses to open with
+    # and the largest canvases it opens with: (w + 128)(h + 128) below 2^28
     for name, size in [("idx-size-zero", "0x480"), ("idx-size-beyond-32-bits", "4294968016x480"),
                        ("idx-size-negative-beyond-32-bits", "720x-4294966816"),
-                       ("idx-size-int-min", "2147483648x480")]:
+                       ("idx-size-int-min", "2147483648x480"), ("idx-size-largest", "16255x16257"),
+                       ("idx-size-past-largest", "16256x16256"), ("idx-size-widest", "2080767x1"),
+                       ("idx-size-past-widest", "2080768x1")]:
         case("vobsub-" + name, raw_idx(out, name, ["size: " + size, P, "id: en, index: 0", T(1000)], sub))
 
     # delay: forms, one before each of twelve units
