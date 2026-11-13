@@ -179,9 +179,9 @@ stay within the numeric rules at a channel RMS of at most 2.2e-8 (`al_sbr_ps_04_
 1.1e-6 to 1.7e-8). Three crafted streams of unrecovered paths are open cases
 ([aac/ps-open-manifest.json](../harness/codecs/aac/ps-open-manifest.json)). Instruction
 counts against the previous decoder (perf stat totals): the PS vectors take 7 to 18 % fewer
-on AArch64 and 0.5 to 2.5 % fewer on ARMv7; HE-AAC without PS and the frozen
-`aac-lc-5.1` and `aac-lc-stereo` workloads are within 0.003 %, so the AAC timing rows
-stand.
+on AArch64 and 0.6 to 3.3 % fewer on ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`); HE-AAC
+without PS and the frozen `aac-lc-5.1` and `aac-lc-stereo` workloads take at most as many
+as before on both, 0.014 % fewer at most, so the AAC timing rows stand.
 
 The rasterising rows on Linux compare the gate build at
 `a7b6635e20cc2dc9d4592a874ba0eecab24f2870` with the libass reference: the four
