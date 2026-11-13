@@ -19748,6 +19748,33 @@
    "sha256": "a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697",
    "bytes": 100014048,
    "source_revision": "230d1314464d34a04f5f2614298e5b7009292f0c"
+  },
+  {
+   "name": "code-size-4dbbd545-aarch64",
+   "path": "code-size-4dbbd545-aarch64",
+   "retention": "retained",
+   "reason": "Code-size change at 4dbbd545 on AArch64 (c8g.4xlarge): the playback, transport, media, subtitle-cc, ISO BMFF and framing gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the worker SHA-256 and .text sizes. The ISO BMFF and framing rows cite it: their workers are byte-identical at 4fc96a49.",
+   "key": "evidence/code-size-4dbbd545-aarch64/da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f.tar.zst",
+   "sha256": "da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f",
+   "bytes": 65174745
+  },
+  {
+   "name": "code-size-4fc96a49-aarch64",
+   "path": "code-size-4fc96a49-aarch64",
+   "retention": "retained",
+   "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.4xlarge): the playback, transport, media and subtitle-cc gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the release tests, worker-tests, the worker SHA-256 and .text sizes.",
+   "key": "evidence/code-size-4fc96a49-aarch64/78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29.tar.zst",
+   "sha256": "78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29",
+   "bytes": 37021601
+  },
+  {
+   "name": "code-size-placement-probe-aarch64",
+   "path": "code-size-placement-probe-aarch64",
+   "retention": "retained",
+   "reason": "Matroska audio clock total RSS on AArch64: alternating audio-clocks runs of main at f426ea65 against b438e75a and 4fc96a49, the per-commit bisect, the split of the first commit, resident pages and faults per 64 KiB fault-around window, every variant tried, subtitle-cc at b438e75a, and the scripts that ran them.",
+   "key": "evidence/code-size-placement-probe-aarch64/9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72.tar.zst",
+   "sha256": "9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72",
+   "bytes": 20056214
   }
  ]
 }
