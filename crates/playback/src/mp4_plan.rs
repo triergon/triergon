@@ -846,7 +846,9 @@ impl<'a> Mp4IndexJob<'a> {
                 } else {
                     self.phase = if let Some(duration) = &self.range_duration {
                         if let Some(cursor) = &mut self.native {
-                            if !duration.scan {
+                            if duration.scan {
+                                cursor.check_duration_before_replay()?;
+                            } else {
                                 cursor.check_projections_before_replay()?;
                             }
                             cursor.enable_range_seek_checkpoints();
@@ -975,28 +977,21 @@ impl<'a> Mp4IndexJob<'a> {
                         .native
                         .as_mut()
                         .ok_or(Error::Invalid("missing native range cursor"))?;
-                    loop {
-                        match cursor.poll(w, c)? {
-                            CursorStatus::Yield => return Ok(false),
-                            CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
-                            CursorStatus::Ready => {
-                                let row = cursor.take_occurrence()?;
-                                let Some(pts) = row.demux.pts else { continue };
-                                let end =
-                                    pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
-                                let micros = row.media_clock.demux_base.rescale(
-                                    end,
-                                    TimeBase::MICROSECONDS,
-                                    Rounding::NearestAway,
-                                )?;
-                                duration.micros = duration.micros.max(micros);
+                    match cursor.poll(w, c)? {
+                        CursorStatus::Yield => return Ok(false),
+                        CursorStatus::Ready => {
+                            return Err(Error::Invalid("range check yielded a packet"));
+                        }
+                        CursorStatus::End => {
+                            if duration.scan {
+                                duration.micros = cursor
+                                    .checked_duration_us()
+                                    .ok_or(Error::Invalid("range duration scan incomplete"))?;
                             }
-                            CursorStatus::End => {
-                                cursor.rewind_at_end()?;
-                                self.track = 0;
-                                self.phase = 5;
-                                return Ok(false);
-                            }
+                            cursor.rewind_at_end()?;
+                            self.track = 0;
+                            self.phase = 5;
+                            return Ok(false);
                         }
                     }
                 }

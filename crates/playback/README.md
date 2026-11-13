@@ -162,8 +162,8 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
-Range playback derives the duration from packet end times when the movie
-header's duration is unknown or exceeds the presentation clock.
+When the movie header's duration is unknown or exceeds the presentation clock,
+range playback finds the latest packet end during the per-track projection check.
 Fragmented files support an open-ended rate-one media edit. Forward playback
 applies it from the front movie, including tracks first seen in later fragments. A
 leading empty subtitle edit delays the subtitle packet clocks. When video

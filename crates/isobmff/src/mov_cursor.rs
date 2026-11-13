@@ -525,6 +525,7 @@ pub struct PacketCursor<'a> {
     terminal: Option<crate::TerminalMdat>,
     forward_regular: Option<crate::ForwardRegularMdat>,
     check_projections: bool,
+    checked_duration_us: Option<i64>,
     projection: TrackProjection,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
@@ -723,6 +724,7 @@ impl<'a> PacketCursor<'a> {
             terminal: None,
             forward_regular: None,
             check_projections: false,
+            checked_duration_us: None,
             projection: TrackProjection::default(),
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
@@ -972,6 +974,23 @@ impl<'a> PacketCursor<'a> {
         self.check_projections = true;
         Ok(())
     }
+
+    /// During the complete projection check, collect the latest packet
+    /// presentation end. The maximum is independent of inter-track order.
+    pub fn check_duration_before_replay(&mut self) -> Result<()> {
+        self.check_projections_before_replay()?;
+        self.checked_duration_us = Some(0);
+        Ok(())
+    }
+
+    /// Return the checked presentation end in microseconds after the scan.
+    pub fn checked_duration_us(&self) -> Option<i64> {
+        if matches!(self.phase, Phase::End) && self.failed.is_none() {
+            self.checked_duration_us
+        } else {
+            None
+        }
+    }
     /// Reconstruct each track's real demux state up to its checked occurrence
     /// position before the existing global selector begins delivery. Full source
     /// extent validation still runs first; skipped metadata reads no payload.
@@ -1151,6 +1170,7 @@ impl<'a> PacketCursor<'a> {
         }
         self.recording_seek_checkpoints = false;
         self.check_projections = false;
+        self.checked_duration_us = None;
         if let (Some(end), [extent]) = (&mut self.forward_encoded_end, self.media) {
             *end = extent.start;
         }
@@ -1427,6 +1447,21 @@ impl<'a> PacketCursor<'a> {
                     }
                     self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                     count(self.generated, self.limits.max_occurrences)?;
+                    if let Some(duration) = &mut self.checked_duration_us {
+                        let row = slot
+                            .head
+                            .as_ref()
+                            .ok_or(Error::Invalid("missing projected packet"))?;
+                        if let Some(pts) = row.demux.pts {
+                            let end = pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
+                            let micros = row.media_clock.demux_base.rescale(
+                                end,
+                                TimeBase::MICROSECONDS,
+                                Rounding::NearestAway,
+                            )?;
+                            *duration = (*duration).max(micros);
+                        }
+                    }
                     if self.recording_seek_checkpoints {
                         self.record_seek_checkpoint(self.at);
                     }
