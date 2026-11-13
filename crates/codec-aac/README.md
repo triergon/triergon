@@ -112,22 +112,32 @@ caller's reserved PCM planes and reuses them on the next access unit.
   transcribed from a document. They are validated by the conformance vectors only;
   codewords no vector reaches are unverified. Provenance:
   [harness/codecs/aac/STATUS.md](../../harness/codecs/aac/STATUS.md).
-- The PS syntax, its Huffman books and every PS signal table and rule are recovered from
-  FFmpeg's output on crafted streams by scripted probes
-  ([harness/codecs/aac/ps](../../harness/codecs/aac/ps/README.md)); `cargo xtask codecs
-  aac-ps-tables --check` reruns the recovery. Two PS paths are not recovered. One is a
-  change between 20 and 34 bands registered while PS is off after an error, followed by a
-  frame that runs: this decoder converts the start matrices and restarts the decorrelator
-  only when a frame's configuration differs from that of the frame read before it, and
-  FFmpeg differs from it in the next frames (up to 5e-2 in one crafted stream). The other
-  is IPD/OPD in a 20-band frame after IID last ran 34 bands, which no probe reached.
+- Parametric Stereo: three crafted streams of
+  [harness/codecs/aac/ps-open-manifest.json](../../harness/codecs/aac/ps-open-manifest.json)
+  are open cases, outside the numeric rules (worst channel RMS / max against FFmpeg):
+  - a change between 20 and 34 bands registered while PS is off after an error, followed
+    by a frame that runs (`ps-open-change-while-off`): 1.4e-3 / 4.7e-2. FFmpeg differs in
+    the next frames; this decoder converts the start matrices and restarts the
+    decorrelator only when a frame's configuration differs from that of the frame read
+    before it;
+  - a PS frame without its SBR element (`ps-open-no-sbr-element`): 1.7e-5 / 5.2e-4, in
+    that frame only; FFmpeg's QMF bands 31..35 differ there. An HE-AAC v1 stream with the
+    same frame matches FFmpeg;
+  - IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands
+    (`ps-open-ipd-after-iid34`): 3.4e-3 / 3.9e-2, in the change frame and the three after
+    it; later frames match.
 
 ## Conformance
 
 - Specifications: ISO/IEC 14496-3 (subpart 4 AAC, 4.6.18 SBR); QMF window from ETSI TS 101
   980 Annex I Table I.1; QMF flowcharts from 3GPP TS 26.404 Figure 6 and TS 26.405 Figure 4.
-  PS: H. Purnhagen, DAFx 2004, J. Breebaart et al., EURASIP JASP 2005:9, and 3GPP TS 26.405
-  Tables 1 and 2, with the rest recovered by probes.
+  PS: H. Purnhagen, DAFx 2004 (mixing, hybrid filterbank, decorrelator structure,
+  transient reduction), J. Breebaart et al., EURASIP JASP 2005:9 (the mixing for ICC modes
+  3..5, IPD/OPD phases) and 3GPP TS 26.405 (hybrid prototype Table 1, 20-band map Table 2);
+  the `ps_data()` syntax, the Huffman books and every table and rule they do not print are
+  recovered from FFmpeg's output by scripted probes
+  ([harness/codecs/aac/ps](../../harness/codecs/aac/ps/README.md)), regenerated and checked
+  by `cargo xtask codecs aac-ps-tables [--check]`.
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
   remuxed to ADTS). Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and

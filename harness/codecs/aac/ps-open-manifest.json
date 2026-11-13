@@ -1,0 +1,26 @@
+{
+ "schema": "triergon.codecs.correctness-manifest.v1",
+ "vectors": [
+  {
+   "lane": "aac",
+   "name": "ps-open-change-while-off.adts",
+   "path": "harness/codecs/aac/ps/open/ps-open-change-while-off.adts",
+   "bytes": 8294,
+   "sha256": "6f326fe923bae64b5d5793073f5c8fbb15a4ac36a01a7bea40e853c1e35c1102"
+  },
+  {
+   "lane": "aac",
+   "name": "ps-open-ipd-after-iid34.adts",
+   "path": "harness/codecs/aac/ps/open/ps-open-ipd-after-iid34.adts",
+   "bytes": 3412,
+   "sha256": "967cd0355a507128fb7adf06b0544252a1f56e6d04dd78b74733f821c35e18ce"
+  },
+  {
+   "lane": "aac",
+   "name": "ps-open-no-sbr-element.adts",
+   "path": "harness/codecs/aac/ps/open/ps-open-no-sbr-element.adts",
+   "bytes": 8263,
+   "sha256": "e22e5c0730680743e810384f56ad31a68cf993ecab119b21de506dedb88c30a3"
+  }
+ ]
+}

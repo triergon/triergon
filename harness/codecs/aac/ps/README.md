@@ -52,5 +52,12 @@ fresh streams, and writes its results as JSON.
   hybrid bands by 8e-5 to 5e-3 rms in the next frames. The decoder converts the start
   matrices and restarts the decorrelator only when a frame's configuration differs from
   that of the frame read before it.
-- IPD/OPD values when IID last ran 34 bands and the frame runs 20 bands (IID disabled):
-  not observed; the decoder takes the first 20 values.
+- IPD/OPD across a change from 34 to 20 bands after IID last ran 34 bands: the steady
+  frames are recovered (p07, p08: the 17 coded values map onto 20 bands as the truncated
+  means of the `CONV_34_20` rows; p12: bands above the 11 IPD bands keep their stored
+  imaginary part), the change frame and the three after it are not (up to 3.9e-2).
+- A PS frame without its SBR element: the reference's QMF bands 31..35 differ in that frame
+  (up to 5.2e-4); an HE-AAC v1 stream with the same frame matches.
+
+The crafted streams of these cases are the open cases of
+[../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`).

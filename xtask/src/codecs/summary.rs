@@ -55,6 +55,15 @@ fn disposition(key: &str) -> Option<&'static str> {
         "aac-sce-in-stereo.adts" => {
             "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/aac/STATUS.md)"
         }
+        "ps-open-change-while-off.adts" => {
+            "open: a 20/34-band change registered while Parametric Stereo is off after an error, then a frame that runs; not recovered (harness/codecs/aac/ps/README.md)"
+        }
+        "ps-open-no-sbr-element.adts" => {
+            "open: a Parametric Stereo frame without its SBR element; the PS input differs from FFmpeg's in QMF bands 31..35 there (harness/codecs/aac/ps/README.md)"
+        }
+        "ps-open-ipd-after-iid34.adts" => {
+            "open: IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands; steady frames match (harness/codecs/aac/ps/README.md)"
+        }
         "ac3" | "eac3" => {
             "AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (harness/codecs/STATUS.md)"
         }

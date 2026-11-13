@@ -29,11 +29,16 @@ binary.
 - SBR Huffman books (except SBR_F_ENVBAL30), SBR noise table and SBR constants: from
   knowledge, validated only by the conformance vectors. Tails and books no vector reaches
   are unverified.
-- Parametric Stereo: the `ps_data()` syntax, the ten PS books, SBR_F_ENVBAL30 and every PS
+- Parametric Stereo: the structure follows Purnhagen 2004, Breebaart 2005 and TS 26.405
+  (Documents above). The `ps_data()` syntax, the ten PS books, SBR_F_ENVBAL30 and every PS
   signal table and rule (hybrid prototypes and band maps, decorrelator and ducking, both
   mixing procedures, IPD/OPD, behaviour over frames, 20/34-band changes) are recovered by
-  scripted probes of the FFmpeg binary: [ps/README.md](ps/README.md), rerun and checked by
-  `cargo xtask codecs aac-ps-tables --check`.
+  scripted probes of the FFmpeg binary ([ps/README.md](ps/README.md)).
+  `cargo xtask codecs aac-ps-tables` reruns the recovery and writes
+  `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`;
+  `--check` compares them. Not recovered: the three open cases of
+  [ps-open-manifest.json](ps-open-manifest.json), graded with `codecs grade` like the
+  other manifests (see the crate's known differences).
 
 Confirmed black-box: PNS noise LCG (1664525, 1013904223, seed `0x1f2e3d4c`), PCE speaker
 mapping (`tools/probe_layout.py`), the libfaac fill-element skip, the implicit PS stereo
