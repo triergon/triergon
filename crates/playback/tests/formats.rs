@@ -4353,6 +4353,53 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
 }
 
 #[test]
+fn range_open_releases_seek_restarts_to_read_the_aac_trim() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").to_vec();
+    let program = include_bytes!("fixtures/mp4/avc-aac-program.mov");
+    let atom = |data: &[u8], kind: &[u8; 4]| {
+        let at = data.windows(4).rposition(|bytes| bytes == kind).unwrap() - 4;
+        let size = u32::from_be_bytes(data[at..at + 4].try_into().unwrap()) as usize;
+        at..at + size
+    };
+    let esds = atom(&raw, b"esds");
+    let replacement = atom(program, b"esds");
+    let added = u32::try_from(replacement.len() - esds.len()).unwrap();
+    // The fragment data offsets are relative to their moof. Growing the
+    // front movie leaves the fragment payload declarations intact.
+    for kind in [
+        b"moov", b"trak", b"mdia", b"minf", b"stbl", b"stsd", b"mp4a",
+    ] {
+        let range = atom(&raw, kind);
+        assert!(range.start < esds.start && range.end >= esds.end);
+        let size = u32::try_from(range.len()).unwrap() + added;
+        raw[range.start..range.start + 4].copy_from_slice(&size.to_be_bytes());
+    }
+    raw.splice(esds, program[replacement].iter().copied());
+    let (opened, pool) = open(&raw, 97, 4096).unwrap();
+    let cancel = off();
+    let mut index = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    // Record the allocation retained by the open plan and seek restarts.
+    assert!((0..4096).any(|_| index.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
+    let retained = pool.used();
+    drop(index);
+
+    // Hold the rest of the pool once that storage is live, before the
+    // temporary program configuration reserves its element vector.
+    let mut index = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..4096).any(|_| {
+        assert!(!index.poll(&mut WorkBudget::new(1), &cancel).unwrap());
+        pool.used() == retained
+    }));
+    let held = pool.reserve(pool.available()).unwrap();
+    assert!((0..4096).any(|_| index.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
+    drop(held);
+    assert!(
+        pool.used() < retained,
+        "the optional restarts should be released"
+    );
+}
+
+#[test]
 fn range_player_keeps_seek_checkpoints_for_unedited_fragments() {
     let raw = include_bytes!("fixtures/mp4/avc-aac-quicktime-fragmented.mov");
     let (opened, _) = open(raw, 97, 4096).unwrap();

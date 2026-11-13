@@ -1078,8 +1078,21 @@ impl<'a> Mp4IndexJob<'a> {
                         self.fragment_aac_trim = FragmentAacTrimJob::new(self.movie, self.track)?;
                     }
                     if let Some(job) = &mut self.fragment_aac_trim {
-                        let Some(samples) = job.poll(w, c)? else {
-                            return Ok(false);
+                        let samples = match job.poll(w, c) {
+                            Ok(Some(samples)) => samples,
+                            Ok(None) => return Ok(false),
+                            Err(Error::Backpressure { .. })
+                                if self.range_duration.is_some()
+                                    && self
+                                        .native
+                                        .as_mut()
+                                        .is_some_and(PacketCursor::discard_seek_checkpoints) =>
+                            {
+                                // The configuration is required. Resume its parser on
+                                // the next poll after releasing optional seek state.
+                                return Ok(false);
+                            }
+                            Err(error) => return Err(error),
                         };
                         p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
                         self.fragment_aac_trim = None;
