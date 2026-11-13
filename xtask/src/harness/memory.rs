@@ -294,16 +294,16 @@ fn observe(
             });
         }
         let raw = raw.unwrap();
-        let receipt = String::from_utf8_lossy(&raw);
+        let observer_output = String::from_utf8_lossy(&raw);
         let work = std::str::from_utf8(&stdout)
             .ok()
             .and_then(|text| text.lines().last())
             .and_then(|line| json::parse_observations(line).ok());
-        let data = json::parse_observations(&receipt);
+        let data = json::parse_observations(&observer_output);
         let (Ok(data), Some(output)) = (data, work) else {
             return Ok(obj(vec![
                 ("status", Value::str("observer-invalid")),
-                ("receipt_raw", Value::str(receipt)),
+                ("observer_raw", Value::str(observer_output)),
                 ("stdout", Value::str(String::from_utf8_lossy(&stdout))),
                 ("stderr", Value::str(String::from_utf8_lossy(&stderr))),
             ]));
