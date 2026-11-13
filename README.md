@@ -121,4 +121,4 @@ notices, and [docs/provenance.md](docs/provenance.md) lists the modules. Softwar
 includes `triergon-font` credits FreeType in its documentation:
 
 > Portions of this software are copyright © 2026 The FreeType Project
-> (https://freetype.org). All rights reserved.
+> (<https://freetype.org>). All rights reserved.
