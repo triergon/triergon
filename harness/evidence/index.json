@@ -19718,6 +19718,19 @@
     "candidate": "92d1a1c5c83b8b39b12ae1ed11b999badbeddc23",
     "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
    }
+  },
+  {
+   "name": "subtitles-small-spots-82190095",
+   "path": "subtitles-small-spots-82190095",
+   "retention": "retained",
+   "reason": "The review commit of the small subtitle and framing pieces re-checked against main: subtitle gates, worker traces and instruction counts on Linux AArch64, parity and instruction counts on ARMv7",
+   "key": "evidence/subtitles-small-spots-82190095/6fc99861c2fc41d8b1fe161148c3c916f84425142d437c0eb09ed5b1b3936731.tar.zst",
+   "sha256": "6fc99861c2fc41d8b1fe161148c3c916f84425142d437c0eb09ed5b1b3936731",
+   "bytes": 1283903,
+   "source_revisions": {
+    "candidate": "821900952ba46678d07300ea7e4bb04ec517f324",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }

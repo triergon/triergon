@@ -127,6 +127,13 @@ gate build at `c79ae2da8b8a0d004d37936100eedd7b46e0a589` on a c8g.xlarge pinned 
 feature. `cargo xtask grade` does not join a slice with its feature's recorded runs, because
 the slice's contract differs from the registered feature's, so their per-case results come
 from each run's report. Their instruction counts run both workers from paths of equal length.
+These measurements, and the first instruction counts of the four features, are at `c79ae2da`.
+The review commit `821900952ba46678d07300ea7e4bb04ec517f324` was re-checked against main:
+the subtitle gates and worker traces on Linux AArch64 (every existing call identical), parity
+on ARMv7, and the instruction sums, 0.99996 (`subtitle-dvd`), 0.99991 (`subtitle-dvd-host`),
+0.99981 (`subtitle-pgs`), 0.99983 (`subtitle-pgs-capsules`) and 0.99266 (`subtitle-teletext`)
+of main's on Linux AArch64 and 0.99999, 0.99998, 0.99991 and 0.99753 on ARMv7, with no case
+above main beyond the run spread.
 
 The ARMv7 subtitle rows use the gate build at `8513398b85d27aa093b8212c202b25c32da859bf` in
 the ARMv7 user space on two c6g.4xlarge hosts that built byte-identical workers from the same
@@ -378,6 +385,8 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | Earlier: subtitles, DVB | `0d70bebfc0799f65df14f170ed97e68c5a35daa7` | `06d1a46a967e052ce365795827803ddbc5ae8ff0e2452ae83428f53744949077` |
 | Subtitles: text, Linux AArch64 and ARMv7 | `6126b759b9b983afe488c3c362c6e37c2d1425a2` | `aec763325453d4174a1d70764d4e863a77ade9315ee607b14cfe44d1eb8a7676` |
 | Subtitles: DVD, PGS and teletext, the 8 crafted size, fragment and trimming cases, runtime and memory on Linux AArch64, parity and instruction counts on Linux AArch64 and ARMv7 | `c79ae2da8b8a0d004d37936100eedd7b46e0a589` | `a5afebfe3a1c86829b0768823e7aa6518d008fd450104a72ca95b812113019a9` |
+| Subtitles: DVD, PGS and teletext, the review commit's gates, traces and instruction counts on Linux AArch64 and parity and instruction counts on ARMv7 | `821900952ba46678d07300ea7e4bb04ec517f324` | `6fc99861c2fc41d8b1fe161148c3c916f84425142d437c0eb09ed5b1b3936731` |
+| Subtitles: DVD, PGS and teletext, worker traces against main on Linux AArch64 and ARMv7 | `92d1a1c5c83b8b39b12ae1ed11b999badbeddc23` | `425c08ba299c60e13c0690b16ef7599bf4fdaade2cfb8ce32b75c547edc7767b` |
 | MPEG-TS | `5634f47d33ca2a9ba671c82e805398ce4eafd83e` | `1076155fd7e9fa939a19889a55a29005463f1f3772e85e4e25b37a31a35891f2` |
 | MPEG-TS finite fault recovery, host | `f3f439b803e079208c9ab422270a77feb6281207` | `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f` |
 | MPEG-TS source boundaries, macOS AArch64 | `f939fb92a6e1309fdafcd84b0bc037130ed35ee3` | `8d5bca73013e5ea711ba82e928f7b6bd770a9008234c3654ee1ca9813abee656` |
