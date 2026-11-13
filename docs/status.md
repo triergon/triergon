@@ -483,7 +483,12 @@ total RSS bound of 1.1222 to 1.1276, and their observed peaks are above the refe
 120 of their 120 pairs: the candidate starts the operation with about 365 more resident
 pages for the transport stream than for the same video as an elementary stream (about 1,265
 against 900), while the reference starts with about 60 more; during the operation the
-candidate grows by the same 22 to 23 pages for both. This is open.
+candidate grows by the same 22 to 23 pages for both. Preparation read the transport
+stream's whole video stream (1.57 MB of PES payload) into memory before extracting its
+captions. It now extracts them as the packets are cut, as it does for the elementary
+stream: in the Thumb-2 build at `4dbbd545`, the transport stream case starts the operation
+with 857 resident pages, against 1,207 before and 853 for the elementary stream. The bounds
+above predate that change.
 
 The other subtitle rows' total RSS is not accepted on this target: under the standard bound,
 the candidate's VmPeak against the reference's observed resident peak, every feature has

@@ -473,10 +473,10 @@ may override that count for diagnostic comparisons.
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
-  with the same two settings in its own release profile. On ARMv7, building the
-  playback worker without fat LTO, Cargo's default, adds 12.6% user-mode instructions
-  on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times as long;
-  Cargo's default of 16 codegen units adds up to another 2.5%. `panic = "abort"` saves
+  with the same two settings in its own release profile. Cargo's default profile has
+  neither. On ARMv7, building the playback worker without fat LTO adds 12.6% user-mode
+  instructions on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times
+  as long; 16 codegen units add up to another 2.5%. `panic = "abort"` saves
   a further 2 to 3% and is safe: no library code catches or relies on unwinding. A
   program that wraps calls into these crates in `catch_unwind` loses that protection
   under abort.
