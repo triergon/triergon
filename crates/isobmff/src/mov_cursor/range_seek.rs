@@ -19,6 +19,28 @@ const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
 const MAX_FRAGMENT_CHECKPOINTS_PER_TRACK: usize = 8;
 const MAX_CHECKPOINTS: usize = 256;
 
+pub(super) fn track_order_fits_checkpoints(slots: &[Slot<'_>]) -> bool {
+    // Fragment restarts stop at half the global cap. Each pure fragment
+    // track stores at most eight. A regular track can add periodic points
+    // and up to four short restarts. An edited regular track may repeat
+    // source samples, so preserve merged order when its count is unknown.
+    let mut maximum = 0u64;
+    for slot in slots {
+        let count = slot.track.table.sample_count();
+        maximum += if slot.saw_fragment {
+            MAX_FRAGMENT_CHECKPOINTS_PER_TRACK as u64
+        } else if slot.track.edits.is_none() || slot.encoded_edit.is_some() {
+            count.div_ceil(CHECKPOINT_INTERVAL) + (MAX_SHORT_CHECKPOINTS_PER_TRACK - 1) as u64
+        } else {
+            return false;
+        };
+        if maximum > (MAX_CHECKPOINTS / 2) as u64 {
+            return false;
+        }
+    }
+    true
+}
+
 #[derive(Debug)]
 struct Checkpoint<'a> {
     ordinal: u64,

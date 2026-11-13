@@ -977,6 +977,7 @@ impl<'a> PacketCursor<'a> {
 
     /// During the complete projection check, collect the latest packet
     /// presentation end. The maximum is independent of inter-track order.
+    /// Preserve merged order if the seek restarts can reach their shared limit.
     pub fn check_duration_before_replay(&mut self) -> Result<()> {
         self.check_projections_before_replay()?;
         self.checked_duration_us = Some(0);
@@ -1365,6 +1366,14 @@ impl<'a> PacketCursor<'a> {
                 }
                 Phase::Initialize => {
                     if self.at == self.slots.len() {
+                        if self.checked_duration_us.is_some()
+                            && self.recording_seek_checkpoints
+                            && !range_seek::track_order_fits_checkpoints(self.slots.as_slice())
+                        {
+                            // Larger sources can reach the shared restart cap.
+                            // Keep merged order for the same restart choices.
+                            self.check_projections = false;
+                        }
                         if self.recording_seek_checkpoints {
                             // Reserve optional restarts after initializing the required cursors.
                             self.initialize_range_seek_checkpoints();
@@ -1452,15 +1461,7 @@ impl<'a> PacketCursor<'a> {
                             .head
                             .as_ref()
                             .ok_or(Error::Invalid("missing projected packet"))?;
-                        if let Some(pts) = row.demux.pts {
-                            let end = pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
-                            let micros = row.media_clock.demux_base.rescale(
-                                end,
-                                TimeBase::MICROSECONDS,
-                                Rounding::NearestAway,
-                            )?;
-                            *duration = (*duration).max(micros);
-                        }
+                        record_duration(duration, row)?;
                     }
                     if self.recording_seek_checkpoints {
                         self.record_seek_checkpoint(self.at);
@@ -1544,6 +1545,15 @@ impl<'a> PacketCursor<'a> {
                             }
                             *end = packet.source.range.end;
                         }
+                        if let Some(duration) = &mut self.checked_duration_us {
+                            let row = occurrence
+                                .as_ref()
+                                .ok_or(Error::Invalid("missing projected packet"))?;
+                            record_duration(duration, row)?;
+                            self.at = 0;
+                            self.phase = Phase::Fill;
+                            continue;
+                        }
                         self.ready = occurrence;
                         self.at = 0;
                         self.phase = Phase::Fill;
@@ -1578,4 +1588,19 @@ impl<'a> PacketCursor<'a> {
             }
         }
     }
+}
+
+fn record_duration(duration: &mut i64, packet: &PacketOccurrence) -> Result<()> {
+    if let Some(pts) = packet.demux.pts {
+        let end = pts
+            .checked_add(packet.demux.duration)
+            .ok_or(Error::Overflow)?;
+        let micros = packet.media_clock.demux_base.rescale(
+            end,
+            TimeBase::MICROSECONDS,
+            Rounding::NearestAway,
+        )?;
+        *duration = (*duration).max(micros);
+    }
+    Ok(())
 }
