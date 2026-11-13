@@ -95,7 +95,7 @@ const fn channel(i: usize, n: usize, [base, low, high]: [u32; 3]) -> u32 {
 ///
 /// | bit 7 | bit 3 | base | low | high | alpha |
 /// |---|---|---|---|---|---|
-/// | 0 | 0 | 0 | 0x55 | 0xaa | 0xff, or 0x3f with low 0xff when bits 4–6 are clear |
+/// | 0 | 0 | 0 | 0x55 | 0xaa | 0xff (bits 4–6 clear: low 0xff, alpha 0x3f) |
 /// | 0 | 1 | 0 | 0x55 | 0xaa | 0x7f |
 /// | 1 | 0 | 0x7f | 0x2b | 0x55 | 0xff |
 /// | 1 | 1 | 0 | 0x2b | 0x55 | 0xff |
@@ -136,24 +136,24 @@ pub(super) fn entry_word(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
 /// Values a pixel can hold.
 const VALUES: usize = 256;
 
-/// The words of a census beyond its sides: each value's counted pixels, exposure
-/// and score.
+/// The words of a census beyond its sides: each value's counted pixels,
+/// exposure and score.
 const TALLIES: usize = 3 * VALUES;
 
 /// A score not worked out since its value's exposure last changed.
 const STALE: u32 = u32::MAX;
 
-/// The automatic palette's working storage, charged to the decoder's budget: one
-/// table of words holding each value's counted pixels, exposure and score (256
-/// words each), then the sides between unlike neighbours. Those are a table of
-/// every ordered pair of values below the region's stride (4, 16 or 256),
-/// `stride²` words, or for 8-bit values, when they are smaller, lists of the
-/// neighbours each value touches: 257 list starts and two words per pair of
+/// The automatic palette's working storage, charged to the decoder's budget:
+/// one table of words holding each value's counted pixels, exposure and score
+/// (256 words each), then the sides between unlike neighbours. Those are a
+/// table of every ordered pair of values below the region's stride (4, 16 or
+/// 256), `stride²` words, or for 8-bit values, when they are smaller, lists of
+/// the neighbours each value touches: 257 list starts and two words per pair of
 /// neighbouring pixels, or per unlike pair where lists for every pair would not
 /// be smaller. A 16 × 16 region of all 256 values holds 3,072 + 4,868 bytes
 /// rather than 3,072 + 262,144. Between regions every word is zero:
-/// [`automatic`] clears the pair table as it reads it and the lists once ranked,
-/// so a region costs no clearing beyond the words its own values touch.
+/// [`automatic`] clears the pair table as it reads it and the lists once
+/// ranked, so a region costs no clearing beyond the words its own values touch.
 #[derive(Debug)]
 pub(super) struct Census {
     table: BudgetVec<u32>,
@@ -171,9 +171,9 @@ impl Census {
         self.table.capacity() * size_of::<u32>()
     }
 
-    /// The most the census allocates for a region whose pixel values are all below
-    /// `values` (4, 16 or 256): the pair table's size, as the lists are used only
-    /// when smaller.
+    /// The most the census allocates for a region whose pixel values are all
+    /// below `values` (4, 16 or 256): the pair table's size, as the lists are
+    /// used only when smaller.
     pub(super) fn bytes_for(values: usize) -> usize {
         let stride = stride(values);
         (TALLIES + stride * stride) * size_of::<u32>()
@@ -189,42 +189,44 @@ fn stride(values: usize) -> usize {
     }
 }
 
-/// The automatic palette (`compute_clut`) of a region: `pixels` row by row, `width`
-/// per row, into `out`. Entries of values no pixel holds keep their words.
+/// The automatic palette (`compute_clut`) of a region: `pixels` row by row,
+/// `width` per row, into `out`. Entries of values no pixel holds keep their
+/// words.
 ///
-/// The values the region holds are ranked, and the `n`-th of `m` (from 0) gets the
-/// level `255 × n / (m − 1)` rounded down, presented as the word with alpha and
-/// green at the level and red and blue at half of it: with three values 0,
-/// `0x7f3f7f3f` and `0xff7fff7f`; with eight, levels 0, 36, 72, 109, 145, 182, 218
-/// and 255. The first value ranked, the background, is transparent black; a
+/// The values the region holds are ranked, and the `n`-th of `m` (from 0) gets
+/// the level `255 × n / (m − 1)` rounded down, presented as the word with alpha
+/// and green at the level and red and blue at half of it: with three values 0,
+/// `0x7f3f7f3f` and `0xff7fff7f`; with eight, levels 0, 36, 72, 109, 145, 182,
+/// 218 and 255. The first value ranked, the background, is transparent black; a
 /// region of one value is all background.
 ///
 /// A value's *counted* pixels are those on the region's edge or with a
-/// 4-neighbour of another value; pixels enclosed by their own value do not count.
-/// Its *exposure* starts as its pixels' sides on the region's edge (a corner pixel
-/// has two; in a region one pixel high every pixel has two and the ends three).
-/// Each step ranks the value with the highest score, exposure × 1024 / counted
-/// pixels rounded down, the smaller value on a tie; then every value still
-/// unranked adds to its exposure its sides against the pixels of the value just
-/// ranked, as if those pixels were the edge. So the background is the value most
-/// exposed on the edge, and the ranks peel inwards from it:
-/// - the row 1 2 3 ranks 1 2 3: 1 and 3 tie at 3072 (three sides on the edge each)
-///   and 1 ranks first; then 2, with two sides on the edge and one against 1, ties
-///   with 3 and ranks before it;
+/// 4-neighbour of another value; pixels enclosed by their own value do not
+/// count. Its *exposure* starts as its pixels' sides on the region's edge (a
+/// corner pixel has two; in a region one pixel high every pixel has two and the
+/// ends three). Each step ranks the value with the highest score, exposure ×
+/// 1024 / counted pixels rounded down, the smaller value on a tie; then every
+/// value still unranked adds to its exposure its sides against the pixels of
+/// the value just ranked, as if those pixels were the edge. So the background
+/// is the value most exposed on the edge, and the ranks peel inwards from it:
+/// - the row 1 2 3 ranks 1 2 3: 1 and 3 tie at 3072 (three sides on the edge
+///   each) and 1 ranks first; then 2, with two sides on the edge and one
+///   against 1, ties with 3 and ranks before it;
 /// - the row 1 1 2 3 ranks 3 2 1: 3 scores 3072 against 1's 2560;
-/// - the row 2 1 3 1 ranks 2 1 3: once 2 is ranked, 1 has six sides on two pixels;
-/// - in a 5 × 5 region of 1, a 2 at a corner ranks first (2048 against 1's 18 sides
-///   on 15 counted pixels, 1228), and a 2 at the middle of an edge ranks after 1
-///   (1024 against 19 sides on 16 pixels, 1216), though counting every pixel of 1
-///   would put 2 first;
+/// - the row 2 1 3 1 ranks 2 1 3: once 2 is ranked, 1 has six sides on two
+///   pixels;
+/// - in a 5 × 5 region of 1, a 2 at a corner ranks first (2048 against 1's 18
+///   sides on 15 counted pixels, 1228), and a 2 at the middle of an edge ranks
+///   after 1 (1024 against 19 sides on 16 pixels, 1216), though counting every
+///   pixel of 1 would put 2 first;
 /// - two rows, 600 columns of 5 then 680 of 3, rank 3 first: both score 1025,
-///   though 5's exact ratio is the greater; with 505 columns of 5 and 520 of 3, 5
-///   scores 1026 and ranks first.
+///   though 5's exact ratio is the greater; with 505 columns of 5 and 520 of 3,
+///   5 scores 1026 and ranks first.
 ///
 /// Every depth follows the same rule, with no limit from the width or height up
 /// to 1280 × 1024: a 1/2 checkerboard there, framed in 1, gives 2 an exposure
-/// above 2³¹ / 1024 once 1 is ranked, and 2 still ranks before a 3 × 3 block of 3.
-/// Entries no pixel uses keep the words of the region's last palette across
+/// above 2³¹ / 1024 once 1 is ranked, and 2 still ranks before a 3 × 3 block of
+/// 3. Entries no pixel uses keep the words of the region's last palette across
 /// redrawing, resizing, a new depth or a display set without the region; a new
 /// epoch (a mode change or an acquisition point) starts its regions from
 /// transparent black.
@@ -288,8 +290,8 @@ trait Walker {
     /// 4-neighbour of another value.
     fn pixel(&mut self, _value: u8, _counted: bool) {}
 
-    /// Each pair of 4-neighbours with unlike values, left then right or upper then
-    /// lower.
+    /// Each pair of 4-neighbours with unlike values, left then right or upper
+    /// then lower.
     fn pair(&mut self, a: u8, b: u8);
 }
 
@@ -350,9 +352,10 @@ fn list_words_for(pairs: usize) -> usize {
     VALUES + 1 + 2 * pairs
 }
 
-/// The words of neighbour lists for `pixels`, or `usize::MAX` when they would not
-/// be smaller than `table` words. Pairs are counted only when lists for every pair
-/// being unlike would not be smaller; then the lists are sized for that.
+/// The words of neighbour lists for `pixels`, or `usize::MAX` when they would
+/// not be smaller than `table` words. Pairs are counted only when lists for
+/// every pair being unlike would not be smaller; then the lists are sized for
+/// that.
 fn list_words(pixels: &[u8], width: usize, table: usize) -> usize {
     let height = pixels.len() / width;
     let every = (width - 1) * height + width * height.saturating_sub(1);
@@ -362,8 +365,8 @@ fn list_words(pixels: &[u8], width: usize, table: usize) -> usize {
     unlike(pixels, width, table).map_or(usize::MAX, list_words_for)
 }
 
-/// The number of unlike pairs in `pixels`, or `None` once lists for them would not
-/// be smaller than `table` words.
+/// The number of unlike pairs in `pixels`, or `None` once lists for them would
+/// not be smaller than `table` words.
 fn unlike(pixels: &[u8], width: usize, table: usize) -> Option<usize> {
     struct Unlike {
         pairs: usize,
@@ -383,8 +386,8 @@ fn unlike(pixels: &[u8], width: usize, table: usize) -> Option<usize> {
     (list_words_for(unlike.pairs) < table).then_some(unlike.pairs)
 }
 
-/// Where the sides between unlike neighbours are counted, and how a ranked value's
-/// sides reach the values still unranked.
+/// Where the sides between unlike neighbours are counted, and how a ranked
+/// value's sides reach the values still unranked.
 trait Sides {
     /// A side between unlike neighbours `a` and `b`.
     fn side(&mut self, a: u8, b: u8);
@@ -470,8 +473,8 @@ impl Sides for Lists<'_> {
 }
 
 /// Count each value's counted pixels, its sides on the region's edge into
-/// `exposure`, and the sides between unlike neighbours into `sides`, which comes
-/// back for the ranking.
+/// `exposure`, and the sides between unlike neighbours into `sides`, which
+/// comes back for the ranking.
 fn count<S: Sides>(
     pixels: &[u8],
     width: usize,
@@ -526,8 +529,8 @@ struct Ranking<'a> {
     score: &'a mut [u32],
 }
 
-/// Rank the counted values, all below `values`, into `out`, clearing the tallies
-/// behind them.
+/// Rank the counted values, all below `values`, into `out`, clearing the
+/// tallies behind them.
 fn rank(
     values: usize,
     counted: &mut [u32],
@@ -578,9 +581,9 @@ fn rank(
     }
 }
 
-/// A score: `exposure` sides per counted pixel in 1024ths, rounded down. A value's
-/// exposed sides belong to its counted pixels, at most four each, so the score is
-/// at most 4096.
+/// A score: `exposure` sides per counted pixel in 1024ths, rounded down. A
+/// value's exposed sides belong to its counted pixels, at most four each, so
+/// the score is at most 4096.
 fn ratio(exposure: u32, counted: u32) -> u32 {
     match exposure.checked_mul(1024) {
         Some(scaled) => scaled / counted,
