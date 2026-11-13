@@ -1,7 +1,7 @@
 //! Closed captions carried in video (ATSC A/53, SCTE 20, DVD user data and
 //! H.264/HEVC SEI).
 //!
-//! [`compat::cc`](crate::compat::cc) reproduces FFmpeg: its `ccaption` decoder
+//! [`compat::cc`](crate::compat::cc) reproduces FFmpeg: its `cc_dec` decoder
 //! of CEA-608, its order and timing of caption data taken from video, and its
 //! `scc` demuxer. CEA-708 data is passed through untouched, as in FFmpeg.
 //! [`video::nal`] names how a video stream carries its NAL units.

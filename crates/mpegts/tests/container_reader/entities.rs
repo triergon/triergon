@@ -1,11 +1,12 @@
 use super::{ID, OFF, PID, Transport, adts};
-use triergon_core::container::{ContainerReader, Event, PacketInfo};
+use triergon_core::container::{ContainerReader, Event, PacketInfo, TrackId};
 use triergon_core::{
     Budget, Bytes, Error, InputToken, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, VideoEofPolicy};
 use triergon_mpegts::{
-    AudioEofPolicy, EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent,
+    AudioEofPolicy, EntityTransition, FaultKind, Packet, Reader, ReaderEvent, ReaderLimits,
+    TraceEvent,
 };
 
 struct Entity<'a> {
@@ -30,21 +31,29 @@ fn read(entities: &[Entity<'_>]) -> Vec<Event<Packet, ReaderEvent>> {
             audio_eof_policy: AudioEofPolicy::ReportIncomplete,
             ..ReaderLimits::default()
         },
+        None,
     )
 }
 
 fn read_with_limits(
     entities: &[Entity<'_>],
     limits: ReaderLimits,
+    tracks: Option<&[TrackId]>,
 ) -> Vec<Event<Packet, ReaderEvent>> {
     let pool = Budget::new(1 << 20).unwrap();
-    let mut reader = Reader::new(
-        &pool,
-        entities[0].source,
-        entities[0].capabilities(),
-        limits,
-        64,
-    )
+    let first = &entities[0];
+    let mut reader = if let Some(tracks) = tracks {
+        Reader::new_with_packet_tracks(
+            &pool,
+            first.source,
+            first.capabilities(),
+            limits,
+            64,
+            tracks,
+        )
+    } else {
+        Reader::new(&pool, first.source, first.capabilities(), limits, 64)
+    }
     .unwrap();
     let mut events = Vec::new();
     let mut index = 0;
@@ -175,6 +184,69 @@ fn initialization_and_partial_pes_continue_across_entities() {
             .collect::<Vec<_>>(),
         [SourceId(100), SourceId(5)]
     );
+}
+
+#[test]
+fn packet_selection_keeps_unselected_pes_and_faults_across_a_discontinuity() {
+    const OTHER: u16 = PID + 1;
+    let first = adts(b"first selected frame");
+    let second = adts(b"second selected frame");
+    let unselected = adts(b"unselected frame");
+    let mut old = Transport::new();
+    old.tables(&[(0x0f, PID, &[]), (0x0f, OTHER, &[])], 0);
+    old.pes(PID, 0xc0, &first, Some(90_000), None);
+    old.pes(OTHER, 0xc1, &unselected, Some(90_000), None);
+    let mut new = Transport::new();
+    new.tables(&[(0x0f, OTHER, &[]), (0x0f, PID, &[])], 0);
+    new.pes(PID, 0xc0, &second, Some(20), None);
+    new.pes(OTHER, 0xc1, &unselected, Some(20), None);
+    let fault_at = new.bytes.len();
+    new.pes(OTHER, 0xc1, &unselected, Some(2_020), None);
+    new.bytes[fault_at + 1] |= 0x80;
+
+    let events = read_with_limits(
+        &[
+            Entity {
+                source: ID,
+                raw: &old.bytes,
+                transition: EntityTransition::Contiguous,
+            },
+            Entity {
+                source: SourceId(90),
+                raw: &new.bytes,
+                transition: EntityTransition::Discontinuity,
+            },
+        ],
+        ReaderLimits::default(),
+        Some(&[TrackId(PID.into())]),
+    );
+    let mut packets = Vec::new();
+    let mut source_pids = Vec::new();
+    let mut fault = 0;
+    let mut boundaries = 0;
+    for event in &events {
+        match event {
+            Event::Packet(packet) => {
+                assert_eq!(packet.track(), TrackId(PID.into()));
+                packets.push(packet.payload());
+            }
+            Event::Other(ReaderEvent::Source(source)) => match source.event() {
+                TraceEvent::Pes(pes) => source_pids.push(pes.pid),
+                TraceEvent::Diagnostic(diagnostic) => {
+                    assert_eq!(diagnostic.kind, FaultKind::Transport);
+                    assert_eq!(diagnostic.pid, Some(OTHER));
+                    assert_eq!(diagnostic.location.source, SourceId(90));
+                    fault += 1;
+                }
+                TraceEvent::Discontinuity { .. } => boundaries += 1,
+                _ => (),
+            },
+            _ => (),
+        }
+    }
+    assert_eq!(packets, [first.as_slice(), second.as_slice()]);
+    assert_eq!(source_pids, [PID, OTHER, PID, OTHER]);
+    assert_eq!((fault, boundaries), (1, 1));
 }
 
 #[test]
@@ -412,6 +484,7 @@ fn opaque_video_waits_across_continuation_and_discards_on_discontinuity() {
                 },
             ],
             limits,
+            None,
         );
         let mut observations = 0;
         let mut pes = 0;

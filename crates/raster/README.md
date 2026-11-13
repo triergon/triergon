@@ -159,8 +159,7 @@ the bitmap unblurred, as libass does. Outline coordinates stay within
 input panics, including arithmetic overflow in debug builds. Where libass's
 result depends on the target for values far out of range (conversions of
 doubles beyond the `long` range, shifts by 32 or more), the crate follows
-libass on 32-bit ARM with GCC (`armv7-unknown-linux-gnueabihf`) on every
-target: conversions saturate, NaN converts to 0 and such shifts give 0, so a
+libass on 32-bit ARM hard-float with GCC on every target: conversions saturate, NaN converts to 0 and such shifts give 0, so a
 coordinate rounds out of range as libass does there.
 
 Not covered: glyph loading, hinting, synthetic styles and decoration lines

@@ -1,5 +1,5 @@
 use super::{Descriptors, Section};
-use crate::{ParseLimits, SourceRange, limit};
+use crate::{ELEMENTARY_PID_RANGE, ParseLimits, SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -362,7 +362,7 @@ impl PmtReader {
             let length = u16::from_be_bytes([data[3], data[4]]);
             if pid & 0xe000 != 0xe000
                 || length & 0xfc00 != 0xf000
-                || !(0x10..=0x1ffe).contains(&(pid & 0x1fff))
+                || !ELEMENTARY_PID_RANGE.contains(&(pid & 0x1fff))
             {
                 return Err(Error::Invalid("PMT elementary PID/reserved bits"));
             }
