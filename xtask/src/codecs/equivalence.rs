@@ -89,11 +89,13 @@ fn decoder_entry(job: &Job) -> Value {
     ])
 }
 
-/// `cargo build --release --locked ARGS...` in `root`; `quiet` captures its output.
+/// `cargo build --release --locked ARGS...` for the worker target in `root`; `quiet`
+/// captures its output.
 pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String> {
     let mut command = Command::new("cargo");
     command
         .args(["build", "--release", "--locked"])
+        .args(crate::harness::gate_build::target_args())
         .args(args)
         .env("CARGO_INCREMENTAL", "0")
         .current_dir(root);
@@ -189,7 +191,9 @@ pub fn run(
 ) -> Result<i32, String> {
     cargo_build(root, &["-p", "codec-worker"], false)?;
     let suite = root.join(".research/fate-samples");
-    let examples = root.join("target/release/examples");
+    let examples = root
+        .join(crate::harness::gate_build::release_dir())
+        .join("examples");
     let scratch = TempDir::new(None)?;
     let mut jobs = Vec::new();
     for (codec, folders) in DECODERS {
@@ -239,7 +243,11 @@ pub fn run(
         jobs.push(Job {
             name: format!("worker/{id}"),
             argv: vec![
-                python::path(&root.join("target/release/codec-worker")),
+                python::path(
+                    &root
+                        .join(crate::harness::gate_build::release_dir())
+                        .join("codec-worker"),
+                ),
                 format!("{}-raw", field("operation")?),
                 python::path(&root.join(field("path")?)),
                 python::path(&out),

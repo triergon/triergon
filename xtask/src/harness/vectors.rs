@@ -14,7 +14,7 @@ use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
 use super::report::{
-    PrefixFeature, case_arguments, expected_for, host_target, resolved_case_arguments,
+    PrefixFeature, case_arguments, expected_for, gate_target, resolved_case_arguments,
 };
 use super::timing::{Operation, Work, benchmark};
 use crate::checks::read_json;
@@ -48,7 +48,7 @@ fn save(path: &Path, value: &Value) -> R<()> {
 fn workers(root: &Path) -> R<(PathBuf, PathBuf, Value)> {
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let (candidate, reference) = (
-        root.join("target/release/media-worker"),
+        root.join(gate_build::release_dir()).join("media-worker"),
         root.join("target/harness/ffmpeg-worker"),
     );
     let binaries = Value::object([
@@ -177,12 +177,9 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     }
     let case = Value::object(case);
     let derived = super::validation::external_contract(&contract, &file)?;
-    let target = match host_target().as_str() {
-        t @ ("aarch64-apple-darwin"
-        | "aarch64-unknown-linux-gnu"
-        | "x86_64-unknown-linux-gnu"
-        | "armv7-unknown-linux-gnueabihf") => t.to_owned(),
-        _ => "unqualified".to_owned(),
+    let target = match gate_target() {
+        unqualified if unqualified.starts_with("unqualified-") => "unqualified".to_owned(),
+        target => target,
     };
     let mut verdict = acceptance(
         root,
@@ -316,7 +313,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         .find(|c| c.0 == case)
         .ok_or_else(|| format!("unsupported FATE case {case}"))?;
     let (candidate, reference) = (
-        root.join("target/release/media-worker"),
+        root.join(gate_build::release_dir()).join("media-worker"),
         root.join("target/harness/ffmpeg-worker"),
     );
     if demux_only && !(candidate.is_file() && reference.is_file()) {
@@ -689,7 +686,7 @@ fn prefix_traces(
     scratch: &Path,
     verdicts: &mut Vec<(String, Value)>,
 ) -> R<()> {
-    let target = host_target();
+    let target = gate_target();
     for feature in features {
         let reference = feature.reference_worker(root, identity)?;
         for case in &feature.cases {
@@ -871,9 +868,10 @@ mod tests {
             .unwrap();
         }
         if with_workers {
-            fs::create_dir_all(root.join("target/release")).unwrap();
+            let release = root.join(gate_build::release_dir());
+            fs::create_dir_all(&release).unwrap();
             fs::create_dir_all(root.join("target/harness")).unwrap();
-            fs::write(root.join("target/release/media-worker"), "candidate").unwrap();
+            fs::write(release.join("media-worker"), "candidate").unwrap();
             fs::write(root.join("target/harness/ffmpeg-worker"), "reference").unwrap();
             let identity = format!(
                 r#"{{"binaries": {{"candidate": "{}", "reference": "{}"}}}}"#,

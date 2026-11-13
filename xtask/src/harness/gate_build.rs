@@ -45,6 +45,80 @@ fn release(compiler: &str) -> Option<&str> {
     compiler.lines().find_map(|l| l.strip_prefix("release: "))
 }
 
+/// The gate target on 32-bit ARM: Thumb-2, assuming NEON. The armhf compilers that
+/// build the FFmpeg and libass references emit Thumb-2 by default, while rustup's
+/// 32-bit ARM host toolchain, [`ARM32_HOST`], emits A32 without NEON.
+pub const ARM32_TARGET: &str = "thumbv7neon-unknown-linux-gnueabihf";
+
+/// The host triple of rustup's 32-bit ARM hard-float toolchain, which builds the
+/// tooling there but no worker.
+const ARM32_HOST: &str = "armv7-unknown-linux-gnueabihf";
+
+/// The host triple of the toolchain cargo resolves in the current directory.
+pub fn host() -> &'static str {
+    static HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    HOST.get_or_init(|| {
+        Command::new("rustc")
+            .arg("-vV")
+            .output()
+            .ok()
+            .and_then(|output| String::from_utf8(output.stdout).ok())
+            .and_then(|version| {
+                version
+                    .lines()
+                    .find_map(|line| line.strip_prefix("host: "))
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| "unknown".to_owned())
+    })
+}
+
+/// The target the workers and the tests are compiled for.
+pub fn worker_target() -> &'static str {
+    target_for(host())
+}
+
+fn target_for(host: &str) -> &str {
+    if host == ARM32_HOST {
+        ARM32_TARGET
+    } else {
+        host
+    }
+}
+
+/// The `--target` arguments cargo needs to compile for [`worker_target`]; none where
+/// it is the host's, so those builds stay as they are.
+pub fn target_args() -> Vec<String> {
+    target_arguments(host())
+}
+
+fn target_arguments(host: &str) -> Vec<String> {
+    let target = target_for(host);
+    if target == host {
+        Vec::new()
+    } else {
+        vec!["--target".to_owned(), target.to_owned()]
+    }
+}
+
+/// Where cargo puts release binaries for [`worker_target`], relative to its target
+/// directory.
+pub fn release_subdir() -> String {
+    release_path(host())
+}
+
+fn release_path(host: &str) -> String {
+    match target_arguments(host).last() {
+        Some(target) => format!("{target}/release"),
+        None => "release".to_owned(),
+    }
+}
+
+/// Where the workers are, relative to the repository root.
+pub fn release_dir() -> String {
+    format!("target/{}", release_subdir())
+}
+
 /// Whether an environment variable changes how cargo compiles a worker.
 fn compiler_variable(name: &str) -> bool {
     matches!(
@@ -324,6 +398,28 @@ mod tests {
     use super::*;
 
     const PIN: &str = "1.99.1";
+
+    #[test]
+    fn workers_compile_for_thumb2_on_32_bit_arm_and_for_the_host_elsewhere() {
+        assert_eq!(target_for(ARM32_HOST), ARM32_TARGET);
+        assert_eq!(
+            target_arguments(ARM32_HOST),
+            ["--target", "thumbv7neon-unknown-linux-gnueabihf"]
+        );
+        assert_eq!(
+            release_path(ARM32_HOST),
+            "thumbv7neon-unknown-linux-gnueabihf/release"
+        );
+        for host in [
+            "aarch64-unknown-linux-gnu",
+            "aarch64-apple-darwin",
+            "x86_64-unknown-linux-gnu",
+        ] {
+            assert_eq!(target_for(host), host);
+            assert!(target_arguments(host).is_empty());
+            assert_eq!(release_path(host), "release");
+        }
+    }
 
     /// A record of the gate build with one field replaced.
     fn record(key: &str, value: Option<Value>) -> Value {
