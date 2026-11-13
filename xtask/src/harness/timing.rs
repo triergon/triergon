@@ -650,20 +650,29 @@ pub struct TimedWorkers {
 
 impl TimedWorkers {
     pub fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
+        let pair = worker::WorkerPair::read(candidate, reference)?;
         let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
-        let [candidate, reference] =
-            worker::WorkerPair::read(candidate, reference)?.write(&directory)?;
-        Ok(TimedWorkers {
+        fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
+        let [candidate, reference] = worker::WorkerPair::paths(&directory);
+        let timed = TimedWorkers {
             directory,
             candidate,
             reference,
-        })
+        };
+        pair.write(&timed.directory)?;
+        Ok(timed)
     }
 }
 
 impl Drop for TimedWorkers {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.directory);
+        for worker in [&self.candidate, &self.reference] {
+            let _ = fs::remove_file(worker);
+            if let Some(parent) = worker.parent() {
+                let _ = fs::remove_dir(parent);
+            }
+        }
+        let _ = fs::remove_dir(&self.directory);
     }
 }
 
@@ -1452,6 +1461,23 @@ mod tests {
         let directory = timed.directory.clone();
         drop(timed);
         assert!(!directory.exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn timed_workers_keep_other_output_in_the_staging_directory() {
+        let dir = crate::walk::scratch("timed-workers-output");
+        let candidate = dir.join("candidate");
+        let reference = dir.join("reference");
+        fs::write(&candidate, b"candidate").unwrap();
+        fs::write(&reference, b"reference").unwrap();
+        let timed = TimedWorkers::new(&candidate, &reference).unwrap();
+        let grade = timed.directory.join("a/report.json");
+        fs::write(&grade, b"saved grade").unwrap();
+        assert!(TimedWorkers::new(&candidate, &reference).is_err());
+        assert_eq!(fs::read(&grade).unwrap(), b"saved grade");
+        drop(timed);
+        assert_eq!(fs::read(&grade).unwrap(), b"saved grade");
         fs::remove_dir_all(dir).unwrap();
     }
 

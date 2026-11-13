@@ -783,6 +783,22 @@ pub(crate) fn create_output(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("{}: {error}; use a new output directory", path.display()))
 }
 
+fn case_output(output: &Path, id: &str) -> Result<PathBuf, String> {
+    let relative = Path::new(id);
+    if relative.as_os_str().is_empty()
+        || relative
+            .components()
+            .any(|part| !matches!(part, std::path::Component::Normal(_)))
+    {
+        return Err(format!(
+            "case id {id:?} does not name a relative output directory"
+        ));
+    }
+    let path = output.join(relative);
+    create_output(&path)?;
+    Ok(path)
+}
+
 /// Run the report; returns 0 for matching parity, 1 for a failed case and 2
 /// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
@@ -979,7 +995,7 @@ pub(crate) fn collect(
                 candidate: &candidate,
                 reference: &reference,
                 input: &path,
-                raw: options.output.join(&id),
+                raw: case_output(&options.output, &id)?,
                 timeout,
             };
             timed = Some((
@@ -1025,7 +1041,7 @@ pub(crate) fn collect(
                 candidate: &candidate,
                 reference: &reference,
                 input: &path,
-                raw: options.output.join(&id),
+                raw: case_output(&options.output, &id)?,
                 timeout,
             };
             let comparison = rule.map(|rule| Comparison {
@@ -1920,6 +1936,18 @@ mod tests {
         assert!(publish_json(&destination, "{}\n").is_err());
         assert_eq!(fs::read(&destination).unwrap(), b"existing grade\n");
         assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn case_output_keeps_existing_nested_traces() {
+        let output = Output::new();
+        let nested = output.0.join("nested/case");
+        create_output(&nested).unwrap();
+        let trace = nested.join("progressive-fold.json");
+        fs::write(&trace, b"existing trace\n").unwrap();
+        assert!(case_output(&output.0, "nested/case").is_err());
+        assert!(case_output(&output.0, "../outside").is_err());
+        assert_eq!(fs::read(&trace).unwrap(), b"existing trace\n");
     }
 
     #[test]

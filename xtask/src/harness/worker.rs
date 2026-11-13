@@ -57,9 +57,9 @@ impl WorkerImage {
         Ok(Self { bytes, permissions })
     }
 
-    fn write(&self, slot: &Path) -> Result<PathBuf, String> {
+    fn write(&self, target: &Path) -> Result<(), String> {
+        let slot = target.parent().ok_or("worker path has no parent")?;
         fs::create_dir_all(slot).map_err(|e| format!("{}: {e}", slot.display()))?;
-        let target = slot.join("worker");
         let pending = slot.join(format!(".worker-{}", std::process::id()));
         let mut file =
             fs::File::create_new(&pending).map_err(|e| format!("{}: {e}", pending.display()))?;
@@ -67,11 +67,11 @@ impl WorkerImage {
             .write_all(&self.bytes)
             .and_then(|()| file.set_permissions(self.permissions.clone()));
         drop(file);
-        if let Err(error) = written.and_then(|()| fs::rename(&pending, &target)) {
+        if let Err(error) = written.and_then(|()| fs::rename(&pending, target)) {
             let _ = fs::remove_file(&pending);
             return Err(format!("{}: {error}", target.display()));
         }
-        Ok(target)
+        Ok(())
     }
 }
 
@@ -95,10 +95,14 @@ impl WorkerPair {
 
     /// Give both workers fresh files with the same write pattern and path length.
     pub fn write(&self, directory: &Path) -> Result<[PathBuf; 2], String> {
-        Ok([
-            self.0.write(&directory.join("a"))?,
-            self.1.write(&directory.join("b"))?,
-        ])
+        let paths = Self::paths(directory);
+        self.0.write(&paths[0])?;
+        self.1.write(&paths[1])?;
+        Ok(paths)
+    }
+
+    pub fn paths(directory: &Path) -> [PathBuf; 2] {
+        [directory.join("a/worker"), directory.join("b/worker")]
     }
 }
 
