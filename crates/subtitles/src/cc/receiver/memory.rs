@@ -57,9 +57,7 @@ pub(super) struct Memory {
 impl Default for Memory {
     fn default() -> Self {
         Self {
-            screens: [Screen::default(), Screen::default()],
             shown: 0,
-            mode: Mode::RollUp,
             roll_rows: 2,
             cursor: Cursor {
                 row: 10,
@@ -67,6 +65,8 @@ impl Default for Memory {
                 style: Style::default(),
                 charset: Charset::Basic,
             },
+            mode: Mode::RollUp,
+            screens: [Screen::default(), Screen::default()],
         }
     }
 }

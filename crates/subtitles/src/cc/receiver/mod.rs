@@ -1,18 +1,22 @@
-//! FFmpeg's `ccaption` receiver: CEA-608 caption data to timed ASS events.
+//! The CEA-608 caption receiver: caption data to timed ASS events, reported
+//! as the reference's `cc_dec` decoder reports them.
 //!
 //! Packets are `cc_data` constructs (three bytes each). The receiver keeps one
 //! field's byte pairs, runs them through a two-screen caption memory and reports
 //! each caption it finishes as one ASS event line.
 //!
 //! **Repeated control codes.** CEA-608 sends each control code twice, and a
-//! receiver acts on the first and ignores the identical repeat (47 CFR
-//! 15.119(h)(2)(i)(4)). The receiver ignores a control code (first byte `0x10`
-//! to `0x1F`) equal to the pair before it however often it repeats, also
-//! across packets: a special character sent five times in a row is written
-//! once. Any other pair ends the repetition: characters (including a first
-//! byte failing parity, written as a block), an XDS pair, or another control
-//! code, of either data channel or without a meaning. Pairs dropped before
-//! decoding (padding, a second byte failing parity) do not.
+//! receiver acts on the first and ignores only the immediate repeat (47 CFR
+//! 15.119(h)(2)(i)(4), 2011 edition), so a special character whose doubled
+//! code is sent twice (four copies in a row) is written twice. The receiver
+//! follows the reference instead, as observed: a control code (first byte
+//! `0x10` to `0x1F`) equal to the pair before it is ignored however often it
+//! repeats, also across packets, and two to five copies of the eighth-note
+//! code in a row write one ♪. Any other pair ends the repetition: characters
+//! (including a first byte failing parity, written as a block), an XDS pair,
+//! or another control code, of either data channel or without a meaning.
+//! Pairs dropped before decoding (padding, a second byte failing parity) do
+//! not.
 //!
 //! **Snapshots.** Erase displayed memory, end of caption and, without
 //! `real_time`, carriage return capture the displayed screen (an end of
@@ -97,7 +101,8 @@ pub enum DataField {
     Second,
 }
 
-/// The receiver's options, as FFmpeg's `ccaption` decoder names them.
+/// The receiver's options, under the reference decoder's names for them. The
+/// reference refuses to open with a latency outside 0 to 500 ms.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Options {
     /// `real_time`: report the screen as it changes.
@@ -222,13 +227,14 @@ struct Snapshots {
 pub struct Clock {
     /// Microseconds, `None` when unknown.
     pub pts: Option<i64>,
-    /// The packet's duration in milliseconds (rounded as FFmpeg rescales it,
-    /// kept to 32 bits); 0 when unknown. An event of no display time that the
-    /// packet produces lasts this long, as FFmpeg's decode API sets it.
+    /// The packet's duration in milliseconds, 0 when unknown. An event the
+    /// packet produces with a display time of 0 lasts this long: two ends of
+    /// caption in one SCC packet 1505 ms long report one event of two lines
+    /// lasting 1505 ms.
     pub duration_ms: u32,
 }
 
-/// FFmpeg's `ccaption` decoder.
+/// The caption receiver: one field's CEA-608 pairs to timed ASS events.
 #[derive(Debug)]
 pub struct Decoder {
     options: Options,
@@ -336,6 +342,9 @@ impl Decoder {
                 let hi = if odd_parity(hi) { hi & 0x7f } else { 0x7f };
                 // Padding is a null pair under a standard flag byte; under
                 // another flag byte a null pair counts as a code.
+                // `0xfa` never gets here (`is_field_pair` requires `cc_valid`), but the full
+                // set compiles to a cheaper test: without it, 1.00002 of main's instructions
+                // in sum, 1,000 to 3,000 more on each video case.
                 if hi == 0 && lo & 0x7f == 0 && matches!(flags, 0xfa | 0xfc | 0xfd) {
                     continue;
                 }
@@ -449,7 +458,9 @@ fn known(time: i64) -> Option<i64> {
 }
 
 /// Microseconds to milliseconds, rounded to nearest with ties away from zero,
-/// kept to 32 bits as FFmpeg's display time is.
+/// kept to the low 32 bits: a caption reported at an unknown time after a
+/// snapshot at 934 267 µs lasts 2 783 137 874 ms, and one starting at 0
+/// lasts 1 511 828 488 ms.
 fn milliseconds(us: i64) -> u32 {
     let ms = if us >= 0 {
         (i128::from(us) + 500) / 1000
