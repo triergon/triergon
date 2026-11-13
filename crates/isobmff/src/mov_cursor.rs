@@ -526,6 +526,7 @@ pub struct PacketCursor<'a> {
     forward_regular: Option<crate::ForwardRegularMdat>,
     check_projections: bool,
     checked_duration_us: Option<i64>,
+    duration_checkpoints: usize,
     projection: TrackProjection,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
@@ -725,6 +726,7 @@ impl<'a> PacketCursor<'a> {
             forward_regular: None,
             check_projections: false,
             checked_duration_us: None,
+            duration_checkpoints: 0,
             projection: TrackProjection::default(),
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
@@ -1239,6 +1241,12 @@ impl<'a> PacketCursor<'a> {
                             if !work.try_charge(1) {
                                 return Ok(CursorStatus::Yield);
                             }
+                            if self.checked_duration_us.is_some() {
+                                let points =
+                                    range_seek::track_checkpoint_bound(slot, self.previous_ordinal);
+                                self.duration_checkpoints =
+                                    self.duration_checkpoints.saturating_add(points);
+                            }
                             self.at += 1;
                             self.previous_ordinal = 0;
                         }
@@ -1368,7 +1376,7 @@ impl<'a> PacketCursor<'a> {
                     if self.at == self.slots.len() {
                         if self.checked_duration_us.is_some()
                             && self.recording_seek_checkpoints
-                            && !range_seek::track_order_fits_checkpoints(self.slots.as_slice())
+                            && self.duration_checkpoints > range_seek::EXTRA_CHECKPOINT_LIMIT
                         {
                             // Larger sources can reach the shared restart cap.
                             // Keep merged order for the same restart choices.

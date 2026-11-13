@@ -18,27 +18,24 @@ const SHORT_CHECKPOINT_INTERVAL: u64 = 32;
 const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
 const MAX_FRAGMENT_CHECKPOINTS_PER_TRACK: usize = 8;
 const MAX_CHECKPOINTS: usize = 256;
+pub(super) const EXTRA_CHECKPOINT_LIMIT: usize = MAX_CHECKPOINTS / 2;
 
-pub(super) fn track_order_fits_checkpoints(slots: &[Slot<'_>]) -> bool {
-    // Fragment restarts stop at half the global cap. Each pure fragment
-    // track stores at most eight. A regular track can add periodic points
-    // and up to four short restarts. An edited regular track may repeat
-    // source samples, so preserve merged order when its count is unknown.
-    let mut maximum = 0u64;
-    for slot in slots {
-        let count = slot.track.table.sample_count();
-        maximum += if slot.saw_fragment {
-            MAX_FRAGMENT_CHECKPOINTS_PER_TRACK as u64
-        } else if slot.track.edits.is_none() || slot.encoded_edit.is_some() {
-            count.div_ceil(CHECKPOINT_INTERVAL) + (MAX_SHORT_CHECKPOINTS_PER_TRACK - 1) as u64
-        } else {
-            return false;
-        };
-        if maximum > (MAX_CHECKPOINTS / 2) as u64 {
-            return false;
-        }
-    }
-    true
+pub(super) fn track_checkpoint_bound(slot: &Slot<'_>, last_source_ordinal: u64) -> usize {
+    // The first periodic point is at zero. Fragment extras stop at eight
+    // total points per track, and regular short points stop at four.
+    let extra = if slot.saw_fragment {
+        MAX_FRAGMENT_CHECKPOINTS_PER_TRACK - 1
+    } else if slot.track.edits.is_none() || slot.encoded_edit.is_some() {
+        MAX_SHORT_CHECKPOINTS_PER_TRACK - 1
+    } else {
+        // An edited regular track can repeat source samples.
+        return usize::MAX;
+    };
+    // Validation checked increasing ordinals, so the final ordinal bounds
+    // the number of source samples even when an index starts partway through.
+    usize::try_from(last_source_ordinal.div_ceil(CHECKPOINT_INTERVAL))
+        .unwrap_or(usize::MAX)
+        .saturating_add(extra)
 }
 
 #[derive(Debug)]
@@ -155,7 +152,7 @@ impl<'a> Checkpoints<'a> {
             && slot.saw_fragment
             && (short_interval
                 || (slot.starts_fragment_run && slot.append_run.is_some_and(|(_, run)| run == 0)))
-            && self.stored < MAX_CHECKPOINTS / 2
+            && self.stored < EXTRA_CHECKPOINT_LIMIT
             && track.points.len() < MAX_FRAGMENT_CHECKPOINTS_PER_TRACK
             && track.points.try_reserve(1).is_ok();
         if periodic || spare || fragment_restart {
