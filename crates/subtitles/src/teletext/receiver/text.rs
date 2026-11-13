@@ -75,19 +75,42 @@ fn print_page<'a>(
     &buffer[..length]
 }
 
-/// The index of the newline that ends the first line, if any.
+/// The newline that ends the first line of `text`: the first one not right
+/// after a non-ASCII byte. A row whose 41st column holds a mosaic (a
+/// private-use code point) therefore runs on into the next row, and a line
+/// that reaches the end of the print without such a newline is not one.
 fn line_end(text: &[u8]) -> Option<usize> {
-    (0..text.len()).find(|&i| text[i] == b'\n' && (i == 0 || text[i - 1] < 0x80))
+    let mut from = 0;
+    while let Some(offset) = text[from..].iter().position(|&b| b == b'\n') {
+        let at = from + offset;
+        if at == 0 || text[at - 1].is_ascii() {
+            return Some(at);
+        }
+        from = at + 1;
+    }
+    None
 }
 
+/// A line without its leading spaces and its trailing ones, except that the
+/// space right after a non-ASCII byte stays: `"   £ab  "` becomes `"£ab"`,
+/// `"ab£   "` becomes `"ab£ "` and `"ab£ x  "` becomes `"ab£ x"`.
 fn chop(line: &[u8]) -> &[u8] {
-    let first = line.iter().position(|&b| b != b' ').unwrap_or(line.len());
-    let line = &line[first..];
-    let mut end = line.len();
-    while end > 0 && line[end - 1] == b' ' && !(end > 1 && line[end - 2] >= 0x80) {
-        end -= 1;
+    // Most rows are blank: skip their spaces eight at a time.
+    let blank = 8 * line
+        .chunks_exact(8)
+        .take_while(|chunk| *chunk == [b' '; 8])
+        .count();
+    let start = line[blank..]
+        .iter()
+        .position(|&b| b != b' ')
+        .map_or(line.len(), |at| blank + at);
+    let mut line = &line[start..];
+    while let [rest @ .., before, b' '] = line
+        && before.is_ascii()
+    {
+        line = &line[..=rest.len()];
     }
-    &line[..end]
+    line
 }
 
 /// The reference's ASS escaping of plain text.
@@ -107,4 +130,48 @@ fn escape(text: &[u8], out: &mut Out<'_>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{chop, line_end};
+
+    /// Rows of pages the reference printed, as `txt_chop_spaces=0` shows them,
+    /// and the lines `txt_chop_spaces=1` made of them.
+    #[test]
+    fn chop_keeps_the_space_after_a_non_ascii_byte() {
+        let (blank, full) = (" ".repeat(41), "x".repeat(40));
+        for (row, chopped) in [
+            ("   Hello  world                          ", "Hello  world"),
+            ("    x                                    ", "x"),
+            (full.as_str(), full.as_str()),
+            ("                                       £ ", "£ "),
+            ("                                      £  ", "£ "),
+            ("ab£ x                                    ", "ab£ x"),
+            ("   £ab                                   ", "£ab"),
+            ("ab←                                      ", "ab← "),
+            ("a£ £                                     ", "a£ £ "),
+            ("  âôû                                    ", "âôû "),
+            (blank.as_str(), ""),
+            ("", ""),
+        ] {
+            assert_eq!(chop(row.as_bytes()), chopped.as_bytes(), "{row:?}");
+        }
+        // A row ending in a mosaic runs on into a blank row, whose spaces go.
+        let mosaic = format!("\u{ee7f}\u{ee7f}\u{ee7f}\n{blank}");
+        assert_eq!(
+            chop(mosaic.as_bytes()),
+            "\u{ee7f}\u{ee7f}\u{ee7f}\n".as_bytes()
+        );
+    }
+
+    #[test]
+    fn a_newline_after_a_non_ascii_byte_ends_no_line() {
+        assert_eq!(line_end(b"ab \ncd\n"), Some(3));
+        assert_eq!(line_end(b"\nab"), Some(0));
+        assert_eq!(line_end("ab £\nnext \n".as_bytes()), Some(11));
+        assert_eq!(line_end("\u{ee7f}\n\u{ee7f}\nx".as_bytes()), None);
+        assert_eq!(line_end(b"no newline"), None);
+        assert_eq!(line_end(b""), None);
+    }
 }
