@@ -114,7 +114,7 @@ pub(crate) fn cargo_metadata_with_features(
     root: &Path,
     features: &[String],
 ) -> Result<Value, String> {
-    let target = super::gate_build::worker_target();
+    let target = super::gate_build::worker_target()?;
     let mut command = Command::new("cargo");
     command.args([
         "metadata",

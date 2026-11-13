@@ -24,6 +24,7 @@ mod error;
 mod fft;
 mod filterbank;
 mod huffman;
+mod huffman_probed;
 mod huffman_tables;
 mod ics;
 mod ltp;
@@ -131,6 +132,17 @@ impl Decoder {
     #[cfg(feature = "inspect")]
     pub fn enable_stats(&mut self) {
         self.core.stats_enabled = true;
+    }
+
+    /// Development aid: the QMF slots the Parametric Stereo tool received in the last
+    /// frame, 38 rows of 64 bands, re and im interleaved (empty without PS).
+    #[cfg(feature = "inspect")]
+    pub fn ps_input(&self) -> &[f32] {
+        self.core
+            .elements
+            .iter()
+            .find_map(|e| e.sbr.as_ref().filter(|s| !s.ps_input.is_empty()))
+            .map_or(&[], |s| &s.ps_input)
     }
 
     /// Development statistics of the last decoded block (unstable format).

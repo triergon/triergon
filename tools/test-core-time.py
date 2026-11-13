@@ -39,6 +39,8 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / '.research/core-time-check')
     parser.add_argument('--profiles', nargs='+', choices=('debug', 'release'), default=['debug', 'release'])
     parser.add_argument('--target', help='the Rust target to build the probe for; the host when omitted')
+    parser.add_argument('--toolchain', default='nightly',
+                        help='the rustup toolchain to build the probe with; cargo xtask check passes its pinned nightly')
     args = parser.parse_args()
     destination = args.output.resolve()
     out = destination / 'runs' / str(time.time_ns())
@@ -80,7 +82,7 @@ def main():
     suites.extend(('edge-' + name, edge, name, count) for name, count in edge_required.items())
     profiles = {}
     for profile in dict.fromkeys(args.profiles):
-        command = ['cargo', '+nightly', 'build', '-p', 'triergon-core', '--example', 'time-oracle', '--locked']
+        command = ['cargo', '+' + args.toolchain, 'build', '-p', 'triergon-core', '--example', 'time-oracle', '--locked']
         if profile == 'release':
             command.append('--release')
         if args.target:

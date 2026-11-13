@@ -95,7 +95,7 @@ pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String
     let mut command = Command::new("cargo");
     command
         .args(["build", "--release", "--locked"])
-        .args(crate::harness::gate_build::target_args())
+        .args(crate::harness::gate_build::target_args()?)
         .args(args)
         .env("CARGO_INCREMENTAL", "0")
         .current_dir(root);
@@ -192,7 +192,7 @@ pub fn run(
     cargo_build(root, &["-p", "codec-worker"], false)?;
     let suite = root.join(".research/fate-samples");
     let examples = root
-        .join(crate::harness::gate_build::release_dir())
+        .join(crate::harness::gate_build::release_dir()?)
         .join("examples");
     let scratch = TempDir::new(None)?;
     let mut jobs = Vec::new();
@@ -245,7 +245,7 @@ pub fn run(
             argv: vec![
                 python::path(
                     &root
-                        .join(crate::harness::gate_build::release_dir())
+                        .join(crate::harness::gate_build::release_dir()?)
                         .join("codec-worker"),
                 ),
                 format!("{}-raw", field("operation")?),
