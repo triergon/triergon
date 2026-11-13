@@ -19950,6 +19950,15 @@
    "key": "evidence/packet-framing-avc-profile-extension-cc7e59d2-aarch64/05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320.tar.zst",
    "sha256": "05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320",
    "bytes": 74607220
+  },
+  {
+   "name": "packet-framing-resident-state-9d3d1f58-aarch64",
+   "path": "packet-framing-resident-state-9d3d1f58-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 comparison of compact AVC and HEVC packet framing with short AVC profile extensions.",
+   "key": "evidence/packet-framing-resident-state-9d3d1f58-aarch64/bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b.tar.zst",
+   "sha256": "bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b",
+   "bytes": 696141192
   }
  ]
 }
