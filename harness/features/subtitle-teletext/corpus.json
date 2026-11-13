@@ -1146,6 +1146,40 @@
       }
     },
     {
+      "id": "teletext-chop-text",
+      "profile": "teletext-chop",
+      "file": "teletext/chop.ts",
+      "sha256": "174719379936fe7a0b992f9fcca5a951cb7dce9a1c9235e931a65e9e670e9887",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1316,
+        "digest": 12104724012399615582
+      }
+    },
+    {
+      "id": "teletext-chop-ass",
+      "profile": "teletext-chop",
+      "file": "teletext/chop.ts",
+      "sha256": "174719379936fe7a0b992f9fcca5a951cb7dce9a1c9235e931a65e9e670e9887",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 826,
+        "digest": 16246044546555376300
+      }
+    },
+    {
       "id": "teletext-random-1-text",
       "profile": "teletext-random-1",
       "file": "teletext/random-1.ts",

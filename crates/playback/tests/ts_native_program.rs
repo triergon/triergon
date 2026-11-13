@@ -109,7 +109,8 @@ fn player_with_namespace(
     (player, budget)
 }
 
-// Captured by the no-parser FFmpeg 9.0.2 demux reference for these fixtures.
+// Captured by the no-parser demux reference (FFmpeg git revision d32b387f on the
+// 9.0 branch) for these fixtures.
 const AV_PAYLOAD: u64 = 0xd3fd_4412_38d4_6078;
 const DVB_PAYLOAD: u64 = 0xa551_170f_0aa9_5055;
 

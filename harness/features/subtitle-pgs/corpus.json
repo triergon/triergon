@@ -1512,6 +1512,38 @@
       }
     },
     {
+      "id": "rx-canvas-bounds-ts",
+      "profile": "rx-canvas-bounds-ts",
+      "file": "pgs/rx-canvas-bounds.ts",
+      "sha256": "0cf8e2f6fef03d8bd624a03b5f9fee669174d1112f3b023357937368fe2c8b23",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 23,
+        "bytes": 23598,
+        "digest": 15001140904510623223
+      }
+    },
+    {
+      "id": "rx-ods-first-fragment-ts",
+      "profile": "rx-ods-first-fragment-ts",
+      "file": "pgs/rx-ods-first-fragment.ts",
+      "sha256": "b99df21fd0d64009657b5a93f8952adfc4f68e2a31df30190f65eff564c0c671",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/pgs_streams.py",
+      "arguments": [
+        "pgs"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 15450,
+        "digest": 15080553869866247647
+      }
+    },
+    {
       "id": "long-movie-sup",
       "profile": "long-movie-sup",
       "file": "pgs/long-movie.sup",
