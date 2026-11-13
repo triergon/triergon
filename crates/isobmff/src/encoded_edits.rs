@@ -825,7 +825,11 @@ impl<'a> EncodedEditJob<'a> {
                 return Ok(CursorStatus::Yield);
             }
             let duration = self.entry.duration(self.context.movie_base)?;
-            let rounding = if self.dts_scale.is_some() {
+            let rounding = if self.dts_scale.is_some()
+                || self.context.stream.kind() == EncodedEntryKind::Aac
+            {
+                // The MOV view rounds AAC edit duration to the nearest media
+                // tick. This also determines which packet carries the tail trim.
                 Rounding::NearestAway
             } else {
                 Rounding::Floor

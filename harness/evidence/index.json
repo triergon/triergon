@@ -19890,6 +19890,16 @@
    }
   },
   {
+   "name": "mp4-forward-edits-f5453ef9-aarch64",
+   "path": "mp4-forward-edits-f5453ef9-aarch64",
+   "retention": "retained",
+   "reason": "MP4 forward and range playback with checked AAC edits and bounded seek restarts",
+   "key": "evidence/mp4-forward-edits-f5453ef9-aarch64/bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223.tar.zst",
+   "sha256": "bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223",
+   "bytes": 67830097,
+   "source_revision": "f5453ef9d88712777aa5b6383250875456e9f334"
+  },
+  {
    "name": "adts-priming-96232af7-aarch64",
    "path": "adts-priming-96232af7-aarch64",
    "retention": "retained",
