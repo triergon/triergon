@@ -34,15 +34,16 @@ benchmarks assume it.
   black box: its inputs and outputs, never its source. Nothing new is translated from
   another implementation. The modules listed in
   [docs/provenance.md](docs/provenance.md) are earlier translations of FreeType,
-  HarfBuzz and libass, kept under those projects' permissive licences and notices; a
-  listed module that has a public specification may be rewritten from it when it is
-  being changed anyway. The reference implementations Unicode publishes with its
-  standards count as specification. Tables the specification declares normative but
-  does not print may be recovered from reference output, provided the recovery is
-  scripted and reproducible (see `crates/codec-dca`). Behaviour, rules as well as
-  tables, may likewise be recovered by scripted, reproducible black-box probes of the
-  reference binary where no specification text is available; the code documents it as
-  observed behaviour and names the probe that establishes it.
+  HarfBuzz and libass, kept for now under those projects' permissive licences and
+  notices. They may be rewritten from specifications later, and a listed module that
+  has a public specification may be rewritten from it whenever it is being changed
+  anyway. The reference implementations Unicode publishes with its standards count as
+  specification. Tables the specification declares normative but does not print may be
+  recovered from reference output, provided the recovery is scripted and reproducible
+  (see `crates/codec-dca`). Behaviour, rules as well as tables, may likewise be
+  recovered by scripted, reproducible black-box probes of the reference binary where
+  no specification text is available; the code documents it as observed behaviour and
+  names the probe that establishes it.
 - **Lints are policy.** Clippy (`all` and `pedantic`) and rustdoc run with
   `-D warnings`. The workspace `[lints]` table states the pedantic lints the code does
   not follow and why; each library's `lib.rs` enables the documentation, visibility,

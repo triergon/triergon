@@ -22,7 +22,8 @@ that documentation of software using FreeType code credit it. Software that incl
 
 New code is written from specifications, with every reference treated as a black box, and
 no further code is translated (see [CONTRIBUTING.md](../CONTRIBUTING.md)). The modules
-below are the translations already in the tree. Modules not listed are written from the
+below are the translations already in the tree, kept under their notices for now; they may
+be rewritten from specifications later. Modules not listed are written from the
 specifications and compared with the references only through their output.
 
 ## triergon-font
