@@ -2,6 +2,118 @@
   "schema": 1,
   "cases": [
     {
+      "id": "automatic-depth2-ts",
+      "profile": "automatic-depth2-ts",
+      "file": "dvb/automatic-depth2.ts",
+      "sha256": "c58171c5d85b316e044ffb187942bed26d21ba8e08c13bf342081d5e550f46d2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1271,
+        "digest": 960832017011729536
+      }
+    },
+    {
+      "id": "automatic-depth8-ts",
+      "profile": "automatic-depth8-ts",
+      "file": "dvb/automatic-depth8.ts",
+      "sha256": "4921764efef4a49efb7f03ee85fcdaba52ba93422beac1d922219574d5045582",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 7512,
+        "digest": 1871739053991426309
+      }
+    },
+    {
+      "id": "automatic-kept-entries-ts",
+      "profile": "automatic-kept-entries-ts",
+      "file": "dvb/automatic-kept-entries.ts",
+      "sha256": "e55d591a25a058f72cb41af207e234eedd27a4c4a15cb7ead99b2451cb3a9089",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 384,
+        "digest": 13843385384704387461
+      }
+    },
+    {
+      "id": "automatic-large-exposure-ts",
+      "profile": "automatic-large-exposure-ts",
+      "file": "dvb/automatic-large-exposure.ts",
+      "sha256": "f7ce8347c2c12bfdc56e60495b9762f9ff562d36a314007208ae45acf0e1457f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1310784,
+        "digest": 6557008487241126824
+      }
+    },
+    {
+      "id": "automatic-ranks-ts",
+      "profile": "automatic-ranks-ts",
+      "file": "dvb/automatic-ranks.ts",
+      "sha256": "5217c29707f5b2386ba2d05671d709c8a12ceda0f59f701b76f86dcd61db39f1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1245,
+        "digest": 4580111887511454452
+      }
+    },
+    {
+      "id": "automatic-steps-ts",
+      "profile": "automatic-steps-ts",
+      "file": "dvb/automatic-steps.ts",
+      "sha256": "beea577fa8a92dcd63829917f3fb8da32d3c4d44b5d41e22ab82be0fde7c7bad",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 14519,
+        "digest": 18376568164846279220
+      }
+    },
+    {
+      "id": "clut-conversion-grid-ts",
+      "profile": "clut-conversion-grid-ts",
+      "file": "dvb/clut-conversion-grid.ts",
+      "sha256": "c9a247320b25814a942ad233488dd7f5417371f43998bc0eb2669ca03fd0ede8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2560,
+        "digest": 15449176908862533309
+      }
+    },
+    {
       "id": "clut-extremes-ts",
       "profile": "clut-extremes-ts",
       "file": "dvb/clut-extremes.ts",
@@ -159,6 +271,22 @@
         "packets": 1,
         "bytes": 1128,
         "digest": 13789930883861658464
+      }
+    },
+    {
+      "id": "clut-flags-ranges-ts",
+      "profile": "clut-flags-ranges-ts",
+      "file": "dvb/clut-flags-ranges.ts",
+      "sha256": "c2ee28e61a1eb408f244d3a53d2e14c3e4b276ec890ebe94ebcf2b82eaea4aaf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8232,
+        "digest": 4168639407923317118
       }
     },
     {
@@ -3148,6 +3276,40 @@
         "packets": 1,
         "bytes": 112,
         "digest": 9830373384832299677
+      }
+    },
+    {
+      "id": "automatic-ranks--compute_clut-1",
+      "profile": "automatic-ranks--compute_clut-1",
+      "file": "dvb/automatic-ranks.ts",
+      "sha256": "5217c29707f5b2386ba2d05671d709c8a12ceda0f59f701b76f86dcd61db39f1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1245,
+        "digest": 4580111887511454452
+      }
+    },
+    {
+      "id": "automatic-kept-entries--compute_clut-1",
+      "profile": "automatic-kept-entries--compute_clut-1",
+      "file": "dvb/automatic-kept-entries.ts",
+      "sha256": "e55d591a25a058f72cb41af207e234eedd27a4c4a15cb7ead99b2451cb3a9089",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 384,
+        "digest": 13843385384704387461
       }
     },
     {
