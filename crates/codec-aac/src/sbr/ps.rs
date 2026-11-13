@@ -214,7 +214,7 @@ fn matrices() -> &'static MatrixTable {
                                     .rem_euclid(std::f64::consts::FRAC_PI_2)
                             };
                             let q = g + 1.0 / g;
-                            // the reference rounds mu^2 and mu to single precision
+                            // the reference output matches mu^2 and mu rounded to single precision (m05)
                             let mu2 = f64::from((1.0 + (4.0 * rho * rho - 4.0) / (q * q)) as f32);
                             let mu = f64::from(mu2.sqrt() as f32);
                             let gam = ((1.0 - mu) / (1.0 + mu)).sqrt().atan();

@@ -153,7 +153,7 @@ def tables(sig):
                 need(v is None or abs(v - float(table1[8][n])) <= tol, '%s[%d] = Table 1' % (key, n))
                 items.append(table1[8][n])
             elif v is None:
-                items.append('0.0')  # multiplies zero in every band the reference runs
+                items.append('0.0')  # no reference output depends on the tap
             elif n == 0:
                 need(abs(v - 1 / q) <= tol, '%s centre tap 1/Q' % key)
                 items.append('1.0 / %d.0' % q)
@@ -162,8 +162,8 @@ def tables(sig):
         doc = {
             'PROTO_20_Q8': 'Hybrid prototypes `g[n]`, n = 6..12 (`g[12 - n] = g[n]`), by configuration and split.\n'
                            '20 bands, Q = 8: 3GPP TS 26.405 Table 1 g0, confirmed by the fits.',
-            'PROTO_20_Q4': '20 bands, Q = 4 (fitted; not TS 26.405 Table 1 g1,2). Taps n = 8 and 12\n'
-                           'multiply zero in every summed pair the reference runs.',
+            'PROTO_20_Q4': '20 bands, Q = 4 (fitted; the output departs from TS 26.405 Table 1 g1,2 by\n'
+                           'up to 8e-3). No reference output depends on taps n = 8 and 12; they are 0.',
             'PROTO_34_Q12': '34 bands, Q = 12, 8 and 4 (fitted).',
         }.get(key, '34 bands (fitted).')
         table(key, '[f64; 7]', doc + ' Precision %s.' % tol_text(tol), items, precision=tol)

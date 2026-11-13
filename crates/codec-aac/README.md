@@ -121,8 +121,8 @@ caller's reserved PCM planes and reuses them on the next access unit.
     decorrelator only when a frame's configuration differs from that of the frame read
     before it;
   - a PS frame without its SBR element (`ps-open-no-sbr-element`): 1.7e-5 / 5.2e-4, in
-    that frame only; FFmpeg's QMF bands 31..35 differ there. An HE-AAC v1 stream with the
-    same frame matches FFmpeg;
+    that frame only, where the difference from FFmpeg's output lies in QMF bands 31..35.
+    An HE-AAC v1 stream with the same frame matches FFmpeg;
   - IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands
     (`ps-open-ipd-after-iid34`): 3.4e-3 / 3.9e-2, in the change frame and the three after
     it; later frames match.

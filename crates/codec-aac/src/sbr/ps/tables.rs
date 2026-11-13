@@ -14,8 +14,8 @@ pub(super) const PROTO_20_Q8: [f64; 7] = [
     0.00746082949812,
 ];
 
-/// 20 bands, Q = 4 (fitted; not TS 26.405 Table 1 g1,2). Taps n = 8 and 12
-/// multiply zero in every summed pair the reference runs. Precision 1e-8.
+/// 20 bands, Q = 4 (fitted; the output departs from TS 26.405 Table 1 g1,2 by
+/// up to 8e-3). No reference output depends on taps n = 8 and 12; they are 0. Precision 1e-8.
 pub(super) const PROTO_20_Q4: [f64; 7] =
     [1.0 / 4.0, 0.21635085, 0.0, 0.05157028, 0.0, -0.0134314, 0.0];
 
