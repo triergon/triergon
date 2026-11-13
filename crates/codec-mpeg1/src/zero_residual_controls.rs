@@ -214,3 +214,47 @@ fn geometry_rejection_keeps_owned_output_and_subsequent_gop_state_unchanged() {
     assert_eq!(next.index, 1);
     assert_eq!(next.bits, output.len() * 8);
 }
+
+#[test]
+fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
+    let geometry = Geometry::new(64, 48).unwrap();
+    let cfg = EncoderConfig {
+        geometry,
+        bit_rate: 1_000_000,
+        max_rate: 1_400_000,
+        vbv_bits: 142_857,
+        gop: 30,
+    };
+    // A gradient with a little texture: the first P pictures refine it, then
+    // its residual quantises to zero and the macroblocks are skipped.
+    let mut input = Picture::new(geometry);
+    let mut seed = 1u32;
+    let mut sample = |base: usize| {
+        seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+        u8::try_from(base % 160 + 40).unwrap() + (seed >> 29) as u8
+    };
+    for (i, v) in input.y_mut().iter_mut().enumerate() {
+        *v = sample(i % 64 + i / 64);
+    }
+    for (i, v) in input.cb_mut().iter_mut().enumerate() {
+        *v = sample(2 * i);
+    }
+    for (i, v) in input.cr_mut().iter_mut().enumerate() {
+        *v = sample(3 * i);
+    }
+    let mut reused = Encoder::new(cfg).unwrap();
+    let mut computed = Encoder::new(cfg).unwrap();
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    let mut reuse_seen = false;
+    for _ in 0..12 {
+        // `computed` never sees a repeated picture, so it codes every
+        // macroblock from its residual.
+        computed.previous_chroma.fill(0);
+        reuse_seen |= reused.skipped_at.iter().any(|&q| q != 0);
+        reused.encode(&input, &mut a).unwrap();
+        computed.encode(&input, &mut b).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(reused.reference.y(), computed.reference.y());
+    }
+    assert!(reuse_seen, "no macroblock was skipped for reuse");
+}
