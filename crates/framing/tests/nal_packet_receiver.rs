@@ -536,6 +536,10 @@ fn observed_avc_update_changes_native_width_but_keeps_source_refusal_and_epoch()
     );
     drop(job);
     assert_eq!(s.receiver_epoch(), 1);
+    assert!(matches!(
+        s.configuration(),
+        NalPacketConfiguration::ReceiverAvc(_)
+    ));
 }
 #[test]
 fn observed_record_work_zero_and_cancellation_do_not_publish_or_invent_errors() {
@@ -656,6 +660,10 @@ fn physical_error_after_observed_update_keeps_new_config_without_committing_inba
     assert_eq!(error(&mut job), Error::Truncated);
     let r = job.take_receiver_rejection().unwrap();
     drop(job);
+    assert!(matches!(
+        s.configuration(),
+        NalPacketConfiguration::ReceiverAvc(_)
+    ));
     drop(s);
     assert_eq!(r.receiver_epoch(), 1);
     assert_eq!(r.configuration_bytes().as_ref(), avcc(3));

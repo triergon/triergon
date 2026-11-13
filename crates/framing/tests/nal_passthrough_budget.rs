@@ -1,8 +1,7 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::{
-    BuildStep, Codec, NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketSegment,
-    NalPacketSession,
+    BuildStep, Codec, NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketSession,
 };
 
 #[test]
@@ -11,10 +10,7 @@ fn unchanged_packet_fits_without_a_second_payload_owner() {
         for quantum in [1, 4096] {
             let length = 1024;
             let baseline = Budget::control_storage_bytes();
-            let pool = Budget::new(
-                baseline + Bytes::owner_overhead_bytes() + length + size_of::<NalPacketSegment>(),
-            )
-            .unwrap();
+            let pool = Budget::new(baseline + Bytes::owner_overhead_bytes() + length).unwrap();
             let bytes = Bytes::copy_from_slice(&pool, &[0xa5; 1024]).unwrap();
             let mut session = NalPacketSession::new(
                 &pool,

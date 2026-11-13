@@ -167,6 +167,98 @@ impl NalConfigurationRefusal {
     }
 }
 
+// Packet side data can replace only an AVC record. Keep its source/receiver
+// distinction without reserving space for HEVC or passthrough configurations.
+enum AvcUpdate {
+    Source(AvcConfiguration),
+    Receiver(crate::compat::nal::ReceiverAvcConfiguration),
+}
+impl AvcUpdate {
+    fn record(&self) -> &AvcConfiguration {
+        match self {
+            Self::Source(record) => record,
+            Self::Receiver(record) => record.record(),
+        }
+    }
+    fn bytes(&self) -> &Bytes {
+        self.record().source_bytes()
+    }
+    fn refusal(&self) -> NalConfigurationRefusal {
+        match self {
+            Self::Receiver(record) => record.refusal(),
+            Self::Source(_) => NalConfigurationRefusal::None,
+        }
+    }
+    fn install(self, configuration: &mut NalPacketConfiguration) {
+        match self {
+            Self::Source(record) => *configuration = NalPacketConfiguration::Avc(record),
+            Self::Receiver(record) => {
+                *configuration = NalPacketConfiguration::ReceiverAvc(record);
+            }
+        }
+    }
+}
+
+// Borrow the active configuration without widening an in-flight AVC update.
+enum ConfigurationRef<'a> {
+    Current(&'a NalPacketConfiguration),
+    Update(&'a AvcUpdate),
+}
+impl<'a> ConfigurationRef<'a> {
+    fn bytes(self) -> &'a Bytes {
+        match self {
+            Self::Current(configuration) => configuration.bytes(),
+            Self::Update(update) => update.bytes(),
+        }
+    }
+    fn source_identity(self) -> Option<(SourceLocation, u64)> {
+        match self {
+            Self::Current(configuration) => configuration.source_identity(),
+            Self::Update(update) => {
+                let source = update.record().source();
+                Some((
+                    SourceLocation {
+                        source: source.source,
+                        offset: source.offset,
+                    },
+                    source.generation,
+                ))
+            }
+        }
+    }
+    fn refusal(self) -> NalConfigurationRefusal {
+        match self {
+            Self::Current(configuration) => configuration.refusal(),
+            Self::Update(update) => update.refusal(),
+        }
+    }
+    fn hevc_array_type(self, index: usize) -> Option<u8> {
+        match self {
+            Self::Current(configuration) => configuration.hevc_array_type(index),
+            Self::Update(_) => None,
+        }
+    }
+    fn config_nal(self, index: usize) -> Option<ConfigNal<'a>> {
+        match self {
+            Self::Current(configuration) => configuration.config_nal(index),
+            Self::Update(update) => {
+                let record = update.record();
+                record.nal(index).map(|nal| ConfigNal {
+                    kind: Some(nal.array_kind()),
+                    owner: record.source_bytes(),
+                    range: nal.source_range(),
+                })
+            }
+        }
+    }
+    fn config_nal_count(self) -> usize {
+        match self {
+            Self::Current(configuration) => configuration.config_nal_count(),
+            Self::Update(update) => update.record().nal_count(),
+        }
+    }
+}
+
 /// One configuration NAL as the packet and initialization writers read it.
 pub(crate) struct ConfigNal<'a> {
     /// AVC array kind; HEVC records select every NAL.
@@ -263,7 +355,7 @@ impl NalPacketSession {
         source: NalPacket<M>,
         avc_update: Option<AvcConfiguration>,
     ) -> Result<NalPacketJob<'_, M>> {
-        self.begin_packet(source, avc_update.map(NalPacketConfiguration::Avc), false)
+        self.begin_packet(source, avc_update.map(AvcUpdate::Source), false)
     }
     /// Frames a packet with the receiver's acceptance ([`crate::compat::nal`]):
     /// a NAL header the strict path refuses is framed and its refusal recorded.
@@ -274,16 +366,12 @@ impl NalPacketSession {
         source: NalPacket<M>,
         update: Option<crate::compat::nal::ReceiverAvcConfiguration>,
     ) -> Result<NalPacketJob<'_, M>> {
-        self.begin_packet(
-            source,
-            update.map(NalPacketConfiguration::ReceiverAvc),
-            true,
-        )
+        self.begin_packet(source, update.map(AvcUpdate::Receiver), true)
     }
     fn begin_packet<M>(
         &mut self,
         source: NalPacket<M>,
-        avc_update: Option<NalPacketConfiguration>,
+        avc_update: Option<AvcUpdate>,
         observed_packet: bool,
     ) -> Result<NalPacketJob<'_, M>> {
         if self.drained {
@@ -327,49 +415,35 @@ impl NalPacketSession {
         } else {
             self.avc
         };
-        let length_width = avc_update.as_ref().unwrap_or(&self.configuration).width();
+        let length_width = match &avc_update {
+            Some(update) => Some(update.record().sample_length_size()),
+            None => self.configuration.width(),
+        };
         let phase = if changes {
-            Phase::Verify
+            PlanPhase::Verify
         } else if codec == Codec::Hevc {
-            Phase::Arrays
+            PlanPhase::Arrays
         } else {
-            Phase::Scan
+            PlanPhase::Scan
         };
         Ok(NalPacketJob {
-            session: self,
-            source: Some(source),
-            update: avc_update,
-            codec,
-            length_width,
-            avc,
-            epoch,
-            phase,
-            verify: 0,
-            update_verified: false,
-            array: 0,
-            offset: 0,
-            length: 0,
-            prefix_read: 0,
-            nals: 0,
-            nal: None,
-            injection: None,
-            injected_irap: false,
-            has_irap: false,
-            look_offset: 0,
-            look_length: 0,
-            look_prefix: 0,
-            look_nals: 0,
-            live_base: None,
-            segment_hint: None,
-            segments: None,
-            output: None,
-            total: 0,
-            copy_segment: 0,
-            copied: 0,
-            failure: None,
-            receiver_failure: None,
-            observed_packet,
-            packet_source_refusal: None,
+            state: PacketState {
+                session: self,
+                source: Some(source),
+                update: avc_update,
+                codec,
+                length_width,
+                avc,
+                epoch,
+                update_verified: false,
+                segments: None,
+                total: 0,
+                failure: None,
+                receiver_failure: None,
+                observed_packet,
+                packet_source_refusal: None,
+            },
+            phase: PacketPhase::Prepare(PacketPlan::new(phase)),
         })
     }
 }
@@ -396,36 +470,44 @@ pub enum NalPacketProgress {
 /// rather than independently cloned into each descriptor.
 #[derive(Clone, PartialEq, Eq)]
 pub struct NalPacketSegment {
-    source_range: Range<usize>,
+    source_start: usize,
+    // Length-framed packet NALs have at most four length bytes; configuration
+    // NALs have two. Passthrough keeps its unbounded length in the offset word.
+    payload_length: u32,
     // The high byte carries the existing source/prefix tag. The low24 bits
     // carry a configuration NAL index: avcC has at most31+255+255 NALs;
     // hvcC has at most255 arrays of65535 NALs. Packet descriptors use index0.
     // Source ranges and output offsets remain full usize values.
     nal_and_prefix: u32,
-    output_offset: usize,
+    output_offset_or_length: usize,
 }
+// Report the unchanged public range and offset fields instead of their packed storage.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for NalPacketSegment {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Preserve the existing public diagnostic fields after private packing.
         let nal_index = (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize;
-        let prefix_and_source = (self.nal_and_prefix >> 24) as u8;
+        let prefix_and_source = (self.nal_and_prefix >> 24) as u8 & !Self::PASSTHROUGH;
         formatter
             .debug_struct("NalPacketSegment")
-            .field("source_range", &self.source_range)
+            .field("source_range", &self.source_range())
             .field("nal_index", &nal_index)
             .field("prefix_and_source", &prefix_and_source)
-            .field("output_offset", &self.output_offset)
+            .field("output_offset", &self.output_offset())
             .finish()
     }
 }
 impl NalPacketSegment {
     const CONFIGURATION_SOURCE: u8 = 0x80;
+    const PASSTHROUGH: u8 = 0x40;
     const NAL_INDEX_MASK: u32 = 0x00ff_ffff;
     fn packet(range: Range<usize>, prefix: u8, offset: usize) -> Self {
+        debug_assert!(u32::try_from(range.len()).is_ok());
         Self {
-            source_range: range,
+            source_start: range.start,
+            payload_length: range.len() as u32,
             nal_and_prefix: u32::from(prefix) << 24,
-            output_offset: offset,
+            output_offset_or_length: offset,
         }
     }
     fn configuration(index: usize, range: Range<usize>, offset: usize) -> Self {
@@ -433,39 +515,57 @@ impl NalPacketSegment {
         // Their literal count fields bound every index below255*65535<2^24;
         // this does not narrow source ranges, output lengths or packet offsets.
         debug_assert!(index < usize::from(u8::MAX) * usize::from(u16::MAX));
+        debug_assert!(u16::try_from(range.len()).is_ok());
         Self {
-            source_range: range,
+            source_start: range.start,
+            payload_length: range.len() as u32,
             nal_and_prefix: (index as u32) | (u32::from(Self::CONFIGURATION_SOURCE | 4) << 24),
-            output_offset: offset,
+            output_offset_or_length: offset,
         }
     }
-    fn passthrough(source: &Bytes, offset: usize) -> Self {
+    fn passthrough(length: usize) -> Self {
+        // Passthrough publishes exactly one whole-packet segment at offset zero.
         Self {
-            source_range: 0..source.len(),
-            nal_and_prefix: 0,
-            output_offset: offset,
+            source_start: 0,
+            payload_length: 0,
+            nal_and_prefix: u32::from(Self::PASSTHROUGH) << 24,
+            output_offset_or_length: length,
         }
     }
     pub fn origin(&self) -> NalPacketOrigin {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
             NalPacketOrigin::Packet {
-                source_range: self.source_range.clone(),
+                source_range: self.source_range(),
             }
         } else {
             NalPacketOrigin::Configuration {
                 nal_index: (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize,
-                source_range: self.source_range.clone(),
+                source_range: self.source_range(),
             }
         }
     }
     pub fn prefix_bytes(&self) -> u8 {
-        (self.nal_and_prefix >> 24) as u8 & !Self::CONFIGURATION_SOURCE
+        (self.nal_and_prefix >> 24) as u8 & !(Self::CONFIGURATION_SOURCE | Self::PASSTHROUGH)
     }
     pub fn output_offset(&self) -> usize {
-        self.output_offset
+        if self.is_passthrough() {
+            0
+        } else {
+            self.output_offset_or_length
+        }
     }
     fn len(&self) -> usize {
-        self.source_range.end - self.source_range.start
+        if self.is_passthrough() {
+            self.output_offset_or_length
+        } else {
+            self.payload_length as usize
+        }
+    }
+    fn source_range(&self) -> Range<usize> {
+        self.source_start..self.source_start + self.len()
+    }
+    fn is_passthrough(&self) -> bool {
+        (self.nal_and_prefix >> 24) as u8 & Self::PASSTHROUGH != 0
     }
     fn owner<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
@@ -477,8 +577,99 @@ impl NalPacketSegment {
     fn payload<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]> {
         self.owner(packet, configuration)
             .as_ref()
-            .get(self.source_range.clone())
+            .get(self.source_range())
             .ok_or(Error::Invalid("packet segment range"))
+    }
+}
+
+const INLINE_PACKET_SEGMENTS: usize = 4;
+
+// Fixed descriptor metadata travels with the job/output. Only a heap table
+// allocates; its complete capacity stays charged through output retention.
+enum PacketSegmentStorage {
+    Inline {
+        data: [NalPacketSegment; INLINE_PACKET_SEGMENTS],
+        len: u8,
+    },
+    Heap(BudgetVec<NalPacketSegment>),
+}
+impl PacketSegmentStorage {
+    fn new() -> Self {
+        Self::Inline {
+            data: std::array::from_fn(|_| NalPacketSegment::packet(0..0, 0, 0)),
+            len: 0,
+        }
+    }
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+    fn as_slice(&self) -> &[NalPacketSegment] {
+        match self {
+            Self::Inline { data, len } => &data[..usize::from(*len)],
+            Self::Heap(parts) => parts.as_slice(),
+        }
+    }
+    fn required_heap_bytes(count: usize) -> Result<usize> {
+        if count <= INLINE_PACKET_SEGMENTS {
+            Ok(0)
+        } else {
+            count
+                .checked_mul(size_of::<NalPacketSegment>())
+                .ok_or(Error::Overflow)
+        }
+    }
+    fn try_push(
+        &mut self,
+        pool: &Budget,
+        planned: Option<usize>,
+        segment: NalPacketSegment,
+    ) -> Result<()> {
+        match self {
+            Self::Inline { data, len } if usize::from(*len) < INLINE_PACKET_SEGMENTS => {
+                data[usize::from(*len)] = segment;
+                *len += 1;
+            }
+            Self::Inline { data, .. } => {
+                *self = Self::Heap(Self::spill(pool, planned, data, segment)?);
+            }
+            Self::Heap(parts) => parts.try_push(segment).map_err(|e| e.error)?,
+        }
+        Ok(())
+    }
+    #[cold]
+    #[inline(never)]
+    fn spill(
+        pool: &Budget,
+        planned: Option<usize>,
+        data: &[NalPacketSegment; INLINE_PACKET_SEGMENTS],
+        segment: NalPacketSegment,
+    ) -> Result<BudgetVec<NalPacketSegment>> {
+        let mut parts = BudgetVec::new(pool);
+        if let Some(planned) = planned {
+            // As with the old first allocation, a refused hint falls back to
+            // ordinary growth. The inline entries remain intact on any error.
+            let _ = parts.try_reserve_exact(planned);
+        }
+        let needed = INLINE_PACKET_SEGMENTS + 1;
+        if parts.capacity() < needed {
+            // Match ordinary four-to-eight growth, including an exact-size
+            // retry when the geometric capacity cannot fit the pool.
+            parts
+                .try_reserve_exact(INLINE_PACKET_SEGMENTS * 2)
+                .or_else(|error| {
+                    if matches!(
+                        error,
+                        Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
+                    ) {
+                        parts.try_reserve_exact(needed)
+                    } else {
+                        Err(error)
+                    }
+                })?;
+        }
+        parts.try_extend_with(data.len(), |i| data[i].clone())?;
+        parts.try_push(segment).map_err(|e| e.error)?;
+        Ok(parts)
     }
 }
 
@@ -502,7 +693,7 @@ pub struct NalPacketOutput<M = NalPacketFields> {
     has_configuration_identity: bool,
     configuration_source_refusal: NalConfigurationRefusal,
     packet_source_refusal: Option<NalHeaderError>,
-    segments: BudgetVec<NalPacketSegment>,
+    segments: PacketSegmentStorage,
     receiver_epoch: u64,
     forward_new_extradata: bool,
 }
@@ -598,7 +789,7 @@ impl<M> NalPacketOutput<M> {
         let part = self.segments.as_slice().get(index)?;
         part.owner(&self.source.bytes, &self.configuration)
             .as_ref()
-            .get(part.source_range.clone())
+            .get(part.source_range())
     }
     /// One segment's payload as its own handle on the retained packet or
     /// configuration owner. No bytes are copied.
@@ -609,18 +800,22 @@ impl<M> NalPacketOutput<M> {
             .get(index)
             .ok_or(Error::Invalid("packet segment index"))?;
         part.owner(&self.source.bytes, &self.configuration)
-            .slice(part.source_range.clone())
+            .slice(part.source_range())
     }
 }
 
 #[derive(Clone, Copy)]
-enum Phase {
+enum PlanPhase {
     Verify,
     Arrays,
     Lookahead,
     Scan,
     Inject,
     Nal,
+    Reserve,
+}
+#[derive(Clone, Copy)]
+enum EmissionPhase {
     Reserve,
     Copy,
     Freeze,
@@ -632,66 +827,100 @@ enum Injection {
     Sps,
     Pps,
 }
-struct PendingNal {
-    range: Range<usize>,
-    kind: u8,
-}
-/// One cooperative packet framing job over the session it borrows.
-pub struct NalPacketJob<'a, M = NalPacketFields> {
+
+// Source, effective update and descriptors coexist through packet copying and
+// publication. Only the preparation scratch can share space with the buffer.
+struct PacketState<'a, M> {
     session: &'a mut NalPacketSession,
     source: Option<NalPacket<M>>,
-    update: Option<NalPacketConfiguration>,
-    // Codec and width stay fixed while the job borrows the session. A valid
-    // update changes only the width of this AVC packet and subsequent packets.
+    update: Option<AvcUpdate>,
     codec: Codec,
     length_width: Option<LengthSize>,
     avc: AvcState,
     epoch: u64,
-    phase: Phase,
-    verify: usize,
     update_verified: bool,
-    array: usize,
-    offset: usize,
-    length: usize,
-    prefix_read: usize,
-    nals: usize,
-    nal: Option<PendingNal>,
-    injection: Option<(Injection, usize)>,
-    injected_irap: bool,
-    has_irap: bool,
-    look_offset: usize,
-    look_length: usize,
-    look_prefix: usize,
-    look_nals: usize,
-    /// Job-invariant part of `minimum_live_bytes`: control storage, both
-    /// descriptor lower bounds and the deduplicated raw owners. None of these
-    /// change while segments are appended, so the sum is computed once.
-    live_base: Option<Result<usize>>,
-    /// Segment count known before the first append: width-framed HEVC after its
-    /// lookahead, or a packet whose first NAL is also its last. Only sizes the
-    /// first allocation; a refused reservation falls back to ordinary growth.
-    segment_hint: Option<usize>,
-    segments: Option<BudgetVec<NalPacketSegment>>,
-    output: Option<BudgetVec<u8>>,
+    segments: Option<PacketSegmentStorage>,
     total: usize,
-    copy_segment: usize,
-    copied: usize,
     failure: Option<Error>,
     receiver_failure: Option<NalPacketReceiverErrorKind>,
     observed_packet: bool,
     packet_source_refusal: Option<NalHeaderError>,
 }
-impl<M> NalPacketJob<'_, M> {
-    fn config(&self) -> &NalPacketConfiguration {
-        self.update.as_ref().unwrap_or(&self.session.configuration)
+struct PacketPlan {
+    phase: PlanPhase,
+    // Verification, array admission, lookahead and scanning run in order.
+    // The cursor is reset before its next role; source offsets stay full width.
+    offset: usize,
+    length: usize,
+    prefix_read: usize,
+    nals: usize,
+    nal: Option<u8>,
+    injection: Option<(Injection, usize)>,
+    injected_irap: bool,
+    has_irap: bool,
+    look_nals: usize,
+    live_base: Option<usize>,
+    // Hints size only a later fifth-descriptor spill, never an early allocation.
+    segment_hint: Option<usize>,
+}
+impl PacketPlan {
+    fn new(phase: PlanPhase) -> Self {
+        Self {
+            phase,
+            offset: 0,
+            length: 0,
+            prefix_read: 0,
+            nals: 0,
+            nal: None,
+            injection: None,
+            injected_irap: false,
+            has_irap: false,
+            look_nals: 0,
+            live_base: None,
+            segment_hint: None,
+        }
     }
-    pub fn source(&self) -> Option<&NalPacket<M>> {
+}
+struct PacketEmission {
+    phase: EmissionPhase,
+    output: Option<BudgetVec<u8>>,
+    copy_segment: usize,
+    copied: usize,
+}
+impl PacketEmission {
+    fn new() -> Self {
+        Self {
+            phase: EmissionPhase::Reserve,
+            output: None,
+            copy_segment: 0,
+            copied: 0,
+        }
+    }
+}
+enum PacketPhase {
+    Prepare(PacketPlan),
+    Emit(PacketEmission),
+}
+
+/// One cooperative packet framing job over the session it borrows.
+pub struct NalPacketJob<'a, M = NalPacketFields> {
+    state: PacketState<'a, M>,
+    phase: PacketPhase,
+}
+impl<M> PacketState<'_, M> {
+    fn config(&self) -> ConfigurationRef<'_> {
+        match &self.update {
+            Some(update) => ConfigurationRef::Update(update),
+            None => ConfigurationRef::Current(&self.session.configuration),
+        }
+    }
+    fn source(&self) -> Option<&NalPacket<M>> {
         self.source.as_ref()
     }
     /// Move the original failed source into an observed receiver-error view.
     /// Only the physical error sites below can enable this transition.
     /// The job's source error remains sticky after the one-time move.
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
+    fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         let kind = self.receiver_failure?;
         let error = self.failure?;
         let source = self.source.take()?;
@@ -706,28 +935,6 @@ impl<M> NalPacketJob<'_, M> {
             receiver_epoch: self.session.receiver_epoch,
         })
     }
-    // Known owner/capacity lower bound, deduplicating raw caller aliases. A
-    // larger allocator replacement peak may still require retryable pressure.
-    // All terms are non-negative, so summing the job-invariant terms first
-    // overflows exactly when the original left-to-right sum overflowed.
-    fn minimum_live_bytes(&mut self, segments: usize, output: usize) -> Result<usize> {
-        let base = match self.live_base {
-            Some(base) => base,
-            None => *self.live_base.insert(self.fixed_live_bytes()),
-        }?;
-        let copied_storage = if self.length_width.is_some() {
-            Bytes::owner_overhead_bytes()
-                .checked_add(output)
-                .ok_or(Error::Overflow)?
-        } else {
-            0
-        };
-        segments
-            .checked_mul(size_of::<NalPacketSegment>())
-            .and_then(|p| p.checked_add(copied_storage))
-            .and_then(|n| n.checked_add(base))
-            .ok_or(Error::Overflow)
-    }
     fn fixed_live_bytes(&self) -> Result<usize> {
         let packet = self
             .source
@@ -738,12 +945,12 @@ impl<M> NalPacketJob<'_, M> {
             .ok_or(Error::Overflow)?;
         if let Some(c) = &self.update {
             total = total
-                .checked_add(c.descriptor_lower_bound()?)
+                .checked_add(c.record().descriptor_lower_bound()?)
                 .ok_or(Error::Overflow)?;
         }
         let owners = [
             Some(self.session.configuration.bytes()),
-            self.update.as_ref().map(NalPacketConfiguration::bytes),
+            self.update.as_ref().map(AvcUpdate::bytes),
             Some(&packet.bytes),
             packet.new_extradata.as_ref(),
         ];
@@ -761,45 +968,84 @@ impl<M> NalPacketJob<'_, M> {
         }
         Ok(total)
     }
-    fn append(&mut self, segment: NalPacketSegment) -> Result<()> {
-        let parts = self.segments.as_ref().map_or(0, BudgetVec::len);
-        if parts == self.session.limits.maximum_segments {
+}
+
+impl PacketPlan {
+    // Known owner/capacity lower bound, deduplicating raw caller aliases. A
+    // larger allocator replacement peak may still require retryable pressure.
+    // All terms are non-negative, so summing the job-invariant terms first
+    // overflows exactly when the original left-to-right sum overflowed.
+    fn minimum_live_bytes<M>(
+        &mut self,
+        state: &PacketState<'_, M>,
+        segments: usize,
+        output: usize,
+    ) -> Result<usize> {
+        let base = match self.live_base {
+            Some(base) => base,
+            None => *self.live_base.insert(state.fixed_live_bytes()?),
+        };
+        let copied_storage = if state.length_width.is_some() {
+            Bytes::owner_overhead_bytes()
+                .checked_add(output)
+                .ok_or(Error::Overflow)?
+        } else {
+            0
+        };
+        PacketSegmentStorage::required_heap_bytes(segments)?
+            .checked_add(copied_storage)
+            .and_then(|n| n.checked_add(base))
+            .ok_or(Error::Overflow)
+    }
+    fn append<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        segment: NalPacketSegment,
+    ) -> Result<()> {
+        let parts = state.segments.as_ref().map_or(0, PacketSegmentStorage::len);
+        if parts == state.session.limits.maximum_segments {
             return Err(Error::Limit {
                 requested: parts.saturating_add(1),
-                maximum: self.session.limits.maximum_segments,
+                maximum: state.session.limits.maximum_segments,
             });
         }
         let count = parts.checked_add(1).ok_or(Error::Overflow)?;
-        let total = self
+        let total = state
             .total
             .checked_add(usize::from(segment.prefix_bytes()))
             .and_then(|v| v.checked_add(segment.len()))
             .ok_or(Error::Overflow)?;
-        if total > self.session.limits.maximum_output_bytes {
+        if total > state.session.limits.maximum_output_bytes {
             return Err(Error::Limit {
                 requested: total,
-                maximum: self.session.limits.maximum_output_bytes,
+                maximum: state.session.limits.maximum_output_bytes,
             });
         }
-        let minimum = self.minimum_live_bytes(count, total)?;
-        if minimum > self.session.pool.limit() {
+        let minimum = self.minimum_live_bytes(state, count, total)?;
+        if minimum > state.session.pool.limit() {
             return Err(Error::Limit {
                 requested: minimum,
-                maximum: self.session.pool.limit(),
+                maximum: state.session.pool.limit(),
             });
         }
-        let parts = self
-            .segments
-            .get_or_insert_with(|| BudgetVec::new(&self.session.pool));
-        if let Some(planned) = self.segment_hint.take().filter(|_| parts.capacity() == 0) {
-            // Exact first allocation instead of the default four slots. Any
-            // refusal leaves the vector empty and try_push applies its own
-            // growth and errors exactly as before.
-            let _ = parts.try_reserve_exact(planned);
+        let parts = state.segments.get_or_insert_with(PacketSegmentStorage::new);
+        parts.try_push(&state.session.pool, self.segment_hint, segment)?;
+        if matches!(parts, PacketSegmentStorage::Heap(_)) {
+            self.segment_hint = None;
         }
-        parts.try_push(segment).map_err(|e| e.error)?;
-        self.total = total;
+        state.total = total;
         Ok(())
+    }
+}
+
+impl<M> NalPacketJob<'_, M> {
+    pub fn source(&self) -> Option<&NalPacket<M>> {
+        self.state.source()
+    }
+    /// Move the original failed source into an observed receiver-error view.
+    /// The source error remains sticky after the one-time move.
+    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
+        self.state.take_receiver_rejection()
     }
     /// The same state engine as `step_into`, returning the output directly.
     pub fn step(
@@ -819,6 +1065,7 @@ impl<M> NalPacketJob<'_, M> {
     /// Publish a complete output directly into an empty caller-owned slot.
     /// Occupied slots are rejected before any job, work or owner change and do
     /// not poison the job. Yield, completion and errors leave the slot empty.
+    #[inline(never)]
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,
@@ -828,29 +1075,36 @@ impl<M> NalPacketJob<'_, M> {
         if ready.is_some() {
             return Err(Error::Invalid("packet output sink occupied"));
         }
-        if let Some(e) = self.failure {
+        if let Some(e) = self.state.failure {
             return Err(e);
         }
         let result = self.advance_into(work, cancel, ready);
         if let Err(e) = result
             && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
         {
-            // A valid side-data configuration precedes payload parsing in
-            // the pinned receiver. Its change survives a physical packet
-            // error, while partial in-band availability never commits.
-            if matches!(e, Error::Invalid(_) | Error::Truncated)
-                && self.update_verified
-                && let Some(configuration) = self.update.take()
-            {
-                self.session.configuration = configuration;
-                self.session.receiver_epoch = self.epoch;
-                self.session.avc = AvcState::default();
-            }
-            self.failure = Some(e);
-            self.output = None;
-            self.segments = None;
+            self.fail(e);
         }
         result
+    }
+    #[cold]
+    #[inline(never)]
+    fn fail(&mut self, e: Error) {
+        // A valid side-data configuration precedes payload parsing in
+        // the pinned receiver. Its change survives a physical packet
+        // error, while partial in-band availability never commits.
+        if matches!(e, Error::Invalid(_) | Error::Truncated)
+            && self.state.update_verified
+            && let Some(configuration) = self.state.update.take()
+        {
+            configuration.install(&mut self.state.session.configuration);
+            self.state.session.receiver_epoch = self.state.epoch;
+            self.state.session.avc = AvcState::default();
+        }
+        self.state.failure = Some(e);
+        if let PacketPhase::Emit(emission) = &mut self.phase {
+            emission.output = None;
+        }
+        self.state.segments = None;
     }
 }
 
@@ -858,6 +1112,43 @@ impl<M> NalPacketJob<'_, M> {
 #[cfg(test)]
 mod packed_plan_boundary_guards {
     use super::*;
+
+    #[test]
+    fn maximum_wire_length_preserves_full_source_and_output_offsets() {
+        let length = u32::MAX as usize;
+        let range = usize::MAX - length..usize::MAX;
+        let part = NalPacketSegment::packet(range.clone(), 4, usize::MAX);
+        assert_eq!(
+            part.origin(),
+            NalPacketOrigin::Packet {
+                source_range: range
+            }
+        );
+        assert_eq!(part.len(), length);
+        assert_eq!(part.output_offset(), usize::MAX);
+        assert_eq!(part.prefix_bytes(), 4);
+    }
+
+    #[test]
+    fn passthrough_length_is_not_limited_to_the_wire_length_field() {
+        let part = NalPacketSegment::passthrough(usize::MAX);
+        assert_eq!(
+            part.origin(),
+            NalPacketOrigin::Packet {
+                source_range: 0..usize::MAX
+            }
+        );
+        assert_eq!(part.len(), usize::MAX);
+        assert_eq!(part.output_offset(), 0);
+        assert_eq!(part.prefix_bytes(), 0);
+        assert_eq!(
+            format!("{part:?}"),
+            format!(
+                "NalPacketSegment {{ source_range: 0..{}, nal_index: 0, prefix_and_source: 0, output_offset: 0 }}",
+                usize::MAX
+            )
+        );
+    }
 
     #[test]
     fn every_configuration_index_boundary_preserves_full_source_ranges() {
@@ -907,6 +1198,156 @@ mod packed_plan_boundary_guards {
                     usize::MAX,
                 )
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod inline_packet_segments {
+    use super::*;
+
+    fn segment(index: usize) -> NalPacketSegment {
+        NalPacketSegment::packet(index..index + 1, 4, index * 5)
+    }
+
+    #[test]
+    fn large_hints_keep_four_inline_appends_uncharged_then_size_the_spill() {
+        for hint in [5, 9] {
+            let pool = Budget::new(4096).unwrap();
+            let base = pool.used();
+            let mut parts = PacketSegmentStorage::new();
+            for index in 0..INLINE_PACKET_SEGMENTS {
+                parts.try_push(&pool, Some(hint), segment(index)).unwrap();
+                assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
+                assert_eq!(pool.used(), base);
+                assert_eq!(pool.peak(), base);
+            }
+            parts.try_push(&pool, Some(hint), segment(4)).unwrap();
+            let PacketSegmentStorage::Heap(heap) = &parts else {
+                panic!("fifth descriptor did not spill");
+            };
+            assert_eq!(heap.capacity(), hint);
+            assert_eq!(pool.used(), base + hint * size_of::<NalPacketSegment>());
+            for (index, part) in parts.as_slice().iter().enumerate() {
+                assert_eq!(*part, segment(index));
+            }
+            drop(parts);
+            assert_eq!(pool.used(), base);
+        }
+    }
+
+    #[test]
+    fn four_descriptors_are_inline_and_spill_keeps_every_entry() {
+        let pool = Budget::new(4096).unwrap();
+        let base = pool.used();
+        let mut parts = PacketSegmentStorage::new();
+        assert!(parts.as_slice().is_empty());
+        for index in 0..4 {
+            parts.try_push(&pool, None, segment(index)).unwrap();
+            assert_eq!(pool.used(), base);
+            assert_eq!(parts.len(), index + 1);
+        }
+        for index in 4..9 {
+            parts.try_push(&pool, None, segment(index)).unwrap();
+            let PacketSegmentStorage::Heap(heap) = &parts else {
+                panic!("fifth descriptor did not spill");
+            };
+            assert_eq!(
+                pool.used(),
+                base + heap.capacity() * size_of::<NalPacketSegment>()
+            );
+            assert_eq!(parts.len(), index + 1);
+            for (index, part) in parts.as_slice().iter().enumerate() {
+                assert_eq!(*part, segment(index));
+            }
+        }
+        drop(parts);
+        assert_eq!(pool.used(), base);
+    }
+
+    #[test]
+    fn refused_spill_keeps_inline_progress_and_resumes_with_exact_capacity() {
+        let pool = Budget::new(4096).unwrap();
+        let blocker = pool
+            .reserve(pool.available() - 4 * size_of::<NalPacketSegment>())
+            .unwrap();
+        let charge = pool.used();
+        let mut parts = PacketSegmentStorage::new();
+        assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
+        assert!(parts.as_slice().is_empty());
+        assert_eq!(pool.used(), charge);
+        for index in 0..4 {
+            parts.try_push(&pool, Some(9), segment(index)).unwrap();
+            assert_eq!(parts.len(), index + 1);
+            assert_eq!(parts.as_slice()[index], segment(index));
+            assert_eq!(pool.used(), charge);
+        }
+        let before = parts.as_slice().to_vec();
+        for _ in 0..2 {
+            assert!(matches!(
+                parts.try_push(&pool, Some(9), segment(4)),
+                Err(Error::Backpressure { .. })
+            ));
+            assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
+            assert_eq!(parts.as_slice(), before);
+            assert_eq!(pool.used(), charge);
+        }
+        drop(blocker);
+        let blocker = pool
+            .reserve(pool.available() - 5 * size_of::<NalPacketSegment>())
+            .unwrap();
+        parts.try_push(&pool, Some(9), segment(4)).unwrap();
+        let PacketSegmentStorage::Heap(heap) = &parts else {
+            panic!("retry did not spill");
+        };
+        assert_eq!(heap.capacity(), 5);
+        for (index, part) in parts.as_slice().iter().enumerate() {
+            assert_eq!(*part, segment(index));
+        }
+        drop(blocker);
+        drop(parts);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn lower_bound_excludes_inline_metadata_and_checks_heap_overflow() {
+        for count in 0..=4 {
+            assert_eq!(PacketSegmentStorage::required_heap_bytes(count), Ok(0));
+        }
+        assert_eq!(
+            PacketSegmentStorage::required_heap_bytes(5),
+            Ok(5 * size_of::<NalPacketSegment>())
+        );
+        assert_eq!(
+            PacketSegmentStorage::required_heap_bytes(usize::MAX),
+            Err(Error::Overflow)
+        );
+    }
+
+    #[test]
+    fn upper_bounds_preserve_inline_progress_across_the_fifth_descriptor() {
+        for actual in [3, 4, 5] {
+            let pool = Budget::new(4096).unwrap();
+            let base = pool.used();
+            let hint = 9;
+            let mut parts = PacketSegmentStorage::new();
+            for index in 0..actual {
+                parts.try_push(&pool, Some(hint), segment(index)).unwrap();
+                assert_eq!(parts.len(), index + 1);
+                assert_eq!(parts.as_slice()[index], segment(index));
+                if index < INLINE_PACKET_SEGMENTS {
+                    assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
+                    assert_eq!(pool.used(), base);
+                } else {
+                    let PacketSegmentStorage::Heap(heap) = &parts else {
+                        panic!("fifth descriptor did not spill");
+                    };
+                    assert_eq!(heap.capacity(), hint);
+                    assert_eq!(pool.used(), base + hint * size_of::<NalPacketSegment>());
+                }
+            }
+            drop(parts);
+            assert_eq!(pool.used(), base);
         }
     }
 }
