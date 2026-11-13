@@ -19692,6 +19692,19 @@
    "key": "evidence/mp4-range-fate-prefix-e35e3584-aarch64/35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063.tar.zst",
    "sha256": "35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063",
    "bytes": 50059794
+  },
+  {
+   "name": "codec-aac-parametric-stereo-560f2225",
+   "path": "codec-aac-parametric-stereo-560f2225",
+   "retention": "90 days",
+   "reason": "AAC Parametric Stereo from open publications and probes: the recovery of the PS syntax, Huffman books, SBR_F_ENVBAL30 and every signal table and rule by scripted probes of FFmpeg 9.0.2, with the notes and probes of both passes and the source texts; the table generator's write and --check runs from empty work directories; the aac lane's gates for 560f2225 and 339ec261 on AArch64 and in the ARMv7 user space (crate tests, fate_vectors with AAC_REF_DIR, per-vector numbers, conformance s16, codecs grade), the equivalence records and the three open cases on both builds and targets; instruction counts of the PS, HE-AAC and frozen AAC-LC workloads against 339ec261 on both targets; the scripts that ran them. Raw PCM outputs are left out.",
+   "key": "qualification/codec-aac-parametric-stereo-560f2225/b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708.tar.gz",
+   "sha256": "b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708",
+   "bytes": 64872808,
+   "source_revisions": {
+    "candidate": "560f222594f3b8767d7454ee1fa5752573020112",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }
