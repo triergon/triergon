@@ -142,12 +142,24 @@ pub(super) fn ycrcbt(y: u8, cr: u8, cb: u8, t: u8) -> u32 {
 /// Values a pixel can hold.
 const VALUES: usize = 256;
 
+/// The words of a census beyond its sides: each value's counted pixels, exposure
+/// and score.
+const TALLIES: usize = 3 * VALUES;
+
+/// A score not worked out since its value's exposure last changed.
+const STALE: u32 = u32::MAX;
+
 /// The automatic palette's working storage, charged to the decoder's budget: one
 /// table of words holding each value's counted pixels, exposure and score (256
-/// words each), then the sides between each ordered pair of values below the
-/// region's stride (4, 16 or 256), `stride²` words. Between regions every word
-/// is zero: [`automatic`] clears each word as it reads it, so a region costs no
-/// clearing beyond the words its own values touch.
+/// words each), then the sides between unlike neighbours. Those are a table of
+/// every ordered pair of values below the region's stride (4, 16 or 256),
+/// `stride²` words, or for 8-bit values, when they are smaller, lists of the
+/// neighbours each value touches: 257 list starts and two words per pair of
+/// neighbouring pixels, or per unlike pair where lists for every pair would not
+/// be smaller. A 16 × 16 region of all 256 values holds 3,072 + 4,868 bytes
+/// rather than 3,072 + 262,144. Between regions every word is zero:
+/// [`automatic`] clears the pair table as it reads it and the lists once ranked,
+/// so a region costs no clearing beyond the words its own values touch.
 #[derive(Debug)]
 pub(super) struct Census {
     table: BudgetVec<u32>,
@@ -166,9 +178,11 @@ impl Census {
     }
 
     /// The most the census allocates for a region whose pixel values are all below
-    /// `values` (4, 16 or 256).
+    /// `values` (4, 16 or 256): the pair table's size, as the lists are used only
+    /// when smaller.
     pub(super) fn bytes_for(values: usize) -> usize {
-        words(stride(values)) * size_of::<u32>()
+        let stride = stride(values);
+        (TALLIES + stride * stride) * size_of::<u32>()
     }
 }
 
@@ -179,11 +193,6 @@ fn stride(values: usize) -> usize {
         5..=16 => 16,
         _ => VALUES,
     }
-}
-
-/// The census words a region of `stride` uses.
-fn words(stride: usize) -> usize {
-    3 * VALUES + stride * stride
 }
 
 /// The automatic palette (`compute_clut`) of a region: `pixels` row by row, `width`
@@ -200,12 +209,11 @@ fn words(stride: usize) -> usize {
 /// 4-neighbour of another value; pixels enclosed by their own value do not count.
 /// Its *exposure* starts as its pixels' sides on the region's edge (a corner pixel
 /// has two; in a region one pixel high every pixel has two and the ends three).
-/// Each step ranks the
-/// value with the highest score, exposure × 1024 / counted pixels rounded down,
-/// the smaller value on a tie; then every value still unranked adds to its
-/// exposure its sides against the pixels of the value just ranked, as if those
-/// pixels were the edge. So the background is the value most exposed on the edge,
-/// and the ranks peel inwards from it:
+/// Each step ranks the value with the highest score, exposure × 1024 / counted
+/// pixels rounded down, the smaller value on a tie; then every value still
+/// unranked adds to its exposure its sides against the pixels of the value just
+/// ranked, as if those pixels were the edge. So the background is the value most
+/// exposed on the edge, and the ranks peel inwards from it:
 /// - the row 1 2 3 ranks 1 2 3: 1 and 3 tie at 3072 (three sides on the edge each)
 ///   and 1 ranks first; then 2, with two sides on the edge and one against 1, ties
 ///   with 3 and ranks before it;
@@ -234,26 +242,197 @@ pub(super) fn automatic(
     census: &mut Census,
     out: &mut [u32; 256],
 ) -> Result<()> {
-    let Some(&max) = pixels.iter().max() else {
+    let Some(max) = pixels.iter().copied().max() else {
         return Ok(());
     };
     if width == 0 {
         return Ok(());
     }
     let stride = stride(usize::from(max) + 1);
-    let needed = words(stride);
-    if census.table.len() < needed {
-        census.table.try_resize(needed, 0)?;
+    let table = stride * stride;
+    // Lists for 8-bit values, when smaller than the table.
+    let lists = if stride == VALUES {
+        list_words(pixels, width, table)
+    } else {
+        usize::MAX
+    };
+    let sides = table.min(lists);
+    if census.table.len() < TALLIES + sides {
+        census.table.try_resize(TALLIES + sides, 0)?;
     }
-    let (counted, rest) = census.table.as_mut_slice().split_at_mut(VALUES);
-    let (exposure, rest) = rest.split_at_mut(VALUES);
-    let (score, pairs) = rest.split_at_mut(VALUES);
+    let (tallies, rest) = census.table.as_mut_slice().split_at_mut(TALLIES);
+    let rest = &mut rest[..sides];
+    let (counted, rest_tallies) = tallies.split_at_mut(VALUES);
+    let (exposure, score) = rest_tallies.split_at_mut(VALUES);
+    if lists < table {
+        let (starts, neighbours) = rest.split_at_mut(VALUES + 1);
+        let lists = Lists::new(pixels, width, starts, neighbours);
+        let mut lists = count(pixels, width, counted, exposure, lists);
+        let filled = VALUES + 1 + lists.starts[VALUES] as usize;
+        rank(stride, counted, exposure, score, &mut lists, out);
+        rest[..filled].fill(0);
+    } else {
+        let pairs = Pairs {
+            stride,
+            pairs: rest,
+        };
+        let mut pairs = count(pixels, width, counted, exposure, pairs);
+        rank(stride, counted, exposure, score, &mut pairs, out);
+    }
+    Ok(())
+}
+
+/// The rows of `pixels`, each with the row below it if the region has one.
+fn rows(pixels: &[u8], width: usize) -> impl Iterator<Item = (&[u8], Option<&[u8]>)> {
+    let rows = pixels.chunks_exact(width);
+    let below = rows.clone().skip(1).map(Some).chain([None]);
+    rows.zip(below)
+}
+
+/// Pairs of 4-neighbours with unlike values, left then right and upper then lower.
+fn each_unlike(pixels: &[u8], width: usize, mut side: impl FnMut(u8, u8)) {
+    for (row, down) in rows(pixels, width) {
+        for window in row.windows(2) {
+            if window[0] != window[1] {
+                side(window[0], window[1]);
+            }
+        }
+        for (&a, &b) in down.into_iter().flat_map(|down| row.iter().zip(down)) {
+            if a != b {
+                side(a, b);
+            }
+        }
+    }
+}
+
+/// The words of neighbour lists for `pixels`, 257 starts and two per unlike pair,
+/// or `usize::MAX` when they would not be smaller than `table` words. Pairs are
+/// counted only when lists for every pair being unlike would not be smaller; then
+/// the lists are sized for that.
+fn list_words(pixels: &[u8], width: usize, table: usize) -> usize {
+    let height = pixels.len() / width;
+    let every = (width - 1) * height + width * height.saturating_sub(1);
+    let words = |pairs| VALUES + 1 + 2 * pairs;
+    if words(every) < table {
+        return words(every);
+    }
+    unlike(pixels, width, table).map_or(usize::MAX, words)
+}
+
+/// The number of pairs [`each_unlike`] visits, or `None` once lists for them could
+/// not be smaller than `table` words.
+fn unlike(pixels: &[u8], width: usize, table: usize) -> Option<usize> {
+    let limit = table.saturating_sub(VALUES + 1) / 2;
+    let mut pairs = 0;
+    for (row, down) in rows(pixels, width) {
+        pairs += row.windows(2).filter(|w| w[0] != w[1]).count();
+        pairs += down.map_or(0, |down| {
+            row.iter().zip(down).filter(|(a, b)| a != b).count()
+        });
+        if pairs >= limit {
+            return None;
+        }
+    }
+    Some(pairs)
+}
+
+/// Where the sides between unlike neighbours are counted, and how a ranked value's
+/// sides reach the values still unranked.
+trait Sides {
+    /// A side between unlike neighbours `a` and `b`.
+    fn side(&mut self, a: u8, b: u8);
+
+    /// Add to the exposure of each value in `left` its sides against `ranked`,
+    /// marking its score stale.
+    fn expose(&mut self, ranked: usize, left: &[u8], tally: &mut Ranking<'_>);
+}
+
+/// Sides counted per ordered pair of values, at `left or upper × stride + right
+/// or lower`, each cleared as it is read.
+struct Pairs<'a> {
+    stride: usize,
+    pairs: &'a mut [u32],
+}
+
+impl Sides for Pairs<'_> {
+    fn side(&mut self, a: u8, b: u8) {
+        self.pairs[usize::from(a) * self.stride + usize::from(b)] += 1;
+    }
+
+    fn expose(&mut self, ranked: usize, left: &[u8], tally: &mut Ranking<'_>) {
+        for &v in left {
+            let v = usize::from(v);
+            let sides = std::mem::take(&mut self.pairs[ranked * self.stride + v])
+                + std::mem::take(&mut self.pairs[v * self.stride + ranked]);
+            if sides > 0 {
+                tally.exposure[v] += sides;
+                tally.score[v] = STALE;
+            }
+        }
+    }
+}
+
+/// Each value's neighbours, one entry per side: value `v`'s are
+/// `neighbours[starts[v]..starts[v + 1]]`.
+struct Lists<'a> {
+    starts: &'a mut [u32],
+    neighbours: &'a mut [u32],
+}
+
+impl<'a> Lists<'a> {
+    /// Lists sized for the sides of `pixels`: `starts` holds where each value's
+    /// list ends, and [`Sides::side`] fills it from there down to its start.
+    fn new(pixels: &[u8], width: usize, starts: &'a mut [u32], neighbours: &'a mut [u32]) -> Self {
+        each_unlike(pixels, width, |a, b| {
+            starts[usize::from(a)] += 1;
+            starts[usize::from(b)] += 1;
+        });
+        let mut end = 0;
+        for start in starts.iter_mut() {
+            end += *start;
+            *start = end;
+        }
+        Self { starts, neighbours }
+    }
+}
+
+impl Sides for Lists<'_> {
+    fn side(&mut self, a: u8, b: u8) {
+        for (v, neighbour) in [(a, b), (b, a)] {
+            let start = &mut self.starts[usize::from(v)];
+            *start -= 1;
+            self.neighbours[*start as usize] = u32::from(neighbour);
+        }
+    }
+
+    fn expose(&mut self, ranked: usize, _left: &[u8], tally: &mut Ranking<'_>) {
+        let list = self.starts[ranked] as usize..self.starts[ranked + 1] as usize;
+        for &v in &self.neighbours[list] {
+            let v = v as usize;
+            // Ranked values have no counted pixels left.
+            if tally.counted[v] > 0 {
+                tally.exposure[v] += 1;
+                tally.score[v] = STALE;
+            }
+        }
+    }
+}
+
+/// Count each value's counted pixels, its sides on the region's edge into
+/// `exposure`, and the sides between unlike neighbours into `sides`, which comes
+/// back for the ranking.
+fn count<S: Sides>(
+    pixels: &[u8],
+    width: usize,
+    counted: &mut [u32],
+    exposure: &mut [u32],
+    sides: S,
+) -> S {
+    // A length of 256 lets pixel values index the tallies unchecked.
     let mut tally = Tally {
-        stride,
-        counted,
-        exposure,
-        score,
-        pairs: &mut pairs[..stride * stride],
+        counted: &mut counted[..VALUES],
+        exposure: &mut exposure[..VALUES],
+        sides,
     };
     let mut rows = pixels.chunks_exact(width);
     let mut up = None;
@@ -264,25 +443,20 @@ pub(super) fn automatic(
         up = Some(current);
         row = down;
     }
-    tally.rank(out);
-    Ok(())
+    tally.sides
 }
 
-/// The census of one region as it is counted and ranked.
-struct Tally<'a> {
-    stride: usize,
+/// The tallies of one region as its rows are counted.
+struct Tally<'a, S> {
     counted: &'a mut [u32],
     exposure: &'a mut [u32],
-    score: &'a mut [u32],
-    /// Sides between unlike neighbours, at `left or upper × stride + right or
-    /// lower`.
-    pairs: &'a mut [u32],
+    sides: S,
 }
 
-impl Tally<'_> {
+impl<S: Sides> Tally<'_, S> {
     fn pair(&mut self, a: u8, b: u8) {
         if a != b {
-            self.pairs[usize::from(a) * self.stride + usize::from(b)] += 1;
+            self.sides.side(a, b);
         }
     }
 
@@ -327,54 +501,64 @@ impl Tally<'_> {
             }
         }
     }
+}
 
-    /// Rank the counted values into `out`, clearing the census behind them.
-    fn rank(self, out: &mut [u32; 256]) {
-        let Self {
-            stride,
-            counted,
-            exposure,
-            score,
-            pairs,
-        } = self;
-        // The values still to rank, in ascending order.
-        let mut left = [0u8; VALUES];
-        let mut len = 0;
-        for v in (0..=u8::MAX).take(stride) {
-            let i = usize::from(v);
-            if counted[i] > 0 {
-                left[len] = v;
-                len += 1;
-                score[i] = ratio(exposure[i], counted[i]);
+/// The tallies the ranking reads and clears.
+struct Ranking<'a> {
+    counted: &'a mut [u32],
+    exposure: &'a mut [u32],
+    score: &'a mut [u32],
+}
+
+/// Rank the counted values, all below `values`, into `out`, clearing the tallies
+/// behind them.
+fn rank(
+    values: usize,
+    counted: &mut [u32],
+    exposure: &mut [u32],
+    score: &mut [u32],
+    sides: &mut impl Sides,
+    out: &mut [u32; 256],
+) {
+    let mut tally = Ranking {
+        counted: &mut counted[..VALUES],
+        exposure: &mut exposure[..VALUES],
+        score: &mut score[..VALUES],
+    };
+    // The values still to rank, in ascending order.
+    let mut left = [0u8; VALUES];
+    let mut len = 0;
+    for v in (0..=u8::MAX).take(values) {
+        if tally.counted[usize::from(v)] > 0 {
+            left[len] = v;
+            len += 1;
+            tally.score[usize::from(v)] = STALE;
+        }
+    }
+    // At least 1, so that a region of one value ranks it at level 0.
+    let top = len.saturating_sub(1).max(1);
+    for rank in 0..len {
+        let remaining = len - rank;
+        let mut at = 0;
+        let mut high = 0;
+        for (i, &v) in left[..remaining].iter().enumerate() {
+            let v = usize::from(v);
+            if tally.score[v] == STALE {
+                tally.score[v] = ratio(tally.exposure[v], tally.counted[v]);
+            }
+            if i == 0 || tally.score[v] > high {
+                at = i;
+                high = tally.score[v];
             }
         }
-        // At least 1, so that a region of one value ranks it at level 0.
-        let top = len.saturating_sub(1).max(1);
-        for rank in 0..len {
-            let remaining = len - rank;
-            let mut at = 0;
-            for i in 1..remaining {
-                if score[usize::from(left[i])] > score[usize::from(left[at])] {
-                    at = i;
-                }
-            }
-            let best = usize::from(left[at]);
-            left.copy_within(at + 1..remaining, at);
-            let level = (255 * rank / top) as u32;
-            out[best] = argb(level, level >> 1, level, level >> 1);
-            counted[best] = 0;
-            exposure[best] = 0;
-            score[best] = 0;
-            for &v in &left[..remaining - 1] {
-                let v = usize::from(v);
-                let sides = std::mem::take(&mut pairs[best * stride + v])
-                    + std::mem::take(&mut pairs[v * stride + best]);
-                if sides > 0 {
-                    exposure[v] += sides;
-                    score[v] = ratio(exposure[v], counted[v]);
-                }
-            }
-        }
+        let best = usize::from(left[at]);
+        left.copy_within(at + 1..remaining, at);
+        let level = (255 * rank / top) as u32;
+        out[best] = argb(level, level >> 1, level, level >> 1);
+        tally.counted[best] = 0;
+        tally.exposure[best] = 0;
+        tally.score[best] = 0;
+        sides.expose(best, &left[..remaining - 1], &mut tally);
     }
 }
 
@@ -628,10 +812,17 @@ mod tests {
         let mut census = Census::new(&budget);
         assert_eq!(census.bytes(), 0);
         let mut out = [0; 256];
-        // The census keeps its largest table, and leaves it clear.
-        for (max, held) in [(3, 4), (15, 16), (2, 16), (255, 256), (9, 256)] {
+        // Words held after each 2 × 2 region 0 max / 1 max: the tallies, then the
+        // pair table, or for 8-bit values lists for its four neighbouring pairs,
+        // 257 + 8 words, which are smaller. The census keeps its largest, and
+        // leaves it clear; it never holds more than the plan for the largest
+        // values so far.
+        let mut planned = 0;
+        for (max, words) in [(3, 16), (15, 256), (2, 256), (255, 265), (9, 265)] {
             automatic(&[0, max, 1, max], 2, &mut census, &mut out).unwrap();
-            assert_eq!(census.bytes(), Census::bytes_for(held), "{max}");
+            assert_eq!(census.bytes(), (768 + words) * 4, "{max}");
+            planned = planned.max(Census::bytes_for(usize::from(max) + 1));
+            assert!(census.bytes() <= planned);
             assert_eq!(
                 budget.used(),
                 Budget::control_storage_bytes() + census.bytes()
@@ -641,6 +832,46 @@ mod tests {
         assert_eq!(Census::bytes_for(4), (768 + 16) * 4);
         assert_eq!(Census::bytes_for(16), (768 + 256) * 4);
         assert_eq!(Census::bytes_for(256), (768 + 65536) * 4);
+        // A 16 × 16 region of all 256 values: lists for its 480 pairs.
+        let mut fresh = Census::new(&budget);
+        let all: Vec<u8> = (0..=255).collect();
+        automatic(&all, 16, &mut fresh, &mut out).unwrap();
+        assert_eq!(fresh.bytes(), (768 + 257 + 960) * 4);
+        // 8-bit noise with more unlike pairs than the table has words uses the
+        // table, as much as the plan allows.
+        let noise = noise(200, 200, 16, 240);
+        automatic(&noise.concat(), 200, &mut census, &mut out).unwrap();
+        assert_eq!(census.bytes(), Census::bytes_for(256));
+        assert!(census.table.iter().all(|&word| word == 0));
+    }
+
+    /// `width × height` pixels of `count` values from `base` up, from a fixed
+    /// sequence.
+    fn noise(width: usize, height: usize, count: u32, base: u8) -> Vec<Vec<u8>> {
+        let mut state = 12345u32;
+        (0..height)
+            .map(|_| {
+                (0..width)
+                    .map(|_| {
+                        state = state.wrapping_mul(1103515245).wrapping_add(12345);
+                        base + ((state >> 16) % count) as u8
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_pair_table_and_the_lists_rank_alike() {
+        // The same pattern in values 0 to 15 (the 16-value table) and 240 to 255
+        // (the lists when small, the 256-value table when not) ranks the same.
+        for (width, height) in [(16, 16), (5, 40), (64, 10), (200, 200)] {
+            let low = noise(width, height, 16, 0);
+            let high = noise(width, height, 16, 240);
+            let shifted: Vec<u8> = order(&low).iter().map(|v| v + 240).collect();
+            assert_eq!(order(&high), shifted, "{width} × {height}");
+            assert_eq!(palette(&low)[..16], palette(&high)[240..]);
+        }
     }
 
     #[test]
