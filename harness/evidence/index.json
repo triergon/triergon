@@ -19696,9 +19696,9 @@
   {
    "name": "subtitles-dvb-palettes-aebbe582",
    "path": "subtitles-dvb-palettes-aebbe582",
-   "retention": "90 days",
+   "retention": "retained",
    "reason": "DVB palettes: the default CLUTs, the CLUT entry conversion and the automatic palette at aebbe582 against main at 339ec261; the subtitle-dvb gate on Linux AArch64 and in the armv7-userland user space, the instruction counts of every case on both targets, the runtime and kernel-bound memory of the 10 new cases on a c8g.xlarge (at edd4e8c8 and aebbe582), both derivations' notes and probes, the scripts that ran them and a bundle of the branch.",
-   "key": "qualification/subtitles-dvb-palettes-aebbe582/d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3.tar.gz",
+   "key": "evidence/subtitles-dvb-palettes-aebbe582/d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3.tar.gz",
    "sha256": "d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3",
    "bytes": 186258324,
    "source_revisions": {
