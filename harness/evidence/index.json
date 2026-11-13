@@ -19825,6 +19825,44 @@
    "source_revisions": {
     "candidate": "da6545639aa4cb878ca62bfb384ea3aeff7f8309"
    }
+  },
+  {
+   "name": "subtitles-mov-text-tags-30fe564a",
+   "path": "subtitles-mov-text-tags-30fe564a",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at 30fe564a, natively on Linux AArch64 and in the ARMv7 user space; the subtitle-text and subtitle-text-host gates against 339ec261's on both targets, the crate and worker tests, a fuzz campaign of subtitle-text; instruction counts of every subtitle-text and subtitle-text-host case against 339ec261 on both targets, with the 13 mov-text-tags sessions split per sample on AArch64; the probes the tag rules were derived from with the reference's output, the clean-room brief, rules and notes, the scripts that ran them and a bundle of the measured commits.",
+   "key": "evidence/subtitles-mov-text-tags-30fe564a/1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc.tar.gz",
+   "sha256": "1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc",
+   "bytes": 31099225,
+   "source_revisions": {
+    "candidate": "30fe564a562f0ed73de7c076fe7f4eb0b12f21d6",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-mov-text-tags-96f660ba",
+   "path": "subtitles-mov-text-tags-96f660ba",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at 96f660ba, with a style's font table entries found by binary search; the 13 mov-text-tags cases timed and memory-measured on a c8g.xlarge pinned to CPU 1, with 30 timing pairs and 30 kernel-bound memory pairs, the RSS proof and the parity run, reported per run because cargo xtask grade does not join a slice of the feature; on Linux AArch64, the subtitle-text and subtitle-text-host gates, the crate and worker tests, the 137 probes, instruction counts of every subtitle-text and subtitle-text-host case against 339ec261 with the 13 sessions split per sample, reruns and diagnostic builds; in the ARMv7 user space, the two gates and instruction counts of every case against 339ec261; the scripts that ran them and a bundle of the measured commits.",
+   "key": "evidence/subtitles-mov-text-tags-96f660ba/03a2ee2f02daf3c5371c5c44e183c45b4bc655c30714bc12594fc58c72a56311.tar.gz",
+   "sha256": "03a2ee2f02daf3c5371c5c44e183c45b4bc655c30714bc12594fc58c72a56311",
+   "bytes": 77641015,
+   "source_revisions": {
+    "candidate": "96f660ba99fa33fbc1a2019cda9e73bec6de287d",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-mov-text-tags-dd395b41-armv7",
+   "path": "subtitles-mov-text-tags-dd395b41-armv7",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at dd395b41 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: the subtitle-text slice of the 13 mov-text-tags cases with parity, 30 timing pairs and 30 kernel-bound memory pairs, the kernel RSS proof made in that checkout, and the CPU, kernel and user-space package list",
+   "key": "evidence/subtitles-mov-text-tags-dd395b41-armv7/f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713.tar.gz",
+   "sha256": "f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713",
+   "bytes": 82035334,
+   "source_revisions": {
+    "candidate": "dd395b41add1b51859be0104ad865de111d7b401"
+   }
   }
  ]
 }
