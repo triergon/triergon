@@ -783,20 +783,29 @@ pub(crate) fn create_output(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("{}: {error}; use a new output directory", path.display()))
 }
 
-fn case_output(output: &Path, id: &str) -> Result<PathBuf, String> {
-    let relative = Path::new(id);
-    if relative.as_os_str().is_empty()
-        || relative
-            .components()
-            .any(|part| !matches!(part, std::path::Component::Normal(_)))
-    {
-        return Err(format!(
-            "case id {id:?} does not name a relative output directory"
-        ));
+fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
+    let mut directories = Vec::with_capacity(cases.len());
+    for case in cases {
+        let id = s(case, "id").unwrap_or_default();
+        let relative = Path::new(id);
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err(format!(
+                "case id {id:?} does not name a relative output directory"
+            ));
+        }
+        directories.push(relative);
     }
-    let path = output.join(relative);
-    create_output(&path)?;
-    Ok(path)
+    // A case may name another case's parent directory. Reserve the parent
+    // first without changing the order of the report rows.
+    directories.sort_unstable();
+    for relative in directories {
+        create_output(&output.join(relative))?;
+    }
+    Ok(())
 }
 
 /// Run the report; returns 0 for matching parity, 1 for a failed case and 2
@@ -930,12 +939,13 @@ pub(crate) fn collect(
         .canonicalize()
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
     let reviewed = reviewed_inputs(root)?;
-    let mut rows: Vec<Value> = Vec::new();
-    for case in manifest
+    let cases = manifest
         .get("cases")
         .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
+        .unwrap_or_default();
+    reserve_case_outputs(&options.output, cases)?;
+    let mut rows: Vec<Value> = Vec::new();
+    for case in cases {
         let id = s(case, "id").unwrap_or_default().to_owned();
         let mut timed: Option<(PathBuf, PathBuf, Operation)> = None;
         let mut row = vec![
@@ -995,7 +1005,7 @@ pub(crate) fn collect(
                 candidate: &candidate,
                 reference: &reference,
                 input: &path,
-                raw: case_output(&options.output, &id)?,
+                raw: options.output.join(&id),
                 timeout,
             };
             timed = Some((
@@ -1041,7 +1051,7 @@ pub(crate) fn collect(
                 candidate: &candidate,
                 reference: &reference,
                 input: &path,
-                raw: case_output(&options.output, &id)?,
+                raw: options.output.join(&id),
                 timeout,
             };
             let comparison = rule.map(|rule| Comparison {
@@ -1945,9 +1955,21 @@ mod tests {
         create_output(&nested).unwrap();
         let trace = nested.join("progressive-fold.json");
         fs::write(&trace, b"existing trace\n").unwrap();
-        assert!(case_output(&output.0, "nested/case").is_err());
-        assert!(case_output(&output.0, "../outside").is_err());
+        for id in ["nested/case", "../outside"] {
+            let case = Value::object([("id", Value::str(id))]);
+            assert!(reserve_case_outputs(&output.0, &[case]).is_err());
+        }
         assert_eq!(fs::read(&trace).unwrap(), b"existing trace\n");
+    }
+
+    #[test]
+    fn case_outputs_reserve_nested_cases_in_either_order() {
+        for ids in [["nested/child", "nested"], ["nested", "nested/child"]] {
+            let output = Output::new();
+            let cases = ids.map(|id| Value::object([("id", Value::str(id))]));
+            reserve_case_outputs(&output.0, &cases).unwrap();
+            assert!(output.0.join("nested/child").is_dir());
+        }
     }
 
     #[test]

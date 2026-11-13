@@ -646,27 +646,46 @@ pub struct TimedWorkers {
     directory: PathBuf,
     pub candidate: PathBuf,
     pub reference: PathBuf,
+    reserved_slots: usize,
 }
 
 impl TimedWorkers {
     pub fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
         let pair = worker::WorkerPair::read(candidate, reference)?;
         let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
+        let mut timed = Self::reserve(directory)?;
+        timed.reserve_slots()?;
+        pair.write(&timed.directory)?;
+        Ok(timed)
+    }
+
+    fn reserve(directory: PathBuf) -> Result<Self, String> {
         fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
         let [candidate, reference] = worker::WorkerPair::paths(&directory);
-        let timed = TimedWorkers {
+        Ok(Self {
             directory,
             candidate,
             reference,
-        };
-        pair.write(&timed.directory)?;
-        Ok(timed)
+            reserved_slots: 0,
+        })
+    }
+
+    fn reserve_slots(&mut self) -> Result<(), String> {
+        for worker in [&self.candidate, &self.reference] {
+            let slot = worker.parent().ok_or("worker path has no parent")?;
+            fs::create_dir(slot).map_err(|error| format!("{}: {error}", slot.display()))?;
+            self.reserved_slots += 1;
+        }
+        Ok(())
     }
 }
 
 impl Drop for TimedWorkers {
     fn drop(&mut self) {
-        for worker in [&self.candidate, &self.reference] {
+        for worker in [&self.candidate, &self.reference]
+            .into_iter()
+            .take(self.reserved_slots)
+        {
             let _ = fs::remove_file(worker);
             if let Some(parent) = worker.parent() {
                 let _ = fs::remove_dir(parent);
@@ -1478,6 +1497,20 @@ mod tests {
         assert_eq!(fs::read(&grade).unwrap(), b"saved grade");
         drop(timed);
         assert_eq!(fs::read(&grade).unwrap(), b"saved grade");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn timed_workers_keep_another_commands_empty_reservation() {
+        let dir = crate::walk::scratch("timed-workers-reserved-slot");
+        let mut timed = TimedWorkers::reserve(dir.join("staging")).unwrap();
+        let grade = timed.directory.join("b");
+        fs::create_dir(&grade).unwrap();
+        assert!(timed.reserve_slots().is_err());
+        assert!(timed.directory.join("a").is_dir());
+        drop(timed);
+        assert!(grade.is_dir());
+        assert!(!dir.join("staging/a").exists());
         fs::remove_dir_all(dir).unwrap();
     }
 
