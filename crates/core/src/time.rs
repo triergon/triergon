@@ -22,6 +22,12 @@ pub struct TimeBase {
 }
 
 impl TimeBase {
+    /// A clock tick lasting one microsecond.
+    pub const MICROSECONDS: Self = Self {
+        numerator: NonZeroU64::MIN,
+        denominator: NonZeroU64::new(1_000_000).unwrap(),
+    };
+
     /// One nanosecond, the Matroska packet clock after TimestampScale.
     pub const NANOSECONDS: Self = Self {
         numerator: NonZeroU64::MIN,

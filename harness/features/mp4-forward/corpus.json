@@ -586,6 +586,111 @@
         "bytes": 108,
         "digest": 11753693190476751358
       }
+    },
+    {
+      "id": "progressive-aac-priming",
+      "profile": "progressive-aac-priming",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-priming.mp4",
+      "sha256": "d86cda57d99064bd1d4799c02fc9b56248486ee81034532da990004f86725dff",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 11510716438675512981
+      }
+    },
+    {
+      "id": "progressive-aac-tail-trim",
+      "profile": "progressive-aac-tail-trim",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-tail-trim.mp4",
+      "sha256": "05d659762cc522255142aadc28cf55f04caf6946a43dbd60854b6f1c5106c841",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 5046906936606270070
+      }
+    },
+    {
+      "id": "progressive-aac-fractional-edit",
+      "profile": "progressive-aac-fractional-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-aac-fractional-edit.mp4",
+      "sha256": "0d38fe25d769d15aaac29bcc161f531e06c0acaec6e1a5a859ba5f7b373169ba",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 3034,
+        "digest": 635478357930127229
+      }
+    },
+    {
+      "id": "progressive-fragment-aac-edit",
+      "profile": "progressive-fragment-aac-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-edit.mp4",
+      "sha256": "d8990d764a54e21ff908bd2b7074b993b8e785e750907f270940034ed23f4c37",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 7922816248949067195
+      }
+    },
+    {
+      "id": "progressive-fragment-aac-late-track",
+      "profile": "progressive-fragment-aac-late-track",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-late-track.mp4",
+      "sha256": "d898a74c2ddc7edf2c0d4a435e9b2808e14b611339028131d324cc518a27af4e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 8711731649149925243
+      }
+    },
+    {
+      "id": "progressive-fragment-aac-short",
+      "profile": "progressive-fragment-aac-short",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-aac-short.mp4",
+      "sha256": "866c763bd24f2f7fb442c152757777cd7456ce422937d19b7ee21eef0aed8d2f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited-recovery"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1654,
+        "digest": 18277983258607515915
+      }
+    },
+    {
+      "id": "progressive-fragment-mp3-edit",
+      "profile": "progressive-fragment-mp3-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-fragment-mp3-edit.mp4",
+      "sha256": "44410be7427716494f36e126ba826b40d3763aa5c65ee932563ec33b385f5f06",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 13,
+        "bytes": 2716,
+        "digest": 1403301861570612487
+      }
     }
   ]
 }
