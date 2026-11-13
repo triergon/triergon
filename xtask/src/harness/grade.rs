@@ -4,7 +4,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use super::acceptance::acceptance_iter;
@@ -119,9 +118,10 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
 
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let value =
-        json::parse(std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+    let value = json::parse_observations(
+        std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?,
+    )
+    .map_err(|e| format!("{}: {e}", path.display()))?;
     members(&value).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok((value, sha256::hex(&bytes)))
 }
@@ -769,6 +769,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         return Ok(0);
     }
     let options = Options::parse(root, args)?;
+    super::report::create_output(&options.output)?;
     let (timed, timing_sha) = document(&options.timing)?;
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
@@ -896,25 +897,16 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     ] {
         put(&mut report, key, value)?;
     }
-    // Refuse replacement so an earlier failed grade and its inputs stay intact.
-    fs::create_dir_all(&options.output)
-        .map_err(|e| format!("{}: {e}", options.output.display()))?;
     let destination = options.output.join("report.json");
     match kind {
-        Shape::Corpus => super::report::write_case_report(
+        Shape::Corpus => super::report::write_observed_case_report(
             &options.output,
             &report,
             expected.iter().map(combine),
         )?,
         Shape::External => {
             put(&mut report, "case", combine(&expected[0])?)?;
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&destination)
-                .map_err(|e| format!("{}: {e}", destination.display()))?;
-            file.write_all(json::to_python(&report, Some(2)).as_bytes())
-                .map_err(|e| format!("{}: {e}", destination.display()))?;
+            super::report::publish_json(&destination, &json::to_python(&report, Some(2)))?;
         }
     }
     let mut code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
@@ -935,6 +927,24 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
+
+    #[test]
+    fn grading_cannot_reuse_a_collection_directory() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let args = [
+            "unused-timing.json",
+            "unused-memory.json",
+            "--contract",
+            "unused-contract.json",
+            "--manifest",
+            "unused-manifest.json",
+            "--output",
+            "harness/features/progressive-ts188",
+        ]
+        .map(str::to_owned);
+        let error = main(root, &args).unwrap_err();
+        assert!(error.contains("use a new output directory"));
+    }
 
     #[test]
     fn ordinary_contracts_do_not_require_functional_control_reports() {
@@ -2270,6 +2280,20 @@ mod tests {
             ("cases", Value::Array(vec![fixture.timed])),
         ]);
         assert!(binding.headers(&header, &header).is_ok());
+        let coverage = |observation| Value::Array(vec![object(&[("observation", observation)])]);
+        let mut timed = header.clone();
+        let mut memory = header.clone();
+        put(
+            &mut timed,
+            "fate_coverage",
+            coverage(json::parse_observations("1.0e-9223372036854775808").unwrap()),
+        )
+        .unwrap();
+        put(&mut memory, "fate_coverage", coverage(Value::float(1.0))).unwrap();
+        assert!(matches!(
+            binding.headers(&timed, &memory),
+            Err(error) if error == "fate_coverage mismatch"
+        ));
         for (key, value) in [
             ("collection_status", Value::str("partial")),
             ("contract_sha256", Value::str(digest('c'))),

@@ -19923,6 +19923,26 @@
    }
   },
   {
+   "name": "progressive-report-stream-855bfea3-aarch64",
+   "path": "progressive-report-stream-855bfea3-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with identical grades from compact and self-contained reports",
+   "key": "evidence/progressive-report-stream-855bfea3-aarch64/d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a.tar.gz",
+   "sha256": "d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a",
+   "bytes": 34538077,
+   "source_revision": "855bfea306ee7c2f7a933505cb18cde287f91a7c"
+  },
+  {
+   "name": "progressive-report-stream-ec6afe86-aarch64",
+   "path": "progressive-report-stream-ec6afe86-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with matching compact and self-contained grades and preserved case outputs",
+   "key": "evidence/progressive-report-stream-ec6afe86-aarch64/f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f.tar.gz",
+   "sha256": "f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f",
+   "bytes": 34423896,
+   "source_revision": "ec6afe8635509d7e9007fd3d3c20ce2bf1c25835"
+  },
+  {
    "name": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
    "path": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
    "retention": "retained",

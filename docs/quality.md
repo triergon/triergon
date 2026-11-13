@@ -442,6 +442,14 @@ CPUs. CPU records are required in both reports. The memory build identity may ad
 a kernel RSS proof pin; every other identity field must match. Both input reports
 and their raw samples are hash-linked from the graded report.
 
+`cargo xtask report` writes each case's raw measurements once and records their
+SHA-256 in `partial.json`. After validating the complete collection it publishes
+the compact `collection.json`, then streams the self-contained `report.json`.
+Pass `collection.json` and keep its `measurements/` directory alongside it to grade
+large collections with one case's samples in memory at a time. Use a new `--output`
+directory for each invocation of `report`, `progressive` or `grade` so earlier
+measurements, traces and grades remain available.
+
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.
 `--require-slice-acceptance` requires the feature gates; `--require-acceptance` also

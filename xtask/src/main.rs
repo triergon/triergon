@@ -1032,6 +1032,14 @@ fn check_features(root: &Path) -> Task {
             (generator.write_inputs)(root)?;
         }
     }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let output = root
+        .join(".research/feature-reports")
+        .join(format!("check-{}-{stamp}", std::process::id()));
+    harness::report::create_output(&output)?;
     let reports = contracts
         .iter()
         .map(|contract| {
@@ -1039,25 +1047,43 @@ fn check_features(root: &Path) -> Task {
             let (document, _) = harness::manifest::read(root, &manifest)?;
             harness::manifest::validate_required(&contract.document, &document)
                 .map_err(|error| format!("{}: {error}", contract.id))?;
-            let directory = generators::for_contract(&contract.document)
-                .map_or(".research/feature-reports", |generator| {
-                    generator.report_directory
-                });
             Ok(vec![
                 "--contract".to_owned(),
                 contract.path.display().to_string(),
                 "--manifest".to_owned(),
                 manifest.display().to_string(),
                 "--output".to_owned(),
-                root.join(directory)
-                    .join(&contract.id)
-                    .display()
-                    .to_string(),
+                output.join(&contract.id).display().to_string(),
             ])
         })
         .collect::<Result<Vec<_>, String>>()?;
     if run_reports(root, &reports) != ExitCode::SUCCESS {
-        return Err("required feature comparison failed".into());
+        return Err(format!(
+            "required feature comparison failed; reports in {}",
+            output.display()
+        ));
+    }
+    let passed = contracts.iter().all(|contract| {
+        checks::read_json(&output.join(&contract.id).join("report.json"))
+            .ok()
+            .and_then(|report| {
+                report
+                    .get("cases")
+                    .and_then(json::Value::as_array)
+                    .map(|cases| {
+                        !cases.is_empty() && cases.iter().all(harness::acceptance::parity_passes)
+                    })
+            })
+            == Some(true)
+    });
+    if passed {
+        std::fs::remove_dir_all(&output)
+            .map_err(|error| format!("{}: {error}", output.display()))?;
+    } else {
+        println!(
+            "Feature reports with unresolved parity in {}",
+            output.display()
+        );
     }
     for generator in generators::GENERATORS {
         smoke_campaigns(root, generator.smoke.iter().copied())?;
