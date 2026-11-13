@@ -19998,6 +19998,24 @@
    "key": "evidence/packet-framing-resident-state-9d3d1f58-aarch64/bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b.tar.zst",
    "sha256": "bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b",
    "bytes": 696141192
+  },
+  {
+   "name": "packet-framing-validated-lengths-fe155a8c-aarch64",
+   "path": "packet-framing-validated-lengths-fe155a8c-aarch64",
+   "retention": "retained",
+   "reason": "Records the full AArch64 packet framing comparison and mapping measurements after reusing validated NAL lengths and array checks.",
+   "key": "evidence/packet-framing-validated-lengths-fe155a8c-aarch64/63b1acf21312e56d2d5b128f1fce3084181fe7814ff1f43f598d531077ad1a79.tar.zst",
+   "sha256": "63b1acf21312e56d2d5b128f1fce3084181fe7814ff1f43f598d531077ad1a79",
+   "bytes": 41983089
+  },
+  {
+   "name": "packet-framing-clock-faults-9d3d1f58-aarch64",
+   "path": "packet-framing-clock-faults-9d3d1f58-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 clock page-fault measurements on three packet framing cases.",
+   "key": "evidence/packet-framing-clock-faults-9d3d1f58-aarch64/3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f.tar.zst",
+   "sha256": "3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f",
+   "bytes": 2758327
   }
  ]
 }
