@@ -93,7 +93,9 @@ impl Configuration {
             writer: Writer::new(pool),
         })
     }
-    pub(super) fn font_name(&self, index: usize) -> Result<&[u8]> {
+    /// The name of font table entry `index` up to its first NUL, and whether
+    /// those bytes are all ASCII.
+    pub(super) fn font_name(&self, index: usize) -> Result<(&[u8], bool)> {
         let font = self
             .fonts
             .as_slice()
@@ -107,7 +109,7 @@ impl Configuration {
             .as_ref()
             .get(font.name.clone())
             .ok_or(Error::Truncated)?;
-        Ok(&name[..name.iter().position(|&v| v == 0).unwrap_or(name.len())])
+        Ok(until_nul(name))
     }
     fn fallback(&mut self) {
         self.fallback = true;
@@ -293,4 +295,28 @@ impl Configuration {
                -i32::from(style.face&1!=0),-i32::from(style.face&2!=0),-i32::from(style.face&4!=0),align).map_err(|_|Error::Overflow)?;
         Ok(h)
     }
+}
+/// The bytes before the first NUL and whether they are all ASCII, eight bytes
+/// a step until a word holds a NUL or a byte above 0x7f.
+fn until_nul(bytes: &[u8]) -> (&[u8], bool) {
+    const ONES: u64 = 0x0101_0101_0101_0101;
+    const HIGH: u64 = 0x8080_8080_8080_8080;
+    let (words, _) = bytes.as_chunks::<8>();
+    // A byte of 0 borrows into its high bit; one above 0x7f has it set.
+    let plain = words
+        .iter()
+        .take_while(|word| {
+            let x = u64::from_ne_bytes(**word);
+            (x.wrapping_sub(ONES) | x) & HIGH == 0
+        })
+        .count();
+    let at = plain * 8;
+    let mut ascii = true;
+    for (i, &b) in bytes[at..].iter().enumerate() {
+        if b == 0 {
+            return (&bytes[..at + i], ascii);
+        }
+        ascii &= b.is_ascii();
+    }
+    (bytes, ascii)
 }

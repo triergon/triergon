@@ -513,6 +513,7 @@ impl PacketJob {
         caller: &mut WorkBudget,
     ) -> Result<bool> {
         let default = config.style;
+        let mut tags = Fixed::<64>::new();
         loop {
             let starting = self.at_start();
             let ends = self
@@ -520,11 +521,12 @@ impl PacketJob {
                 .as_slice()
                 .get(self.selected)
                 .is_some_and(|span| usize::from(span.end) == self.character);
-            let mut tags = Fixed::<64>::new();
+            tags.clear();
             // While the font stage has entries to examine: whether this one
             // has the starting style's font ID.
             let mut font = None;
             let mut name = None;
+            let mut ascii = true;
             let mut width = 0;
             match self.stage {
                 Stage::Reset => {
@@ -557,7 +559,9 @@ impl PacketJob {
                             Some(font.id == style.font)
                         });
                     if font == Some(true) {
-                        name = Some(config.font_name(self.font_at)?);
+                        let found;
+                        (found, ascii) = config.font_name(self.font_at)?;
+                        name = Some(found);
                     }
                 }
                 Stage::Colour => {
@@ -606,7 +610,7 @@ impl PacketJob {
             if !funding.pay(1 + size, caller)? {
                 return Ok(false);
             }
-            if name.is_some_and(|name| !is_valid_text(name)) {
+            if name.is_some_and(|name| !ascii && !is_valid_text(name)) {
                 funding.commit();
                 self.refuse(true);
                 return Ok(true);
