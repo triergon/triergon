@@ -8,8 +8,11 @@
 //! ancillary page, subtitling type. The operation runs [`ReceiverDecoder`] over
 //! every packet and reports each subtitle it outputs.
 //!
-//! Decoder options: `compute_edt` (0, 1), `compute_clut` (-2, -1, 0, 1) and
-//! `dvb_substream` (-1 or a service index).
+//! Decoder options: `compute_edt` (0, 1), `compute_clut` and `dvb_substream`
+//! (-1 or a service index). `compute_clut` selects the automatic palette: 1
+//! for every region, 0 never, -1 for regions without a defined CLUT, and -2
+//! as -1 but computed once, when a region is first presented, and kept while
+//! the region lasts (until an acquisition point or mode change).
 
 use crate::container::{self, Result, Track};
 use crate::sink::{Bitmap, EventHead, RectHead, RectKind, Sink};
@@ -59,7 +62,8 @@ fn options(args: &Args) -> Result<Options> {
         Some(value) => return Err(refuse("compute_edt", value).into()),
     };
     let automatic_palette = match args.option("compute_clut") {
-        None | Some("-1" | "-2") => AutomaticPalette::WithoutClut,
+        None | Some("-1") => AutomaticPalette::WithoutClut,
+        Some("-2") => AutomaticPalette::WithoutClutOnce,
         Some("0") => AutomaticPalette::Never,
         Some("1") => AutomaticPalette::Always,
         Some(value) => return Err(refuse("compute_clut", value).into()),
