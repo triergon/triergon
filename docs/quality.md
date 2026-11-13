@@ -443,11 +443,12 @@ a kernel RSS proof pin; every other identity field must match. Both input report
 and their raw samples are hash-linked from the graded report.
 
 `cargo xtask report` writes each case's raw measurements once and records their
-SHA-256 in `partial.json`. After all cases finish it writes both the self-contained
-`report.json` and a compact `collection.json`. Pass `collection.json` and keep its
-`measurements/` directory alongside it to grade large collections with one case's
-samples in memory at a time. Give each measurement run a fresh `--output` directory
-to keep earlier results and checkpoints available.
+SHA-256 in `partial.json`. After validating the complete collection it publishes
+the compact `collection.json`, then streams the self-contained `report.json`.
+Pass `collection.json` and keep its `measurements/` directory alongside it to grade
+large collections with one case's samples in memory at a time. Use a new `--output`
+directory for each invocation of `report` or `progressive` so earlier measurements
+and traces remain available.
 
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.

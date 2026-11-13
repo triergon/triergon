@@ -170,44 +170,40 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         return Ok(0);
     }
     let options = options(root, args)?;
-    let result: Result<i32, String> = (|| {
-        validate(root, &options)?;
-        let code = collect(root, &options, report::run, |root, selected| {
-            let code = check_controls(root, selected)?;
-            bind_controls(root, selected)?;
-            Ok(code)
-        })?;
-        bind_controls(root, &options)?;
-        Ok(code)
-    })();
-    if let Err(error) = &result {
-        invalidate_controls(&options, error)?;
+    validate(root, &options)?;
+    report::create_output(&options.output)?;
+    if options.benchmark || options.memory {
+        report::create_output(&options.output.join("parity"))?;
     }
-    result
+    collect(root, &options, report::collect, check_controls)
 }
 
 fn collect(
     root: &Path,
     selected: &Options,
-    mut run: impl FnMut(&Path, &Options) -> Result<i32, String>,
-    mut controls: impl FnMut(&Path, &Options) -> Result<i32, String>,
+    mut run: impl FnMut(&Path, &Options, Option<&Value>) -> Result<i32, String>,
+    mut controls: impl FnMut(&Path, &Options) -> Result<Option<Value>, String>,
 ) -> Result<i32, String> {
-    let measuring = selected.benchmark || selected.memory;
+    let proof = controls(root, selected);
     let mut parity = options(root, &[])?;
+    let measuring = selected.benchmark || selected.memory;
     parity.output = if measuring {
         selected.output.join("parity")
     } else {
         selected.output.clone()
     };
-    let parity_code = run(root, &parity)?;
-    let control_code = controls(root, selected)?;
-    if parity_code != 0 || control_code != 0 {
-        return Ok(1);
+    if !measuring {
+        parity.require_acceptance = selected.require_acceptance;
+        parity.require_slice_acceptance = selected.require_slice_acceptance;
     }
-    if measuring || selected.require_acceptance || selected.require_slice_acceptance {
-        run(root, selected)
+    let parity_code = run(root, &parity, proof.as_ref().ok().and_then(Option::as_ref))?;
+    let Some(proof) = proof? else {
+        return Ok(1);
+    };
+    if measuring && parity_code == 0 {
+        run(root, selected, Some(&proof))
     } else {
-        Ok(0)
+        Ok(parity_code)
     }
 }
 
@@ -549,7 +545,7 @@ fn trace_outcome(
     Ok(Value::object(fields))
 }
 
-fn check_controls(root: &Path, selected: &Options) -> Result<i32, String> {
+fn check_controls(root: &Path, selected: &Options) -> Result<Option<Value>, String> {
     let before = context(root, selected)?;
     let output = selected.output.join("controls");
     fs::create_dir_all(&output).map_err(|e| e.to_string())?;
@@ -612,129 +608,23 @@ fn check_controls(root: &Path, selected: &Options) -> Result<i32, String> {
         ),
         ("passed", Value::Bool(passed)),
     ]);
-    write_json(&output.join("report.json"), &report)?;
-    Ok(i32::from(!passed))
-}
-
-fn report_paths(selected: &Options) -> [PathBuf; 3] {
-    [
-        selected.output.join("report.json"),
-        selected.output.join("collection.json"),
-        selected.output.join("parity/report.json"),
-    ]
-}
-
-fn bind_controls(root: &Path, selected: &Options) -> Result<(), String> {
-    let result = bind_verified_controls(root, selected);
-    if let Err(error) = &result {
-        invalidate_controls(selected, error)?;
+    let path = output.join("report.json");
+    write_json(&path, &report)?;
+    if !passed {
+        return Ok(None);
     }
-    result
-}
-
-fn bind_verified_controls(root: &Path, selected: &Options) -> Result<(), String> {
-    let controls_path = selected.output.join("controls/report.json");
-    let controls = read_json(&controls_path)?;
-    let contract = read_json(&selected.contract)?;
-    let manifest = read_json(&selected.manifest)?;
-    for path in report_paths(selected) {
-        if !path.is_file() {
-            continue;
-        }
-        let mut report = read_json(&path)?;
-        if let Value::Object(fields) = &mut report {
-            fields.retain(|(key, _)| key != "functional_controls");
-            fields.push((
-                "functional_controls".to_owned(),
-                Value::object([
-                    (
-                        "path",
-                        Value::str(
-                            controls_path
-                                .canonicalize()
-                                .map_err(|e| e.to_string())?
-                                .to_string_lossy(),
-                        ),
-                    ),
-                    ("sha256", Value::str(digest(&controls_path)?)),
-                    (
-                        "passed",
-                        controls
-                            .get("passed")
-                            .cloned()
-                            .unwrap_or(Value::Bool(false)),
-                    ),
-                ]),
-            ));
-        }
-        validate_report_controls(root, &path, &report, &contract, &manifest)?;
-        write_json(&path, &report)?;
-    }
-    Ok(())
-}
-
-fn set(value: &mut Value, key: &str, replacement: Value) -> Result<(), String> {
-    let Value::Object(fields) = value else {
-        return Err("expected an object".into());
-    };
-    fields.retain(|(name, _)| name != key);
-    fields.push((key.to_owned(), replacement));
-    Ok(())
-}
-
-fn invalidate_controls(selected: &Options, error: &str) -> Result<(), String> {
-    let mut errors = Vec::new();
-    for path in report_paths(selected) {
-        if !path.is_file() {
-            continue;
-        }
-        let update = || -> Result<(), String> {
-            let mut report = read_json(&path)?;
-            let mut verdict = report
-                .get("acceptance")
-                .cloned()
-                .unwrap_or(Value::Object(Vec::new()));
-            if !matches!(verdict, Value::Object(_)) {
-                verdict = Value::Object(Vec::new());
-            }
-            for key in ["accepted", "slice_accepted"] {
-                set(&mut verdict, key, Value::Bool(false))?;
-            }
-            for key in ["reasons", "slice_reasons"] {
-                let mut reasons = verdict
-                    .get(key)
-                    .and_then(Value::as_array)
-                    .unwrap_or_default()
-                    .to_vec();
-                let reason = Value::str(format!(
-                    "mandatory progressive functional controls: {error}"
-                ));
-                if !reasons.contains(&reason) {
-                    reasons.push(reason);
-                }
-                set(&mut verdict, key, Value::Array(reasons))?;
-            }
-            set(&mut report, "acceptance", verdict)?;
-            let mut controls = report
-                .get("functional_controls")
-                .cloned()
-                .unwrap_or(Value::Object(Vec::new()));
-            if !matches!(controls, Value::Object(_)) {
-                controls = Value::Object(Vec::new());
-            }
-            set(&mut controls, "passed", Value::Bool(false))?;
-            set(&mut report, "functional_controls", controls)?;
-            write_json(&path, &report)
-        };
-        if let Err(error) = update() {
-            errors.push(error);
-        }
-    }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors.join("; "))
-    }
+    Ok(Some(Value::object([
+        (
+            "path",
+            Value::str(
+                path.canonicalize()
+                    .map_err(|e| e.to_string())?
+                    .to_string_lossy(),
+            ),
+        ),
+        ("sha256", Value::str(digest(&path)?)),
+        ("passed", Value::Bool(true)),
+    ])))
 }
 
 #[cfg(test)]
@@ -760,6 +650,15 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+
+    fn set(value: &mut Value, key: &str, replacement: Value) -> Result<(), String> {
+        let Value::Object(fields) = value else {
+            return Err("expected an object".into());
+        };
+        fields.retain(|(name, _)| name != key);
+        fields.push((key.to_owned(), replacement));
+        Ok(())
     }
 
     fn change(value: &mut Value, path: &[&str], replacement: Value) {
@@ -1032,37 +931,9 @@ mod tests {
     }
 
     #[test]
-    fn missing_or_rehashed_proof_cannot_leave_an_accepted_report() {
+    fn missing_or_rehashed_proof_is_rejected() {
         let directory = Temporary::new();
-        let mut selected = options(root(), &[]).unwrap();
-        selected.output = directory.0.clone();
-        // Untrusted stale flags, with no metric evidence or positive gate.
-        let stale = Value::object([(
-            "acceptance",
-            Value::object([
-                ("accepted", Value::Bool(true)),
-                ("slice_accepted", Value::Bool(true)),
-            ]),
-        )]);
-        for path in report_paths(&selected) {
-            write_json(&path, &stale).unwrap();
-        }
-        assert!(bind_controls(root(), &selected).is_err());
-        for path in report_paths(&selected) {
-            let report = read_json(&path).unwrap();
-            assert_eq!(
-                report.get("acceptance").unwrap().get("accepted"),
-                Some(&Value::Bool(false))
-            );
-            assert_eq!(
-                report.get("acceptance").unwrap().get("slice_accepted"),
-                Some(&Value::Bool(false))
-            );
-            assert_eq!(
-                report.get("functional_controls").unwrap().get("passed"),
-                Some(&Value::Bool(false))
-            );
-        }
+        let selected = options(root(), &[]).unwrap();
         let path = directory.0.join("proof with spaces.json");
         fs::write(&path, b"{}\n").unwrap();
         let report = Value::object([(
@@ -1096,28 +967,28 @@ mod tests {
     }
 
     #[test]
-    fn early_entrypoint_failure_revokes_stale_acceptance() {
+    fn rerun_preserves_existing_reports_and_controls() {
         let directory = Temporary::new();
-        let mut selected = options(&directory.0, &[]).unwrap();
-        selected.output = directory.0.join("output");
-        let accepted = Value::object([(
-            "acceptance",
-            Value::object([("accepted", Value::Bool(true))]),
-        )]);
-        for name in ["report.json", "collection.json"] {
-            write_json(&selected.output.join(name), &accepted).unwrap();
+        let output = directory.0.join("output");
+        let saved = [
+            "report.json",
+            "collection.json",
+            "parity/report.json",
+            "controls/report.json",
+        ];
+        for name in saved {
+            let path = output.join(name);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path, name).unwrap();
         }
-        let args = args(&["--output", selected.output.to_str().unwrap()]);
-        assert!(main(&directory.0, &args).is_err());
-        for name in ["report.json", "collection.json"] {
-            assert_eq!(
-                read_json(&selected.output.join(name))
-                    .unwrap()
-                    .get("acceptance")
-                    .unwrap()
-                    .get("accepted"),
-                Some(&Value::Bool(false))
-            );
+        let args = args(&["--output", output.to_str().unwrap()]);
+        assert!(
+            main(root(), &args)
+                .unwrap_err()
+                .contains("use a new output directory")
+        );
+        for name in saved {
+            assert_eq!(fs::read_to_string(output.join(name)).unwrap(), name);
         }
     }
 
@@ -1181,7 +1052,8 @@ mod tests {
         let result = collect(
             root(),
             &selected,
-            |_, request| {
+            |_, request, proof| {
+                assert_eq!(proof.and_then(Value::as_str), Some("proof"));
                 calls.push((request.benchmark, request.memory));
                 assert_eq!(request.manifest, selected.manifest);
                 assert_eq!(request.output, selected.output.join("parity"));
@@ -1190,7 +1062,7 @@ mod tests {
             },
             |_, _| {
                 controls += 1;
-                Ok(0)
+                Ok(Some(Value::str("proof")))
             },
         );
         assert_eq!(result.unwrap(), 1);
@@ -1209,7 +1081,8 @@ mod tests {
         let result = collect(
             root(),
             &selected,
-            |_, request| {
+            |_, request, proof| {
+                assert_eq!(proof.and_then(Value::as_str), Some("proof"));
                 calls.push((request.benchmark, request.memory));
                 assert_eq!(request.manifest, selected.manifest);
                 assert_eq!(request.corpus, selected.corpus);
@@ -1219,7 +1092,7 @@ mod tests {
                 }
                 Ok(0)
             },
-            |_, _| Ok(0),
+            |_, _| Ok(Some(Value::str("proof"))),
         );
         assert_eq!(result.unwrap(), 0);
         assert_eq!(calls, [(false, false), (true, true)]);
@@ -1232,11 +1105,12 @@ mod tests {
         let code = collect(
             root(),
             &selected,
-            |_, request| {
+            |_, request, proof| {
+                assert!(proof.is_none());
                 calls.push((request.benchmark, request.memory));
                 Ok(0)
             },
-            |_, _| Ok(1),
+            |_, _| Ok(None),
         )
         .unwrap();
         assert_eq!(code, 1);
@@ -1251,13 +1125,14 @@ mod tests {
         let code = collect(
             root(),
             &selected,
-            |_, _| {
+            |_, _, proof| {
+                assert!(proof.is_none());
                 calls += 1;
                 Ok(0)
             },
             |_, _| {
                 controls += 1;
-                Ok(1)
+                Ok(None)
             },
         )
         .unwrap();
@@ -1271,7 +1146,8 @@ mod tests {
         let result = collect(
             root(),
             &selected,
-            |_, request| {
+            |_, request, proof| {
+                assert!(proof.is_none());
                 assert!(!request.benchmark && !request.memory);
                 calls += 1;
                 Ok(0)

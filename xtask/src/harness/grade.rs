@@ -119,9 +119,10 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
 
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let value =
-        json::parse(std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+    let value = json::parse_observations(
+        std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?,
+    )
+    .map_err(|e| format!("{}: {e}", path.display()))?;
     members(&value).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok((value, sha256::hex(&bytes)))
 }
@@ -901,7 +902,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         .map_err(|e| format!("{}: {e}", options.output.display()))?;
     let destination = options.output.join("report.json");
     match kind {
-        Shape::Corpus => super::report::write_case_report(
+        Shape::Corpus => super::report::write_observed_case_report(
             &options.output,
             &report,
             expected.iter().map(combine),

@@ -659,7 +659,7 @@ fn store_measurement(
 ) -> Result<Value, String> {
     let name = format!("measurements/{case:04}-{kind}.json");
     let path = output.join(&name);
-    let data = json::canonical(measurement) + "\n";
+    let data = json::observations(measurement) + "\n";
     OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -672,22 +672,48 @@ fn store_measurement(
     ]))
 }
 
-/// Stream canonical report JSON, retaining at most one case from the iterator.
-/// Publish a complete report without replacing an existing destination.
+/// Stream canonical report JSON for callers with a canonical output format.
 pub(crate) fn write_case_report(
     output: &Path,
     header: &Value,
     rows: impl Iterator<Item = Result<Value, String>>,
 ) -> Result<(), String> {
+    stream_report(output, header, rows, true)
+}
+
+/// Stream the cases in their recorded order, including each observer's run order.
+pub(crate) fn write_observed_case_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+) -> Result<(), String> {
+    stream_report(output, header, rows, false)
+}
+
+/// Retain at most one case and publish without replacing an existing report.
+fn stream_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+    canonical: bool,
+) -> Result<(), String> {
     let Value::Object(fields) = header else {
         return Err("report header must be an object".into());
     };
-    let mut fields: BTreeMap<_, _> = fields
+    let mut fields: Vec<_> = fields
         .iter()
+        .filter(|(key, _)| key != "cases")
         .map(|(key, value)| (key.as_str(), value))
         .collect();
-    let placeholder = Value::Null;
-    fields.insert("cases", &placeholder);
+    fields.push(("cases", &Value::Null));
+    let serialize = if canonical {
+        json::canonical
+    } else {
+        json::observations
+    };
+    if canonical {
+        fields.sort_unstable_by_key(|(key, _)| *key);
+    }
     let temporary = output.join("report.json.tmp");
     let destination = output.join("report.json");
     let file = OpenOptions::new()
@@ -699,19 +725,19 @@ pub(crate) fn write_case_report(
         let mut writer = BufWriter::new(file);
         let mut rows = rows;
         write!(writer, "{{")?;
-        for (index, (key, value)) in fields.iter().enumerate() {
+        for (index, (key, value)) in fields.into_iter().enumerate() {
             let separator = if index == 0 { "" } else { "," };
-            write!(writer, "{separator}{}:", json::canonical(&Value::str(*key)))?;
-            if *key == "cases" {
+            write!(writer, "{separator}{}:", json::canonical(&Value::str(key)))?;
+            if key == "cases" {
                 write!(writer, "[")?;
                 for (index, row) in rows.by_ref().enumerate() {
                     let row = row.map_err(std::io::Error::other)?;
                     let separator = if index == 0 { "" } else { "," };
-                    write!(writer, "{separator}{}", json::canonical(&row))?;
+                    write!(writer, "{separator}{}", serialize(&row))?;
                 }
                 write!(writer, "]")?;
             } else {
-                write!(writer, "{}", json::canonical(value))?;
+                write!(writer, "{}", serialize(value))?;
             }
         }
         writeln!(writer, "}}")?;
@@ -727,9 +753,31 @@ fn object(pairs: Vec<(&str, Value)>) -> Value {
     Value::Object(pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect())
 }
 
-/// Run the report; returns the process exit code (0 all cases pass, 1 a case
-/// failed, 2 a required acceptance was not reached).
+/// Reserve a new directory before emitting any report, traces or observations.
+pub(crate) fn create_output(path: &Path) -> Result<(), String> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::create_dir(path)
+        .map_err(|error| format!("{}: {error}; use a new output directory", path.display()))
+}
+
+/// Run the report; returns 0 for matching parity, 1 for a failed case and 2
+/// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
+    create_output(&options.output)?;
+    collect(root, options, None)
+}
+
+/// Collect inside the directory reserved by the report command.
+pub(crate) fn collect(
+    root: &Path,
+    options: &Options,
+    controls: Option<&Value>,
+) -> Result<i32, String> {
     if options.baseline_worker.is_some()
         && (options.require_acceptance || options.require_slice_acceptance)
     {
@@ -787,18 +835,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         }
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
-    fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
     let measures = options.benchmark || options.memory;
     if measures {
-        for name in ["partial.json", "report.json", "collection.json"] {
-            let path = options.output.join(name);
-            if path.exists() {
-                return Err(format!(
-                    "{} already exists; use a new --output directory",
-                    path.display()
-                ));
-            }
-        }
         let samples = options.output.join("measurements");
         fs::create_dir(&samples).map_err(|e| format!("{}: {e}", samples.display()))?;
     }
@@ -832,6 +870,26 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     ];
     if measures {
         base.push(("case_storage", Value::str("sha256-files")));
+    }
+    if let Some(proof) = controls {
+        base.push(("functional_controls", proof.clone()));
+    }
+    let validate_controls = |header: &Value| {
+        if contract.get("functional_controls").is_some() {
+            crate::progressive_bench::validate_report_controls(
+                root,
+                &options.output.join("report.json"),
+                header,
+                &contract,
+                &manifest,
+            )
+        } else {
+            Ok(())
+        }
+    };
+    let header = object(base.clone());
+    if measures || controls.is_some() {
+        validate_controls(&header)?;
     }
     let corpus = options
         .corpus
@@ -1072,6 +1130,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         ]);
         save_json(&options.output.join("partial.json"), &object(partial))?;
     }
+    let mut unavailable = None;
     let load_case = |row: &Value| {
         if measures {
             validation::expand_measurements(&options.output, row)
@@ -1082,13 +1141,19 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let mut verdict = acceptance_iter(
         root,
         &contract,
-        rows.iter().map(load_case),
+        rows.iter()
+            .map(|row| load_case(row).inspect_err(|error| unavailable = Some(error.clone()))),
         &identity,
         &target,
         &coverage,
         &additional,
     );
-    if let Some(error) = source_identity_error(root, &identity)
+    if let Some(error) = unavailable {
+        return Err(error);
+    }
+    let control_error = validate_controls(&header).err();
+    let controls_valid = controls.is_none() || control_error.is_none();
+    if let Some(error) = source_identity_error(root, &identity).or(control_error)
         && let Value::Object(fields) = &mut verdict
     {
         for (key, value) in fields.iter_mut() {
@@ -1106,11 +1171,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     ]);
     if measures {
         let mut header = object(report);
-        validation::put(&mut header, "case_storage", Value::str("inline"))?;
-        write_case_report(&options.output, &header, rows.iter().map(load_case))?;
         validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
         validation::put(&mut header, "cases", Value::Array(rows.clone()))?;
         save_json(&options.output.join("collection.json"), &header)?;
+        validation::put(&mut header, "case_storage", Value::str("inline"))?;
+        write_observed_case_report(&options.output, &header, rows.iter().map(load_case))?;
     } else {
         report.push(("cases", Value::Array(rows.clone())));
         save_json(&options.output.join("report.json"), &object(report))?;
@@ -1147,7 +1212,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    Ok(i32::from(!ratchet(&label, &rows, &open)))
+    let parity_matches = ratchet(&label, &rows, &open);
+    Ok(i32::from(!parity_matches || !controls_valid))
 }
 
 /// A contract's `open_cases` on `target`: case ids that fail today, each tied to
@@ -1635,8 +1701,10 @@ mod tests {
             r#"{"ratio":{"upper_95":1.01234567890123456789},"samples":[18446744073709551615]}"#,
         )
         .unwrap();
-        let memory =
-            json::parse_strict(r#"{"status":"qualified","samples":[9007199254740993]}"#).unwrap();
+        let memory = json::parse_observations(
+            r#"{"status":"invalid-memory-work","samples":[{"reference_rss":9007199254740993,"candidate_heap":NaN}]}"#,
+        )
+        .unwrap();
         let row = Value::object([
             ("id", Value::str("sample")),
             (
@@ -1663,9 +1731,21 @@ mod tests {
             json::canonical(expanded.get("timing").unwrap()),
             json::canonical(&timing)
         );
-        assert_eq!(
-            json::canonical(expanded.get("memory").unwrap()),
-            json::canonical(&memory)
+        let memory = json::observations(&memory);
+        assert_eq!(json::observations(expanded.get("memory").unwrap()), memory);
+        let inline = output.0.join("inline");
+        create_output(&inline).unwrap();
+        stream_report(
+            &inline,
+            &Value::Object(Vec::new()),
+            [Ok(expanded)].into_iter(),
+            false,
+        )
+        .unwrap();
+        assert!(
+            fs::read_to_string(inline.join("report.json"))
+                .unwrap()
+                .contains(&memory)
         );
         assert!(store_measurement(&output.0, 0, "memory", &timing).is_err());
         fs::write(output.0.join("measurements/0000-memory.json"), b"{}\n").unwrap();
@@ -1700,6 +1780,7 @@ mod tests {
         .unwrap();
         let expected = Value::object([
             ("z", header.get("z").unwrap().clone()),
+            ("a", Value::str("complete")),
             (
                 "cases",
                 Value::Array(
@@ -1708,7 +1789,6 @@ mod tests {
                         .collect(),
                 ),
             ),
-            ("a", Value::str("complete")),
         ]);
         let text = fs::read_to_string(output.0.join("report.json")).unwrap();
         assert_eq!(text, format!("{}\n", json::canonical(&expected)));
@@ -1735,6 +1815,25 @@ mod tests {
         assert!(error.contains("raw case unavailable"));
         assert!(!output.0.join("report.json").exists());
         assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn parity_only_cannot_overwrite_a_measured_report() {
+        let parent = Output::new();
+        let output = parent.0.join("run");
+        create_output(&output).unwrap();
+        let path = output.join("partial.json");
+        fs::write(&path, "measurement checkpoint").unwrap();
+        let options = Options {
+            output,
+            ..Options::defaults(&parent.0)
+        };
+        assert!(
+            run(&parent.0, &options)
+                .unwrap_err()
+                .contains("use a new output directory")
+        );
+        assert_eq!(fs::read_to_string(path).unwrap(), "measurement checkpoint");
     }
 
     #[test]
