@@ -19692,6 +19692,19 @@
    "key": "evidence/mp4-range-fate-prefix-e35e3584-aarch64/35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063.tar.zst",
    "sha256": "35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063",
    "bytes": 50059794
+  },
+  {
+   "name": "subtitles-small-spots-c79ae2da",
+   "path": "subtitles-small-spots-c79ae2da",
+   "retention": "retained",
+   "reason": "Subtitle, framing and transport pieces written anew from their specifications and observation: parity and instruction counts against main on Linux AArch64 and ARMv7, runtime and memory of the 8 crafted cases on Linux AArch64, and the probes they were derived from",
+   "key": "evidence/subtitles-small-spots-c79ae2da/a5afebfe3a1c86829b0768823e7aa6518d008fd450104a72ca95b812113019a9.tar.zst",
+   "sha256": "a5afebfe3a1c86829b0768823e7aa6518d008fd450104a72ca95b812113019a9",
+   "bytes": 27668526,
+   "source_revisions": {
+    "candidate": "c79ae2da8b8a0d004d37936100eedd7b46e0a589",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }
