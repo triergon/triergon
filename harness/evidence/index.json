@@ -19894,9 +19894,9 @@
    "path": "progressive-report-stream-855bfea3-aarch64",
    "retention": "retained",
    "reason": "Progressive playback with identical grades from compact and self-contained reports",
-   "key": "evidence/progressive-report-stream-855bfea3-aarch64/23a105fa6608a9b83936824a82f47e94630ca0f64f54e32ff5a4bc566ebd33f9.tar.zst",
-   "sha256": "23a105fa6608a9b83936824a82f47e94630ca0f64f54e32ff5a4bc566ebd33f9",
-   "bytes": 33776295,
+   "key": "evidence/progressive-report-stream-855bfea3-aarch64/d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a.tar.gz",
+   "sha256": "d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a",
+   "bytes": 34538077,
    "source_revision": "855bfea306ee7c2f7a933505cb18cde287f91a7c"
   }
  ]
