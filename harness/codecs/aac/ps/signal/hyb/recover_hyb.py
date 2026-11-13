@@ -1,6 +1,6 @@
 """recover_hyb.py OUTDIR: reruns the whole `hyb` recovery against the pinned reference and
-writes OUTDIR/hyb.json. Deterministic (fixed seeds). Run through prun.sh:
-    probes/prun.sh hyb/recover_hyb.py
+writes OUTDIR/hyb.json. Deterministic (fixed seeds). recover_tables.py runs it with
+`signal` on PYTHONPATH and FFMPEG and PS_INPUT in the environment.
 
 Steps (each prints its evidence):
  A. layout: one one-hot IID stream per parameter band (mode 1 and mode 2: 20 and 34 bands,

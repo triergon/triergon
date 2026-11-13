@@ -3,7 +3,7 @@ pinned reference, fits, and writes OUTDIR/mix.json. Deterministic; a few minutes
 
 usage: recover_mix.py OUTDIR
 
-Steps (each prints its evidence; mix.md explains them):
+Steps (each prints its evidence):
   A  D above QMF 23 in 20 bands: FIR taps of L with ICC index 7 (delays and gain).
   B  2x2 matrices for every IID x ICC index pair, first and second procedure, coarse and fine
      IID, fitted in parameter bands 18 / 19; then the IID level per index, rho per ICC index,

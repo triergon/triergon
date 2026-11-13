@@ -1,8 +1,8 @@
 """recover_dec.py OUTDIR: rerun the recovery of the PS decorrelator and its ducking from
 scratch against the pinned reference and write OUTDIR/dec.json.
 
-Stages (each one crafts its streams, decodes them with the reference and fits; the probe of
-the notes that each stage repeats is named):
+Stages (each one crafts its streams, decodes them with the reference and fits; the probe
+each stage repeats is named):
  1. QMF all-pass chain (D06..D08): single-QMF parameter bands 4, 7, 8 of the 20-band
     configuration, steady tone plus weak noise, ICC 7 in the band. Unconstrained fit of
     G z^-d0 prod (alpha_m + z^-d_m) / (1 + beta_m z^-d_m), d = 3, 4, 5, from random starts;

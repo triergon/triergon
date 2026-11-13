@@ -26,7 +26,7 @@ import sys
 
 import numpy as np
 
-# Constants (probe, precision: see dec.md)
+# Constants and the probes that fit them (recover_dec.py refits them)
 A = (0.65143909, 0.56471814, 0.48954165)  # D08/D10, refined by D25
 QF = (0.43, 0.75, 0.347)                 # D08/D10, D25
 F0 = 0.39                                # D08/D10, D25
