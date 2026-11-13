@@ -30,6 +30,9 @@
 //!   the coded border, with one more envelope to slot 31 when the last border is lower). A
 //!   frame starts from the target stored at the index of the previous frame's last
 //!   envelope; the first PS frame starts from the zero matrix.
+//! - IPD/OPD apply to 11 of 20 or 17 of 34 bands; above them the stored imaginary parts of
+//!   the matrices are kept. Values coded for 34 bands in a 20-band frame (IID last ran 34
+//!   bands) take the truncated means of the 34-band rows the start conversion averages.
 //! - A frame without PS data repeats the last PS frame; a header-less frame uses the last
 //!   header; a header with IID or ICC disabled resets those values to index 0.
 //! - A frame with an invalid value, a decreasing border, a reserved mode or more data than
@@ -233,7 +236,9 @@ fn phasor(i: u8) -> (f64, f64) {
     P[usize::from(i & 7)]
 }
 
-/// Coded values of `nb` bands onto the configuration run (`big`: 34 bands).
+/// Coded values of `nb` bands onto the configuration run (`big`: 34 bands). Only IPD/OPD
+/// meet 34 coded bands in the 20-band configuration (IID last ran 34 bands, the frame has
+/// IID disabled): band b takes the mean of the 34-band rows `CONV_34_20` lists, truncated.
 fn to_config<T: Copy + Into<i32> + TryFrom<i32> + Default>(
     src: &[T],
     nb: usize,
@@ -248,9 +253,15 @@ fn to_config<T: Copy + Into<i32> + TryFrom<i32> + Default>(
             .enumerate()
             .for_each(|(j, v)| *v = src[j / 2]),
         20 => v20.copy_from_slice(&src[..20]),
-        _ => {
+        _ if big => {
             out.copy_from_slice(&src[..MAX_PAR]);
             return;
+        }
+        _ => {
+            for (v, list) in v20.iter_mut().zip(&t::CONV_34_20) {
+                let sum: i32 = list.iter().map(|&r| src[usize::from(r)].into()).sum();
+                *v = T::try_from(sum / list.len() as i32).unwrap_or_default();
+            }
         }
     }
     if big {
@@ -277,10 +288,12 @@ pub(crate) struct Ps {
     last_iid: [i8; MAX_PAR],
     last_icc: [i8; MAX_PAR],
     last_ipd: [[u8; 17]; 2],
-    /// IPD/OPD: enabled by the last extension; values per envelope index on the
-    /// configuration; smoothing history (two previous envelopes, newest first).
+    /// IPD/OPD: enabled by the last extension; values per envelope index as coded, with
+    /// their band count (mapped onto the configuration each frame); smoothing history on the
+    /// configuration (two previous envelopes, newest first).
     phase_on: bool,
     phase: [[[u8; MAX_PAR]; 2]; MAX_ENV],
+    phase_bands: [usize; MAX_ENV],
     phase_history: [[[u8; MAX_PAR]; 2]; 2],
     /// Envelope counts of the last two frames read and their configurations (20 bands
     /// before any).
@@ -313,6 +326,7 @@ impl Ps {
             last_ipd: [[0; 17]; 2],
             phase_on: false,
             phase: [[[0; MAX_PAR]; 2]; MAX_ENV],
+            phase_bands: [10; MAX_ENV],
             phase_history: [[[0; MAX_PAR]; 2]; 2],
             count: 0,
             count_before: 0,
@@ -359,6 +373,7 @@ impl Ps {
         self.last_ipd = [[0; 17]; 2];
         self.phase_on = false;
         self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
+        self.phase_bands = [10; MAX_ENV];
         self.frame = Frame::new();
     }
 
@@ -744,20 +759,16 @@ impl Ps {
                         }
                         let mut full = [0u8; MAX_PAR];
                         full[..17].copy_from_slice(&vals[e][k]);
-                        if self.iid_bands == 34 && !big {
-                            // not observed: IID last ran 34 bands, the frame runs 20
-                            self.phase[e][k] = [0; MAX_PAR];
-                            self.phase[e][k][..20].copy_from_slice(&full[..20]);
-                        } else {
-                            to_config(&full, self.iid_bands, big, &mut self.phase[e][k]);
-                        }
+                        self.phase[e][k] = full;
                     }
                 }
                 if n > 0 {
                     self.last_ipd = vals[n - 1];
                 }
+                self.phase_bands[..n].fill(self.iid_bands);
                 for e in n.max(1)..envelopes {
                     self.phase[e] = self.phase[e - 1];
+                    self.phase_bands[e] = self.phase_bands[e - 1];
                 }
             } else {
                 self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
@@ -835,22 +846,29 @@ impl Ps {
             let mut re1 = [[0f32; 4]; MAX_PAR];
             let mut im1 = [[0f32; 4]; MAX_PAR];
             let (pl, pr) = if has_phase {
-                self.smooth(e, pars)
+                self.smooth(e, pars, f.big)
             } else {
                 ([(1.0, 0.0); MAX_PAR], [(1.0, 0.0); MAX_PAR])
             };
+            // phases reach the bands IPD/OPD can cover (11 of 20, 17 of 34); above them the
+            // stored imaginary part is neither computed nor replaced
+            let phased = ipd_bands(if f.big { 34 } else { 20 });
             for b in 0..pars {
                 let h = table[usize::from(f.second)][usize::from(f.fine)]
                     [(i32::from(f.iid[e][b]) + 15) as usize][f.icc[e][b] as usize];
                 for (i, &v) in h.iter().enumerate() {
                     let (c, s) = if i < 2 { pl[b] } else { pr[b] };
                     re1[b][i] = (f64::from(v) * c) as f32;
-                    im1[b][i] = (f64::from(v) * s) as f32;
+                    im1[b][i] = if b < phased {
+                        (f64::from(v) * s) as f32
+                    } else {
+                        self.store_im[e][b][i]
+                    };
                 }
             }
             self.store_re[e][..pars].copy_from_slice(&re1[..pars]);
             if has_phase {
-                self.store_im[e][..pars].copy_from_slice(&im1[..pars]);
+                self.store_im[e][..phased].copy_from_slice(&im1[..phased]);
             }
             let last = usize::from(f.last_slot[e]);
             if last + 1 > first {
@@ -883,14 +901,18 @@ impl Ps {
     }
 
     /// Smoothed row phases (cos, sin) of envelope `e`; advances the smoothing history.
-    fn smooth(&mut self, e: usize, pars: usize) -> (Phases, Phases) {
+    fn smooth(&mut self, e: usize, pars: usize, big: bool) -> (Phases, Phases) {
         let mut out = [[(1.0, 0.0); MAX_PAR]; 2];
         let mut unit = [[(1.0, 0.0); MAX_PAR]; 2];
+        let mut cur = [[0u8; MAX_PAR]; 2];
+        for (c, coded) in cur.iter_mut().zip(&self.phase[e]) {
+            to_config(coded, self.phase_bands[e], big, c);
+        }
         for k in 0..2 {
             for b in 0..pars {
                 let w = &t::PHASE_WEIGHTS;
                 let p = [
-                    phasor(self.phase[e][k][b]),
+                    phasor(cur[k][b]),
                     phasor(self.phase_history[0][k][b]),
                     phasor(self.phase_history[1][k][b]),
                 ];
@@ -901,7 +923,7 @@ impl Ps {
                 unit[k][b] = (re / n, im / n);
             }
             self.phase_history[1][k] = self.phase_history[0][k];
-            self.phase_history[0][k] = self.phase[e][k];
+            self.phase_history[0][k] = cur[k];
         }
         // row 1 turns by the OPD, row 2 by OPD - IPD
         let (ipd, opd) = (unit[0], unit[1]);

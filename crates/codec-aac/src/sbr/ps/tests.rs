@@ -68,6 +68,25 @@ fn coded_values_map_onto_the_configuration() {
 }
 
 #[test]
+fn ipd_of_34_bands_maps_onto_20_by_truncated_means() {
+    // probe p07: IPD indices (m s + c) % 8 of 17 bands, applied in 20 bands
+    let cases = [
+        (1, 0, [0u8, 1, 3, 4, 6, 0, 2, 3, 4, 6, 0]),
+        (3, 1, [2, 6, 3, 1, 4, 2, 7, 2, 2, 4, 1]),
+    ];
+    for (m, c, want) in cases {
+        let mut src = [0u8; MAX_PAR];
+        for (s, v) in src.iter_mut().enumerate().take(17) {
+            *v = ((m * s + c) % 8) as u8;
+        }
+        let mut out = [0u8; MAX_PAR];
+        to_config(&src, 34, false, &mut out);
+        assert_eq!(&out[..11], &want);
+        assert!(out[11..].iter().all(|&v| v == 0));
+    }
+}
+
+#[test]
 fn class_one_borders_get_an_envelope_to_the_end() {
     // probes t03, t21 and t23
     let raw = |class1, coded_env, borders| Raw {
