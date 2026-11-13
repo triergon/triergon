@@ -19888,6 +19888,31 @@
    "source_revisions": {
     "candidate": "74155089881341aa7aae67e5f754b35a86e4898b"
    }
+  },
+  {
+   "name": "capture-armv7-conversion-dcf51398-armv7",
+   "path": "capture-armv7-conversion-dcf51398-armv7",
+   "retention": "retained",
+   "reason": "Capture at dcf51398 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: the capture qualification of all 15 cases with parity, 30 timing pairs and 30 standard-bound memory pairs, the measured workers, the crate and xtask tests at dcf51398 and e8e14c54 with the e8e14c54 worker's digest, the black-box probes of the ARMv7 and AArch64 FFmpeg conversions with the scripts that ran them, the earlier AArch64 correctness comparisons, and the CPU, kernel and user-space package list",
+   "key": "evidence/capture-armv7-conversion-dcf51398-armv7/1b48bb701d74e5bc17a0e930ecf08e1061454b94e98b519b092573d9d24e0d99.tar.gz",
+   "sha256": "1b48bb701d74e5bc17a0e930ecf08e1061454b94e98b519b092573d9d24e0d99",
+   "bytes": 98793862,
+   "source_revisions": {
+    "candidate": "dcf51398e97c781d517c2c577194a9d92f8c7f15"
+   }
+  },
+  {
+   "name": "capture-armv7-conversion-dcf51398-aarch64",
+   "path": "capture-armv7-conversion-dcf51398-aarch64",
+   "retention": "retained",
+   "reason": "Capture at dcf51398 on Linux AArch64 (c6g.4xlarge, CPU 1): parity of all 15 cases against FFmpeg 9.0.2 for AArch64 with the conversion listed open (2 timing and 2 memory pairs, not a gate), the crate and xtask tests at dcf51398 and e8e14c54 with the e8e14c54 worker's digest, user-mode instruction counts of every case against main's build at f3d4935b and against FFmpeg, the counted workers and the scripts that ran them",
+   "key": "evidence/capture-armv7-conversion-dcf51398-aarch64/016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2.tar.gz",
+   "sha256": "016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2",
+   "bytes": 75856048,
+   "source_revisions": {
+    "candidate": "dcf51398e97c781d517c2c577194a9d92f8c7f15",
+    "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+   }
   }
  ]
 }
