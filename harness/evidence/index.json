@@ -19692,6 +19692,19 @@
    "key": "evidence/mp4-range-fate-prefix-e35e3584-aarch64/35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063.tar.zst",
    "sha256": "35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063",
    "bytes": 50059794
+  },
+  {
+   "name": "subtitles-dvb-palettes-aebbe582",
+   "path": "subtitles-dvb-palettes-aebbe582",
+   "retention": "90 days",
+   "reason": "DVB palettes: the default CLUTs, the CLUT entry conversion and the automatic palette at aebbe582 against main at 339ec261; the subtitle-dvb gate on Linux AArch64 and in the armv7-userland user space, the instruction counts of every case on both targets, the runtime and kernel-bound memory of the 10 new cases on a c8g.xlarge (at edd4e8c8 and aebbe582), both derivations' notes and probes, the scripts that ran them and a bundle of the branch.",
+   "key": "qualification/subtitles-dvb-palettes-aebbe582/d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3.tar.gz",
+   "sha256": "d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3",
+   "bytes": 186258324,
+   "source_revisions": {
+    "candidate": "aebbe5827b1b2ae8f1dcf53a1be67053c850a279",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
   }
  ]
 }
