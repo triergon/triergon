@@ -778,9 +778,10 @@ def build():
             ts = ts_rewrite_video(cra, lambda n, au: au if n != 12 else reserved_before_slice(au))
             cases.append(("hevc-reserved-ts", write("hevc-reserved.ts", ts), ["cc"]))
             # An end of sequence first in the second CRA access unit and an end
-            # of bitstream last in the one before the third: decoding starts
-            # again at both CRA pictures, and FFmpeg drops the pictures still
-            # waiting for output there (no_output_of_prior_pics_flag).
+            # of bitstream last in the one before the third. Each CRA picture
+            # then starts a new sequence: it discards the picture still waiting
+            # for output, and its RASL pictures are not decoded and pass their
+            # captions to the next picture decoded.
             ends = {12: (b"\0\0\x01\x48\x01", b""), 23: (b"", b"\0\0\x01\x4a\x01")}
             ts = ts_rewrite_video(cra, lambda n, au: ends.get(n, (b"", b""))[0] + au + ends.get(n, (b"", b""))[1])
             cases.append(("hevc-eos-ts", write("hevc-eos.ts", ts), ["cc"]))

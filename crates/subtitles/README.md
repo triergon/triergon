@@ -162,7 +162,7 @@ bytes are errors; nothing is replaced with U+FFFD.
 
 | Format | Decoded | Output |
 | --- | --- | --- |
-| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps), decoded to the ASS events of its `cc_dec` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
+| CEA-608/708 in video | `cc_data` from ATSC A/53 (`GA94`) and DVD caption user data in MPEG-2 pictures, SCTE 20, Dish Network user data, and A/53 SEI in H.264 and HEVC; CEA-608 control codes, PACs, mid-row codes, special and extended characters, XDS; CEA-708 data passed through untouched, as in FFmpeg | Receiver: the caption data of each frame in FFmpeg's output order and times (`CaptionExtractor`; at most 6000 bytes per MPEG-2 frame, as FFmpeg keeps; H.264 and HEVC pictures through the picture output model of `triergon_framing::picture_output`), decoded to the ASS events of its `cc_dec` decoder with `real_time` and `data_field`; SCC files read as its `scc` demuxer does. CEA-708 data is passed through untouched and, as in FFmpeg, not decoded to text |
 | DVB teletext (EN 300 472, EN 300 706) | Data units, Hamming 8/4 and 24/18, parity, headers and rows, parallel and serial magazines, subpages, national option subsets and G0/G1/G2/G3 sets, X/26 enhancements and local objects (active, adaptive, passive), X/28 and M/29 designations and colour tables | Receiver: libzvbi's subtitle pages as FFmpeg's `libzvbi_teletextdec` presents them in its `text` and `ass` formats, with its page selection and options |
 
 ## Behaviour and limits
@@ -193,13 +193,6 @@ bytes are errors; nothing is replaced with U+FFFD.
   POP and GPOP pages (pages invoking them are presented at Level 1, as the
   reference presents them); CEA-708 text; glyph rendering, ASS styling and font
   loading; WebVTT browser recovery and CSS.
-- **Open: HEVC captions at a new sequence.** The caption extractor has no model of
-  the decoder's picture output (DPB). When a CRA picture follows an end of
-  sequence, FFmpeg discards the pictures still waiting for output
-  (`no_output_of_prior_pics_flag`) with their captions, and the extractor keeps
-  them. It also does not apply an end of bitstream, or an end of sequence first in
-  a packet, at the picture hevcdec does. This is the open `subtitle-cc` case
-  `hevc-eos-ts`.
 
 The text profile names, default limits and timing rules are in
 [src/text/README.md](src/text/README.md).

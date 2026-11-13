@@ -1,6 +1,8 @@
 //! A packet the caption extractor refuses leaves it as it was: the frames
 //! afterwards are those of a stream without that packet.
 
+mod nal_streams;
+
 use triergon_core::{Budget, WorkBudget};
 use triergon_subtitles::cc::video::nal::{Codec, Framing};
 use triergon_subtitles::compat::cc::{CaptionExtractor, VideoCoding, VideoPacket};
@@ -120,7 +122,7 @@ fn a_refused_mpeg2_packet_leaves_the_extractor_as_it_was() {
 
 /// An access unit: an SEI NAL unit of `messages` (type and payload), then a
 /// slice NAL unit.
-fn h264_access_unit(messages: &[(u8, Vec<u8>)], slice: [u8; 2]) -> Vec<u8> {
+fn h264_access_unit(messages: &[(u8, Vec<u8>)], slice: &[u8]) -> Vec<u8> {
     let mut au = vec![0, 0, 1, 0x06];
     for (kind, payload) in messages {
         au.push(*kind);
@@ -128,8 +130,35 @@ fn h264_access_unit(messages: &[(u8, Vec<u8>)], slice: [u8; 2]) -> Vec<u8> {
         au.extend_from_slice(payload);
     }
     au.extend_from_slice(&[0x80, 0, 0, 1]);
-    au.extend_from_slice(&slice);
+    au.extend_from_slice(slice);
     au
+}
+
+/// A reference picture with `frame_num` `n` (order count type 2): an IDR
+/// picture after its parameter sets for 0, a P picture otherwise.
+fn h264_slice(n: u8) -> Vec<u8> {
+    use nal_streams::{AvcSlice, AvcSps, annex_b, avc_pps, avc_slice, avc_sps};
+    let slice = AvcSlice {
+        idr: n == 0,
+        reference: true,
+        slice_type: if n == 0 { 2 } else { 0 },
+        frame_num: u32::from(n % 16),
+        ..AvcSlice::default()
+    };
+    let slice = avc_slice(&slice, 2);
+    if n != 0 {
+        return slice;
+    }
+    // Parameter sets without VUI timing, then the slice.
+    let sps = AvcSps {
+        poc_type: 2,
+        timing: None,
+        ..AvcSps::default()
+    };
+    let mut nals = annex_b(&[avc_sps(&sps), avc_pps()]);
+    nals.extend_from_slice(&[0, 0, 1]);
+    nals.extend_from_slice(&slice[..]);
+    nals[3..].to_vec()
 }
 
 /// A T.35 A/53 payload announcing `count` constructs, then `cc_data`.
@@ -143,12 +172,10 @@ fn atsc(count: u8, cc_data: &[u8]) -> Vec<u8> {
 #[test]
 fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
     // IDR, then P pictures, one frame period apart in decode order and
-    // without container durations, so each frame lasts the least step.
+    // without VUI timing or container durations, so each frame lasts the
+    // step between their decode times.
     let units: Vec<_> = (0..40u8)
-        .map(|n| {
-            let slice = if n == 0 { [0x65, 0x88] } else { [0x41, 0xc0] };
-            h264_access_unit(&[(4, atsc(1, &[0xfc, 0x80 | n, 0x80]))], slice)
-        })
+        .map(|n| h264_access_unit(&[(4, atsc(1, &[0xfc, 0x80 | n, 0x80]))], &h264_slice(n)))
         .collect();
     let packets: Vec<_> = units
         .iter()
@@ -163,7 +190,7 @@ fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
     // One tick after the last decode time, and more caption bytes than the
     // pool holds.
     let message = (4, atsc(31, &[0xfc, 0x94, 0x2c].repeat(31)));
-    let bad = h264_access_unit(&vec![message; 40_000], [0x41, 0xc0]);
+    let bad = h264_access_unit(&vec![message; 40_000], &h264_slice(20));
     let refused = [
         Refused {
             before: 20,

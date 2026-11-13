@@ -11,6 +11,7 @@
 pub mod compat;
 #[cfg(feature = "reference-trace")]
 mod dts_operation;
+pub mod picture_output;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
 

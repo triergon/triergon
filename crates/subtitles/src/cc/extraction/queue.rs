@@ -14,8 +14,7 @@ pub(super) struct Entry {
     end: usize,
 }
 
-/// Frames in order. Frames leave from the front, or from anywhere for the
-/// reorder buffer.
+/// Frames in order. Frames leave from the front.
 #[derive(Debug)]
 pub(super) struct FrameQueue {
     entries: BudgetVec<Entry>,
@@ -105,22 +104,6 @@ impl FrameQueue {
         }))
     }
 
-    /// Removes the live entry at `index` (from the front), keeping the order of
-    /// the others, and hands it and its bytes to `take`.
-    pub(super) fn remove(
-        &mut self,
-        index: usize,
-        take: impl FnOnce(Entry, &[u8]) -> Result<()>,
-    ) -> Result<()> {
-        let at = self.head + index;
-        let entry = self.entries.as_slice()[at];
-        take(entry, &self.data.as_bytes()[entry.start..entry.end])?;
-        self.entries.as_mut_slice()[at..].rotate_left(1);
-        self.entries.pop();
-        self.live -= entry.end - entry.start;
-        Ok(())
-    }
-
     /// Keeps the first `len` live frames, dropping the newer ones.
     pub(super) fn truncate(&mut self, len: usize) {
         while self.len() > len {
@@ -195,9 +178,7 @@ mod tests {
                 0 => {
                     queue.pop_front().expect("pop");
                 }
-                1 => queue
-                    .remove(queue.len() / 2, |_, _| Ok(()))
-                    .expect("remove"),
+                1 => queue.truncate(queue.len().saturating_sub(1)),
                 _ => {}
             }
             assert_eq!(queue.live, live(&queue));
