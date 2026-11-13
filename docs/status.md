@@ -147,7 +147,14 @@ pairs and 30 memory pairs under the kernel RSS proof, run as a slice of the feat
 `cargo xtask grade` does not join the two runs, because the slice's contract differs from
 the registered feature's, so their per-case results come from each run's report.
 
-Codec and decode-session memory await gate-build measurement with repository runners.
+The ADTS AAC decoder can leave priming to a caller with an explicit container
+edit. The default still applies the encoder delay signature. The stereo and
+5.1 AAC-LC workloads use the gate build at `96232af7d9431c2285c6b6d248aa38a133b85fe3`
+on a c8g.large pinned to CPU 1, with 30 timing pairs and 30 memory pairs
+per case. Both match the reference PCM within the decoder's numeric rules.
+The upper runtime bound is at most 0.7587, peak heap at most 0.7034, and
+total RSS at most 0.4219 of the reference. Other codec and decode-session
+memory comparisons await gate-build measurement with repository runners.
 
 ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 `--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
@@ -384,6 +391,7 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MP4 range playback with QuickTime AAC, earlier preload | `4c59b8121079719a3c988835c1cef6e65eae1719` | `b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2` |
 | AAC in MOV PCM | `63f5e8e5626ed5dac0bbeb9c0e742e0eec6146e6` | `100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556` |
 | AAC in MOV and fragmented QuickTime host comparisons | `9559dae0b89dfd2df2b08b9a97267bc75711be65` | `0bc8fb8726cff0d2ba18d7c138ba83375baf13265bb148086522047bf816aea2` |
+| ADTS AAC priming | `96232af7d9431c2285c6b6d248aa38a133b85fe3` | `a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe` |
 | AAC access-unit decoder | `907ac3dce61c98bd05f52bfa3ff92497efdd141d` | `b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0` |
 | AAC access-unit decoder, fixed layouts and indexed rates | `3d422610316d79665c80b48ab8a27a8a57880efe` | `5b707aa011c5f32e5915a7ba3b8b3daa85ae32111842c7e91754d4de75c2c949` |
 | AAC access-unit decoder with program configurations | `0a51b7c3746c882b3ca5127ad047162130c01ea6` | `86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf` |
