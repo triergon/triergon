@@ -6,13 +6,13 @@ use std::path::{Path, PathBuf};
 
 use crate::checks::read_json;
 use crate::harness::report::{self, Options};
-use crate::harness::{build, comparison, diff, provenance, worker};
+use crate::harness::{build, comparison, diff, provenance, reuse, worker};
 use crate::json::{self, Value};
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask progressive [--output DIR]
        [--benchmark] [--memory] [--pairs N] [--iterations 50] [--seed N]
-       [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance]
+       [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance] [--full]
 
 All five functional inputs (ten literal worker outcomes) must pass first.
 The three original comparable cases are required for correctness, runtime and memory.
@@ -41,6 +41,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
         match flag.as_str() {
             "--benchmark" => options.benchmark = true,
             "--memory" => options.memory = true,
+            "--full" => options.full = true,
             "--require-acceptance" => options.require_acceptance = true,
             "--require-slice-acceptance" => options.require_slice_acceptance = true,
             "--output" => options.output = PathBuf::from(value()?),
@@ -174,7 +175,13 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
     if options.benchmark || options.memory {
         report::create_output(&options.output.join("parity"))?;
     }
-    collect(root, &options, report::collect, check_controls)
+    let documents = ["controls.json", "provenance.json"].map(|name| root.join(FEATURE).join(name));
+    match report::gate_key(root, &options, &documents)? {
+        Some(key) => reuse::step(root, &options.output, &key, options.full, || {
+            collect(root, &options, report::collect, check_controls)
+        }),
+        None => collect(root, &options, report::collect, check_controls),
+    }
 }
 
 fn collect(
