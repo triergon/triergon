@@ -1304,7 +1304,8 @@ mod tests {
             }
         }
         assert!(names.contains(&"grade-subtitle-cc"));
-        assert!(names.contains(&"benchmark-isobmff"));
+        assert!(names.contains(&"benchmark-isobmff-3"));
+        assert!(names.contains(&"capture-4"));
     }
 
     #[test]
