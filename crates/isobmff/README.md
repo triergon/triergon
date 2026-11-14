@@ -391,11 +391,11 @@ Verification:
   normalise either side.
 
 With the `formats` reference prepared, `cargo xtask build-workers` registers the
-comparison workers. Run `cargo xtask isobmff-bench` for all 1,020 open and index
-parity checks, covering 972 output labels and 48 explicit refusals. Add
+comparison workers. Run `cargo xtask isobmff-bench` for all 1,076 open and index
+parity checks, covering 1,028 output labels and 48 explicit refusals. Add
 `--benchmark --memory` to measure the complete selection, or
 `--benchmark --memory --subset52` for the separate 52-operation selection.
-Both retain all 1,020 parity checks. The complete selection measures 956 physical
+Both retain all 1,076 parity checks. The complete selection measures 1,012 physical
 operations with 16 explicit aliases. Run these commands with `CARGO_INCREMENTAL=0`
 and keep the RSS kernel module unloaded while timing.
 
