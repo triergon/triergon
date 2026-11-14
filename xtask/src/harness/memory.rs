@@ -30,6 +30,87 @@ type R<T> = Result<T, String>;
 /// early only when both settle below it.
 pub const CEILING: f64 = 1.0;
 
+/// Pairs of one collection that may be measured again after the kernel RSS bound
+/// voided them ([`voided_by_foreign_update`]); beyond this the collection fails.
+pub const MAX_RETRIES: usize = 2;
+
+/// The RSS bound module's error for a resident counter update by a task other
+/// than the session's owner (`harness/rss-bound/triergon_rss_bound.c`).
+const FOREIGN_UPDATE: i128 = 1;
+
+/// The observer's error bit for a kernel bound it cannot use
+/// (`ERR_CONFIG` in `harness/allocations-linux.c`).
+const KERNEL_BOUND_REFUSED: i128 = 1 << 9;
+
+/// Whether the kernel RSS bound alone voided this pair: every observation was
+/// measured and has a valid receipt, except resident runs on which the module
+/// reported that another task updated the worker's resident counters during the
+/// window. The module decides this from the update's task, never from the values,
+/// so measuring such a pair again cannot favour either worker; any other fault in
+/// the pair still fails the collection.
+pub(super) fn voided_by_foreign_update(row: &Value, observer_sha256: Option<&Value>) -> bool {
+    let Value::Object(entries) = row else {
+        return false;
+    };
+    let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+    keys.sort_unstable();
+    if keys
+        != [
+            "candidate_heap",
+            "candidate_rss",
+            "reference_heap",
+            "reference_rss",
+        ]
+    {
+        return false;
+    }
+    let mut voided = false;
+    for (key, sample) in entries {
+        let mode = key.rsplit('_').next().unwrap_or_default();
+        let Some(observer) = sample.get("observer") else {
+            return false;
+        };
+        if s(sample, "status") != Some("measured")
+            || observer_sha256.is_none_or(|sha| sample.get("instrument_sha256") != Some(sha))
+        {
+            return false;
+        }
+        let n = |k: &str| py_int(observer.get(k));
+        let foreign = mode == "rss"
+            && s(observer, "status") == Some("invalid")
+            && n("error_bits") == Some(KERNEL_BOUND_REFUSED)
+            && n("kernel_rss_requested") == Some(1)
+            && n("kernel_rss_errors") == Some(FOREIGN_UPDATE)
+            && n("kernel_rss_missed") == Some(0);
+        if foreign {
+            voided = true;
+        } else if !linux::valid_receipt(observer, mode) {
+            return false;
+        }
+    }
+    voided
+}
+
+/// Whether a collection's discarded pairs (`retried_pairs`) were each voided by
+/// the kernel bound alone, within [`MAX_RETRIES`], at pairs it measured.
+pub(super) fn retries_valid(
+    retried: Option<&Value>,
+    measured: usize,
+    observer_sha256: Option<&Value>,
+) -> bool {
+    let Some(retried) = retried else {
+        return true;
+    };
+    retried.as_array().is_some_and(|list| {
+        list.len() <= MAX_RETRIES
+            && list.iter().all(|r| {
+                py_int(r.get("pair")).is_some_and(|p| (0..measured as i128).contains(&p))
+                    && r.get("sample")
+                        .is_some_and(|row| voided_by_foreign_update(row, observer_sha256))
+            })
+    })
+}
+
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -1271,19 +1352,9 @@ fn measure(
     let kernel = certificate
         .get("kernel_rss_required")
         .is_some_and(Value::truthy);
-    let mut samples = Vec::new();
-    let (mut heaps, mut totals) = (Vec::new(), Vec::new());
-    let mut usable = true;
-    for _ in 0..pairs.planned {
-        let mut jobs = [
-            ("candidate", "heap"),
-            ("candidate", "rss"),
-            ("reference", "heap"),
-            ("reference", "rss"),
-        ];
-        rng.shuffle(&mut jobs);
+    let observe_pair = |jobs: &[(&str, &str)]| {
         let mut row = Vec::new();
-        for (name, mode) in jobs {
+        for &(name, mode) in jobs {
             let worker = if name == "candidate" {
                 candidate
             } else {
@@ -1305,7 +1376,42 @@ fn measure(
             };
             row.push((format!("{name}_{mode}"), observed));
         }
-        let row = Value::Object(row);
+        Value::Object(row)
+    };
+    let observer_sha256 = certificate.get("observer_sha256");
+    let mut samples = Vec::new();
+    let mut retried = Vec::new();
+    let (mut heaps, mut totals) = (Vec::new(), Vec::new());
+    let mut usable = true;
+    for pair in 0..pairs.planned {
+        let mut jobs = [
+            ("candidate", "heap"),
+            ("candidate", "rss"),
+            ("reference", "heap"),
+            ("reference", "rss"),
+        ];
+        rng.shuffle(&mut jobs);
+        // A pair the kernel bound alone voided is measured again in the same
+        // order, at most MAX_RETRIES times per collection; the voided pair is kept.
+        let row = loop {
+            let row = observe_pair(&jobs);
+            if kernel
+                && retried.len() < MAX_RETRIES
+                && voided_by_foreign_update(&row, observer_sha256)
+            {
+                println!(
+                    "memory of {}: the kernel RSS bound voided pair {} (another task updated a worker's resident counters); measuring it again",
+                    invocation.input.display(),
+                    pair + 1
+                );
+                retried.push(Value::object([
+                    ("pair", Value::int(pair as i128)),
+                    ("sample", row),
+                ]));
+                continue;
+            }
+            break row;
+        };
         // A pair with no usable values never settles the session; the full
         // validation is evaluate's.
         let values = pair_values(&row, linux);
@@ -1348,6 +1454,9 @@ fn measure(
             invocation.expected_outputs,
         )
     };
+    if !retried.is_empty() {
+        push(&mut result, "retried_pairs", Value::Array(retried));
+    }
     push(&mut result, "input_sha256", Value::str(&input_sha));
     match file_sha(invocation.input) {
         Ok(hash) if hash == input_sha => (),
@@ -1919,7 +2028,12 @@ pub fn evidence_valid_with_outputs(
         let minimum = py_int(contract.get("minimum_pairs"))?;
         if !(covered
             && py_int(memory.get("pairs")) == Some(raw.len() as i128)
-            && planned >= minimum)
+            && planned >= minimum
+            && retries_valid(
+                memory.get("retried_pairs"),
+                raw.len(),
+                certificate.get("observer_sha256"),
+            ))
         {
             return Some(false);
         }

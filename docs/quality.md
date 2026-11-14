@@ -644,25 +644,25 @@ draws: against each session's own shuffled ratios, the share of sessions whose l
 autocorrelation exceeds the shuffled 95th percentile is 4.5% to 5.3% of memory
 collections and 3.0% to 6.0% of timing sessions (5% for independent pairs), and the mean
 of pairs 1 to 10 against pairs 11 to 30 differs by −0.04 to +0.04 standard deviations on
-average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts. Simulated with the true
-median exactly at the ceiling, the rule stops a session early with probability 0.007%
-for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2, 0.27% at 0.5, and
-0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3 standard
-deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
+average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts.
+Simulated with the true median exactly at the ceiling, the rule stops a session early
+with probability 0.007% for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2,
+0.27% at 0.5, and 0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3
+standard deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
 
 Replayed on those sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, the rule
 stops 1,597 of 1,663 AArch64 and 2,980 of 3,037 ARMv7 timing sessions and 1,337 of 1,663
 AArch64 and 2,956 of 3,335 ARMv7 memory collections, and no session it stops failed at
-30 pairs (a collection refused for contamination is refused either way). Drawing pairs
-from the ARMv7 timing sessions' own ratios rescaled to a median exactly at the ceiling,
-0.006% of 128,000 simulated sessions stop early, and the share that passes, 3.22%, is
-the 30-pair bound's; from the ARMv7 memory collections' total resident ratios at a
-median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against fresh
-30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every session
-that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux` memory cases,
-whose total resident bounds lie between 0.978 and 1.011, ran every pair on both sides
-and changed verdict between the two runs, as two 30-pair bounds that close to the
-ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
+30 pairs (a collection refused as an invalid observation is refused either way).
+Drawing pairs from the ARMv7 timing sessions' own ratios rescaled to a median exactly at
+the ceiling, 0.006% of 128,000 simulated sessions stop early, and the share that passes,
+3.22%, is the 30-pair bound's; from the ARMv7 memory collections' total resident ratios
+at a median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against
+fresh 30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every
+session that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux`
+memory cases, whose total resident bounds lie between 0.978 and 1.011, ran every pair on
+both sides and changed verdict between the two runs, as two 30-pair bounds that close to
+the ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
 instead of 19.2 on ARMv7, and its memory 13.5 instead of 19.2 and 10.7 instead of 15.0.
 The replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
 `gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`.
