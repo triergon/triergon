@@ -78,6 +78,10 @@ static void word(Digest *h, uint64_t n) {
         b[i] = (uint8_t)(n >> (i * 8));
     group(h, b);
 }
+static __attribute__((noinline)) void words(Digest *h, const uint64_t *values, size_t count) {
+    for (size_t i = 0; i < count; ++i)
+        word(h, values[i]);
+}
 static void blob(Digest *h, const uint8_t *p, size_t n) {
     word(h, n);
     raw(h, p, n);
@@ -170,17 +174,13 @@ static int case_load(Case *c, const uint8_t *data, size_t n) {
     return r.bad || r.at != n ? -1 : 0;
 }
 static void packet(Digest *h, unsigned kind, int input, unsigned output, const AVPacket *p) {
-    word(h, kind);
-    word(h, (uint64_t)(int64_t)input);
-    word(h, output);
-    word(h, (uint64_t)p->pts);
-    word(h, (uint64_t)p->dts);
-    word(h, (uint64_t)p->duration);
-    word(h, (uint64_t)p->pos);
-    word(h, (uint64_t)(int64_t)p->flags);
-    word(h, (uint64_t)(int64_t)p->stream_index);
-    word(h, (uint64_t)(int64_t)p->time_base.num);
-    word(h, (uint64_t)(int64_t)p->time_base.den);
+    const uint64_t fields[] = {
+        kind, (uint64_t)(int64_t)input, output, (uint64_t)p->pts, (uint64_t)p->dts,
+        (uint64_t)p->duration, (uint64_t)p->pos, (uint64_t)(int64_t)p->flags,
+        (uint64_t)(int64_t)p->stream_index, (uint64_t)(int64_t)p->time_base.num,
+        (uint64_t)(int64_t)p->time_base.den,
+    };
+    words(h, fields, sizeof(fields) / sizeof(fields[0]));
     blob(h, p->data, (size_t)p->size);
     word(h, (unsigned)p->side_data_elems);
     for (int i = 0; i < p->side_data_elems; ++i) {
@@ -202,9 +202,8 @@ static int receive_all(AVBSFContext *ctx, AVPacket **kept, unsigned *count, int 
             if (rc == AVERROR(ENOMEM))
                 return -1;
             if (rc != AVERROR(EAGAIN) && rc != AVERROR_EOF) {
-                word(&out->hash, 3);
-                word(&out->hash, (uint64_t)(int64_t)input);
-                word(&out->hash, (uint64_t)(int64_t)rc);
+                const uint64_t fields[] = {3, (uint64_t)(int64_t)input, (uint64_t)(int64_t)rc};
+                words(&out->hash, fields, sizeof(fields) / sizeof(fields[0]));
             }
             return 0;
         }

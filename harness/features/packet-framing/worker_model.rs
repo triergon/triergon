@@ -195,6 +195,13 @@ impl Digest {
     pub fn signed(&mut self, n: i64) {
         self.group(&n.to_le_bytes());
     }
+    /// Runs the same eight-byte fold for each scalar in wire order.
+    #[inline(never)]
+    pub fn words(&mut self, words: &[u64]) {
+        for &word in words {
+            self.word(word);
+        }
+    }
     pub fn blob(&mut self, bytes: &[u8]) {
         self.word(bytes.len() as u64);
         self.raw(bytes);

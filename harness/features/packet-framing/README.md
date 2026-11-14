@@ -17,7 +17,8 @@ those observations verbatim; the serial oracle derives both independent byte
 polynomials from them. A word is eight little-endian bytes. Each iteration folds
 both whole-operation digest words, including iterations with zero output packets.
 Both workers fold eight-byte groups with the same polynomial recurrence and
-process any trailing bytes individually.
+process any trailing bytes individually. Packet metadata and receive errors
+pass their scalar fields to the same ordered word loop in each worker.
 
 `avc-profile-extension-inputs.json` adds the five fixed-header lengths and a
 nonempty configuration update. `cargo xtask framing manifest --record` records
