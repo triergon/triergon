@@ -480,6 +480,10 @@ For ISO BMFF, collect `isobmff-bench --benchmark` and `isobmff-bench --memory`
 in separate output directories. Pass their `collection.json` files to `grade`
 with the registered open and index contract and corpus. Keep the `case-NNNN/`
 directories with both collections so the grader can verify the measurements.
+On AArch64, the sharded gate grades each ISO BMFF timing and memory pair on its
+measurement host with `grade --isobmff-part I/N`. The grader checks the full parity
+corpus and the exact partition of measurements, including matching aliases. The
+gate summary requires a passing grade for each planned part.
 
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.

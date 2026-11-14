@@ -242,6 +242,8 @@ fn coverage_problems(root: &Path) -> R<Vec<String>> {
 }
 /// How many parts the ISO BMFF suite's measurements are split into.
 const ISOBMFF_PARTS: usize = 3;
+/// The open and index contract qualifies this target.
+const ISOBMFF_GRADE_TARGET: &str = "aarch64-unknown-linux-gnu";
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
@@ -402,11 +404,12 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
 
     // ISO BMFF in parts, each measuring every ISOBMFF_PARTS-th operation and comparing
     // all of them: a part is a third of the measurements and the whole comparison.
+    let grade_isobmff = target == ISOBMFF_GRADE_TARGET;
     for part in 1..=ISOBMFF_PARTS {
         let name = format!("isobmff-{part}");
         let part = format!("{part}/{ISOBMFF_PARTS}");
         let bench = |mode: &str, flag: &str| {
-            with_full(xtask(&[
+            let mut command = xtask(&[
                 "isobmff-bench",
                 &format!("--{mode}"),
                 flag,
@@ -415,16 +418,41 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 &part,
                 "--output",
                 &format!("{out}/{mode}/{name}"),
-            ]))
+            ]);
+            if full || grade_isobmff {
+                command.push("--full".into());
+            }
+            command
         };
+        let mut steps = Vec::from(collections(
+            &name,
+            bench("benchmark", "--pairs"),
+            bench("memory", "--memory-pairs"),
+        ));
+        if grade_isobmff {
+            steps.push(step(
+                format!("grade-{name}"),
+                Stage::Memory,
+                Placement::Grade,
+                xtask(&[
+                    "grade",
+                    &format!("{out}/benchmark/{name}/collection.json"),
+                    &format!("{out}/memory/{name}/collection.json"),
+                    "--contract",
+                    "harness/features/isobmff-open-index/contract.json",
+                    "--manifest",
+                    "harness/features/isobmff-open-index/corpus.json",
+                    "--output",
+                    &format!("{out}/graded/{name}"),
+                    "--isobmff-part",
+                    &part,
+                    "--full",
+                ]),
+            ));
+        }
         items.push(Item {
             weight: 9,
-            steps: collections(
-                &name,
-                bench("benchmark", "--pairs"),
-                bench("memory", "--memory-pairs"),
-            )
-            .into(),
+            steps,
             name,
             preflight: owned(&["--isobmff"]),
         });
@@ -1618,14 +1646,19 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect();
     let capture = capture_cases(root)?;
-    let planned = items("OUT", false, "TARGET", "target/release", &capture);
+    let target = shards.first().and_then(|s| field(s, "target"));
+    let target = target
+        .as_ref()
+        .and_then(Value::as_str)
+        .ok_or("gate summary needs at least one shard with a target")?;
+    let planned = items("OUT", false, target, "target/release", &capture);
     // Each shard ran the items the plan gives it.
     let count = count.unwrap_or(0.0) as usize;
     if count > 0 {
         let names =
             |items: Vec<Item>| -> Vec<String> { items.into_iter().map(|i| i.name).collect() };
         let plan: Vec<Vec<String>> = self::shards(
-            items("OUT", false, "TARGET", "target/release", &capture),
+            items("OUT", false, target, "target/release", &capture),
             count,
         )
         .into_iter()
@@ -1660,6 +1693,20 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .count();
             if ran != 1 {
                 problems.push(format!("{}: {ran} records", step.name));
+            }
+        }
+    }
+    if target == ISOBMFF_GRADE_TARGET {
+        for part in 1..=ISOBMFF_PARTS {
+            let name = format!("isobmff-{part}");
+            let step = format!("grade-{name}");
+            for record in steps
+                .iter()
+                .filter(|row| row.get("step").and_then(Value::as_str) == Some(&step))
+            {
+                if !isobmff_grade_step(record, &name, &format!("{part}/{ISOBMFF_PARTS}")) {
+                    problems.push(format!("{step}: missing or mismatched ISO BMFF part"));
+                }
             }
         }
     }
@@ -1725,6 +1772,24 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
     Ok(i32::from(!failed.is_empty() || !problems.is_empty()))
 }
 
+fn isobmff_grade_step(record: &Value, item: &str, part: &str) -> bool {
+    record.get("item").and_then(Value::as_str) == Some(item)
+        && record.get("stage").and_then(Value::as_str) == Some(Stage::Memory.name())
+        && record
+            .get("command")
+            .and_then(Value::as_array)
+            .is_some_and(|args| {
+                let mut args = args.iter().map(Value::as_str);
+                if args.next() != Some(Some("xtask")) || args.next() != Some(Some("grade")) {
+                    return false;
+                }
+                let mut parts = args.skip_while(|arg| *arg != Some("--isobmff-part"));
+                parts.next().is_some()
+                    && parts.next() == Some(Some(part))
+                    && !parts.any(|arg| arg == Some("--isobmff-part"))
+            })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1770,6 +1835,38 @@ mod tests {
         assert!(names.contains(&"benchmark-isobmff-3"));
         assert!(names.contains(&"capture-c04"));
         assert!(names.contains(&"memory-codec-file-workloads") && names.contains(&"test-release"));
+    }
+
+    #[test]
+    fn aarch64_plan_grades_each_isobmff_part_once() {
+        let plan = items(
+            "/o",
+            false,
+            "aarch64-unknown-linux-gnu",
+            "target/release",
+            &[],
+        );
+        for i in 1..=ISOBMFF_PARTS {
+            let name = format!("isobmff-{i}");
+            let item = plan.iter().find(|item| item.name == name).unwrap();
+            let grade = item
+                .steps
+                .iter()
+                .filter(|step| step.placement == Placement::Grade)
+                .collect::<Vec<_>>();
+            assert_eq!(grade.len(), 1);
+            let record = Value::object([
+                ("item", Value::str(&name)),
+                ("stage", Value::str(grade[0].stage.name())),
+                ("command", Value::strings(grade[0].command.clone())),
+            ]);
+            assert!(isobmff_grade_step(
+                &record,
+                &name,
+                &format!("{i}/{ISOBMFF_PARTS}")
+            ));
+            assert!(!isobmff_grade_step(&record, &name, "1/1"));
+        }
     }
 
     #[test]

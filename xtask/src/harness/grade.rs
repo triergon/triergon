@@ -22,7 +22,7 @@ use crate::sha256;
 pub const USAGE: &str =
     "usage: cargo xtask grade TIMING MEMORY --contract PATH --manifest PATH --output DIR
     [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]
-    [--full]";
+    [--isobmff-part I/N] [--full]";
 
 type R<T> = Result<T, String>;
 
@@ -34,6 +34,7 @@ struct Options {
     output: PathBuf,
     additional: Vec<PathBuf>,
     requirement: Option<&'static str>,
+    isobmff_part: Option<(usize, usize)>,
     /// Grade the reports even when a cited set holds this grade.
     full: bool,
 }
@@ -46,11 +47,21 @@ impl Options {
         let (mut contract, mut manifest, mut output) = (None, None, None);
         let mut additional = Vec::new();
         let mut requirement = None;
+        let mut isobmff_part = None;
         let mut full = false;
         let mut rest = rest.iter();
         while let Some(flag) = rest.next() {
             match flag.as_str() {
                 "--full" => full = true,
+                "--isobmff-part" => {
+                    let part = rest.next().ok_or("--isobmff-part needs I/N")?;
+                    if isobmff_part
+                        .replace(crate::gate::parse_part(part)?)
+                        .is_some()
+                    {
+                        return Err("duplicate --isobmff-part".into());
+                    }
+                }
                 "--require-slice-acceptance" | "--require-acceptance" => {
                     let key = if flag == "--require-acceptance" {
                         "accepted"
@@ -83,6 +94,11 @@ impl Options {
                 _ => return Err(format!("unexpected argument {flag}")),
             }
         }
+        if isobmff_part.is_some() && (requirement.is_some() || !additional.is_empty()) {
+            return Err(
+                "an ISO BMFF part cannot request full acceptance or additional reports".into(),
+            );
+        }
         Ok(Self {
             timing: root.join(timing),
             memory: root.join(memory),
@@ -91,6 +107,7 @@ impl Options {
             output: output.ok_or("--output is required")?,
             additional,
             requirement,
+            isobmff_part,
             full,
         })
     }
@@ -443,7 +460,7 @@ fn membership<'a>(expected: &[Value], actual: &'a [Value]) -> R<BTreeMap<&'a str
 }
 
 /// An alias keeps its own parity proof but reuses only an identical operation.
-fn aliases(expected: &[Value], actual: &BTreeMap<&str, &Value>) -> R<()> {
+fn aliases(expected: &[Value], actual: &BTreeMap<&str, &Value>, partial: bool) -> R<()> {
     for spec in expected {
         let id = text(spec, "id")?;
         let row = actual[id];
@@ -462,8 +479,6 @@ fn aliases(expected: &[Value], actual: &BTreeMap<&str, &Value>) -> R<()> {
         };
         if integer(prior, "index")? >= index
             || prior.get("outcome").and_then(Value::as_str) != Some("output")
-            || row.get("sampled_as") != Some(alias)
-            || row.get("sampled_profile") != prior.get("profile")
         {
             return Err(format!("{id}: invalid measurement alias"));
         }
@@ -479,6 +494,16 @@ fn aliases(expected: &[Value], actual: &BTreeMap<&str, &Value>) -> R<()> {
         for key in ["timing", "memory"] {
             same_field(row, previous, key)?;
         }
+        let sample_required = !partial
+            || has_measurement(row)
+            || row.get("sampled_as").is_some()
+            || row.get("sampled_profile").is_some();
+        if sample_required
+            && (row.get("sampled_as") != Some(alias)
+                || row.get("sampled_profile") != prior.get("profile"))
+        {
+            return Err(format!("{id}: invalid measurement alias"));
+        }
         for key in ["candidate_trace", "reference_trace"] {
             require_same(
                 field(field(row, key)?, "stdout_sha256")?,
@@ -488,6 +513,53 @@ fn aliases(expected: &[Value], actual: &BTreeMap<&str, &Value>) -> R<()> {
         }
     }
     Ok(())
+}
+
+fn has_measurement(row: &Value) -> bool {
+    ["timing", "memory"]
+        .iter()
+        .any(|key| row.get(key).is_some_and(|value| *value != Value::Null))
+}
+
+fn part_selection(
+    root: &Path,
+    contract: &Value,
+    timed: &Value,
+    memory: &Value,
+    requested: Option<(usize, usize)>,
+) -> R<Option<BTreeSet<usize>>> {
+    let Some((index, count)) = requested else {
+        if [timed, memory].iter().any(|report| {
+            report
+                .get("part")
+                .is_some_and(|value| *value != Value::Null)
+        }) {
+            return Err("grading an ISO BMFF part requires its explicit --isobmff-part".into());
+        }
+        return Ok(None);
+    };
+    if text(contract, "id")? != "isobmff-open-index" {
+        return Err(
+            "--isobmff-part requires the registered ISO BMFF open and index contract".into(),
+        );
+    }
+    let part = Value::str(format!("{}/{count}", index + 1));
+    let selection = crate::isobmff_bench::full_part_selection(root, (index, count))?;
+    let encoded = Value::Array(
+        selection
+            .iter()
+            .map(|&index| Value::int(index as i128))
+            .collect(),
+    );
+    for report in [timed, memory] {
+        require_same(field(report, "part")?, &part, "ISO BMFF part")?;
+        require_same(
+            field(report, "selection")?,
+            &encoded,
+            "ISO BMFF part selection",
+        )?;
+    }
+    Ok(Some(selection.into_iter().collect()))
 }
 
 fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -> R<Value> {
@@ -620,11 +692,7 @@ fn join_case(
     same_case(timed, measured)?;
     let workers = selected(timed, expected, contract, identity)?;
     if expected.get("outcome").and_then(Value::as_str) == Some("refusal") {
-        if [timed, measured].iter().any(|row| {
-            ["timing", "memory"]
-                .iter()
-                .any(|key| row.get(key).is_some_and(|value| *value != Value::Null))
-        }) {
+        if has_measurement(timed) || has_measurement(measured) {
             return Err("a registered refusal cannot contain successful measurements".into());
         }
         return Ok(timed.clone());
@@ -846,10 +914,18 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         let reports = [options.timing.as_path(), options.memory.as_path()];
         let mut files = vec![options.contract.as_path(), options.manifest.as_path()];
         files.extend(options.additional.iter().map(PathBuf::as_path));
-        let settings = Value::object([(
-            "requirement",
-            options.requirement.map_or(Value::Null, Value::str),
-        )]);
+        let settings = Value::object([
+            (
+                "requirement",
+                options.requirement.map_or(Value::Null, Value::str),
+            ),
+            (
+                "isobmff_part",
+                options
+                    .isobmff_part
+                    .map_or(Value::Null, |(i, n)| Value::str(format!("{}/{n}", i + 1))),
+            ),
+        ]);
         Some(
             reuse::Key::new(root, "grade", settings, &files, &[])?
                 .untimed()
@@ -900,15 +976,38 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(identity, &pinned));
     let refusals = gate_build::refusals(identity, &pinned);
-    if options.requirement.is_some() && !refusals.is_empty() {
+    if (options.requirement.is_some() || options.isobmff_part.is_some()) && !refusals.is_empty() {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
     current_workers(root, identity, &contract)?;
     let expected = binding.expected(&timed, kind)?;
     let timed_rows = membership(&expected, rows(&timed, kind)?)?;
     let memory_rows = membership(&expected, rows(&memory, kind)?)?;
-    aliases(&expected, &timed_rows)?;
-    aliases(&expected, &memory_rows)?;
+    let selection = part_selection(root, &contract, &timed, &memory, options.isobmff_part)?;
+    aliases(&expected, &timed_rows, selection.is_some())?;
+    aliases(&expected, &memory_rows, selection.is_some())?;
+    let mut grade_members: Vec<_> = expected.iter().collect();
+    if let Some(selection) = &selection {
+        grade_members.clear();
+        for spec in &expected {
+            let id = text(spec, "id")?;
+            if text(spec, "outcome")? == "refusal"
+                || usize::try_from(integer(spec, "index")?)
+                    .is_ok_and(|index| selection.contains(&index))
+            {
+                grade_members.push(spec);
+                continue;
+            }
+            let (a, b) = (timed_rows[id], memory_rows[id]);
+            same_case(a, b).map_err(|error| format!("{id}: {error}"))?;
+            if has_measurement(a) || has_measurement(b) || !super::acceptance::parity_passes(a) {
+                return Err(format!(
+                    "{id}: part requires matching parity without measurements"
+                ));
+            }
+            selected(a, spec, &contract, identity)?;
+        }
+    }
     let ceiling = super::policy::Runtime::load(root)?.ceiling;
     let combine = |spec: &Value| -> R<Value> {
         let id = text(spec, "id")?;
@@ -939,10 +1038,27 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     if kind == Shape::External && !additional.is_empty() {
         return Err("an external-vector grade cannot contain additional cases".into());
     }
+    if selection.is_some() && !additional.is_empty() {
+        return Err("an ISO BMFF part cannot contain additional cases".into());
+    }
     validate_additional(&additional, &binding, identity, target, ceiling)?;
     let derived;
     let selected_contract = if kind == Shape::External {
         derived = external_contract(&contract, text(&expected[0], "id")?)?;
+        &derived
+    } else if selection.is_some() {
+        let mut part_contract = contract.clone();
+        put(
+            &mut part_contract,
+            "required_profiles",
+            Value::strings(
+                grade_members
+                    .iter()
+                    .map(|spec| text(spec, "profile"))
+                    .collect::<R<Vec<_>>>()?,
+            ),
+        )?;
+        derived = part_contract;
         &derived
     } else {
         &contract
@@ -953,10 +1069,10 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         _ => return Err("fate_coverage must be an array".into()),
     };
     let mut join_error = None;
-    let verdict = acceptance_iter(
+    let mut verdict = acceptance_iter(
         root,
         selected_contract,
-        expected.iter().map(|spec| {
+        grade_members.iter().copied().map(|spec| {
             combine(spec).inspect_err(|error| {
                 join_error = Some(error.clone());
             })
@@ -969,6 +1085,16 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     if let Some(error) = join_error {
         return Err(error);
     }
+    let part_pass = if selection.is_some() {
+        let passed = verdict.get("slice_accepted") == Some(&Value::Bool(true));
+        put(&mut verdict, "accepted", Value::Bool(false))?;
+        put(&mut verdict, "slice_accepted", Value::Bool(false))?;
+        put(&mut verdict, "scope", Value::str("isobmff-part"))?;
+        put(&mut verdict, "part_accepted", Value::Bool(passed))?;
+        Some(passed)
+    } else {
+        None
+    };
     let mut report = without(&memory, &["cases", "case"])?;
     for (key, value) in [
         ("collection_status", Value::str("complete")),
@@ -1009,7 +1135,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         Shape::Corpus => super::report::write_observed_case_report(
             &options.output,
             &report,
-            expected.iter().map(combine),
+            grade_members.iter().copied().map(combine),
         )?,
         Shape::External => {
             put(&mut report, "case", combine(&expected[0])?)?;
@@ -1020,13 +1146,23 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     if !super::report::ratchet(text(&contract, "id")?, rows(&timed, kind)?, &open) {
         code = code.max(1);
     }
-    println!(
-        "{} cases; slice accepted: {}; accepted: {}; {}",
-        expected.len(),
-        verdict.get("slice_accepted") == Some(&Value::Bool(true)),
-        verdict.get("accepted") == Some(&Value::Bool(true)),
-        destination.display()
-    );
+    if let Some(passed) = part_pass {
+        code = code.max(i32::from(!passed) * 2);
+        println!(
+            "ISO BMFF part {}: {} measured labels, part accepted: {}",
+            text(&memory, "part")?,
+            selection.as_ref().map_or(0, BTreeSet::len),
+            passed
+        );
+    } else {
+        println!(
+            "{} cases; slice accepted: {}; accepted: {}; {}",
+            expected.len(),
+            verdict.get("slice_accepted") == Some(&Value::Bool(true)),
+            verdict.get("accepted") == Some(&Value::Bool(true)),
+            destination.display()
+        );
+    }
     Ok(code)
 }
 
@@ -1034,6 +1170,42 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
+
+    #[test]
+    fn isobmff_parts_bind_the_registered_selection_and_cover_all_outputs() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let contract =
+            read_json(&root.join("harness/features/isobmff-open-index/contract.json")).unwrap();
+        let mut membership = BTreeSet::new();
+        for index in 0..3 {
+            let requested = (index, 3);
+            let selection = crate::isobmff_bench::full_part_selection(root, requested).unwrap();
+            assert!(selection.iter().all(|&case| membership.insert(case)));
+            let report = object(&[
+                ("part", Value::str(format!("{}/3", index + 1))),
+                (
+                    "selection",
+                    Value::Array(selection.iter().map(|&i| Value::int(i as i128)).collect()),
+                ),
+            ]);
+            assert_eq!(
+                part_selection(root, &contract, &report, &report, Some(requested)).unwrap(),
+                Some(selection.into_iter().collect())
+            );
+            assert!(part_selection(root, &contract, &report, &report, None).is_err());
+            let mut incomplete = report.clone();
+            put(&mut incomplete, "selection", Value::Array(Vec::new())).unwrap();
+            assert!(
+                part_selection(root, &contract, &report, &incomplete, Some(requested)).is_err()
+            );
+            let mut mislabeled = report.clone();
+            put(&mut mislabeled, "part", Value::str("1/1")).unwrap();
+            assert!(
+                part_selection(root, &contract, &report, &mislabeled, Some(requested)).is_err()
+            );
+        }
+        assert_eq!(membership.len(), 972);
+    }
 
     #[test]
     fn an_early_stopped_collection_counts_its_planned_pairs() {
@@ -1626,11 +1798,11 @@ mod tests {
             field(&expected[0], "profile").unwrap().clone(),
         )
         .unwrap();
-        assert!(aliases(&expected, &membership(&expected, &actual).unwrap()).is_ok());
+        assert!(aliases(&expected, &membership(&expected, &actual).unwrap(), false).is_ok());
 
         let mut altered = actual.clone();
         put(&mut altered[1], "sampled_as", Value::int(55)).unwrap();
-        assert!(aliases(&expected, &membership(&expected, &altered).unwrap()).is_err());
+        assert!(aliases(&expected, &membership(&expected, &altered).unwrap(), false).is_err());
         let mut altered = actual.clone();
         change(
             &mut altered[1],
@@ -1638,7 +1810,7 @@ mod tests {
             "stdout_sha256",
             Value::str(digest('2')),
         );
-        assert!(aliases(&expected, &membership(&expected, &altered).unwrap()).is_err());
+        assert!(aliases(&expected, &membership(&expected, &altered).unwrap(), false).is_err());
         let mut altered = expected.clone();
         change(
             &mut altered[1],
@@ -1646,9 +1818,9 @@ mod tests {
             "arguments",
             Value::strings(["1", "0", "memory", "3"]),
         );
-        assert!(aliases(&altered, &membership(&altered, &actual).unwrap()).is_err());
+        assert!(aliases(&altered, &membership(&altered, &actual).unwrap(), false).is_err());
         put(&mut actual[0], "sampled_as", Value::int(0)).unwrap();
-        assert!(aliases(&expected, &membership(&expected, &actual).unwrap()).is_err());
+        assert!(aliases(&expected, &membership(&expected, &actual).unwrap(), false).is_err());
     }
 
     /// The open-case ratchet: a listed failing case is graded on parity alone, a
