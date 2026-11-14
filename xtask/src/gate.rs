@@ -25,6 +25,7 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
        cargo xtask gate preflight [--shard I/N] --review FILE [--kernel]
        cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full]
        cargo xtask gate summary --output FILE DIR...
+       cargo xtask gate test --profile debug|release --output DIR [--full]
 
   plan       print the gate's items and their planning weights (minutes on a
              32-bit ARMv7 c6g.4xlarge), split into N shards (default 1)
@@ -37,7 +38,12 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
              evidence set holds
   summary    join the outputs of every shard of a run into FILE: each step's
              status and time, with a failure if a planned step did not run, a
-             step failed, or the shards measured different sources or workers";
+             step failed, or the shards measured different sources or workers
+  test       the workspace tests for the gate target in one profile: debug (with
+             overflow checks and debug assertions) or release (the gate build's
+             optimisation); a result a kept evidence set holds for the same tracked
+             sources, test inputs, toolchain, target and host class is reused
+             unless --full";
 
 /// The shard file each run writes in its output directory.
 const SHARD: &str = "shard.json";
@@ -496,18 +502,26 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 "test-debug",
                 Stage::Timing,
                 Placement::Free,
-                target_args(owned(&["cargo", "test", "--workspace", "--locked"])),
+                with_full(xtask(&[
+                    "gate",
+                    "test",
+                    "--profile",
+                    "debug",
+                    "--output",
+                    &format!("{out}/tests/debug"),
+                ])),
             ),
             step(
                 "test-release",
                 Stage::Timing,
                 Placement::Free,
-                target_args(owned(&[
-                    "cargo",
+                with_full(xtask(&[
+                    "gate",
                     "test",
-                    "--workspace",
-                    "--release",
-                    "--locked",
+                    "--profile",
+                    "release",
+                    "--output",
+                    &format!("{out}/tests/release"),
                 ])),
             ),
             step(
@@ -590,6 +604,7 @@ struct Options {
     review: Option<String>,
     kernel: bool,
     full: bool,
+    profile: Option<String>,
     directories: Vec<PathBuf>,
 }
 
@@ -603,6 +618,7 @@ impl Options {
             review: None,
             kernel: false,
             full: false,
+            profile: None,
             directories: Vec::new(),
         };
         let mut rest = args.iter();
@@ -632,6 +648,7 @@ impl Options {
                 "--review" => options.review = Some(value()?),
                 "--kernel" => options.kernel = true,
                 "--full" => options.full = true,
+                "--profile" => options.profile = Some(value()?),
                 flag if flag.starts_with("--") => return Err(USAGE.into()),
                 directory => options.directories.push(PathBuf::from(directory)),
             }
@@ -698,6 +715,15 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         "summary" => {
             let output = options.output.ok_or("gate summary needs --output FILE")?;
             summary(&output, &options.directories)
+        }
+        "test" => {
+            let output = options.output.ok_or("gate test needs --output DIR")?;
+            let release = match options.profile.as_deref() {
+                Some("debug") => false,
+                Some("release") => true,
+                _ => return Err("gate test needs --profile debug|release".into()),
+            };
+            test(root, &output, release, options.full)
         }
         "--help" | "-h" => {
             println!("{USAGE}");
@@ -913,6 +939,79 @@ fn git(root: &Path, args: &[&str]) -> R<String> {
         return Err(format!("git {}: {}", args.join(" "), out.status));
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+/// The test inputs outside the repository that crate tests read when present.
+const TEST_INPUTS: [&str; 3] = [
+    ".research/fate-samples",
+    ".research/flac-generated",
+    ".research/flac-test-files",
+];
+
+/// Runs the workspace tests in one profile, or takes the result of a kept set
+/// for the same key: every tracked file as the working tree holds it, untracked
+/// files that are not ignored, the test inputs of [`TEST_INPUTS`], and what every
+/// gate key holds (the measuring code, toolchains, target and host class).
+fn test(root: &Path, output: &Path, release: bool, full: bool) -> R<i32> {
+    let mut command = owned(&["test", "--workspace", "--locked"]);
+    if release {
+        command.push("--release".into());
+    }
+    command.extend(crate::harness::gate_build::target_args()?);
+    let inputs = TEST_INPUTS
+        .iter()
+        .map(|dir| Ok(((*dir).to_owned(), Value::str(tree_digest(&root.join(dir))?))))
+        .collect::<R<Vec<_>>>()?;
+    let settings = Value::object([
+        ("cargo", Value::strings(command.clone())),
+        ("sources", Value::str(sources_digest(root)?)),
+        ("inputs", Value::Object(inputs)),
+    ]);
+    let key = crate::harness::reuse::Key::new(root, "gate test", settings, &[], &[])?;
+    crate::harness::reuse::step(root, output, &key, full, || {
+        status(
+            Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+                .args(&command)
+                .env("CARGO_INCREMENTAL", "0")
+                .current_dir(root),
+        )
+    })
+}
+
+/// The SHA-256 of every tracked file as the working tree holds it, and of the
+/// untracked files git does not ignore.
+fn sources_digest(root: &Path) -> R<String> {
+    let mut digest = sha256::Sha256::default();
+    digest.update(git(root, &["ls-files", "-s"])?.as_bytes());
+    let changed = git(root, &["diff", "HEAD", "--name-only", "-z"])?;
+    let untracked = git(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+    for path in changed
+        .split('\0')
+        .chain(untracked.split('\0'))
+        .filter(|p| !p.is_empty())
+    {
+        let file = root.join(path);
+        let sha = if file.is_file() {
+            sha256::file_hex(&file).map_err(|e| format!("{}: {e}", file.display()))?
+        } else {
+            "absent".to_owned()
+        };
+        digest.update(format!("{sha}  {path}\n").as_bytes());
+    }
+    Ok(digest.finish_hex())
+}
+
+/// The SHA-256 of every file under `dir` by relative path, or `absent`.
+fn tree_digest(dir: &Path) -> R<String> {
+    if !dir.is_dir() {
+        return Ok("absent".into());
+    }
+    let mut digest = sha256::Sha256::default();
+    for (relative, path) in crate::evidence::files(dir)? {
+        let sha = sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        digest.update(format!("{sha}  {relative}\n").as_bytes());
+    }
+    Ok(digest.finish_hex())
 }
 
 /// Joins the shards' outputs into one result at `file`; 0 when every planned
@@ -1143,6 +1242,37 @@ mod tests {
                 .collect();
             assert_eq!(again, names);
         }
+    }
+
+    #[test]
+    fn a_test_result_is_keyed_by_every_source_the_working_tree_holds() {
+        let root = crate::walk::scratch("gate-test-sources");
+        let git = |args: &[&str]| {
+            assert!(
+                Command::new("git")
+                    .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+                    .args(args)
+                    .current_dir(&root)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        };
+        git(&["init", "-q"]);
+        fs::write(root.join("lib.rs"), b"a").unwrap();
+        git(&["add", "lib.rs"]);
+        git(&["commit", "-qm", "a"]);
+        let committed = sources_digest(&root).unwrap();
+        fs::write(root.join("lib.rs"), b"b").unwrap();
+        let changed = sources_digest(&root).unwrap();
+        assert_ne!(committed, changed);
+        fs::write(root.join("new.rs"), b"c").unwrap();
+        assert_ne!(sources_digest(&root).unwrap(), changed);
+        fs::remove_file(root.join("new.rs")).unwrap();
+        fs::write(root.join("lib.rs"), b"a").unwrap();
+        assert_eq!(sources_digest(&root).unwrap(), committed);
+        assert_eq!(tree_digest(&root.join("absent")).unwrap(), "absent");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
