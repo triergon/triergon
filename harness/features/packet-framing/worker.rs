@@ -11,7 +11,36 @@ use std::env::ArgsOs;
 use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, Read, Write};
+use std::process::ExitCode;
 use std::time::Instant;
+use triergon_core::Error;
+
+#[derive(Debug)]
+enum Failure {
+    Usage(&'static str),
+    Io(io::Error),
+    Framing(Error),
+}
+impl From<io::Error> for Failure {
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+impl From<Error> for Failure {
+    fn from(error: Error) -> Self {
+        Self::Framing(error)
+    }
+}
+
+#[cold]
+fn failed(error: Failure) -> ExitCode {
+    match error {
+        Failure::Usage(message) => eprintln!("framing worker: {message}"),
+        Failure::Io(error) => eprintln!("framing worker: {error}"),
+        Failure::Framing(error) => eprintln!("framing worker: {error}"),
+    }
+    ExitCode::FAILURE
+}
 
 fn execute(case: &Case, iterations: u32) -> triergon_core::Result<Outcome> {
     let mut total = Outcome::default();
@@ -22,11 +51,8 @@ fn execute(case: &Case, iterations: u32) -> triergon_core::Result<Outcome> {
         total.packets = total
             .packets
             .checked_add(next.packets)
-            .ok_or(triergon_core::Error::Overflow)?;
-        total.bytes = total
-            .bytes
-            .checked_add(next.bytes)
-            .ok_or(triergon_core::Error::Overflow)?;
+            .ok_or(Error::Overflow)?;
+        total.bytes = total.bytes.checked_add(next.bytes).ok_or(Error::Overflow)?;
     }
     Ok(total)
 }
@@ -40,7 +66,7 @@ fn read_chunk(input: &mut impl Read, output: &mut [u8]) -> io::Result<usize> {
     }
 }
 
-fn read_case(mut input: impl Read) -> Result<Case, Box<dyn std::error::Error>> {
+fn read_case(mut input: impl Read) -> Result<Case, Failure> {
     let mut chunk = [0; 1024];
     let mut filled = 0;
     while filled < chunk.len() {
@@ -56,13 +82,13 @@ fn read_case(mut input: impl Read) -> Result<Case, Box<dyn std::error::Error>> {
     loop {
         let length = script.len() + filled;
         if length > CAP {
-            return Err(triergon_core::Error::Limit {
+            return Err(Error::Limit {
                 requested: length,
                 maximum: CAP,
             }
             .into());
         }
-        script.try_reserve(filled)?;
+        script.try_reserve(filled).map_err(|_| Error::Allocation)?;
         script.extend_from_slice(&chunk[..filled]);
         filled = read_chunk(&mut input, &mut chunk)?;
         if filled == 0 {
@@ -110,13 +136,20 @@ fn write_report(
 }
 
 /// `nal-fold FILE`, `nal-bench FILE ITERATIONS`, `nal-memory FILE`, or `identity -`.
-pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
+pub fn main(args: ArgsOs) -> ExitCode {
+    match run(args) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => failed(error),
+    }
+}
+
+fn run(mut args: ArgsOs) -> Result<(), Failure> {
     args.next();
     let mode = args.next();
     let mode = mode
         .as_deref()
         .and_then(OsStr::to_str)
-        .ok_or("mode required")?;
+        .ok_or(Failure::Usage("mode required"))?;
     let mut output = io::stdout().lock();
     if mode == "identity" && args.len() <= 1 {
         output.write_all(
@@ -129,20 +162,22 @@ pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
     if (!timing && !memory && mode != "nal-fold" && mode != "nal-check")
         || args.len() != if timing { 2 } else { 1 }
     {
-        return Err("expected nal-fold FILE, nal-bench FILE ITERATIONS, or nal-memory FILE".into());
+        return Err(Failure::Usage(
+            "expected nal-fold FILE, nal-bench FILE ITERATIONS, or nal-memory FILE",
+        ));
     }
-    let path = args.next().ok_or("file required")?;
+    let path = args.next().ok_or(Failure::Usage("file required"))?;
     let iterations = if timing {
-        let count = args.next().ok_or("iteration count required")?;
-        count
-            .to_str()
-            .ok_or("invalid iteration count")?
-            .parse::<u32>()?
+        args.next()
+            .as_deref()
+            .and_then(OsStr::to_str)
+            .and_then(|count| count.parse::<u32>().ok())
+            .ok_or(Failure::Usage("invalid iteration count"))?
     } else {
         1
     };
     if !(1..=1_000_000).contains(&iterations) {
-        return Err("iterations must be 1..1000000".into());
+        return Err(Failure::Usage("iterations must be 1..1000000"));
     }
     let case = read_case(File::open(path)?)?;
     if memory {
@@ -152,7 +187,7 @@ pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
     let start = timing.then(Instant::now);
     let total = execute(&case, iterations)?;
     let elapsed = if let Some(start) = start {
-        u64::try_from(start.elapsed().as_nanos())?
+        u64::try_from(start.elapsed().as_nanos()).map_err(|_| Error::Overflow)?
     } else {
         0
     };
