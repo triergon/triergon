@@ -744,14 +744,21 @@ impl PacketEmission {
         cancel: &AtomicBool,
     ) -> Result<Step> {
         let parts = state.segments.as_slice();
+        let source = state
+            .source
+            .as_ref()
+            .ok_or(Error::Invalid("missing packet source"))?
+            .bytes
+            .as_ref();
+        let configuration = state.config().bytes().as_ref();
+        let buffer = self
+            .output
+            .as_mut()
+            .ok_or(Error::Invalid("missing packet buffer"))?;
         while let Some(part) = parts.get(self.copy_segment) {
             let prefix = usize::from(part.prefix_bytes());
             // Planning checked the complete output extent, including every prefix.
             let end = prefix + part.len();
-            let buffer = self
-                .output
-                .as_mut()
-                .ok_or(Error::Invalid("missing packet buffer"))?;
             // Charge and check cancellation at the prefix, payload chunks
             // and segment boundary, including when resuming a partial copy.
             if self.copied < prefix {
@@ -777,23 +784,14 @@ impl PacketEmission {
                 if work.remaining() == 0 {
                     return Ok(YIELD);
                 }
-                let source = &state
-                    .source
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing packet source"))?
-                    .bytes;
-                let backing = if (part.nal_and_prefix >> 24) as u8
-                    & NalPacketSegment::CONFIGURATION_SOURCE
-                    == 0
-                {
-                    source
+                let backing = if part.is_configuration() {
+                    configuration
                 } else {
-                    state.update.as_ref().map_or_else(
-                        || state.session.configuration.bytes(),
-                        super::AvcUpdate::bytes,
-                    )
+                    source
                 };
-                let payload = part.payload(backing)?;
+                let payload = backing
+                    .get(part.source_range())
+                    .ok_or(Error::Invalid("packet segment range"))?;
                 while self.copied < end {
                     let count = work_count(work).min(end - self.copied);
                     if count == 0 {

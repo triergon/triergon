@@ -572,13 +572,13 @@ impl NalPacketSegment {
         }
     }
     pub fn origin(&self) -> NalPacketOrigin {
-        if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
-            NalPacketOrigin::Packet {
+        if self.is_configuration() {
+            NalPacketOrigin::Configuration {
+                nal_index: (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize,
                 source_range: self.source_range(),
             }
         } else {
-            NalPacketOrigin::Configuration {
-                nal_index: (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize,
+            NalPacketOrigin::Packet {
                 source_range: self.source_range(),
             }
         }
@@ -606,18 +606,15 @@ impl NalPacketSegment {
     fn is_passthrough(&self) -> bool {
         (self.nal_and_prefix >> 24) as u8 & Self::PASSTHROUGH != 0
     }
-    fn backing<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
-        if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
-            packet
-        } else {
-            configuration
-        }
+    fn is_configuration(&self) -> bool {
+        (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE != 0
     }
-    fn payload<'a>(&self, backing: &'a Bytes) -> Result<&'a [u8]> {
-        backing
-            .as_ref()
-            .get(self.source_range())
-            .ok_or(Error::Invalid("packet segment range"))
+    fn backing<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
+        if self.is_configuration() {
+            configuration
+        } else {
+            packet
+        }
     }
 }
 
@@ -1284,7 +1281,7 @@ mod packed_plan_boundary_guards {
             );
             assert_eq!(part.prefix_bytes(), prefix);
             assert_eq!(part.output_offset(), usize::MAX);
-            assert_eq!(part.payload(part.backing(&raw, &raw)).unwrap(), &[0x41]);
+            assert_eq!(&part.backing(&raw, &raw)[part.source_range()], &[0x41]);
             assert_eq!(
                 format!("{part:?}"),
                 format!(
