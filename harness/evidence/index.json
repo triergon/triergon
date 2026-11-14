@@ -20235,6 +20235,15 @@
    "key": "evidence/packet-framing-combined-40e2ab49-aarch64/1af7451dbad47826469d5133ff4d09cc658cf942eaab7f84fd9b7631ba848881.tar.zst",
    "sha256": "1af7451dbad47826469d5133ff4d09cc658cf942eaab7f84fd9b7631ba848881",
    "bytes": 60161485
+  },
+  {
+   "name": "packet-framing-parallel-bb57273d-aarch64",
+   "path": "packet-framing-parallel-bb57273d-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with shared libm and parallel memory collection. Includes source, workers, the reviewed observer and all 131 cases with the two runtime misses.",
+   "key": "evidence/packet-framing-parallel-bb57273d-aarch64/7d7f2805ee7835963e2d68d771cd5bda5a61f59a077bfee84a80dee6552aa53b.tar.zst",
+   "sha256": "7d7f2805ee7835963e2d68d771cd5bda5a61f59a077bfee84a80dee6552aa53b",
+   "bytes": 55066769
   }
  ]
 }
