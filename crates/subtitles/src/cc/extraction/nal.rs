@@ -29,21 +29,28 @@
 //! the depth leave (probes p53, p12-big). Without a bitstream restriction the
 //! depth starts at 0 and becomes the number of the last 16 pictures decoded
 //! above a picture, when that is more (probes p47, p57; `h264-grow-ts`,
-//! `h264-depth-grow-ts`), and after a B picture at least one picture waits
-//! (probe p50; `h264-b-in-order-ts`). Nothing then leaves before the seventh
-//! picture when MaxDpbFrames (Table A-1) is 2 or more (probes p27, p29, p47;
-//! `h264-start-hold-ts`), before the ninth or tenth when the depth is 1 or 2 by
-//! the seventh (probe p62; `h264-hold-depth1-ts`), nor before the twenty-first
-//! when it is 3 or more (probes p48, p50); and a picture more than 2 above the
-//! last output waits for one more picture, except at the seventh, where it also
-//! holds those behind it (probes p31, p34; package case0014). Among the first
-//! 20 pictures at least one waits (probe p27). A picture below each of the last
-//! 15 decoded leaves at once, after those waiting (probes p22, p23; package
-//! case0003). A picture leaving after a picture with a higher order count has
-//! been output (since the last IDR picture or operation 5) is dropped with its
-//! captions (`h264-reorder-ts`). The two fields of a pair, in one packet or
-//! two, make one frame carrying both fields' captions in decode order, with the
-//! first field's times; its VUI frame period is one tick (`h264-fields-ts`).
+//! `h264-depth-grow-ts`); after a B picture at least one picture waits
+//! (probe p50; `h264-b-in-order-ts`), and at depth 0 a picture more than 2
+//! above the one before it raises the depth to 1, unless a gap in `frame_num`
+//! comes before it (probe p74; `h264-jump-depth-ts`, `h264-gap-jump-ts`).
+//! When MaxDpbFrames (Table A-1) is 2 or more, nothing leaves at first: the
+//! hold ends once a decoder outputting from the first picture would have
+//! output 7 pictures at a depth below 3 (its depth growing as above, a B
+//! picture or such a step raising 0 to 1, and a picture below the last it
+//! output dropped), at the twenty-first picture at a deeper depth, or at the
+//! picture whose depth equals MaxDpbFrames (probes p27, p47, p62, p64-p69;
+//! `h264-start-hold-ts`, `h264-hold-depth1-ts`, `h264-hold-jump-ts`,
+//! `h264-hold-dpb-ts`). Among the first 20 pictures at least one waits (probe
+//! p27). A picture below each of the last 15 decoded leaves at once, after
+//! those waiting (probes p22, p23; package case0003). A picture leaving after a
+//! picture with a higher order count has been output (since the last IDR
+//! picture or operation 5) is dropped with its captions (`h264-reorder-ts`).
+//! The two fields of a pair, in one packet or two, make one frame carrying both
+//! fields' captions in decode order, with the first field's times; its VUI
+//! frame period is one tick (`h264-fields-ts`). Pictures leave by frames, none
+//! while a first field waits for its second (`h264-fields-packed-ts`). A field
+//! without its pair is not output; its caption bytes go to the next picture
+//! (`h264-fields-lone-ts`).
 //!
 //! A stream that does not start at an IDR picture outputs nothing until it
 //! recovers (`h264-recovery-*`): at an IDR picture; at the reference picture
@@ -123,26 +130,18 @@ use triergon_framing::picture_output::{
 };
 use triergon_framing::{AvcPocSyntax, hevc as kinds};
 
-/// H.264 without a bitstream restriction: the index of the picture (from 0,
-/// in decode order) before which the reference outputs nothing (probes p27,
-/// p47).
-const HOLD_UNTIL: u32 = 6;
-
 /// H.264: the pictures before this index wait for at least one more
 /// (probes p27, p51).
 const START_WINDOW: u32 = 20;
 
-/// H.264 without a bitstream restriction: the index of the picture that ends
-/// the start hold, by the depth at [`HOLD_UNTIL`] (0: probes p27, p47; 1
-/// and 2: probe p62; 3 or more: probes p48, p50).
-fn hold_end(depth: u32) -> u32 {
-    match depth {
-        0 => HOLD_UNTIL,
-        1 => HOLD_UNTIL + 2,
-        2 => HOLD_UNTIL + 3,
-        _ => START_WINDOW,
-    }
-}
+/// H.264 without a bitstream restriction: the start hold ends once the
+/// early decoder ([`EarlyHold`]) has output this many pictures at a depth
+/// below [`DEEP`] (probes p27, p47, p62, p64-p68).
+const EARLY_OUTPUTS: u32 = 7;
+
+/// H.264 without a bitstream restriction: from this depth the start hold
+/// lasts until index [`START_WINDOW`] (probes p48, p50, p69, p70).
+const DEEP: u32 = 3;
 
 /// H.264: the order counts of the last pictures decoded that a picture's
 /// displacement counts (probes p47, p57).
@@ -152,8 +151,8 @@ const RECENT: usize = 16;
 /// decoded is output at once, after the pictures waiting (probes p22, p23).
 const FAR_BACK: usize = 15;
 
-/// H.264: a picture whose order count is at most this much above the last
-/// output follows it without a gap (probes p31, p32, p34).
+/// H.264: a picture whose order count is more than this above the picture
+/// before it raises a depth of 0 to 1 (probes p31, p32, p64, p66, p74).
 const NEXT_STEP: i32 = 2;
 
 /// The packets whose decode times the duration estimate takes.
@@ -181,6 +180,72 @@ struct FirstField {
     id: PictureId,
     frame_num: u16,
     parity: Parity,
+}
+
+/// H.264 without a bitstream restriction: the start of the stream as a
+/// decoder that outputs from the first picture would see it, which decides
+/// when the reference's start hold ends. Its depth grows to each picture's
+/// displacement; at depth 0 a B picture, or a picture more than
+/// [`NEXT_STEP`] above the one before it, raises it to 1; pictures leave,
+/// lowest order count first, while more wait than the depth, and one below
+/// the last to leave is dropped (probes p64-p70).
+#[derive(Clone, Copy, Debug, Default)]
+struct EarlyHold {
+    depth: u32,
+    waiting: [i32; RECENT + 1],
+    len: usize,
+    last: Option<i32>,
+    previous: Option<i32>,
+    outputs: u32,
+    /// The hold has ended.
+    ended: bool,
+}
+
+impl EarlyHold {
+    /// Takes the next picture: its order count, the number of recent
+    /// pictures above it, whether it is a B picture and whether a gap in
+    /// `frame_num` comes before it.
+    fn picture(&mut self, poc: i32, displaced: u32, b: bool, gap: bool) {
+        self.depth = self.depth.max(displaced.min(RECENT as u32));
+        if self.depth == 0
+            && (b
+                || !gap
+                    && self
+                        .previous
+                        .is_some_and(|p| poc > p.saturating_add(NEXT_STEP)))
+        {
+            self.depth = 1;
+        }
+        self.previous = Some(poc);
+        self.waiting[self.len] = poc;
+        self.len += 1;
+        while self.len > self.depth as usize {
+            let (at, &lowest) = self.waiting[..self.len]
+                .iter()
+                .enumerate()
+                .min_by_key(|&(_, &q)| q)
+                .unwrap_or((0, &poc));
+            self.len -= 1;
+            self.waiting[at] = self.waiting[self.len];
+            if self.last.is_none_or(|last| lowest >= last) {
+                self.outputs += 1;
+                self.last = Some(lowest);
+            }
+        }
+    }
+
+    /// Whether the hold ends at picture `index`: once [`EARLY_OUTPUTS`]
+    /// pictures have left at a depth below [`DEEP`] (probes p64, p66,
+    /// p68: 7, 8, 9 or 10 pictures by the drops and raises before), at
+    /// index [`START_WINDOW`] at a deeper depth (probes p69, p70), or when
+    /// the depth equals MaxDpbFrames (probe p67).
+    fn ends(&self, index: u32, dpb_frames: u32) -> bool {
+        if self.depth < DEEP {
+            self.outputs >= EARLY_OUTPUTS || self.depth == dpb_frames
+        } else {
+            index >= START_WINDOW || self.depth == dpb_frames
+        }
+    }
 }
 
 /// The order counts of the last pictures decoded.
@@ -223,9 +288,12 @@ struct AvcState {
     holds: bool,
     /// A B picture has been decoded (no bitstream restriction).
     b_seen: bool,
-    /// The depth when picture [`HOLD_UNTIL`] was decoded.
-    early_depth: u32,
+    /// MaxDpbFrames of the SPS (Table A-1), and the start hold.
+    dpb_frames: u32,
+    early: EarlyHold,
     recent: Recent,
+    /// The order count of the last picture decoded.
+    previous: Option<i32>,
     recovered: bool,
     /// The `frame_num` a recovery point SEI names.
     target: Option<u32>,
@@ -477,6 +545,8 @@ impl NalDecode {
     ) -> Result<()> {
         let start = self.progress.pending.unwrap_or(self.captions.bytes.len());
         let mut picture = Picture::None;
+        // H.264: the other field of the frame, in the same packet.
+        let mut second = None;
         let mut recovery = None;
         let mut end_after = false;
         for nal in nal_units(data, self.framing) {
@@ -515,11 +585,20 @@ impl NalDecode {
                 (
                     Tables::Avc(tables),
                     triergon_framing::avc::SLICE | triergon_framing::avc::IDR,
-                ) if matches!(picture, Picture::None) => {
-                    if let Some(slice) = tables.slice(nal) {
-                        picture = Picture::Avc(slice);
+                ) => match picture {
+                    Picture::None => {
+                        if let Some(slice) = tables.slice(nal) {
+                            picture = Picture::Avc(slice);
+                        }
                     }
-                }
+                    Picture::Avc(first) if second.is_none() => {
+                        second = tables.slice(nal).filter(|slice| {
+                            slice.header.bottom_field.is_some()
+                                && slice.header.bottom_field != first.header.bottom_field
+                        });
+                    }
+                    _ => {}
+                },
                 (Tables::Hevc(tables), kinds::SPS) => {
                     if let Some((id, old)) = tables.put_sps(payload)? {
                         if old.is_some() {
@@ -586,7 +665,25 @@ impl NalDecode {
                     2
                 };
                 let held = held(self, sps.timing(), ticks);
-                self.avc_picture(slice, recovery, held, out)
+                self.avc_picture(slice, recovery, held, out)?;
+                // The second field, without caption bytes of its own: the
+                // packet's go to the first.
+                match second {
+                    Some(slice) => {
+                        let end = self.captions.bytes.len();
+                        self.avc_picture(
+                            slice,
+                            None,
+                            Held {
+                                start: end,
+                                end,
+                                ..held
+                            },
+                            out,
+                        )
+                    }
+                    None => Ok(()),
+                }
             }
             Picture::Hevc { slice, after_end } => {
                 let Tables::Hevc(tables) = &self.tables else {
@@ -681,6 +778,16 @@ impl NalDecode {
             AvcPocSyntax::FrameNum => AvcPocCoding::FrameNum,
         };
         let state = &mut self.progress.avc;
+        // A gap in `frame_num` (8.2.5.2) before this picture.
+        let gap = !slice.idr
+            && state
+                .order
+                .gap(
+                    u32::from(header.frame_num),
+                    u32::from(fields.frame_num_bits),
+                )
+                .next()
+                .is_some();
         let poc = state.order.next(&AvcPocFields {
             idr: slice.idr,
             reference: slice.reference,
@@ -728,9 +835,12 @@ impl NalDecode {
                     self.emit_avc(out)?;
                     return self.bump_avc(out);
                 }
-            } else if let Some(mut entry) = self.pictures.entry(first.id) {
-                // An unpaired first field may leave on its own.
-                entry.release();
+            } else if let Some(lone) = self.pictures.take(first.id) {
+                // An unpaired field is not output: its caption bytes go to
+                // the next picture (package case0021, case0116).
+                if lone.end == held.start {
+                    held.start = lone.start;
+                }
             }
         }
         // The reorder depth: the bitstream restriction's, or one that grows.
@@ -747,15 +857,14 @@ impl NalDecode {
             }
             state.stated = false;
         }
-        state.holds = !state.stated
-            && max_dpb_frames(
-                fields.profile_idc,
-                fields.constraint_set3,
-                fields.level_idc,
-                fields.frame_mbs,
-            )
-            .unwrap_or(16)
-                >= 2;
+        state.dpb_frames = max_dpb_frames(
+            fields.profile_idc,
+            fields.constraint_set3,
+            fields.level_idc,
+            fields.frame_mbs,
+        )
+        .unwrap_or(16);
+        state.holds = !state.stated && state.dpb_frames >= 2;
         if slice.idr || header.mmco5 {
             self.leaving.try_reserve(self.pictures.len())?;
             let leaving = &mut self.leaving;
@@ -797,6 +906,17 @@ impl NalDecode {
                     // p50 k0: a B picture in order at index 1).
                     state.b_seen = true;
                 }
+                // At depth 0, a picture more than NEXT_STEP above the one
+                // before it raises the depth to 1, unless a gap in
+                // `frame_num` comes before it (probe p74).
+                if state.depth == 0
+                    && !gap
+                    && state
+                        .previous
+                        .is_some_and(|p| order > p.saturating_add(NEXT_STEP))
+                {
+                    state.depth = 1;
+                }
             } else if displaced > 0 && header.slice_type % 5 == 1 && state.decoded <= START_WINDOW {
                 // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
                 // p3-h264-pyr-r0).
@@ -804,10 +924,19 @@ impl NalDecode {
             }
         }
         let state = &mut self.progress.avc;
-        state.recent.push(order);
-        if state.decoded == HOLD_UNTIL + 1 {
-            state.early_depth = state.depth;
+        if !state.early.ended {
+            let displaced = state.recent.last(RECENT).filter(|&q| q > order).count();
+            state.early.picture(
+                order,
+                u32::try_from(displaced).unwrap_or(u32::MAX),
+                header.slice_type % 5 == 1,
+                gap,
+            );
+            let index = state.decoded.saturating_sub(1);
+            state.early.ended = state.early.ends(index, state.dpb_frames);
         }
+        state.recent.push(order);
+        state.previous = Some(order);
         let state = &mut self.progress.avc;
         if slice.idr {
             state.recovered = true;
@@ -930,32 +1059,24 @@ impl NalDecode {
     }
 
     /// Outputs H.264 pictures while more wait than the reorder depth: none
-    /// while the start is held, at least one waits in the start window, and
-    /// without a bitstream restriction a picture after a gap in the order
-    /// counts waits for one more (none at the end of the hold).
+    /// while the start is held or a first field waits for its second, and at
+    /// least one waits in the start window and, without a bitstream
+    /// restriction, after a B picture.
     fn bump_avc(&mut self, out: &mut FrameQueue) -> Result<()> {
         let state = &self.progress.avc;
+        // Pictures leave by frames: none while a first field waits for its
+        // second (package case0060, case0749).
+        if state.first_field.is_some() {
+            return Ok(());
+        }
         let index = state.decoded.saturating_sub(1);
-        if state.holds && (index < HOLD_UNTIL || index < hold_end(state.early_depth)) {
+        if state.holds && !state.early.ended {
             return Ok(());
         }
         loop {
             let state = &self.progress.avc;
-            let Some(next) = self.pictures.next_output() else {
-                return Ok(());
-            };
             let mut depth = state.depth as usize;
             if index < START_WINDOW || (state.b_seen && !state.stated) {
-                depth = depth.max(1);
-            }
-            let follows = state
-                .late
-                .last()
-                .is_none_or(|last| next <= last.saturating_add(NEXT_STEP));
-            if !state.stated && !follows {
-                if state.holds && index == HOLD_UNTIL && hold_end(state.early_depth) == HOLD_UNTIL {
-                    return Ok(());
-                }
                 depth = depth.max(1);
             }
             if self.pictures.waiting() <= depth {
@@ -1204,4 +1325,64 @@ fn keep<T>(list: &mut BudgetVec<T>, item: T) {
     debug_assert!(list.len() < list.capacity());
     // Within the reserved capacity, the push neither allocates nor fails.
     let _ = list.try_push(item);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EarlyHold;
+
+    /// The index at which the start hold ends for pictures given as (order
+    /// count, B picture), without frame_num gaps.
+    fn hold_end(pictures: &[(i32, bool)], dpb_frames: u32) -> Option<u32> {
+        let mut hold = EarlyHold::default();
+        let mut recent: Vec<i32> = Vec::new();
+        for (index, &(poc, b)) in (0u32..).zip(pictures) {
+            let displaced = recent.iter().rev().take(16).filter(|&&q| q > poc).count();
+            hold.picture(poc, u32::try_from(displaced).unwrap(), b, false);
+            recent.push(poc);
+            if hold.ends(index, dpb_frames) {
+                return Some(index);
+            }
+        }
+        None
+    }
+
+    /// P frames from order count `first` in steps of 2, with B pictures at
+    /// the given indices `below` P frames under the last.
+    fn stream(first: i32, bs: &[(usize, usize)], count: usize) -> Vec<(i32, bool)> {
+        let mut out = vec![(0, false)];
+        let mut p = first - 2;
+        let mut ps = vec![0];
+        while out.len() < count {
+            if let Some(&(_, below)) = bs.iter().find(|&&(at, _)| at == out.len()) {
+                out.push((ps[ps.len() - below] - 1, true));
+            } else {
+                p += 2;
+                ps.push(p);
+                out.push((p, false));
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn the_hold_ends_by_the_early_outputs() {
+        // Probes p27/p47 (depth 0), p64 (a2: 8, a4: 7), p68 (b2k1-b5k2: 10),
+        // p67 (k2: 9), p69 (k3: 20).
+        assert_eq!(hold_end(&stream(2, &[], 30), 16), Some(6));
+        assert_eq!(hold_end(&stream(2, &[(2, 1)], 30), 16), Some(8));
+        assert_eq!(hold_end(&stream(4, &[(2, 1)], 30), 16), Some(7));
+        assert_eq!(hold_end(&stream(2, &[(3, 2)], 30), 16), Some(9));
+        assert_eq!(hold_end(&stream(2, &[(2, 1), (5, 2)], 30), 16), Some(10));
+        assert_eq!(hold_end(&stream(2, &[(4, 3)], 30), 16), Some(20));
+    }
+
+    #[test]
+    fn the_hold_ends_when_the_depth_reaches_max_dpb_frames() {
+        // Probe p67: d2-k2 and d3-k3 release at the B picture itself; d2-k3
+        // holds to index 20.
+        assert_eq!(hold_end(&stream(2, &[(4, 2)], 30), 2), Some(4));
+        assert_eq!(hold_end(&stream(2, &[(5, 3)], 30), 3), Some(5));
+        assert_eq!(hold_end(&stream(2, &[(4, 3)], 30), 2), Some(20));
+    }
 }

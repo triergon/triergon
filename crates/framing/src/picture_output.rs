@@ -333,12 +333,6 @@ impl<P> DecodedPictures<P> {
         self.stored.iter().filter(|p| p.waiting).count()
     }
 
-    /// The order count of the picture [`DecodedPictures::bump`] outputs next.
-    #[must_use]
-    pub fn next_output(&self) -> Option<i32> {
-        self.first_waiting().map(|at| self.stored[at].poc)
-    }
-
     /// The stored pictures, in storage order.
     pub fn entries_mut(&mut self) -> impl Iterator<Item = Entry<'_, P>> {
         self.stored.iter_mut().map(Entry)
@@ -347,6 +341,14 @@ impl<P> DecodedPictures<P> {
     /// The stored picture `id`.
     pub fn entry(&mut self, id: PictureId) -> Option<Entry<'_, P>> {
         self.stored.iter_mut().find(|p| p.id == id).map(Entry)
+    }
+
+    /// Removes the stored picture `id` without output and gives its payload
+    /// back.
+    pub fn take(&mut self, id: PictureId) -> Option<P> {
+        let at = self.stored.iter().position(|p| p.id == id)?;
+        self.stored.as_mut_slice()[at..].rotate_left(1);
+        self.stored.pop().map(|p| p.picture)
     }
 
     /// Marks both fields of the pictures `keep` refuses (given each picture's

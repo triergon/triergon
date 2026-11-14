@@ -133,16 +133,79 @@ fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
         u32::try_from(track.time_base.numerator())?,
         u32::try_from(track.time_base.denominator())?,
     );
+    // The configuration's parameter sets go before the first packet's NAL
+    // units, as a decoder takes them before the stream.
+    let sets = match coding {
+        VideoCoding::Nal(codec, Framing::Lengths(size)) => {
+            configuration_units(codec, &track.configuration, size)
+        }
+        _ => Vec::new(),
+    };
     extract(coding, time_base, |push| {
-        track.packets.iter().try_for_each(|p| {
+        track.packets.iter().enumerate().try_for_each(|(at, p)| {
+            let first;
+            let data = if at == 0 && !sets.is_empty() {
+                first = [sets.as_slice(), &p.data].concat();
+                &first[..]
+            } else {
+                &p.data[..]
+            };
             push(VideoPacket {
-                data: &p.data,
+                data,
                 pts: p.pts,
                 dts: p.dts,
                 duration: p.duration,
             })
         })
     })
+}
+
+/// The parameter-set NAL units of an `avcC` or `hvcC` configuration, each
+/// behind a `size`-byte length.
+fn configuration_units(codec: Codec, configuration: &[u8], size: u8) -> Vec<u8> {
+    let mut units = Vec::new();
+    let mut put = |nal: &[u8]| {
+        let len = u32::try_from(nal.len()).unwrap_or(u32::MAX).to_be_bytes();
+        units.extend_from_slice(&len[4 - usize::from(size)..]);
+        units.extend_from_slice(nal);
+    };
+    // A list of `count` units, each behind a 16-bit length, from `at`.
+    let list = |at: &mut usize, count: usize, put: &mut dyn FnMut(&[u8])| {
+        for _ in 0..count {
+            let Some(len) = configuration.get(*at..*at + 2) else {
+                return;
+            };
+            let len = usize::from(u16::from_be_bytes([len[0], len[1]]));
+            let Some(nal) = configuration.get(*at + 2..*at + 2 + len) else {
+                return;
+            };
+            put(nal);
+            *at += 2 + len;
+        }
+    };
+    match codec {
+        Codec::H264 => {
+            let mut at = 6;
+            let sps = configuration.get(5).map_or(0, |b| usize::from(b & 0x1f));
+            list(&mut at, sps, &mut put);
+            if let Some(&pps) = configuration.get(at) {
+                at += 1;
+                list(&mut at, usize::from(pps), &mut put);
+            }
+        }
+        Codec::Hevc => {
+            let mut at = 23;
+            for _ in 0..configuration.get(22).copied().unwrap_or(0) {
+                let Some(count) = configuration.get(at + 1..at + 3) else {
+                    break;
+                };
+                let count = usize::from(u16::from_be_bytes([count[0], count[1]]));
+                at += 3;
+                list(&mut at, count, &mut put);
+            }
+        }
+    }
+    units
 }
 
 /// The caption frames of the video packets `feed` pushes (decode order) as

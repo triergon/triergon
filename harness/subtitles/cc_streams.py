@@ -755,7 +755,9 @@ def set_vui_timing(au, old, new, hevc):
 # P and B fields of one skipped macroblock), I P B B order, order count type 0.
 
 
-def field_sps():
+def field_sps(restriction=(2, 4)):
+    """An SPS of 16x32 field pairs, VUI timing 1001/60000 and the bitstream
+    restriction (reorder, buffering)."""
     b = BitWriter()
     for v, n in ((77, 8), (0, 8), (30, 8)):
         b.u(v, n)
@@ -774,7 +776,7 @@ def field_sps():
     b.u(0, 3)
     b.u(1, 1)
     b.u(1, 1)
-    for v in (0, 0, 16, 16, 2, 4):
+    for v in (0, 0, 16, 16) + tuple(restriction):
         b.ue(v)
     b.u(1, 1)
     return b"\x67" + escape(b.rbsp())
@@ -824,18 +826,19 @@ def field_slice(kind, idr, ref, frame_num, bottom, lsb):
     return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
 
 
-def frame_sps(restriction=None):
-    """An SPS of 32x32 frames: frame_num 4 bits, POC type 0 with 8-bit LSBs,
-    2 reference frames, level 3.0; with `restriction` (reorder, buffering) a
-    VUI bitstream restriction, else no VUI."""
+def frame_sps(restriction=None, size=(2, 2), level=30):
+    """An SPS of 32x32 frames (or `size` macroblocks): frame_num 4 bits, POC
+    type 0 with 8-bit LSBs, 2 reference frames, level 3.0 (or `level`); with
+    `restriction` (reorder, buffering) a VUI bitstream restriction, else no
+    VUI."""
     b = BitWriter()
-    for v, n in ((77, 8), (0, 8), (30, 8)):
+    for v, n in ((77, 8), (0, 8), (level, 8)):
         b.u(v, n)
     for v in (0, 0, 0, 4, 2):
         b.ue(v)
     b.u(0, 1)
-    b.ue(1)
-    b.ue(1)  # 32x32
+    b.ue(size[0] - 1)
+    b.ue(size[1] - 1)
     for v in (1, 1, 0):
         b.u(v, 1)  # frames, direct 8x8, no crop
     b.u(1 if restriction else 0, 1)
@@ -851,8 +854,9 @@ def frame_sps(restriction=None):
     return b"\x67" + escape(b.rbsp())
 
 
-def frame_slice(kind, idr, ref, frame_num, lsb):
-    """A slice of a 32x32 frame (field_pps): I_PCM or skipped macroblocks."""
+def frame_slice(kind, idr, ref, frame_num, lsb, mbs=4):
+    """A slice of a 32x32 frame (or of `mbs` macroblocks; field_pps): I_PCM
+    or skipped macroblocks."""
     b = BitWriter()
     b.ue(0)
     b.ue({"P": 5, "B": 6, "I": 7}[kind])
@@ -869,22 +873,24 @@ def frame_slice(kind, idr, ref, frame_num, lsb):
         b.u(0, 2 if idr else 1)
     b.se(0)
     if kind == "I":
-        for _ in range(4):
+        for _ in range(mbs):
             b.ue(25)  # I_PCM
             b.u(0, -len(b.bits) % 8)
             for _ in range(384):
                 b.u(0x80, 8)
     else:
-        b.ue(4)  # mb_skip_run
+        b.ue(mbs)  # mb_skip_run
     b.u(1, 1)
     return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
 
 
-def frame_pictures(count, bs=(), start=None, ifr=None):
+def frame_pictures(count, bs=(), start=None, ifr=None, jumps=(), gaps=()):
     """(kind, idr, ref, frame_num, order count) of P frames with order counts
     2 apart from an IDR picture; `bs` maps a decode index to (P frames above
     it, ...) for a non-reference B picture; `start` (index of a non-IDR I
-    frame) begins without an IDR picture."""
+    frame) begins without an IDR picture; the P frames at the decode indices
+    in `jumps` are 4 above the one before, and those in `gaps` skip one
+    frame_num."""
     out, fn, pk = [], 0, 0
     pocs = []
     base, offset = (0, 0) if start is None else (40, 2)
@@ -895,8 +901,8 @@ def frame_pictures(count, bs=(), start=None, ifr=None):
             continue
         if n == 0 and start is None:
             out.append(("I", True, True, 0, 0)); pocs.append(0); continue
-        fn += 1
-        pk += 1
+        fn += 2 if n in gaps else 1
+        pk += 2 if n in jumps else 1
         kind = "I" if start is not None and n == start else "P"
         poc = base + 2 * pk
         out.append((kind, False, True, fn + offset, poc)); pocs.append(poc)
@@ -1536,15 +1542,16 @@ def picture_output_cases(tmp_dir):
     # of its decode index.
     carrier32 = base("h264", "h264-carrier32", params="bframes=0")
 
-    def written(name, pictures, restriction=None):
+    def written(name, pictures, restriction=None, size=(2, 2), level=30):
         def au(n, payload):
             if n >= len(pictures):
                 return None
             kind, idr, ref, fn, poc = pictures[n]
-            nals = [b"\x09\xf0"] + ([frame_sps(restriction), field_pps()] if n == 0 else [])
+            nals = [b"\x09\xf0"] + ([frame_sps(restriction, size, level), field_pps()] if n == 0 else [])
             units = b"".join(b"\x00\x00\x00\x01" + nal for nal in nals)
             sei = sei_nal(sei_messages_t35(data[n % len(data)]), False)
-            return units + sei + b"\x00\x00\x00\x01" + frame_slice(kind, idr, ref, fn, poc)
+            slice_nal = frame_slice(kind, idr, ref, fn, poc, size[0] * size[1])
+            return units + sei + b"\x00\x00\x00\x01" + slice_nal
         out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au)), ["cc"]))
 
     # The start hold and depth growth without a bitstream restriction: a B
@@ -1583,7 +1590,53 @@ def picture_output_cases(tmp_dir):
         units = b"".join(b"\x00\x00\x00\x01" + nal for nal in nals)
         return units + sei + b"\x00\x00\x00\x01" + fields[n][0]
     out.append(("h264-fields-ts", write("h264-fields.ts", ts_rewrite_video(carrier, field_au)), ["cc"]))
+    out += hold_and_field_cases(written, carrier, fields, data)
     shutil.rmtree(tmp_dir)
+    return out
+
+
+def hold_and_field_cases(written, carrier, fields, data):
+    """The start hold by an order count jump and by MaxDpbFrames, the depth
+    raised by a jump, frame_num gaps, unpaired fields, field pairs in one
+    packet and parameter sets only in a Matroska CodecPrivate."""
+    out = []
+    # A step of 4 from the IDR picture before the B picture that makes the
+    # depth 1 ends the hold at index 7: the B picture 5 below at index 8 is
+    # dropped (kept in h264-hold-depth1).
+    written("h264-hold-jump", frame_pictures(300, bs={2: 1, 8: 5, 12: 2}, jumps={1}))
+    # MaxDpbFrames 2 (198 macroblocks at level 1): the depth reaching 2 at
+    # index 3 ends the hold there; the B picture 5 below at index 8 is late.
+    written("h264-hold-dpb", frame_pictures(300, bs={3: 2, 8: 5, 30: 2}), size=(22, 9), level=10)
+    # After the start window, a step of 4 at index 30 raises the depth to 1
+    # for good: B pictures one below at 32 and 40 are kept; the same step
+    # after a frame_num gap does not (the B picture at 61 is dropped).
+    written("h264-jump-depth", frame_pictures(300, bs={32: 1, 40: 1}, jumps={30}))
+    written("h264-gap-jump", frame_pictures(300, bs={31: 1, 40: 1}, jumps={30}, gaps={30}))
+
+    def field_case(name, au_of):
+        out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier, au_of)), ["cc"]))
+
+    def field_unit(n, first, restriction=(2, 4)):
+        nals = [b"\x09\xf0"] + ([field_sps(restriction), field_pps()] if first else [])
+        sei = sei_nal(sei_messages_t35(data[(2 * fields[n][1] + n % 2) % len(data)]), False)
+        units = b"".join(b"\x00\x00\x00\x01" + nal for nal in nals)
+        return units + sei + b"\x00\x00\x00\x01" + fields[n][0]
+    # An unpaired field (the second field of the B frame at fields 8, 9 is
+    # left out) is not output; its caption bytes go to the next frame.
+    lone = [n for n in range(len(fields)) if n != 9]
+    field_case("h264-fields-lone", lambda n, au: field_unit(lone[n], n == 0) if n < len(lone) else None)
+    # Both fields of each frame in one packet, with B frames and a reorder
+    # depth of 1: frames leave by display order (the P frame after the B
+    # frames before it, none waiting for its second field).
+    field_case("h264-fields-packed", lambda n, au: field_unit(2 * n, n == 0, (1, 2)) + field_unit(2 * n + 1, False)
+               if 2 * n + 1 < len(fields) else None)
+    # The H.264 stream of h264-hold-depth1 in Matroska with its parameter
+    # sets only in the CodecPrivate.
+    source = os.path.join(OUT, "h264-hold-depth1.ts")
+    target = os.path.join(OUT, "h264-config.mkv")
+    run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-i", source, "-map", "0:v", "-c", "copy",
+         "-bsf:v", "filter_units=remove_types=7|8", "-fflags", "+bitexact", target])
+    out.append(("h264-config-mkv", target, ["cc"]))
     return out
 
 

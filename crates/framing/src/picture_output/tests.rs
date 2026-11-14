@@ -542,3 +542,26 @@ fn a_store_the_pool_refuses_gives_the_picture_back() {
     let refused = dpb.store(new, [7u8; 256]).expect_err("refused");
     assert_eq!(refused.picture, [7u8; 256]);
 }
+
+#[test]
+fn take_removes_a_picture_without_output() {
+    let mut dpb = DecodedPictures::new(&pool());
+    let new = |poc| NewPicture {
+        poc,
+        output: true,
+        marking: Marking::Unused,
+        field: None,
+        hold: false,
+    };
+    let first = dpb.store(new(0), 'a').unwrap();
+    dpb.store(new(2), 'b').unwrap();
+    assert_eq!(dpb.take(first), Some('a'));
+    assert_eq!(dpb.take(first), None);
+    let mut out = Vec::new();
+    dpb.flush(|leave| {
+        if let Leave::Output { poc, .. } = leave {
+            out.push(poc);
+        }
+    });
+    assert_eq!(out, [2]);
+}

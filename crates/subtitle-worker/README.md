@@ -38,7 +38,8 @@ stream, the default) or `source=packets` (608 byte pairs, such as an SCC file).
 Preparation is outside the timed interval and the memory window: reading the file
 through the Triergon container readers, selecting the stream, copying its packets
 in demux order, for captions extracting the caption data of every picture in
-output order, and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet with
+output order (H.264 and HEVC in Matroska or MP4 with the parameter sets of the
+track's configuration before the first packet's), and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet with
 one call each, drains it, folds every output subtitle (`src/sink.rs`) and frees
 everything.
 
