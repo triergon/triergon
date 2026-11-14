@@ -119,10 +119,11 @@ teardown() {
     fi
 }
 
-# COUNT hosts from IMAGE; sets INSTANCES and writes STATE/ip-I.
+# COUNT hosts from IMAGE, numbered from FIRST (default 1); adds them to INSTANCES
+# and writes STATE/ip-I.
 launch() {
-    local image=$1 count=$2
-    local ids
+    local image=$1 count=$2 first=${3:-1}
+    local ids new
     ids=$(aws ec2 run-instances --image-id "$image" --instance-type "$TYPE" --count "$count" \
         --subnet-id "$TRIERGON_SUBNET" --security-group-ids "$SG" --key-name "$NAME" \
         --associate-public-ip-address --instance-initiated-shutdown-behavior terminate \
@@ -130,10 +131,11 @@ launch() {
         --user-data "$EXPIRY" \
         --tag-specifications "$(tags instance "$NAME")" "$(tags volume "$NAME")" \
         --query 'Instances[].InstanceId' --output text)
-    read -r -a INSTANCES <<< "$ids"
-    aws ec2 wait instance-running --instance-ids "${INSTANCES[@]}"
-    local i=1 id
-    for id in "${INSTANCES[@]}"; do
+    read -r -a new <<< "$ids"
+    INSTANCES+=("${new[@]}")
+    aws ec2 wait instance-running --instance-ids "${new[@]}"
+    local i=$first id
+    for id in "${new[@]}"; do
         aws ec2 describe-instances --instance-ids "$id" \
             --query 'Reservations[0].Instances[0].PublicIpAddress' --output text > "$STATE/ip-$i"
         aws ec2 describe-instances --instance-ids "$id" \
@@ -255,6 +257,24 @@ image() {
         case $state in available) break ;; pending) sleep 60 ;; *) say "image $ami $state"; return 1 ;; esac
     done
     say "image $ami available"
+    # A host from the image boots the reviewed kernel, with the kernel packages held
+    # and no unattended upgrades; otherwise the image is removed again.
+    local kernel verdict
+    kernel=$(on 1 "cat ~/reviewed-kernel")
+    launch "$ami" 1 2
+    reachable 2
+    verdict=$(on 2 "uname -r; apt-mark showhold | grep -c '^linux-'; systemctl is-enabled unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer 2>&1 | sort -u | tr '\n' ' '")
+    say "host from $ami: $(echo "$verdict" | tr '\n' ' ')(reviewed kernel $kernel)"
+    if [ "$(echo "$verdict" | sed -n 1p)" != "$kernel" ] || [ "$(echo "$verdict" | sed -n 2p)" -lt 1 ] ||
+        [ "$(echo "$verdict" | sed -n 3p)" != "masked " ]; then
+        say "image $ami does not boot the reviewed kernel held: removing it"
+        local snapshots
+        snapshots=$(aws ec2 describe-images --image-ids "$ami" \
+            --query 'Images[0].BlockDeviceMappings[].Ebs.SnapshotId' --output text)
+        aws ec2 deregister-image --image-id "$ami"
+        for snapshot in $snapshots; do aws ec2 delete-snapshot --snapshot-id "$snapshot"; done
+        return 1
+    fi
     local old snapshots
     for old in $(aws ec2 describe-images --owners self \
         --filters "Name=tag:Name,Values=$name" "Name=tag:Project,Values=triergon" \

@@ -37,7 +37,7 @@ ARM32=thumbv7neon-unknown-linux-gnueabihf
 USERLAND_SHA256=f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533
 PACKAGES="build-essential pkg-config zlib1g-dev python3 python3-numpy make git zstd curl
     ca-certificates jq time binutils autoconf automake libtool autopoint gettext
-    linux-headers-$(uname -r) linux-tools-common linux-tools-$(uname -r)"
+    linux-tools-common"
 USERSPACE_PACKAGES="autoconf automake libtool autopoint gettext"
 
 log() { echo "$(date -u +%FT%TZ) $*" >> "$LOG"; }
@@ -65,10 +65,59 @@ rust() { # TARGETS...: rustup with the pinned toolchain, the targets and the pin
     inside "rustup toolchain install $nightly --profile minimal $* >/dev/null"
 }
 
+# The kernel release the committed review of DIR's RSS module source covers.
+reviewed_kernel() {
+    local dir=$1 source
+    source=$(sha256sum "$dir/harness/rss-bound/triergon_rss_bound.c" | cut -c1-12)
+    python3 - "$dir" "$source" <<'EOF'
+import glob
+import json
+import sys
+
+directory, source = sys.argv[1:]
+reviews = glob.glob(f"{directory}/harness/rss-bound/reviews/{source}-*.json")
+kernels = sorted({json.load(open(review))["kernel_release"] for review in reviews})
+if len(kernels) != 1:
+    sys.exit(f"want one reviewed kernel for module source {source}, have {kernels}")
+print(kernels[0])
+EOF
+}
+
+# Boot KERNEL and nothing else: the GRUB default, every kernel package held, and
+# no unattended or periodic apt run that could install another.
+pin_kernel() {
+    local kernel=$1 unit
+    [ -e "/boot/vmlinuz-$kernel" ] || { echo "the reviewed kernel $kernel is not installed" >&2; return 1; }
+    for unit in unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service; do
+        sudo systemctl disable --now "$unit" >/dev/null 2>&1 || true
+        sudo systemctl mask "$unit" >/dev/null
+    done
+    printf 'APT::Periodic::%s "0";\n' Update-Package-Lists Download-Upgradeable-Packages \
+        AutocleanInterval Unattended-Upgrade | sudo tee /etc/apt/apt.conf.d/99-gate-host-no-periodic >/dev/null
+    echo "GRUB_DEFAULT=\"Advanced options for Ubuntu>Ubuntu, with Linux $kernel\"" |
+        sudo tee /etc/default/grub.d/99-gate-host-kernel.cfg >/dev/null
+    sudo update-grub >/dev/null 2>&1
+    sudo grep -q "Ubuntu, with Linux $kernel'" /boot/grub/grub.cfg ||
+        { echo "GRUB has no entry for $kernel" >&2; return 1; }
+}
+
+# Hold every installed kernel package and the metapackages that would pull in another.
+hold_kernel() {
+    # shellcheck disable=SC2046
+    sudo apt-mark hold $(dpkg-query -W -f '${db:Status-Abbrev} ${Package}\n' |
+        awk '$1 == "ii" && $2 ~ /^linux-(image|headers|modules|aws|tools)/ { print $2 }') >/dev/null
+}
+
 setup() {
-    local target=$1 revision=$2
+    local target=$1 revision=$2 kernel
+    # The kernel the RSS module review of REVISION covers, before anything installs.
+    git clone -q "$REPOSITORY" /tmp/review-source
+    git -C /tmp/review-source checkout -q --detach "$revision"
+    kernel=$(reviewed_kernel /tmp/review-source)
+    rm -rf /tmp/review-source
+    echo "$kernel" > ~/reviewed-kernel
     # Nothing may install or upgrade packages, or change the kernel, while a gate runs.
-    sudo systemctl disable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+    pin_kernel "$kernel"
     # A crashing process dumps core in place rather than through a crash reporter,
     # which can take longer than the tests and fuzzing allow a crash to take.
     sudo systemctl disable --now apport.service >/dev/null 2>&1 || true
@@ -76,8 +125,9 @@ setup() {
     sudo sysctl -q -p /etc/sysctl.d/60-core-pattern.conf
     sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
     # shellcheck disable=SC2086
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $PACKAGES >/dev/null
-    sudo apt-mark hold "linux-image-$(uname -r)" "linux-headers-$(uname -r)" >/dev/null
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $PACKAGES \
+        "linux-headers-$kernel" "linux-tools-$kernel" >/dev/null
+    hold_kernel
     if [ "$target" = armv7 ]; then
         fetch "$USERLAND_URL" > /tmp/userland.tar.gz
         echo "$USERLAND_SHA256  /tmp/userland.tar.gz" | sha256sum --check --quiet

@@ -888,8 +888,11 @@ Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
 `tools/gate-aws.sh` runs gate hosts on AWS from a workstation with the `aws` CLI; the
 hosts hold no AWS credentials. `tools/gate-aws.sh image aarch64|armv7 REVISION
 INPUT...` builds a target's gate image on a Graviton2 c6g.4xlarge: Ubuntu 24.04 with
-the build packages, the kernel headers and Rust, the kernel held at the release the
-RSS module review names, unattended upgrades off; for ARMv7 the armhf user space with
+the build packages, the kernel headers and Rust; the kernel the committed RSS module
+review of REVISION's module source covers, as GRUB's default, with every kernel package
+held and unattended and periodic apt runs masked and off, so the image never boots
+another (the image step launches a host from the new image and removes the image
+unless that host runs the reviewed kernel with the holds in place); for ARMv7 the armhf user space with
 its own Rust and the gate target; the repository at REVISION with every reference
 build (restored from the archive's packs where it holds their keys, the packs of the
 others uploaded), the generated fixtures, vectors, font corpus and manifests, and the
