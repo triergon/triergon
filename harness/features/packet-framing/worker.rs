@@ -6,9 +6,10 @@ mod model;
 #[path = "worker_operation.rs"]
 mod operation;
 
-use model::{Case, Outcome};
+use model::{CAP, Case, Outcome};
 use std::env::ArgsOs;
 use std::ffi::OsStr;
+use std::fs::File;
 use std::io::{self, Read, Write};
 use std::time::Instant;
 
@@ -28,6 +29,67 @@ fn execute(case: &Case, iterations: u32) -> triergon_core::Result<Outcome> {
             .ok_or(triergon_core::Error::Overflow)?;
     }
     Ok(total)
+}
+
+fn load_case(path: &OsStr) -> Result<Case, Box<dyn std::error::Error>> {
+    let mut file = File::open(path)?;
+    let length = usize::try_from(file.metadata()?.len()).unwrap_or(usize::MAX);
+    if length > CAP {
+        return Err(triergon_core::Error::Limit {
+            requested: length,
+            maximum: CAP,
+        }
+        .into());
+    }
+    let mut script = Vec::new();
+    script.try_reserve_exact(length)?;
+    script.resize(length, 0);
+    file.read_exact(&mut script)?;
+    // Protect the input pin if a file is replaced or grows during the read.
+    match file.read_exact(&mut [0]) {
+        Ok(()) => return Err("trailing case bytes".into()),
+        Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {}
+        Err(error) => return Err(error.into()),
+    }
+    Ok(Case::parse(&script)?)
+}
+
+fn write_report(
+    output: &mut impl Write,
+    iterations: u32,
+    total: Outcome,
+    elapsed_ns: u64,
+) -> io::Result<()> {
+    const KEYS: [&[u8]; 6] = [
+        b"{\"schema\":1,\"operation\":\"NalPacketWholeFoldV1\",\"iterations\":",
+        b",\"packets\":",
+        b",\"bytes\":",
+        b",\"digest\":",
+        b",\"digest_b\":",
+        b",\"elapsed_ns\":",
+    ];
+    for (key, mut number) in KEYS.into_iter().zip([
+        u64::from(iterations),
+        total.packets,
+        total.bytes,
+        total.digest.0,
+        total.digest.1,
+        elapsed_ns,
+    ]) {
+        let mut digits = [0; 20];
+        let mut start = digits.len();
+        loop {
+            start -= 1;
+            digits[start] = b'0' + (number % 10) as u8;
+            number /= 10;
+            if number == 0 {
+                break;
+            }
+        }
+        output.write_all(key)?;
+        output.write_all(&digits[start..])?;
+    }
+    output.write_all(b",\"eof\":true}\n")
 }
 
 /// `nal-fold FILE`, `nal-bench FILE ITERATIONS`, `nal-memory FILE`, or `identity -`.
@@ -65,13 +127,7 @@ pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
     if !(1..=1_000_000).contains(&iterations) {
         return Err("iterations must be 1..1000000".into());
     }
-    let case = {
-        let mut data = Vec::new();
-        std::fs::File::open(path)?
-            .take(16 * 1024 * 1024 + 1)
-            .read_to_end(&mut data)?;
-        Case::parse(&data)?
-    };
+    let case = load_case(&path)?;
     if memory {
         output.write_all(b"TRIERGON_BEGIN_V1\n")?;
         output.flush()?;
@@ -87,12 +143,7 @@ pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
         output.write_all(b"TRIERGON_END_V1\n")?;
         output.flush()?;
     }
-    writeln!(
-        output,
-        "{{\"schema\":1,\"operation\":\"NalPacketWholeFoldV1\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"digest_b\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest.0, total.digest.1
-    )?;
-    Ok(())
+    Ok(write_report(&mut output, iterations, total, elapsed)?)
 }
 
 #[cfg(test)]

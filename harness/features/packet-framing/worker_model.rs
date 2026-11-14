@@ -2,7 +2,7 @@
 use triergon_core::{Budget, Bytes, Error, Result};
 use triergon_framing::{Codec, NalPacketFields};
 
-const CAP: usize = 16 * 1024 * 1024;
+pub(super) const CAP: usize = 16 * 1024 * 1024;
 
 pub enum Event {
     Packet {
@@ -36,11 +36,11 @@ impl Reader<'_> {
         self.at = end;
         Ok(part)
     }
-    fn word(&mut self, n: usize) -> Result<u64> {
-        Ok(self
-            .take(n)?
-            .iter()
-            .fold(0, |a, b| (a << 8) | u64::from(*b)))
+    fn fixed<const N: usize>(&mut self) -> Result<[u8; N]> {
+        self.take(N)?.try_into().map_err(|_| Error::Truncated)
+    }
+    fn len32(&mut self) -> Result<usize> {
+        usize::try_from(u32::from_be_bytes(self.fixed()?)).map_err(|_| Error::Overflow)
     }
     fn blob(&mut self, pool: &Budget, n: usize) -> Result<Bytes> {
         if n > CAP {
@@ -76,15 +76,15 @@ impl Case {
         if r.take(8)? != b"SMBSF001" {
             return Err(Error::Invalid("case magic"));
         }
-        let codec = match r.word(1)? {
+        let codec = match u8::from_be_bytes(r.fixed()?) {
             1 => Codec::Avc,
             2 => Codec::Hevc,
             _ => return Err(Error::Invalid("case codec")),
         };
-        let config_len = usize::try_from(r.word(4)?).map_err(|_| Error::Overflow)?;
+        let config_len = r.len32()?;
         let config_offset = r.at as u64;
         let configuration = r.blob(&pool, config_len)?;
-        let count = usize::try_from(r.word(4)?).map_err(|_| Error::Overflow)?;
+        let count = r.len32()?;
         if count > 64 {
             return Err(Error::Limit {
                 requested: count,
@@ -96,30 +96,28 @@ impl Case {
             .try_reserve_exact(count)
             .map_err(|_| Error::Allocation)?;
         for _ in 0..count {
-            let event = match r.word(1)? {
+            let event = match u8::from_be_bytes(r.fixed()?) {
                 1 => Event::Flush,
                 2 => Event::Drain,
                 0 => {
                     let fields = NalPacketFields {
-                        pts: r.word(8)? as i64,
-                        dts: r.word(8)? as i64,
-                        duration: r.word(8)? as i64,
-                        position: r.word(8)? as i64,
-                        flags: r.word(4)? as u32,
-                        stream_index: r.word(4)? as i32,
+                        pts: i64::from_be_bytes(r.fixed()?),
+                        dts: i64::from_be_bytes(r.fixed()?),
+                        duration: i64::from_be_bytes(r.fixed()?),
+                        position: i64::from_be_bytes(r.fixed()?),
+                        flags: u32::from_be_bytes(r.fixed()?),
+                        stream_index: i32::from_be_bytes(r.fixed()?),
                     };
-                    let size = usize::try_from(r.word(4)?).map_err(|_| Error::Overflow)?;
-                    let extra_size = r.word(4)?;
+                    let size = r.len32()?;
+                    let extra_size = u32::from_be_bytes(r.fixed()?);
                     let offset = r.at as u64;
                     let bytes = r.blob(&pool, size)?;
                     let extra_offset = r.at as u64;
-                    let extra = if extra_size == u64::from(u32::MAX) {
+                    let extra = if extra_size == u32::MAX {
                         None
                     } else {
-                        Some(r.blob(
-                            &pool,
-                            usize::try_from(extra_size).map_err(|_| Error::Overflow)?,
-                        )?)
+                        let length = usize::try_from(extra_size).map_err(|_| Error::Overflow)?;
+                        Some(r.blob(&pool, length)?)
                     };
                     Event::Packet {
                         fields,
@@ -187,13 +185,14 @@ impl Digest {
         self.1 = self.1.wrapping_mul(POW131[8]).wrapping_add(b);
     }
     /// A word is exactly one eight-byte group of its little-endian bytes.
-    #[inline]
+    // Initialization, packet metadata, and teardown all emit the same word.
+    #[inline(never)]
     pub fn word(&mut self, n: u64) {
         self.group(&n.to_le_bytes());
     }
     #[inline]
     pub fn signed(&mut self, n: i64) {
-        self.group(&n.to_le_bytes());
+        self.word(n as u64);
     }
     pub fn blob(&mut self, bytes: &[u8]) {
         self.word(bytes.len() as u64);
