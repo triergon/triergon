@@ -691,6 +691,12 @@ each slot pinned to its CPU, at `8607afdd` on AArch64 and `247e8560` on ARMv7 (e
 set `gate-parallel-memory-matroska-head`), the same comparison gives the same result:
 heaps identical, medians within one page on AArch64 and twelve on ARMv7, verdicts
 unchanged.
+ISO BMFF, collected serially and in parallel at `a92f2d0a` (evidence sets
+`gate-parallel-memory-isobmff-aarch64` and `gate-parallel-memory-isobmff-armv7`), gives
+all 956 cases the same peak heap sample for sample, moves no case's median resident peak
+by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread, and
+passes every case either way; the collection took 82 instead of 252 minutes on AArch64
+and 96 instead of 296 on ARMv7.
 
 #### Reuse
 
