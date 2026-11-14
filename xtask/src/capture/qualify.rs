@@ -31,7 +31,7 @@ use crate::codecs::correctness::file_sha;
 use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::policy;
-use crate::harness::timing::{self, GATE_PAIRS, Operation, Work};
+use crate::harness::timing::{self, GATE_PAIRS, Operation, Pairs, Work};
 use crate::harness::worker::data;
 use crate::json::{self, Value};
 use crate::process::exit_code;
@@ -63,6 +63,8 @@ pub struct Options {
     pub iterations: usize,
     pub memory_pairs: usize,
     pub seed: u64,
+    /// Let a gate session stop at an early look (`--no-early-stop` clears it).
+    pub early_stop: bool,
 }
 
 /// The key of a qualification run as a gate step: its settings, the cases and
@@ -74,6 +76,7 @@ pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, 
         ("iterations", Value::int(a.iterations as i64)),
         ("memory_pairs", Value::int(a.memory_pairs as i64)),
         ("seed", Value::int(a.seed)),
+        ("early_stop", Value::Bool(a.early_stop)),
         (
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
@@ -205,7 +208,7 @@ fn runtime(
     reference: &str,
     case: &Value,
     path: &Path,
-    pairs: usize,
+    pairs: Pairs,
     iterations: u32,
     seed: u64,
     expected_outputs: Option<&Value>,
@@ -223,7 +226,7 @@ fn runtime(
         && expected_outputs.is_none_or(|outputs| outputs_match(&graded.record, outputs));
     let passes = |bound: f64| {
         graded.interval.as_ref().is_ok_and(|interval| {
-            deterministic && pairs >= GATE_PAIRS && interval.upper_95 <= bound
+            deterministic && pairs.planned >= GATE_PAIRS && interval.upper_95 <= bound
         })
     };
     let (gate_pass, target_pass) = (passes(gate.ceiling), passes(gate.target));
@@ -431,7 +434,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             &a.reference,
             case,
             &path,
-            a.pairs,
+            Pairs::gate(a.pairs, gate.ceiling).early_stop(a.early_stop),
             iterations,
             a.seed,
             outputs,
@@ -457,7 +460,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     small,
                     case,
                     &path,
-                    10.max(a.pairs / 3),
+                    Pairs::fixed(10.max(a.pairs / 3)),
                     iterations,
                     a.seed + SMALL_CONFIG_SEED,
                     None,
@@ -481,7 +484,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     candidate,
                     reference,
                     &path,
-                    a.memory_pairs,
+                    Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop),
                     a.seed + MEMORY_SEED,
                     &args,
                     outputs,

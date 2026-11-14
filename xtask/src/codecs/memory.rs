@@ -37,6 +37,8 @@ pub struct Options {
     pub pairs: usize,
     pub seed: u64,
     pub only: Option<String>,
+    /// Let a gate session stop at an early look (`--no-early-stop` clears it).
+    pub early_stop: bool,
 }
 
 /// The work one unobserved `-memory` run reports: its last stdout line.
@@ -204,7 +206,8 @@ pub fn run(options: &Options) -> Result<(), String> {
                                 &options.candidate,
                                 &options.reference,
                                 &input,
-                                options.pairs,
+                                memory::Pairs::gate(options.pairs, memory::CEILING)
+                                    .early_stop(options.early_stop),
                                 options.seed,
                                 &arguments,
                                 &expected,
