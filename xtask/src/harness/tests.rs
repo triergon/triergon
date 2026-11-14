@@ -130,6 +130,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
         ("rustc", Value::str(compiler)),
         ("build_environment", Value::Object(Vec::new())),
         ("cargo_configuration", Value::Array(Vec::new())),
+        ("link_policy", Value::str(gate_build::LINK_POLICY)),
         (
             "instrumentation",
             v(r#"{"probe_sha256": "probe-hash", "observer_sha256": "observer-hash"}"#),
