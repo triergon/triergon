@@ -115,7 +115,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
   transcribed from a document. They are validated by the conformance vectors only;
   codewords no vector reaches are unverified. Provenance:
   [harness/codecs/aac/STATUS.md](../../harness/codecs/aac/STATUS.md).
-- Parametric Stereo: three crafted streams of
+- Parametric Stereo and SBR: seven crafted streams of
   [harness/codecs/aac/ps-open-manifest.json](../../harness/codecs/aac/ps-open-manifest.json)
   are open cases, outside the numeric rules (worst channel RMS / max against FFmpeg):
   - a change between 20 and 34 bands registered while PS is off after an error, followed
@@ -128,7 +128,20 @@ caller's reserved PCM planes and reuses them on the next access unit.
     An HE-AAC v1 stream with the same frame matches FFmpeg;
   - IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands
     (`ps-open-ipd-after-iid34`): 3.4e-3 / 3.9e-2, in the change frame and the three after
-    it; later frames match.
+    it; later frames match;
+  - a PS header without the extension after an error frame while IPD/OPD was on
+    (`ps-open-noext-after-error`). From that frame on, FFmpeg's output equals IPD/OPD
+    indices 0, while this decoder keeps the earlier values;
+  - a time-differential IID envelope after a 4-envelope frame with fewer coded bands
+    (`ps-open-dt-envelope-reference`). FFmpeg's dt reference above the coded bands
+    differs from this decoder's;
+  - the frame after a missing SBR element whose previous frame's envelope crossed the
+    frame border (`ps-open-sbr-after-missing`, HE-AAC v1; the same with PS);
+  - an SBR payload cut short (`ps-open-sbr-truncated`). This decoder refuses the access
+    unit, while FFmpeg outputs the frame.
+
+  The README in `harness/codecs/aac/ps` has the measured differences and what is known of
+  each cause.
 
 ## Conformance
 
