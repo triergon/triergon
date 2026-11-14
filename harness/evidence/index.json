@@ -20354,6 +20354,98 @@
      "status": 0
     }
    ]
+  },
+  {
+   "name": "capture-armv7-conversion-dcf51398-armv7",
+   "path": "capture-armv7-conversion-dcf51398-armv7",
+   "retention": "retained",
+   "reason": "Capture at dcf51398 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: the capture qualification of all 15 cases with parity, 30 timing pairs and 30 standard-bound memory pairs, the measured workers, the crate and xtask tests at dcf51398 and e8e14c54 with the e8e14c54 worker's digest, the black-box probes of the ARMv7 and AArch64 FFmpeg conversions with the scripts that ran them, the earlier AArch64 correctness comparisons, and the CPU, kernel and user-space package list",
+   "key": "evidence/capture-armv7-conversion-dcf51398-armv7/1b48bb701d74e5bc17a0e930ecf08e1061454b94e98b519b092573d9d24e0d99.tar.gz",
+   "sha256": "1b48bb701d74e5bc17a0e930ecf08e1061454b94e98b519b092573d9d24e0d99",
+   "bytes": 98793862,
+   "source_revisions": {
+    "candidate": "dcf51398e97c781d517c2c577194a9d92f8c7f15"
+   }
+  },
+  {
+   "name": "capture-armv7-conversion-dcf51398-aarch64",
+   "path": "capture-armv7-conversion-dcf51398-aarch64",
+   "retention": "retained",
+   "reason": "Capture at dcf51398 on Linux AArch64 (c6g.4xlarge, CPU 1): parity of all 15 cases against FFmpeg 9.0.2 for AArch64 with the conversion listed open (2 timing and 2 memory pairs, not a gate), the crate and xtask tests at dcf51398 and e8e14c54 with the e8e14c54 worker's digest, user-mode instruction counts of every case against main's build at f3d4935b and against FFmpeg, the counted workers and the scripts that ran them",
+   "key": "evidence/capture-armv7-conversion-dcf51398-aarch64/016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2.tar.gz",
+   "sha256": "016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2",
+   "bytes": 75856048,
+   "source_revisions": {
+    "candidate": "dcf51398e97c781d517c2c577194a9d92f8c7f15",
+    "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+   }
+  },
+  {
+   "name": "capture-held-5aa55488-aarch64",
+   "path": "capture-held-5aa55488-aarch64",
+   "retention": "retained",
+   "reason": "Capture at 5aa55488, linked under the link policy, on Linux AArch64 (c6g.4xlarge, kernel 7.0.0-1014-aws): the crate and xtask tests, gate-build workers with every profile reference, preflight with the capture cases and the RSS review, the capture qualification of all 15 cases with 30 timing pairs on CPU 1 with the RSS module unloaded, the kernel RSS proof, the workers rebuilt with it, preflight --kernel and 30 kernel-bound memory pairs, the summaries, the workers' digests and build identities, the scripts that ran them, and the CPU, kernel and package list; the capture inputs and decoded frames are left out and regenerate from the cases",
+   "key": "evidence/capture-held-5aa55488-aarch64/c8a13c1a1388ffdcc928206334410d0d6d7556943d432f694fcbdbc881d47921.tar.gz",
+   "sha256": "c8a13c1a1388ffdcc928206334410d0d6d7556943d432f694fcbdbc881d47921",
+   "bytes": 158827882,
+   "results": [
+    {
+     "path": "memory/gate-result.json",
+     "command": "capture qualify",
+     "key": "0b51967f12f6f0031b14dabd4b46d8d4cd706a52f5c524289e0ac6ce2e9f2d3a",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "timing/gate-result.json",
+     "command": "capture qualify",
+     "key": "fc7725ff86c92416983526afada481468975b09ea7c6e26bf0aca1c99c84d661",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "5aa554886320b59d220523032d9b81e998a60deb"
+   }
+  },
+  {
+   "name": "fonts-truetype-interpreter-e110f29c",
+   "path": "fonts-truetype-interpreter-e110f29c",
+   "retention": "retained",
+   "reason": "The TrueType bytecode interpreter in triergon-font at e110f29c against main at 4a932ef9 on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the ass-render timing (30 pairs, CPU 1), kernel-bound memory (30 pairs) and grades with their proofs and module review, the build identities, logs, scripts, and the kernel, CPU, compilers and ARMv7 package list",
+   "key": "evidence/fonts-truetype-interpreter-e110f29c/aa45ccdbeecec1d775a19639afae3d4559dd2cdbd91570a6bb07af9d84155033.tar.gz",
+   "sha256": "aa45ccdbeecec1d775a19639afae3d4559dd2cdbd91570a6bb07af9d84155033",
+   "bytes": 966990401,
+   "source_revisions": {
+    "candidate": "e110f29cb904c0a4f3925fc90a2d1a10a67aeff4",
+    "baseline": "4a932ef908ca783976c56e187c0563ce955f15b5"
+   }
+  },
+  {
+   "name": "fonts-truetype-interpreter-218065d6",
+   "path": "fonts-truetype-interpreter-218065d6",
+   "retention": "retained",
+   "reason": "The TrueType interpreter after review, at 218065d6, against main at 2886a3fd (its merge base) on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and against e110f29c, each with the reference against itself, the build logs, the scripts, and the kernel, CPU and compiler",
+   "key": "evidence/fonts-truetype-interpreter-218065d6/e017f46cf9d4ff61e7b0615a16ee1d39eac92d92c8bafc43141a255e6ccec818.tar.gz",
+   "sha256": "e017f46cf9d4ff61e7b0615a16ee1d39eac92d92c8bafc43141a255e6ccec818",
+   "bytes": 53818400,
+   "source_revisions": {
+    "candidate": "218065d60fb7520fc5e636c8451b46a4d6bda61f",
+    "baseline": "2886a3fd7b84392b75a98369e8426e0dd6f9edda"
+   }
+  },
+  {
+   "name": "fonts-truetype-compatibility-dc792ea4",
+   "path": "fonts-truetype-compatibility-dc792ea4",
+   "retention": "retained",
+   "reason": "The shaping cases that need the TrueType interpreter (Bitstream Vera 1.10 in the corpus, the DejaVu Sans and Vera Latin cases, the c + U+0308 and x + U+0301 samples) at dc792ea4, with their recorded shaping pins, against main at 51977aba on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the pin recording logs, the scripts, and the kernel, CPU and compiler",
+   "key": "evidence/fonts-truetype-compatibility-dc792ea4/45aee0c0f9681c334a2eb2e495f83e60ee60df6701b7c8961d2b961e845817bf.tar.gz",
+   "sha256": "45aee0c0f9681c334a2eb2e495f83e60ee60df6701b7c8961d2b961e845817bf",
+   "bytes": 53029348,
+   "source_revisions": {
+    "candidate": "dc792ea4b25af0e64db6b73b47ce66dc89b6e045",
+    "baseline": "51977abacdfe2e8086c124e37c0ad303168423f3"
+   }
   }
  ]
 }

@@ -20,6 +20,7 @@ const Y_SAME_OR_POSITIVE: u8 = 0x20;
 /// Component flags.
 const ARGS_ARE_WORDS: u16 = 0x0001;
 const ARGS_ARE_XY_VALUES: u16 = 0x0002;
+const ROUND_XY_TO_GRID: u16 = 0x0004;
 const HAVE_A_SCALE: u16 = 0x0008;
 const MORE_COMPONENTS: u16 = 0x0020;
 const HAVE_X_AND_Y_SCALE: u16 = 0x0040;
@@ -83,6 +84,61 @@ pub(crate) fn translate(points: &mut [OutlinePoint], (dx, dy): (i64, i64)) -> Re
         p.point.y = narrow(i64::from(p.point.y) + dy)?;
     }
     Ok(())
+}
+
+/// Runs each glyph's program as a hinted load builds the outline. The
+/// loader is generic over it, so an unhinted load ([`Unhinted`]) compiles to
+/// the plain loader.
+pub(crate) trait Hint {
+    /// Whether the load hints at all.
+    const ACTIVE: bool;
+
+    /// Records the font-unit position of the point a simple glyph just
+    /// appended to the outline.
+    fn unit(&mut self, unit: Point) -> Result<()>;
+
+    /// Whether the programs fit glyphs to the grid at this size; the
+    /// control value program may turn that off.
+    fn grid_fitting(&self) -> bool;
+
+    /// Runs a glyph's program on its points in `outline`.
+    fn glyph(
+        &mut self,
+        glyph: Loaded<'_>,
+        outline: &mut Outline,
+        work: &mut WorkBudget,
+    ) -> Result<()>;
+}
+
+/// The load without hinting.
+pub(crate) struct Unhinted;
+
+impl Hint for Unhinted {
+    const ACTIVE: bool = false;
+
+    fn unit(&mut self, _: Point) -> Result<()> {
+        Ok(())
+    }
+
+    fn grid_fitting(&self) -> bool {
+        false
+    }
+
+    fn glyph(&mut self, _: Loaded<'_>, _: &mut Outline, _: &mut WorkBudget) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// A glyph just loaded, as [`Hint::glyph`] takes it.
+pub(crate) struct Loaded<'a> {
+    /// The metrics that apply to it.
+    pub(crate) metrics: Metrics,
+    /// Whether its points are a composite's placed components'.
+    pub(crate) composite: bool,
+    /// Its first point and first contour in the outline.
+    pub(crate) base: usize,
+    pub(crate) ends: usize,
+    pub(crate) instructions: &'a [u8],
 }
 
 /// The `glyf` table and its `loca` index.
@@ -280,25 +336,29 @@ impl Glyf {
         Ok(metrics)
     }
 
-    /// Loads `glyph` into `outline` and reports whose metrics apply.
-    pub(crate) fn outline(
+    /// Loads `glyph` into `outline` and reports whose metrics apply; with
+    /// `hint`, running each glyph's program on its points as it loads.
+    pub(crate) fn outline<H: Hint>(
         &self,
         cx: &Context<'_>,
         glyph: GlyphId,
         scale: Scale,
         outline: &mut Outline,
         work: &mut WorkBudget,
+        hint: &mut H,
     ) -> Result<Metrics> {
-        self.load(cx, glyph.0, scale, outline, work, 0)
+        self.load(cx, glyph.0, scale, outline, work, hint, 0)
     }
 
-    fn load(
+    #[allow(clippy::too_many_arguments, reason = "the recursion carries the load")]
+    fn load<H: Hint>(
         &self,
         cx: &Context<'_>,
         glyph: u16,
         scale: Scale,
         outline: &mut Outline,
         work: &mut WorkBudget,
+        hint: &mut H,
         depth: u32,
     ) -> Result<Metrics> {
         if glyph >= cx.glyph_count {
@@ -311,7 +371,15 @@ impl Glyf {
         let contours = header.contours;
         let mut metrics = Metrics::of(glyph, header);
         if contours > 0 {
-            simple(&mut r, contours.unsigned_abs(), scale, outline, work)?;
+            simple(
+                &mut r,
+                contours.unsigned_abs(),
+                scale,
+                outline,
+                work,
+                hint,
+                metrics,
+            )?;
         } else {
             // FreeType reads every negative count as a composite.
             if depth >= MAX_COMPONENT_DEPTH {
@@ -320,54 +388,84 @@ impl Glyf {
             if depth >= cx.limits.depth {
                 return Err(Error::Policy("glyph nesting depth"));
             }
-            if let Some(own) = self.composite(cx, &mut r, scale, outline, work, depth)? {
+            if let Some(own) =
+                self.composite(cx, &mut r, scale, outline, work, hint, depth, metrics)?
+            {
                 metrics = own;
             }
         }
         Ok(metrics)
     }
 
-    /// Appends the components; returns the metrics of the last `USE_MY_METRICS`
-    /// component.
-    fn composite(
+    /// Appends the components, then runs the composite's program with
+    /// `hint`; returns the metrics of the last `USE_MY_METRICS` component.
+    /// `own` are the composite's own metrics.
+    #[allow(clippy::too_many_arguments, reason = "the recursion carries the load")]
+    fn composite<H: Hint>(
         &self,
         cx: &Context<'_>,
         r: &mut Reader<'_>,
         scale: Scale,
         outline: &mut Outline,
         work: &mut WorkBudget,
+        hint: &mut H,
         depth: u32,
+        own: Metrics,
     ) -> Result<Option<Metrics>> {
         let mut metrics = None;
         let first = outline.len();
+        let ends = outline.contour_ends().len();
         loop {
             charge(work, 1)?;
             let c = component(r)?;
             let base = outline.len();
-            let component = self.load(cx, c.glyph, scale, outline, work, depth + 1)?;
+            let component = self.load(cx, c.glyph, scale, outline, work, hint, depth + 1)?;
             if c.flags & USE_MY_METRICS != 0 {
                 metrics = Some(component);
             }
             // FreeType places only components that add points.
             if outline.len() > base {
-                place(&c, scale, outline, first, base)?;
+                let fitted = H::ACTIVE && hint.grid_fitting();
+                place(&c, scale, outline, first, base, fitted)?;
             }
             if c.flags & MORE_COMPONENTS == 0 {
-                break;
+                if H::ACTIVE {
+                    // The last component says whether the composite has a
+                    // program.
+                    let instructions = if c.flags & WE_HAVE_INSTRUCTIONS != 0 {
+                        let len = usize::from(r.u16()?);
+                        r.take(len)?
+                    } else {
+                        &[]
+                    };
+                    let loaded = Loaded {
+                        metrics: metrics.unwrap_or(own),
+                        composite: true,
+                        base: first,
+                        ends,
+                        instructions,
+                    };
+                    hint.glyph(loaded, outline, work)?;
+                }
+                return Ok(metrics);
             }
         }
-        Ok(metrics)
     }
 }
 
 /// Transforms and moves the component points from `base` on: by its offset,
 /// or so that its point matches a point of the composite starting at `first`.
+/// A load that fits glyphs to the grid rounds an offset that asks for it
+/// (`ROUND_XY_TO_GRID`) to whole pixels vertically; observed, never
+/// horizontally, nor where the control value program turned grid fitting off
+/// (`composites`, `composites-without-grid-fitting`).
 fn place(
     c: &Component,
     scale: Scale,
     outline: &mut Outline,
     first: usize,
     base: usize,
+    fitted: bool,
 ) -> Result<()> {
     let (a, b) = c.args;
     if let Some(m) = c.matrix {
@@ -375,7 +473,12 @@ fn place(
     }
     let offset = if c.flags & ARGS_ARE_XY_VALUES != 0 {
         let scaled = c.matrix.filter(|_| c.flags & SCALED_COMPONENT_OFFSET != 0);
-        offset(scale, a, b, scaled)
+        let (x, y) = offset(scale, a, b, scaled);
+        if fitted && c.flags & ROUND_XY_TO_GRID != 0 {
+            (x, (y + 32) & !63)
+        } else {
+            (x, y)
+        }
     } else {
         let parent = usize::try_from(a)
             .ok()
@@ -434,13 +537,16 @@ fn component(r: &mut Reader<'_>) -> Result<Component> {
     })
 }
 
-/// Appends a simple glyph's contours.
-fn simple(
+/// Appends a simple glyph's contours, recording their font-unit points with
+/// `hint`, then runs its program with `hint`; `metrics` are the glyph's.
+fn simple<H: Hint>(
     r: &mut Reader<'_>,
     contours: u16,
     scale: Scale,
     outline: &mut Outline,
     work: &mut WorkBudget,
+    hint: &mut H,
+    metrics: Metrics,
 ) -> Result<()> {
     let ends = r.take(2 * usize::from(contours))?;
     let mut count = 0_usize;
@@ -452,8 +558,13 @@ fn simple(
         count = end + 1;
     }
     charge(work, count)?;
-    let instructions = usize::from(r.u16()?);
-    r.skip(instructions)?;
+    let len = usize::from(r.u16()?);
+    let instructions = if H::ACTIVE {
+        r.take(len)?
+    } else {
+        r.skip(len)?;
+        &[]
+    };
     // First pass: the flags, to find where the x and y coordinates start.
     let flags_at = *r;
     let mut flags = Flags::new(r, count);
@@ -478,12 +589,26 @@ fn simple(
             PointKind::Quadratic
         };
         outline.push_point(point(scale, x, y)?, kind)?;
+        if H::ACTIVE {
+            hint.unit(Point::new(narrow(x)?, narrow(y)?))?;
+        }
     }
     let ends = ends
         .chunks_exact(2)
         .map(|end| u32::from(u16::from_be_bytes([end[0], end[1]])) + 1);
+    let first_end = outline.contour_ends().len();
     outline.extend_ends(ends, base)?;
     *r = ys;
+    if H::ACTIVE {
+        let loaded = Loaded {
+            metrics,
+            composite: false,
+            base: base as usize,
+            ends: first_end,
+            instructions,
+        };
+        hint.glyph(loaded, outline, work)?;
+    }
     Ok(())
 }
 

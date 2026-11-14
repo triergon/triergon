@@ -19,32 +19,37 @@ use std::time::Duration;
 use crate::process::{Stop, run_text};
 use font::Description;
 
-pub(super) const ASSEMBLE_USAGE: &str = "usage: cargo xtask fonts assemble DESCRIPTION OUTPUT
+pub(super) const ASSEMBLE_USAGE: &str =
+    "usage: cargo xtask fonts assemble DESCRIPTION OUTPUT [FONTS]
 
   Write the TrueType font DESCRIPTION describes (see xtask/src/fonts/probe/font.rs)
-  to OUTPUT.";
+  to OUTPUT, taking the parts of fonts it names from the directory FONTS
+  (default .research/fonts/files).";
 
 pub(super) const PROBE_USAGE: &str =
     "usage: cargo xtask fonts probe --reference WORKER [--candidate WORKER]
-                              [--record] [--output DIR] PROBE...
+                              [--record] [--output DIR] [--fonts DIR] PROBE...
 
   Assemble each PROBE (a .probe description, or a directory of them, such as
   harness/fonts/probes) into DIR (default target/probes) and load it with the
   font workers at each of its heights (`font-sized-dump FONT default HEIGHT`).
   The reference must match the probe's recorded .dump, which --record rewrites
   (record on 32-bit ARMv7); the candidate must match the reference. Fails on any
-  difference.";
+  difference. Probes that take parts of corpus fonts find them in --fonts
+  (default .research/fonts/files).";
 
 /// The longest a worker may take to load one probe face.
 const TIMEOUT: Duration = Duration::from_secs(60);
 
-pub(super) fn assemble_command(args: &[String]) -> Result<(), String> {
-    let [description, output] = args else {
-        return Err(ASSEMBLE_USAGE.into());
+pub(super) fn assemble_command(root: &Path, args: &[String]) -> Result<(), String> {
+    let (description, output, fonts) = match args {
+        [d, o] => (d, o, root.join(super::CORPUS_FILES)),
+        [d, o, f] => (d, o, PathBuf::from(f)),
+        _ => return Err(ASSEMBLE_USAGE.into()),
     };
     let text = fs::read_to_string(description).map_err(|e| format!("{description}: {e}"))?;
     let font = Description::parse(&text)
-        .and_then(|d| d.build())
+        .and_then(|mut d| d.borrow_parts(&fonts).and_then(|()| d.build()))
         .map_err(|e| format!("{description}: {e}"))?;
     fs::write(output, font).map_err(|e| format!("{output}: {e}"))
 }
@@ -54,6 +59,7 @@ struct Options {
     candidate: Option<String>,
     record: bool,
     output: PathBuf,
+    fonts: PathBuf,
     probes: Vec<PathBuf>,
 }
 
@@ -63,6 +69,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
         candidate: None,
         record: false,
         output: root.join("target/probes"),
+        fonts: root.join(super::CORPUS_FILES),
         probes: Vec::new(),
     };
     let mut args = args.iter();
@@ -72,6 +79,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
             "--reference" => o.reference = value()?,
             "--candidate" => o.candidate = Some(value()?),
             "--output" => o.output = PathBuf::from(value()?),
+            "--fonts" => o.fonts = PathBuf::from(value()?),
             "--record" => o.record = true,
             flag if flag.starts_with("--") => return Err(PROBE_USAGE.into()),
             path => o.probes.extend(probe_files(Path::new(path))?),
@@ -110,17 +118,32 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
             .and_then(|s| s.to_str())
             .ok_or_else(|| format!("{}: not a probe name", probe.display()))?;
         let text = fs::read_to_string(probe).map_err(|e| format!("{}: {e}", probe.display()))?;
-        let description = Description::parse(&text).map_err(|e| format!("{name}: {e}"))?;
+        let mut description = Description::parse(&text).map_err(|e| format!("{name}: {e}"))?;
+        description
+            .borrow_parts(&o.fonts)
+            .map_err(|e| format!("{name}: {e}"))?;
         let font_path = o.output.join(format!("{name}.ttf"));
         let font = description.build().map_err(|e| format!("{name}: {e}"))?;
         fs::write(&font_path, font).map_err(|e| format!("{}: {e}", font_path.display()))?;
-        let reference = dump(&o.reference, &font_path, &description.heights)?;
+        let mut reference = dump(&o.reference, &font_path, &description.heights)?;
         let record = probe.with_extension("dump");
         let mut differences = Vec::new();
+        let mut note = "";
         if o.record {
             fs::write(&record, &reference).map_err(|e| format!("{}: {e}", record.display()))?;
         } else {
             match fs::read_to_string(&record) {
+                // A 64-bit reference keeps values the 32-bit one wraps; the
+                // candidate follows the 32-bit record. A 32-bit reference must
+                // match it.
+                Ok(recorded)
+                    if description.wraps_at_32_bits
+                        && recorded != reference
+                        && is_64_bit(&o.reference)? =>
+                {
+                    note = " (this reference computes in 64 bits; compared with the record)";
+                    reference = recorded;
+                }
                 Ok(recorded) => differences.extend(compare("record", &recorded, &reference)),
                 Err(_) => differences.push(format!("no record {}", record.display())),
             }
@@ -130,7 +153,7 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
             differences.extend(compare("reference", &reference, &candidate));
         }
         if differences.is_empty() {
-            println!("{name}: same");
+            println!("{name}: same{note}");
         } else {
             println!("{name}: differs");
             for line in &differences {
@@ -148,6 +171,18 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
             failed.join(", ")
         ))
     }
+}
+
+/// Whether the executable `worker` is a 64-bit ELF or Mach-O binary.
+fn is_64_bit(worker: &str) -> Result<bool, String> {
+    let mut header = [0_u8; 5];
+    let mut file = fs::File::open(worker).map_err(|e| format!("{worker}: {e}"))?;
+    std::io::Read::read_exact(&mut file, &mut header).map_err(|e| format!("{worker}: {e}"))?;
+    Ok(match header {
+        [0x7F, b'E', b'L', b'F', class] => class == 2,
+        [0xCF, 0xFA, 0xED, 0xFE, _] | [0xFE, 0xED, 0xFA, 0xCF, _] => true,
+        _ => false,
+    })
 }
 
 /// The worker's default-load dump of `font` at each height, each after a line
@@ -219,7 +254,15 @@ fn value_differences(a: &str, b: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::compare;
+    use super::{compare, is_64_bit};
+
+    #[test]
+    fn the_reference_width_is_read_from_its_executable() {
+        let exe = std::env::current_exe().unwrap();
+        let exe = exe.to_str().unwrap();
+        assert_eq!(is_64_bit(exe), Ok(cfg!(target_pointer_width = "64")));
+        assert!(is_64_bit("/nonexistent/worker").is_err());
+    }
 
     #[test]
     fn differences_name_the_values_that_changed() {

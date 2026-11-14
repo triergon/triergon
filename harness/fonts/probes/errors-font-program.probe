@@ -1,0 +1,13 @@
+# An error in the font program after a function definition. Observed: glyph
+# programs still run, and the function defined before the error can be
+# called.
+heights 16384
+fpgm
+  PUSH 0; FDEF; SVTCA[0]; PUSH 1; MDAP[1]; ENDF; BYTES 0x28
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 0; CALL
+  end
+end

@@ -1,0 +1,25 @@
+# A control value program that turns grid fitting off (INSTCTRL flag 1).
+# Observed: composites then keep their offsets as scaled, ROUND_XY_TO_GRID
+# or not.
+heights 16384 1000 700
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  PUSH 1 1; INSTCTRL
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 600
+  component 0 offset 0 13 round
+end
+glyph advance 600
+  component 0 offset 37 -586 round
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]
+  end
+end

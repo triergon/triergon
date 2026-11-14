@@ -1,0 +1,46 @@
+# A version 0.5 maxp, without program limits, and a font program without
+# definitions: storage 0 and 3 written and read back to points 0 and 1; MIAP
+# on twilight points 3 and 4 read back to points 2 and 3; then 126, 127 and
+# 128 values pushed before point 1 is rounded.
+# Observed: no storage, a twilight zone of 4 points, a stack of 128 values.
+heights 16384
+maxp-version 0.5
+cvt 30
+fpgm
+  SVTCA[0]
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0; PUSH 0 77; WS; PUSH 0; RS; SVTCA[0]; SCFS; PUSH 1; PUSH 3 77; WS; PUSH 3; RS; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 2; PUSH 0; SZP0; SVTCA[0]; PUSH 3 0; MIAP[0]; PUSH 0; SZP2; PUSH 3; GC[0]; PUSH 1; SZP0; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 3; PUSH 0; SZP0; SVTCA[0]; PUSH 4 0; MIAP[0]; PUSH 0; SZP2; PUSH 4; GC[0]; PUSH 1; SZP0; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    NPUSHB 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1; NPUSHB 1 1 1 1 1 1; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    NPUSHB 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1; NPUSHB 1 1 1 1 1 1 1; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    NPUSHB 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1; NPUSHB 1 1 1 1 1 1 1 1; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end

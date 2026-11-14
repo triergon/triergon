@@ -1,0 +1,83 @@
+# Errors in glyph programs. Observed: an undefined opcode, a call of an
+# undefined function, a division by zero and an ELSE outside an IF end the
+# program, keeping what it did; a stack short of arguments, a point, storage
+# location or control value outside its table does not. Each glyph errs, then
+# rounds point 1 in y (11224 to 11200 at 16384 when the program goes on);
+# the last errs after rounding it.
+heights 16384
+cvt 100 200
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    ADD; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    BYTES 0x28; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 50; MDAP[1]; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 9; CALL; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 64 0; DIV; POP; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 100; RS; POP; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 9; RCVT; POP; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    ELSE; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    POP; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 100 5; WS; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 9 5; WCVTP; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]; BYTES 0x28
+  end
+end

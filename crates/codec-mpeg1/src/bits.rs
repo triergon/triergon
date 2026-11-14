@@ -8,7 +8,9 @@ pub(crate) struct BitWriter {
     bytes: BudgetVec<u8>,
     /// Bytes written.
     len: usize,
-    acc: u64,
+    /// The `used` (< 32) bits not yet written, in its low bits; higher bits
+    /// are left over from written ones and never read.
+    acc: u32,
     used: u32,
     /// Output went past the bound and was dropped (the bound rules this out).
     overflow: bool,
@@ -32,12 +34,17 @@ impl BitWriter {
     #[inline]
     pub(crate) fn put(&mut self, value: u32, len: u32) {
         debug_assert!(len <= 32 && (len == 32 || value >> len == 0));
-        self.acc = (self.acc << len) | value as u64;
-        self.used += len;
-        if self.used >= 32 {
-            self.used -= 32;
-            let word = (self.acc >> self.used) as u32;
+        let free = 32 - self.used;
+        if len < free {
+            self.acc = (self.acc << len) | value;
+            self.used += len;
+        } else {
+            // `value`'s top `free` bits complete a word; `spill` bits remain.
+            let spill = len - free;
+            let word = self.acc.checked_shl(free).unwrap_or(0) | value >> spill;
             self.emit(word.to_be_bytes());
+            self.acc = value & ((1u32 << spill) - 1);
+            self.used = spill;
         }
     }
 
