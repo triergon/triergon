@@ -860,7 +860,7 @@ impl PacketEmission {
                 .and_then(|s| s.new_extradata.as_ref())
                 .is_some_and(Bytes::is_empty);
         if let Some(c) = state.update.take() {
-            c.install(&mut state.session.configuration);
+            state.session.install_avc(c, state.length_width);
         }
         state.session.avc = state.avc;
         state.session.receiver_epoch = state.epoch;

@@ -224,14 +224,6 @@ impl AvcUpdate {
             Self::Source(_) => NalConfigurationRefusal::None,
         }
     }
-    fn install(self, configuration: &mut NalPacketConfiguration) {
-        match self {
-            Self::Source(record) => *configuration = NalPacketConfiguration::Avc(record),
-            Self::Receiver(record) => {
-                *configuration = NalPacketConfiguration::ReceiverAvc(record);
-            }
-        }
-    }
 }
 
 // Borrow the active configuration without widening an in-flight AVC update.
@@ -344,6 +336,8 @@ impl Default for AvcState {
 /// receiver fact; cancellation/resource refusal does not adopt that update.
 pub struct NalPacketSession {
     configuration: NalPacketConfiguration,
+    codec: Codec,
+    length_width: Option<LengthSize>,
     limits: NalPacketLimits,
     maximum_copy_storage: usize,
     avc: AvcState,
@@ -368,6 +362,8 @@ impl NalPacketSession {
             PacketPlan::added_storage(limits.maximum_segments, limits.maximum_output_bytes, true)
                 .unwrap_or(usize::MAX);
         Ok(Self {
+            codec: configuration.codec(),
+            length_width: configuration.width(),
             configuration,
             limits,
             maximum_copy_storage,
@@ -378,6 +374,15 @@ impl NalPacketSession {
     }
     pub fn configuration(&self) -> &NalPacketConfiguration {
         &self.configuration
+    }
+    fn install_avc(&mut self, update: AvcUpdate, length_width: Option<LengthSize>) {
+        self.configuration = match update {
+            AvcUpdate::Source(record) => NalPacketConfiguration::Avc(record),
+            AvcUpdate::Receiver(record) => NalPacketConfiguration::ReceiverAvc(record),
+        };
+        // Only an AVC side-data update can reach this path. Its width was
+        // selected from the parsed update when the packet began.
+        self.length_width = length_width;
     }
     pub fn receiver_epoch(&self) -> u64 {
         self.receiver_epoch
@@ -446,7 +451,7 @@ impl NalPacketSession {
             .offset
             .checked_add(u64::try_from(source.bytes.len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
-        let codec = self.configuration.codec();
+        let codec = self.codec;
         let changes =
             codec == Codec::Avc && source.new_extradata.as_ref().is_some_and(|v| !v.is_empty());
         if changes != avc_update.is_some() {
@@ -464,7 +469,7 @@ impl NalPacketSession {
         };
         let length_width = match &avc_update {
             Some(update) => Some(update.record().sample_length_size()),
-            None => self.configuration.width(),
+            None => self.length_width,
         };
         let phase = if changes {
             PlanPhase::Verify
@@ -1200,7 +1205,9 @@ impl<M> NalPacketJob<'_, M> {
             && self.state.update_verified
             && let Some(configuration) = self.state.update.take()
         {
-            configuration.install(&mut self.state.session.configuration);
+            self.state
+                .session
+                .install_avc(configuration, self.state.length_width);
             self.state.session.receiver_epoch = self.state.epoch;
             self.state.session.avc = AvcState::default();
         }
