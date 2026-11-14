@@ -16,6 +16,10 @@ pub(crate) struct EbmlJob {
     done: bool,
 }
 impl EbmlJob {
+    /// The EBML header element's data.
+    pub(crate) fn source(&self) -> &SharedBytes {
+        &self.source
+    }
     pub(crate) fn new(source: SharedBytes) -> Self {
         let end = source.len();
         Self {
@@ -95,6 +99,10 @@ pub(crate) struct SeekHeadJob {
     phase: Phase,
 }
 impl SeekHeadJob {
+    /// The SeekHead element's data.
+    pub(crate) fn source(&self) -> &SharedBytes {
+        &self.source
+    }
     pub(crate) fn new(source: SharedBytes, segment: u64, old_count: usize, pool: &Budget) -> Self {
         let end = source.len();
         Self {

@@ -242,9 +242,7 @@ fn skip_short_term_sets(bits: &mut Rbsp<'_>, max_references: u32) -> Result<()> 
                     kept += 1;
                 }
             }
-            // H.265 §7.4.8: negative deltas nearest first, then positive
-            // deltas nearest first. The next prediction's flags use this order.
-            next[..kept].sort_unstable_by_key(|delta| (*delta > 0, delta.unsigned_abs()));
+            order_deltas(&mut next[..kept]);
             previous = next;
             len = kept;
         } else {
@@ -263,6 +261,20 @@ fn skip_short_term_sets(bits: &mut Rbsp<'_>, max_references: u32) -> Result<()> 
         }
     }
     Ok(())
+}
+
+/// H.265 §7.4.8: negative deltas nearest first, then positive deltas nearest
+/// first. The next prediction's flags use this order. A set has at most 78
+/// distinct entries, so an insertion sort is enough.
+fn order_deltas(deltas: &mut [i32]) {
+    let key = |delta: i32| (delta > 0, delta.unsigned_abs());
+    for end in 1..deltas.len() {
+        let mut at = end;
+        while at > 0 && key(deltas[at - 1]) > key(deltas[at]) {
+            deltas.swap(at - 1, at);
+            at -= 1;
+        }
+    }
 }
 
 fn vui_timing(bits: &mut Rbsp<'_>) -> Result<Option<HevcVuiTiming>> {
