@@ -16,6 +16,7 @@ mod fixtures;
 pub const USAGE: &str = "usage: cargo xtask framing [fixtures] [--output DIR]
        [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
        [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance] [--full]
+       [--no-early-stop]
        cargo xtask framing manifest --record
        cargo xtask framing fate --ffmpeg FILE --candidate FILE --output DIR
 
@@ -38,6 +39,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
             "--benchmark" => options.benchmark = true,
             "--memory" => options.memory = true,
             "--full" => options.full = true,
+            "--no-early-stop" => options.early_stop = false,
             "--require-acceptance" => options.require_acceptance = true,
             "--require-slice-acceptance" => options.require_slice_acceptance = true,
             "--pairs" => {
