@@ -535,19 +535,21 @@ impl<'f> SizedFont<'f> {
 
     /// Applies libass's synthetic styles to an outline loaded by
     /// [`Self::outline_into`]: the [`Synthesis::shear`] first, then emboldening
-    /// by [`Self::embolden_strength`]. Metrics are unchanged.
+    /// by [`Self::embolden_strength`]. Metrics are unchanged. Returns `false`
+    /// when emboldening was asked for and refused, as FreeType refuses it: the
+    /// outline then keeps the shear alone (see [`Outline::embolden`]).
     ///
     /// # Errors
     ///
     /// `Overflow` for coordinates beyond `i32`.
-    pub fn synthesize(&self, outline: &mut Outline, synthesis: Synthesis) -> Result<()> {
+    pub fn synthesize(&self, outline: &mut Outline, synthesis: Synthesis) -> Result<bool> {
         if synthesis.oblique {
             outline.transform([0x1_0000, Synthesis::shear(self.font), 0, 0x1_0000])?;
         }
         if synthesis.embolden {
-            outline.embolden(self.embolden_strength())?;
+            return outline.embolden(self.embolden_strength());
         }
-        Ok(())
+        Ok(true)
     }
 
     /// The advance FreeType's default loading reports (`FT_LOAD_DEFAULT`, the

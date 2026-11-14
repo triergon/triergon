@@ -145,7 +145,7 @@ fn sizes_scale_as_freetype_does_for_libass() {
     assert_eq!(outline.orientation(), Orientation::TrueType);
     let synthesis = face.synthesis(700, 110);
     assert_eq!((synthesis.oblique, synthesis.embolden), (true, true));
-    sized.synthesize(&mut outline, synthesis).unwrap();
+    assert!(sized.synthesize(&mut outline, synthesis).unwrap());
     assert_eq!(outline.points()[1].point, Point::new(1538, 2760));
     let tricky = parse(&font(
         b"\0\x01\0\0",
