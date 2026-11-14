@@ -953,10 +953,11 @@ keys, the packs of the others uploaded), the generated fixtures, vectors, font c
 and manifests, and the workers; and each INPUT, an archive of media inputs the
 repository does not generate, with repository-relative paths: evidence set
 `gate-media-inputs` holds the FATE samples, the codec workload inputs and the
-subtitle corpus the gate reads, and set `codec-file-workload-inputs` the inputs of
-[file-workloads.json](../harness/codecs/file-workloads.json)
+subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
+[file-workloads.json](../harness/codecs/file-workloads.json), and set
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/index.json)); a gate image is built with both. The image
+[index](../harness/evidence/index.json)); a gate image is built with all three. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.

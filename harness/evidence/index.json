@@ -26341,6 +26341,262 @@
    ]
   },
   {
+   "name": "subtitle-cc-inputs",
+   "path": "subtitle-cc-inputs",
+   "retention": "retained",
+   "reason": "The closed caption streams of harness/features/subtitle-cc/corpus.json that gate-media-inputs lacks (.research/subtitle-corpus/cc), authored by harness/subtitles/cc_streams.py, each matching its manifest SHA-256, unpacked at the repository root of a gate host; the gate images are built with it",
+   "key": "evidence/subtitle-cc-inputs/a6deea8c8d8c6609943f1437f47e69ce3e5125396dd9d724e380c0b507ba2b17.tar.gz",
+   "sha256": "a6deea8c8d8c6609943f1437f47e69ce3e5125396dd9d724e380c0b507ba2b17",
+   "bytes": 914639,
+   "unpacked_at": "repository",
+   "files": [
+    {
+     "path": ".research/subtitle-corpus/cc/h264-b-in-order.ts",
+     "sha256": "a65fadbd71521fe96f750310c419b62b104490832cec1ec86244a927212810b6"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-config.mkv",
+     "sha256": "569b5367354a91cd0c5b8665441af1c00a27d9f18f03b9086dfe24883d0e9a94"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-depth-grow.ts",
+     "sha256": "2d68b921859dcc565f0aad50c15373c3967f16184c1f93b3182be7d5b4a43336"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-depth-two.ts",
+     "sha256": "2fde4c12d19faca9bfaaa8e8208ca62fedebc0a2a6d3c48751d9c9cd1404c963"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-estimate.ts",
+     "sha256": "de92911ea245d5fe6a5ee5403d42ce3a09e4873101eb5f764c2f62429250be7e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-far-back.ts",
+     "sha256": "2f545679abe637c94f0de1754c134f5c43fde4abb978262bc10d1575da82b197"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-fields-lone.ts",
+     "sha256": "2998006b5ab521390d4ce0d54ee302ff29992461479d5e7851570fbcbd4426e2"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-fields-packed.ts",
+     "sha256": "e9ddc57ab87366c5be8be46667dd27104b6a701c283c6fa804c1d9a8e47f4d2e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-fields.ts",
+     "sha256": "c53fc2a88faff18d7fbae1d91c09da8c87a627129ad2ff5fbb8382ad7dd026de"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-gap-allowed.ts",
+     "sha256": "925bc98ff0562fbb88d49a74d3053cbbedcafa12d965cf9984f281f57cff8d33"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-gap-jump.ts",
+     "sha256": "6c8c82b58be1af7016526977e635c92f733c279f67b776685c2e8c8a2f0da3a6"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-gap.ts",
+     "sha256": "fd66b32c585ba953ba38d62402e1415f4ec78f76a423fccddfc62581a2fd53ab"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-grow.ts",
+     "sha256": "a12fb26fe1087caab5d8550f96b25aab9803baaeabd3f8948d0bed1b8074740a"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-depth1.ts",
+     "sha256": "4a9480df615b713fc873234bc5b31ae7e8dc552d2864fd8843be4ba14337afcb"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-dpb.ts",
+     "sha256": "1e980ac0eb63429d803b9db68a22296f8b257dbdaf4998c3f772786276785992"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-jump.ts",
+     "sha256": "4dcf90a44515d19cdba43c7582396edc223d42e2c9f4c081c4037870a95d5348"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-step3.ts",
+     "sha256": "0af37710aefd88e194f05473973bd45f6d7e8745158878fd1168d72d015ba45e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-jump-depth.ts",
+     "sha256": "7d24896eb58e7c152dda6038310d54793849e570761c51667d6caaaa944622d8"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-jump-stated.ts",
+     "sha256": "348d40529cb1851ce27a212d3533165e0c6b08271e2243e63eeb623d35b056c0"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-mmco5-start.ts",
+     "sha256": "7ff465ec18c59f07f33eb6f3903a687c7143a32527d69d200b0e969380eac997"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-mmco5.ts",
+     "sha256": "95b9d0929acfd77597bb27f7163effb4221d20401e04b07aaa2b917b4a3eb590"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-nodur-coarse.mkv",
+     "sha256": "0d571db070b445c41f5f629aa084b53898c42b77e69de8e02308473aa9a23ab4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-nodur-fine.mkv",
+     "sha256": "358a01ad01ffddc944461fbd6b9327d0e303026db4feb00a80c6df5863777a60"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-nodur.mkv",
+     "sha256": "346ae7cbfb8ee3275f4b0a6f61e58500302868568378223b58d3fbd9efed79fd"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-noout.ts",
+     "sha256": "dc07629f89e27df3ddd9c480780ed16360cca706839832b91a9f009b5b0f278f"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-norestr.ts",
+     "sha256": "dc9353eb02c14f9ca60edcaa74669ba733c5e2c752462a2d1a98ef4d1127615b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-close.ts",
+     "sha256": "9df803736f1aa9ab026fcb4a44d985b2076222ba857d770442baf60a73819175"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-divisor.ts",
+     "sha256": "ad021566e2916fe64f7a7738f0c34e5a7bd40b3ea76853e229b04474daf5a510"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-fallback.ts",
+     "sha256": "1fafe8e456dd5902618ebab314718f563f7c4e92511eebee4172359b642e6c85"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-far.ts",
+     "sha256": "291ac1657690ac94bbc4375fdb956fcc3f7e4d89231c85bc1fefbb64d657b27a"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-fast.ts",
+     "sha256": "dff6c946952aa4924f692011c546aaa6239e4380032bb24e30fe3ae2f956069e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-jump.ts",
+     "sha256": "f2513115e0e7e2f4f3f50888af966d634dc931c441e8f6fc7d0dc23e5f50bdd4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-multiple.ts",
+     "sha256": "4f8ff5d7c08a23cf08b3c20d3d24cbc396df082e4fd49e0c0e13a3638da31da6"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-ntsc.ts",
+     "sha256": "46cf11073119cccd17ccdf8f8170d24d117a24023b117b291494a236749a33e3"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-pts-b.ts",
+     "sha256": "d7fbfcfdd4b29a25735f1da6d117714f11ab3adab93dbb052b8fb3b96b767d9b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-pts-run.ts",
+     "sha256": "5ab76fa1a5849029ba07a8379299e5fe2f1070a2ce3c7ca5e9ae4f04db77fb83"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-skip.ts",
+     "sha256": "8c37731624e355e07c070a5cddb91b66e8de964a4fa193fabbde47b7609b295c"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-twelfths.ts",
+     "sha256": "5478d5864e2571220a11f63ef88e3543d30ee0cbbd1edcb9c0dfb011812ba0f2"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-two.ts",
+     "sha256": "ba1a2163b66b6be7b7d598571ae2a0a50f285c2039fc2df711945dd899fb386a"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-whole.ts",
+     "sha256": "6f507b72bcfa2c8d503c5afa6762a7ad8272f18ba53305230b6c3edfb5be8cc9"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-recovery-above.ts",
+     "sha256": "e027ea333243d65111013b8f86ec59f399ed4cdad29066ddbd654f5e8a726359"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-recovery-cnt1.ts",
+     "sha256": "89c459cbbb6e25955befef21854c672c781cf6a4a913a52a9a42916227418020"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-reorder.ts",
+     "sha256": "a369a00320be102e24e80db50ee111f242f7075e1affb3f3239abbace732037b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-b-window.ts",
+     "sha256": "5c514a8fe060d71420711bfd8995777fd1baf839b5a2e0fd0f3eb3cd8cced74d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-fn0.ts",
+     "sha256": "522e52151502a3528d70477f5c8b661a16a801c5714c50e9ac8f88152762396d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-hold.ts",
+     "sha256": "15ac1f8a09ad667e53a9e6bbd5ef2a97c9855d20afa16d75c4d0fa4641738d9d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-intra-r2.ts",
+     "sha256": "832e02d5e997828aafbeef0944d1a04ffed6b748b4ec7e1e148ccd9e76e68429"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-intra-run.ts",
+     "sha256": "49d1d45a4cd6b94c5453faf20ed9e2ad1747a743fcebc5d62e0bf570e27b67de"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-intra.ts",
+     "sha256": "ad02897998a121594c5b8c3d8b0fb4268ffbdbd4d2d1a1b38cb14970c28045f0"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-jump.ts",
+     "sha256": "111bc4babbea5e47357257a83fd63d6e60ff0db2bb5e35364169483cfbfd2658"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-nonref.ts",
+     "sha256": "84241b2f16e82d7c2ef7c71eb38b5c43455b446ab8bba8e1b6a326422c683b3b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-stated-b20.ts",
+     "sha256": "893f782f7e184abef324396bfcd49ffab2c25c8fe5a81e28ab54354a822187a5"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-untimed-bytes.ts",
+     "sha256": "40d801abd21ad8558476dacef081d21b3256ee4dd7e4e877d3005c8ef28075b3"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-untimed-far.ts",
+     "sha256": "9704855cd4768c829fa8c991c3a91a58aeda37d2997e71c5fd5c20c6752b059d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-untimed.ts",
+     "sha256": "8349e1d282f7c4aed0256e56ebc979209e2e7f06f0853e4215f7c1c6f2517099"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-vui-fast.ts",
+     "sha256": "c9787bf865ff15d90f61a4aaecdd7e49b0ac868fe2f7a198c414dd7940b6b9e4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-dpb-raise.ts",
+     "sha256": "00a1593026976457e5e302666d782aab6c3fab4e07795a96386e659374be5628"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-dpb.ts",
+     "sha256": "6ec47d0a9b68ab4c6707982b809adb911800653ad84934792ae9b3a63ffc64da"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-eos-rasl.ts",
+     "sha256": "451e48aceda261d3cd21a7a68aa661a420b01b45a7ae863c5ea7d58901a84d91"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-sps-change.ts",
+     "sha256": "f13915808b327301d2a6f46efb44f5dc9b9660875da80e2fac63d2cff92efa6e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-sps-ids.ts",
+     "sha256": "6a5b163c216ced774137bfd9bf39123f8e25704e73e7058ff55f14cc67458a34"
+    }
+   ]
+  },
+  {
    "name": "gate-ass-render-79e0ae13",
    "path": "gate-ass-render-79e0ae13",
    "retention": "retained",
