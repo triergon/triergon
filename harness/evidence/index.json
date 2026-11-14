@@ -20766,6 +20766,16 @@
     }
    ],
    "source_revision": "0ce0e7389c4f7232701558b7fdf614e69b393a3f"
+  },
+  {
+   "name": "framing-upstream-0ce0e738",
+   "path": "framing-upstream-0ce0e738",
+   "retention": "retained",
+   "reason": "Seven upstream Annex B replays and four frame or remux comparisons",
+   "key": "evidence/framing-upstream-0ce0e738/0f1dfb80affe8acc1f56b16175e318031a5e71d9f8631410cea06180889b277d.tar.zst",
+   "sha256": "0f1dfb80affe8acc1f56b16175e318031a5e71d9f8631410cea06180889b277d",
+   "bytes": 26759317,
+   "source_revision": "0ce0e7389c4f7232701558b7fdf614e69b393a3f"
   }
  ]
 }
