@@ -978,7 +978,10 @@ current public address as a /32, which they read from `https://checkip.amazonaws
 and print beside it; they never widen it. When a poll fails because the workstation's
 public address is no longer the one the session's security group admits, the run says so
 and waits, polling on, instead of giving up on hosts that are still working: open the
-group to the new address (one /32) and it carries on. It never changes the group itself.
+group to the new address (one /32) within 30 minutes and it carries on; after that the
+shard fails and the session's teardown removes its host. It never changes the group
+itself. A group it cannot read is reported as a credential failure, and counts as a
+failed poll.
 
 ## Robustness
 

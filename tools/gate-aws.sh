@@ -189,35 +189,49 @@ require_address() {
     fi
 }
 
-# Whether the session's security group lets ADDRESS reach the hosts by SSH.
+# Whether the session's security group lets ADDRESS reach the hosts by SSH: prints
+# yes, no, or unknown when the group cannot be read (expired credentials, say).
 admitted() {
-    aws ec2 describe-security-groups --group-ids "$SG" \
-        --query 'SecurityGroups[0].IpPermissions[].IpRanges[].CidrIp' --output text < /dev/null |
-        tr '\t' '\n' | grep -qx "$1/32"
+    local ranges
+    ranges=$(aws ec2 describe-security-groups --group-ids "$SG" \
+        --query 'SecurityGroups[0].IpPermissions[].IpRanges[].CidrIp' --output text \
+        < /dev/null 2>/dev/null) || { echo unknown; return; }
+    if tr '\t' '\n' <<< "$ranges" | grep -qx "$1/32"; then echo yes; else echo no; fi
 }
+# How long polls wait for the security group to admit a new address, in seconds.
+ADDRESS_WAIT=1800
 
 # Run tools/gate-host.sh ARGS on host I, detached, and wait until its log records
 # MARKER; give up after five failed polls in a row. A poll that fails because this
 # workstation's address left the security group's one /32 is not a failure: the
-# hosts work on, so it says so once and waits until the group admits the new address,
-# which it never changes itself.
+# hosts work on, so it says so once and waits, for up to ADDRESS_WAIT, until the
+# group admits the new address, which it never changes itself. A group it cannot
+# read is a credential failure, reported as one.
 detached() {
     local i=$1 marker=$2; shift 2
     on "$i" "setsid nohup env $(printf '%q ' "${ENVIRONMENT[@]}") bash ~/gate-host.sh $* > ~/gate-host.out 2>&1 < /dev/null &"
-    local failures=0 state moved=
+    local failures=0 state moved='' waited=0
     while sleep "$POLL"; do
         if state=$(on "$i" "taskset -c 0 tail -1 ~/gate-host.log; taskset -c 0 pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
             failures=0
             case $state in *"$marker"*) return 0;; esac
             case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
         else
-            local address
+            local address verdict=yes
             address=$(workstation)
-            if [ -n "$address" ] && ! admitted "$address"; then
+            [ -z "$address" ] || verdict=$(admitted "$address")
+            if [ "$verdict" = unknown ]; then
+                say "host $i: unreachable, and $SG cannot be read: the AWS credentials \
+may have expired"
+            elif [ "$verdict" = no ]; then
                 [ "$address" = "${moved:-}" ] || say "host $i: unreachable, because this \
 workstation's address is now $address and $SG admits SSH from another; polls resume \
 once $SG admits $address/32"
-                moved=$address failures=0
+                moved=$address failures=0 waited=$((waited + POLL))
+                if [ "$waited" -ge "$ADDRESS_WAIT" ]; then
+                    say "host $i: $SG still does not admit $address after $((waited / 60)) min"
+                    return 1
+                fi
                 continue
             fi
             failures=$((failures + 1))
