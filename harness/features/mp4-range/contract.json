@@ -27,7 +27,8 @@
     "compare Opus leading and trailing edit trim, unequal media and decoder clocks, long leading crops with variable packet durations, and secondary-track alignment at exact and between-sample seek boundaries",
     "opus-roll cases use the audio sample at the actual video presentation landing, including a landing whose PTS and DTS differ, to select the source roll group and decoder start",
     "compare the video landing extent, audio sync and start ordinals, and preroll in 48 kHz samples before comparing the complete suffix",
-    "the reference uses the public MOV index, the source composition offsets and a complete roll map to select both track starts, then seeks once and reads the exact suffix"
+    "the reference uses the public MOV index, the source composition offsets and a complete roll map to select both track starts, then seeks once and reads the exact suffix",
+    "compare a regular reordered AVC track with a leading empty edit through EOF and after backward seek"
   ],
   "required_profiles": [
     "regular-open",
@@ -80,7 +81,9 @@
     "fragmented-subtitle-edit-seek-during-cue",
     "fragmented-subtitle-edit-seek-after-cue",
     "fate-non-sync-prefix-open",
-    "fate-non-sync-prefix-seek"
+    "fate-non-sync-prefix-seek",
+    "leading-video-edit-open",
+    "leading-video-edit-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

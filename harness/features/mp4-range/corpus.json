@@ -703,6 +703,34 @@
       }
     },
     {
+      "id": "leading-video-edit-open",
+      "profile": "leading-video-edit-open",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 237,
+        "bytes": 81478,
+        "digest": 9596315584292083372
+      }
+    },
+    {
+      "id": "leading-video-edit-seek",
+      "profile": "leading-video-edit-seek",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "28000"
+      ],
+      "expected": {
+        "packets": 181,
+        "bytes": 62042,
+        "digest": 5378275097212072522
+      }
+    },
+    {
       "id": "fate-non-sync-prefix-open",
       "profile": "fate-non-sync-prefix-open",
       "file": "mov/mp4-init-nonkeyframe.mp4",

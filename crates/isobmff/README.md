@@ -25,6 +25,8 @@ The crate exposes two views of the same file:
   `+noparse+nofillin` (`DemuxProfile::NoParseNoFillin`), for a consumer that
   chooses FFmpeg's result. It is a separate projection and never rewrites source
   facts. The `compat::mov` documentation names the FFmpeg revision it reproduces.
+  Encoded AVC playback preserves a leading empty edit before its rate-one video
+  edit, with both packet clocks shifted by the start delay.
 
 Values that only make sense when comparing traces with FFmpeg, such as its return
 codes, log lines and models of its input layer, are compiled only with the

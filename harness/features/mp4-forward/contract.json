@@ -15,7 +15,8 @@
     "one direct output slot; every track selected; every packet through end of file in native read order",
     "each packet folded with track ID, PTS, DTS and duration in the track time base, packet flags, size and every payload byte",
     "progressive-edited and progressive-edited-recovery also fold the packet byte offset, reduced time base, and presence of skip-sample metadata with both counts and reasons when present",
-    "the expected fold is recorded per case from the pinned reference worker"
+    "the expected fold is recorded per case from the pinned reference worker",
+    "a regular front-moov AVC/AAC stream preserves a leading empty AVC edit and AAC trim through EOF"
   ],
   "required_profiles": [
     "regular-r-ctts-v1",
@@ -63,7 +64,8 @@
     "progressive-fragment-aac-edit",
     "progressive-fragment-aac-late-track",
     "progressive-fragment-aac-short",
-    "progressive-fragment-mp3-edit"
+    "progressive-fragment-mp3-edit",
+    "progressive-leading-video-edit"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"
