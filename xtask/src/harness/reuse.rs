@@ -3,8 +3,8 @@
 //! measurement is the same.
 //!
 //! Every gate command ([`super::report`]'s timing and memory collections, `grade`,
-//! `isobmff-bench`, `codecs time`, `capture qualify` and `external-vector`) derives a
-//! [`Key`] before it measures: its command and settings, the files that define its
+//! `isobmff-bench`, `isobmff-seek`, `codecs time`, `capture qualify` and
+//! `external-vector`) derives a [`Key`] before it measures: its command and settings, the files that define its
 //! cases, the bytes of every worker it runs and of their shared libraries, the
 //! allocation observer and probe, the measuring and grading code, the
 //! toolchains, the gate target and the host class. It records the key and its

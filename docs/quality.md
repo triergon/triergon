@@ -352,9 +352,11 @@ physical operations and 16 explicit aliases. `--subset52` selects the separate
 52-operation measurement set while retaining the full correctness comparison, and
 `--part I/N` every Nth physical operation from the Ith with their aliases, so that N
 parts measure the set once between them.
+`cargo xtask isobmff-seek` compares all 476 seek and range-plan outcomes, including
+4 refusals, and `--benchmark --memory` measures the other 472.
 `cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.
-Their contracts and input manifests are in `harness/features/isobmff-open-index/`
-and `harness/features/packet-framing/`.
+Their contracts and input manifests are in `harness/features/isobmff-open-index/`,
+`harness/features/isobmff-seek/` and `harness/features/packet-framing/`.
 
 `report --memory-pairs N` selects a separate memory sample count, with
 `--pairs` applying to both measurements by default.
@@ -618,9 +620,9 @@ may override that count for diagnostic comparisons.
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the packet-framing and progressive TS suites, the codecs' parity, a codec
-workload list's timing, a part of its memory (`codecs memory --part I/N`, every Nth
-workload), a capture case, the checked or the release tests, and the font, shaping,
+measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the
+codecs' parity, a codec workload list's timing, a part of its memory (`codecs memory
+--part I/N`, every Nth workload), a capture case, the checked or the release tests, and the font, shaping,
 rasterising and ASS comparisons. Every registered feature is either one of them or
 named, in `xtask/src/gate.rs`, with the reason it is not gated (an on-demand or
 diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
@@ -668,7 +670,7 @@ On one host, a shard's run is:
    `cargo xtask build-workers --all-references`, so that every profile reference is
    built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
    everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
-   `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--codecs` for each
+   `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--isobmff-seek`, `--codecs` for each
    workload list, `--external-vector`, `--capture` for the capture cases), with the
    [committed RSS module review](../harness/rss-bound/README.md#proof) of the tree's
    module source for the running kernel (`cargo xtask preflight` also takes
@@ -729,8 +731,9 @@ cargo xtask grade OUT/benchmark/mp4-forward/report.json OUT/memory/mp4-forward/r
 
 #### Early stop
 
-A gate timing session (`report`, `isobmff-bench`, `external-vector`, `codecs time`,
-`capture qualify`) may end after 20 of its 30 pairs, taken as two blocks of ten: when
+A gate timing session (`report`, `isobmff-bench`, `isobmff-seek`, `external-vector`,
+`codecs time`, `capture qualify`) may end after 20 of its 30 pairs, taken as two blocks
+of ten: when
 every ratio `T_triergon / T_reference` of the second block and at least eight of the
 first lie strictly below the ceiling, and the lag-1 autocorrelation of the 20 ratios is
 at most 0.42. A gate memory collection stops only when its peak heap ratios and its
@@ -832,7 +835,7 @@ whether reclaim ran while they were measured.
 #### Reuse
 
 Every gate command (`report --benchmark`, `report --memory`, `grade`, `isobmff-bench`,
-`framing`, `progressive`, `external-vector`, `codecs time`, `codecs memory`, `capture
+`isobmff-seek`, `framing`, `progressive`, `external-vector`, `codecs time`, `codecs memory`, `capture
 qualify`) derives
 a key before it measures and writes it, with its exit status, to `gate-result.json` in
 its output directory. The key covers the command and its settings (pairs, seed,
