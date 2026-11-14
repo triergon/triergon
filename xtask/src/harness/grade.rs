@@ -835,6 +835,8 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         println!("{USAGE}");
         return Ok(0);
     }
+    let root = root.canonicalize().map_err(|error| error.to_string())?;
+    let root = root.as_path();
     let options = Options::parse(root, args)?;
     super::report::create_output(&options.output)?;
     // A grade binds the gate results recorded beside the reports it joins.
