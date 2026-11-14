@@ -4,7 +4,7 @@
 use super::{
     AvcState, EmissionPhase, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
     NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase, PacketPlan,
-    PacketSegmentStorage, PacketState, PlanPhase,
+    PacketSegmentStorage, PacketState, PlanPhase, packet_pool,
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
@@ -722,14 +722,15 @@ impl PacketEmission {
             .checked_add(Bytes::owner_overhead_bytes())
             .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
             .ok_or(Error::Overflow)?;
-        if minimum > state.session.pool.limit() {
+        let pool = packet_pool(state.source.as_ref())?;
+        if minimum > pool.limit() {
             return Err(Error::Limit {
                 requested: minimum,
-                maximum: state.session.pool.limit(),
+                maximum: pool.limit(),
             });
         }
         self.output
-            .get_or_insert_with(|| BudgetVec::new(&state.session.pool))
+            .get_or_insert_with(|| BudgetVec::new(pool))
             .try_reserve_exact(state.total)?;
         self.phase = EmissionPhase::Copy;
         Ok(NEXT)

@@ -335,7 +335,6 @@ impl Default for AvcState {
 /// AVC side-data update survives a later physical payload error, as an explicit
 /// receiver fact; cancellation/resource refusal does not adopt that update.
 pub struct NalPacketSession {
-    pool: Budget,
     configuration: NalPacketConfiguration,
     limits: NalPacketLimits,
     maximum_copy_storage: usize,
@@ -361,7 +360,6 @@ impl NalPacketSession {
             PacketPlan::added_storage(limits.maximum_segments, limits.maximum_output_bytes, true)
                 .unwrap_or(usize::MAX);
         Ok(Self {
-            pool: pool.clone(),
             configuration,
             limits,
             maximum_copy_storage,
@@ -415,14 +413,17 @@ impl NalPacketSession {
         if self.drained {
             return Err(Error::Invalid("packet after drain requires flush"));
         }
-        if !source.bytes.belongs_to(&self.pool)
+        if !source
+            .bytes
+            .budget()
+            .same_pool(self.configuration.bytes().budget())
             || source
                 .new_extradata
                 .as_ref()
-                .is_some_and(|v| !v.belongs_to(&self.pool))
+                .is_some_and(|extra| !extra.belongs_to(source.bytes.budget()))
             || avc_update
                 .as_ref()
-                .is_some_and(|v| !v.bytes().belongs_to(&self.pool))
+                .is_some_and(|update| !update.bytes().belongs_to(source.bytes.budget()))
         {
             return Err(Error::ForeignPool);
         }
@@ -659,9 +660,9 @@ impl PacketSegmentStorage {
                 .ok_or(Error::Overflow)
         }
     }
-    fn try_push(
+    fn try_push<'a>(
         &mut self,
-        pool: &Budget,
+        pool: impl FnOnce() -> Result<&'a Budget>,
         planned: Option<usize>,
         segment: NalPacketSegment,
     ) -> Result<()> {
@@ -671,7 +672,7 @@ impl PacketSegmentStorage {
                 *len += 1;
             }
             Self::Inline { data, .. } => {
-                *self = Self::Heap(Self::spill(pool, planned, data, segment)?);
+                *self = Self::Heap(Self::spill(pool()?, planned, data, segment)?);
             }
             Self::Heap(parts) => parts.try_push(segment).map_err(|e| e.error)?,
         }
@@ -956,6 +957,14 @@ pub struct NalPacketJob<'a, M = NalPacketFields> {
     state: PacketState<'a, M>,
     phase: PacketPhase,
 }
+// Session creation and packet admission ensure every retained source and
+// configuration uses this pool. The live packet already keeps it alive.
+fn packet_pool<M>(source: Option<&NalPacket<M>>) -> Result<&Budget> {
+    source
+        .map(|packet| packet.bytes.budget())
+        .ok_or(Error::Invalid("missing packet source"))
+}
+
 impl<M> PacketState<'_, M> {
     fn config(&self) -> ConfigurationRef<'_> {
         match &self.update {
@@ -1044,7 +1053,7 @@ impl PacketPlan {
         // pool. Its fixed storage is therefore at most the current live charge.
         // If both logical ceilings fit in the remaining capacity, they bound
         // every future append. Actual reservations still check current pressure.
-        self.live_base = if maximum <= state.session.pool.available() {
+        self.live_base = if maximum <= packet_pool(state.source.as_ref())?.available() {
             Self::LIMITS_FIT
         } else {
             state.fixed_live_bytes()?
@@ -1078,10 +1087,11 @@ impl PacketPlan {
                 state.length_width.is_some(),
             )?)
             .ok_or(Error::Overflow)?;
-        if minimum > state.session.pool.limit() {
+        let limit = packet_pool(state.source.as_ref())?.limit();
+        if minimum > limit {
             return Err(Error::Limit {
                 requested: minimum,
-                maximum: state.session.pool.limit(),
+                maximum: limit,
             });
         }
         Ok(())
@@ -1113,9 +1123,10 @@ impl PacketPlan {
         if self.live_base != Self::LIMITS_FIT {
             self.check_storage_bound(state, count, total)?;
         }
+        let source = &state.source;
         state
             .segments
-            .try_push(&state.session.pool, self.segment_hint, segment)?;
+            .try_push(|| packet_pool(source.as_ref()), self.segment_hint, segment)?;
         state.total = total;
         Ok(())
     }
@@ -1300,13 +1311,15 @@ mod inline_packet_segments {
             let base = pool.used();
             let mut parts = PacketSegmentStorage::new();
             for index in 0..INLINE_PACKET_SEGMENTS {
-                parts.try_push(&pool, Some(hint), segment(index)).unwrap();
+                parts
+                    .try_push(|| Ok(&pool), Some(hint), segment(index))
+                    .unwrap();
                 assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
                 assert_eq!(pool.used(), base);
                 assert_eq!(pool.peak(), base);
             }
             parts
-                .try_push(&pool, Some(hint), segment(INLINE_PACKET_SEGMENTS))
+                .try_push(|| Ok(&pool), Some(hint), segment(INLINE_PACKET_SEGMENTS))
                 .unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
                 panic!("descriptor did not spill");
@@ -1328,12 +1341,12 @@ mod inline_packet_segments {
         let mut parts = PacketSegmentStorage::new();
         assert!(parts.as_slice().is_empty());
         for index in 0..INLINE_PACKET_SEGMENTS {
-            parts.try_push(&pool, None, segment(index)).unwrap();
+            parts.try_push(|| Ok(&pool), None, segment(index)).unwrap();
             assert_eq!(pool.used(), base);
             assert_eq!(parts.len(), index + 1);
         }
         for index in INLINE_PACKET_SEGMENTS..9 {
-            parts.try_push(&pool, None, segment(index)).unwrap();
+            parts.try_push(|| Ok(&pool), None, segment(index)).unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
                 panic!("descriptor did not spill");
             };
@@ -1362,7 +1375,9 @@ mod inline_packet_segments {
         assert!(parts.as_slice().is_empty());
         assert_eq!(pool.used(), charge);
         for index in 0..INLINE_PACKET_SEGMENTS {
-            parts.try_push(&pool, Some(9), segment(index)).unwrap();
+            parts
+                .try_push(|| Ok(&pool), Some(9), segment(index))
+                .unwrap();
             assert_eq!(parts.len(), index + 1);
             assert_eq!(parts.as_slice()[index], segment(index));
             assert_eq!(pool.used(), charge);
@@ -1370,7 +1385,7 @@ mod inline_packet_segments {
         let before = parts.as_slice().to_vec();
         for _ in 0..2 {
             assert!(matches!(
-                parts.try_push(&pool, Some(9), segment(INLINE_PACKET_SEGMENTS)),
+                parts.try_push(|| Ok(&pool), Some(9), segment(INLINE_PACKET_SEGMENTS)),
                 Err(Error::Backpressure { .. })
             ));
             assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
@@ -1383,7 +1398,7 @@ mod inline_packet_segments {
             .reserve(pool.available() - needed * size_of::<NalPacketSegment>())
             .unwrap();
         parts
-            .try_push(&pool, Some(9), segment(INLINE_PACKET_SEGMENTS))
+            .try_push(|| Ok(&pool), Some(9), segment(INLINE_PACKET_SEGMENTS))
             .unwrap();
         let PacketSegmentStorage::Heap(heap) = &parts else {
             panic!("retry did not spill");
@@ -1425,7 +1440,9 @@ mod inline_packet_segments {
             let hint = 9;
             let mut parts = PacketSegmentStorage::new();
             for index in 0..actual {
-                parts.try_push(&pool, Some(hint), segment(index)).unwrap();
+                parts
+                    .try_push(|| Ok(&pool), Some(hint), segment(index))
+                    .unwrap();
                 assert_eq!(parts.len(), index + 1);
                 assert_eq!(parts.as_slice()[index], segment(index));
                 if index < INLINE_PACKET_SEGMENTS {
