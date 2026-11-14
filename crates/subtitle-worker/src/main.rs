@@ -49,7 +49,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use triergon_core::Budget;
-use triergon_harness_runner::{Invocation, Mode, Refusal, Totals, measure};
+use triergon_harness_runner::{Invocation, Mode, Refusal, Totals, measure_with};
 
 /// The words after the file: KIND and its arguments.
 const USAGE: &str = " KIND [ARG...]";
@@ -186,6 +186,20 @@ fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
     }
 }
 
+/// The prepared packets' count and each packet's PTS (absent or present and
+/// its value) and duration, in order, folded as the reference's `sub-fold`
+/// folds them into `input_digest`.
+fn input_digest(track: &container::Track) -> u64 {
+    let mix = |digest: u64, word: u64| digest.wrapping_mul(31).wrapping_add(word);
+    let count = u64::try_from(track.packets.len()).unwrap_or(u64::MAX);
+    track.packets.iter().fold(mix(0, count), |digest, packet| {
+        let digest = mix(digest, u64::from(packet.pts.is_some()));
+        // The two's complement words, as the reference casts them.
+        let digest = mix(digest, packet.pts.unwrap_or(0).cast_unsigned());
+        mix(digest, packet.duration.unwrap_or(0).cast_unsigned())
+    })
+}
+
 fn main() -> ExitCode {
     let words: Vec<String> = std::env::args().skip(1).collect();
     let result = match words.first() {
@@ -224,10 +238,16 @@ fn run(words: &[String]) -> Result<()> {
         out.flush()?;
         return Ok(());
     }
-    measure(
+    // The fold also gives the prepared packets' times (outside the operation).
+    let input = match (invocation.mode, prepared.input()) {
+        (Mode::Fold, Some(track)) => vec![("input_digest", input_digest(track))],
+        _ => vec![],
+    };
+    measure_with(
         &invocation,
         "subtitle-decode",
         Some(prepared.pool()),
+        &input,
         || {
             let mut sink = Sink::new(None);
             let refusal = match prepared.run(&mut sink) {

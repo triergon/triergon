@@ -23,8 +23,9 @@
 //! full buffer (C.4.5): one leaves, lowest order count first, as soon as more
 //! pictures wait than the reorder depth (`h264-reorder-ts`). With a bitstream
 //! restriction that is its `max_num_reorder_frames` (an SPS stating more than
-//! 16 is not taken); among the first 20 pictures a B picture below an earlier
-//! one raises a stated 0 to 1 (probes p3-h264-closed-r0, p3-h264-pyr-r0), and
+//! 16 is not taken); among the first 21 pictures a B picture below an earlier
+//! one raises a stated 0 to 1 (probes p3-h264-closed-r0, p3-h264-pyr-r0, p88;
+//! `h264-stated-b20-ts`; a step does not: `h264-jump-stated-ts`), and
 //! up to the twenty-first a reference picture first lets the pictures beyond
 //! the depth leave (probes p53, p12-big). Without a bitstream restriction the
 //! depth starts at 0 and becomes the number of the last 16 pictures decoded
@@ -32,7 +33,9 @@
 //! `h264-depth-grow-ts`); after a B picture at least one picture waits
 //! (probe p50; `h264-b-in-order-ts`), and at depth 0 a picture more than 2
 //! above the one before it raises the depth to 1, unless a gap in `frame_num`
-//! comes before it (probe p74; `h264-jump-depth-ts`, `h264-gap-jump-ts`).
+//! comes before it in an SPS with `gaps_in_frame_num_value_allowed_flag` 0
+//! (probes p74, p88c; `h264-jump-depth-ts`, `h264-gap-jump-ts`,
+//! `h264-gap-allowed-ts`; `h264-depth-two-ts`).
 //! When MaxDpbFrames (Table A-1) is 2 or more, nothing leaves at first: the
 //! hold ends once a decoder outputting from the first picture would have
 //! output 7 pictures at a depth below 3 (its depth growing as above, a B
@@ -40,9 +43,13 @@
 //! output dropped), at the twenty-first picture at a deeper depth, or at the
 //! picture whose depth equals MaxDpbFrames (probes p27, p47, p62, p64-p69;
 //! `h264-start-hold-ts`, `h264-hold-depth1-ts`, `h264-hold-jump-ts`,
-//! `h264-hold-dpb-ts`). Among the first 20 pictures at least one waits (probe
-//! p27). A picture below each of the last 15 decoded leaves at once, after
-//! those waiting (probes p22, p23; package case0003). A picture leaving after a
+//! `h264-hold-step3-ts`, `h264-hold-dpb-ts`). The output of a first picture
+//! that is a non-IDR intra picture with `frame_num` 0 does not count (probes
+//! p89b, p89c; `h264-start-fn0-ts`). Among the first 20 pictures at least one
+//! waits (probe p27). A picture below each of the last 16 decoded makes those
+//! waiting leave first, does not raise the depth and is not dropped for being
+//! below the first intra picture of a stream without an IDR picture (probes
+//! p22, p23, p87, p89e; `h264-far-back-ts`). A picture leaving after a
 //! picture with a higher order count has been output (since the last IDR
 //! picture or operation 5) is dropped with its captions (`h264-reorder-ts`).
 //! The two fields of a pair, in one packet or two, make one frame carrying both
@@ -53,24 +60,34 @@
 //! (`h264-fields-lone-ts`).
 //!
 //! A stream that does not start at an IDR picture outputs nothing until it
-//! recovers (`h264-recovery-*`): at an IDR picture; at the reference picture
-//! whose `frame_num` a recovery point SEI names (`recovery_frame_cnt` after the
-//! SEI's picture), which also recovers the pictures waiting; or, without a
-//! recovery point, once as many pictures above the first intra picture as the
-//! reorder depth have followed it, the last of them still not recovered
-//! (`h264-start-intra-r2-ts`; probe p59), the depth counted when each of them
-//! is decoded, so pictures below the intra picture decoded before them can
-//! raise it (probes p6-h264-b2-norec-norestr, p6-h264-b2-norec-r0d1;
-//! `h264-norestr-ts`). When the depth is still 0 at the first picture above,
-//! the stream recovers there and the intra picture is dropped unless it is the
-//! stream's first picture with a `frame_num` other than 0
-//! (`h264-start-intra-ts`; probes p59, p60, p61). Intra pictures decoded before
-//! recovery are output, and recovery also comes when one of them leaves. With a
-//! bitstream restriction, a B picture below an earlier picture in the first 20
-//! raises a stated 0 to 1 (probes p3-h264-closed-r0, p3-h264-pyr-r0). Pictures
-//! decoded before recovery, and pictures with a lower order count than the
-//! first of those intra pictures or the recovery point (as stored, so 0 after
-//! operation 5: `h264-mmco5-start-ts`), are dropped with their captions.
+//! recovers (`h264-recovery-*`): at an IDR picture, or by the pictures above
+//! its first intra picture: those up to the reorder depth are not recovered,
+//! and the stream recovers at the last of them (`h264-start-intra-r2-ts`;
+//! probe p59), the depth counted when each of them is decoded, so pictures
+//! below the intra picture decoded before them can raise it (probes
+//! p6-h264-b2-norec-norestr, p6-h264-b2-norec-r0d1; `h264-norestr-ts`), and
+//! during the start hold the depth at its end (probe p89;
+//! `h264-start-jump-ts`). A B picture among the first 21 pictures makes that
+//! depth at least 1, also when it comes after the pictures concerned have
+//! left: frames wait until it is known (probes p89c-p89e;
+//! `h264-start-b-window-ts`). At depth 0 the stream recovers at the first
+//! picture above, and the intra picture is dropped unless it is the stream's
+//! first picture with a `frame_num` other than 0 (`h264-start-intra-ts`;
+//! probes p59, p60, p61). Reference intra pictures decoded before recovery
+//! are output, also among those not recovered (probe p89;
+//! `h264-start-intra-run-ts`), and recovery also comes when one of them
+//! leaves. A non-reference intra picture is the first only as the stream's
+//! first picture with a `frame_num` other than 0, and then recovers the
+//! stream only at depth 0 (probe p91; `h264-start-nonref-ts`). A recovery
+//! point SEI names a reference picture by its `frame_num`
+//! (`recovery_frame_cnt` after the SEI's picture). Before any intra picture,
+//! at the first or below it, that picture recovers the stream and the
+//! pictures waiting; above it, it recovers the pictures from its order count
+//! on, waiting or later, while those below it still count above the intra
+//! picture (probe p90; `h264-recovery-above-ts`). Pictures decoded before
+//! recovery, and pictures with a lower order count than the first intra
+//! picture or the recovery point (as stored, so 0 after operation 5:
+//! `h264-mmco5-start-ts`), are dropped with their captions.
 //!
 //! **HEVC.** Order counts follow 8.3.1 and the reference picture sets 8.3.2. A
 //! picture is decoded from the first IRAP picture on; RASL pictures of an IRAP
@@ -101,8 +118,8 @@
 //! truncated to the time base, or 0 when that period is 1/1000 s or less
 //! (`h264-vui-fast-ts`); without VUI timing, the duration estimated from the
 //! times of the first 21 packets ([`RateEstimate`]: a common divisor of their
-//! steps, else the frame rate whose grid they fit best; `h264-estimate-ts`,
-//! `h264-rate-*-ts`). A packet's time is its DTS, else its PTS; in H.264
+//! steps, else the frame rate whose grid they fit best, one tick with fewer
+//! than three; `h264-estimate-ts`, `h264-rate-*-ts`). A packet's time is its DTS, else its PTS; in H.264
 //! without a bitstream restriction, when a picture up to the sixth raises the
 //! depth from 0 by its order count step before any B picture, the packets
 //! after it up to the seventh whose DTS is absent or equals their PTS give the
@@ -156,8 +173,9 @@ const DEEP: u32 = 3;
 const RECENT: usize = 16;
 
 /// H.264: a picture with a lower order count than the last this many
-/// decoded is output at once, after the pictures waiting (probes p22, p23).
-const FAR_BACK: usize = 15;
+/// decoded makes the pictures waiting leave first and does not raise the
+/// depth; one below only the last 15 is late (probes p22, p23, p87).
+const FAR_BACK: usize = 16;
 
 /// H.264: a picture whose order count is more than this above the picture
 /// before it raises a depth of 0 to 1 (probes p31, p32, p64, p66, p74).
@@ -183,6 +201,32 @@ struct Held {
     recovered: bool,
     /// H.264: an intra picture decoded before the stream recovered.
     key: bool,
+    /// H.264: decoded before recovery, the how-manyth picture above the first
+    /// intra picture (0 for none).
+    above: u32,
+    /// H.264: the stream's first intra picture before recovery.
+    first_key: bool,
+}
+
+/// H.264 streams that start without an IDR picture: whether a B picture
+/// comes among the first [`START_WINDOW`] + 1 pictures (probes p89d, p89e).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum BWindow {
+    #[default]
+    Open,
+    Seen,
+    Closed,
+}
+
+/// H.264: a stream that recovered at depth 0 while the [`BWindow`] was
+/// open. A B picture in the window drops the first picture above the intra
+/// picture and keeps the intra picture; none keeps the first picture above
+/// and drops the intra picture unless it is kept (probes p89c-p89e). The
+/// frames, in the frames kept until the choice is made.
+#[derive(Clone, Copy, Debug, Default)]
+struct StartChoice {
+    key: Option<usize>,
+    above: Option<usize>,
 }
 
 /// An H.264 first field waiting for its second.
@@ -208,6 +252,9 @@ struct EarlyHold {
     last: Option<i32>,
     previous: Option<i32>,
     outputs: u32,
+    /// The first output does not count: the stream starts at a non-IDR intra
+    /// picture with `frame_num` 0 (probes p89b, p89c).
+    uncounted_first: bool,
     /// The hold has ended.
     ended: bool,
 }
@@ -239,7 +286,9 @@ impl EarlyHold {
             self.len -= 1;
             self.waiting[at] = self.waiting[self.len];
             if self.last.is_none_or(|last| lowest >= last) {
-                self.outputs += 1;
+                if self.last.is_some() || !self.uncounted_first {
+                    self.outputs += 1;
+                }
                 self.last = Some(lowest);
             }
         }
@@ -317,10 +366,37 @@ struct AvcState {
     /// recovers at depth 0.
     key_id: Option<PictureId>,
     key_kept: bool,
+    key_reference: bool,
+    /// Pictures above the first intra picture were counted during the start
+    /// hold, their recovery not yet decided.
+    deferred: bool,
+    b_window: BWindow,
+    choice: Option<StartChoice>,
+    /// Pictures from this order count on are recovered: a recovery point
+    /// above the first intra picture (probe p90).
+    recovered_from: Option<i32>,
     /// Pictures with a lower order count than this are dropped.
     floor: Option<i32>,
     late: LateOutput,
     first_field: Option<FirstField>,
+}
+
+impl AvcState {
+    /// Whether the first intra picture can recover the stream: a reference
+    /// picture, or one kept at depth 0 (probe p91).
+    fn key_recovers(&self) -> bool {
+        self.key_reference || self.key_kept && self.recovery_depth() == 0
+    }
+
+    /// The reorder depth that decides recovery: at least 1 after a B picture
+    /// in the [`BWindow`] (probes p89d, p89e).
+    fn recovery_depth(&self) -> u32 {
+        if self.b_window == BWindow::Seen {
+            self.depth.max(1)
+        } else {
+            self.depth
+        }
+    }
 }
 
 /// HEVC decoding state between pictures.
@@ -351,8 +427,12 @@ struct Progress {
     timing: RateEstimate,
     /// The duration estimate, once settled.
     estimate: Option<i64>,
-    /// Frames wait in `unsettled` until the duration estimate is settled.
+    /// Frames wait in `unsettled` until the duration estimate is settled
+    /// (when one of them needs it) and the start choice is made.
     holding: bool,
+    needs_estimate: bool,
+    /// The frame kept in `unsettled` that the start choice dropped.
+    skip: Option<usize>,
 }
 
 /// The parameter sets of either codec.
@@ -448,6 +528,13 @@ impl NalDecode {
 
     pub(super) fn finish(&mut self, out: &mut FrameQueue) -> Result<()> {
         self.step(out, |decode, out| {
+            if decode.progress.avc.deferred {
+                decode.resolve_recovery();
+            }
+            if decode.progress.avc.b_window == BWindow::Open {
+                decode.progress.avc.b_window = BWindow::Closed;
+                decode.choose_start();
+            }
             decode.leaving.try_reserve(decode.pictures.len())?;
             let leaving = &mut decode.leaving;
             decode.pictures.flush(|leave| {
@@ -627,6 +714,8 @@ impl NalDecode {
             end: decode.captions.bytes.len(),
             recovered: false,
             key: false,
+            above: 0,
+            first_key: false,
         };
         match picture {
             Picture::None => {
@@ -866,9 +955,20 @@ impl NalDecode {
         }
         let state = &mut self.progress.avc;
         state.decoded = state.decoded.saturating_add(1);
+        if state.b_window == BWindow::Open {
+            if header.slice_type % 5 == 1 && state.decoded <= START_WINDOW + 1 {
+                state.b_window = BWindow::Seen;
+                self.choose_start();
+            } else if state.decoded > START_WINDOW + 1 {
+                state.b_window = BWindow::Closed;
+                self.choose_start();
+            }
+        }
+        let state = &mut self.progress.avc;
         let order = poc.stored_poc;
-        // Far below the last pictures decoded: the pictures waiting leave,
-        // then this one at once.
+        // Far below the last pictures decoded: the pictures waiting leave
+        // first, it does not raise the depth, and no floor drops it (probe
+        // p89e N19-N22 with the B picture below the intra picture).
         let far = state.recent.len >= FAR_BACK && state.recent.last(FAR_BACK).all(|q| order < q);
         if far {
             self.leaving.try_reserve(self.pictures.len())?;
@@ -880,6 +980,7 @@ impl NalDecode {
             }) {}
             self.emit_avc(out)?;
             self.progress.avc.late.restart();
+            self.progress.avc.floor = None;
         } else {
             let displaced = state.recent.last(RECENT).filter(|&q| q > order).count();
             if !state.stated {
@@ -895,7 +996,7 @@ impl NalDecode {
                 // before it raises the depth to 1, unless a gap in
                 // `frame_num` comes before it (probe p74).
                 if state.depth == 0
-                    && !gap
+                    && (!gap || fields.gaps_in_frame_num_allowed)
                     && state
                         .previous
                         .is_some_and(|p| order > p.saturating_add(NEXT_STEP))
@@ -905,13 +1006,19 @@ impl NalDecode {
                         self.progress.timing.untime_through(UNTIMED_THROUGH);
                     }
                 }
-            } else if displaced > 0 && header.slice_type % 5 == 1 && state.decoded <= START_WINDOW {
+            } else if displaced > 0
+                && header.slice_type % 5 == 1
+                && state.decoded <= START_WINDOW + 1
+            {
                 // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
                 // p3-h264-pyr-r0).
                 state.depth = state.depth.max(1);
             }
         }
         let state = &mut self.progress.avc;
+        if state.decoded == 1 {
+            state.early.uncounted_first = !slice.idr && header.intra() && header.frame_num == 0;
+        }
         if !state.early.ended {
             let displaced = state.recent.last(RECENT).filter(|&q| q > order).count();
             state.early.picture(
@@ -936,42 +1043,47 @@ impl NalDecode {
             let max_frame_num = 1u32 << fields.frame_num_bits.min(16);
             state.target = Some(u32::from(header.frame_num).wrapping_add(count) % max_frame_num);
         }
-        // Before recovery: the stream recovers once `depth` pictures above
-        // the first intra picture follow it (that one still not recovered);
-        // at depth 0 it recovers at the intra picture, which itself is kept
-        // only as the stream's first picture with `frame_num` other than 0
-        // (probes p59, p60, p61).
-        let first_key =
-            !state.recovered && header.intra() && !state.keyed && state.target.is_none();
-        let mut unrecovered = false;
-        let mut drop_key = None;
-        if !state.recovered
-            && !first_key
-            && let Some(key) = state.key_poc
-            && poc.stored_poc > key
-        {
-            state.above_key = state.above_key.saturating_add(1);
-            if state.depth == 0 {
-                // Still depth 0 at the first picture above: it recovers,
-                // and the intra picture is dropped.
-                state.recovered = true;
-                state.key_poc = None;
-                if !state.key_kept {
-                    drop_key = state.key_id;
-                }
-            } else if state.above_key >= state.depth {
-                state.recovered = true;
-                state.key_poc = None;
-                unrecovered = true;
-            }
-        }
-        if let Some(id) = drop_key
-            && let Some(mut entry) = self.pictures.entry(id)
-        {
-            entry.picture_mut().key = false;
+        // Before recovery: the pictures above the first intra picture up to
+        // the reorder depth are not recovered, and the stream recovers at the
+        // last of them; at depth 0 at the first, where the intra picture is
+        // kept only as the stream's first picture with `frame_num` other than
+        // 0 (probes p59, p60, p61). During the start hold the depth at its end
+        // decides (probe p89).
+        // Intra pictures decoded before recovery are output only when they
+        // are reference pictures, or a non-reference one that is the
+        // stream's first picture with `frame_num` other than 0 (probe p91).
+        let key = header.intra() && slice.reference;
+        let first_key = !state.recovered
+            && !state.keyed
+            && header.intra()
+            && (slice.reference || state.decoded == 1 && header.frame_num != 0);
+        // The reference picture a recovery point names, and the first intra
+        // picture's order count before this picture.
+        let target = !state.recovered
+            && slice.reference
+            && state.target == Some(u32::from(header.frame_num));
+        let key_poc = state.key_poc;
+        let deferring = state.holds && !state.early.ended;
+        if state.deferred && !deferring {
+            self.resolve_recovery();
         }
         let state = &mut self.progress.avc;
-        if !state.recovered && header.intra() {
+        let mut unrecovered = false;
+        if !state.recovered && !first_key && state.key_poc.is_some_and(|key| poc.stored_poc > key) {
+            state.above_key = state.above_key.saturating_add(1);
+            held.above = state.above_key;
+            if deferring {
+                state.deferred = true;
+            } else {
+                let depth = state.recovery_depth();
+                unrecovered = state.above_key <= depth;
+                if state.above_key >= depth.max(1) {
+                    self.recover_above_key();
+                }
+            }
+        }
+        let state = &mut self.progress.avc;
+        if (!state.recovered || unrecovered) && (key || first_key) {
             held.key = true;
             if !state.keyed {
                 state.keyed = true;
@@ -979,19 +1091,34 @@ impl NalDecode {
             }
         }
         if first_key {
+            held.first_key = true;
+            state.key_reference = slice.reference;
             state.key_poc = Some(poc.stored_poc);
             state.above_key = 0;
             state.key_kept = state.decoded == 1 && header.frame_num != 0;
         }
-        if !state.recovered && slice.reference && state.target == Some(u32::from(header.frame_num))
-        {
-            // The recovery point recovers the pictures still waiting too.
-            state.recovered = true;
+        if target {
             state.target = None;
-            let floor = poc.stored_poc;
-            state.floor = Some(state.floor.map_or(floor, |old| old.min(floor)));
-            for mut entry in self.pictures.entries_mut() {
-                entry.picture_mut().recovered = true;
+            if first_key || key_poc.is_none_or(|key| poc.stored_poc < key) {
+                // Before any intra picture, at the first or below it: the
+                // recovery point recovers the pictures still waiting too.
+                state.recovered = true;
+                let floor = poc.stored_poc;
+                state.floor = Some(state.floor.map_or(floor, |old| old.min(floor)));
+                for mut entry in self.pictures.entries_mut() {
+                    entry.picture_mut().recovered = true;
+                }
+            } else {
+                // After the first intra picture it recovers itself and the
+                // pictures above it, waiting or later; those below it still
+                // count above the intra picture (probe p90).
+                let floor = poc.stored_poc;
+                state.recovered_from = Some(floor);
+                for mut entry in self.pictures.entries_mut() {
+                    if entry.poc() >= floor {
+                        entry.picture_mut().recovered = true;
+                    }
+                }
             }
         }
         // With a bitstream restriction, a reference picture in the start
@@ -1009,7 +1136,11 @@ impl NalDecode {
             });
             self.emit_avc(out)?;
         }
-        held.recovered = self.progress.avc.recovered && !unrecovered;
+        let state = &self.progress.avc;
+        held.recovered = state.recovered && !unrecovered
+            || state
+                .recovered_from
+                .is_some_and(|from| poc.stored_poc >= from);
         // Stored without the processes of C.4.5: pictures leave by the
         // reorder depth instead. A first field waits for its second.
         let new = NewPicture {
@@ -1033,17 +1164,95 @@ impl NalDecode {
                 parity,
             });
         }
-        if far {
-            self.leaving.try_reserve(self.pictures.len())?;
-            let leaving = &mut self.leaving;
-            while self.pictures.bump(|leave| {
-                if let Leave::Output { poc, picture } = leave {
-                    collect(leaving, poc, picture);
-                }
-            }) {}
-            return self.emit_avc(out);
-        }
         self.bump_avc(out)
+    }
+
+    /// Decides the recovery of the pictures above the first intra picture
+    /// counted during the start hold, by the reorder depth at its end: those
+    /// up to the depth are not recovered (probe p89).
+    fn resolve_recovery(&mut self) {
+        let state = &mut self.progress.avc;
+        state.deferred = false;
+        let depth = state.recovery_depth();
+        if state.above_key < depth.max(1) {
+            return;
+        }
+        if !state.key_recovers() {
+            self.recover_above_key();
+            return;
+        }
+        for mut entry in self.pictures.entries_mut() {
+            let held = entry.picture_mut();
+            if held.above > depth {
+                held.recovered = true;
+            }
+        }
+        self.recover_above_key();
+    }
+
+    /// The stream recovers by the pictures above the first intra picture;
+    /// at depth 0 the intra picture is dropped unless it is kept.
+    fn recover_above_key(&mut self) {
+        let state = &mut self.progress.avc;
+        state.key_poc = None;
+        if !state.key_recovers() {
+            // A non-reference intra picture recovers the stream only when it
+            // is kept at depth 0; otherwise the next intra picture is the
+            // first (probe p91: frame_num 0, or reorder 1, outputs nothing).
+            state.keyed = false;
+            state.floor = None;
+            if let Some(id) = state.key_id
+                && let Some(mut entry) = self.pictures.entry(id)
+            {
+                entry.picture_mut().key = false;
+            }
+            return;
+        }
+        state.recovered = true;
+        if state.recovery_depth() == 0 {
+            if state.b_window == BWindow::Open {
+                state.choice = Some(StartChoice::default());
+            } else {
+                self.drop_key();
+            }
+        }
+    }
+
+    /// Drops the first intra picture unless it is kept.
+    fn drop_key(&mut self) {
+        let state = &self.progress.avc;
+        if state.key_kept {
+            return;
+        }
+        if let Some(id) = state.key_id
+            && let Some(mut entry) = self.pictures.entry(id)
+        {
+            entry.picture_mut().key = false;
+        }
+        if let Some(choice) = state.choice {
+            self.progress.skip = choice.key;
+        }
+    }
+
+    /// Makes the start choice once the [`BWindow`] is decided.
+    fn choose_start(&mut self) {
+        let Some(choice) = self.progress.avc.choice else {
+            return;
+        };
+        if self.progress.avc.b_window == BWindow::Seen {
+            let from = self.progress.avc.recovered_from;
+            for mut entry in self.pictures.entries_mut() {
+                let poc = entry.poc();
+                let held = entry.picture_mut();
+                if held.above == 1 && from.is_none_or(|from| poc < from) {
+                    held.recovered = false;
+                }
+            }
+            self.progress.skip = choice.above;
+        } else {
+            self.drop_key();
+        }
+        self.progress.avc.choice = None;
     }
 
     /// Outputs H.264 pictures while more wait than the reorder depth: none
@@ -1217,8 +1426,20 @@ impl NalDecode {
     fn output(&mut self, held: Held, out: &mut FrameQueue) -> Result<()> {
         let bytes = &self.captions.bytes.as_bytes()[held.start..held.end];
         let progress = &mut self.progress;
-        if progress.holding || held.duration.is_none() && !progress.timing.settled() {
+        let needs_estimate = held.duration.is_none() && !progress.timing.settled();
+        if progress.holding || needs_estimate || progress.avc.choice.is_some() {
             progress.holding = true;
+            progress.needs_estimate |= held.duration.is_none();
+            if let Some(choice) = &mut progress.avc.choice
+                && !bytes.is_empty()
+            {
+                let at = Some(self.unsettled.len());
+                if held.first_key {
+                    choice.key = at;
+                } else if held.above == 1 {
+                    choice.above = at;
+                }
+            }
             return self.unsettled.push(held.pts, held.duration, bytes);
         }
         let duration = held.duration.or_else(|| estimate(progress, self.time_base));
@@ -1228,19 +1449,33 @@ impl NalDecode {
     /// Releases the frames kept for the duration estimate once it is
     /// settled, or at the end of the stream.
     fn settle(&mut self, finishing: bool, out: &mut FrameQueue) -> Result<()> {
-        if !self.progress.holding || !(finishing || self.progress.timing.settled()) {
+        let progress = &self.progress;
+        if !progress.holding
+            || !finishing
+                && (progress.avc.choice.is_some()
+                    || progress.needs_estimate && !progress.timing.settled())
+        {
             return Ok(());
         }
-        let estimate = estimate(&mut self.progress, self.time_base);
-        for entry in self.unsettled.entries() {
-            out.push(
-                entry.pts,
-                entry.duration.or(estimate),
-                self.unsettled.bytes(entry),
-            )?;
+        let estimate = if self.progress.needs_estimate {
+            estimate(&mut self.progress, self.time_base)
+        } else {
+            None
+        };
+        let skip = self.progress.skip;
+        for (at, entry) in self.unsettled.entries().iter().enumerate() {
+            if skip != Some(at) {
+                out.push(
+                    entry.pts,
+                    entry.duration.or(estimate),
+                    self.unsettled.bytes(entry),
+                )?;
+            }
         }
         self.unsettled.clear();
         self.progress.holding = false;
+        self.progress.needs_estimate = false;
+        self.progress.skip = None;
         Ok(())
     }
 
@@ -1331,7 +1566,14 @@ mod tests {
     /// The index at which the start hold ends for pictures given as (order
     /// count, B picture), without frame_num gaps.
     fn hold_end(pictures: &[(i32, bool)], dpb_frames: u32) -> Option<u32> {
-        let mut hold = EarlyHold::default();
+        hold_end_from(EarlyHold::default(), pictures, dpb_frames)
+    }
+
+    fn hold_end_from(
+        mut hold: EarlyHold,
+        pictures: &[(i32, bool)],
+        dpb_frames: u32,
+    ) -> Option<u32> {
         let mut recent: Vec<i32> = Vec::new();
         for (index, &(poc, b)) in (0u32..).zip(pictures) {
             let displaced = recent.iter().rev().take(16).filter(|&&q| q > poc).count();
@@ -1372,6 +1614,17 @@ mod tests {
         assert_eq!(hold_end(&stream(2, &[(3, 2)], 30), 16), Some(9));
         assert_eq!(hold_end(&stream(2, &[(2, 1), (5, 2)], 30), 16), Some(10));
         assert_eq!(hold_end(&stream(2, &[(4, 3)], 30), 16), Some(20));
+    }
+
+    #[test]
+    fn a_first_intra_picture_with_frame_num_0_does_not_count() {
+        // Probes p89b, p89c: from a non-IDR intra picture with frame_num 0
+        // the hold at depth 0 ends at index 7, not 6.
+        let hold = EarlyHold {
+            uncounted_first: true,
+            ..EarlyHold::default()
+        };
+        assert_eq!(hold_end_from(hold, &stream(2, &[], 30), 16), Some(7));
     }
 
     #[test]

@@ -826,17 +826,17 @@ def field_slice(kind, idr, ref, frame_num, bottom, lsb):
     return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
 
 
-def frame_sps(restriction=None, size=(2, 2), level=30):
+def frame_sps(restriction=None, size=(2, 2), level=30, gaps=False):
     """An SPS of 32x32 frames (or `size` macroblocks): frame_num 4 bits, POC
-    type 0 with 8-bit LSBs, 2 reference frames, level 3.0 (or `level`); with
-    `restriction` (reorder, buffering) a VUI bitstream restriction, else no
-    VUI."""
+    type 0 with 8-bit LSBs, 2 reference frames, level 3.0 (or `level`),
+    gaps_in_frame_num_value_allowed_flag `gaps`; with `restriction` (reorder,
+    buffering) a VUI bitstream restriction, else no VUI."""
     b = BitWriter()
     for v, n in ((77, 8), (0, 8), (level, 8)):
         b.u(v, n)
     for v in (0, 0, 0, 4, 2):
         b.ue(v)
-    b.u(0, 1)
+    b.u(1 if gaps else 0, 1)
     b.ue(size[0] - 1)
     b.ue(size[1] - 1)
     for v in (1, 1, 0):
@@ -882,6 +882,81 @@ def frame_slice(kind, idr, ref, frame_num, lsb, mbs=4):
         b.ue(mbs)  # mb_skip_run
     b.u(1, 1)
     return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
+
+
+def recovery_point_sei(count):
+    """An H.264 recovery point SEI NAL unit: recovery_frame_cnt `count`,
+    exact match, no broken link."""
+    b = BitWriter()
+    b.ue(count)
+    b.u(1, 1)
+    b.u(0, 3)
+    payload = b.rbsp()
+    return b"\x00\x00\x00\x01\x06" + escape(bytes([6, len(payload)]) + payload + b"\x80")
+
+
+def start_pictures(kinds, steps=None, refs=None, frame_num=5, count=300):
+    """(kind, idr, ref, frame_num, order count) of a stream without an IDR
+    picture: `kinds` gives the first pictures' kinds (then P frames); order
+    counts from 40 in steps of 2, or steps[n] where given; refs[n] False makes
+    picture n a non-reference picture; frame_num from `frame_num`."""
+    out, fn, poc = [], frame_num, 40
+    for n in range(count):
+        if n:
+            poc += (steps or {}).get(n, 2)
+        kind = kinds[n] if n < len(kinds) else "P"
+        ref = (refs or {}).get(n, kind != "B")
+        out.append((kind, False, ref, fn, poc))
+        fn += 1 if ref else 0
+    return out
+
+
+def matroska(units, scale=1_000_000):
+    """A Matroska file of one H.264 track (avcC from the first unit's SPS and
+    PPS) whose SimpleBlocks carry no duration, without DefaultDuration:
+    units are (time in nanoseconds, Annex B access unit) in decode order,
+    the first a keyframe."""
+    def vint(n):
+        length = next(k for k in range(1, 9) if n < (1 << (7 * k)) - 1)
+        return ((1 << (7 * length)) | n).to_bytes(length, "big")
+
+    def element(eid, body):
+        return eid + vint(len(body)) + body
+
+    def uint(eid, v):
+        return element(eid, v.to_bytes(max(1, (v.bit_length() + 7) // 8), "big"))
+
+    def nals(au):
+        return [part.rstrip(b"\x00") for part in au.split(b"\x00\x00\x01")[1:]]
+
+    first = nals(units[0][1])
+    sps = next(n for n in first if n[0] & 0x1F == 7)
+    pps = next(n for n in first if n[0] & 0x1F == 8)
+    avcc = (bytes([1, sps[1], sps[2], sps[3], 0xFF, 0xE1]) + len(sps).to_bytes(2, "big") + sps
+            + b"\x01" + len(pps).to_bytes(2, "big") + pps)
+    header = element(b"\x1a\x45\xdf\xa3", uint(b"\x42\x86", 1) + uint(b"\x42\xf7", 1) + uint(b"\x42\xf2", 4)
+                     + uint(b"\x42\xf3", 8) + element(b"\x42\x82", b"matroska") + uint(b"\x42\x87", 4)
+                     + uint(b"\x42\x85", 2))
+    info = element(b"\x15\x49\xa9\x66", uint(b"\x2a\xd7\xb1", scale) + element(b"\x4d\x80", b"t")
+                   + element(b"\x57\x41", b"t"))
+    track = element(b"\xae", uint(b"\xd7", 1) + uint(b"\x73\xc5", 1) + uint(b"\x83", 1)
+                    + element(b"\x86", b"V_MPEG4/ISO/AVC") + element(b"\x63\xa2", avcc)
+                    + element(b"\xe0", uint(b"\xb0", 32) + uint(b"\xba", 32)))
+    clusters, blocks, base = b"", [], None
+    for n, (ns, au) in enumerate(units):
+        t = ns // scale
+        if base is None or not -32000 <= t - base <= 32000:
+            if blocks:
+                clusters += element(b"\x1f\x43\xb6\x75", uint(b"\xe7", base) + b"".join(blocks))
+            blocks, base = [], t
+        payload = b"".join(len(x).to_bytes(4, "big") + x for x in nals(au) if x[0] & 0x1F not in (7, 8, 9))
+        block = vint(1) + (t - base).to_bytes(2, "big", signed=True) + bytes([0x80 if n == 0 else 0]) + payload
+        blocks.append(element(b"\xa3", block))
+    if blocks:
+        clusters += element(b"\x1f\x43\xb6\x75", uint(b"\xe7", base) + b"".join(blocks))
+    segment = (b"\x18\x53\x80\x67" + b"\x01\xff\xff\xff\xff\xff\xff\xff" + info
+               + element(b"\x16\x54\xae\x6b", track) + clusters)
+    return header + segment
 
 
 def frame_pictures(count, bs=(), start=None, ifr=None, jumps=(), gaps=()):
@@ -1548,17 +1623,27 @@ def picture_output_cases(tmp_dir):
     # of its decode index.
     carrier32 = base("h264", "h264-carrier32", params="bframes=0")
 
-    def written(name, pictures, restriction=None, size=(2, 2), level=30, pts=None):
+    def written(name, pictures, restriction=None, size=(2, 2), level=30, pts=None, gaps=False,
+                recovery=None, mkv_ns=None):
+        """A case of `pictures` in the carrier's packets (or, with mkv_ns(n)
+        times in nanoseconds, in a Matroska file without durations), with a
+        recovery point of recovery_frame_cnt `recovery` on the first."""
         def au(n, payload):
             if n >= len(pictures):
                 return None
             kind, idr, ref, fn, poc = pictures[n]
-            nals = [b"\x09\xf0"] + ([frame_sps(restriction, size, level), field_pps()] if n == 0 else [])
+            nals = [b"\x09\xf0"] + ([frame_sps(restriction, size, level, gaps), field_pps()] if n == 0 else [])
             units = b"".join(b"\x00\x00\x00\x01" + nal for nal in nals)
+            if recovery is not None and n == 0:
+                units += recovery_point_sei(recovery)
             sei = sei_nal(sei_messages_t35(data[n % len(data)]), False)
             slice_nal = frame_slice(kind, idr, ref, fn, poc, size[0] * size[1])
             return units + sei + b"\x00\x00\x00\x01" + slice_nal
-        out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au, pts)), ["cc"]))
+        if mkv_ns is not None:
+            units = [(mkv_ns(n), au(n, b"")) for n in range(len(pictures))]
+            out.append((name + "-mkv", write(name + ".mkv", matroska(units)), ["cc"]))
+        else:
+            out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au, pts)), ["cc"]))
 
     # The start hold and depth growth without a bitstream restriction: a B
     # picture below 5 P frames at decode index 6 is kept (nothing leaves
@@ -1598,6 +1683,7 @@ def picture_output_cases(tmp_dir):
     out.append(("h264-fields-ts", write("h264-fields.ts", ts_rewrite_video(carrier, field_au)), ["cc"]))
     out += hold_and_field_cases(written, carrier, fields, data)
     rate_cases(written)
+    output_rule_cases(written)
     shutil.rmtree(tmp_dir)
     return out
 
@@ -1638,6 +1724,77 @@ def rate_cases(written):
     # frame 2 moved 1501 later does not count (3003, not 1501).
     jump = frame_pictures(300, jumps={1})
     written("h264-rate-jump", jump, pts=lambda n: at_rate(30000, 1001)(n) + (1501 if n == 2 else 0))
+
+
+def output_rule_cases(written):
+    """Probe streams of the H.264 output rules: far-back pictures, frame_num
+    gaps with gaps_in_frame_num_value_allowed_flag, a stated depth raised by
+    a B picture, starts without an IDR picture (intra runs, order count
+    jumps in the start hold, a B picture among the first 21 pictures, an
+    intra picture with frame_num 0, a non-reference intra picture, a
+    recovery point above the intra picture), the start hold's step, the depth
+    growth, a stated depth against a jump, and the duration estimate of two
+    packets; and two open behaviours of the prepared packets' durations."""
+    def shifted(pictures, by, start=1):
+        return [(k, i, r, f, q + by if n >= start else q) for n, (k, i, r, f, q) in enumerate(pictures)]
+
+    # A B picture below each of the last 15 pictures but not the 16th last is
+    # dropped as late; one below each of the last 16 leaves (probe p87).
+    written("h264-far-back", frame_pictures(300, bs={36: 15, 60: 16}))
+    # With gaps_in_frame_num_value_allowed_flag set, the step of 4 after a
+    # frame_num gap still raises the depth: the B picture at 31 is kept
+    # (dropped in h264-gap-jump; probe p88c).
+    written("h264-gap-allowed", frame_pictures(300, bs={31: 1, 40: 1}, jumps={30}, gaps={30}), gaps=True)
+    # A stated depth of 0 is raised by a B picture below an earlier one up to
+    # index 20: the B picture one below the step at 40 is kept (probe p88).
+    written("h264-stated-b20", frame_pictures(300, bs={20: 1, 41: 1}, jumps={40}), restriction=(0, 2))
+    # Against a stated depth of 0 a step of 4 raises nothing: the B picture
+    # one below it is dropped (probe p74).
+    written("h264-jump-stated", frame_pictures(300, bs={31: 1}, jumps={30}), restriction=(0, 2))
+    # Without an IDR picture, reorder 2: intra pictures among the first
+    # pictures above the first are kept (probe p89 I-k3-r2).
+    written("h264-start-intra-run", start_pictures("III"), restriction=(2, 3))
+    # No restriction: a step of 4 at index 4, in the start hold, makes the
+    # depth 1 when the hold ends, so the first picture above the intra
+    # picture is dropped (probe p89 J-j4).
+    written("h264-start-jump", start_pictures("I", steps={4: 4}))
+    # A B picture at index 14, after the hold: the first picture above the
+    # intra picture is dropped all the same (probe p89e N14).
+    written("h264-start-b-window", start_pictures("I" + "P" * 13 + "B", steps={14: -1, 15: 3}))
+    # The intra picture has frame_num 0: its output does not count in the
+    # start hold, so the step at index 7 still falls in it (probe p89c j7-f0).
+    written("h264-start-fn0", start_pictures("I", steps={7: 4}, frame_num=0))
+    # A non-reference intra picture with frame_num 0 recovers nothing; the
+    # reference intra picture at index 5 is the first (probe p91 fn-k5R).
+    written("h264-start-nonref", start_pictures("IPPPPI", refs={0: False}, frame_num=0))
+    # A recovery point naming the P picture above the intra picture recovers
+    # it; the B picture below it still counts towards reorder 2 and is
+    # dropped (probe p90 pb-c1-r2).
+    pb, anchor, fn = [("I", False, True, 5, 44)], 44, 6
+    while len(pb) < 300:
+        anchor += 6
+        pb += [("P", False, True, fn, anchor), ("B", False, False, fn + 1, anchor - 4),
+               ("B", False, False, fn + 1, anchor - 2)]
+        fn += 1
+    written("h264-recovery-above", pb[:300], restriction=(2, 2), recovery=1)
+    # The start hold ends at index 7 after a first step of 3 (above 2), as
+    # after one of 4 in h264-hold-jump: the B picture 5 below at 8 is dropped
+    # (probe p64).
+    written("h264-hold-step3", shifted(frame_pictures(300, bs={2: 1, 8: 5, 12: 2}, jumps={1}), -1))
+    # Depth growth from a late B picture 2 below: dropped itself, it makes the
+    # depth 2; one 2 below at 40 is kept, one 3 below at 50 dropped (probes
+    # p47, p57).
+    written("h264-depth-two", frame_pictures(300, bs={25: 2, 40: 2, 50: 3}))
+    # Two packets: the estimate is one tick (probe p42).
+    written("h264-rate-two", frame_pictures(2))
+    # Open: PTS-only with a B picture at index 2, the second packet after it
+    # moved half a frame. The reference's estimate leaves out a run of packets
+    # after the B picture (its window starts at packet 8; probe p71p h8).
+    written("h264-rate-pts-b", frame_pictures(300, bs={2: 1}),
+            pts=lambda n: 90000 + (2 * n * 90000 * 1001 + 30000) // 60000 + n % 2 + (1501 if n == 4 else 0))
+    # Open: Matroska without block durations, DefaultDuration or VUI timing.
+    # The reference gives the first frames a duration of 0 (probes p85, p86).
+    written("h264-nodur", frame_pictures(300), mkv_ns=lambda n: 10**9 + n * 40_000_000)
 
 
 def hold_and_field_cases(written, carrier, fields, data):
@@ -1724,7 +1881,7 @@ def manifest(cases):
             expected = None
             if fold.returncode == 0:
                 record = json.loads(fold.stdout.strip().splitlines()[-1])
-                expected = {k: record[k] for k in ("packets", "bytes", "digest")}
+                expected = {k: record[k] for k in ("packets", "bytes", "digest", "input_digest")}
             data = open(path, "rb").read()
             entries.append({
                 "id": case_id + variant,

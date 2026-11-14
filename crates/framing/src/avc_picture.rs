@@ -75,6 +75,8 @@ pub struct AvcSps {
     pub frame_num_bits: u8,
     pub poc: AvcPocSyntax,
     pub max_num_ref_frames: u32,
+    /// `gaps_in_frame_num_value_allowed_flag`.
+    pub gaps_in_frame_num_allowed: bool,
     pub frame_mbs_only: bool,
     /// PicWidthInMbs * FrameHeightInMbs.
     pub frame_mbs: u32,
@@ -346,7 +348,7 @@ pub fn read_avc_sps(
         _ => AvcPocSyntax::FrameNum,
     };
     let max_num_ref_frames = bits.unsigned(u32::MAX)?;
-    bits.flag()?; // gaps_in_frame_num_value_allowed_flag
+    let gaps_in_frame_num_allowed = bits.flag()?;
     let width = bits.unsigned(u32::MAX)?.saturating_add(1);
     let height_units = bits.unsigned(u32::MAX)?.saturating_add(1);
     let frame_mbs_only = bits.flag()?;
@@ -364,6 +366,7 @@ pub fn read_avc_sps(
         frame_num_bits,
         poc,
         max_num_ref_frames,
+        gaps_in_frame_num_allowed,
         frame_mbs_only,
         frame_mbs: width.saturating_mul(height_units.saturating_mul(2 - u32::from(frame_mbs_only))),
         vui: AvcVui::default(),

@@ -610,10 +610,11 @@ fn h264_start_of_a_stream_holds_its_pictures() {
 
 #[test]
 fn h264_picture_far_below_the_last_decoded_leaves_at_once() {
-    // Probes p22 and p23: a picture below the last 15 pictures decoded is
-    // output after those waiting, not dropped; one above the 15th is late.
+    // Probes p22, p23 and p87; case h264-far-back-ts: a picture below the
+    // last 16 pictures decoded is output after those waiting, not dropped;
+    // one above the 16th is late.
     let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
-    for (above, kept) in [(15, true), (14, false)] {
+    for (above, kept) in [(16, true), (15, false)] {
         let frames = extract(coding, ts_packets(&avc_late_b(30, above, 40)));
         let order = tags(&frames);
         assert_eq!(order.iter().any(|tags| tags == &[30]), kept);
@@ -1071,4 +1072,210 @@ fn hevc_reference_picture_sets_in_every_coding_are_read() {
         tags(&extract(coding, ts_packets(&units))),
         [[0], [1], [2], [3], [4], [5]]
     );
+}
+
+/// Access units of `pictures` (slice type, reference, LSB, frame_num) from a
+/// non-IDR first picture with the parameter sets and, when given, a
+/// recovery point of that `recovery_frame_cnt`.
+fn avc_start(
+    sps: &AvcSps,
+    pictures: &[(u32, bool, u32, u32)],
+    recovery: Option<u32>,
+) -> Vec<(Vec<u8>, i64)> {
+    let mut units = avc_stream(sps, pictures, &[]);
+    let (slice_type, reference, poc_lsb, frame_num) = pictures[0];
+    let slice = AvcSlice {
+        reference,
+        slice_type,
+        frame_num,
+        poc_lsb,
+        ..AvcSlice::default()
+    };
+    let mut nals = vec![avc_sps(sps), avc_pps()];
+    if let Some(count) = recovery {
+        // A one-byte payload for recovery_frame_cnt up to 2.
+        let mut point = Bits::default();
+        point
+            .u(6, 8)
+            .u(1, 8)
+            .ue(count)
+            .flag(true)
+            .flag(false)
+            .u(0, 2);
+        nals.push(point.nal(&[0x06]));
+    }
+    nals.push(caption_sei(&[0x06], 0));
+    nals.push(avc_slice(&slice, sps.poc_type));
+    units[0].0 = annex_b(&nals);
+    units
+}
+
+/// Pictures from a non-IDR I picture (order count 40, `frame_num` 5): the
+/// kinds of the first (then P pictures), order counts 2 apart but where
+/// `steps` says otherwise.
+fn start_pictures(
+    kinds: &[u32],
+    steps: &[(usize, u32)],
+    count: usize,
+) -> Vec<(u32, bool, u32, u32)> {
+    let (mut poc, mut frame_num) = (40u32, 5u32);
+    (0..count)
+        .map(|n| {
+            if n > 0 {
+                poc += steps.iter().find(|s| s.0 == n).map_or(2, |s| s.1);
+            }
+            let kind = kinds.get(n).copied().unwrap_or(0);
+            let reference = kind != 1;
+            let picture = (kind, reference, poc % 256, frame_num % 16);
+            frame_num += u32::from(reference);
+            picture
+        })
+        .collect()
+}
+
+#[test]
+fn h264_intra_pictures_before_recovery_are_kept() {
+    // Probe p89 I-k3-r2; case h264-start-intra-run-ts: with reorder 2 the two
+    // pictures above the first intra picture are not recovered, but intra
+    // ones are output.
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let sps = AvcSps {
+        reorder: Some(2),
+        ..AvcSps::default()
+    };
+    let frames = extract(
+        coding,
+        ts_packets(&avc_start(&sps, &start_pictures(&[2, 2, 2], &[], 30), None)),
+    );
+    assert_eq!(tags(&frames)[..5], [[0], [1], [2], [3], [4]]);
+    let frames = extract(
+        coding,
+        ts_packets(&avc_start(&sps, &start_pictures(&[2, 0, 2], &[], 30), None)),
+    );
+    assert_eq!(tags(&frames)[..4], [[0], [2], [3], [4]]);
+}
+
+#[test]
+fn h264_a_b_picture_among_the_first_21_drops_the_first_above_the_intra_picture() {
+    // Probes p89d, p89e; case h264-start-b-window-ts: without a restriction
+    // a B picture at index 14 or 20 drops picture 1 and keeps the intra
+    // picture, one at 21 does not.
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let sps = AvcSps {
+        reorder: None,
+        ..AvcSps::default()
+    };
+    for (at, first) in [(14, [0, 2]), (20, [0, 2]), (21, [0, 1])] {
+        let mut kinds = vec![0; at + 1];
+        kinds[0] = 2;
+        kinds[at] = 1;
+        let pictures = start_pictures(&kinds, &[(at, 255), (at + 1, 3)], 45);
+        let frames = extract(coding, ts_packets(&avc_start(&sps, &pictures, None)));
+        assert_eq!(tags(&frames)[..2], [[first[0]], [first[1]]], "B at {at}");
+    }
+}
+
+#[test]
+fn h264_a_non_reference_intra_picture_with_frame_num_0_does_not_recover() {
+    // Probe p91 fn-k5R-n; case h264-start-nonref-ts: the reference intra
+    // picture at index 5 is the first; picture 6 is the first output.
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let sps = AvcSps {
+        reorder: None,
+        ..AvcSps::default()
+    };
+    let mut pictures = start_pictures(&[2, 0, 0, 0, 0, 2], &[], 30);
+    let mut frame_num = 0;
+    for (n, picture) in pictures.iter_mut().enumerate() {
+        picture.1 = n != 0;
+        picture.3 = frame_num % 16;
+        frame_num += u32::from(picture.1);
+    }
+    let frames = extract(coding, ts_packets(&avc_start(&sps, &pictures, None)));
+    assert_eq!(frames.len(), 24);
+    assert_eq!(tags(&frames)[0], [6]);
+}
+
+#[test]
+fn h264_a_recovery_point_above_the_intra_picture_recovers_from_it() {
+    // Probe p90 pb-c1-r2; case h264-recovery-above-ts: the recovery point
+    // names P50; B46 below it is the second picture above the intra picture
+    // with reorder 2 and is dropped, B48 is kept.
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let sps = AvcSps {
+        reorder: Some(2),
+        ..AvcSps::default()
+    };
+    let mut pictures = vec![(2, true, 44, 5)];
+    let (mut anchor, mut frame_num) = (44, 6);
+    while pictures.len() < 30 {
+        anchor += 6;
+        pictures.extend([
+            (0, true, anchor, frame_num),
+            (1, false, anchor - 4, frame_num + 1),
+            (1, false, anchor - 2, frame_num + 1),
+        ]);
+        frame_num += 1;
+    }
+    let frames = extract(coding, ts_packets(&avc_start(&sps, &pictures, Some(1))));
+    assert_eq!(tags(&frames)[..5], [[0], [3], [1], [5], [6]]);
+}
+
+/// P frames from an IDR picture, a `frame_num` gap of one frame and an order
+/// count step of 4 at index 30, a B picture one below at 31.
+fn avc_gap_then_step(sps: &AvcSps) -> Vec<(Vec<u8>, i64)> {
+    let mut pictures = vec![(2, true, 0, 0)];
+    let (mut poc, mut frame_num) = (0, 0);
+    for n in 1..50 {
+        if n == 31 {
+            pictures.push((1, false, poc - 1, frame_num + 1));
+            continue;
+        }
+        frame_num += if n == 30 { 2 } else { 1 };
+        poc += if n == 30 { 4 } else { 2 };
+        pictures.push((0, true, poc % 256, frame_num % 16));
+    }
+    avc_stream(sps, &pictures, &[0])
+}
+
+#[test]
+fn h264_a_gap_blocks_the_depth_raise_only_when_gaps_are_not_allowed() {
+    // Probe p88c; cases h264-gap-jump-ts and h264-gap-allowed-ts.
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    for gaps_allowed in [false, true] {
+        let sps = AvcSps {
+            reorder: None,
+            gaps_allowed,
+            ..AvcSps::default()
+        };
+        let frames = extract(coding, ts_packets(&avc_gap_then_step(&sps)));
+        assert_eq!(tags(&frames).iter().any(|t| t == &[31]), gaps_allowed);
+    }
+}
+
+#[test]
+fn h264_a_stated_depth_of_0_is_raised_by_a_b_picture_up_to_index_20() {
+    // Probe p88 B-k20, B-k21; case h264-stated-b20-ts: a B picture one below
+    // the P frame before it raises reorder 0 to 1 at index 20, not at 21; the
+    // B picture one below a step of 4 at 41 is kept only then.
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let sps = AvcSps {
+        reorder: Some(0),
+        ..AvcSps::default()
+    };
+    for (at, kept) in [(20, true), (21, false)] {
+        let mut pictures = vec![(2, true, 0, 0)];
+        let (mut poc, mut frame_num) = (0, 0);
+        for n in 1..60 {
+            if n == at || n == 41 {
+                pictures.push((1, false, poc - 1, frame_num + 1));
+                continue;
+            }
+            frame_num += 1;
+            poc += if n == 40 { 4 } else { 2 };
+            pictures.push((0, true, poc % 256, frame_num % 16));
+        }
+        let frames = extract(coding, ts_packets(&avc_stream(&sps, &pictures, &[0])));
+        assert_eq!(tags(&frames).iter().any(|t| t == &[41]), kept, "B at {at}");
+    }
 }

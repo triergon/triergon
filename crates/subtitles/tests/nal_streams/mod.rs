@@ -93,6 +93,8 @@ pub struct AvcSps {
     pub frame_mbs_only: bool,
     pub offset_for_non_ref_pic: i32,
     pub cycle: Vec<i32>,
+    /// `gaps_in_frame_num_value_allowed_flag`.
+    pub gaps_allowed: bool,
 }
 
 impl Default for AvcSps {
@@ -105,6 +107,7 @@ impl Default for AvcSps {
             frame_mbs_only: true,
             offset_for_non_ref_pic: 0,
             cycle: Vec::new(),
+            gaps_allowed: false,
         }
     }
 }
@@ -123,7 +126,7 @@ pub fn avc_sps(sps: &AvcSps) -> Vec<u8> {
             b.se(offset);
         }
     }
-    b.ue(sps.max_ref_frames).flag(false).ue(3).ue(2); // 64x48 frames
+    b.ue(sps.max_ref_frames).flag(sps.gaps_allowed).ue(3).ue(2); // 64x48 frames
     b.flag(sps.frame_mbs_only);
     if !sps.frame_mbs_only {
         b.flag(false); // mb_adaptive_frame_field_flag

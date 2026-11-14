@@ -95,13 +95,14 @@ impl RateEstimate {
         self.taken >= TAKEN
     }
 
-    /// The estimated duration in ticks of `time_base`, or `None` without
-    /// two packet times.
+    /// The estimated duration in ticks of `time_base`, or `None` without a
+    /// packet time; one tick with fewer than three (probe p42: one or two
+    /// packets last 1, three 3003).
     pub(super) fn duration(&self, time_base: (u32, u32)) -> Option<i64> {
         let times = &self.times[..self.taken];
         let (&first, &last) = (times.first()?, times.last()?);
-        if times.len() < 2 {
-            return None;
+        if times.len() < 3 {
+            return Some(1);
         }
         let (num, den) = (u64::from(time_base.0.max(1)), u64::from(time_base.1.max(1)));
         let divisor = times
@@ -207,6 +208,15 @@ mod tests {
         // Not candidates: 11/12 gives 22/12, 70 the fallback.
         assert_eq!(estimate(at_rate(11, 12)), Some(49_090));
         assert_eq!(estimate(at_rate(70, 1)), Some(1));
+    }
+
+    #[test]
+    fn fewer_than_three_times_give_one_tick() {
+        // Probe p42: streams of one, two and three packets 3003 apart.
+        assert_eq!(estimate([]), None);
+        assert_eq!(estimate([90_000]), Some(1));
+        assert_eq!(estimate([90_000, 93_003]), Some(1));
+        assert_eq!(estimate([90_000, 93_003, 96_006]), Some(3003));
     }
 
     #[test]

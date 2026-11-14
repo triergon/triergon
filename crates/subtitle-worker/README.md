@@ -50,7 +50,12 @@ leaves storage charged to the pool, and print the harness protocol's one JSON li
 subtitle's packet index, times, and per rectangle its geometry, flags, palette,
 pixels, text and ASS line. A decoder error, such as memory the pool refuses, ends
 the operation: the line counts what was folded before it and carries the error as
-its `refusal`, with the packet it stopped at as its `cause`. The bench mode adds the
+its `refusal`, with the packet it stopped at as its `cause`. The fold mode also
+prints `input_digest`, worked out outside the operation from the prepared packets as
+the reference's fold works it out: their count, then per packet whether it has a PTS,
+the PTS and the duration, in order, folded word by word (d = 31d + w, wrapping); the
+`subtitle-cc` contract compares it, so the prepared packets' order and times must
+match the reference's exactly. The bench mode adds the
 elapsed time of the timed loop and the memory mode brackets one operation with the
 allocation-window markers. The
 trace mode prints the same values as lines, identical to the reference's trace, so a

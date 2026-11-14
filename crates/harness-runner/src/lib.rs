@@ -156,6 +156,23 @@ pub fn measure(
     invocation: &Invocation<'_>,
     name: &str,
     held: Option<&Budget>,
+    operation: impl FnMut() -> Result<Totals>,
+) -> Result<()> {
+    measure_with(invocation, name, held, &[], operation)
+}
+
+/// [`measure`], with `fields` printed after the digest: named values the
+/// worker works out outside the operation, such as a digest of its prepared
+/// input.
+///
+/// # Errors
+///
+/// When the operation fails, retains charged storage, or stdout fails.
+pub fn measure_with(
+    invocation: &Invocation<'_>,
+    name: &str,
+    held: Option<&Budget>,
+    fields: &[(&str, u64)],
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
     let retained = held.map(Budget::used);
@@ -191,6 +208,9 @@ pub fn measure(
         "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{runs},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":{}",
         refusal.is_none()
     );
+    for (key, value) in fields {
+        line.push_str(&format!(",\"{key}\":{value}"));
+    }
     if let Some(refusal) = refusal {
         line.push_str(",\"refusal\":");
         push_quoted(&mut line, &refusal.reason);
