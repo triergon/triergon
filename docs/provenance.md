@@ -38,6 +38,7 @@ Translated from FreeType 2.15.0:
 | `cff/matrix.rs` | `FT_Matrix_Check` (`base/ftcalc.c`) |
 | `autofit/hints.rs` | `autofit/afhints.c` |
 | `autofit/latin/` | `autofit/aflatin.c`, `autofit/afadjust.c` |
+| `autofit/cjk/` | `autofit/afcjk.c`: the CJK writing system, the only module translated after the specification-first rule, by explicit decision |
 | `autofit/style.rs`, `autofit/mod.rs` | `autofit/afglobal.c`, `afshaper.c`, `afloader.c`, `afmodule.c`, `afdummy.c` |
 | `fixed.rs`, `long.rs` | `base/ftcalc.c`, `base/fttrigon.c` |
 | `synthesis.rs` | `base/ftoutln.c`, `base/ftsynth.c` |
@@ -49,13 +50,13 @@ Generated from FreeType 2.15.0's source files by `cargo xtask fonts tables`:
 
 | Module | FreeType source |
 | --- | --- |
-| `autofit/tables.rs` | `autofit/afscript.h`, `afstyles.h`, `afranges.c`, `afblue.h`, `afblue.c`, `afadjust.h`, `afadjust.c` |
+| `autofit/tables.rs` | `autofit/afscript.h`, `afstyles.h`, `afranges.c`, `afblue.h`, `afblue.c` (the latin and CJK blue strings), `afadjust.h`, `afadjust.c` |
 | `postscript/tables.rs` | `psnames/pstables.h`; the standard and expert charsets and encodings of `cff/cffload.c` |
 
-`cmap.rs`, `glyf.rs`, `kern.rs`, `lib.rs`, `metrics.rs`, `name.rs`, `outline.rs` and the
-rest of `sfnt.rs` read the font formats and reproduce FreeType's reading of them, including its
-repairs of malformed data; where their comments name a FreeType function, the code follows
-it.
+Following FreeType 2.15.0's reading of the font formats: `cmap.rs`, `glyf.rs`, `kern.rs`,
+`lib.rs`, `metrics.rs`, `name.rs`, `outline.rs` and the rest of `sfnt.rs`. They reproduce
+FreeType's reading of the tables, including its repairs of malformed data, and follow the
+FreeType functions their comments name.
 
 Following libass 0.17.5: the face scoring of `matching.rs`, the choice of synthetic styles
 in `synthesis.rs`, the size request and load flags of `sized.rs`, and the text charmap

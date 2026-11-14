@@ -1,29 +1,30 @@
 //! The latin writing system (`aflatin.c`), which hints most scripts: the
 //! style's global metrics (standard stem widths, blue zones and whether the
 //! digits share one advance), measured on the face once and scaled for each
-//! size, and the hinting of one glyph with them in [`apply`].
+//! size, and the hinting of one glyph with them in [`apply`]. The CJK
+//! writing system measures its stem widths and its digits as this one does
+//! ([`Stems::measure`], [`digits_have_same_width`]) and finds segments and
+//! edge properties with [`compute_segments`] and [`edge_properties`].
 
 mod adjust;
 mod analysis;
 mod fit;
 
 pub(super) use adjust::adjustment;
+pub(super) use analysis::{add_to_edge, compute_segments, edge_properties, start_edge};
 pub(super) use fit::{Glyph, Scope, apply};
 
 use super::Face;
 use super::hints::{Dimension, GlyphHints, Width, sort_and_quantize_widths};
-use super::style::clusters;
+use super::style::{MAX_BLUES, MAX_CLUSTERS, clusters};
 use super::tables::{SCRIPTS, STYLES};
 use crate::long::{self, abs, mul_div, mul_fix, pix_round, wrap};
 use crate::outline::{Outline, OutlinePoint, PointKind};
 use triergon_core::{Result, WorkBudget};
 
-/// `AF_LATIN_MAX_WIDTHS`: the standard widths kept per dimension.
+/// `AF_LATIN_MAX_WIDTHS` (and `AF_CJK_MAX_WIDTHS`): the standard widths kept
+/// per dimension.
 const MAX_WIDTHS: usize = 16;
-/// `AF_BLUE_STRINGSET_MAX_LEN`: the blue zones of one style.
-const MAX_BLUES: usize = 8;
-/// `AF_BLUE_STRING_MAX_LEN`: the clusters of one blue string.
-const MAX_CLUSTERS: usize = 51;
 
 /// The properties of a blue string (`AF_BLUE_PROPERTY_LATIN_*`).
 mod property {
@@ -51,8 +52,112 @@ mod blue {
 
 /// `AF_LATIN_CONSTANT`: `value`, given for 2048 units per em, for the face's
 /// units per em.
-fn constant(units_per_em: u16, value: i64) -> i64 {
+pub(super) fn constant(units_per_em: u16, value: i64) -> i64 {
     value * i64::from(units_per_em) / 2048
+}
+
+/// The standard stem widths of one dimension, in font units, as
+/// `af_latin_metrics_init_widths` measures them and
+/// `af_cjk_metrics_init_widths`, its copy, does too.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Stems {
+    pub(super) count: usize,
+    pub(super) widths: [Width; MAX_WIDTHS],
+    /// Segments closer than this, in font units, share an edge.
+    pub(super) edge_distance_threshold: i64,
+    pub(super) standard: i64,
+}
+
+impl Stems {
+    /// None measured, as without a Unicode charmap.
+    pub(super) const EMPTY: Self = Self {
+        count: 0,
+        widths: [Width {
+            org: 0,
+            cur: 0,
+            fit: 0,
+        }; MAX_WIDTHS],
+        edge_distance_threshold: 0,
+        standard: 0,
+    };
+
+    pub(super) fn widths(&self) -> &[Width] {
+        &self.widths[..self.count]
+    }
+
+    /// The stems of both dimensions: the widths of the stems of the first
+    /// standard character of `style`'s script the face maps, quantized;
+    /// then each dimension's standard width (the smallest, or 50/2048 em
+    /// without any) and edge threshold (a fifth of it). `outline` is
+    /// scratch storage.
+    pub(super) fn measure(
+        face: &Face<'_>,
+        style: usize,
+        outline: &mut Outline,
+        work: &mut WorkBudget,
+    ) -> Result<[Self; 2]> {
+        let units_per_em = face.font.units_per_em();
+        let mut stems = [Self::EMPTY; 2];
+        let script = &SCRIPTS[STYLES[style].script];
+        let glyph = clusters(script.standard).find_map(|c| c.and_then(|c| face.glyph(c)));
+        if let Some(glyph) = glyph
+            && face.load_units(glyph, outline, work)?
+            && !outline.is_empty()
+        {
+            // The analysis runs in font units: FreeType's hints keep their
+            // zero scale here.
+            let mut hints = GlyphHints::new(face.budget);
+            hints.reload(outline, units_per_em, work)?;
+            for dim in Dimension::BOTH {
+                compute_segments(&mut hints, dim, units_per_em, work)?;
+                analysis::link_segments(&mut hints, dim, units_per_em, &[], work)?;
+                let axis = &mut stems[dim.index()];
+                let segments = hints.axis[dim.index()].segments.as_slice();
+                let mut count = 0;
+                for (index, segment) in segments.iter().enumerate() {
+                    // Stems only: segments linked to each other, once.
+                    let Some(link) = segment.link.filter(|&l| l > index) else {
+                        continue;
+                    };
+                    if segments[link].link == Some(index) && count < MAX_WIDTHS {
+                        let distance = i64::from(segment.pos) - i64::from(segments[link].pos);
+                        axis.widths[count].org = distance.abs();
+                        count += 1;
+                    }
+                }
+                let threshold = i64::from(units_per_em / 100);
+                axis.count = sort_and_quantize_widths(&mut axis.widths, count, threshold);
+            }
+        }
+        for axis in &mut stems {
+            axis.standard = if axis.count > 0 {
+                axis.widths[0].org
+            } else {
+                constant(units_per_em, 50)
+            };
+            axis.edge_distance_threshold = axis.standard / 5;
+        }
+        Ok(stems)
+    }
+}
+
+/// `af_latin_metrics_check_digits` (and `af_cjk_metrics_check_digits`, its
+/// copy): whether the glyphs of the ASCII digits the face maps share one
+/// `hmtx` advance.
+pub(super) fn digits_have_same_width(face: &Face<'_>) -> bool {
+    let mut first: Option<u16> = None;
+    for digit in '0'..='9' {
+        let Some(glyph) = face.glyph(digit) else {
+            continue;
+        };
+        let advance = face.font.advance(glyph).unwrap_or_default();
+        match first {
+            Some(first) if first != advance => return false,
+            Some(_) => {}
+            None => first = Some(advance),
+        }
+    }
+    true
 }
 
 /// A blue zone (`AF_LatinBlueRec`): its reference and overshoot positions,
@@ -71,11 +176,7 @@ struct Blue {
 #[derive(Clone, Copy, Debug)]
 struct Axis {
     scale: i64,
-    width_count: usize,
-    widths: [Width; MAX_WIDTHS],
-    /// Segments closer than this, in font units, share an edge.
-    edge_distance_threshold: i64,
-    standard_width: i64,
+    stems: Stems,
     /// Whether the standard width is under 5/8 pixel at the size.
     extra_light: bool,
     blue_count: usize,
@@ -85,14 +186,7 @@ struct Axis {
 impl Axis {
     const EMPTY: Self = Self {
         scale: 0,
-        width_count: 0,
-        widths: [Width {
-            org: 0,
-            cur: 0,
-            fit: 0,
-        }; MAX_WIDTHS],
-        edge_distance_threshold: 0,
-        standard_width: 0,
+        stems: Stems::EMPTY,
         extra_light: false,
         blue_count: 0,
         blues: [Blue {
@@ -111,10 +205,6 @@ impl Axis {
             flags: 0,
         }; MAX_BLUES],
     };
-
-    fn widths(&self) -> &[Width] {
-        &self.widths[..self.width_count]
-    }
 
     fn blues(&self) -> &[Blue] {
         &self.blues[..self.blue_count]
@@ -154,67 +244,16 @@ impl Metrics {
             return Ok(Some(metrics));
         }
         let mut outline = Outline::new(face.budget);
-        metrics.init_widths(face, &mut outline, work)?;
+        // `af_latin_metrics_init_widths`.
+        let stems = Stems::measure(face, style, &mut outline, work)?;
+        for (axis, stems) in metrics.axis.iter_mut().zip(stems) {
+            axis.stems = stems;
+        }
         if !metrics.init_blues(face, &mut outline, work)? {
             return Ok(None);
         }
-        metrics.check_digits(face);
+        metrics.digits_have_same_width = digits_have_same_width(face);
         Ok(Some(metrics))
-    }
-
-    /// `af_latin_metrics_init_widths`: the widths of the stems of the
-    /// first standard character of the script the face maps, in both
-    /// dimensions, quantized; then each dimension's standard width (the
-    /// smallest, or 50/2048 em without any) and edge threshold (a fifth of
-    /// it).
-    fn init_widths(
-        &mut self,
-        face: &Face<'_>,
-        outline: &mut Outline,
-        work: &mut WorkBudget,
-    ) -> Result<()> {
-        let script = &SCRIPTS[STYLES[self.style].script];
-        let glyph = clusters(script.standard).find_map(|c| c.and_then(|c| face.glyph(c)));
-        if let Some(glyph) = glyph
-            && face.load_units(glyph, outline, work)?
-            && !outline.is_empty()
-        {
-            // The analysis runs in font units: FreeType's hints keep their
-            // zero scale here.
-            let mut hints = GlyphHints::new(face.budget);
-            hints.reload(outline, self.units_per_em, work)?;
-            for dim in Dimension::BOTH {
-                analysis::compute_segments(&mut hints, dim, self.units_per_em, work)?;
-                analysis::link_segments(&mut hints, dim, self.units_per_em, &[], work)?;
-                let axis = &mut self.axis[dim.index()];
-                let segments = hints.axis[dim.index()].segments.as_slice();
-                let mut count = 0;
-                for (index, segment) in segments.iter().enumerate() {
-                    // Stems only: segments linked to each other, once.
-                    let Some(link) = segment.link.filter(|&l| l > index) else {
-                        continue;
-                    };
-                    if segments[link].link == Some(index) && count < MAX_WIDTHS {
-                        let distance = i64::from(segment.pos) - i64::from(segments[link].pos);
-                        axis.widths[count].org = distance.abs();
-                        count += 1;
-                    }
-                }
-                let threshold = i64::from(self.units_per_em / 100);
-                axis.width_count = sort_and_quantize_widths(&mut axis.widths, count, threshold);
-            }
-        }
-        for axis in &mut self.axis {
-            let standard = if axis.width_count > 0 {
-                axis.widths[0].org
-            } else {
-                constant(self.units_per_em, 50)
-            };
-            axis.edge_distance_threshold = standard / 5;
-            axis.standard_width = standard;
-            axis.extra_light = false;
-        }
-        Ok(())
     }
 
     /// `af_latin_metrics_init_blues`: one blue zone per blue string of the
@@ -355,28 +394,6 @@ impl Metrics {
         Ok(true)
     }
 
-    /// `af_latin_metrics_check_digits`: whether the glyphs of the ASCII
-    /// digits the face maps share one `hmtx` advance.
-    fn check_digits(&mut self, face: &Face<'_>) {
-        let mut first: Option<u16> = None;
-        let mut same = true;
-        for digit in '0'..='9' {
-            let Some(glyph) = face.glyph(digit) else {
-                continue;
-            };
-            let advance = face.font.advance(glyph).unwrap_or_default();
-            match first {
-                Some(first) if first != advance => {
-                    same = false;
-                    break;
-                }
-                Some(_) => {}
-                None => first = Some(advance),
-            }
-        }
-        self.digits_have_same_width = same;
-    }
-
     /// `af_latin_metrics_scale`: the metrics at 16.16 scales `x_scale` and
     /// `y_scale` (font units to 26.6 pixels), in the 32 bits of an
     /// `FT_Fixed`.
@@ -421,11 +438,11 @@ impl Metrics {
         }
         let axis = &mut self.axis[dim.index()];
         axis.scale = scale;
-        for width in &mut axis.widths[..axis.width_count] {
+        for width in &mut axis.stems.widths[..axis.stems.count] {
             width.cur = mul_fix(width.org, scale);
             width.fit = width.cur;
         }
-        axis.extra_light = mul_fix(axis.standard_width, scale) < 32 + 8;
+        axis.extra_light = mul_fix(axis.stems.standard, scale) < 32 + 8;
         if dim == Dimension::Horizontal {
             return;
         }
