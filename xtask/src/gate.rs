@@ -1633,6 +1633,17 @@ const TEST_INPUTS: [&str; 3] = [
 fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i32> {
     let mut command = owned(&["test", "--workspace", "--locked", "--profile", profile]);
     command.extend(crate::harness::gate_build::target_args()?);
+    // The tests that read the evidence index, which the key leaves out, run apart
+    // from the reused run and every time.
+    let mut index = command.clone();
+    index[1..2].clone_from_slice(&owned(&["-p"]));
+    index.insert(2, "xtask".into());
+    index.extend(owned(&["--bin", "xtask", "--", "--exact"]));
+    index.extend(INDEX_TESTS.iter().map(|&name| name.to_owned()));
+    command.push("--".into());
+    for name in INDEX_TESTS {
+        command.extend(owned(&["--skip", name]));
+    }
     let inputs = TEST_INPUTS
         .iter()
         .map(|dir| Ok(((*dir).to_owned(), Value::str(tree_digest(&root.join(dir))?))))
@@ -1643,18 +1654,30 @@ fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i32> {
         ("inputs", Value::Object(inputs)),
     ]);
     let key = crate::harness::reuse::Key::new(root, "gate test", settings, &[], &[])?;
-    crate::harness::reuse::step(root, output, &key, full, || {
+    let cargo = |args: &[String]| {
         status(
             Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
-                .args(&command)
+                .args(args)
                 .env("CARGO_INCREMENTAL", "0")
                 .current_dir(root),
         )
-    })
+    };
+    let reused = crate::harness::reuse::step(root, output, &key, full, || cargo(&command))?;
+    let read = cargo(&index)?;
+    Ok(if reused != 0 { reused } else { read })
 }
 
-/// What no test reads: the evidence index, which changes when a result is
-/// promoted, and the project documents.
+/// The tests that read the evidence index: the index changes when a result is
+/// promoted, so a test result's key leaves it out, and these run on every gate test
+/// instead of with the reused run.
+const INDEX_TESTS: [&str; 3] = [
+    "evidence::tests::the_index_lists_every_archived_file_once",
+    "gate::tests::a_feature_whose_inputs_are_neither_committed_nor_kept_is_refused",
+    "gate::tests::inputs_in_a_kept_set_count_by_its_listing_and_pins",
+];
+
+/// What no reused test reads: the evidence index, which changes when a result is
+/// promoted and which only [`INDEX_TESTS`] read, and the project documents.
 const NOT_TEST_INPUTS: [&str; 2] = ["harness/evidence/", "docs/"];
 
 /// The SHA-256 of every tracked file as the working tree holds it, and of the
@@ -2238,6 +2261,20 @@ mod tests {
         );
         assert!(names(&["progressive"]).is_err());
         assert_eq!(select(plan(), None).unwrap().len(), plan().len());
+    }
+
+    #[test]
+    fn the_index_tests_exist_by_their_names() {
+        // `--exact` and `--skip` match these names; a renamed test must rename them.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let sources: String = ["src/evidence.rs", "src/gate.rs"]
+            .iter()
+            .map(|file| fs::read_to_string(root.join(file)).unwrap())
+            .collect();
+        for name in INDEX_TESTS {
+            let function = name.rsplit("::").next().unwrap();
+            assert!(sources.contains(&format!("fn {function}()")), "{name}");
+        }
     }
 
     #[test]

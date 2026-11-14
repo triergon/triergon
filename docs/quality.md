@@ -861,7 +861,9 @@ target and is reused the same way. Its key holds the profile and adds every trac
 file as the working tree holds it and the untracked files git does not ignore, but the
 evidence index (which a promotion changes) and `docs/`, and the test inputs the crate
 tests read when present (`.research/fate-samples`, `.research/flac-generated`,
-`.research/flac-test-files`). The gate runs each profile once. The `checked` profile
+`.research/flac-test-files`). The few tests that read the evidence index skip the reused
+run and run on every `gate test`, so a failing index is never reused as a pass. The gate
+runs each profile once. The `checked` profile
 is the release optimisation with every overflow check and every `debug_assert!` and
 `#[cfg(debug_assertions)]` item of a debug build, so the same 4,429 tests run; it loses
 only the unoptimised build's larger stack frames, which bring stack depth problems out
