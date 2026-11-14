@@ -29,6 +29,7 @@ mod progressive_bench;
 mod pyrandom;
 mod python;
 mod raster;
+mod references;
 mod sha256;
 mod shape;
 mod stats;
@@ -63,6 +64,10 @@ commands:
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
                  matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
+  references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
+                 their packs in .research/reference-cache and the evidence archive, which
+                 the prepare commands restore instead of building (see `cargo xtask
+                 references --help`)
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
@@ -240,6 +245,7 @@ fn main() -> ExitCode {
             _ => Err(USAGE.to_owned()),
         },
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
+        Some("references") => references::main(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
             [flag] if flag == "--record" => {
@@ -766,10 +772,10 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
             _ => return Err(USAGE.to_owned()),
         }
     }
-    println!(
-        "{}",
-        prepare::prepare(root, jobs, profile, &fetch::Network)?
-    );
+    let built = references::ffmpeg_build(profile).prepare(root, || {
+        prepare::prepare(root, jobs, profile, &fetch::Network)
+    })?;
+    println!("{built}");
     Ok(())
 }
 

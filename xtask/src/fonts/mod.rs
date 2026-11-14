@@ -70,7 +70,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
                 }
                 _ => return Err(USAGE.into()),
             };
-            println!("{}", prepare(root, jobs, &fetch::Network)?.display());
+            let built = crate::references::build("freetype")?.prepare(root, || {
+                prepare(root, jobs, &fetch::Network).map(|p| p.display().to_string())
+            })?;
+            println!("{built}");
             Ok(())
         }
         [command] if command == "fetch" => {
