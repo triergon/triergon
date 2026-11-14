@@ -96,7 +96,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   default-load metrics and hinted outline there), which `cargo xtask check`
   requires, and `font-hinting-modes` (the nine other heights libass requests when
   hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
-  reports the required three, with `--all` all four.
+  reports the required three, with `--all` all four. Behaviour of TrueType
+  programs that no specification settles is established by probes:
+  `harness/fonts/probes/*.probe` describe small faces and their programs,
+  `cargo xtask fonts probe` assembles them and loads them through both font
+  workers, and each `.dump` beside a probe records the reference's default load
+  on 32-bit ARMv7 (`--record`).
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
@@ -403,7 +408,8 @@ selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
-oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
+oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`,
+or the Python `TRIERGON_PYTHON` names, as for the capture input generator),
 as do the numpy table-recovery chains under `harness/codecs/` and the capture input
 generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draws the
 cited capture inputs depend on. `cargo xtask codecs` grades, times, measures the memory
@@ -497,6 +503,23 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- Workers and references follow one link policy, `static-runtime-support-v1`: on
+  GNU/Linux each side links the support libraries of its language runtime from their
+  static archives, and libc and third-party libraries, such as zlib, stay shared on
+  both. Today that is libgcc's unwinder (`libgcc_eh`) and libm for the Rust workers, and
+  libm, libstdc++, libgcc and libatomic for the C and C++ references; libm stays shared
+  on both sides on x86, where glibc's `libm.a` links only into a static program. Total
+  RSS then compares the code and data each process's libraries use: a shared runtime
+  support library is mapped whether or not that code calls it, and the two toolchains
+  load different ones. The Rust standard library loads `libgcc_s` and runs its
+  initialisation in every program, one that never unwinds included; FFmpeg loads `libm`,
+  and HarfBuzz `libstdc++`. On ARMv7, `libgcc_s` holds 18 resident pages of the framing
+  worker, and `libm` 18 and 58 of the framing and ISO BMFF references. No worker or
+  reference maps libatomic today: the FFmpeg references name it, and the linker leaves
+  it out. Elsewhere both link as their toolchains do. `build-workers` records the policy
+  in `identity.json`, and `report` and `grade` refuse a build that records another
+  policy or none, so results from differently linked builds are never compared or reused
+  together.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
   with the same two settings in its own release profile. On ARMv7, building the
@@ -521,8 +544,9 @@ may override that count for diagnostic comparisons.
   one run of `--iterations` complete sessions, each opened afresh, and the run fails if
   any session's stream differs. Work counts are totals over the iterations.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
-  run may use and those online. Neither instance size nor pinning is required, but a
-  bound measured pinned to one CPU is not comparable with one measured unpinned.
+  run may use and those online. On Linux a timing session refuses to start unless the
+  process may use exactly one CPU (`taskset -c CPU`), or when it cannot read which CPUs
+  it may use, so every Linux bound is measured pinned and alone on its CPU.
 - Time optimised builds doing equivalent work. For demuxing, the timed operation is
   open, probe, the required reads and packet production for the same selection, with
   process startup and serialisation outside the timing.
@@ -583,13 +607,17 @@ run is:
 1. `tools/gate-host.sh ready I/N REVIEW`: the prepare commands, the workers, and `cargo
    xtask gate preflight`, which runs `cargo xtask preflight` with everything the shard
    measures (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
-   takes them, `--isobmff`, `--codecs` for each workload list) and `--review` for the
-   RSS module review. Preflight checks that the gate build's workers and references
-   match the build identity, that every case names a reference the identity holds and
-   has each input it reads with its pinned hash, that the review covers this module
-   source and kernel, and that the module is unloaded, and prints every failure at
-   once. Then `prove.sh` runs once into a scratch directory and the module is unloaded
-   again, so a module that will not build, load or prove itself stops the run here.
+   takes them, `--isobmff`, `--codecs` for each workload list, `--external-vector`,
+   `--capture` for the capture cases) and `--review` for the RSS module review
+   (`cargo xtask preflight` takes `--standard-memory` instead for a run without the
+   kernel bound). Preflight checks that the gate build's workers and references match
+   the build identity, that every case names a reference the identity holds and has
+   each input it reads with its pinned hash, that the capture input generator's Python
+   has numpy, that the review covers this module source and kernel, and that the
+   module is unloaded. A feature without cases or a workload list without workloads
+   fails, and every failure is printed at once. Then `prove.sh` runs once into a
+   scratch directory and the module is unloaded again, so a module that will not
+   build, load or prove itself stops the run here.
 2. `tools/gate-host.sh run I/N REVIEW OUT` times the shard alone on one CPU with the RSS
    module unloaded (`taskset -c 1`, `cargo xtask gate run --stage timing`), after its
    parity steps.
@@ -607,14 +635,20 @@ source revisions or timing builds.
 
 #### Memory in parallel
 
-Memory collections run side by side, one per CPU the process may use (at most 32, the
-sessions the kernel RSS bound admits). Each slot measures one case at a time from its
-own copies of the workers, under the same eviction before every run, so evicting one
-slot's executables never touches a file another slot runs. Cases that read a common
-file (the input, an ordered entity or a companion) run in the same slot one after
-another, so no run's eviction or reads change another's page-cache state. Workers
-measured from their own paths are such a file, so their cases run one at a time.
-Pinned to one CPU, collection runs exactly as before.
+Memory collections run side by side, one slot per CPU the process may use (at most
+32, the sessions the kernel RSS bound admits), each slot's thread pinned to its CPU so
+the workers it starts run there alone. Each slot measures one case at a time from its
+own copies of the worker executables, and only those copies are evicted before every
+run, so one slot's eviction never touches an executable another slot runs. Inputs are
+not evicted: they stay in the page cache as in a serial run, and cases that read a
+common file (the input, an ordered entity or a companion) run in the same slot one
+after another. Workers measured from their own paths are such a file, so their cases
+run one at a time. Pinned to one CPU, collection runs exactly as before.
+Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
+(evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
+same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
+no case's median total RSS by more than one page on AArch64 or ten pages on ARMv7,
+both inside the serial collection's own spread, and grades every case the same.
 
 #### Reuse
 
@@ -625,17 +659,24 @@ a key before it measures and writes it, with its exit status, to `gate-result.js
 its output directory. The key covers the command and its settings (pairs, seed,
 iterations, acceptance requirement, the kernel bound), the contract, manifest and other
 documents that define its cases, the bytes of every worker it runs and of every shared
-library their loader resolves, the allocation observer and probe, every file of
-`xtask/src`, the observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml`
-and `harness/policy.json`, the Rust and C compilers' versions, the gate target, and the
-host class (architecture and personality, kernel release, CPU model and features,
-machine type, page size and online CPUs). A `grade` key also binds the keys of the two
-collections it joins. When an [evidence](#evidence) set that the index keeps lists a
+library their loader resolves, the allocation observer and probe, every shared input
+of the build identity (oracles, specification sources, reference headers, generator
+inputs), every file of `xtask/src` and `harness/*.py`, the reviewed input lists, the
+observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml` and
+`harness/policy.json`, the Rust, C and Python versions with numpy's, the gate target,
+and the host class (architecture and personality, kernel release, CPU model and
+features, machine type, page size, the CPUs online and, for a timed step, those the
+process may use). A
+probe that fails is an error. A `grade` key also binds the two collections it joins:
+each one's key and the SHA-256 of its report, so grading reports measured again with
+`--full` is never answered with an earlier grade. When an [evidence](#evidence) set
+that the index keeps lists a
 result with the same key, the command takes that result instead of measuring: it
 prints the set, writes a `gate-result.json` that names it as `reused` with the set's
-source revisions, and exits with the recorded status. `--full` measures anyway.
-Grading a reused collection takes the cited grade; a reused collection beside a
-measured one cannot be graded, so measure both with `--full`.
+source revisions, and exits with the recorded status. `--full` measures (or, for
+`grade`, grades) anyway. Grading two reused collections takes the cited grade; a
+reused collection beside a measured one cannot be graded, so measure both with
+`--full`.
 
 ### 32-bit ARMv7
 

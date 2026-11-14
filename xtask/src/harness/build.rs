@@ -459,7 +459,7 @@ fn additional_candidates(
     for spec in selected {
         let mut command: Vec<String> = [
             "cargo",
-            "build",
+            "rustc",
             "-p",
             spec.package,
             "--release",
@@ -472,12 +472,15 @@ fn additional_candidates(
             root.join("target").display().to_string(),
         ]);
         command.extend(gate_build::target_args()?);
-        if let Some(example) = spec.example {
-            command.extend(["--example".into(), example.into()]);
+        match spec.example {
+            Some(example) => command.extend(["--example".into(), example.into()]),
+            None => command.extend(["--bin".into(), spec.name.into()]),
         }
         if !spec.features.is_empty() {
             command.extend(["--features".into(), spec.features.join(",")]);
         }
+        command.push("--".into());
+        command.extend(gate_build::worker_link_arguments()?);
         let status = Command::new("cargo")
             .args(&command[1..])
             .env("CARGO_INCREMENTAL", "0")
@@ -835,7 +838,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
     let linux = cfg!(target_os = "linux");
     let mut candidate_command: Vec<String> = [
         "cargo",
-        "build",
+        "rustc",
         "-p",
         "media-worker",
         "--release",
@@ -848,6 +851,8 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         root.join("target").display().to_string(),
     ]);
     candidate_command.extend(gate_build::target_args()?);
+    candidate_command.extend(["--bin".into(), "media-worker".into(), "--".into()]);
+    candidate_command.extend(gate_build::worker_link_arguments()?);
     let status = Command::new("cargo")
         .args(&candidate_command[1..])
         .env("CARGO_INCREMENTAL", "0")
@@ -893,7 +898,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         "-Werror".into(),
         root.join("harness/reference.c").display().to_string(),
     ];
-    command.extend(shell_words(&flags)?);
+    command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
     command.extend(["-o".into(), worker.display().to_string()]);
     run(&command)?;
     let mut combined_command = vec![command[0].clone(), "-DTRIERGON_COMBINED_REFERENCE=1".into()];
@@ -949,7 +954,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
             command.push(generate(root)?.display().to_string());
         }
         command.push(root.join(reference.source).display().to_string());
-        command.extend(shell_words(&flags)?);
+        command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
         command.extend(["-o".into(), path.display().to_string()]);
         run(&command)?;
         profile_workers.push((reference, path, build, command));

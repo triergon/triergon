@@ -21,7 +21,8 @@ use crate::sha256;
 
 pub const USAGE: &str =
     "usage: cargo xtask grade TIMING MEMORY --contract PATH --manifest PATH --output DIR
-    [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]";
+    [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]
+    [--full]";
 
 type R<T> = Result<T, String>;
 
@@ -33,6 +34,8 @@ struct Options {
     output: PathBuf,
     additional: Vec<PathBuf>,
     requirement: Option<&'static str>,
+    /// Grade the reports even when a cited set holds this grade.
+    full: bool,
 }
 
 impl Options {
@@ -43,9 +46,11 @@ impl Options {
         let (mut contract, mut manifest, mut output) = (None, None, None);
         let mut additional = Vec::new();
         let mut requirement = None;
+        let mut full = false;
         let mut rest = rest.iter();
         while let Some(flag) = rest.next() {
             match flag.as_str() {
+                "--full" => full = true,
                 "--require-slice-acceptance" | "--require-acceptance" => {
                     let key = if flag == "--require-acceptance" {
                         "accepted"
@@ -86,6 +91,7 @@ impl Options {
             output: output.ok_or("--output is required")?,
             additional,
             requirement,
+            full,
         })
     }
 }
@@ -771,14 +777,18 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let collections = [&options.timing, &options.memory]
         .map(|report| report.parent().unwrap_or(Path::new(".")).to_path_buf());
     let key = if collections.iter().all(|d| reuse::read(d).is_ok()) {
+        let reports = [options.timing.as_path(), options.memory.as_path()];
         let mut files = vec![options.contract.as_path(), options.manifest.as_path()];
         files.extend(options.additional.iter().map(PathBuf::as_path));
         let settings = Value::object([(
             "requirement",
             options.requirement.map_or(Value::Null, Value::str),
         )]);
-        let inputs = collections.each_ref().map(PathBuf::as_path);
-        Some(reuse::Key::new(root, "grade", settings, &files, &[])?.with_inputs(&inputs)?)
+        Some(
+            reuse::Key::new(root, "grade", settings, &files, &[])?
+                .untimed()
+                .with_inputs(&reports)?,
+        )
     } else {
         None
     };
@@ -791,7 +801,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         grade(root, &options)
     };
     match key {
-        Some(key) => reuse::step(root, &options.output, &key, false, join),
+        Some(key) => reuse::step(root, &options.output, &key, options.full, join),
         None => join(),
     }
 }

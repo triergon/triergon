@@ -492,3 +492,10 @@ its selective style override (`ass_set_selective_style_override`; with libass's
 default settings it changes nothing), track features (`ass_track_set_feature`),
 `ass_step_sub`, `ass_configure_prune` (a player calls
 `prune_events`), reading files and charset conversion.
+
+## Licence
+
+MIT or Apache-2.0, at your option, with libass 0.17.5's ISC licence: the script reader,
+the tag parser and the renderer's stages are translated from libass. `LICENSE`
+holds the notice, and [docs/provenance.md](../../docs/provenance.md#triergon-ass) lists
+the modules.
