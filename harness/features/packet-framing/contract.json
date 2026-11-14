@@ -16,6 +16,7 @@
     "configuration publication and exact signed packet fields, complete payload and NEW_EXTRADATA side data",
     "receive failures, flush and drain actions, close, then complete retained packet access in order",
     "dual wrapping byte-polynomial fold (31 and 131), including configuration, failures and retained data",
+    "only timing reads the clock; memory markers bracket the whole operation and fold",
     "send, EAGAIN and EOF progress are not part of this output projection"
   ],
   "required_profiles": [

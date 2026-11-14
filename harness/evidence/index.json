@@ -20049,6 +20049,15 @@
    }
   },
   {
+   "name": "packet-framing-memory-clock-ee052323-aarch64",
+   "path": "packet-framing-memory-clock-ee052323-aarch64",
+   "retention": "retained",
+   "reason": "Records the packet framing comparison with the clock read confined to timing and the associated resident mapping measurements.",
+   "key": "evidence/packet-framing-memory-clock-ee052323-aarch64/f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183.tar.zst",
+   "sha256": "f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183",
+   "bytes": 42091880
+  },
+  {
    "name": "gate-parallel-memory-matroska",
    "path": "gate-parallel-memory-matroska",
    "retention": "retained",
