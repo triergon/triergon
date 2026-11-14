@@ -476,6 +476,11 @@ large collections with one case's samples in memory at a time. Use a new `--outp
 directory for each invocation of `report`, `progressive` or `grade` so earlier
 measurements, traces and grades remain available.
 
+For ISO BMFF, collect `isobmff-bench --benchmark` and `isobmff-bench --memory`
+in separate output directories. Pass their `collection.json` files to `grade`
+with the registered open and index contract and corpus. Keep the `case-NNNN/`
+directories with both collections so the grader can verify the measurements.
+
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.
 `--require-slice-acceptance` requires the feature gates; `--require-acceptance` also
