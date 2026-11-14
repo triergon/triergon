@@ -34,11 +34,12 @@ impl From<Error> for Failure {
 
 #[cold]
 fn failed(error: Failure) -> ExitCode {
-    match error {
-        Failure::Usage(message) => eprintln!("framing worker: {message}"),
-        Failure::Io(error) => eprintln!("framing worker: {error}"),
-        Failure::Framing(error) => eprintln!("framing worker: {error}"),
-    }
+    let mut stderr = io::stderr().lock();
+    let _ = match error {
+        Failure::Usage(message) => writeln!(stderr, "framing worker: {message}"),
+        Failure::Io(error) => writeln!(stderr, "framing worker: {error}"),
+        Failure::Framing(error) => writeln!(stderr, "framing worker: {error}"),
+    };
     ExitCode::FAILURE
 }
 
