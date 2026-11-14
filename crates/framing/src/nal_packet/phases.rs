@@ -762,49 +762,37 @@ impl PacketEmission {
             let end = part.framed_len();
             // Charge and check cancellation at the prefix, payload chunks
             // and segment boundary, including when resuming a partial copy.
-            if self.copied < prefix {
-                let left = prefix - self.copied;
-                let count = (work.remaining().min(left as u64)) as usize;
-                if count == 0 {
+            let mut payload = None;
+            while self.copied < end {
+                let available = work_count(work);
+                if available == 0 {
                     return Ok(YIELD);
                 }
-                let start = 4 - prefix + self.copied;
-                buffer.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
+                let remaining = if self.copied < prefix {
+                    &[0, 0, 0, 1][4 - prefix + self.copied..]
+                } else {
+                    let bytes = if let Some(bytes) = payload {
+                        bytes
+                    } else {
+                        let backing = if part.is_configuration() {
+                            configuration
+                        } else {
+                            source
+                        };
+                        let bytes = backing
+                            .get(part.source_range())
+                            .ok_or(Error::Invalid("packet segment range"))?;
+                        payload = Some(bytes);
+                        bytes
+                    };
+                    &bytes[self.copied - prefix..]
+                };
+                let count = available.min(remaining.len());
+                buffer.try_extend_from_slice(&remaining[..count])?;
                 work.take(count as u64);
                 self.copied += count;
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
-                }
-                // A partial prefix used all remaining work: prefixes are at
-                // most four bytes and always fit within a copy chunk.
-                if count < left {
-                    return Ok(YIELD);
-                }
-            }
-            if self.copied < end {
-                if work.remaining() == 0 {
-                    return Ok(YIELD);
-                }
-                let backing = if part.is_configuration() {
-                    configuration
-                } else {
-                    source
-                };
-                let payload = backing
-                    .get(part.source_range())
-                    .ok_or(Error::Invalid("packet segment range"))?;
-                while self.copied < end {
-                    let count = work_count(work).min(end - self.copied);
-                    if count == 0 {
-                        return Ok(YIELD);
-                    }
-                    let start = self.copied - prefix;
-                    buffer.try_extend_from_slice(&payload[start..start + count])?;
-                    work.take(count as u64);
-                    self.copied += count;
-                    if cancel.load(Ordering::Relaxed) {
-                        return Err(Error::Cancelled);
-                    }
                 }
             }
             if !work.try_charge(1) {
