@@ -10,6 +10,9 @@
 //!   the em);
 //! - `heights H...`: the 26.6 pixel heights a probe loads the face at, as
 //!   libass sizes a face (default 16384);
+//! - `wraps-at-32-bits`: the probe's results depend on the reference's
+//!   integer width; its record, from 32-bit ARMv7, stands for the reference
+//!   on every target;
 //! - `maxp KEY N...`: `maxp` fields, overriding the defaults and the values
 //!   computed from the glyphs: `zones` (2), `twilight` (16), `storage` (64),
 //!   `functions` (64), `instruction-defs` (0), `stack` (256), `points`,
@@ -18,7 +21,12 @@
 //! - `cvt V...`: control values in font units, appended in order;
 //! - `gasp PPEM BEHAVIOUR`: one `gasp` range, in order;
 //! - `fpgm` and `prep`: a program up to a line `end`, in the assembler's
-//!   syntax (see `asm`); the table is written even when the program is empty.
+//!   syntax (see `asm`); the table is written even when the program is empty;
+//! - `from FILE PART...`: parts of the first face of the font file `FILE`
+//!   (relative to the fonts directory the command is given): `fpgm`, `prep`
+//!   and `cvt` as stored, `maxp` (its program limits), `head` (units per em
+//!   and flags) and `metrics` (the ascender and descender libass sizes it
+//!   by), so a probe can run a real face's programs.
 //!
 //! Glyphs follow in index order, each from `glyph [advance N] [lsb N]
 //! [char C]...` to `end`, where `char` maps a character code to it:
@@ -74,9 +82,11 @@ const UNSCALED_COMPONENT_OFFSET: u16 = 0x1000;
 #[derive(Debug, Default)]
 pub(super) struct Description {
     pub(super) heights: Vec<i32>,
+    pub(super) wraps_at_32_bits: bool,
     units_per_em: u16,
     head_flags: u16,
     metrics: Option<(i16, i16)>,
+    borrowed: Vec<(String, Vec<String>)>,
     maxp: Vec<(String, u16)>,
     cvt: Vec<i16>,
     gasp: Vec<(u16, u16)>,
@@ -130,6 +140,7 @@ impl Description {
                     _ => return Err(fail("metrics ASCENDER DESCENDER".into())),
                 },
                 "heights" => d.heights = numbers(&args).map_err(fail)?,
+                "wraps-at-32-bits" if args.is_empty() => d.wraps_at_32_bits = true,
                 "maxp" => {
                     if !args.len().is_multiple_of(2) {
                         return Err(fail("maxp KEY VALUE...".into()));
@@ -156,6 +167,17 @@ impl Description {
                     }
                 }
                 "glyph" => d.glyphs.push(glyph(&args, &mut lines).map_err(fail)?),
+                "from" => match &args[..] {
+                    [file, parts @ ..] if !parts.is_empty() => {
+                        let known = ["fpgm", "prep", "cvt", "maxp", "head", "metrics"];
+                        if let Some(part) = parts.iter().find(|p| !known.contains(p)) {
+                            return Err(fail(format!("unknown part `{part}`")));
+                        }
+                        let parts = parts.iter().map(|&p| p.to_owned()).collect();
+                        d.borrowed.push(((*file).to_owned(), parts));
+                    }
+                    _ => return Err(fail("from FILE PART...".into())),
+                },
                 _ => return Err(fail(format!("unknown setting `{key}`"))),
             }
         }
@@ -174,6 +196,76 @@ impl Description {
             return Err(format!("component glyph {} is not in the face", c.glyph));
         }
         Ok(d)
+    }
+
+    /// Takes the parts `from` lines name out of their font files, found in
+    /// `fonts`.
+    pub(super) fn borrow_parts(&mut self, fonts: &std::path::Path) -> Result<(), String> {
+        for (file, parts) in std::mem::take(&mut self.borrowed) {
+            let path = fonts.join(&file);
+            let data = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let table = |tag: &[u8; 4]| {
+                sfnt_table(&data, tag)
+                    .ok_or_else(|| format!("{file}: no {}", String::from_utf8_lossy(tag)))
+            };
+            for part in parts {
+                match part.as_str() {
+                    "fpgm" => self.fpgm = Some(table(b"fpgm")?.to_vec()),
+                    "prep" => self.prep = Some(table(b"prep")?.to_vec()),
+                    "cvt" => {
+                        self.cvt = table(b"cvt ")?
+                            .chunks_exact(2)
+                            .map(|w| i16::from_be_bytes([w[0], w[1]]))
+                            .collect();
+                    }
+                    "maxp" => {
+                        let maxp = table(b"maxp")?;
+                        let at = |i: usize| {
+                            maxp.get(i..i + 2)
+                                .map_or(0, |w| u16::from_be_bytes([w[0], w[1]]))
+                        };
+                        for (key, offset) in [
+                            ("zones", 14),
+                            ("twilight", 16),
+                            ("storage", 18),
+                            ("functions", 20),
+                            ("instruction-defs", 22),
+                            ("stack", 24),
+                        ] {
+                            self.maxp.push((key.to_owned(), at(offset)));
+                        }
+                    }
+                    "head" => {
+                        let head = table(b"head")?;
+                        let at = |i: usize| {
+                            head.get(i..i + 2)
+                                .map_or(0, |w| u16::from_be_bytes([w[0], w[1]]))
+                        };
+                        self.head_flags = at(16);
+                        self.units_per_em = at(18);
+                    }
+                    _ => {
+                        // The Windows metrics libass sizes a face by, else `hhea`'s.
+                        let os2 = sfnt_table(&data, b"OS/2");
+                        let at = |t: &[u8], i: usize| {
+                            t.get(i..i + 2)
+                                .map_or(0, |w| u16::from_be_bytes([w[0], w[1]]))
+                        };
+                        self.metrics = Some(match os2 {
+                            Some(o) if at(o, 74) != 0 || at(o, 76) != 0 => (
+                                at(o, 74).cast_signed(),
+                                at(o, 76).cast_signed().wrapping_neg(),
+                            ),
+                            _ => {
+                                let hhea = table(b"hhea")?;
+                                (at(hhea, 4).cast_signed(), at(hhea, 6).cast_signed())
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 
     /// The font file.
@@ -519,6 +611,29 @@ impl Description {
         t.extend(sub);
         Ok(t)
     }
+}
+
+/// The table `tag` of the first face of the font file `data`.
+fn sfnt_table<'d>(data: &'d [u8], tag: &[u8; 4]) -> Option<&'d [u8]> {
+    let u32_at = |i: usize| {
+        data.get(i..i + 4)
+            .map(|w| u32::from_be_bytes([w[0], w[1], w[2], w[3]]))
+    };
+    let directory = if data.get(..4) == Some(b"ttcf") {
+        u32_at(12)? as usize
+    } else {
+        0
+    };
+    let count = usize::from(u16::from_be_bytes(
+        data.get(directory + 4..directory + 6)?.try_into().ok()?,
+    ));
+    (0..count).find_map(|i| {
+        let record = directory + 12 + 16 * i;
+        (data.get(record..record + 4)? == tag).then(|| {
+            let (offset, len) = (u32_at(record + 8)? as usize, u32_at(record + 12)? as usize);
+            data.get(offset..offset.checked_add(len)?)
+        })?
+    })
 }
 
 /// The box of `points`, `None` without points.
