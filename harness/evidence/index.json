@@ -19777,6 +19777,15 @@
    "bytes": 20056214
   },
   {
+   "name": "code-size-4fc96a49-armv7",
+   "path": "code-size-4fc96a49-armv7",
+   "retention": "retained",
+   "reason": "Code-size change at 4fc96a49 on 32-bit ARMv7 (Thumb-2 with NEON, c6g.4xlarge): the playback, transport, media and subtitle-cc gates, the external vector, ISO BMFF and framing (30 pairs; kernel-bound memory graded with the module loaded), total RSS of long-movie-mkv and charset-cp950-nomapping-a240, the release tests, worker-tests, the worker SHA-256 and .text sizes, user-mode instruction counts of main at f426ea65 against 4fc96a49, and the scripts that ran them.",
+   "key": "evidence/code-size-4fc96a49-armv7/9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda.tar.zst",
+   "sha256": "9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda",
+   "bytes": 62855498
+  },
+  {
    "name": "codec-aac-parametric-stereo-560f2225",
    "path": "codec-aac-parametric-stereo-560f2225",
    "retention": "retained",
