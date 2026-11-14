@@ -290,9 +290,16 @@ them when the scale is undefined. A `SizedFont` then gives:
   runs between the hinted phantom points (the scaled advance in a fixed-pitch
   face and for digits of one width), the vertical advance is scaled by the
   style's vertical scale, and the box is fitted outwards to pixels. Glyphs of
-  the CJK and Indic styles have their advances (the scaled advance, rounded,
-  which those writing systems leave unhinted) and, without points, their empty
-  outlines, but outlines with points are `Unsupported`. The style of every glyph and each style's metrics are
+  the CJK style (CJK characters and every glyph no script covers) go through the
+  CJK writing system: stem widths and digits measured as the latin ones, a top
+  and a bottom blue zone measured on its ideographs, then in both dimensions
+  segments, stems and serifs (stems nested in wider stroke ends), edges
+  snapped to the zones, stems centred on the pixel grid, stems less than a
+  pixel after the previous one interpolated instead, and strong and weak
+  points interpolated. Their advance stays the scaled one, rounded, and their
+  outline is not moved by it. Glyphs of the Indic styles have that advance
+  and, without points, their empty outlines, but outlines with points are
+  `Unsupported`. The style of every glyph and each style's metrics are
   computed on the first load that needs them and kept with the face, charged
   to its budget, as is the storage one load hints in, which the next reuses
   and which stays charged at the largest glyph's size.
@@ -373,10 +380,10 @@ kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Ty
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph.
 
-At a size, the default-load outline, with points, of an auto-hinted glyph of a
-CJK or Indic style is `Unsupported`, hence its glyph extents and contour points,
-which libass's HarfBuzz callbacks report: the auto-hinter here does not run
-those writing systems. So is HarfBuzz's coverage of
+At a size, the default-load outline, with points, of an auto-hinted glyph of an
+Indic style is `Unsupported`, hence its glyph extents and contour points, which
+libass's HarfBuzz callbacks report: the auto-hinter here does not run that
+writing system. So is HarfBuzz's coverage of
 glyphs through OpenType features, which FreeType's auto-hinter has only with
 HarfBuzz built in. The auto-hinter runs only the normal render mode, without
 the light mode's stem darkening.
@@ -399,12 +406,9 @@ size, with the vertical advances of `@` fonts (`font-hinting-none`), all of whic
 match FreeType, the auto-hinted faces' included. The default load itself, every
 glyph's metrics and hinted outline at that size, is gated too
 (`font-hinting-default`): every CFF, CFF2 and CID-keyed face, every instructed
-TrueType face and the auto-hinted authored-cmap-formats match FreeType.
-DejaVuMathTeXGyre is open under the auto-hinter's CJK writing system, which
-styles most of its glyphs. For libass's default configuration that gap is in
-what HarfBuzz reads to position marks without GPOS anchors (glyph extents and
-contour points) in that font; the outlines libass draws are unhinted and
-compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
+TrueType face, and the auto-hinted authored-cmap-formats and DejaVuMathTeXGyre,
+whose glyphs the auto-hinter's CJK writing system styles, match FreeType. The
+outlines libass draws are unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
 NORMAL), the unhinted outlines and default-load advances at nine other sizes are
 only measured (`font-hinting-modes`), and the hinted outlines those modes draw
 are not compared.
@@ -418,15 +422,16 @@ tables charged to the `Budget` it was created with: the supported cmap records, 
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
 records. A face FreeType auto-hints also keeps, once a default load needs
 them, the auto-hinter's style of each glyph, its reverse charmap of accented
-characters and each latin style's metrics, charged to that budget, as is the
+characters and each latin or CJK style's metrics, charged to that budget, as is the
 scratch storage of an auto-hinted load. A face with TrueType programs keeps, for
 the size it last loaded hinted at, the interpreter's function and instruction
 definitions, control values, storage, twilight zone, stack and the zone one
 glyph is hinted in, charged to that budget and sized by `maxp` as FreeType
 sizes them (the stack 128 values deeper and the twilight zone four points
-larger, at least 64 function definitions); a hinted load holds it locked. An `Outline` charges its points and contour ends to its own
-budget and keeps its capacity across glyphs; a `SizedFont` is a small copyable
-view that allocates nothing.
+larger, at least 64 function definitions); a hinted load holds it locked. An
+`Outline` charges its points and contour ends to its own budget and keeps its
+capacity across glyphs; a `SizedFont` is a small copyable view that allocates
+nothing.
 
 `Limits` bounds the work of one parse and of one outline (`work`, which a
 hinted load's instructions also count against, as the font and control value
@@ -506,3 +511,17 @@ composites) are
 The comparison establishes agreement with FreeType on that corpus, not conformance
 with the OpenType specification. Face matching is checked by unit tests and
 through the renderer's comparison with libass (`ass-render`).
+
+## Licence
+
+MIT or Apache-2.0, at your option, with FreeType 2.15.0's FreeType License,
+HarfBuzz 14.6.0's "Old MIT" licence and libass 0.17.5's ISC licence for the modules
+derived from them: most of the CFF hinter and the auto-hinter, the fixed-point
+arithmetic, synthetic styles and glyph-name tables are translated from or generated
+from FreeType, and face matching and the text charmap follow libass. `LICENSE`
+holds all the notices, and [docs/provenance.md](../../docs/provenance.md#triergon-font)
+lists the modules. Software that includes this crate credits FreeType in its
+documentation:
+
+> Portions of this software are copyright © 2026 The FreeType Project
+> (<https://freetype.org>). All rights reserved.
