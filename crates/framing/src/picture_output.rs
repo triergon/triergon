@@ -3,9 +3,13 @@
 //! order counts of H.264 8.2.1 and H.265 8.3.1, without decoding pixels.
 //!
 //! [`DecodedPictures`] holds the pictures a decoder keeps, each with a payload
-//! of the caller's choosing: a decoded picture for a video decoder, the
-//! picture's caption bytes for caption extraction. The caller drives it with
-//! the same events for every picture, in decode order.
+//! of the caller's choosing: a decoded picture for the video decoders of
+//! `triergon-codec-h264` and `triergon-codec-hevc`, the picture's caption bytes
+//! for caption extraction. The caller drives it with the same events for every
+//! picture, in decode order, and reads the stored pictures in storage order
+//! through [`DecodedPictures::entries`] (or marks them through
+//! [`DecodedPictures::entries_mut`]); a picture's position there is the same
+//! until a picture leaves.
 //!
 //! H.264 (C.4):
 //!
@@ -17,7 +21,8 @@
 //! 3. removal before it is stored: [`DecodedPictures::avc_remove`] (C.4.4);
 //! 4. storage: [`DecodedPictures::avc_store`] (C.4.5.1, C.4.5.2), or
 //!    [`DecodedPictures::avc_store_second_field`] for the second field of a
-//!    pair whose first field is stored.
+//!    pair whose first field is stored ([`Entry::pair`] when the caller
+//!    joins the payloads itself).
 //!
 //! H.265 (C.5.2):
 //!
@@ -31,7 +36,9 @@
 //! leaves is reported to a sink as a [`Leave`]: output (the "bumping" process,
 //! H.264 C.4.5.3, H.265 C.5.2.4), then removed, or removed without output.
 //! [`DecodedPictures::store`] stores a picture without any process, for a
-//! caller that drives output itself. Storing is the only step that takes
+//! caller that drives output itself with [`DecodedPictures::bump`] and the
+//! counts [`DecodedPictures::len`] and [`DecodedPictures::bumpable`]. Storing
+//! is the only step that takes
 //! memory; [`DecodedPictures::try_reserve`] takes it ahead, for a caller whose
 //! step must not fail once it has changed the buffer.
 //!
@@ -193,6 +200,63 @@ impl<P> Entry<'_, P> {
     pub fn picture_mut(&mut self) -> &mut P {
         &mut self.0.picture
     }
+
+    /// H.264 C.4.5.1/C.4.5.2 for the second field of a complementary pair
+    /// whose first field this is: marks the field, lets bumping output the
+    /// pair, and makes the pair wait for output, at the lower order count of
+    /// the two, when the field's OutputFlag is 1. True when the field is to
+    /// be output on its own, its first field having been output already; the
+    /// caller then outputs it.
+    pub fn pair(&mut self, second: NewPicture) -> bool {
+        let p = &mut *self.0;
+        if let Some(field) = second.field {
+            p.marking[field.index()] = second.marking;
+        }
+        p.held = false;
+        if !second.output {
+            return false;
+        }
+        if p.output {
+            return true;
+        }
+        p.waiting = true;
+        p.poc = p.poc.min(second.poc);
+        false
+    }
+}
+
+/// A stored picture, for the caller to read.
+#[derive(Debug)]
+pub struct View<'a, P>(&'a Stored<P>);
+
+impl<'a, P> View<'a, P> {
+    #[must_use]
+    pub fn id(&self) -> PictureId {
+        self.0.id
+    }
+
+    /// PicOrderCnt( ) of the frame, pair or field.
+    #[must_use]
+    pub fn poc(&self) -> i32 {
+        self.0.poc
+    }
+
+    #[must_use]
+    pub fn marking(&self, field: Parity) -> Marking {
+        self.0.marking[field.index()]
+    }
+
+    /// Either field is used for reference.
+    #[must_use]
+    pub fn is_reference(&self) -> bool {
+        self.0.reference()
+    }
+
+    /// The payload, borrowed for as long as the buffer is.
+    #[must_use]
+    pub fn picture(&self) -> &'a P {
+        &self.0.picture
+    }
 }
 
 /// A picture to store.
@@ -319,8 +383,20 @@ impl<P> DecodedPictures<P> {
         self.stored.iter().filter(|p| p.waiting).count()
     }
 
+    /// The pictures [`DecodedPictures::bump`] may output: needed for output
+    /// and not held.
+    #[must_use]
+    pub fn bumpable(&self) -> usize {
+        self.stored.iter().filter(|p| p.waiting && !p.held).count()
+    }
+
     /// The stored pictures, in storage order.
-    pub fn entries_mut(&mut self) -> impl Iterator<Item = Entry<'_, P>> {
+    pub fn entries(&self) -> impl ExactSizeIterator<Item = View<'_, P>> {
+        self.stored.iter().map(View)
+    }
+
+    /// The stored pictures, in storage order, for the caller to mark.
+    pub fn entries_mut(&mut self) -> impl ExactSizeIterator<Item = Entry<'_, P>> {
         self.stored.iter_mut().map(Entry)
     }
 
@@ -342,6 +418,14 @@ impl<P> DecodedPictures<P> {
     /// The stored picture `id`.
     pub fn entry(&mut self, id: PictureId) -> Option<Entry<'_, P>> {
         self.stored.iter_mut().find(|p| p.id == id).map(Entry)
+    }
+
+    /// The payload of the stored picture `id`, borrowed for as long as the buffer is.
+    pub fn picture_mut(&mut self, id: PictureId) -> Option<&mut P> {
+        self.stored
+            .iter_mut()
+            .find(|p| p.id == id)
+            .map(|p| &mut p.picture)
     }
 
     /// Removes the stored picture `id` without output and gives its payload
@@ -562,7 +646,7 @@ impl<P> DecodedPictures<P> {
     /// buffer, `merge` taking its payload into the first field's. When the
     /// first field has already been output, the second is output on its
     /// own before it joins; otherwise the pair waits for output when the
-    /// field's OutputFlag is 1. The pair is no longer held.
+    /// field's OutputFlag is 1 ([`Entry::pair`]).
     ///
     /// # Errors
     ///
@@ -575,25 +659,16 @@ impl<P> DecodedPictures<P> {
         mut leave: impl FnMut(Leave<'_, P>),
         merge: impl FnOnce(&mut P, P),
     ) -> std::result::Result<(), P> {
-        let Some(p) = self.stored.iter_mut().find(|p| p.id == first) else {
+        let Some(mut entry) = self.entry(first) else {
             return Err(picture);
         };
-        if let Some(field) = current.field {
-            p.marking[field.index()] = current.marking;
+        if entry.pair(current) {
+            leave(Leave::Output {
+                poc: current.poc,
+                picture: &picture,
+            });
         }
-        p.held = false;
-        if current.output {
-            if p.output {
-                leave(Leave::Output {
-                    poc: current.poc,
-                    picture: &picture,
-                });
-            } else {
-                p.waiting = true;
-                p.poc = p.poc.min(current.poc);
-            }
-        }
-        merge(&mut p.picture, picture);
+        merge(entry.picture_mut(), picture);
         Ok(())
     }
 

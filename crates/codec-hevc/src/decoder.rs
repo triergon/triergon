@@ -1,6 +1,7 @@
 //! Picture-level decoding: NAL dispatch, parameter set activation, POC (8.3.1), RPS (8.3.2),
 //! unavailable reference generation (8.3.3), reference picture lists (8.3.4), collocated
-//! picture (8.3.5), in-loop filters (8.7) and the output-order DPB (C.5.2).
+//! picture (8.3.5) and in-loop filters (8.7). The decoded picture buffer, its marking and
+//! its output and removal (C.5.2) are `triergon-framing`'s `DecodedPictures`.
 
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -15,6 +16,9 @@ use crate::state::{PicState, SliceInfo};
 use crate::{deblock, sao};
 use triergon_codec::{
     Budget, BudgetVec, Charged, Colour, DecodeFailure, PictureView, VideoDecoder,
+};
+use triergon_framing::picture_output::{
+    DecodedPictures, HevcLimits, HevcPicture, Leave, Marking, NewPicture, Parity, View,
 };
 use triergon_framing::{AnnexBUnits, hevc};
 
@@ -182,13 +186,6 @@ impl VideoDecoder for Decoder {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RefMark {
-    Unused,
-    Short,
-    Long,
-}
-
 #[derive(Debug)]
 struct OutInfo {
     crop: [u32; 4],
@@ -199,14 +196,11 @@ struct OutInfo {
     colour: ColourDescription,
 }
 
+/// A picture of the decoded picture buffer, which keeps its order count and marking.
 #[derive(Debug)]
 struct DpbPic {
     frame: Arc<SharedFrame>,
     col: Arc<ColMotion>,
-    poc: i32,
-    mark: RefMark,
-    needed_for_output: bool,
-    latency: u32,
     pts: Option<i64>,
     info: Arc<OutInfo>,
 }
@@ -245,7 +239,7 @@ struct Context {
     pps: Vec<Option<Shared<Pps>>>,
     active_sps: Option<Shared<Sps>>,
     layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
-    dpb: Vec<DpbPic>,
+    dpb: DecodedPictures<DpbPic>,
     out: VecDeque<Picture>,
     /// The picture the last [`VideoDecoder::receive`] view borrows.
     held: Option<Picture>,
@@ -371,7 +365,7 @@ impl Context {
             pps: (0..ps::MAX_PPS).map(|_| None).collect(),
             active_sps: None,
             layout_cache: None,
-            dpb: Vec::new(),
+            dpb: DecodedPictures::new(budget),
             out: VecDeque::new(),
             held: None,
             cur: None,
@@ -394,13 +388,12 @@ impl Context {
         if self.cur.is_some() {
             let _ = self.finish_picture();
         }
-        while self.bump() {}
-        self.dpb.clear();
+        self.dpb.flush(output(&mut self.out));
     }
 
     fn reset(&mut self) {
         self.cur = None;
-        self.dpb.clear();
+        self.dpb.discard(|_| {});
         self.out.clear();
         self.first_picture = true;
         self.seen_irap = false;
@@ -490,6 +483,7 @@ impl Context {
             ref_lt: [[false; 16]; 2],
         };
         let mut lists: [[Option<usize>; 16]; 2] = [[None; 16]; 2];
+        let dpb: Vec<View<'_, DpbPic>> = self.dpb.entries().collect();
         if sh.slice_type != SLICE_I {
             let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
             let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
@@ -528,7 +522,7 @@ impl Context {
                         temp[r]
                     };
                     lists[l][r] = Some(e.0);
-                    info.ref_poc[l][r] = self.dpb[e.0].poc;
+                    info.ref_poc[l][r] = dpb[e.0].poc();
                     info.ref_lt[l][r] = e.1;
                 }
             }
@@ -553,7 +547,7 @@ impl Context {
                 &layout,
                 f,
                 &mut self.st,
-                &self.dpb,
+                &dpb,
                 &lists,
                 &mut self.scratch8,
                 rbsp,
@@ -567,7 +561,7 @@ impl Context {
                 &layout,
                 f,
                 &mut self.st,
-                &self.dpb,
+                &dpb,
                 &lists,
                 &mut self.scratch16,
                 rbsp,
@@ -623,9 +617,7 @@ impl Context {
         let poc = poc_msb + lsb;
         // RPS (8.3.2)
         if irap && self.no_rasl_output {
-            for p in &mut self.dpb {
-                p.mark = RefMark::Unused;
-            }
+            self.dpb.mark_unused();
         }
         let mut st_before_poc = Vec::new();
         let mut st_after_poc = Vec::new();
@@ -665,31 +657,37 @@ impl Context {
             }
         }
         let mut keep = vec![false; self.dpb.len()];
-        let find_lt = |dpb: &Vec<DpbPic>, p: i32, msb: bool| -> Option<usize> {
-            dpb.iter().position(|d| {
-                d.mark != RefMark::Unused
-                    && if msb {
-                        d.poc == p
-                    } else {
-                        (d.poc & (max_lsb - 1)) == p
-                    }
-            })
+        // A long-term entry names a reference picture by its order count or its LSBs.
+        let lt_poc = |d: &View<'_, DpbPic>, p: i32, msb: bool| {
+            if msb {
+                d.poc() == p
+            } else {
+                (d.poc() & (max_lsb - 1)) == p
+            }
         };
-        let mut lt_curr_idx: Vec<Option<usize>> = Vec::new();
-        for &(p, m) in &lt_curr_poc {
-            lt_curr_idx.push(find_lt(&self.dpb, p, m));
+        let find_lt = |dpb: &DecodedPictures<DpbPic>, p: i32, msb: bool| {
+            position(dpb, |d| d.is_reference() && lt_poc(d, p, msb))
+        };
+        let lt_curr_idx: Vec<Option<usize>> = lt_curr_poc
+            .iter()
+            .map(|&(p, m)| find_lt(&self.dpb, p, m))
+            .collect();
+        let lt_foll_idx: Vec<Option<usize>> = lt_foll_poc
+            .iter()
+            .map(|&(p, m)| find_lt(&self.dpb, p, m))
+            .collect();
+        for &i in lt_curr_idx.iter().chain(lt_foll_idx.iter()).flatten() {
+            keep[i] = true;
         }
-        let mut lt_foll_idx: Vec<Option<usize>> = Vec::new();
-        for &(p, m) in &lt_foll_poc {
-            lt_foll_idx.push(find_lt(&self.dpb, p, m));
+        for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
+            if *keep {
+                d.set_marking(None, Marking::LongTerm);
+            }
         }
-        for i in lt_curr_idx.iter().chain(lt_foll_idx.iter()).flatten() {
-            self.dpb[*i].mark = RefMark::Long;
-            keep[*i] = true;
-        }
-        let find_st = |dpb: &Vec<DpbPic>, p: i32| {
-            dpb.iter()
-                .position(|d| d.mark == RefMark::Short && d.poc == p)
+        let find_st = |dpb: &DecodedPictures<DpbPic>, p: i32| {
+            position(dpb, |d| {
+                d.marking(Parity::Top) == Marking::ShortTerm && d.poc() == p
+            })
         };
         let st_before_idx: Vec<Option<usize>> = st_before_poc
             .iter()
@@ -701,17 +699,17 @@ impl Context {
             .collect();
         let st_foll_idx: Vec<Option<usize>> =
             st_foll_poc.iter().map(|&p| find_st(&self.dpb, p)).collect();
-        for i in st_before_idx
+        for &i in st_before_idx
             .iter()
             .chain(st_after_idx.iter())
             .chain(st_foll_idx.iter())
             .flatten()
         {
-            keep[*i] = true;
+            keep[i] = true;
         }
-        for (i, p) in self.dpb.iter_mut().enumerate() {
-            if !keep[i] {
-                p.mark = RefMark::Unused;
+        for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
+            if !*keep {
+                d.set_marking(None, Marking::Unused);
             }
         }
         // Picture output info.
@@ -732,45 +730,21 @@ impl Context {
             },
         });
         // C.5.2.2 output and removal of pictures before decoding the current picture.
-        let highest = sps.max_sub_layers_minus1 as usize;
-        if irap && self.no_rasl_output && !self.first_picture {
-            let no_output_of_prior = if t == hevc::CRA {
-                true
-            } else {
-                sh.no_output_of_prior_pics
-            };
-            if no_output_of_prior {
-                self.dpb.clear();
-            } else {
-                while self.bump() {}
-                self.dpb.clear();
-            }
-        } else {
-            self.remove_unused();
-            loop {
-                let needed = self.dpb.iter().filter(|p| p.needed_for_output).count();
-                let latency_hit = sps.max_latency_increase_plus1[highest] != 0 && {
-                    let max_lat =
-                        sps.max_num_reorder[highest] + sps.max_latency_increase_plus1[highest] - 1;
-                    self.dpb
-                        .iter()
-                        .any(|p| p.needed_for_output && p.latency >= max_lat)
-                };
-                if needed > sps.max_num_reorder[highest] as usize
-                    || latency_hit
-                    || self.dpb.len() >= sps.max_dec_pic_buffering[highest] as usize
-                {
-                    if !self.bump() {
-                        // Nothing to output: drop the oldest non-reference picture to make room.
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
-        }
+        self.dpb.hevc_remove(
+            HevcPicture {
+                irap_no_rasl_output: irap && self.no_rasl_output,
+                cra: t == hevc::CRA,
+                first: self.first_picture,
+                no_output_of_prior_pics: sh.no_output_of_prior_pics,
+            },
+            limits(&sps),
+            output(&mut self.out),
+        );
         // The current picture's storage is charged once the removal above has freed what it
-        // can (into the frame pool), and before the missing references and the POC state.
+        // can (into the frame pool), and before the missing references and the POC state:
+        // the buffer's room for the references generated below and the picture first.
+        self.dpb
+            .try_reserve(st_before_poc.len() + st_after_poc.len() + lt_curr_poc.len() + 1)?;
         let (w, hgt) = (sps.width as usize, sps.height as usize);
         let frame = if sps.high_bit_depth() {
             AnyFrame::U16(match self.pool.take(w, hgt) {
@@ -792,9 +766,8 @@ impl Context {
         self.st
             .reset(w, hgt, sps.pic_size_ctb() as usize, sps.pic_h_ctb as usize)?;
         // The indices computed above are invalid if the DPB changed; recompute by POC.
-        let resolve = |dpb: &Vec<DpbPic>, p: i32| {
-            dpb.iter()
-                .position(|d| d.mark != RefMark::Unused && d.poc == p)
+        let resolve = |dpb: &DecodedPictures<DpbPic>, p: i32| {
+            position(dpb, |d| d.is_reference() && d.poc() == p)
         };
         let mut st_before = Vec::new();
         let mut st_after = Vec::new();
@@ -803,33 +776,28 @@ impl Context {
         for (k, &p) in st_before_poc.iter().enumerate() {
             let i = match resolve(&self.dpb, p) {
                 Some(i) if st_before_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, RefMark::Short, info.clone())?,
+                _ => self.generate_missing(&sps, p, Marking::ShortTerm, info.clone())?,
             };
             st_before.push(i);
         }
         for (k, &p) in st_after_poc.iter().enumerate() {
             let i = match resolve(&self.dpb, p) {
                 Some(i) if st_after_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, RefMark::Short, info.clone())?,
+                _ => self.generate_missing(&sps, p, Marking::ShortTerm, info.clone())?,
             };
             st_after.push(i);
         }
         for (k, &(p, msb)) in lt_curr_poc.iter().enumerate() {
             let found = if lt_curr_idx[k].is_some() {
-                self.dpb.iter().position(|d| {
-                    d.mark == RefMark::Long
-                        && if msb {
-                            d.poc == p
-                        } else {
-                            (d.poc & (max_lsb - 1)) == p
-                        }
+                position(&self.dpb, |d| {
+                    d.marking(Parity::Top) == Marking::LongTerm && lt_poc(d, p, msb)
                 })
             } else {
                 None
             };
             let i = match found {
                 Some(i) => i,
-                None => self.generate_missing(&sps, p, RefMark::Long, info.clone())?,
+                None => self.generate_missing(&sps, p, Marking::LongTerm, info.clone())?,
             };
             lt_curr.push(i);
         }
@@ -874,11 +842,13 @@ impl Context {
         Ok(())
     }
 
+    /// Stores a generated reference picture (8.3.3), not needed for output, and returns
+    /// its position in the buffer. The caller has reserved its room.
     fn generate_missing(
         &mut self,
         sps: &Sps,
         poc: i32,
-        mark: RefMark,
+        marking: Marking,
         info: Arc<OutInfo>,
     ) -> Result<usize> {
         let (w, h) = (sps.width as usize, sps.height as usize);
@@ -892,47 +862,23 @@ impl Context {
         } else {
             AnyFrame::U8(Frame::try_new(&self.budget, w, h, 128u8)?)
         };
-        self.dpb.push(DpbPic {
+        let picture = DpbPic {
             frame: SharedFrame::new(frame, &self.pool),
             col: Arc::new(ColMotion::try_new(&self.budget, w, h)?),
-            poc,
-            mark,
-            needed_for_output: false,
-            latency: 0,
             pts: None,
             info,
-        });
+        };
+        let stored = NewPicture {
+            poc,
+            output: false,
+            marking,
+            field: None,
+            hold: false,
+        };
+        self.dpb
+            .store(stored, picture)
+            .map_err(|refused| refused.error)?;
         Ok(self.dpb.len() - 1)
-    }
-
-    fn remove_unused(&mut self) {
-        let mut i = 0;
-        while i < self.dpb.len() {
-            if !self.dpb[i].needed_for_output && self.dpb[i].mark == RefMark::Unused {
-                self.dpb.remove(i);
-            } else {
-                i += 1;
-            }
-        }
-    }
-
-    /// C.5.2.4 bumping: output the smallest-POC picture needed for output.
-    fn bump(&mut self) -> bool {
-        let mut best: Option<usize> = None;
-        for (i, p) in self.dpb.iter().enumerate() {
-            if p.needed_for_output && best.is_none_or(|b| p.poc < self.dpb[b].poc) {
-                best = Some(i);
-            }
-        }
-        let Some(i) = best else { return false };
-        let p = &mut self.dpb[i];
-        p.needed_for_output = false;
-        let pic = make_picture(p);
-        self.out.push_back(pic);
-        if self.dpb[i].mark == RefMark::Unused {
-            self.dpb.remove(i);
-        }
-        true
     }
 
     fn finish_picture(&mut self) -> Result<()> {
@@ -958,19 +904,21 @@ impl Context {
         let w16 = w.div_ceil(16);
         let h16 = h.div_ceil(16);
         let data = &mut cur.col.data;
+        let st = &self.st;
+        let (log2_ctb, pic_w_ctb) = (sps.log2_ctb, sps.pic_w_ctb as usize);
         for y in 0..h16 {
             for x in 0..w16 {
                 let (lx, ly) = (x * 16, y * 16);
-                let m = self.st.motion[(ly >> 2) * self.st.w4 + (lx >> 2)];
+                let m = st.motion[(ly >> 2) * st.w4 + (lx >> 2)];
                 if !m.is_inter() {
                     continue;
                 }
-                let ctb = (ly >> sps.log2_ctb) * sps.pic_w_ctb as usize + (lx >> sps.log2_ctb);
+                let ctb = (ly >> log2_ctb) * pic_w_ctb + (lx >> log2_ctb);
                 // A CTB no slice of this picture decoded holds an earlier picture's motion.
-                if self.st.ctb_slice_addr[ctb] == u32::MAX {
+                if st.ctb_slice_addr[ctb] == u32::MAX {
                     continue;
                 }
-                let Some(si) = self.st.slices.get(self.st.ctb_slice_idx[ctb] as usize) else {
+                let Some(si) = st.slices.get(st.ctb_slice_idx[ctb] as usize) else {
                     continue;
                 };
                 let mut c = ColMv {
@@ -992,44 +940,53 @@ impl Context {
         }
         let col = Arc::new(cur.col);
 
-        // C.5.2.3: marking and additional bumping.
-        let highest = sps.max_sub_layers_minus1 as usize;
-        if cur.output {
-            for p in &mut self.dpb {
-                if p.needed_for_output && p.poc > cur.poc {
-                    p.latency += 1;
-                }
-            }
-        }
-        self.dpb.push(DpbPic {
+        // C.3.4 and C.5.2.3: marking, storage and additional bumping, in the room
+        // `start_picture` reserved.
+        let picture = DpbPic {
             frame: SharedFrame::new(cur.frame, &self.pool),
             col,
-            poc: cur.poc,
-            mark: RefMark::Short,
-            needed_for_output: cur.output,
-            latency: 0,
             pts: cur.pts,
             info: cur.info,
-        });
-        loop {
-            let needed = self.dpb.iter().filter(|p| p.needed_for_output).count();
-            let latency_hit = sps.max_latency_increase_plus1[highest] != 0 && {
-                let max_lat =
-                    sps.max_num_reorder[highest] + sps.max_latency_increase_plus1[highest] - 1;
-                self.dpb
-                    .iter()
-                    .any(|p| p.needed_for_output && p.latency >= max_lat)
-            };
-            if needed > sps.max_num_reorder[highest] as usize || latency_hit {
-                if !self.bump() {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
+        };
+        self.dpb
+            .hevc_store(
+                cur.poc,
+                cur.output,
+                picture,
+                limits(&sps),
+                output(&mut self.out),
+            )
+            .map_err(|refused| refused.error)?;
         Ok(())
     }
+}
+
+/// The output limits of the highest temporal sub-layer of `sps` (C.5.2.2).
+fn limits(sps: &Sps) -> HevcLimits {
+    let highest = sps.max_sub_layers_minus1 as usize;
+    HevcLimits::from_sps(
+        sps.max_dec_pic_buffering[highest] - 1,
+        sps.max_num_reorder[highest],
+        sps.max_latency_increase_plus1[highest],
+    )
+}
+
+/// Queues the pictures the buffer outputs. A picture that leaves is dropped, and its
+/// frame returns to the pool once no output picture shows it.
+fn output(out: &mut VecDeque<Picture>) -> impl FnMut(Leave<'_, DpbPic>) + '_ {
+    |leave| {
+        if let Leave::Output { poc, picture } = leave {
+            out.push_back(make_picture(poc, picture));
+        }
+    }
+}
+
+/// The position of the first stored picture `found` accepts.
+fn position(
+    dpb: &DecodedPictures<DpbPic>,
+    found: impl Fn(&View<'_, DpbPic>) -> bool,
+) -> Option<usize> {
+    dpb.entries().position(|d| found(&d))
 }
 
 /// Deblocking (8.7.2) and SAO (8.7.3) in CTB-row bands, equivalent to the picture-level
@@ -1158,7 +1115,7 @@ fn prepare_band<P: Pixel>(
     Ok(())
 }
 
-fn make_picture(p: &DpbPic) -> Picture {
+fn make_picture(poc: i32, p: &DpbPic) -> Picture {
     let i = &p.info;
     let [l, r, t, b] = i.crop;
     let w = (i.width - l - r) as usize;
@@ -1182,7 +1139,7 @@ fn make_picture(p: &DpbPic) -> Picture {
             mk(2, l as usize / 2, t as usize / 2, w / 2, h / 2),
         ],
         pts: p.pts,
-        poc: p.poc,
+        poc,
         sar: i.sar,
         colour: i.colour,
     }
@@ -1196,7 +1153,7 @@ fn decode_slice_generic<P: Pixel>(
     layout: &Layout,
     frame: &mut Frame<P>,
     st: &mut PicState,
-    dpb: &[DpbPic],
+    dpb: &[View<'_, DpbPic>],
     lists: &[[Option<usize>; 16]; 2],
     sc: &mut Scratch<P>,
     rbsp: &[u8],
@@ -1222,11 +1179,11 @@ fn decode_slice_generic<P: Pixel>(
             if let Some(i) = lists[l][r] {
                 let d = &dpb[i];
                 refs.list[l][r] = RefEntry {
-                    frame: P::view(&d.frame),
-                    poc: d.poc,
+                    frame: P::view(&d.picture().frame),
+                    poc: d.poc(),
                     lt: si.ref_lt[l][r],
                 };
-                if d.poc > poc {
+                if d.poc() > poc {
                     refs.no_backward_pred = false;
                 }
             }
@@ -1239,8 +1196,8 @@ fn decode_slice_generic<P: Pixel>(
             0
         };
         if let Some(i) = lists[l][sh.collocated_ref_idx as usize] {
-            refs.col = Some(&dpb[i].col);
-            refs.col_poc = dpb[i].poc;
+            refs.col = Some(&dpb[i].picture().col);
+            refs.col_poc = dpb[i].poc();
         }
     }
     let mut dec = SliceDecoder::new(

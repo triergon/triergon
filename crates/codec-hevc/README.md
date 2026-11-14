@@ -1,8 +1,9 @@
 # triergon-codec-hevc
 
 H.265/HEVC decoder for Annex B byte streams, written from Rec. ITU-T H.265 (V11, 01/2026).
-It is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md) and [triergon-codec](../codec/README.md)
-(it implements `VideoDecoder`). It decodes the Main,
+It is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md),
+[triergon-codec](../codec/README.md) (it implements `VideoDecoder`) and
+[triergon-framing](../framing/README.md) (Annex B units and the decoded picture buffer). It decodes the Main,
 Main 10 and Main Still Picture profiles (4:2:0, 8 and 10 bit) to cropped pictures in
 output order, single-threaded. It does not scale, convert colour or conceal errors.
 
@@ -55,7 +56,7 @@ identical output.
 | Prediction | Intra (planar, DC, 33 angular, strong smoothing, constrained intra); merge, AMVP, TMVP; default and explicit weighted prediction |
 | Loop filters | Deblocking and SAO with slice/tile boundary control |
 | References | Short-term RPS with inter-RPS prediction, long-term references, CRA/BLA/IDR, RASL/RADL handling, missing-reference generation |
-| Output | DPB bumping (reorder, latency, buffering limits), `no_output_of_prior_pics`, `pic_output_flag`, conformance-window cropping, VUI SAR and colour description |
+| Output | The decoded picture buffer of `triergon-framing`'s `picture_output`: output and removal of C.5.2.2–C.5.2.4 (reorder, latency and buffering limits of the highest sub-layer), `no_output_of_prior_pics`, `pic_output_flag`; conformance-window cropping, VUI SAR and colour description |
 
 ## Behaviour and limits
 
@@ -76,7 +77,7 @@ identical output.
 - Limits: picture size capped at level 6.2 (35,651,584 luma samples, 16,888 per side)
   before allocation; DPB size from `sps_max_dec_pic_buffering` (at most 16).
 - Storage: decoded and reference pictures (also while a caller holds a `Picture`), the
-  frame pool, collocated motion, per-picture block and CTB maps, parameter sets, tile and
+  decoded picture buffer, the frame pool, collocated motion, per-picture block and CTB maps, parameter sets, tile and
   scan tables, the SAO band buffer and the RBSP of the NAL unit being parsed are charged
   to the budget before they are allocated; a refused charge is `DecodeError::Budget`,
   the picture it was for is not started, and decoding resumes once the storage fits. A frame returns to the pool (one spare per bit depth) when the last picture

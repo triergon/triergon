@@ -193,14 +193,13 @@ impl SliceDecoder<'_> {
             let f = *l.get((r >> 1) as usize)?;
             let cur_par = 1 + (self.cur & 1) as u8;
             let par = if r & 1 == 0 { cur_par } else { 3 - cur_par };
-            let st = &self.refs.dpb[f.idx];
-            let poc = st.poc[(par - 1) as usize];
-            let long = st.mark[(par - 1) as usize] == RefMark::Long;
+            let st = self.refs.dpb[f.idx];
+            // A frame of a frame list is short-term or long-term in both fields.
             Some(RefPic {
                 idx: f.idx,
                 parity: par,
-                poc,
-                long,
+                poc: st.poc[(par - 1) as usize],
+                long: f.long,
                 id: ref_id(st.uid, par),
             })
         } else {
@@ -615,8 +614,6 @@ impl SliceDecoder<'_> {
         let cur_poc = self.pic.pic_poc();
         // Select colPic motion, mbAddrCol, yM, vertMvScale (Tables 8-6, 8-8).
         let (motion, mb_col, ym, vs): (&Motion, usize, i32, VertScale);
-        let cur_motion_is = |idx: usize| idx == self.pic.store;
-        let _ = cur_motion_is;
         let top_closer = {
             let t = (st.poc[0] - cur_poc).abs();
             let b = (st.poc[1] - cur_poc).abs();
@@ -944,7 +941,7 @@ impl SliceDecoder<'_> {
                 let (x, y, w, h) = parts[k];
                 pm[k] = self.part_motion(x, y, w, h)?;
                 for r in pm[k].refs.iter().flatten() {
-                    if r.idx != self.pic.store && self.refs.dpb[r.idx].buf.is_none() {
+                    if Some(r.idx) != self.pic.first_field && self.refs.dpb[r.idx].buf.is_none() {
                         return Err(SliceError::InvalidData("reference picture missing"));
                     }
                 }
@@ -962,13 +959,13 @@ impl SliceDecoder<'_> {
                 field_dbl,
             };
             let refs = self.refs;
-            let cur_store = self.pic.store;
+            let first_field = self.pic.first_field;
             let cur_buf = &self.pic.buf;
             for p in &pm[..n] {
                 mc_part(
                     &lctx,
                     |i| {
-                        if i == cur_store {
+                        if Some(i) == first_field {
                             cur_buf
                         } else {
                             refs.samples(i)

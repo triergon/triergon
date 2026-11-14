@@ -643,3 +643,81 @@ fn take_removes_a_picture_without_output() {
     });
     assert_eq!(out, [2]);
 }
+
+#[test]
+fn stored_pictures_read_in_storage_order_and_bumping_skips_a_held_field() {
+    let mut dpb = DecodedPictures::new(&pool());
+    let frame = NewPicture {
+        poc: 4,
+        output: true,
+        marking: Marking::ShortTerm,
+        field: None,
+        hold: false,
+    };
+    let gap = NewPicture {
+        poc: 0,
+        output: false,
+        ..frame
+    };
+    let a = dpb.store(frame, 1).expect("stored");
+    let b = dpb
+        .store(field_store(2, Parity::Top, true), 2)
+        .expect("stored");
+    let c = dpb.store(gap, 3).expect("stored");
+    let read: Vec<_> = dpb
+        .entries()
+        .map(|v| (v.id(), v.poc(), *v.picture()))
+        .collect();
+    assert_eq!(read, [(a, 4, 1), (b, 2, 2), (c, 0, 3)]);
+    let field = dpb.entries().nth(1).expect("field");
+    assert_eq!(field.marking(Parity::Top), Marking::ShortTerm);
+    assert_eq!(field.marking(Parity::Bottom), Marking::Unused);
+    assert!(field.is_reference());
+    // Two pictures wait for output; bumping may output only the frame.
+    assert_eq!((dpb.waiting(), dpb.bumpable()), (2, 1));
+    *dpb.picture_mut(c).expect("stored") = 30;
+    assert_eq!(dpb.payloads().copied().collect::<Vec<_>>(), [1, 2, 30]);
+    let mut seen = Seen::default();
+    assert!(dpb.bump(seen.leave()));
+    assert!(!dpb.bump(seen.leave()));
+    assert_eq!(seen.output, [1]);
+    assert_eq!(dpb.bumpable(), 0);
+}
+
+#[test]
+fn a_second_field_pairs_with_the_first_whose_payload_the_caller_joins() {
+    let mut dpb = DecodedPictures::new(&pool());
+    let first = dpb
+        .store(field_store(6, Parity::Top, true), 'f')
+        .expect("stored");
+    let mut entry = dpb.entry(first).expect("first");
+    assert!(!entry.pair(field_store(5, Parity::Bottom, false)));
+    assert_eq!(entry.poc(), 5);
+    assert_eq!(entry.marking(Parity::Bottom), Marking::ShortTerm);
+    assert!(entry.is_waiting() && !entry.is_held());
+    // A field whose first field has been output is for the caller to output on its own.
+    let lone = dpb
+        .store(field_store(8, Parity::Top, false), 'l')
+        .expect("stored");
+    let mut seen_poc = Vec::new();
+    while dpb.bump(|leave| {
+        if let Leave::Output { poc, .. } = leave {
+            seen_poc.push(poc);
+        }
+    }) {}
+    assert_eq!(seen_poc, [5, 8]);
+    let mut entry = dpb.entry(lone).expect("lone");
+    assert!(entry.pair(field_store(9, Parity::Bottom, false)));
+    assert!(!entry.is_waiting());
+    assert_eq!(entry.poc(), 8);
+    // A second field with OutputFlag 0 leaves the pair's output as it was.
+    let quiet = dpb
+        .store(field_store(10, Parity::Top, true), 'q')
+        .expect("stored");
+    let mut entry = dpb.entry(quiet).expect("quiet");
+    let mut second = field_store(11, Parity::Bottom, false);
+    second.output = false;
+    assert!(!entry.pair(second));
+    assert!(entry.is_waiting() && !entry.is_held());
+    assert_eq!(entry.poc(), 10);
+}
