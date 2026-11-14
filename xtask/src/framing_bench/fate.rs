@@ -239,6 +239,13 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
     }
     let options = Options::read(root, args)?;
     let manifest = read_json(&root.join(MANIFEST))?;
+    let revision = field(&manifest, "revision")?;
+    let upstream = read_json(&root.join("harness/fate/map.json"))?;
+    if revision != field(&upstream, "ffmpeg_revision")?
+        || field(&manifest, "rights")? != "fetched-not-redistributed"
+    {
+        return Err("Annex B manifest does not match the upstream revision or rights".into());
+    }
     let pins = read_json(&root.join("harness/fate/samples.json"))?;
     let pins = pins
         .get("samples")
@@ -260,6 +267,13 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
     let version = version.lines().next().ok_or("missing FFmpeg version")?;
     let reference_sha = sha256::file_hex(&options.ffmpeg).map_err(|e| e.to_string())?;
     let candidate_sha = sha256::file_hex(&options.candidate).map_err(|e| e.to_string())?;
+    if let Some(parent) = options
+        .output
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    }
     fs::create_dir(&options.output).map_err(|e| format!("{}: {e}", options.output.display()))?;
     let mut passed = 0;
     let mut comparisons = Vec::with_capacity(cases.len());
@@ -287,10 +301,7 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
         &options.output.join("report.json"),
         &Value::object([
             ("operation", Value::str("annex-b-byte-projection")),
-            (
-                "upstream_revision",
-                Value::str(field(&manifest, "revision")?),
-            ),
+            ("upstream_revision", Value::str(revision)),
             ("reference_version", Value::str(version)),
             ("reference_sha256", Value::str(reference_sha)),
             ("candidate_sha256", Value::str(candidate_sha)),
