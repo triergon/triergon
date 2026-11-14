@@ -836,9 +836,13 @@ impl PacketEmission {
                 }
             }
         };
-        let configuration = state.config().bytes().clone();
-        let configuration_identity = state.config().source_identity();
-        let configuration_source_refusal = state.config().refusal();
+        let record = state.config();
+        let configuration = record.bytes().clone();
+        let configuration_identity = record.source_identity();
+        let configuration_source_refusal = match &state.update {
+            Some(update) => update.refusal(),
+            None => state.session.configuration.refusal(),
+        };
         let forward_new_extradata = state.codec == Codec::Hevc
             || state
                 .source
