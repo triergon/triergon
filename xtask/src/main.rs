@@ -347,13 +347,17 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             println!("{}", evidence::upload(set, Path::new(archive))?);
             Ok(())
         }
+        [command, set, archive] if command == "entry" => {
+            println!("{}", evidence::entry(set, Path::new(archive))?.1);
+            Ok(())
+        }
         [command, set] if command == "promote" => {
             println!("{}", evidence::promote(root, set)?);
             Ok(())
         }
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence promote SET | evidence fetch SET [DIR]"
+                  | evidence entry SET ARCHIVE | evidence promote SET | evidence fetch SET [DIR]"
                 .into(),
         ),
     }

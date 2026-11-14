@@ -968,7 +968,9 @@ set to the archive location:
    `.tar.zst` compresses it with the system `zstd`, which suits large sets of reports.
 2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
    prints its index entry, which lists the fresh [gate results](#reuse) the set holds.
-   Every new set starts there.
+   Every new set starts there. `cargo xtask evidence entry SET OUT` prints the same
+   entry and uploads nothing, for a host without archive credentials whose upload
+   streams through another machine to the entry's key.
 3. `cargo xtask evidence promote SET` moves an indexed set under `evidence/` and
    records it as kept. Promote a set in the pull request that first cites it; an
    uncited upload simply expires.
