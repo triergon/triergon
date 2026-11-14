@@ -25,6 +25,17 @@ pub enum Record {
     },
     /// A face or text the candidate cannot shape; the reference always can.
     ShapeError(usize),
+    /// A face's glyph count, then each glyph's extents.
+    Glyphs(u16),
+    /// Whether a glyph has extents, and its x and y bearing, width and height
+    /// (zero without).
+    Extents {
+        id: u16,
+        extents: Option<[i32; 4]>,
+    },
+    /// A glyph whose extents the candidate cannot read; the reference always
+    /// can.
+    ExtentsError(u16),
     /// A resolved line: its length, then directions, levels and the map.
     BidiLine(usize),
     Paragraph(bool),
@@ -70,6 +81,21 @@ impl Record {
             ),
             Self::TextError(i) => (5, "text-error", one(i as i64)),
             Self::ShapeError(i) => (6, "shape-error", one(i as i64)),
+            Self::Glyphs(n) => (7, "glyphs", one(n.into())),
+            Self::Extents { id, extents } => {
+                let [x, y, w, h] = extents.unwrap_or_default();
+                let found = extents.is_some();
+                let values = [
+                    id.into(),
+                    found.into(),
+                    x.into(),
+                    y.into(),
+                    w.into(),
+                    h.into(),
+                ];
+                (8, "extents", Values::many(&values))
+            }
+            Self::ExtentsError(id) => (9, "extents-error", one(id.into())),
             Self::BidiLine(n) => (10, "line", one(n as i64)),
             Self::Paragraph(rtl) => (11, "paragraph", one(rtl.into())),
             Self::Level(l) => (12, "level", one(l.into())),

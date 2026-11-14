@@ -23,6 +23,7 @@ shape-worker OPERATION-dump   FILE ARGUMENT...
 | `bidi` | text, one paragraph or line set per line | `BASE BRACKETS` | levels per paragraph and each line reordered as libass does: directions, levels and the visual-to-logical map; packets count lines |
 | `simple` | text, one line each | `BASE` | libass's simple shaping level: the shaped code points; packets count lines |
 | `unicode` | code point ranges | none | every code point's HarfBuzz and FriBidi properties; packets count code points |
+| `extents` | a font file | none | every face's glyph count, then every glyph's extents through `OtMetrics` at its default scale, as `shape` makes it: whether it has any, its x and y bearing, width and height; packets count glyphs |
 
 `DIRECTION` and `BASE` are `ltr`, `rtl` (and `on` for automatic); `SCRIPT` an ISO
 15924 tag; `FEATURES` `-` or comma-separated `TAG=VALUE`; a `TEXT` upper-case
