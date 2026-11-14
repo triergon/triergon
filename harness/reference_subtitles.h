@@ -20,8 +20,8 @@
  * decode every prepared packet in order with one call each; then drain with empty
  * packets until no subtitle comes out (at most 64); fold every output subtitle
  * (all rectangles, palettes, pixels, text and ASS) and free it; free the decoder.
- * The same protocol as crates/subtitle-worker. sub-fold also prints
- * "input_digest", worked out in preparation: the prepared packets' count and
+ * The same protocol as crates/subtitle-worker. sub-fold, sub-bench and sub-memory
+ * also print "input_digest", worked out in preparation: the prepared packets' count and
  * each packet's pts (whether present, then its value) and duration, in order,
  * folded as the digest folds words. sub-fold adds "host_dependent":true
  * when the run reached a C library call whose result differs between the
@@ -365,7 +365,7 @@ static int sub_main(int argc, char **argv) {
         sub_input_free(&in);
         return 0;
     }
-    const uint64_t input_digest = fold_only ? sub_input_digest(&in) : 0;
+    const uint64_t input_digest = sub_input_digest(&in);
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) return 2;
     SubWork total = {0};
     const uint64_t start = bench ? now_ns() : 0;
@@ -391,7 +391,7 @@ static int sub_main(int argc, char **argv) {
     const int flagged = fold_only && atomic_load(&sub_host_dependent);
 #endif
     char input_field[48] = "";
-    if (fold_only) snprintf(input_field, sizeof(input_field), ",\"input_digest\":%" PRIu64, input_digest);
+    snprintf(input_field, sizeof(input_field), ",\"input_digest\":%" PRIu64, input_digest);
     if (!trace)
         printf("{\"schema\":1,\"operation\":\"" SUB_OPERATION "\",\"iterations\":%lu,\"packets\":%" PRIu64
                ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 "%s%s,\"eof\":true}\n",

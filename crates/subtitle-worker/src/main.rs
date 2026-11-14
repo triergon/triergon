@@ -238,11 +238,12 @@ fn run(words: &[String]) -> Result<()> {
         out.flush()?;
         return Ok(());
     }
-    // The fold also gives the prepared packets' times (outside the operation).
-    let input = match (invocation.mode, prepared.input()) {
-        (Mode::Fold, Some(track)) => vec![("input_digest", input_digest(track))],
-        _ => vec![],
-    };
+    // Each run also gives the prepared packets' times, worked out outside the
+    // operation, so timed and measured runs report the same work as the fold.
+    let input = prepared
+        .input()
+        .map(|track| vec![("input_digest", input_digest(track))])
+        .unwrap_or_default();
     measure_with(
         &invocation,
         "subtitle-decode",
