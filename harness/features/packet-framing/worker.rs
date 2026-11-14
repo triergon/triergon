@@ -31,27 +31,44 @@ fn execute(case: &Case, iterations: u32) -> triergon_core::Result<Outcome> {
     Ok(total)
 }
 
-fn load_case(path: &OsStr) -> Result<Case, Box<dyn std::error::Error>> {
-    let mut file = File::open(path)?;
-    let length = usize::try_from(file.metadata()?.len()).unwrap_or(usize::MAX);
-    if length > CAP {
-        return Err(triergon_core::Error::Limit {
-            requested: length,
-            maximum: CAP,
+fn read_chunk(input: &mut impl Read, output: &mut [u8]) -> io::Result<usize> {
+    loop {
+        match input.read(output) {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            result => return result,
         }
-        .into());
     }
+}
+
+fn read_case(mut input: impl Read) -> Result<Case, Box<dyn std::error::Error>> {
+    let mut chunk = [0; 1024];
+    let mut filled = 0;
+    while filled < chunk.len() {
+        let length = read_chunk(&mut input, &mut chunk[filled..])?;
+        if length == 0 {
+            return Ok(Case::parse(&chunk[..filled])?);
+        }
+        filled += length;
+    }
+    // Small scripts never need a separate input allocation. Larger scripts
+    // use the same scratch block and keep the complete input capped.
     let mut script = Vec::new();
-    script.try_reserve_exact(length)?;
-    script.resize(length, 0);
-    file.read_exact(&mut script)?;
-    // Protect the input pin if a file is replaced or grows during the read.
-    match file.read_exact(&mut [0]) {
-        Ok(()) => return Err("trailing case bytes".into()),
-        Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => {}
-        Err(error) => return Err(error.into()),
+    loop {
+        let length = script.len() + filled;
+        if length > CAP {
+            return Err(triergon_core::Error::Limit {
+                requested: length,
+                maximum: CAP,
+            }
+            .into());
+        }
+        script.try_reserve(filled)?;
+        script.extend_from_slice(&chunk[..filled]);
+        filled = read_chunk(&mut input, &mut chunk)?;
+        if filled == 0 {
+            return Ok(Case::parse(&script)?);
+        }
     }
-    Ok(Case::parse(&script)?)
 }
 
 fn write_report(
@@ -127,7 +144,7 @@ pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
     if !(1..=1_000_000).contains(&iterations) {
         return Err("iterations must be 1..1000000".into());
     }
-    let case = load_case(&path)?;
+    let case = read_case(File::open(path)?)?;
     if memory {
         output.write_all(b"TRIERGON_BEGIN_V1\n")?;
         output.flush()?;
@@ -159,6 +176,20 @@ mod sha256;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn script_reader_keeps_bytes_across_the_scratch_boundary() {
+        for length in [900, 1011, 1012, 2600] {
+            let data: Vec<_> = (0..length).map(|i| (i % 251) as u8).collect();
+            let mut script = b"SMBSF001\x01".to_vec();
+            script.extend((length as u32).to_be_bytes());
+            script.extend(&data);
+            script.extend(0_u32.to_be_bytes());
+            let case = read_case(script.as_slice()).unwrap();
+            assert_eq!(case.configuration.as_ref(), data);
+            assert!(case.events.is_empty());
+        }
+    }
 
     #[test]
     fn whole_operation_matches_all_125_recorded_observations() {
