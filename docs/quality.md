@@ -386,7 +386,8 @@ selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
-oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
+oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`,
+or the Python `TRIERGON_PYTHON` names, as for the capture input generator),
 as do the numpy table-recovery chains under `harness/codecs/` and the capture input
 generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draws the
 cited capture inputs depend on. `cargo xtask codecs` grades, times, measures the memory
@@ -505,8 +506,8 @@ may override that count for diagnostic comparisons.
   any session's stream differs. Work counts are totals over the iterations.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
   run may use and those online. On Linux a timing session refuses to start unless the
-  process may use exactly one CPU (`taskset -c CPU`), so every Linux bound is measured
-  pinned and alone on its CPU.
+  process may use exactly one CPU (`taskset -c CPU`), or when it cannot read which CPUs
+  it may use, so every Linux bound is measured pinned and alone on its CPU.
 - Time optimised builds doing equivalent work. For demuxing, the timed operation is
   open, probe, the required reads and packet production for the same selection, with
   process startup and serialisation outside the timing.
@@ -609,7 +610,8 @@ inputs), every file of `xtask/src` and `harness/*.py`, the reviewed input lists,
 observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml` and
 `harness/policy.json`, the Rust, C and Python versions with numpy's, the gate target,
 and the host class (architecture and personality, kernel release, CPU model and
-features, machine type, page size, the CPUs online and those the process may use). A
+features, machine type, page size, the CPUs online and, for a timed step, those the
+process may use). A
 probe that fails is an error. A `grade` key also binds the two collections it joins:
 each one's key and the SHA-256 of its report, so grading reports measured again with
 `--full` is never answered with an earlier grade. When an [evidence](#evidence) set

@@ -297,11 +297,6 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// The Python with numpy that generates the capture inputs.
-fn python_with_numpy() -> String {
-    std::env::var("TRIERGON_PYTHON").unwrap_or_else(|_| "python3".into())
-}
-
 pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     fs::create_dir_all(&a.out).map_err(|e| format!("{}: {e}", a.out.display()))?;
     let cases =
@@ -373,7 +368,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         let path_text = python::path(&path);
         if !path.exists() {
             let generator = python::path(&root.join("harness/capture/generate_inputs.py"));
-            let python = python_with_numpy();
+            let python = python::interpreter();
             let status = Command::new(&python)
                 .args([
                     generator,

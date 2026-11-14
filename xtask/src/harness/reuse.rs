@@ -113,6 +113,18 @@ impl Key {
         })
     }
 
+    /// The key without the CPUs this process may use, for a step that is not
+    /// timed (`grade`).
+    pub fn untimed(mut self) -> Self {
+        if let Value::Object(fields) = &mut self.components
+            && let Some((_, Value::Object(host))) = fields.iter_mut().find(|(k, _)| k == "host")
+        {
+            host.retain(|(k, _)| k != "cpus");
+        }
+        self.sha256 = sha256::hex(json::canonical(&self.components).as_bytes());
+        self
+    }
+
     /// A key that also binds the reports it reads, each with the gate result
     /// recorded beside it: `grade` binds the collections it joins. A measured
     /// report is bound by its bytes, so measuring again with `--full` changes the
@@ -315,13 +327,12 @@ fn output(program: &str, args: &[&str]) -> R<String> {
 }
 
 /// The Python that runs the oracles and the capture input generator
-/// (`TRIERGON_PYTHON`, else `python3`), with numpy's version where it has one.
+/// ([`crate::python::interpreter`]), with numpy's version where it has one,
+/// probed as they run it.
 pub fn python() -> R<Value> {
-    let program = std::env::var("TRIERGON_PYTHON").unwrap_or_else(|_| "python3".into());
     let version = output(
-        &program,
+        &crate::python::interpreter(),
         &[
-            "-I",
             "-c",
             "import sys\ntry:\n import numpy; n = numpy.__version__\nexcept ImportError:\n n = None\nprint(sys.version.split()[0], n)",
         ],

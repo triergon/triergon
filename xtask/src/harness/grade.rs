@@ -784,7 +784,11 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             "requirement",
             options.requirement.map_or(Value::Null, Value::str),
         )]);
-        Some(reuse::Key::new(root, "grade", settings, &files, &[])?.with_inputs(&reports)?)
+        Some(
+            reuse::Key::new(root, "grade", settings, &files, &[])?
+                .untimed()
+                .with_inputs(&reports)?,
+        )
     } else {
         None
     };
