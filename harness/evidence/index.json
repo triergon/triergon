@@ -19753,7 +19753,7 @@
    "name": "code-size-4dbbd545-aarch64",
    "path": "code-size-4dbbd545-aarch64",
    "retention": "retained",
-   "reason": "Code-size change at 4dbbd545 on AArch64 (c8g.4xlarge): the playback, transport, media, subtitle-cc, ISO BMFF and framing gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the worker SHA-256 and .text sizes. The ISO BMFF and framing rows cite it: their workers are byte-identical at 4fc96a49.",
+   "reason": "Code-size change at 4dbbd545 on AArch64 (c8g.2xlarge): the playback, transport, media, subtitle-cc, ISO BMFF and framing gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the worker SHA-256 and .text sizes. The ISO BMFF and framing rows cite it: their workers are byte-identical at 4fc96a49.",
    "key": "evidence/code-size-4dbbd545-aarch64/da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f.tar.zst",
    "sha256": "da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f",
    "bytes": 65174745
@@ -19762,10 +19762,19 @@
    "name": "code-size-4fc96a49-aarch64",
    "path": "code-size-4fc96a49-aarch64",
    "retention": "retained",
-   "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.4xlarge): the playback, transport, media and subtitle-cc gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the release tests, worker-tests, the worker SHA-256 and .text sizes.",
+   "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.2xlarge): the playback, transport, media and subtitle-cc gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the release tests, worker-tests, the worker SHA-256 and .text sizes.",
    "key": "evidence/code-size-4fc96a49-aarch64/78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29.tar.zst",
    "sha256": "78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29",
    "bytes": 37021601
+  },
+  {
+   "name": "code-size-4fc96a49-aarch64-recollect",
+   "path": "code-size-4fc96a49-aarch64-recollect",
+   "retention": "retained",
+   "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.2xlarge), companion to code-size-4fc96a49-aarch64: kernel-bound memory of tags-binary, track-disabled and fate-witch-realtime collected again (30 pairs, the same worker and reference SHA-256), user-mode instruction counts of the Matroska worker at main f426ea65, ce6b5f71, 4fc96a49 and a variant with one demux loop per scan_prefix, Callgrind per-function tables of three cases, and the scripts that ran them.",
+   "key": "evidence/code-size-4fc96a49-aarch64-recollect/606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192.tar.zst",
+   "sha256": "606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192",
+   "bytes": 1173263
   },
   {
    "name": "code-size-placement-probe-aarch64",

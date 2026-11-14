@@ -378,14 +378,15 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 `ass-render`.
 
 The container, playback, MPEG-TS, HLS and closed caption rows were checked again with the
-code-size change at `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` on a c8g.4xlarge pinned to
-CPU 1: parity, 30 timing pairs and 30 kernel-bound memory pairs per case, graded with the
-module loaded; the release tests and the worker tests pass. Every case passes runtime. Every
-case but three passes peak heap and is lower in total RSS; the three have no valid memory
-observation. In one pair each of `tags-binary` and `track-disabled` (Matroska segment
+code-size change at `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7`, linked before the link
+policy, on a c8g.2xlarge pinned to CPU 1: parity, 30 timing pairs and 30 kernel-bound memory pairs per case, graded with the
+module loaded; the release tests and the worker tests pass. Every case passes runtime and
+peak heap and is lower in total RSS. In that run, three cases had no valid memory
+observation: in one pair each of `tags-binary` and `track-disabled` (Matroska segment
 metadata) and `fate-witch-realtime` (closed captions), the kernel bound recorded an error
-while it observed the reference, and the grader rejects the case's memory. At `4dbbd545` all
-three were lower. The worst upper bounds of runtime and of the proven total RSS:
+while it observed the reference. Their memory was collected again, 30 pairs each, on
+another c8g.2xlarge with byte-identical workers and references: total RSS ≤0.9310, ≤0.9308
+and ≤0.7770, every observation valid. The worst upper bounds of runtime and total RSS:
 
 | Feature | Cases | Runtime | Total RSS |
 |---|---:|---:|---:|
@@ -396,16 +397,14 @@ three were lower. The worst upper bounds of runtime and of the proven total RSS:
 | `hls-segments` | 71 | 1.0780 | 0.8215 |
 | `matroska-audio-clocks` | 10 | 1.1294 | 0.9903 |
 | `matroska-startup-seek` | 44 | 1.1414 | 0.9375 |
-| Matroska's six feature groups | 115 (113 for memory) | 1.1312 | 0.9841 |
+| Matroska's six feature groups | 115 | 1.1312 | 0.9841 |
 | External HDR vector | 1 | 0.9783 | 0.8676 |
-| `subtitle-cc` | 201 (200 for memory) | 0.5290 | 0.7773 |
+| `subtitle-cc` | 201 | 0.5290 | 0.7773 |
 
-`subtitle-cc` keeps its four open `hevc-eos-ts` cases. The ISO BMFF and packet framing
-workers, and every reference worker, are byte-identical to those of
-`4dbbd545d2d452220cd0e35ff11807f6c2fd2703`, measured the same way on another c8g.4xlarge:
-ISO BMFF passes all 972 outputs (runtime ≤0.8972, peak heap ≤0.316, total RSS ≤0.7433, all lower), and
-packet framing gives runtime ≤1.4025 with 38/125 cases within the ceiling, against the row's
-45/125 on a c8g.large, peak heap ≤0.985 (125/125 lower) and total RSS ≤1.0458 (0/125 lower).
+`subtitle-cc` keeps its four open `hevc-eos-ts` cases. The ISO BMFF worker, and every
+reference worker, are byte-identical to those of `4dbbd545d2d452220cd0e35ff11807f6c2fd2703`,
+measured the same way on the same host: ISO BMFF passes all 972 outputs (runtime ≤0.8972,
+peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
@@ -512,7 +511,8 @@ packet framing gives runtime ≤1.4025 with 38/125 cases within the ceiling, aga
 | ARMv7: the AAC codec timings (AAC-LC, HE-AAC v1 and v2), their instruction counts against `b89e5844`, equivalence and the `aac-he-stereo` profiles | `0b3c2db5239da81ab38d7a33f73b70a9f77df464` | `bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a` |
 | ARMv7: the AC-3, E-AC-3 and DTS codec timings, the s16 conversion's instruction counts against `f3d4935b`, equivalence and the `aac-lc-stereo` profiles | `ddb02a59a7ac8bf1974c14439194430e2b245504` | `52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977` |
 | Linux AArch64: the container, playback, MPEG-TS, HLS and closed caption rows, checked again with the code-size change | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29` |
-| Linux AArch64: ISO BMFF and packet framing with the code-size change | `4dbbd545d2d452220cd0e35ff11807f6c2fd2703` | `da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f` |
+| Linux AArch64: the memory of `tags-binary`, `track-disabled` and `fate-witch-realtime`, collected again with the code-size change | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192` |
+| Linux AArch64: ISO BMFF with the code-size change | `4dbbd545d2d452220cd0e35ff11807f6c2fd2703` | `da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f` |
 | ARMv7: the Matroska, startup and seek, HLS, ISO BMFF, packet framing, audio clock, MPEG-TS, playback and closed caption rows of the ARMv7 table, the third collection of `charset-cp950-nomapping-a240` and `long-movie-mkv` | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda` |
 | ARMv7: every other row of the ARMv7 table and the earlier bounds of the rows above, the video codec timings | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
 | Earlier ARMv7, before the page-cache eviction: the container, playback, ASS rendering and capture rows; the A32 and NEON codec comparisons | `22ed8232b28a285f1439772b91713df3aa64ea91` | `abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e` |
