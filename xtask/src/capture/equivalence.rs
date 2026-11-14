@@ -110,7 +110,11 @@ pub fn run(
     compare: Option<&Path>,
     threads: usize,
 ) -> Result<i32, String> {
-    cargo_build(root, &["--bin", "capture-worker"], false)?;
+    cargo_build(
+        root,
+        &["-p", "capture-worker", "--bin", "capture-worker"],
+        false,
+    )?;
     let worker = python::path(
         &root
             .join(crate::harness::gate_build::release_dir()?)
