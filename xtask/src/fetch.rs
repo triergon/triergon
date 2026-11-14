@@ -419,32 +419,28 @@ pub fn vectors(root: &Path, net: &dyn Transport, limit: usize) -> Result<Vec<Str
     Ok(verified)
 }
 
+/// A vector `fetch-vectors` fetches with its pin: the repository-relative
+/// directory it goes to, its file there and its SHA-256.
+pub struct Pin {
+    pub directory: String,
+    pub file: String,
+    pub sha256: String,
+}
+
+/// Every vector `fetch-vectors` fetches, without fetching any.
+pub fn pins(root: &Path) -> Result<Vec<Pin>, String> {
+    let mut pins = required_pins(root)?;
+    pins.extend(fate_corpus_pins(root)?);
+    Ok(pins)
+}
+
 fn required_vectors(
     root: &Path,
     net: &dyn Transport,
     cache: Option<&Path>,
     limit: usize,
 ) -> Result<Vec<String>, String> {
-    let directory = root.join(".research/fate-samples");
-    let contract = crate::checks::read_json(&root.join(VECTOR_CONTRACT))?;
-    let mut verified = Vec::new();
-    for vector in contract
-        .get("required_additional_vectors")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
-        let relative = vector
-            .get("file")
-            .and_then(Value::as_str)
-            .ok_or("required vector without a file")?;
-        let expected = vector
-            .get("sha256")
-            .and_then(Value::as_str)
-            .ok_or("required vector without a hash")?;
-        fetch_vector(&directory, relative, expected, net, cache, limit)?;
-        verified.push(relative.to_owned());
-    }
-    Ok(verified)
+    fetch_pins(root, required_pins(root)?, net, cache, limit)
 }
 
 /// Fetch the FATE cases of registered corpora that request them.
@@ -454,7 +450,60 @@ fn fate_corpus_vectors(
     cache: Option<&Path>,
     limit: usize,
 ) -> Result<Vec<String>, String> {
+    fetch_pins(root, fate_corpus_pins(root)?, net, cache, limit)
+}
+
+fn fetch_pins(
+    root: &Path,
+    pins: Vec<Pin>,
+    net: &dyn Transport,
+    cache: Option<&Path>,
+    limit: usize,
+) -> Result<Vec<String>, String> {
     let mut verified = Vec::new();
+    for pin in pins {
+        fetch_vector(
+            &root.join(&pin.directory),
+            &pin.file,
+            &pin.sha256,
+            net,
+            cache,
+            limit,
+        )?;
+        verified.push(pin.file);
+    }
+    Ok(verified)
+}
+
+/// The mandatory external vectors, in the sample cache.
+fn required_pins(root: &Path) -> Result<Vec<Pin>, String> {
+    let contract = crate::checks::read_json(&root.join(VECTOR_CONTRACT))?;
+    let mut pins = Vec::new();
+    for vector in contract
+        .get("required_additional_vectors")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let file = vector
+            .get("file")
+            .and_then(Value::as_str)
+            .ok_or("required vector without a file")?;
+        let sha256 = vector
+            .get("sha256")
+            .and_then(Value::as_str)
+            .ok_or("required vector without a hash")?;
+        pins.push(Pin {
+            directory: ".research/fate-samples".into(),
+            file: file.to_owned(),
+            sha256: sha256.to_owned(),
+        });
+    }
+    Ok(pins)
+}
+
+/// The FATE cases of registered corpora that request them, once each.
+fn fate_corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
+    let mut all = Vec::new();
     for contract in crate::harness::features::discover(root)? {
         if contract.document.get("fetch_fate_cases") != Some(&Value::Bool(true)) {
             continue;
@@ -498,13 +547,13 @@ fn fate_corpus_vectors(
                 ));
             }
         }
-        let directory = root.join(directory);
-        for (relative, expected) in pins {
-            fetch_vector(&directory, relative, expected, net, cache, limit)?;
-            verified.push(relative.to_owned());
-        }
+        all.extend(pins.into_iter().map(|(file, sha256)| Pin {
+            directory: directory.to_owned(),
+            file: file.to_owned(),
+            sha256: sha256.to_owned(),
+        }));
     }
-    Ok(verified)
+    Ok(all)
 }
 
 fn relative_path(path: &str) -> bool {
