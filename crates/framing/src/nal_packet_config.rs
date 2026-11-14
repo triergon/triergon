@@ -1,5 +1,7 @@
 //! Bounded initialization-extradata view of the same pinned packet receiver.
-use crate::nal_packet::{NalConfigurationRefusal, copy_annex_b_piece};
+use crate::nal_packet::{
+    NalConfigurationRefusal, copy_annex_b_piece, freeze_annex_b_output, reserve_annex_b_output,
+};
 use crate::{AvcConfigArrayKind, BuildStep, NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -199,21 +201,13 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let minimum = self
-                        .total
-                        .checked_add(Bytes::owner_overhead_bytes())
-                        .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
-                        .ok_or(Error::Overflow)?;
-                    if minimum > self.pool_limit {
-                        return Err(Error::Limit {
-                            requested: minimum,
-                            maximum: self.pool_limit,
-                        });
-                    }
-                    self.output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing config output"))?
-                        .try_reserve_exact(self.total)?;
+                    reserve_annex_b_output(
+                        self.output
+                            .as_mut()
+                            .ok_or(Error::Invalid("missing config output"))?,
+                        self.total,
+                        self.pool_limit,
+                    )?;
                     self.phase = 3;
                 }
                 3 => {
@@ -254,17 +248,7 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let b = self
-                        .output
-                        .take()
-                        .ok_or(Error::Invalid("missing config output"))?;
-                    let bytes = match b.freeze() {
-                        Ok(v) => v,
-                        Err(e) => {
-                            self.output = Some(e.buffer);
-                            return Err(e.error);
-                        }
-                    };
+                    let bytes = freeze_annex_b_output(&mut self.output, "missing config output")?;
                     self.phase = 5;
                     return Ok(BuildStep::Ready(NalPacketConfigOutput {
                         bytes,

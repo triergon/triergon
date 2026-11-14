@@ -33,6 +33,42 @@ pub(crate) fn copy_annex_b_piece(
     Ok(true)
 }
 
+/// Reserve the payload while leaving room for the charged result header.
+#[inline(never)]
+pub(crate) fn reserve_annex_b_output(
+    output: &mut BudgetVec<u8>,
+    bytes: usize,
+    pool_limit: usize,
+) -> Result<()> {
+    let minimum = bytes
+        .checked_add(Bytes::owner_overhead_bytes())
+        .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
+        .ok_or(Error::Overflow)?;
+    if minimum > pool_limit {
+        return Err(Error::Limit {
+            requested: minimum,
+            maximum: pool_limit,
+        });
+    }
+    output.try_reserve_exact(bytes)
+}
+
+/// Retain the charged bytes for retry if publishing the result fails.
+#[inline(never)]
+pub(crate) fn freeze_annex_b_output(
+    output: &mut Option<BudgetVec<u8>>,
+    absent: &'static str,
+) -> Result<Bytes> {
+    let buffer = output.take().ok_or(Error::Invalid(absent))?;
+    match buffer.freeze() {
+        Ok(bytes) => Ok(bytes),
+        Err(error) => {
+            *output = Some(error.buffer);
+            Err(error.error)
+        }
+    }
+}
+
 /// Literal caller fields. A numeric value here is not a known-source-clock proof.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NalPacketFields {

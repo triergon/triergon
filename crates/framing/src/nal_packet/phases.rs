@@ -4,7 +4,8 @@
 use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacketJob, NalPacketOutput,
     NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase,
-    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_piece, packet_pool,
+    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_piece,
+    freeze_annex_b_output, packet_pool, reserve_annex_b_output,
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
@@ -723,21 +724,12 @@ impl PacketEmission {
             self.phase = EmissionPhase::Freeze;
             return Ok(NEXT);
         }
-        let minimum = state
-            .total
-            .checked_add(Bytes::owner_overhead_bytes())
-            .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
-            .ok_or(Error::Overflow)?;
         let pool = packet_pool(state.source.as_ref())?;
-        if minimum > pool.limit() {
-            return Err(Error::Limit {
-                requested: minimum,
-                maximum: pool.limit(),
-            });
-        }
-        self.output
-            .get_or_insert_with(|| BudgetVec::new(pool))
-            .try_reserve_exact(state.total)?;
+        reserve_annex_b_output(
+            self.output.get_or_insert_with(|| BudgetVec::new(pool)),
+            state.total,
+            pool.limit(),
+        )?;
         self.phase = EmissionPhase::Copy;
         Ok(NEXT)
     }
@@ -834,17 +826,7 @@ impl PacketEmission {
                 .bytes
                 .clone()
         } else {
-            let b = self
-                .output
-                .take()
-                .ok_or(Error::Invalid("missing packet buffer"))?;
-            match b.freeze() {
-                Ok(v) => v,
-                Err(e) => {
-                    self.output = Some(e.buffer);
-                    return Err(e.error);
-                }
-            }
+            freeze_annex_b_output(&mut self.output, "missing packet buffer")?
         };
         let record = state.config();
         let configuration = record.bytes().clone();
