@@ -872,7 +872,7 @@ fn a_large_hint_does_not_preempt_logical_segment_or_output_refusal() {
 }
 
 #[test]
-fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capacity() {
+fn avc_parameter_set_counts_preserve_tight_budget_admission() {
     fn record(count: u8) -> Vec<u8> {
         let mut raw = vec![1, 66, 0, 40, 255, 0xe0 | count];
         for index in 0..count {
@@ -909,16 +909,16 @@ fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capaci
         };
         let output_storage = Bytes::owner_overhead_bytes() + output_bytes;
         let spare = match count {
-            2 => 120,            // The hint fits, but the three-entry output stays inline.
+            2 => 120,            // The three-entry output stays inline.
             5 => output_storage, // Six actual entries stay inline.
-            _ => 13 * size_of::<NalPacketSegment>() + output_storage,
+            _ => (usize::from(count) + 1) * size_of::<NalPacketSegment>() + output_storage,
         };
         for quantum in [1, 4096] {
             let p = Budget::new(base + spare).unwrap();
             let (mut s, source) = setup(&p, &raw);
             assert_eq!(p.available(), spare);
             let out = run(&mut s, source, None, quantum)
-                .expect("an AVC upper hint must not starve an otherwise admitted output");
+                .expect("the selected AVC parameter sets and output fit the pool");
             assert_eq!(out.segments().len(), usize::from(count) + 1);
             assert_eq!(out.bytes().len(), output_bytes);
             let mut expected = Vec::new();
@@ -950,6 +950,53 @@ fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capaci
         }
     }
 }
+#[test]
+fn avc_spill_leaves_room_for_output_when_only_sps_is_inserted() {
+    let aud = [0x09, 0xf0];
+    let sps = [0x67, 0x80];
+    let pps = [0x68, 0x80];
+    let mut raw = vec![1, 66, 0, 40, 255, 0xe1, 0, 2];
+    raw.extend(sps);
+    raw.push(9);
+    for _ in 0..9 {
+        raw.extend([0, 2]);
+        raw.extend(pps);
+    }
+    let setup = |pool: &Budget| {
+        let session = NalPacketSession::new(
+            pool,
+            NalPacketConfiguration::Avc(avc_from_record(pool, &raw)),
+            limits(),
+        )
+        .unwrap();
+        (session, packet(pool, &[&aud, &aud, &aud, &aud, &aud, &pps]))
+    };
+    let mut expected = framed(4, &aud);
+    for _ in 1..5 {
+        expected.extend(framed(3, &aud));
+    }
+    expected.extend(framed(4, &sps));
+    expected.extend(framed(4, &pps));
+    let base = {
+        let p = pool();
+        let _inputs = setup(&p);
+        p.used()
+    };
+    // Reserving for all ten configuration NALs fits by itself but leaves less
+    // than the output payload. Seven real segments and the output fit together.
+    let spare = 16 * size_of::<NalPacketSegment>() + expected.len() - 1;
+    for quantum in [1, 4096] {
+        let p = Budget::new(base + spare).unwrap();
+        let (mut session, source) = setup(&p);
+        let output = run(&mut session, source, None, quantum).unwrap();
+        assert_eq!(output.bytes().as_ref(), expected);
+        assert_eq!(output.segments().len(), 7);
+        drop(session);
+        drop(output);
+        assert_eq!(p.used(), Budget::control_storage_bytes());
+    }
+}
+
 #[test]
 fn hevc_exact_counts_keep_in_band_duplicates_and_ignore_empty_admitted_arrays() {
     let mut raw = hvcc();

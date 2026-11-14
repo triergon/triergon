@@ -2,9 +2,9 @@
 //! [`NalPacketJob::advance_into`]. Each method is one step of the original
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
-    AvcState, EmissionPhase, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
-    NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase, PacketPlan,
-    PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_piece, packet_pool,
+    AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacketJob, NalPacketOutput,
+    NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase,
+    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_piece, packet_pool,
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
@@ -455,15 +455,19 @@ impl PacketPlan {
             self.segment_hint = Some(self.look_nals + injected);
         } else if codec == Codec::Avc
             && end == source.bytes.len()
-            && inject.is_some()
+            && let Some(which) = inject
             && !matches!(state.segments, PacketSegmentStorage::Heap(_))
+            && let ConfigurationRef::Avc(config) = state.config()
         {
-            // The final source NAL and its inserted configuration may cross
-            // the inline boundary together. Size the first allocation for
-            // both. The count bounds an AVC injection that selects only SPS,
-            // PPS or non-extension NALs.
-            let preceding = state.segments.len();
-            self.segment_hint = Some(preceding + 1 + state.config().config_nal_count());
+            // Count only the parameter sets this NAL selects. Unused entries
+            // would leave less of the pool available for the output payload.
+            let (sps, pps) = config.base_parameter_set_counts();
+            let inserted = match which {
+                Injection::Sps => sps,
+                Injection::Pps => pps,
+                Injection::All => sps + pps,
+            };
+            self.segment_hint = Some(state.segments.len() + 1 + inserted);
         }
         if let Some(i) = inject {
             self.injection = Some((i, 0));

@@ -733,6 +733,12 @@ impl AvcConfiguration {
         let last = &self.arrays[self.array_count() - 1];
         usize::from(last.first_nal) + usize::from(last.nal_count)
     }
+    pub(crate) fn base_parameter_set_counts(&self) -> (usize, usize) {
+        (
+            usize::from(self.arrays[0].nal_count),
+            usize::from(self.arrays[1].nal_count),
+        )
+    }
     pub(crate) fn annex_b_configuration_len(&self) -> usize {
         let picture = &self.arrays[1];
         let count = picture.nal_indices().end;
