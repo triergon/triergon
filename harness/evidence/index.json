@@ -20433,6 +20433,62 @@
     "candidate": "218065d60fb7520fc5e636c8451b46a4d6bda61f",
     "baseline": "2886a3fd7b84392b75a98369e8426e0dd6f9edda"
    }
+  },
+  {
+   "name": "mp4-leading-avc-edit-f16392a9-aarch64",
+   "path": "mp4-leading-avc-edit-f16392a9-aarch64",
+   "retention": "retained",
+   "reason": "Forward and range playback with a leading empty AVC edit. All 47 forward and 53 range cases passed on AArch64 with 30 timing pairs and 30 kernel-bound memory pairs.",
+   "key": "evidence/mp4-leading-avc-edit-f16392a9-aarch64/f62922f9609fda3ae29dd1d3053a9e2917e5d5a94333a4caa3e0db29c993365c.tar.zst",
+   "sha256": "f62922f9609fda3ae29dd1d3053a9e2917e5d5a94333a4caa3e0db29c993365c",
+   "bytes": 20699351,
+   "results": [
+    {
+     "path": "results/mp4-forward/grade/gate-result.json",
+     "command": "grade",
+     "key": "fd96e641bc7045c313444e7a219808ed6a24f303ef40288abe8069252a758463",
+     "status": 0,
+     "report_sha256": "954d1b18829ee2737e437c0d6dbc39c4bf824e597158adee8f9530faee2f4d5b"
+    },
+    {
+     "path": "results/mp4-forward/memory/gate-result.json",
+     "command": "report --memory",
+     "key": "68c4b2a4fb3910cfd56cad73c3ca3ef2aaa9da25640e6866d24610c97f46f8fe",
+     "status": 0,
+     "report_sha256": "ed70e35015d98f4d12c58175e66998901edd749013d1cffd5e3e8a85bf543bb6"
+    },
+    {
+     "path": "results/mp4-forward/timing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "1b49152f1e9f655d11d9c2c8426191898882fcff71f682b553fe5b5352ff7036",
+     "status": 0,
+     "report_sha256": "f75f1d44e77b54c6d8dcba4c8aeea53f668f3708014dfb1617ac4e0e425188b1"
+    },
+    {
+     "path": "results/mp4-range/grade/gate-result.json",
+     "command": "grade",
+     "key": "b1db4768a112a99291fb29ba085b5c0518c89fe45e50edeb8904e1d2c35bd432",
+     "status": 0,
+     "report_sha256": "1308a9befc6184ce7b629ef02a46233a61e437c59669c0085048df423a5fdc35"
+    },
+    {
+     "path": "results/mp4-range/memory/gate-result.json",
+     "command": "report --memory",
+     "key": "57596e847a3e18d91a72a3db7b88aad0e146b67350e77d50f97118fcb6485f81",
+     "status": 0,
+     "report_sha256": "002d57fbe3383d6257e6b6139db02161fcce7a05ffae59f89d90bc668b2832bc"
+    },
+    {
+     "path": "results/mp4-range/timing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "0175d3a2c82fe81665df511377ca481cd2ae7670fd47002ae671063c9848ae71",
+     "status": 0,
+     "report_sha256": "90d3d634f67a22230b53340d7e786a9458b37724d861ca0fcd2300fc428b9df6"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "f16392a95cd03c7ef2b90445baa994e637ca3ead"
+   }
   }
  ]
 }
