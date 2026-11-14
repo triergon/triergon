@@ -9,23 +9,33 @@ use triergon_bitstream::{BitError, BitSource, Rbsp};
 use triergon_core::{Budget, BudgetVec, Result};
 use triergon_framing::{Codec as Coding, picture_output::HevcLimits, skip_hevc_profile_tier_level};
 
+/// The largest `sps_max_dec_pic_buffering_minus1` the reference takes, after
+/// raising it to `sps_max_num_reorder_pics`; an SPS above it is not taken
+/// (case `hevc-dpb-ts`, probe p17).
+const MOST_DEC_PIC_BUFFERING_MINUS1: u32 = 15;
+
 /// The fields of a sequence parameter set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Sps {
+pub(crate) struct SpsFields {
     pub separate_colour_plane: bool,
     pub log2_max_lsb: u32,
     /// The highest sub-layer's buffering values.
     pub limits: HevcLimits,
-    /// The short-term reference picture sets: `sets` entries of the table's
-    /// set pool from `sets_start`.
-    pub sets_start: usize,
-    pub sets: usize,
-    /// `long_term_ref_pics_present_flag` and the SPS's long-term order count
-    /// LSBs (`lt_count` entries of the LSB pool from `lt_start`).
+    /// Its `sps_max_dec_pic_buffering_minus1 + 1`.
+    pub max_dec_pic_buffering: u32,
+    /// `long_term_ref_pics_present_flag`.
     pub long_term: bool,
-    pub lt_start: usize,
-    pub lt_count: usize,
     pub timing: Option<Timing>,
+}
+
+/// A sequence parameter set with its short-term reference picture sets and
+/// long-term order count LSBs.
+#[derive(Debug)]
+pub(crate) struct Sps {
+    pub fields: SpsFields,
+    sets: BudgetVec<StSet>,
+    deltas: BudgetVec<i32>,
+    lt_lsbs: BudgetVec<u32>,
 }
 
 /// The delta order counts of one short-term reference picture set as read:
@@ -73,7 +83,7 @@ fn push_deltas(
 }
 
 /// One short-term reference picture set: `negative` then `positive` deltas of
-/// the delta pool from `start`.
+/// its SPS's deltas from `start`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct StSet {
     start: usize,
@@ -112,24 +122,14 @@ pub(crate) struct Slice {
     pub poc_lsb: u32,
 }
 
-/// The parameter sets received, by id, and their pooled lists.
+/// The parameter sets received, by id.
 #[derive(Debug)]
 pub(crate) struct Tables {
+    pool: Budget,
     sps: BudgetVec<Option<Sps>>,
     pps: BudgetVec<Option<Pps>>,
     last_sps: LastPayload,
     last_pps: LastPayload,
-    sets: BudgetVec<StSet>,
-    deltas: BudgetVec<i32>,
-    lt_lsbs: BudgetVec<u32>,
-}
-
-/// The pool lengths, to return to.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Mark {
-    sets: usize,
-    deltas: usize,
-    lt_lsbs: usize,
 }
 
 const SPS_IDS: usize = 16;
@@ -158,13 +158,11 @@ impl From<triergon_core::Error> for Failure {
 impl Tables {
     pub(crate) fn new(pool: &Budget) -> Self {
         Self {
+            pool: pool.clone(),
             sps: BudgetVec::new(pool),
             pps: BudgetVec::new(pool),
             last_sps: LastPayload::new(pool),
             last_pps: LastPayload::new(pool),
-            sets: BudgetVec::new(pool),
-            deltas: BudgetVec::new(pool),
-            lt_lsbs: BudgetVec::new(pool),
         }
     }
 
@@ -172,73 +170,24 @@ impl Tables {
         self.sps.get(usize::from(id))?.as_ref()
     }
 
-    pub(crate) fn mark(&self) -> Mark {
-        Mark {
-            sets: self.sets.len(),
-            deltas: self.deltas.len(),
-            lt_lsbs: self.lt_lsbs.len(),
-        }
-    }
-
-    pub(crate) fn rollback(&mut self, mark: Mark) {
-        self.sets.truncate(mark.sets);
-        self.deltas.truncate(mark.deltas);
-        self.lt_lsbs.truncate(mark.lt_lsbs);
-    }
-
     /// Reads an SPS NAL unit payload (after the two header bytes) and stores
-    /// it, returning its id and the set it replaces. An SPS cut short or out
-    /// of range is ignored.
+    /// it, returning its id and the set it replaces; a repeated set changes
+    /// nothing. An SPS cut short, out of range or not taken by the reference
+    /// is ignored.
     pub(crate) fn put_sps(&mut self, payload: &[u8]) -> Result<Option<(u8, Option<Sps>)>> {
         if self.sps.is_empty() {
-            self.sps.try_resize(SPS_IDS, None)?;
+            self.sps.try_extend_with(SPS_IDS, |_| None)?;
         }
         if self.last_sps.repeats(payload) {
             return Ok(None);
         }
         self.last_sps.remember(payload)?;
-        let mark = self.mark();
         let mut bits = Rbsp::lenient(payload);
         match self.read_sps(&mut bits) {
-            Ok((id, sps)) => {
-                let slot = usize::from(id);
-                if let Some(old) = self.sps[slot]
-                    && self.same(&old, &sps)
-                {
-                    self.rollback(mark);
-                    return Ok(None);
-                }
-                Ok(Some((id, self.sps[slot].replace(sps))))
-            }
-            Err(failure) => {
-                self.rollback(mark);
-                match failure {
-                    Failure::Memory(error) => Err(error),
-                    Failure::Invalid => Ok(None),
-                }
-            }
+            Ok((id, sps)) => Ok(Some((id, self.sps[usize::from(id)].replace(sps)))),
+            Err(Failure::Memory(error)) => Err(error),
+            Err(Failure::Invalid) => Ok(None),
         }
-    }
-
-    /// Whether two sets read alike, their pooled lists compared by value.
-    fn same(&self, a: &Sps, b: &Sps) -> bool {
-        let unpooled = |sps: &Sps| Sps {
-            sets_start: 0,
-            lt_start: 0,
-            ..*sps
-        };
-        let sets = |sps: &Sps| &self.sets[sps.sets_start..sps.sets_start + sps.sets];
-        let deltas = |sps: &Sps| {
-            sets(sps)
-                .iter()
-                .flat_map(|set| &self.deltas[set.start..set.start + set.negative + set.positive])
-        };
-        let shape = |sps: &Sps| sets(sps).iter().map(|set| (set.negative, set.positive));
-        unpooled(a) == unpooled(b)
-            && shape(a).eq(shape(b))
-            && deltas(a).eq(deltas(b))
-            && self.lt_lsbs[a.lt_start..a.lt_start + a.lt_count]
-                == self.lt_lsbs[b.lt_start..b.lt_start + b.lt_count]
     }
 
     pub(crate) fn put_pps(&mut self, payload: &[u8]) -> Result<Option<(u8, Option<Pps>)>> {
@@ -303,7 +252,7 @@ impl Tables {
         }
     }
 
-    fn read_sps(&mut self, bits: &mut Bits<'_>) -> std::result::Result<(u8, Sps), Failure> {
+    fn read_sps(&self, bits: &mut Bits<'_>) -> std::result::Result<(u8, Sps), Failure> {
         bits.read(4)?; // sps_video_parameter_set_id
         let sub_layers = bits.read(3)?; // sps_max_sub_layers_minus1
         if sub_layers > 6 {
@@ -326,19 +275,27 @@ impl Tables {
         }
         bits.ue()?; // bit_depth_luma_minus8
         bits.ue()?; // bit_depth_chroma_minus8
-        // log2_max_pic_order_cnt_lsb, summed in 32 bits and limited to 16 as
-        // FFmpeg's decoder does.
+        // log2_max_pic_order_cnt_lsb plus 4, summed in 32 bits; above 16 the
+        // reference refuses the set.
         let log2_max_lsb = bits.ue()?.wrapping_add(4);
         if log2_max_lsb > 16 {
             return Err(Failure::Invalid);
         }
         let all_layers = bits.flag()?;
         let mut limits = HevcLimits::from_sps(0, 0, 0);
+        let mut max_dec_pic_buffering = 1;
         for _ in (if all_layers { 0 } else { sub_layers })..=sub_layers {
             let dpb = bits.ue()?;
             let reorder = bits.ue()?;
             let latency = bits.ue()?;
+            // The reference raises the buffer to the reorder count (case
+            // `hevc-dpb-ts`, probe p17) and refuses one above 16 pictures.
+            let dpb = dpb.max(reorder);
+            if dpb > MOST_DEC_PIC_BUFFERING_MINUS1 {
+                return Err(Failure::Invalid);
+            }
             limits = HevcLimits::from_sps(dpb, reorder, latency);
+            max_dec_pic_buffering = dpb + 1;
         }
         for _ in 0..6 {
             bits.ue()?; // block sizes and transform hierarchy depths
@@ -357,33 +314,33 @@ impl Tables {
         if sets > 64 {
             return Err(Failure::Invalid);
         }
-        let sets_start = self.sets.len();
-        self.sets.try_reserve(sets)?;
+        let mut set_list = BudgetVec::new(&self.pool);
+        let mut deltas = BudgetVec::new(&self.pool);
+        set_list.try_reserve(sets)?;
         for index in 0..sets {
-            let deltas = self.st_set(bits, sets_start, index, sets)?;
-            let start = self.deltas.len();
-            self.deltas.try_extend_from_slice(deltas.as_slice())?;
-            self.sets
+            let set = st_set(bits, &set_list, &deltas, index, sets)?;
+            let start = deltas.len();
+            deltas.try_extend_from_slice(set.as_slice())?;
+            set_list
                 .try_push(StSet {
                     start,
-                    negative: deltas.negative,
-                    positive: deltas.len - deltas.negative,
+                    negative: set.negative,
+                    positive: set.len - set.negative,
                 })
                 .map_err(|rejected| Failure::Memory(rejected.error))?;
         }
         let long_term = bits.flag()?;
-        let lt_start = self.lt_lsbs.len();
-        let mut lt_count = 0;
+        let mut lt_lsbs = BudgetVec::new(&self.pool);
         if long_term {
-            lt_count = bits.ue()? as usize;
-            if lt_count > 32 {
+            let count = bits.ue()? as usize;
+            if count > 32 {
                 return Err(Failure::Invalid);
             }
-            self.lt_lsbs.try_reserve(lt_count)?;
-            for _ in 0..lt_count {
+            lt_lsbs.try_reserve(count)?;
+            for _ in 0..count {
                 let lsb = bits.read(log2_max_lsb)?;
                 bits.flag()?; // used_by_curr_pic_lt_sps_flag
-                self.lt_lsbs
+                lt_lsbs
                     .try_push(lsb)
                     .map_err(|rejected| Failure::Memory(rejected.error))?;
             }
@@ -397,104 +354,19 @@ impl Tables {
         Ok((
             id as u8,
             Sps {
-                separate_colour_plane,
-                log2_max_lsb,
-                limits,
-                sets_start,
-                sets,
-                long_term,
-                lt_start,
-                lt_count,
-                timing,
+                fields: SpsFields {
+                    separate_colour_plane,
+                    log2_max_lsb,
+                    limits,
+                    max_dec_pic_buffering,
+                    long_term,
+                    timing,
+                },
+                sets: set_list,
+                deltas,
+                lt_lsbs,
             },
         ))
-    }
-
-    /// st_ref_pic_set( index ) (7.3.7) as its delta order counts (7.4.8),
-    /// in an SPS whose sets start at `sets_start` (`index < sets`) or in a
-    /// slice header (`index == sets`).
-    fn st_set(
-        &self,
-        bits: &mut Bits<'_>,
-        sets_start: usize,
-        index: usize,
-        sets: usize,
-    ) -> std::result::Result<Deltas, Failure> {
-        let mut out = Deltas::default();
-        if index != 0 && bits.flag()? {
-            // inter_ref_pic_set_prediction_flag
-            let delta_idx = if index == sets {
-                bits.ue()? as usize + 1
-            } else {
-                1
-            };
-            let sign = bits.flag()?;
-            let abs = i64::from(bits.ue()?) + 1;
-            let delta_rps = if sign { -abs } else { abs };
-            let reference = *index
-                .checked_sub(delta_idx)
-                .and_then(|r| self.sets.get(sets_start + r))
-                .ok_or(Failure::Invalid)?;
-            let count = reference.negative + reference.positive;
-            // use_delta_flag of each reference delta and of deltaRps itself.
-            let mut used = [false; 33];
-            for flag in &mut used[..=count] {
-                *flag = bits.flag()? || bits.flag()?;
-            }
-            let delta = |at: usize| i64::from(self.deltas[reference.start + at]);
-            // 7-61: S0 from the reference's positive deltas (last first),
-            // deltaRps, then its negative deltas.
-            for j in (0..reference.positive).rev() {
-                let d = delta(reference.negative + j) + delta_rps;
-                if d < 0 && used[reference.negative + j] {
-                    out.push_negative(d);
-                }
-            }
-            if delta_rps < 0 && used[count] {
-                out.push_negative(delta_rps);
-            }
-            for j in 0..reference.negative {
-                let d = delta(j) + delta_rps;
-                if d < 0 && used[j] {
-                    out.push_negative(d);
-                }
-            }
-            // 7-62: S1 likewise.
-            for j in (0..reference.negative).rev() {
-                let d = delta(j) + delta_rps;
-                if d > 0 && used[j] {
-                    out.push_positive(d);
-                }
-            }
-            if delta_rps > 0 && used[count] {
-                out.push_positive(delta_rps);
-            }
-            for j in 0..reference.positive {
-                let d = delta(reference.negative + j) + delta_rps;
-                if d > 0 && used[reference.negative + j] {
-                    out.push_positive(d);
-                }
-            }
-            return Ok(out);
-        }
-        let negative = bits.ue()?;
-        let positive = bits.ue()?;
-        if negative > 16 || positive > 16 {
-            return Err(Failure::Invalid);
-        }
-        let mut poc = 0i64;
-        for _ in 0..negative {
-            poc -= i64::from(bits.ue()?) + 1;
-            bits.flag()?; // used_by_curr_pic_s0_flag
-            out.push_negative(poc);
-        }
-        poc = 0;
-        for _ in 0..positive {
-            poc += i64::from(bits.ue()?) + 1;
-            bits.flag()?; // used_by_curr_pic_s1_flag
-            out.push_positive(poc);
-        }
-        Ok(out)
     }
 
     fn read_slice(
@@ -515,11 +387,11 @@ impl Tables {
             .get(pps_id as usize)
             .and_then(Option::as_ref)
             .ok_or(Failure::Invalid)?;
-        let sps = *self.sps(pps.sps_id).ok_or(Failure::Invalid)?;
+        let sps = self.sps(pps.sps_id).ok_or(Failure::Invalid)?;
         bits.skip(pps.extra_slice_header_bits)?; // slice_reserved_flag
         bits.ue()?; // slice_type
         let pic_output = !pps.output_flag_present || bits.flag()?;
-        if sps.separate_colour_plane {
+        if sps.fields.separate_colour_plane {
             bits.read(2)?; // colour_plane_id
         }
         let mut slice = Slice {
@@ -533,92 +405,169 @@ impl Tables {
         if matches!(nal_type, 19 | 20) {
             return Ok(Some(slice)); // IDR: no order count LSBs, an empty set
         }
-        slice.poc_lsb = bits.read(sps.log2_max_lsb)?;
+        slice.poc_lsb = bits.read(sps.fields.log2_max_lsb)?;
+        let count = sps.sets.len();
         if bits.flag()? {
             // short_term_ref_pic_set_sps_flag
-            let width = usize::BITS - sps.sets.saturating_sub(1).leading_zeros();
-            let index = if sps.sets > 1 {
+            let width = usize::BITS - count.saturating_sub(1).leading_zeros();
+            let index = if count > 1 {
                 bits.read(width)? as usize
             } else {
                 0
             };
-            let set = *self
-                .sets
-                .get(sps.sets_start + index)
-                .filter(|_| index < sps.sets)
-                .ok_or(Failure::Invalid)?;
+            let set = *sps.sets.get(index).ok_or(Failure::Invalid)?;
             push_deltas(
-                &self.deltas[set.start..set.start + set.negative + set.positive],
+                &sps.deltas[set.start..set.start + set.negative + set.positive],
                 references,
             )?;
         } else {
-            let own = self.st_set(bits, sps.sets_start, sps.sets, sps.sets)?;
+            let own = st_set(bits, &sps.sets, &sps.deltas, count, count)?;
             push_deltas(own.as_slice(), references)?;
         }
-        self.read_long_term(bits, sps, slice, references)?;
+        read_long_term(bits, sps, slice, references)?;
         Ok(Some(slice))
     }
+}
 
-    fn read_long_term(
-        &self,
-        bits: &mut Bits<'_>,
-        sps: Sps,
-        slice: Slice,
-        references: &mut BudgetVec<Reference>,
-    ) -> std::result::Result<(), Failure> {
-        if !sps.long_term {
-            return Ok(());
-        }
-        let from_sps = if sps.lt_count > 0 {
-            bits.ue()? as usize
-        } else {
-            0
-        };
-        let own = bits.ue()? as usize;
-        if from_sps > sps.lt_count || from_sps + own > 32 {
-            return Err(Failure::Invalid);
-        }
-        let max_lsb = 1i64 << sps.log2_max_lsb;
-        let mut cycle = 0i64;
-        references.try_reserve(from_sps + own)?;
-        for i in 0..from_sps + own {
-            let lsb = if i < from_sps {
-                let width = usize::BITS - sps.lt_count.saturating_sub(1).leading_zeros();
-                let index = if sps.lt_count > 1 {
-                    bits.read(width)? as usize
-                } else {
-                    0
-                };
-                *self
-                    .lt_lsbs
-                    .get(sps.lt_start + index)
-                    .filter(|_| index < sps.lt_count)
-                    .ok_or(Failure::Invalid)?
-            } else {
-                let lsb = bits.read(sps.log2_max_lsb)?;
-                bits.flag()?; // used_by_curr_pic_lt_flag
-                lsb
-            };
-            // delta_poc_msb_present_flag and DeltaPocMsbCycleLt (7-52), whose
-            // absent deltas count 0.
-            let present = bits.flag()?;
-            let delta = if present { i64::from(bits.ue()?) } else { 0 };
-            cycle = if i == 0 || i == from_sps {
-                delta
-            } else {
-                cycle + delta
-            };
-            let reference = if present {
-                Reference::LongDelta(-cycle * max_lsb - (i64::from(slice.poc_lsb) - i64::from(lsb)))
-            } else {
-                Reference::Lsb(lsb)
-            };
-            references
-                .try_push(reference)
-                .map_err(|rejected| Failure::Memory(rejected.error))?;
-        }
-        Ok(())
+fn read_long_term(
+    bits: &mut Bits<'_>,
+    sps: &Sps,
+    slice: Slice,
+    references: &mut BudgetVec<Reference>,
+) -> std::result::Result<(), Failure> {
+    if !sps.fields.long_term {
+        return Ok(());
     }
+    let lt_count = sps.lt_lsbs.len();
+    let from_sps = if lt_count > 0 { bits.ue()? as usize } else { 0 };
+    let own = bits.ue()? as usize;
+    let total = from_sps.checked_add(own).ok_or(Failure::Invalid)?;
+    if from_sps > lt_count || total > 32 {
+        return Err(Failure::Invalid);
+    }
+    let max_lsb = 1i64 << sps.fields.log2_max_lsb;
+    let mut cycle = 0i64;
+    references.try_reserve(total)?;
+    for i in 0..total {
+        let lsb = if i < from_sps {
+            let width = usize::BITS - lt_count.saturating_sub(1).leading_zeros();
+            let index = if lt_count > 1 {
+                bits.read(width)? as usize
+            } else {
+                0
+            };
+            *sps.lt_lsbs.get(index).ok_or(Failure::Invalid)?
+        } else {
+            let lsb = bits.read(sps.fields.log2_max_lsb)?;
+            bits.flag()?; // used_by_curr_pic_lt_flag
+            lsb
+        };
+        // delta_poc_msb_present_flag and DeltaPocMsbCycleLt (7-52), whose
+        // absent deltas count 0.
+        let present = bits.flag()?;
+        let delta = if present { i64::from(bits.ue()?) } else { 0 };
+        cycle = if i == 0 || i == from_sps {
+            delta
+        } else {
+            cycle + delta
+        };
+        let reference = if present {
+            Reference::LongDelta(-cycle * max_lsb - (i64::from(slice.poc_lsb) - i64::from(lsb)))
+        } else {
+            Reference::Lsb(lsb)
+        };
+        references
+            .try_push(reference)
+            .map_err(|rejected| Failure::Memory(rejected.error))?;
+    }
+    Ok(())
+}
+
+/// st_ref_pic_set( index ) (7.3.7) as its delta order counts (7.4.8),
+/// in an SPS of `count` sets whose earlier sets are `sets` (`index < count`)
+/// or in a slice header (`index == count`).
+fn st_set(
+    bits: &mut Bits<'_>,
+    sets: &[StSet],
+    deltas: &[i32],
+    index: usize,
+    count: usize,
+) -> std::result::Result<Deltas, Failure> {
+    let mut out = Deltas::default();
+    if index != 0 && bits.flag()? {
+        // inter_ref_pic_set_prediction_flag
+        let delta_idx = if index == count {
+            bits.ue()? as usize + 1
+        } else {
+            1
+        };
+        let sign = bits.flag()?;
+        let abs = i64::from(bits.ue()?) + 1;
+        let delta_rps = if sign { -abs } else { abs };
+        let reference = *index
+            .checked_sub(delta_idx)
+            .and_then(|r| sets.get(r))
+            .ok_or(Failure::Invalid)?;
+        let len = reference.negative + reference.positive;
+        // use_delta_flag of each reference delta and of deltaRps itself.
+        let mut used = [false; 33];
+        for flag in &mut used[..=len] {
+            *flag = bits.flag()? || bits.flag()?;
+        }
+        let delta = |at: usize| i64::from(deltas[reference.start + at]);
+        // 7-61: S0 from the reference's positive deltas (last first),
+        // deltaRps, then its negative deltas.
+        for j in (0..reference.positive).rev() {
+            let d = delta(reference.negative + j) + delta_rps;
+            if d < 0 && used[reference.negative + j] {
+                out.push_negative(d);
+            }
+        }
+        if delta_rps < 0 && used[len] {
+            out.push_negative(delta_rps);
+        }
+        for j in 0..reference.negative {
+            let d = delta(j) + delta_rps;
+            if d < 0 && used[j] {
+                out.push_negative(d);
+            }
+        }
+        // 7-62: S1 likewise.
+        for j in (0..reference.negative).rev() {
+            let d = delta(j) + delta_rps;
+            if d > 0 && used[j] {
+                out.push_positive(d);
+            }
+        }
+        if delta_rps > 0 && used[len] {
+            out.push_positive(delta_rps);
+        }
+        for j in 0..reference.positive {
+            let d = delta(reference.negative + j) + delta_rps;
+            if d > 0 && used[reference.negative + j] {
+                out.push_positive(d);
+            }
+        }
+        return Ok(out);
+    }
+    let negative = bits.ue()?;
+    let positive = bits.ue()?;
+    if negative > 16 || positive > 16 {
+        return Err(Failure::Invalid);
+    }
+    let mut poc = 0i64;
+    for _ in 0..negative {
+        poc -= i64::from(bits.ue()?) + 1;
+        bits.flag()?; // used_by_curr_pic_s0_flag
+        out.push_negative(poc);
+    }
+    poc = 0;
+    for _ in 0..positive {
+        poc += i64::from(bits.ue()?) + 1;
+        bits.flag()?; // used_by_curr_pic_s1_flag
+        out.push_positive(poc);
+    }
+    Ok(out)
 }
 
 fn read_pps(bits: &mut Bits<'_>) -> std::result::Result<(u8, Pps), BitError> {
@@ -669,7 +618,7 @@ mod tests {
         let pool = Budget::new(1 << 20).expect("pool");
         let mut tables = Tables::new(&pool);
         match tables.put_sps(&nal[2..]).expect("memory") {
-            Some((id, _)) => (true, tables.sps(id).and_then(|sps| sps.timing)),
+            Some((id, _)) => (true, tables.sps(id).and_then(|sps| sps.fields.timing)),
             None => (false, None),
         }
     }
@@ -688,7 +637,7 @@ mod tests {
     }
 
     #[test]
-    fn hevc_poc_lsb_lengths_are_limited_to_16_bits_as_ffmpeg_sums_them() {
+    fn hevc_poc_lsb_lengths_above_16_bits_refuse_the_parameter_set() {
         let expected = (
             true,
             Some(Timing {
@@ -699,7 +648,7 @@ mod tests {
         assert_eq!(timing(&hevc_sps(12)), expected);
         assert_eq!(timing(&hevc_sps(13)), (false, None));
         assert_eq!(timing(&hevc_sps(0xffff_fffb)), (false, None));
-        // FFmpeg sums in 32 bits: 0xFFFFFFFE codes two-bit LSBs.
+        // The reference sums in 32 bits: 0xFFFFFFFE codes two-bit LSBs.
         assert_eq!(timing(&hevc_sps(0xffff_fffe)), expected);
     }
 
@@ -709,9 +658,14 @@ mod tests {
         let mut tables = Tables::new(&pool);
         let sps = hevc_sps(4);
         assert!(matches!(tables.put_sps(&sps[2..]), Ok(Some((0, None)))));
-        let pooled = tables.mark();
         assert!(matches!(tables.put_sps(&sps[2..]), Ok(None)));
-        assert_eq!(tables.mark().lt_lsbs, pooled.lt_lsbs);
+        // Another set replaces it, and the first comes back in its place.
+        let other = hevc_sps(5);
+        assert!(matches!(
+            tables.put_sps(&other[2..]),
+            Ok(Some((0, Some(_))))
+        ));
+        assert!(matches!(tables.put_sps(&sps[2..]), Ok(Some((0, Some(_))))));
     }
 
     /// Writes RBSP bits and frames them as a NAL unit.

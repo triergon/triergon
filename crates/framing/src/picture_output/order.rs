@@ -51,22 +51,24 @@ pub enum AfterMmco5 {
     /// frame whose bottom field does not come first).
     #[default]
     Specified,
-    /// FFmpeg's H.264 decoder: its `pic_order_cnt_lsb` as coded.
+    /// Its `pic_order_cnt_lsb` as coded (observed in FFmpeg's H.264 output,
+    /// case `h264-mmco5-ts`).
     CodedLsb,
 }
 
-/// How a gap in `frame_num` (a reference picture's `frame_num` other than
-/// PrevRefFrameNum and its successor, 7.4.3) moves FrameNumOffset for
-/// order count types 1 and 2.
+/// How a gap in `frame_num` (a `frame_num` other than PrevRefFrameNum and its
+/// successor, 7.4.3) reaches the order counts of types 1 and 2.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AfterGap {
-    /// 8.2.5.2: the frames of the gap are inferred, each as the previous
-    /// picture of the next, so FrameNumOffset grows by MaxFrameNum when the
-    /// gap passes `frame_num` 0.
+    /// 8.2.5.2: the caller passes each inferred frame of the gap to
+    /// [`AvcOrder::gap_frame`] before the picture, each the previous picture
+    /// of the next.
     #[default]
     Specified,
-    /// FFmpeg's H.264 decoder: the previous `frame_num` is the one before the
-    /// picture's, and FrameNumOffset is that of the last picture decoded.
+    /// No frame is inferred: the previous `frame_num` is the one before the
+    /// picture's and FrameNumOffset that of the last picture decoded, so a
+    /// gap across `frame_num` 0 does not advance FrameNumOffset (observed in
+    /// FFmpeg's H.264 output, case `h264-gap-ts`).
     OffsetKept,
 }
 
@@ -108,29 +110,74 @@ impl AvcOrder {
         }
     }
 
-    /// The order counts of the next picture in decode order.
+    /// PrevRefFrameNum (7.4.3), once a reference picture has been decoded.
+    #[must_use]
+    pub fn prev_ref_frame_num(&self) -> Option<u32> {
+        self.prev_ref_frame_num
+    }
+
+    /// The `frame_num` values of the frames a gap before a picture with
+    /// `frame_num` infers (8.2.5.2): those after PrevRefFrameNum up to the
+    /// picture's, modulo MaxFrameNum. None after an IDR picture's.
+    pub fn gap(&self, frame_num: u32, log2_max_frame_num: u32) -> impl Iterator<Item = u32> {
+        let max = 1u32 << log2_max_frame_num.min(16);
+        let frame_num = frame_num & (max - 1);
+        let (first, count) = match self.prev_ref_frame_num {
+            Some(prev) if frame_num != prev && frame_num != (prev + 1) % max => {
+                ((prev + 1) % max, (frame_num + max - prev - 1) % max)
+            }
+            _ => (0, 0),
+        };
+        (0..count).map(move |k| (first + k) % max)
+    }
+
+    /// The order counts of an inferred "non-existing" frame of a gap
+    /// (8.2.5.2), a reference frame without memory management operations.
+    /// Type 0 counts leave the state untouched; their value is not used.
+    pub fn gap_frame(
+        &mut self,
+        frame_num: u32,
+        log2_max_frame_num: u32,
+        coding: AvcPocCoding<'_>,
+    ) -> AvcPoc {
+        let saved = (self.prev_msb, self.prev_lsb);
+        let poc = self.next(&AvcPocFields {
+            idr: false,
+            reference: true,
+            frame_num,
+            log2_max_frame_num,
+            field: None,
+            mmco5: false,
+            coding,
+        });
+        if matches!(coding, AvcPocCoding::Lsb { .. }) {
+            (self.prev_msb, self.prev_lsb) = saved;
+        }
+        poc
+    }
+
+    /// The order counts of the next picture in decode order. `frame_num` is
+    /// taken modulo MaxFrameNum.
     pub fn next(&mut self, f: &AvcPocFields<'_>) -> AvcPoc {
         let max_frame_num = 1i64 << f.log2_max_frame_num.min(16);
         let max = max_frame_num as u32;
-        let mut prev = if self.prev_mmco5 {
+        let frame_num = f.frame_num & (max - 1);
+        let prev = if self.prev_mmco5 {
             0
         } else {
             self.prev_frame_num_offset
         };
-        if let Some(prev_ref) = self.prev_ref_frame_num
+        if self.after_gap == AfterGap::OffsetKept
+            && let Some(prev_ref) = self.prev_ref_frame_num
             && !f.idr
-            && f.frame_num != prev_ref
-            && f.frame_num != (prev_ref + 1) % max
+            && frame_num != prev_ref
+            && frame_num != (prev_ref + 1) % max
         {
-            if self.after_gap == AfterGap::Specified && f.frame_num != 0 && f.frame_num <= prev_ref
-            {
-                prev = (i64::from(prev) + max_frame_num) as i32;
-            }
-            self.prev_frame_num = (f.frame_num + max - 1) % max;
+            self.prev_frame_num = (frame_num + max - 1) % max;
         }
         let frame_num_offset = if f.idr {
             0
-        } else if self.prev_frame_num > f.frame_num {
+        } else if self.prev_frame_num > frame_num {
             (i64::from(prev) + max_frame_num) as i32
         } else {
             prev
@@ -185,7 +232,7 @@ impl AvcOrder {
             } => {
                 let cycle = offsets_for_ref_frame.len() as i64;
                 let mut abs = if cycle != 0 {
-                    i64::from(frame_num_offset) + i64::from(f.frame_num)
+                    i64::from(frame_num_offset) + i64::from(frame_num)
                 } else {
                     0
                 };
@@ -230,17 +277,18 @@ impl AvcOrder {
                 let temp = if f.idr {
                     0
                 } else {
-                    let doubled = 2 * (i64::from(frame_num_offset) + i64::from(f.frame_num));
+                    let doubled = 2 * (i64::from(frame_num_offset) + i64::from(frame_num));
                     (if f.reference { doubled } else { doubled - 1 }) as i32
                 };
                 (temp, temp)
             }
         };
         self.prev_frame_num_offset = frame_num_offset;
-        self.prev_frame_num = f.frame_num;
+        // A picture with operation 5 counts as frame_num 0 afterwards (7.4.3).
+        self.prev_frame_num = if f.mmco5 { 0 } else { frame_num };
         self.prev_mmco5 = f.mmco5;
         if f.reference {
-            self.prev_ref_frame_num = Some(if f.mmco5 { 0 } else { f.frame_num });
+            self.prev_ref_frame_num = Some(self.prev_frame_num);
         }
         let poc = Self::pic_order_cnt(top, bottom, f.field);
         AvcPoc {

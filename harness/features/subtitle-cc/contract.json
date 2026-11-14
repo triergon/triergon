@@ -20,6 +20,25 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [],
-  "open_cases": []
+  "pending_module_requirements": [
+    "a stream starting at a non-IDR I picture without a recovery point SEI and without a bitstream restriction: with the start held until the seventh picture, the pictures decoded before the first intra picture leaves are dropped, where the reference keeps the B pictures decoded after the first P picture (probes p6-h264-b2-norec-norestr, p6-h264-pyr-norec-norestr); the recovery rule for this start is not established yet"
+  ],
+  "open_cases": [
+    {
+      "id": "h264-norestr-ts",
+      "requirement": "a stream starting at a non-IDR I picture without a recovery point SEI and without a bitstream restriction: with the start held until the seventh picture, the pictures decoded before the first intra picture leaves are dropped, where the reference keeps the B pictures decoded after the first P picture (probes p6-h264-b2-norec-norestr, p6-h264-pyr-norec-norestr); the recovery rule for this start is not established yet"
+    },
+    {
+      "id": "h264-norestr-ts-realtime",
+      "requirement": "a stream starting at a non-IDR I picture without a recovery point SEI and without a bitstream restriction: with the start held until the seventh picture, the pictures decoded before the first intra picture leaves are dropped, where the reference keeps the B pictures decoded after the first P picture (probes p6-h264-b2-norec-norestr, p6-h264-pyr-norec-norestr); the recovery rule for this start is not established yet"
+    },
+    {
+      "id": "h264-norestr-ts-first",
+      "requirement": "a stream starting at a non-IDR I picture without a recovery point SEI and without a bitstream restriction: with the start held until the seventh picture, the pictures decoded before the first intra picture leaves are dropped, where the reference keeps the B pictures decoded after the first P picture (probes p6-h264-b2-norec-norestr, p6-h264-pyr-norec-norestr); the recovery rule for this start is not established yet"
+    },
+    {
+      "id": "h264-norestr-ts-second",
+      "requirement": "a stream starting at a non-IDR I picture without a recovery point SEI and without a bitstream restriction: with the start held until the seventh picture, the pictures decoded before the first intra picture leaves are dropped, where the reference keeps the B pictures decoded after the first P picture (probes p6-h264-b2-norec-norestr, p6-h264-pyr-norec-norestr); the recovery rule for this start is not established yet"
+    }
+  ]
 }

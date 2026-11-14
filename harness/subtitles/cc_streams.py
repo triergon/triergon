@@ -317,6 +317,529 @@ def reserved_before_slice(au):
     return au
 
 
+# ------------------------------------------------- header rewrites (H.264/HEVC)
+#
+# The crafted picture output cases change header fields an encoder option
+# cannot reach. Each rewrite reads the RBSP bit by bit and writes it back with
+# the fields replaced; slices whose header changes length are CAVLC encodes.
+
+
+def unescape(data):
+    out, zeros = bytearray(), 0
+    for byte in data:
+        if zeros >= 2 and byte == 3:
+            zeros = 0
+            continue
+        out.append(byte)
+        zeros = zeros + 1 if byte == 0 else 0
+    return bytes(out)
+
+
+class BitReader:
+    def __init__(self, rbsp):
+        self.data = rbsp
+        self.pos = 0
+
+    def u(self, n):
+        v = 0
+        for _ in range(n):
+            byte = self.data[self.pos >> 3] if self.pos >> 3 < len(self.data) else 0
+            v = (v << 1) | ((byte >> (7 - (self.pos & 7))) & 1)
+            self.pos += 1
+        return v
+
+    def ue(self):
+        zeros = 0
+        while self.u(1) == 0:
+            zeros += 1
+        return (1 << zeros) - 1 + self.u(zeros)
+
+    def se(self):
+        k = self.ue()
+        return (k + 1) // 2 if k & 1 else -(k // 2)
+
+    def left(self):
+        return len(self.data) * 8 - self.pos
+
+
+class BitWriter:
+    def __init__(self):
+        self.bits = []
+
+    def u(self, v, n):
+        self.bits += [(v >> (n - 1 - i)) & 1 for i in range(n)]
+
+    def ue(self, v):
+        code = v + 1
+        width = code.bit_length()
+        self.u(0, width - 1)
+        self.u(code, width)
+
+    def se(self, v):
+        self.ue(2 * v - 1 if v > 0 else -2 * v)
+
+    def rbsp(self):
+        bits = self.bits + [0] * (-len(self.bits) % 8)
+        return bytes(int("".join(map(str, bits[i:i + 8])), 2) for i in range(0, len(bits), 8))
+
+
+class Copy:
+    """Reads fields, writing them unchanged unless the caller writes others."""
+
+    def __init__(self, nal, header_len):
+        self.head = nal[:header_len]
+        self.src = BitReader(unescape(nal[header_len:]))
+        self.dst = BitWriter()
+
+    def u(self, n):
+        v = self.src.u(n)
+        self.dst.u(v, n)
+        return v
+
+    def ue(self):
+        v = self.src.ue()
+        self.dst.ue(v)
+        return v
+
+    def se(self):
+        v = self.src.se()
+        self.dst.se(v)
+        return v
+
+    def finish(self):
+        while self.src.left() > 0:
+            self.dst.u(self.src.u(1), 1)
+        return self.head + escape(self.dst.rbsp().rstrip(b"\x00"))
+
+
+def map_nals(au, change):
+    """`au` with each NAL unit (from its header) replaced by change(nal)."""
+    out = bytearray()
+    last = 0
+    for begin, end, _ in nal_units(au):
+        unit = au[begin:end]
+        nal = unit[unit.index(b"\x00\x00\x01") + 3:]
+        out += au[last:begin] + b"\x00\x00\x00\x01" + change(nal)
+        last = end
+    return bytes(out + au[last:])
+
+
+HIGH_PROFILES = (100, 110, 122, 244, 44, 83, 86, 118, 128, 138, 139, 134, 135)
+
+
+def avc_sps_fields(b):
+    """Walks an H.264 SPS with `b` (a Copy) up to the VUI; returns the fields
+    slices need."""
+    f = {}
+    profile = b.u(8)
+    b.u(16)
+    b.ue()
+    f["chroma"] = 1
+    if profile in HIGH_PROFILES:
+        f["chroma"] = b.ue()
+        if f["chroma"] == 3:
+            b.u(1)
+        b.ue()
+        b.ue()
+        b.u(1)
+        if b.u(1):
+            for i in range(8 if f["chroma"] != 3 else 12):
+                if b.u(1):
+                    last, nxt = 8, 8
+                    for _ in range(16 if i < 6 else 64):
+                        if nxt:
+                            nxt = (last + b.se() + 256) % 256
+                        last = nxt or last
+    f["fn_bits"] = b.ue() + 4
+    f["poc_type"] = b.ue()
+    if f["poc_type"] == 0:
+        f["lsb_bits"] = b.ue() + 4
+    elif f["poc_type"] == 1:
+        f["always_zero"] = b.u(1)
+        b.se()
+        b.se()
+        for _ in range(b.ue()):
+            b.se()
+    b.ue()
+    b.u(1)
+    b.ue()
+    b.ue()
+    f["frame_mbs_only"] = b.u(1)
+    if not f["frame_mbs_only"]:
+        b.u(1)
+    b.u(1)
+    if b.u(1):
+        for _ in range(4):
+            b.ue()
+    return f
+
+
+def avc_set_restriction(nal, restriction, timing=None):
+    """An H.264 SPS with its VUI bitstream restriction replaced by
+    `restriction` ((max_num_reorder_frames, max_dec_frame_buffering) or None
+    to drop it) and, with `timing`, its timing (num_units_in_tick, time_scale)."""
+    b = Copy(nal, 1)
+    avc_sps_fields(b)
+    assert b.u(1), "an SPS with VUI"
+    if b.u(1) and b.u(8) == 255:
+        b.u(32)
+    if b.u(1):
+        b.u(1)
+    if b.u(1):
+        b.u(4)
+        if b.u(1):
+            b.u(24)
+    if b.u(1):
+        b.ue()
+        b.ue()
+    if b.src.u(1):
+        old = (b.src.u(32), b.src.u(32), b.src.u(1))
+        b.dst.u(1, 1)
+        num, scale = timing or old[:2]
+        b.dst.u(num, 32)
+        b.dst.u(scale, 32)
+        b.dst.u(old[2], 1)
+    else:
+        b.dst.u(0, 1)
+    for _ in range(2):  # no HRD in libx264's VUI
+        assert not b.u(1)
+    b.u(1)  # pic_struct_present_flag
+    old = None
+    if b.src.u(1):
+        old = [b.src.u(1)] + [b.src.ue() for _ in range(6)]
+    if restriction is None:
+        b.dst.u(0, 1)
+    else:
+        b.dst.u(1, 1)
+        fields = old or [1, 2, 1, 16, 16, 0, 0]
+        b.dst.u(fields[0], 1)
+        for v in fields[1:5] + list(restriction):
+            b.dst.ue(v)
+    b.dst.u(1, 1)
+    return b.head + escape(b.dst.rbsp())
+
+
+class AvcSlices:
+    """Rewrites H.264 slice headers: frame_num, the order count LSB width and
+    value, and dec_ref_pic_marking."""
+
+    def __init__(self):
+        self.sps = {}
+        self.pps = {}
+
+    def see(self, nal):
+        kind = nal[0] & 0x1F
+        if kind == 7:
+            r = BitReader(unescape(nal[1:]))
+            r.u(24)
+            self.sps[r.ue()] = avc_sps_fields(Copy(nal, 1))
+        elif kind == 8:
+            r = BitReader(unescape(nal[1:]))
+            pid, sid, _, bottom = r.ue(), r.ue(), r.u(1), r.u(1)
+            assert r.ue() == 0
+            l0, l1 = r.ue() + 1, r.ue() + 1
+            wp, wbi = r.u(1), r.u(2)
+            r.se(), r.se(), r.se(), r.u(1), r.u(1)
+            self.pps[pid] = dict(sps=sid, bottom=bottom, l0=l0, l1=l1, wp=wp, wbi=wbi, redundant=r.u(1))
+
+    def rewrite(self, nal, frame_num=None, marking=None):
+        """frame_num(old) -> new; marking(ops) -> ops for a non-IDR reference
+        slice (ops: (operation, args) pairs) or the IDR's
+        no_output_of_prior_pics_flag as `marking(None)`."""
+        kind = nal[0] & 0x1F
+        ref = nal[0] >> 5
+        b = Copy(nal, 1)
+        b.ue()
+        st = b.ue() % 5
+        p = self.pps[b.ue()]
+        s = self.sps[p["sps"]]
+        fn = b.src.u(s["fn_bits"])
+        b.dst.u(frame_num(fn) if frame_num else fn, s["fn_bits"])
+        field = 0
+        if not s["frame_mbs_only"]:
+            field = b.u(1)
+            if field:
+                b.u(1)
+        if kind == 5:
+            b.ue()
+        if s["poc_type"] == 0:
+            b.u(s["lsb_bits"])
+            if p["bottom"] and not field:
+                b.se()
+        if s["poc_type"] == 1 and not s["always_zero"]:
+            b.se()
+            if p["bottom"] and not field:
+                b.se()
+        if p["redundant"]:
+            b.ue()
+        if st == 1:
+            b.u(1)
+        l0, l1 = p["l0"], p["l1"]
+        if st in (0, 1, 3) and b.u(1):
+            l0 = b.ue() + 1
+            if st == 1:
+                l1 = b.ue() + 1
+        for _ in range((2 if st == 1 else 1) if st in (0, 1, 3) else 0):
+            if b.u(1):
+                while b.ue() != 3:
+                    b.ue()
+        if (p["wp"] and st in (0, 3)) or (p["wbi"] == 1 and st == 1):
+            b.ue()
+            chroma = s["chroma"] != 0
+            if chroma:
+                b.ue()
+            for count in ((l0, l1) if st == 1 else (l0,)):
+                for _ in range(count):
+                    if b.u(1):
+                        b.se()
+                        b.se()
+                    if chroma and b.u(1):
+                        for _ in range(4):
+                            b.se()
+        if ref:
+            if kind == 5:
+                old = b.src.u(1)
+                b.dst.u(int(marking(None)) if marking else old, 1)
+                b.u(1)
+            else:
+                ops = []
+                if b.src.u(1):
+                    while True:
+                        op = b.src.ue()
+                        if op == 0:
+                            break
+                        args = [b.src.ue() for _ in range({1: 1, 2: 1, 3: 2, 4: 1, 6: 1}.get(op, 0))]
+                        ops.append((op, args))
+                new = marking(ops) if marking else ops
+                b.dst.u(1 if new else 0, 1)
+                if new:
+                    for op, args in new:
+                        b.dst.ue(op)
+                        for a in args:
+                            b.dst.ue(a)
+                    b.dst.ue(0)
+        return b.finish(), dict(type=kind, ref=ref, slice_type=st, frame_num=fn)
+
+
+def avc_edit(ts, transform_slice=None, transform_sps=None, transform_au=None):
+    """`ts` (H.264 in MPEG-TS) with each SPS passed through transform_sps(nal),
+    each slice through transform_slice(n, slices, nal) and each access unit
+    through transform_au(n, au) (None drops it)."""
+    slices = AvcSlices()
+
+    def each(n, au):
+        if transform_au:
+            au = transform_au(n, au)
+            if au is None:
+                return None
+
+        def change(nal):
+            kind = nal[0] & 0x1F
+            if kind == 7 and transform_sps:
+                nal = transform_sps(nal)
+            if kind in (7, 8):
+                slices.see(nal)
+            if kind in (1, 5) and transform_slice:
+                return transform_slice(n, slices, nal)
+            return nal
+        return map_nals(au, change)
+    return ts_rewrite_video(ts, each)
+
+
+def avc_mmco5(at):
+    """A slice transform: the reference pictures `at(n)` names get
+    memory_management_control_operation 5, and the frame_num of the pictures
+    after each, until the next IDR picture, is renumbered so the next
+    reference picture has frame_num 1."""
+    state = {"shift": None}
+
+    def transform(n, slices, nal):
+        if nal[0] & 0x1F == 5:
+            state["shift"] = None
+            return nal
+        if at(n):
+            shift = state["shift"] or 0
+            bits = slices.sps[0]["fn_bits"]
+            new, fields = slices.rewrite(nal, frame_num=lambda fn: (fn - shift) % (1 << bits),
+                                         marking=lambda ops: ops + [(5, [])])
+            state["shift"] = fields["frame_num"]
+            return new
+        if state["shift"] is not None:
+            bits = slices.sps[0]["fn_bits"]
+            return slices.rewrite(nal, frame_num=lambda fn: (fn - state["shift"]) % (1 << bits))[0]
+        return nal
+    return transform
+
+
+def set_recovery_frame_cnt(au, count):
+    """An H.264 access unit with its recovery point SEI's recovery_frame_cnt
+    set to `count`."""
+    w = BitWriter()
+    w.ue(count)
+    w.u(1, 1)
+    w.u(0, 1)
+    w.u(0, 2)
+    payload = w.rbsp()
+
+    def change(nal):
+        if nal[0] & 0x1F == 6 and nal[1] == 6:
+            return b"\x06\x06" + bytes([len(payload)]) + payload + b"\x80"
+        return nal
+    return map_nals(au, change)
+
+
+def hevc_ptl_copy(b, sub_layers):
+    b.u(96)
+    present = [(b.u(1), b.u(1)) for _ in range(sub_layers)]
+    if sub_layers > 0:
+        b.u(2 * (8 - sub_layers))
+    for profile, level in present:
+        if profile:
+            b.u(88)
+        if level:
+            b.u(8)
+
+
+def hevc_set_ordering(au, dpb, reorder, latency):
+    """An HEVC access unit whose SPS states sps_max_dec_pic_buffering_minus1
+    `dpb`, sps_max_num_reorder_pics `reorder` and
+    sps_max_latency_increase_plus1 `latency` for every sub-layer."""
+    def change(nal):
+        if (nal[0] >> 1) & 0x3F != 33:
+            return nal
+        b = Copy(nal, 2)
+        b.u(4)
+        sub = b.u(3)
+        b.u(1)
+        hevc_ptl_copy(b, sub)
+        b.ue()
+        if b.ue() == 3:
+            b.u(1)
+        b.ue()
+        b.ue()
+        if b.u(1):
+            for _ in range(4):
+                b.ue()
+        b.ue()
+        b.ue()
+        b.ue()
+        all_layers = b.u(1)
+        for _ in range(0 if all_layers else sub, sub + 1):
+            for value in (dpb, reorder, latency):
+                b.src.ue()
+                b.dst.ue(value)
+        return b.finish()
+    return map_nals(au, change)
+
+
+def set_vui_timing(au, old, new, hevc):
+    """`au` with its SPS's VUI timing (num_units_in_tick, time_scale) `old`
+    replaced by `new` (fields of the same width)."""
+    def change(nal):
+        kind = (nal[0] >> 1) & 0x3F if hevc else nal[0] & 0x1F
+        if kind != (33 if hevc else 7):
+            return nal
+        head = 2 if hevc else 1
+        bits = "".join("{:08b}".format(b) for b in unescape(nal[head:]))
+        at = bits.find("{:032b}{:032b}".format(*old))
+        bits = bits[:at] + "{:032b}{:032b}".format(*new) + bits[at + 64:]
+        rbsp = bytes(int(bits[i:i + 8], 2) for i in range(0, len(bits) - len(bits) % 8, 8))
+        return nal[:head] + escape(rbsp)
+    return map_nals(au, change)
+
+
+# ------------------------------------------------------ field-coded H.264
+#
+# libx264 codes no field pictures, so these are written directly: 16x32
+# frames as a top and a bottom field each (I fields of one I_PCM macroblock,
+# P and B fields of one skipped macroblock), I P B B order, order count type 0.
+
+
+def field_sps():
+    b = BitWriter()
+    for v, n in ((77, 8), (0, 8), (30, 8)):
+        b.u(v, n)
+    for v in (0, 0, 0, 4, 4):
+        b.ue(v)  # id, frame_num 4 bits, POC type 0, 8-bit LSBs, 4 reference frames
+    b.u(0, 1)
+    b.ue(0)
+    b.ue(0)  # 16x32
+    for v in (0, 0, 1, 0, 1):
+        b.u(v, 1)  # fields, no MBAFF, direct 8x8, no crop, VUI
+    b.u(0, 4)
+    b.u(1, 1)
+    b.u(1001, 32)
+    b.u(60000, 32)
+    b.u(1, 1)
+    b.u(0, 3)
+    b.u(1, 1)
+    b.u(1, 1)
+    for v in (0, 0, 16, 16, 2, 4):
+        b.ue(v)
+    b.u(1, 1)
+    return b"\x67" + escape(b.rbsp())
+
+
+def field_pps():
+    b = BitWriter()
+    for v in (0, 0):
+        b.ue(v)
+    b.u(0, 2)
+    for v in (0, 0, 0):
+        b.ue(v)
+    b.u(0, 3)
+    for _ in range(3):
+        b.se(0)
+    b.u(0, 3)
+    b.u(1, 1)
+    return b"\x68" + escape(b.rbsp())
+
+
+def field_slice(kind, idr, ref, frame_num, bottom, lsb):
+    b = BitWriter()
+    b.ue(0)
+    b.ue({"P": 5, "B": 6, "I": 7}[kind])
+    b.ue(0)
+    b.u(frame_num, 4)
+    b.u(1, 1)
+    b.u(int(bottom), 1)
+    if idr:
+        b.ue(0)
+    b.u(lsb, 8)
+    if kind == "B":
+        b.u(1, 1)
+    if kind != "I":
+        b.u(0, 2 if kind == "P" else 3)
+    if ref:
+        b.u(0, 2 if idr else 1)
+    b.se(0)
+    if kind == "I":
+        b.ue(25)  # I_PCM
+        b.u(0, -len(b.bits) % 8)
+        for _ in range(384):
+            b.u(0x80, 8)
+    else:
+        b.ue(1)  # mb_skip_run
+    b.u(1, 1)
+    return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
+
+
+def field_pictures(count):
+    """(slice NAL, display index) of each field, in decode order."""
+    frames = [("I", 0, 0)]
+    fn = d = 0
+    while len(frames) < count:
+        fn += 1
+        frames += [("P", d + 3, fn), ("B", d + 1, fn + 1), ("B", d + 2, fn + 1)]
+        d += 3
+    fields = []
+    for k, (kind, d, fn) in enumerate(frames[:count]):
+        for bottom in (False, True):
+            nal = field_slice(kind, k == 0 and not bottom, kind != "B", fn % 16, bottom, (4 * d + bottom) % 256)
+            fields.append((nal, d))
+    return fields
+
+
 # --------------------------------------------------------------- encodes
 
 
@@ -324,24 +847,27 @@ def run(args):
     subprocess.run(args, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
-def encode(codec, frames_count, path, open_gop=False):
+def encode(codec, frames_count, path, open_gop=False, params="", size="64x48"):
     """The base video: a small test pattern at 29.97 Hz with B pictures; MPEG-2
     as an elementary stream, H.264 and HEVC in MPEG-TS. `open_gop` makes the
     H.264 and HEVC keyframes after the first non-IDR I pictures (with recovery
-    point SEI) and CRA pictures."""
-    source = ["-f", "lavfi", "-i", "testsrc=size=64x48:rate=30000/1001"]
+    point SEI) and CRA pictures. `params` replaces the B picture options of
+    the libx264 and libx265 parameters."""
+    source = ["-f", "lavfi", "-i", "testsrc=size=%s:rate=30000/1001" % size]
     common = [FFMPEG, "-v", "error", "-y", "-fflags", "+bitexact"] + source + [
         "-frames:v", str(frames_count), "-flags", "+bitexact", "-threads", "1"]
     if codec == "mpeg2":
         run(common + ["-c:v", "mpeg2video", "-g", "12", "-bf", "2", "-b:v", "200k", "-f", "mpeg2video", path])
     elif codec == "h264":
         run(common + ["-c:v", "libx264", "-preset", "veryfast",
-                      "-x264-params", "aud=1:keyint=12:min-keyint=12:scenecut=0:threads=1:bframes=2:b-adapt=0:b-pyramid=none"
+                      "-x264-params", "aud=1:keyint=12:min-keyint=12:scenecut=0:threads=1:"
+                      + (params or "bframes=2:b-adapt=0:b-pyramid=none")
                       + (":open-gop=1" if open_gop else ""),
                       "-f", "mpegts", path])
     else:
         run(common + ["-c:v", "libx265", "-preset", "veryfast",
-                      "-x265-params", "aud=1:bframes=2:b-adapt=0:b-pyramid=0:keyint=12:min-keyint=12:scenecut=0:pools=1:frame-threads=1:log-level=error"
+                      "-x265-params", "aud=1:" + (params or "bframes=2:b-adapt=0:b-pyramid=0")
+                      + ":keyint=12:min-keyint=12:scenecut=0:pools=1:frame-threads=1:log-level=error"
                       + (":open-gop=1" if open_gop else ""),
                       "-f", "mpegts", path])
 
@@ -824,7 +1350,123 @@ def build():
             else:
                 merged.append((f, list(pairs)))
         cases.append((name, scc(name + ".scc", merged), ["cc", "source=packets"]))
+
+    # Picture output departures from H.264 Annex C.4 and H.265 Annex C.5.2,
+    # each named by the extraction rule it pins.
+    cases.extend(picture_output_cases(tmp_dir=os.path.join(OUT, "tmp")))
     return cases
+
+
+def picture_output_cases(tmp_dir):
+    os.makedirs(tmp_dir, exist_ok=True)
+    out = []
+    data = caption_frames(400)
+
+    def captioned(name, ts, hevc, transform=None):
+        """`ts` with each access unit through transform(n, au) (None drops
+        it), then given the caption data of its presentation rank."""
+        if transform is not None:
+            ts = ts_rewrite_video(ts, transform)
+        ranks = ts_presentation_ranks(ts)
+        ts = ts_rewrite_video(ts, lambda n, au: annexb_insert(
+            au, [sei_nal(sei_messages_t35(data[ranks[n]]), hevc)], hevc))
+        out.append((name + "-ts", write(name + ".ts", ts), ["cc"]))
+
+    def base(codec, name, **options):
+        path = os.path.join(tmp_dir, name + ".ts")
+        encode(codec, 300, path, **options)
+        return open(path, "rb").read()
+
+    eos = b"\x00\x00\x00\x01\x48\x01"
+    hevc_open = base("hevc", "hevc-open", open_gop=True)
+    # CRA pictures stand at access units 10, 22, 34, ... (every 12th after
+    # the IDR picture); the edits below repeat every 48 access units.
+
+    # HEVC: the buffer makes room at sps_max_dec_pic_buffering_minus1 + 2
+    # pictures, before the reference picture set applies; a buffer below the
+    # reorder count is raised to it (with an end of sequence before CRA
+    # pictures, whose discards show the pictures waiting).
+    captioned("hevc-dpb", hevc_open, True, lambda n, au: hevc_set_ordering(au, 2, 2, 0))
+    captioned("hevc-dpb-raise", hevc_open, True,
+              lambda n, au: (eos if n % 48 == 22 else b"") + hevc_set_ordering(au, 1, 3, 0))
+    # An end of sequence before a RASL picture of a CRA picture that is not
+    # the first: the pictures waiting are output before it is decoded.
+    captioned("hevc-eos-rasl", hevc_open, True, lambda n, au: eos + au if n % 48 == 23 else au)
+    # VUI timing changing at CRA pictures: each starts a new sequence.
+    captioned("hevc-sps-change", hevc_open, True, lambda n, au: set_vui_timing(
+        au, (1001, 30000), (1001, 240000), True) if (n + 26) // 48 % 2 else au)
+
+    pyramid = "bframes=3:b-adapt=0:b-pyramid=strict"
+    h264_pyr = base("h264", "h264-pyr", params=pyramid)
+    h264_pyr_open = base("h264", "h264-pyr-open", open_gop=True, params=pyramid)
+    h264_closed = base("h264", "h264-closed")
+    # The reorder depth of a bitstream restriction (1, where the pyramid needs
+    # 2): pictures that would leave after a later one are dropped.
+    captioned("h264-reorder", avc_edit(h264_pyr, transform_sps=lambda nal: avc_set_restriction(nal, (1, 2))), False)
+    # No bitstream restriction, from a non-IDR I picture without recovery point.
+    captioned("h264-norestr", avc_edit(
+        h264_pyr_open, transform_sps=lambda nal: avc_set_restriction(nal, None),
+        transform_au=lambda n, au: strip_recovery_points(au) if n >= 9 else None), False)
+    # No bitstream restriction at 352x288 and level 1.0 (one frame): the depth
+    # grows after the first picture dropped.
+    cif = base("h264", "h264-cif", params=pyramid, size="352x288")
+
+    def level10(nal):
+        nal = bytearray(avc_set_restriction(nal, None))
+        nal[3] = 10
+        return bytes(nal)
+    captioned("h264-grow", avc_edit(cif, transform_sps=level10), False)
+    # no_output_of_prior_pics_flag on every fourth IDR picture.
+    captioned("h264-noout", avc_edit(h264_closed, transform_slice=lambda n, sl, nal: sl.rewrite(
+        nal, marking=lambda ops: True)[0] if n % 48 == 12 else nal), False)
+    # memory_management_control_operation 5 on a P picture every 48 access units.
+    h264_cavlc = base("h264", "h264-cavlc", params="bframes=2:b-adapt=0:b-pyramid=none:cabac=0:weightp=0")
+    captioned("h264-mmco5", avc_edit(h264_cavlc, transform_slice=avc_mmco5(lambda n: n % 48 == 4)), False)
+    # From a non-IDR I picture with memory_management_control_operation 5 and
+    # without its recovery point SEI.
+    h264_cavlc_open = base("h264", "h264-cavlc-open", open_gop=True,
+                           params="bframes=2:b-adapt=0:b-pyramid=none:cabac=0:weightp=0")
+    captioned("h264-mmco5-start", avc_edit(
+        h264_cavlc_open, transform_slice=avc_mmco5(lambda n: n == 10),
+        transform_au=lambda n, au: strip_recovery_points(au) if n >= 10 else None), False)
+    # Every third picture of an open-GOP stream without B pictures (4-bit
+    # frame_num continuing across its non-IDR I pictures, order count type
+    # 2): frame_num jumps across its wrap.
+    h264_open_nob = base("h264", "h264-open-nob", open_gop=True, params="bframes=0")
+    captioned("h264-gap", h264_open_nob, False, lambda n, au: au if n % 3 == 0 else None)
+    # From a non-IDR I picture whose recovery point SEI names the next
+    # reference picture (recovery_frame_cnt 1).
+    captioned("h264-recovery-cnt1", h264_pyr_open, False,
+              lambda n, au: set_recovery_frame_cnt(au, 1) if n >= 9 else None)
+    # A VUI frame period of 1/1000 s (45/90000 per field), and no VUI timing
+    # with decode time steps alternating 4 and 6 frames before every frame.
+    captioned("h264-vui-fast", avc_edit(h264_closed, transform_sps=lambda nal: avc_set_restriction(
+        nal, (1, 2), timing=(45, 90000))), False)
+    sparse = {0}
+    at = 0
+    for k in range(20):
+        at += 4 if k % 2 == 0 else 6
+        sparse.add(at)
+    h264_nob = base("h264", "h264-nob", params="bframes=0")
+    captioned("h264-estimate", h264_nob, False,
+              lambda n, au: strip_vui_timing(au) if n in sparse or n > at else None)
+
+    # Field pairs in separate packets (the carrier's PES headers keep their
+    # times; each field gets the caption data of its frame's display index
+    # and its parity).
+    fields = field_pictures(150)
+    carrier = base("h264", "h264-carrier", params="bframes=0")
+
+    def field_au(n, au):
+        if n >= len(fields):
+            return None
+        nals = [b"\x09\xf0"] + ([field_sps(), field_pps()] if n == 0 else [])
+        sei = sei_nal(sei_messages_t35(data[(2 * fields[n][1] + n % 2) % len(data)]), False)
+        units = b"".join(b"\x00\x00\x00\x01" + nal for nal in nals)
+        return units + sei + b"\x00\x00\x00\x01" + fields[n][0]
+    out.append(("h264-fields-ts", write("h264-fields.ts", ts_rewrite_video(carrier, field_au)), ["cc"]))
+    shutil.rmtree(tmp_dir)
+    return out
 
 
 def fate_cases():

@@ -155,8 +155,6 @@ pub(crate) const SEI_RECOVERY_POINT: u32 = 6;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SeiMessage<'a> {
     pub payload_type: u32,
-    /// The payload size the message states.
-    pub payload_size: usize,
     /// The payload, possibly cut to the reader's buffer.
     pub payload: &'a [u8],
 }
@@ -201,7 +199,6 @@ pub(crate) fn sei_messages(
         }
         each(SeiMessage {
             payload_type,
-            payload_size: payload_size as usize,
             payload: &buffer[..kept],
         });
     }

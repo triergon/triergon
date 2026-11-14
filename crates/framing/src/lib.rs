@@ -30,6 +30,10 @@ mod av1;
 mod av1_config;
 mod av1_temporal_unit;
 mod avc_picture;
+pub use avc_picture::{
+    AvcPocSyntax, AvcPps, AvcReading, AvcSliceDepth, AvcSliceHeader, AvcSps, AvcVui,
+    avc_slice_pps_id, read_avc_pps, read_avc_slice_header, read_avc_sps,
+};
 mod config;
 mod declared_config;
 mod dts_core;

@@ -214,3 +214,67 @@ fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
     assert!(expected.iter().all(|frame| frame.1 == Some(3003)));
     assert_eq!(extract(coding, 1 << 20, &packets, &refused), expected);
 }
+
+#[test]
+fn a_refused_hevc_access_unit_leaves_the_extractor_as_it_was() {
+    use nal_streams::{annex_b, caption_sei, hevc_pps, hevc_slice, hevc_sps};
+    // IDR0, then trailing pictures 1 to 29 in order, each referring to the
+    // one before.
+    let units: Vec<_> = (0..30u8)
+        .map(|n| {
+            let mut nals = Vec::new();
+            if n == 0 {
+                nals.extend([hevc_sps(4, 1, 0), hevc_pps()]);
+            }
+            nals.push(caption_sei(&[0x4e, 0x01], n));
+            nals.push(match n {
+                0 => hevc_slice(19, 0, &[], false),
+                _ => hevc_slice(1, u32::from(n), &[-1], false),
+            });
+            annex_b(&nals)
+        })
+        .collect();
+    let packets: Vec<_> = units
+        .iter()
+        .enumerate()
+        .map(|(n, data)| VideoPacket {
+            data,
+            pts: Some(n as i64 * 3003),
+            dts: Some(n as i64 * 3003),
+            duration: None,
+        })
+        .collect();
+    // A replacing SPS with other buffer sizes, then more caption bytes than
+    // the pool holds.
+    let mut bad = annex_b(&[hevc_sps(1, 1, 1), hevc_pps()]);
+    bad.extend_from_slice(&[0, 0, 1, 0x4e, 0x01]);
+    let message = atsc(31, &[0xfc, 0x94, 0x2c].repeat(31));
+    for _ in 0..40_000 {
+        bad.push(4);
+        bad.push(u8::try_from(message.len()).expect("short payload"));
+        bad.extend_from_slice(&message);
+    }
+    bad.push(0x80);
+    bad.extend(annex_b(&[hevc_slice(1, 15, &[-1], false)]));
+    let refused = [
+        Refused {
+            before: 15,
+            packet: VideoPacket {
+                data: &bad,
+                pts: Some(14 * 3003 + 1),
+                dts: Some(14 * 3003 + 1),
+                duration: None,
+            },
+            work: u64::MAX,
+        },
+        Refused {
+            before: 25,
+            packet: packets[25],
+            work: 0,
+        },
+    ];
+    let coding = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
+    let expected = extract(coding, 1 << 20, &packets, &[]);
+    assert_eq!(expected.len(), 30);
+    assert_eq!(extract(coding, 1 << 20, &packets, &refused), expected);
+}
