@@ -79,7 +79,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   default-load metrics and hinted outline there), which `cargo xtask check`
   requires, and `font-hinting-modes` (the nine other heights libass requests when
   hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
-  reports the required three, with `--all` all four.
+  reports the required three, with `--all` all four. Behaviour of TrueType
+  programs that no specification settles is established by probes:
+  `harness/fonts/probes/*.probe` describe small faces and their programs,
+  `cargo xtask fonts probe` assembles them and loads them through both font
+  workers, and each `.dump` beside a probe records the reference's default load
+  on 32-bit ARMv7 (`--record`).
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
@@ -481,6 +486,23 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- Workers and references follow one link policy, `static-runtime-support-v1`: on
+  GNU/Linux each side links the support libraries of its language runtime from their
+  static archives, and libc and third-party libraries, such as zlib, stay shared on
+  both. Today that is libgcc's unwinder (`libgcc_eh`) and libm for the Rust workers, and
+  libm, libstdc++, libgcc and libatomic for the C and C++ references; libm stays shared
+  on both sides on x86, where glibc's `libm.a` links only into a static program. Total
+  RSS then compares the code and data each process's libraries use: a shared runtime
+  support library is mapped whether or not that code calls it, and the two toolchains
+  load different ones. The Rust standard library loads `libgcc_s` and runs its
+  initialisation in every program, one that never unwinds included; FFmpeg loads `libm`,
+  and HarfBuzz `libstdc++`. On ARMv7, `libgcc_s` holds 18 resident pages of the framing
+  worker, and `libm` 18 and 58 of the framing and ISO BMFF references. No worker or
+  reference maps libatomic today: the FFmpeg references name it, and the linker leaves
+  it out. Elsewhere both link as their toolchains do. `build-workers` records the policy
+  in `identity.json`, and `report` and `grade` refuse a build that records another
+  policy or none, so results from differently linked builds are never compared or reused
+  together.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
   with the same two settings in its own release profile. On ARMv7, building the

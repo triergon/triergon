@@ -132,9 +132,10 @@ commands:
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
-  fonts          prepare|fetch|manifest|compare   the pinned FreeType reference, the font
-                 corpus and the font features' manifests; compare reports the required
-                 font features, --all every one (see `cargo xtask fonts --help`)
+  fonts          prepare|fetch|manifest|compare|assemble|probe   the pinned FreeType
+                 reference, the font corpus and the font features' manifests; compare
+                 reports the required font features, --all every one; probe compares
+                 assembled TrueType probe faces (see `cargo xtask fonts --help`)
   shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
                  HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
   raster         prepare|manifest|compare   triergon-raster against the pinned libass

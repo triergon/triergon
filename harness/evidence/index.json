@@ -19982,6 +19982,19 @@
    }
   },
   {
+   "name": "fonts-cjk-autohinter-204d2122",
+   "path": "fonts-cjk-autohinter-204d2122",
+   "retention": "retained",
+   "reason": "FreeType's CJK writing system in triergon-font at 204d2122 against main at b78dd86f on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets (fonts, shape and ass compare --all), the per-feature parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the build identities and logs, the scripts, and the kernel, CPU and compilers",
+   "key": "evidence/fonts-cjk-autohinter-204d2122/6aa341a5864a8f4b535d2d9383ebcd7a4726f5889f1258f91a9c17d4c7136973.tar.gz",
+   "sha256": "6aa341a5864a8f4b535d2d9383ebcd7a4726f5889f1258f91a9c17d4c7136973",
+   "bytes": 53632017,
+   "source_revisions": {
+    "candidate": "204d212285ace2400a36774544188b687b06eff6",
+    "baseline": "b78dd86f2eebb7417c758b0a5757500039d718bf"
+   }
+  },
+  {
    "name": "gate-parallel-memory-matroska",
    "path": "gate-parallel-memory-matroska",
    "retention": "retained",
