@@ -313,20 +313,28 @@ pub struct NalPacketLimits {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct AvcState {
-    sps: bool,
-    pps: bool,
-    new_idr: bool,
-    injected_for_buffering_period: bool,
+struct AvcState(u8);
+impl AvcState {
+    const SPS: u8 = 1;
+    const PPS: u8 = 2;
+    const NEW_IDR: u8 = 4;
+    const BUFFERING_PERIOD: u8 = 8;
+
+    fn has_any(self, bits: u8) -> bool {
+        self.0 & bits != 0
+    }
+
+    fn set(&mut self, bits: u8) {
+        self.0 |= bits;
+    }
+
+    fn clear(&mut self, bits: u8) {
+        self.0 &= !bits;
+    }
 }
 impl Default for AvcState {
     fn default() -> Self {
-        Self {
-            sps: false,
-            pps: false,
-            new_idr: true,
-            injected_for_buffering_period: false,
-        }
+        Self(Self::NEW_IDR)
     }
 }
 

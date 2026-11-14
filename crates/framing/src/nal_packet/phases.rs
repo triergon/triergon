@@ -375,9 +375,9 @@ impl PacketPlan {
             match kind {
                 avc::SEI
                     if state.observed_packet
-                        && !state.avc.sps
-                        && !state.avc.pps
-                        && !state.avc.injected_for_buffering_period
+                        && !state.avc.has_any(
+                            AvcState::SPS | AvcState::PPS | AvcState::BUFFERING_PERIOD,
+                        )
                         && source
                             .bytes
                             .get(self.offset + 1)
@@ -401,13 +401,14 @@ impl PacketPlan {
                     return Ok(NEXT);
                 }
                 7 => {
-                    state.avc.sps = true;
-                    state.avc.new_idr = true;
+                    state.avc.set(AvcState::SPS | AvcState::NEW_IDR);
                 }
                 8 => {
-                    state.avc.pps = true;
-                    state.avc.new_idr = true;
-                    if !state.avc.sps && !state.avc.injected_for_buffering_period {
+                    state.avc.set(AvcState::PPS | AvcState::NEW_IDR);
+                    if !state
+                        .avc
+                        .has_any(AvcState::SPS | AvcState::BUFFERING_PERIOD)
+                    {
                         inject = Some(Injection::Sps);
                     }
                 }
@@ -422,17 +423,18 @@ impl PacketPlan {
                     } else {
                         return Err(Error::Truncated);
                     };
-                    if (state.avc.new_idr || first_byte & 0x80 != 0)
-                        && !state.avc.pps
-                        && !state.avc.injected_for_buffering_period
+                    if (state.avc.has_any(AvcState::NEW_IDR) || first_byte & 0x80 != 0)
+                        && !state
+                            .avc
+                            .has_any(AvcState::PPS | AvcState::BUFFERING_PERIOD)
                     {
-                        inject = Some(if state.avc.sps {
+                        inject = Some(if state.avc.has_any(AvcState::SPS) {
                             Injection::Pps
                         } else {
                             Injection::All
                         });
                     }
-                    state.avc.new_idr = false;
+                    state.avc.clear(AvcState::NEW_IDR);
                 }
                 1 => {
                     state.avc = AvcState::default();
@@ -555,7 +557,7 @@ impl PacketPlan {
                 return Err(Error::Cancelled);
             }
         }
-        state.avc.injected_for_buffering_period = true;
+        state.avc.set(AvcState::BUFFERING_PERIOD);
         self.phase = PlanPhase::AvcBufferingInject;
         Ok(NEXT)
     }
@@ -586,7 +588,7 @@ impl PacketPlan {
             self.injection = Some((which, index + 1));
         } else {
             if matches!(which, Injection::Sps) {
-                state.avc.sps = true;
+                state.avc.set(AvcState::SPS);
             }
             self.injection = None;
             self.injected_irap = true;
