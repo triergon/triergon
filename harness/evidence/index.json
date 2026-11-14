@@ -20632,6 +20632,24 @@
      "report_sha256": "3530659a7c211d244834092d6e577f1f7ec8009aa4473424002f17545369271b"
     }
    ]
+  },
+  {
+   "name": "framing-metadata-fold-1fb7e8e2",
+   "path": "framing-metadata-fold-1fb7e8e2",
+   "retention": "retained",
+   "reason": "Native AArch64 timing and Thumb-2 link diagnostics for the shared packet metadata fold.",
+   "key": "evidence/framing-metadata-fold-1fb7e8e2/ba6879bc75d9b7e2a1c74a5dd4c9035b63695cc150444111667ec2cfb5929281.tar.gz",
+   "sha256": "ba6879bc75d9b7e2a1c74a5dd4c9035b63695cc150444111667ec2cfb5929281",
+   "bytes": 304984312,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "75ee22cd210e21a386a5b8a75838081322e143a0a77ee2f23fea93b01af27d64",
+     "status": 0,
+     "report_sha256": "ac99201fe52266d501afdb9330cb71c03667af24295e6cd80e9a8f3531db409b"
+    }
+   ]
   }
  ]
 }
