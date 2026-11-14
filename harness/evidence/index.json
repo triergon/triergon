@@ -20047,6 +20047,31 @@
    "key": "evidence/packet-framing-memory-clock-ee052323-aarch64/f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183.tar.zst",
    "sha256": "f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183",
    "bytes": 42091880
+  },
+  {
+   "name": "gate-parallel-memory-matroska",
+   "path": "gate-parallel-memory-matroska",
+   "retention": "retained",
+   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on Linux AArch64 and on the ARMv7 gate target in the armhf user space, each on a c6g.4xlarge, at a92f2d0a: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the timing collection both grades join, the comparisons, the RSS module review for the concurrent-session module source, the proofs, the measured workers and observers, and the scripts",
+   "key": "evidence/gate-parallel-memory-matroska/68e8dd83e9051e2927195cac4ac4c97102d56a61152355c3da3180176365469d.tar.gz",
+   "sha256": "68e8dd83e9051e2927195cac4ac4c97102d56a61152355c3da3180176365469d",
+   "bytes": 334587340,
+   "source_revisions": {
+    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   }
+  },
+  {
+   "name": "gate-parallel-memory-matroska-head",
+   "path": "gate-parallel-memory-matroska-head",
+   "retention": "retained",
+   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15 with each slot pinned to its CPU, at the branch head on Linux AArch64 (8607afdd, the worker link policy of main) and at 247e8560 on the ARMv7 gate target in the armhf user space (main's link policy did not build there), each on a second c6g.4xlarge: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the preflights, the timing collection both grades join, the comparisons, the RSS module review and proofs for the current module source, the measured workers and observers, and the scripts",
+   "key": "evidence/gate-parallel-memory-matroska-head/4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233.tar.gz",
+   "sha256": "4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233",
+   "bytes": 332932426,
+   "source_revisions": {
+    "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
+    "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
+   }
   }
  ]
 }
