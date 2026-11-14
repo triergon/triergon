@@ -595,15 +595,15 @@ impl NalPacketSegment {
     fn is_passthrough(&self) -> bool {
         (self.nal_and_prefix >> 24) as u8 & Self::PASSTHROUGH != 0
     }
-    fn owner<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
+    fn backing<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
             packet
         } else {
             configuration
         }
     }
-    fn payload<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]> {
-        self.owner(packet, configuration)
+    fn payload<'a>(&self, backing: &'a Bytes) -> Result<&'a [u8]> {
+        backing
             .as_ref()
             .get(self.source_range())
             .ok_or(Error::Invalid("packet segment range"))
@@ -817,7 +817,7 @@ impl<M> NalPacketOutput<M> {
     /// owner. No Bytes clone or allocation occurs.
     pub fn segment_bytes(&self, index: usize) -> Option<&[u8]> {
         let part = self.segments.as_slice().get(index)?;
-        part.owner(&self.source.bytes, &self.configuration)
+        part.backing(&self.source.bytes, &self.configuration)
             .as_ref()
             .get(part.source_range())
     }
@@ -829,7 +829,7 @@ impl<M> NalPacketOutput<M> {
             .as_slice()
             .get(index)
             .ok_or(Error::Invalid("packet segment index"))?;
-        part.owner(&self.source.bytes, &self.configuration)
+        part.backing(&self.source.bytes, &self.configuration)
             .slice(part.source_range())
     }
 }
@@ -1019,7 +1019,6 @@ impl PacketPlan {
             .ok_or(Error::Overflow)
     }
 
-    #[cold]
     fn establish_storage_bound<M>(&mut self, state: &PacketState<'_, M>) -> Result<()> {
         let limits = state.session.limits;
         let maximum = Self::added_storage(
@@ -1043,25 +1042,35 @@ impl PacketPlan {
     // larger allocator replacement peak may still require retryable pressure.
     // All terms are non-negative, so summing the job-invariant terms first
     // overflows exactly when the original left-to-right sum overflowed.
-    fn minimum_live_bytes<M>(
+    #[cold]
+    #[inline(never)]
+    fn check_storage_bound<M>(
         &mut self,
         state: &PacketState<'_, M>,
         segments: usize,
         output: usize,
-    ) -> Result<usize> {
+    ) -> Result<()> {
         if self.live_base == Self::UNCHECKED_STORAGE {
             self.establish_storage_bound(state)?;
         }
         if self.live_base == Self::LIMITS_FIT {
-            return Ok(0);
+            return Ok(());
         }
-        self.live_base
+        let minimum = self
+            .live_base
             .checked_add(Self::added_storage(
                 segments,
                 output,
                 state.length_width.is_some(),
             )?)
-            .ok_or(Error::Overflow)
+            .ok_or(Error::Overflow)?;
+        if minimum > state.session.pool.limit() {
+            return Err(Error::Limit {
+                requested: minimum,
+                maximum: state.session.pool.limit(),
+            });
+        }
+        Ok(())
     }
     fn append<M>(
         &mut self,
@@ -1087,18 +1096,11 @@ impl PacketPlan {
                 maximum: state.session.limits.maximum_output_bytes,
             });
         }
-        let minimum = self.minimum_live_bytes(state, count, total)?;
-        if minimum > state.session.pool.limit() {
-            return Err(Error::Limit {
-                requested: minimum,
-                maximum: state.session.pool.limit(),
-            });
+        if self.live_base != Self::LIMITS_FIT {
+            self.check_storage_bound(state, count, total)?;
         }
         let parts = state.segments.get_or_insert_with(PacketSegmentStorage::new);
         parts.try_push(&state.session.pool, self.segment_hint, segment)?;
-        if matches!(parts, PacketSegmentStorage::Heap(_)) {
-            self.segment_hint = None;
-        }
         state.total = total;
         Ok(())
     }
@@ -1256,7 +1258,7 @@ mod packed_plan_boundary_guards {
             );
             assert_eq!(part.prefix_bytes(), prefix);
             assert_eq!(part.output_offset(), usize::MAX);
-            assert_eq!(part.payload(&raw, &raw).unwrap(), &[0x41]);
+            assert_eq!(part.payload(part.backing(&raw, &raw)).unwrap(), &[0x41]);
             assert_eq!(
                 format!("{part:?}"),
                 format!(

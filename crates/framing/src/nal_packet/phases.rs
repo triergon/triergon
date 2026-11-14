@@ -149,8 +149,35 @@ impl PacketPlan {
         Ok(NEXT)
     }
 
-    #[inline(never)]
+    #[inline]
     fn read_length(
+        &mut self,
+        input: &[u8],
+        width: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        refusal: &mut Option<NalPacketReceiverErrorKind>,
+    ) -> Result<bool> {
+        if width == 4
+            && self.prefix_read == 0
+            && work.remaining() >= 4
+            && let Some(tail) = input.get(self.offset..)
+            && let Some(bytes) = tail.first_chunk()
+        {
+            work.take(4);
+            self.length = u32::from_be_bytes(*bytes) as usize;
+            self.offset += 4;
+            self.prefix_read = 4;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            return Ok(work.try_charge(1));
+        }
+        self.read_partial_length(input, width, work, cancel, refusal)
+    }
+
+    #[inline(never)]
+    fn read_partial_length(
         &mut self,
         input: &[u8],
         width: usize,
@@ -566,7 +593,7 @@ impl PacketEmission {
                     .as_ref()
                     .ok_or(Error::Invalid("missing packet source"))?
                     .bytes;
-                let configuration = if (part.nal_and_prefix >> 24) as u8
+                let backing = if (part.nal_and_prefix >> 24) as u8
                     & NalPacketSegment::CONFIGURATION_SOURCE
                     == 0
                 {
@@ -577,7 +604,7 @@ impl PacketEmission {
                         super::AvcUpdate::bytes,
                     )
                 };
-                let payload = part.payload(source, configuration)?;
+                let payload = part.payload(backing)?;
                 while self.copied < end {
                     let count = work_count(work).min(end - self.copied);
                     if count == 0 {
