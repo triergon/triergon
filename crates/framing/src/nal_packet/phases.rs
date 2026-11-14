@@ -412,20 +412,17 @@ impl PacketPlan {
                     }
                 }
                 5 => {
+                    let next = self.offset + 1;
                     // The receiver reads the next packet byte, with zero
                     // padding at the end. The strict path needs a slice byte.
-                    let first = *source
-                        .bytes
-                        .get(self.offset + 1)
-                        .filter(|_| self.length > 1 || state.observed_packet)
-                        .or_else(|| state.observed_packet.then_some(&0))
-                        .ok_or(Error::Truncated)?
-                        & 128
-                        != 0;
-                    if first {
-                        state.avc.new_idr = true;
-                    }
-                    if state.avc.new_idr
+                    let first_byte = if self.length > 1 {
+                        source.bytes[next]
+                    } else if state.observed_packet {
+                        source.bytes.get(next).copied().unwrap_or(0)
+                    } else {
+                        return Err(Error::Truncated);
+                    };
+                    if (state.avc.new_idr || first_byte & 0x80 != 0)
                         && !state.avc.pps
                         && !state.avc.injected_for_buffering_period
                     {
@@ -757,7 +754,8 @@ impl PacketEmission {
             // Charge and check cancellation at the prefix, payload chunks
             // and segment boundary, including when resuming a partial copy.
             if self.copied < prefix {
-                let count = work_count(work).min(prefix - self.copied);
+                let left = prefix - self.copied;
+                let count = (work.remaining().min(left as u64)) as usize;
                 if count == 0 {
                     return Ok(YIELD);
                 }
@@ -770,7 +768,7 @@ impl PacketEmission {
                 }
                 // A partial prefix used all remaining work: prefixes are at
                 // most four bytes and always fit within a copy chunk.
-                if self.copied < prefix {
+                if count < left {
                     return Ok(YIELD);
                 }
             }
