@@ -98,22 +98,23 @@ pub struct Item {
 }
 
 /// The features the gate measures through `report`, with their corpus
-/// directory, manifest and planning weight.
+/// directory and planning weight: the minutes their timing, memory and grade took
+/// on a 32-bit ARMv7 c6g.4xlarge.
 const FEATURES: [(&str, Option<&str>, u32); 23] = [
-    ("mp4-forward", None, 4),
-    ("ts-program", None, 4),
-    ("matroska-audio-clocks", None, 1),
-    ("raw-annex-b", None, 1),
-    ("mpegts-pes", None, 9),
-    ("hls-segments", Some("harness/fixtures/hls"), 11),
+    ("mp4-forward", None, 10),
+    ("ts-program", None, 8),
+    ("matroska-audio-clocks", None, 3),
+    ("raw-annex-b", None, 2),
+    ("mpegts-pes", None, 20),
+    ("hls-segments", Some("harness/fixtures/hls"), 17),
     (
         "matroska-startup-seek",
         Some(".research/startup-seek-fixtures"),
-        5,
+        10,
     ),
-    ("matroska-colour", Some(".research/colour-fixtures"), 4),
-    ("matroska-cues-preroll", Some(".research/seek-fixtures"), 1),
-    ("matroska-demux", Some(".research/fixtures"), 2),
+    ("matroska-colour", Some(".research/colour-fixtures"), 8),
+    ("matroska-cues-preroll", Some(".research/seek-fixtures"), 2),
+    ("matroska-demux", Some(".research/fixtures"), 3),
     (
         "matroska-header-removal",
         Some(".research/header-fixtures"),
@@ -122,21 +123,24 @@ const FEATURES: [(&str, Option<&str>, u32); 23] = [
     (
         "matroska-segment-metadata",
         Some(".research/catalogue-fixtures"),
-        7,
+        13,
     ),
-    ("matroska-zlib", Some(".research/zlib-fixtures"), 1),
-    ("ass-render", Some(""), 36),
-    ("ass-render-host", Some(""), 1),
-    ("subtitle-text", Some(""), 42),
-    ("subtitle-text-host", Some(""), 2),
-    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 46),
-    ("subtitle-dvb", Some(SUBTITLE_CORPUS), 29),
-    ("subtitle-dvd", Some(SUBTITLE_CORPUS), 25),
+    ("matroska-zlib", Some(".research/zlib-fixtures"), 2),
+    ("ass-render", Some(""), 39),
+    ("ass-render-host", Some(""), 2),
+    ("subtitle-text", Some(""), 79),
+    ("subtitle-text-host", Some(""), 5),
+    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 74),
+    ("subtitle-dvb", Some(SUBTITLE_CORPUS), 55),
+    ("subtitle-dvd", Some(SUBTITLE_CORPUS), 48),
     ("subtitle-dvd-host", Some(SUBTITLE_CORPUS), 1),
-    ("subtitle-cc", Some(SUBTITLE_CORPUS), 24),
-    ("subtitle-teletext", Some(SUBTITLE_CORPUS), 10),
+    ("subtitle-cc", Some(SUBTITLE_CORPUS), 44),
+    ("subtitle-teletext", Some(SUBTITLE_CORPUS), 18),
 ];
 const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
+/// How many parts the ISO BMFF suite's measurements and the capture cases are split into.
+const ISOBMFF_PARTS: usize = 3;
+const CAPTURE_PARTS: usize = 4;
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
@@ -294,31 +298,35 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         preflight: owned(&["--external-vector"]),
     });
 
-    items.push(Item {
-        name: "isobmff".into(),
-        weight: 78,
-        steps: collections(
-            "isobmff",
+    // ISO BMFF in parts, each measuring every ISOBMFF_PARTS-th operation and comparing
+    // all of them: a part is a third of the measurements and the whole comparison.
+    for part in 1..=ISOBMFF_PARTS {
+        let name = format!("isobmff-{part}");
+        let part = format!("{part}/{ISOBMFF_PARTS}");
+        let bench = |mode: &str, pairs: &str| {
             with_full(xtask(&[
                 "isobmff-bench",
-                "--benchmark",
-                "--pairs",
+                &format!("--{mode}"),
+                pairs,
                 PAIRS,
+                "--part",
+                &part,
                 "--output",
-                &format!("{out}/benchmark/isobmff"),
-            ])),
-            with_full(xtask(&[
-                "isobmff-bench",
-                "--memory",
-                "--memory-pairs",
-                PAIRS,
-                "--output",
-                &format!("{out}/memory/isobmff"),
-            ])),
-        )
-        .into(),
-        preflight: owned(&["--isobmff"]),
-    });
+                &format!("{out}/{mode}/{name}"),
+            ]))
+        };
+        items.push(Item {
+            weight: 45,
+            steps: collections(
+                &name,
+                bench("benchmark", "--pairs"),
+                bench("memory", "--memory-pairs"),
+            )
+            .into(),
+            name,
+            preflight: owned(&["--isobmff"]),
+        });
+    }
 
     let framing = |mode: &str| {
         with_full(xtask(&[
@@ -341,7 +349,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     ));
     items.push(Item {
         name: "framing".into(),
-        weight: 9,
+        weight: 23,
         steps,
         preflight: owned(&[
             "--feature",
@@ -370,7 +378,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     let codec_worker = format!("{release}/codec-worker");
     items.push(Item {
         name: "codecs".into(),
-        weight: 46,
+        weight: 49,
         steps: vec![
             step("codec-bin", Stage::Timing, Placement::Free, build_codecs),
             step(
@@ -438,14 +446,14 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
     });
 
-    // The capture cases in two halves, alternating, so that each holds sizes
-    // and rates alike.
-    for half in 0..2 {
-        let name = format!("capture-{}", half + 1);
+    // The capture cases in CAPTURE_PARTS parts, dealt out in turn, so that each
+    // holds sizes and rates alike.
+    for part in 0..CAPTURE_PARTS {
+        let name = format!("capture-{}", part + 1);
         let ids: Vec<&str> = capture
             .iter()
-            .skip(half)
-            .step_by(2)
+            .skip(part)
+            .step_by(CAPTURE_PARTS)
             .map(String::as_str)
             .collect();
         let mut command = xtask(&[
@@ -477,7 +485,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         qualify.environment.push(("TRIERGON_PYTHON", "python3"));
         items.push(Item {
             name,
-            weight: 100,
+            weight: 48,
             steps: vec![qualify],
             preflight: owned(&["--capture", CAPTURE_CASES]),
         });
@@ -496,7 +504,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     }
     items.push(Item {
         name: "tests".into(),
-        weight: 45,
+        weight: 50,
         steps: vec![
             step(
                 "test-debug",
@@ -823,15 +831,20 @@ fn run(root: &Path, output: &Path, stage: Stage, shard: (usize, usize), full: bo
         .iter()
         .filter(|(_, s)| s.placement == Placement::Grade)
         .collect();
+    let grader = if grades.is_empty() {
+        exe.clone()
+    } else {
+        release_xtask(root, &output)?
+    };
     let width = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
     for batch in grades.chunks(width.max(1)) {
         let results: Vec<R<i32>> = std::thread::scope(|scope| {
             let handles: Vec<_> = batch
                 .iter()
                 .map(|(item, step)| {
-                    let (output, log, exe) = (&output, &log, &exe);
+                    let (output, log, grader) = (&output, &log, &grader);
                     scope.spawn(move || {
-                        let mut command = command(root, exe, step, None);
+                        let mut command = command(root, grader, step, None);
                         run_step(output, log, item, step, None, &mut command)
                     })
                 })
@@ -849,6 +862,30 @@ fn run(root: &Path, output: &Path, stage: Stage, shard: (usize, usize), full: bo
     }
     append(&log, &format!("{} done, {failed} failed", stage.name()))?;
     Ok(i32::from(failed > 0))
+}
+
+/// This program built with the release profile, which grades faster than the
+/// development build `cargo xtask` runs; the build's log goes to DIR/logs.
+fn release_xtask(root: &Path, output: &Path) -> R<PathBuf> {
+    let logs = output.join("logs");
+    fs::create_dir_all(&logs).map_err(|e| format!("{}: {e}", logs.display()))?;
+    let log = fs::File::create(logs.join("xtask-release.log")).map_err(|e| e.to_string())?;
+    let errors = log.try_clone().map_err(|e| e.to_string())?;
+    let code = status(
+        Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+            .args(["build", "--release", "--locked", "-p", "xtask"])
+            .env("CARGO_INCREMENTAL", "0")
+            .current_dir(root)
+            .stdout(log)
+            .stderr(errors),
+    )?;
+    if code != 0 {
+        return Err(format!(
+            "the release build of xtask failed: see {}",
+            logs.display()
+        ));
+    }
+    Ok(root.join("target/release/xtask"))
 }
 
 fn command(root: &Path, exe: &Path, step: &Step, cpus: Option<&str>) -> Command {
@@ -906,6 +943,19 @@ fn run_step(
         .map_or(127, |s| s.code().unwrap_or(1));
     let seconds = clock.elapsed().as_secs_f64();
     append(log, &format!("{} EXIT={code}", step.name))?;
+    // A grade's verdict lines, which tell listed open cases from other failures.
+    let outcome: Vec<String> = if step.placement == Placement::Grade {
+        fs::read_to_string(logs.join(format!("{}.log", step.name)))
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| {
+                line.contains(" cases pass") || line.contains(" open failures, as listed")
+            })
+            .map(str::to_owned)
+            .collect()
+    } else {
+        Vec::new()
+    };
     let mut shown = step.command.clone();
     if let Some(cpus) = cpus {
         shown.splice(0..0, owned(&["taskset", "-c", cpus]));
@@ -924,6 +974,7 @@ fn run_step(
             ("started", Value::str(started)),
             ("seconds", Value::float((seconds * 10.0).round() / 10.0)),
             ("status", Value::int(i64::from(code))),
+            ("outcome", Value::strings(outcome)),
         ]),
     )?;
     Ok(code)
@@ -1014,6 +1065,37 @@ fn tree_digest(dir: &Path) -> R<String> {
     Ok(digest.finish_hex())
 }
 
+/// Whether a grade step's only failures are the contract's listed open cases: its
+/// log reports N of M cases passing and M - N open failures, as listed.
+fn only_open_cases(record: &Value) -> bool {
+    let lines: Vec<&str> = record
+        .get("outcome")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let passing = lines.iter().find_map(|line| {
+        let words: Vec<&str> = line[..line.find(" cases pass")?]
+            .split_whitespace()
+            .collect();
+        match words[..] {
+            [.., passed, "of", total] => {
+                Some((passed.parse::<usize>().ok()?, total.parse::<usize>().ok()?))
+            }
+            _ => None,
+        }
+    });
+    let open = lines.iter().find_map(|line| {
+        line[..line.find(" open failures, as listed")?]
+            .split_whitespace()
+            .last()?
+            .parse::<usize>()
+            .ok()
+    });
+    matches!((passing, open), (Some((passed, total)), Some(open)) if passed + open == total)
+}
+
 /// Joins the shards' outputs into one result at `file`; 0 when every planned
 /// step ran once and passed on one source and one set of workers.
 fn summary(file: &Path, directories: &[PathBuf]) -> R<i32> {
@@ -1026,8 +1108,13 @@ fn summary(file: &Path, directories: &[PathBuf]) -> R<i32> {
             .map_err(|e| format!("{}: {e}", directory.join(SHARD).display()))?;
         let mut records = Vec::new();
         if let Ok(entries) = fs::read_dir(directory.join("steps")) {
+            // Step records only: no other file, and no file a copying tool adds.
             for entry in entries.flatten() {
-                records.push(crate::checks::read_json(&entry.path())?);
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                if !name.starts_with('.') && name.ends_with(".json") {
+                    records.push(crate::checks::read_json(&entry.path())?);
+                }
             }
         }
         records.sort_by(|a, b| {
@@ -1131,15 +1218,32 @@ fn summary(file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .unwrap_or_default(),
             record.get("status").and_then(Value::as_f64).unwrap_or(-1.0)
         );
+        for line in record
+            .get("outcome")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            println!("    {}", line.as_str().unwrap_or_default());
+        }
     }
     for problem in &problems {
         println!("FAIL {problem}");
     }
+    let open: Vec<&String> = failed
+        .iter()
+        .filter(|name| {
+            steps
+                .iter()
+                .find(|r| r.get("step").and_then(Value::as_str) == Some(name.as_str()))
+                .is_some_and(only_open_cases)
+        })
+        .collect();
     println!(
-        "{} steps on {} shards, {} failed",
+        "{} steps on {} shards, {} failed, {} of them only on the contract's listed open cases",
         steps.len(),
         shards.len(),
-        failed.len()
+        failed.len(),
+        open.len()
     );
     crate::corpus::write_json(
         file,
@@ -1148,6 +1252,10 @@ fn summary(file: &Path, directories: &[PathBuf]) -> R<i32> {
             ("shards", Value::Array(shards)),
             ("steps", Value::Array(steps)),
             ("failed", Value::strings(failed.clone())),
+            (
+                "failed_on_open_cases_only",
+                Value::strings(open.into_iter().cloned()),
+            ),
             ("problems", Value::strings(problems.clone())),
         ]),
     )?;
@@ -1273,6 +1381,26 @@ mod tests {
         assert_eq!(sources_digest(&root).unwrap(), committed);
         assert_eq!(tree_digest(&root.join("absent")).unwrap(), "absent");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_grade_failing_only_on_listed_open_cases_is_told_apart() {
+        let record =
+            |lines: &[&str]| Value::object([("outcome", Value::strings(lines.iter().copied()))]);
+        let open = "subtitle-cc: 4 open failures, as listed: hevc-eos-ts, hevc-eos-ts-realtime, \
+                    hevc-eos-ts-first, hevc-eos-ts-second";
+        assert!(only_open_cases(&record(&[
+            "subtitle-cc: 201 of 205 cases pass",
+            open
+        ])));
+        assert!(!only_open_cases(&record(&[
+            "subtitle-cc: 200 of 205 cases pass",
+            open
+        ])));
+        assert!(!only_open_cases(&record(&[
+            "subtitle-cc: 201 of 205 cases pass"
+        ])));
+        assert!(!only_open_cases(&record(&[])));
     }
 
     #[test]

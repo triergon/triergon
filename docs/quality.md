@@ -344,7 +344,9 @@ and rebuild workers before running the container and packet-framing commands.
 `cargo xtask isobmff-bench` compares all 1,020 open and index outcomes, including
 48 refusals. `--benchmark --memory` measures the 972 output labels, with 956
 physical operations and 16 explicit aliases. `--subset52` selects the separate
-52-operation measurement set while retaining the full correctness comparison.
+52-operation measurement set while retaining the full correctness comparison, and
+`--part I/N` every Nth physical operation from the Ith with their aliases, so that N
+parts measure the set once between them.
 `cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.
 Their contracts and input manifests are in `harness/features/isobmff-open-index/`
 and `harness/features/packet-framing/`.
@@ -598,9 +600,9 @@ may override that count for diagnostic comparisons.
 ### Running the gates
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
-measured thing: a feature's timing, memory and grade, the ISO BMFF and packet-framing
-suites, the codecs, each half of the capture cases, the tests, and the font, shaping,
-rasterising and ASS comparisons. `cargo xtask gate plan --shards N` splits them into N
+measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
+measurements, the packet-framing suite, the codecs, a part of the capture cases, the
+tests, and the font, shaping, rasterising and ASS comparisons. `cargo xtask gate plan --shards N` splits them into N
 shards of about equal planning weight, each for its own host. On one host, a shard's
 run is:
 
@@ -625,13 +627,15 @@ run is:
    with the proof, checks them with `cargo xtask gate preflight --kernel`, and collects
    memory on the remaining CPUs (`taskset -c 1-15` on a 16-CPU host, `cargo xtask gate
    run --stage memory`).
-4. It grades with the module loaded. Grades measure nothing, so several run at once.
+4. It grades with the module loaded. Grades measure nothing, so several run at once,
+   from a release build of xtask.
 
 Never time while memory, a build or anything else runs on the host. Each step's log,
 and a record of its command, status and time, go under OUT. `cargo xtask gate summary
 --output FILE DIR...` joins the shards' outputs into one result; it fails when a
 planned step did not run exactly once, a step failed, or the shards measured different
-source revisions or timing builds.
+source revisions or timing builds, and names the failed grades whose only failures are
+the contract's listed open cases.
 
 #### Memory in parallel
 
