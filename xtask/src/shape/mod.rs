@@ -58,8 +58,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
                 }
                 _ => return Err(USAGE.into()),
             };
-            let built = reference::prepare(root, jobs, &fetch::Network)?;
-            println!("{}", built.display());
+            let built = crate::references::build("harfbuzz")?.prepare(root, || {
+                reference::prepare(root, jobs, &fetch::Network).map(|p| p.display().to_string())
+            })?;
+            println!("{built}");
             Ok(())
         }
         [command, rest @ ..] if command == "manifest" => {

@@ -28,5 +28,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [],
-  "open_cases": []
+  "open_cases": [],
+  "parity_timeout_seconds": 120
 }
