@@ -807,14 +807,17 @@ source revisions, and exits with the recorded status. `--full` measures (or, for
 reused collection beside a measured one cannot be graded, so measure both with
 `--full`.
 
-`cargo xtask gate test --profile debug|release` runs the workspace tests for the gate
-target and is reused the same way. Its key adds every tracked file as the working tree
-holds it and the untracked files git does not ignore, but the evidence index (which a
-promotion changes) and `docs/`, and the test inputs the crate tests read when present (`.research/fate-samples`, `.research/flac-generated`,
-`.research/flac-test-files`). The gate runs both profiles once: the debug tests run
-with overflow checks and debug assertions (the library's `debug_assert!`s and the tests
-that expect them), which the release profile turns off, and the release tests run the
-optimisation the workers are measured with.
+`cargo xtask gate test --profile checked|release` runs the workspace tests for the gate
+target and is reused the same way. Its key holds the profile and adds every tracked
+file as the working tree holds it and the untracked files git does not ignore, but the
+evidence index (which a promotion changes) and `docs/`, and the test inputs the crate
+tests read when present (`.research/fate-samples`, `.research/flac-generated`,
+`.research/flac-test-files`). The gate runs each profile once. The `checked` profile
+is the release optimisation with every overflow check and every `debug_assert!` and
+`#[cfg(debug_assertions)]` item of a debug build, so the same 4,429 tests run; it loses
+only the unoptimised build's larger stack frames, which bring stack depth problems out
+sooner, and on 32-bit ARMv7 it takes about 6.5 minutes against 29.7 for the debug
+profile. The release tests run the optimisation the workers are measured with.
 
 ### 32-bit ARMv7
 

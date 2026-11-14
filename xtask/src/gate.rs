@@ -27,7 +27,7 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
        cargo xtask gate preflight [--shard I/N] [--review FILE] [--kernel]
        cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full]
        cargo xtask gate summary --output FILE DIR...
-       cargo xtask gate test --profile debug|release --output DIR [--full]
+       cargo xtask gate test --profile checked|release --output DIR [--full]
 
   plan       print the gate's items and their planning weights (minutes on a
              32-bit ARMv7 c6g.4xlarge), split into N shards (default 1)
@@ -42,9 +42,10 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
   summary    join the outputs of every shard of a run into FILE: each step's
              status and time, with a failure if a planned step did not run, a
              step failed, or the shards measured different sources or workers
-  test       the workspace tests for the gate target in one profile: debug (with
-             overflow checks and debug assertions) or release (the gate build's
-             optimisation); a result a kept evidence set holds for the same tracked
+  test       the workspace tests for the gate target in one profile: checked
+             (release optimisation with overflow checks and debug assertions) or
+             release (the gate build's); a result a kept evidence set holds for the
+             same profile, tracked
              sources, test inputs, toolchain, target and host class is reused
              unless --full";
 
@@ -651,19 +652,19 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     });
     items.push(Item {
         name: "tests".into(),
-        weight: 32,
+        weight: 8,
         steps: vec![
             step(
-                "test-debug",
+                "test-checked",
                 Stage::Timing,
                 Placement::Free,
                 with_full(xtask(&[
                     "gate",
                     "test",
                     "--profile",
-                    "debug",
+                    "checked",
                     "--output",
-                    &format!("{out}/tests/debug"),
+                    &format!("{out}/tests/checked"),
                 ])),
             ),
             step(
@@ -871,12 +872,10 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         }
         "test" => {
             let output = options.output.ok_or("gate test needs --output DIR")?;
-            let release = match options.profile.as_deref() {
-                Some("debug") => false,
-                Some("release") => true,
-                _ => return Err("gate test needs --profile debug|release".into()),
+            let Some(profile @ ("checked" | "release")) = options.profile.as_deref() else {
+                return Err("gate test needs --profile checked|release".into());
             };
-            test(root, &output, release, options.full)
+            test(root, &output, profile, options.full)
         }
         "--help" | "-h" => {
             println!("{USAGE}");
@@ -1160,11 +1159,8 @@ const TEST_INPUTS: [&str; 3] = [
 /// for the same key: every tracked file as the working tree holds it, untracked
 /// files that are not ignored, the test inputs of [`TEST_INPUTS`], and what every
 /// gate key holds (the measuring code, toolchains, target and host class).
-fn test(root: &Path, output: &Path, release: bool, full: bool) -> R<i32> {
-    let mut command = owned(&["test", "--workspace", "--locked"]);
-    if release {
-        command.push("--release".into());
-    }
+fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i32> {
+    let mut command = owned(&["test", "--workspace", "--locked", "--profile", profile]);
     command.extend(crate::harness::gate_build::target_args()?);
     let inputs = TEST_INPUTS
         .iter()

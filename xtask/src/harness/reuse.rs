@@ -425,9 +425,11 @@ fn build_environment() -> Value {
         "LDFLAGS",
     ];
     const PREFIXES: [&str; 3] = ["CARGO_PROFILE_", "CARGO_BUILD_", "CARGO_TARGET_"];
+    // How many jobs build it changes nothing that is built.
     let mut set: Vec<(String, Value)> = std::env::vars()
         .filter(|(name, _)| {
-            NAMES.contains(&name.as_str()) || PREFIXES.iter().any(|p| name.starts_with(p))
+            (NAMES.contains(&name.as_str()) || PREFIXES.iter().any(|p| name.starts_with(p)))
+                && name != "CARGO_BUILD_JOBS"
         })
         .map(|(name, value)| (name, Value::str(value)))
         .collect();
