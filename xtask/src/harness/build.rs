@@ -398,6 +398,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             .map(str::to_owned),
         );
         for file in [
+            "avc-profile-extension-inputs.json",
             "contract.json",
             "corpus.json",
             "fixtures.rs",

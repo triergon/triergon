@@ -352,7 +352,7 @@ physical operations and 16 explicit aliases. `--subset52` selects the separate
 52-operation measurement set while retaining the full correctness comparison, and
 `--part I/N` every Nth physical operation from the Ith with their aliases, so that N
 parts measure the set once between them.
-`cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.
+`cargo xtask framing --benchmark --memory` measures all 131 packet-framing scripts.
 Their contracts and input manifests are in `harness/features/isobmff-open-index/`
 and `harness/features/packet-framing/`.
 

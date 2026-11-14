@@ -88,6 +88,10 @@ impl AvcConfigFields {
     }
 }
 
+pub(crate) const fn profile_extension_required(profile: u8) -> bool {
+    matches!(profile, 100 | 110 | 122 | 144)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ArrayDescriptor {
     kind: AvcConfigArrayKind,
@@ -165,7 +169,7 @@ impl Scan {
 
     // Single caller per walk; inlining lets the event stay in registers.
     #[inline(always)]
-    fn next(&mut self, raw: &[u8], limits: AvcConfigLimits) -> Result<Event> {
+    fn next(&mut self, raw: &[u8], limits: AvcConfigLimits, receiver: bool) -> Result<Event> {
         match self.phase {
             ScanPhase::Sequence => self.group(
                 AvcConfigArrayKind::Sequence,
@@ -187,17 +191,20 @@ impl Scan {
             ScanPhase::Extension => {
                 // This explicitly selects the acquired2010 edition, whose
                 // branch list includes144. No newer profile list is guessed.
-                if !matches!(raw[1], 100 | 110 | 122 | 144) {
+                if !profile_extension_required(raw[1]) {
                     self.phase = ScanPhase::End;
                     return Ok(Event::End(self.position));
                 }
                 let start = self.position;
                 let end = start.checked_add(4).ok_or(Error::Overflow)?;
-                let bytes: [u8; 4] = raw
-                    .get(start..end)
-                    .ok_or(Error::Truncated)?
-                    .try_into()
-                    .map_err(|_| Error::Truncated)?;
+                let Some(bytes) = raw.get(start..end) else {
+                    if receiver {
+                        self.phase = ScanPhase::End;
+                        return Ok(Event::End(start));
+                    }
+                    return Err(Error::Truncated);
+                };
+                let bytes: [u8; 4] = bytes.try_into().map_err(|_| Error::Truncated)?;
                 self.extension = Some(bytes);
                 self.position = end;
                 self.group(
@@ -288,7 +295,7 @@ pub struct AvcConfigParser {
     nals: Option<BudgetVec<AvcNalDescriptor>>,
     counted: [AvcNalDescriptor; 4],
     failure: Option<Error>,
-    observed_width_three: bool,
+    receiver: bool,
 }
 
 impl AvcConfigParser {
@@ -326,20 +333,20 @@ impl AvcConfigParser {
             nals: Some(BudgetVec::new(pool)),
             counted: [AvcNalDescriptor::EMPTY; 4],
             failure: None,
-            observed_width_three: false,
+            receiver: false,
         })
     }
 
     // Crate-private: only the separately typed observed-record wrapper can
     // publish this result. The ordinary source constructor remains strict.
-    pub(crate) fn new_observed_width(
+    pub(crate) fn new_receiver(
         pool: &Budget,
         source: AvcConfigSource,
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
         let mut parser = Self::new(pool, source, raw, limits)?;
-        parser.observed_width_three = true;
+        parser.receiver = true;
         Ok(parser)
     }
 
@@ -392,7 +399,7 @@ impl AvcConfigParser {
                         .ok_or(Error::Truncated)?
                         .try_into()
                         .map_err(|_| Error::Truncated)?;
-                    if prefix[4] & 3 == 2 && !self.observed_width_three {
+                    if prefix[4] & 3 == 2 && !self.receiver {
                         return Err(Error::Invalid("AVC three-byte sample length"));
                     }
                     self.width = Some(LengthSize::new((prefix[4] & 3) + 1)?);
@@ -404,7 +411,7 @@ impl AvcConfigParser {
                 }
                 Phase::Count | Phase::Fill => {
                     let mut next = self.scan;
-                    let event = next.next(raw.as_ref(), self.limits)?;
+                    let event = next.next(raw.as_ref(), self.limits, self.receiver)?;
                     match event {
                         Event::Group { kind, start } if matches!(self.phase, Phase::Count) => {
                             let start = u32::try_from(start).map_err(|_| Error::Overflow)?;
