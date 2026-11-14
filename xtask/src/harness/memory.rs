@@ -16,13 +16,19 @@ use std::time::Duration;
 use super::acceptance::active_cpu;
 use super::diff::equal;
 use super::linux::{self, py_int};
-use super::timing::{Operation, competing_builds, cpu_snapshot, lock};
+pub use super::timing::Pairs;
+use super::timing::{EARLY_STOP_RULE, Operation, competing_builds, cpu_snapshot, lock};
 use super::worker::{self, Finished};
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
 use crate::stats;
 
 type R<T> = Result<T, String>;
+
+/// The memory gates' ratio ceiling: the candidate's peak heap and total resident
+/// peak must lie strictly below the reference's, so a gate collection stops
+/// early only when both settle below it.
+pub const CEILING: f64 = 1.0;
 
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
@@ -899,7 +905,7 @@ pub(super) fn kernel_used(certificate: &Value, samples: &[Value]) -> bool {
 pub fn evaluate(
     root: &Path,
     samples: &[Value],
-    pairs: i128,
+    pairs: Pairs,
     seed: u64,
     certificate: &Value,
     expected_outputs: Option<&Value>,
@@ -924,6 +930,9 @@ pub fn evaluate(
         return failed("observer-unqualified");
     }
     let n = |v: &Value, k: &str| py_int(v.get(k));
+    // The kernel certificate is the collection's, as the guard certificate is:
+    // verify it once, at the first sample that used the kernel bound.
+    let mut kernel_verified = None;
     let (mut rss, mut heaps, mut totals) = (Vec::new(), Vec::new(), Vec::new());
     for row in samples {
         let Value::Object(entries) = row else {
@@ -936,26 +945,32 @@ pub fn evaluate(
                 .filter_map(|(_, v)| v.get("observer"))
                 .collect();
             if kernel_used(certificate, std::slice::from_ref(row)) {
-                let ok = matches!(
-                    certificate.get("kernel_rss_required"),
-                    Some(Value::Bool(true))
-                ) && linux::kernel_certificate_valid(
-                    root,
-                    certificate.get("kernel_rss_certificate"),
-                    observer,
-                    probe,
-                ) && kernel_rows
-                    .iter()
-                    .all(|d| n(d, "kernel_rss_requested") == Some(1));
+                let verified = *kernel_verified.get_or_insert_with(|| {
+                    matches!(
+                        certificate.get("kernel_rss_required"),
+                        Some(Value::Bool(true))
+                    ) && linux::kernel_certificate_valid(
+                        root,
+                        certificate.get("kernel_rss_certificate"),
+                        observer,
+                        probe,
+                    )
+                });
+                let ok = verified
+                    && kernel_rows
+                        .iter()
+                        .all(|d| n(d, "kernel_rss_requested") == Some(1));
                 if !ok {
                     return failed("observer-unqualified");
                 }
             }
         }
+        // The guard certificate was verified above; each observation must still
+        // show a clean active window.
         if guarded
-            && entries.iter().any(|(_, v)| {
-                !linux::sample_valid(v.get("observer"), guard, &linked, observer, probe)
-            })
+            && entries
+                .iter()
+                .any(|(_, v)| !v.get("observer").is_some_and(linux::guard_component_valid))
         {
             return failed("invalid-memory-observation");
         }
@@ -1003,51 +1018,15 @@ pub fn evaluate(
         if !work_matches {
             return failed("unequal-memory-work");
         }
-        let (Some(a), Some(b)) = (
-            row.get("candidate_rss").and_then(|r| r.get("observer")),
-            row.get("reference_rss").and_then(|r| r.get("observer")),
-        ) else {
+        let Some(pair) = pair_values(row, linux) else {
             return failed("invalid-memory-observation");
         };
-        let field = |o: &Value, k: &str| n(o, k);
-        let values = (|| -> Option<(i128, i128, i128, i128)> {
-            let candidate_peak = if linux {
-                field(a, "rss_peak_upper_bound_bytes")?
-            } else {
-                field(a, "hwm_end")?.max(field(a, "rss_peak_observed")?)
-            };
-            let upper = candidate_peak - field(a, "rss_start")? + 2 * field(a, "page_size")?;
-            let lower = field(b, "rss_peak_observed")?
-                - field(b, "rss_start")?
-                - 2 * field(b, "page_size")?;
-            let reference_total = if linux {
-                field(b, "rss_peak_observed")?
-            } else {
-                field(b, "hwm_end")?.max(field(b, "rss_peak_observed")?)
-            };
-            // The policy's total resident peak: the candidate's ceiling plus two
-            // pages against the reference's observed peak minus two pages.
-            let total_upper = candidate_peak + 2 * field(a, "page_size")?;
-            let total_lower = reference_total - 2 * field(b, "page_size")?;
-            Some((upper, lower, total_upper, total_lower))
-        })();
-        let Some((upper, lower, total_upper, total_lower)) = values else {
-            return failed("invalid-memory-observation");
-        };
-        if total_lower <= 0 || total_upper <= 0 {
+        if pair.total.0 <= 0 || pair.total.1 <= 0 {
             return failed("total-rss-attribution-unresolved");
         }
-        rss.push((upper, lower));
-        let heap = |k: &str| {
-            row.get(k)
-                .and_then(|r| r.get("observer"))
-                .and_then(|o| n(o, "heap_peak_bytes"))
-        };
-        let (Some(ch), Some(rh)) = (heap("candidate_heap"), heap("reference_heap")) else {
-            return failed("invalid-memory-observation");
-        };
-        heaps.push((ch, rh));
-        totals.push((total_upper, total_lower));
+        rss.push(pair.growth);
+        heaps.push(pair.heap);
+        totals.push(pair.total);
     }
     let interval = |values: &[(i128, i128)], nonnegative: bool| -> R<Value> {
         let pairs: Vec<(f64, f64)> = values.iter().map(|&(a, b)| (a as f64, b as f64)).collect();
@@ -1062,12 +1041,28 @@ pub fn evaluate(
             ("upper_95", Value::float(i.upper_95)),
         ]))
     };
-    let (Ok(heap), Ok(total)) = (interval(&heaps, true), interval(&totals, false)) else {
-        return failed("invalid-memory-observation");
+    let as_f64 = |values: &[(i128, i128)]| -> Vec<(f64, f64)> {
+        values.iter().map(|&(a, b)| (a as f64, b as f64)).collect()
     };
-    // The page allowance can make a growth bound nonpositive even when
-    // both total resident bounds are valid.
-    let growth = interval(&rss, false).unwrap_or(Value::Null);
+    let (heap_ratios, total_ratios) = (as_f64(&heaps), as_f64(&totals));
+    let first_stop = (1..=samples.len())
+        .find_map(|n| settled(&heap_ratios[..n], &total_ratios[..n], pairs).map(|s| (n, s)));
+    let (heap, total, growth) = match first_stop {
+        Some((n, (heap, total))) if n == samples.len() => {
+            let growth = stats::order_interval(&as_f64(&rss), stats::EARLY_BOUND)
+                .map_or(Value::Null, |i| interval_value(&i));
+            (interval_value(&heap), interval_value(&total), growth)
+        }
+        None if samples.len() as i128 == pairs.planned as i128 => {
+            let (Ok(heap), Ok(total)) = (interval(&heaps, true), interval(&totals, false)) else {
+                return failed("invalid-memory-observation");
+            };
+            // The page allowance can make a growth bound nonpositive even when
+            // both total resident bounds are valid.
+            (heap, total, interval(&rss, false).unwrap_or(Value::Null))
+        }
+        _ => return failed("memory-pairs-off-rule"),
+    };
     let mut fields = vec![
         ("status", Value::str("qualified")),
         (
@@ -1093,11 +1088,33 @@ pub fn evaluate(
             ),
         ),
         ("rss_growth_ratio", growth),
-        ("pairs", Value::int(pairs)),
+        ("pairs", Value::int(samples.len() as i64)),
         ("samples", Value::Array(samples.to_vec())),
         ("certificate", certificate.clone()),
         ("seed", Value::int(seed as i64)),
     ];
+    if let Some(ceiling) = pairs.stop_below {
+        fields.push((
+            "early_stop",
+            obj(vec![
+                ("rule", Value::str(EARLY_STOP_RULE)),
+                ("planned_pairs", Value::int(pairs.planned as i64)),
+                ("ceiling", Value::float(ceiling)),
+                (
+                    "stopped_after",
+                    first_stop.map_or(Value::Null, |(n, _)| Value::int(n as i64)),
+                ),
+                (
+                    "interval",
+                    Value::str(if first_stop.is_some() {
+                        "order statistics of the look"
+                    } else {
+                        "bootstrap"
+                    }),
+                ),
+            ]),
+        ));
+    }
     if linux {
         fields.extend([
             ("total_rss_basis", Value::str("graded: candidate resident peak ceiling plus two pages / reference observed resident peak minus two pages; not a VM ratio")),
@@ -1106,6 +1123,70 @@ pub fn evaluate(
         ]);
     }
     obj(fields)
+}
+
+/// One pair's measured values, each as (candidate, reference).
+struct PairValues {
+    heap: (i128, i128),
+    /// Total resident peak: the candidate's ceiling plus two pages against the
+    /// reference's observed peak minus two pages.
+    total: (i128, i128),
+    /// Resident growth from the start, the same way.
+    growth: (i128, i128),
+}
+
+/// The values the gates compare in one pair, or `None` when an observation
+/// lacks them.
+fn pair_values(row: &Value, linux: bool) -> Option<PairValues> {
+    let observer = |key: &str| row.get(key).and_then(|r| r.get("observer"));
+    let (a, b) = (observer("candidate_rss")?, observer("reference_rss")?);
+    let field = |o: &Value, k: &str| py_int(o.get(k));
+    let candidate_peak = if linux {
+        field(a, "rss_peak_upper_bound_bytes")?
+    } else {
+        field(a, "hwm_end")?.max(field(a, "rss_peak_observed")?)
+    };
+    let reference_total = if linux {
+        field(b, "rss_peak_observed")?
+    } else {
+        field(b, "hwm_end")?.max(field(b, "rss_peak_observed")?)
+    };
+    let (a_page, b_page) = (field(a, "page_size")?, field(b, "page_size")?);
+    let heap = |key: &str| observer(key).and_then(|o| field(o, "heap_peak_bytes"));
+    Some(PairValues {
+        heap: (heap("candidate_heap")?, heap("reference_heap")?),
+        total: (candidate_peak + 2 * a_page, reference_total - 2 * b_page),
+        growth: (
+            candidate_peak - field(a, "rss_start")? + 2 * a_page,
+            field(b, "rss_peak_observed")? - field(b, "rss_start")? - 2 * b_page,
+        ),
+    })
+}
+
+/// The heap and total resident intervals a collection stops with, if it stops
+/// after these pairs: at the early look, with pairs remaining, both ratios
+/// settled below the ceiling.
+fn settled(
+    heaps: &[(f64, f64)],
+    totals: &[(f64, f64)],
+    pairs: Pairs,
+) -> Option<(stats::Interval, stats::Interval)> {
+    let ceiling = pairs.stop_below?;
+    if heaps.len() != stats::EARLY_LOOK
+        || stats::EARLY_LOOK >= pairs.planned
+        || !stats::settled_below(heaps, ceiling)
+        || !stats::settled_below(totals, ceiling)
+    {
+        return None;
+    }
+    Some((
+        stats::order_interval(heaps, stats::EARLY_BOUND).ok()?,
+        stats::order_interval(totals, stats::EARLY_BOUND).ok()?,
+    ))
+}
+
+fn interval_value(interval: &stats::Interval) -> Value {
+    super::timing::interval_value(interval)
 }
 
 fn work_valid(samples: &[Value], fields: &[String], expected: Option<&Value>) -> bool {
@@ -1158,7 +1239,7 @@ fn measure(
     root: &Path,
     candidate: &Path,
     reference: &Path,
-    pairs: usize,
+    pairs: Pairs,
     seed: u64,
     certificate: &Value,
     invocation: Invocation<'_>,
@@ -1191,7 +1272,9 @@ fn measure(
         .get("kernel_rss_required")
         .is_some_and(Value::truthy);
     let mut samples = Vec::new();
-    for _ in 0..pairs {
+    let (mut heaps, mut totals) = (Vec::new(), Vec::new());
+    let mut usable = true;
+    for _ in 0..pairs.planned {
         let mut jobs = [
             ("candidate", "heap"),
             ("candidate", "rss"),
@@ -1222,7 +1305,29 @@ fn measure(
             };
             row.push((format!("{name}_{mode}"), observed));
         }
-        samples.push(Value::Object(row));
+        let row = Value::Object(row);
+        // A pair with no usable values never settles the session; the full
+        // validation is evaluate's.
+        let values = pair_values(&row, linux);
+        samples.push(row);
+        match values {
+            Some(pair) if usable => {
+                heaps.push((pair.heap.0 as f64, pair.heap.1 as f64));
+                totals.push((pair.total.0 as f64, pair.total.1 as f64));
+                if let Some((heap, total)) = settled(&heaps, &totals, pairs) {
+                    println!(
+                        "memory of {}: stopped after {} of {} pairs, heap and total RSS order statistics {:.4} and {:.4} below 1",
+                        invocation.input.display(),
+                        heaps.len(),
+                        pairs.planned,
+                        heap.upper_95,
+                        total.upper_95
+                    );
+                    break;
+                }
+            }
+            _ => usable = false,
+        }
     }
     let mut result = if invocation
         .work_fields
@@ -1237,7 +1342,7 @@ fn measure(
         evaluate(
             root,
             &samples,
-            pairs as i128,
+            pairs,
             seed,
             certificate,
             invocation.expected_outputs,
@@ -1511,7 +1616,7 @@ pub fn collect(
     root: &Path,
     workers: WorkerPaths<'_>,
     input: &Path,
-    pairs: usize,
+    pairs: Pairs,
     seed: u64,
     operation: &Operation,
 ) -> R<Value> {
@@ -1578,7 +1683,7 @@ pub(crate) fn collect_command(
     candidate: &Path,
     reference: &Path,
     input: &Path,
-    pairs: usize,
+    pairs: Pairs,
     seed: u64,
     arguments: &[String],
     expected_outputs: &Value,
@@ -1620,7 +1725,7 @@ pub(crate) fn collect_commands(
     candidate: &Path,
     reference: &Path,
     input: &Path,
-    pairs: usize,
+    pairs: Pairs,
     seed: u64,
     commands: Commands<'_>,
 ) -> R<Value> {
@@ -1668,7 +1773,7 @@ fn collect_invocation(
     slot: &Slot,
     root: &Path,
     workers: WorkerPaths<'_>,
-    pairs: usize,
+    pairs: Pairs,
     seed: u64,
     invocation: Invocation<'_>,
 ) -> R<Value> {
@@ -1810,11 +1915,29 @@ pub fn evidence_valid_with_outputs(
                 observer.get("heap_live_start")?,
                 observer.get("heap_live_end")?,
             );
-        let pairs = py_int(memory.get("pairs"))?;
+        let planned = super::timing::planned_pairs(memory)?;
         let minimum = py_int(contract.get("minimum_pairs"))?;
-        if !(covered && raw.len() as i128 == pairs && raw.len() as i128 >= minimum) {
+        if !(covered
+            && py_int(memory.get("pairs")) == Some(raw.len() as i128)
+            && planned >= minimum)
+        {
             return Some(false);
         }
+        let pairs = Pairs {
+            planned: usize::try_from(planned).ok()?,
+            stop_below: match memory.get("early_stop") {
+                Some(stop) => {
+                    // A collection may stop early only under the memory gates' own ceiling.
+                    #[allow(clippy::float_cmp)] // The record must carry the constant exactly.
+                    let named = stop.get("ceiling")?.as_f64()? == CEILING;
+                    if s(stop, "rule") != Some(EARLY_STOP_RULE) || !named {
+                        return Some(false);
+                    }
+                    Some(CEILING)
+                }
+                None => None,
+            },
+        };
         let fields = super::comparison::work_fields(contract).ok()?;
         let expected = row.get("parity").and_then(|p| p.get("expected"));
         if !work_valid(raw, &fields, expected) {
@@ -1955,6 +2078,29 @@ mod command_tests {
     }
 
     #[test]
+    fn a_memory_session_settles_only_when_heap_and_total_rss_both_do() {
+        let heaps = vec![(0.0, 4096.0); 20];
+        let mut totals: Vec<(f64, f64)> = (0..20)
+            .map(|i| (if i % 2 == 0 { 900.0 } else { 910.0 }, 1000.0))
+            .collect();
+        let gate = Pairs::gate(30, CEILING);
+        assert!(settled(&heaps[..19], &totals[..19], gate).is_none());
+        assert!(settled(&heaps, &totals, gate).is_some());
+        assert!(settled(&heaps, &totals, Pairs::fixed(30)).is_none());
+        assert!(settled(&heaps, &totals, Pairs::gate(20, CEILING)).is_none());
+        // Equal to the reference is not lower; two of the first ten may be.
+        totals[2] = (1000.0, 1000.0);
+        totals[5] = (1100.0, 1000.0);
+        assert!(settled(&heaps, &totals, gate).is_some());
+        totals[12] = (1000.0, 1000.0);
+        assert!(settled(&heaps, &totals, gate).is_none());
+        totals[12] = (900.0, 1000.0);
+        let mut heavy = heaps.clone();
+        heavy[15] = (4096.0, 4096.0);
+        assert!(settled(&heavy, &totals, gate).is_none());
+    }
+
+    #[test]
     fn slots_never_outnumber_the_kernel_sessions() {
         let module = fs::read_to_string(
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../harness/rss-bound/triergon_rss_bound.c"),
@@ -2028,7 +2174,7 @@ mod command_tests {
             &root,
             &root,
             &root,
-            1,
+            Pairs::fixed(1),
             0,
             &certificate,
             Invocation {

@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::checks::read_json;
 use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
+use crate::harness::policy::Runtime;
 use crate::harness::timing::{self, Operation};
 use crate::harness::worker::{self, Finished};
 use crate::harness::{
@@ -26,7 +27,7 @@ type R<T> = Result<T, String>;
 
 pub const USAGE: &str = "usage: cargo xtask isobmff-bench [--benchmark] [--memory]
     [--subset52] [--part I/N] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
-    [--require-acceptance] [--full]
+    [--require-acceptance] [--full] [--no-early-stop]
 
 Always compare all 1020 traces: 972 output labels and 48 explicit refusals.
 The full measurement set has 956 physical operations and 16 explicit aliases.
@@ -734,7 +735,7 @@ fn native() -> bool {
 }
 
 fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
-    number(raw, "pairs").ok() == Some(pairs as i128)
+    timing::planned_pairs(raw) == Some(pairs as i128)
         && number(raw, "seed").ok() == Some(i128::from(seed))
 }
 
@@ -750,6 +751,7 @@ struct Options {
     full: bool,
     /// Which part of the measured set to measure, counted from 0, of how many.
     part: Option<(usize, usize)>,
+    early_stop: bool,
 }
 
 impl Options {
@@ -772,6 +774,7 @@ impl Options {
             seed: 37,
             full: false,
             part: None,
+            early_stop: true,
         };
         let mut args = args.iter();
         while let Some(argument) = args.next() {
@@ -794,6 +797,7 @@ impl Options {
                             })?,
                     );
                 }
+                "--no-early-stop" => options.early_stop = false,
                 "--output" => {
                     options.output = root.join(args.next().ok_or("--output needs a directory")?);
                 }
@@ -933,7 +937,8 @@ fn measure_time(
             &build.candidate,
             &build.reference,
             &input,
-            options.pairs,
+            timing::Pairs::gate(options.pairs, Runtime::load(root)?.ceiling)
+                .early_stop(options.early_stop),
             ITERATIONS,
             options.seed,
             &operation,
@@ -1007,7 +1012,8 @@ fn measure_memory(
             &build.candidate,
             &build.reference,
             &input,
-            options.memory_pairs,
+            timing::Pairs::gate(options.memory_pairs, memory::CEILING)
+                .early_stop(options.early_stop),
             options.seed,
             memory::Commands {
                 candidate: &candidate,
@@ -1267,6 +1273,7 @@ fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
         ("memory_pairs", Value::int(options.memory_pairs as i128)),
         ("seed", Value::int(options.seed)),
         ("iterations", Value::int(ITERATIONS)),
+        ("early_stop", Value::Bool(options.early_stop)),
         (
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),

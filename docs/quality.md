@@ -12,8 +12,8 @@ when it passes all three gates on every case in its corpus.
 | Gate | Requirement |
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
-| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
-| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
+| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval ([early stop](#early-stop)). The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
+| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
 corpus manifest live in `harness/features/<feature>/`.
@@ -505,23 +505,26 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
-- Workers and references follow one link policy, `static-runtime-support-v1`: on
-  GNU/Linux each side links the support libraries of its language runtime from their
-  static archives, and libc and third-party libraries, such as zlib, stay shared on
-  both. Today that is libgcc's unwinder (`libgcc_eh`) and libm for the Rust workers, and
-  libm, libstdc++, libgcc and libatomic for the C and C++ references; libm stays shared
-  on both sides on x86, where glibc's `libm.a` links only into a static program. Total
-  RSS then compares the code and data each process's libraries use: a shared runtime
-  support library is mapped whether or not that code calls it, and the two toolchains
-  load different ones. The Rust standard library loads `libgcc_s` and runs its
-  initialisation in every program, one that never unwinds included; FFmpeg loads `libm`,
-  and HarfBuzz `libstdc++`. On ARMv7, `libgcc_s` holds 18 resident pages of the framing
-  worker, and `libm` 18 and 58 of the framing and ISO BMFF references. No worker or
-  reference maps libatomic today: the FFmpeg references name it, and the linker leaves
-  it out. Elsewhere both link as their toolchains do. `build-workers` records the policy
-  in `identity.json`, and `report` and `grade` refuse a build that records another
-  policy or none, so results from differently linked builds are never compared or reused
-  together.
+- Workers and references follow one link policy, `static-toolchain-runtime-v1`: on
+  GNU/Linux each side links its toolchain's runtime support libraries from their static
+  archives, libgcc's unwinder (`libgcc_eh`) for the Rust workers and libgcc, libstdc++
+  and libatomic for the C and C++ references. The C library, libc with libm, and
+  third-party libraries, such as zlib, stay shared on both sides. A C program already
+  links libgcc statically by default; the Rust standard library instead loads `libgcc_s`
+  and runs its initialisation in every program, one that never unwinds included, and
+  HarfBuzz and libass load `libstdc++`. Mapped shared, each costs its process resident
+  pages its own code does not use: on ARMv7, 18 for `libgcc_s` in the framing worker and
+  276 for `libstdc++` in the libass player reference. No worker or reference maps
+  libatomic today: the FFmpeg references name it, and the linker leaves it out. glibc's
+  static libm needs the static libc, so libm stays with libc. Elsewhere both sides link
+  as their toolchains do. `build-workers` records the policy in `identity.json`, and
+  `report` and `grade` refuse a build that records another policy or none, so results
+  from differently linked builds are never compared or reused together.
+- A gate run builds with `cargo xtask build-workers --all-references`, which fails when
+  any profile reference's FFmpeg, FreeType, HarfBuzz or libass profile is not prepared.
+  Without the flag, `build-workers` builds the references whose profiles are prepared
+  and prints each one it skipped; `comparison_references` in `identity.json` lists
+  exactly those it built.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
   with the same two settings in its own release profile. Cargo's default profile has
@@ -554,7 +557,7 @@ may override that count for diagnostic comparisons.
   process startup and serialisation outside the timing.
 - Use 30 or more randomised A/B pairs per case after warm-up, keep every raw sample,
   and report p50, p95 and the confidence bound per case. An aggregate never hides a
-  failing case.
+  failing case. A gate session may end earlier, by the rule [below](#early-stop).
 - Measure on an isolated machine. Never time while compiling, fuzzing or running
   another benchmark; the runner watches the whole run and rejects it if a tracked
   process uses CPU or steal time grows.
@@ -602,21 +605,25 @@ may override that count for diagnostic comparisons.
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
 measurements, the packet-framing suite, the codecs, a part of the capture cases, the
-tests, and the font, shaping, rasterising and ASS comparisons. `cargo xtask gate plan --shards N` splits them into N
-shards of about equal planning weight, each for its own host. On one host, a shard's
-run is:
+tests, and the font, shaping, rasterising and ASS comparisons. `cargo xtask gate plan
+--shards N` splits them into N shards of about equal planning weight, each for its own
+host. On one host, a shard's run is:
 
-1. `tools/gate-host.sh ready I/N REVIEW`: the prepare commands, the workers, and `cargo
-   xtask gate preflight`, which runs `cargo xtask preflight` with everything the shard
-   measures (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
-   takes them, `--isobmff`, `--codecs` for each workload list, `--external-vector`,
-   `--capture` for the capture cases) and `--review` for the RSS module review
-   (`cargo xtask preflight` takes `--standard-memory` instead for a run without the
-   kernel bound). Preflight checks that the gate build's workers and references match
-   the build identity, that every case names a reference the identity holds and has
-   each input it reads with its pinned hash, that the capture input generator's Python
-   has numpy, that the review covers this module source and kernel, and that the
-   module is unloaded. A feature without cases or a workload list without workloads
+1. `tools/gate-host.sh ready I/N REVIEW`: the prepare commands, the workers with
+   `cargo xtask build-workers --all-references`, so that every profile reference is
+   built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
+   everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
+   `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--codecs` for each
+   workload list, `--external-vector`, `--capture` for the capture cases) and
+   `--review` for the RSS module review (`cargo xtask preflight` also takes
+   `--reference NAME` for any other reference a run names by path, and
+   `--standard-memory` instead of `--review` for a run without the kernel bound).
+   Preflight checks that the gate build's workers and references match the build
+   identity, that every case names a reference the identity holds and has each input it
+   reads with its pinned hash, that the references ISO BMFF, the codecs and capture
+   measure against were built, that the capture input generator's Python has numpy,
+   that the review covers this module source and kernel, and that the module is
+   unloaded. A feature without cases or a workload list without workloads
    fails, and every failure is printed at once. Then `prove.sh` runs once into a
    scratch directory and the module is unloaded again, so a module that will not
    build, load or prove itself stops the run here.
@@ -636,6 +643,66 @@ and a record of its command, status and time, go under OUT. `cargo xtask gate su
 planned step did not run exactly once, a step failed, or the shards measured different
 source revisions or timing builds, and names the failed grades whose only failures are
 the contract's listed open cases.
+
+#### Early stop
+
+A gate timing session (`report`, `isobmff-bench`, `external-vector`, `codecs time`,
+`capture qualify`) may end after 20 of its 30 pairs, taken as two blocks of ten: when
+every ratio `T_triergon / T_reference` of the second block and at least eight of the
+first lie strictly below the ceiling, and the lag-1 autocorrelation of the 20 ratios is
+at most 0.42. A gate memory collection stops only when its peak heap ratios and its
+total resident ratios each meet the same three conditions under 1. Otherwise either
+runs all 30 pairs and is graded by the paired bootstrap as before. A session that stops
+records the rule (`early_stop`) and, as its interval, the median of its 20 ratios
+bounded by their 3rd and 18th smallest. The validator and the memory evaluator replay
+the rule on the recorded pairs, so a session that stopped where the rule does not, or
+ran on where it stops, does not count; the record must name exactly the ceiling of
+[`harness/policy.json`](../harness/policy.json), and grading holds its planned pairs to
+the contract's minimum. A stopped session prints where it stopped, and its record
+labels its interval `order statistics of the look`. Comparisons with another build
+(`--baseline-worker`, quick checks) always run every pair, and `--no-early-stop` makes
+any gate command do the same.
+
+The bound is a sign test. When every ratio of the second block lies below the ceiling,
+so does the 18th smallest of all 20. For independent pairs whose true median ratio is
+at the ceiling, each ratio lies below it with probability at most ½, so the second block
+qualifies with probability at most 2⁻¹⁰, and with eight of the first block, at most
+2⁻¹⁰ · 56/2¹⁰ = 0.005%, whatever their distribution. Because the second block alone
+bounds it by 2⁻¹⁰ = 0.098%, a warm-up or drift confined to the first pairs cannot stop a
+case the second block would not. The autocorrelation limit, the 99th percentile of 20
+independent ratios, refuses sessions whose pairs are visibly not independent. This adds
+to the unchanged error of the 30-pair bound and keeps the one-sided 5% false-pass
+guarantee of a 95% bound.
+
+The guarantee assumes independent pairs. In the archived 30-pair sessions
+(`armv7-thumb2-3df7ae6d-linux-armv7` on ARMv7; `runners-gate-build-linux-arm64` and
+`mpegts-pes-gate-build-linux-arm64` on AArch64) the paired ratios behave as independent
+draws: against each session's own shuffled ratios, the share of sessions whose lag-1
+autocorrelation exceeds the shuffled 95th percentile is 4.5% to 5.3% of memory
+collections and 3.0% to 6.0% of timing sessions (5% for independent pairs), and the mean
+of pairs 1 to 10 against pairs 11 to 30 differs by −0.04 to +0.04 standard deviations on
+average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts. Simulated with the true
+median exactly at the ceiling, the rule stops a session early with probability 0.007%
+for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2, 0.27% at 0.5, and
+0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3 standard
+deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
+
+Replayed on those sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, the rule
+stops 1,597 of 1,663 AArch64 and 2,980 of 3,037 ARMv7 timing sessions and 1,337 of 1,663
+AArch64 and 2,956 of 3,335 ARMv7 memory collections, and no session it stops failed at
+30 pairs (a collection refused for contamination is refused either way). Drawing pairs
+from the ARMv7 timing sessions' own ratios rescaled to a median exactly at the ceiling,
+0.006% of 128,000 simulated sessions stop early, and the share that passes, 3.22%, is
+the 30-pair bound's; from the ARMv7 memory collections' total resident ratios at a
+median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against fresh
+30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every session
+that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux` memory cases,
+whose total resident bounds lie between 0.978 and 1.011, ran every pair on both sides
+and changed verdict between the two runs, as two 30-pair bounds that close to the
+ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
+instead of 19.2 on ARMv7, and its memory 13.5 instead of 19.2 and 10.7 instead of 15.0.
+The replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
+`gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`.
 
 #### Memory in parallel
 
