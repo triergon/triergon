@@ -44,3 +44,72 @@ glyph 4 57 truetype 2 | 4 8 | 6 0 1 6 25 1 25 25 1 25 0 1 32 0 1 50 0 1 50 25 1 
 bold 4 truetype 2 | 4 8 | 6 0 1 6 25 1 25 25 1 25 0 1 32 0 1 50 0 1 50 25 1 32 25 1
 oblique 4 truetype 2 | 4 8 | 6 0 1 14 25 1 33 25 1 25 0 1 32 0 1 50 0 1 58 25 1 40 25 1
 both 4 truetype 2 | 4 8 | 6 0 1 14 25 1 33 25 1 25 0 1 32 0 1 50 0 1 58 25 1 40 25 1
+height 64 outlines
+face 0
+size 64 1 1 4194 4194 64 -64 64 64 51 13 63 63 1 0 underline -8 -5 strikeout -
+glyph 0 32 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 38 truetype 1 | 4 | 6 0 1 6 45 1 32 45 1 32 0 1
+bold 1 truetype 1 | 4 | 6 0 1 6 45 1 32 45 1 32 0 1
+oblique 1 truetype 1 | 4 | 6 0 1 21 45 1 47 45 1 32 0 1
+both 1 truetype 1 | 4 | 6 0 1 21 45 1 47 45 1 32 0 1
+glyph 2 38 none 1 | 1 | 19 19 1
+bold 2 none 1 | 1 | 19 19 1
+oblique 2 none 1 | 1 | 25 19 1
+both 2 none 1 | 1 | 25 19 1
+glyph 3 38 none 1 | 4 | 6 0 1 32 45 1 32 0 1 6 45 1
+bold 3 none 1 | 4 | 6 0 1 32 45 1 32 0 1 6 45 1
+oblique 3 none 1 | 4 | 6 0 1 47 45 1 32 0 1 21 45 1
+both 3 none 1 | 4 | 6 0 1 47 45 1 32 0 1 21 45 1
+glyph 4 58 truetype 2 | 4 8 | 6 0 1 6 26 1 26 26 1 26 0 1 32 0 1 51 0 1 51 26 1 32 26 1
+bold 4 truetype 2 | 4 8 | 6 0 1 6 26 1 26 26 1 26 0 1 32 0 1 51 0 1 51 26 1 32 26 1
+oblique 4 truetype 2 | 4 8 | 6 0 1 15 26 1 35 26 1 26 0 1 32 0 1 51 0 1 60 26 1 41 26 1
+both 4 truetype 2 | 4 8 | 6 0 1 15 26 1 35 26 1 26 0 1 32 0 1 51 0 1 60 26 1 41 26 1
+height 127 outlines
+face 0
+size 127 2 2 8323 8323 128 -64 128 128 102 25 126 126 1 0 underline -16 -10 strikeout -
+glyph 0 63 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 76 truetype 1 | 4 | 13 0 1 13 89 1 63 89 1 63 0 1
+bold 1 truetype 1 | 4 | 13 0 1 13 89 1 63 89 1 63 0 1
+oblique 1 truetype 1 | 4 | 13 0 1 43 89 1 93 89 1 63 0 1
+both 1 truetype 1 | 4 | 13 0 1 43 89 1 93 89 1 63 0 1
+glyph 2 76 none 1 | 1 | 38 38 1
+bold 2 none 1 | 1 | 38 38 1
+oblique 2 none 1 | 1 | 51 38 1
+both 2 none 1 | 1 | 51 38 1
+glyph 3 76 none 1 | 4 | 13 0 1 63 89 1 63 0 1 13 89 1
+bold 3 none 1 | 4 | 13 0 1 63 89 1 63 0 1 13 89 1
+oblique 3 none 1 | 4 | 13 0 1 93 89 1 63 0 1 43 89 1
+both 3 none 1 | 4 | 13 0 1 93 89 1 63 0 1 43 89 1
+glyph 4 114 postscript 2 | 4 8 | 13 0 1 13 51 1 51 51 1 51 0 1 63 0 1 102 0 1 102 51 1 63 51 1
+bold 4 postscript 2 | 4 8 | 13 0 1 13 51 1 51 51 1 51 0 1 63 0 1 102 0 1 102 51 1 63 51 1
+oblique 4 postscript 2 | 4 8 | 13 0 1 30 51 1 68 51 1 51 0 1 63 0 1 102 0 1 119 51 1 80 51 1
+both 4 postscript 2 | 4 8 | 13 0 1 30 51 1 68 51 1 51 0 1 63 0 1 102 0 1 119 51 1 80 51 1
+height 128 outlines
+face 0
+size 128 2 2 8389 8389 128 -64 128 128 102 26 128 128 2 0 underline -16 -10 strikeout -
+glyph 0 64 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 77 truetype 1 | 4 | 13 0 1 13 90 1 64 90 1 64 0 1
+bold 1 truetype 1 | 4 | 13 0 1 13 92 1 66 92 1 66 0 1
+oblique 1 truetype 1 | 4 | 13 0 1 44 90 1 95 90 1 64 0 1
+both 1 truetype 1 | 4 | 13 0 1 44 92 1 97 92 1 66 0 1
+glyph 2 77 none 1 | 1 | 38 38 1
+bold 2 error
+oblique 2 none 1 | 1 | 51 38 1
+both 2 error
+glyph 3 77 none 1 | 4 | 13 0 1 64 90 1 64 0 1 13 90 1
+bold 3 error
+oblique 3 none 1 | 4 | 13 0 1 95 90 1 64 0 1 44 90 1
+both 3 error
+glyph 4 115 none 2 | 4 8 | 13 0 1 13 51 1 51 51 1 51 0 1 64 0 1 102 0 1 102 51 1 64 51 1
+bold 4 error
+oblique 4 none 2 | 4 8 | 13 0 1 30 51 1 68 51 1 51 0 1 64 0 1 102 0 1 119 51 1 81 51 1
+both 4 error

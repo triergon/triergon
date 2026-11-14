@@ -1,11 +1,11 @@
-# Emboldening outlines without an orientation where the emboldening
-# strength is zero: heights below one pixel per em that still size the face
-# (x_ppem 1), with a clockwise square beside a single point, a figure eight
-# with equal lobes and two squares whose areas cancel.
+# Emboldening outlines without an orientation at the smallest emboldening
+# strengths: 0 (heights 40 and 63, below one pixel per em, x_ppem 1), 1
+# (64 and 127) and 2 (128), with a clockwise square beside a single point,
+# a figure eight with equal lobes and two squares whose areas cancel.
 family Triergon Zero Strength
 units-per-em 1000
 metrics 800 -200
-heights 40 63
+heights 40 63 64 127 128
 modes outlines
 glyph advance 500
 end
