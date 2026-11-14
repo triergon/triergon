@@ -676,9 +676,18 @@ own copies of the worker executables, and only those copies are evicted before e
 run, so one slot's eviction never touches an executable another slot runs. Inputs are
 not evicted: they stay in the page cache as in a serial run, and cases that read a
 common file (the input, an ordered entity or a companion) run in the same slot one
-after another. Workers measured from their own paths are such a file, so their cases
-run one at a time. Pinned to one CPU, collection runs exactly as before. The reference's
-memory is measured afresh in every pair, not reused from earlier runs: on a second host
+after another. Workers measured from their own paths, as a comparison with another
+build is, are such a file, so their cases run one at a time; `codecs memory` and
+`capture qualify` measure copies whenever both workers are the gate build, as the other
+commands do unless they compare with another build. `capture qualify --stage timing`
+runs correctness and timing alone, on one CPU, and `--stage memory --timing DIR` then
+collects every case's memory in one collection from the records the timing run wrote,
+refusing them if the sources, workers, cases or host differ; without `--stage` one run
+does both, its memory after all its timing. Collecting side by side, it gives each
+case its own copy of its generated input, checked against the hash its timing recorded
+and removed when the run ends, so cases of one input no longer share a file; on one CPU
+they read the input itself. Pinned to one CPU, collection runs exactly as before. The reference's memory is measured afresh in every pair, not reused from
+earlier runs: on a second host
 of the same class it gives the same heaps and resident peaks within their spread
 (evidence set `gate-reference-memory-cross-host`), but caching it would save a few
 minutes and give up the interleaving of both workers within each pair.
