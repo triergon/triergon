@@ -13,12 +13,10 @@ terminal-media matrix against the FFmpeg 9.0.2 release; fonts against FreeType 2
 shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17;
 rasterising, ASS parsing and ASS rendering against libass 0.17.5
 ([reference pins](quality.md#reference-and-corpus)).
-Every runtime and memory figure below was measured with workers and references linked as
-their toolchains link them, before the [link policy](quality.md#measuring-performance) that
-links both sides' toolchain runtime support libraries from their static archives. The policy
-changes every Rust worker and the HarfBuzz and libass references; the FFmpeg and FreeType
-references link as before. Each row cites its earlier measurement until it is measured again
-under the policy.
+Measurements use the toolchains' default links unless the measurement notes state
+that the workers and references used the [static runtime link policy](quality.md#measuring-performance).
+The policy links toolchain runtime support from static archives for the Rust workers
+and the HarfBuzz and libass references. FFmpeg and FreeType keep their existing links.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -26,7 +24,7 @@ under the policy.
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1423 (116/116 pass) | heap ≤0.6263, total RSS ≤0.9831 (116/116 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 100 of 116 cases | full EBML/Matroska scope |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1488 (44/44 pass) | heap ≤0.4038, total RSS ≤0.9202 (44/44 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 27 of 44 cases | FATE mapping |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10/10 packet folds (`matroska-audio-clocks`) | 1.1408 (10/10 pass) | heap ≤0.8103, total RSS ≤0.9875 (10/10 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 10 of 10 cases | audio seek and FATE coverage |
-| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8854 (972/972 pass) | heap ≤0.4132, total RSS ≤0.7260 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
+| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 and Dolby Vision sample entry identification | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 0.8048 (972/972 pass) | heap ≤0.3157, total RSS ≤0.7048 (972/972 lower) | FATE coverage; seek and range-plan timing; FFmpeg comparison for the neutral reader |
 | MP4 range playback | Regular AVC/AAC and AVC/Opus startup and backward seek, including regular AVC with an initial non-sync prefix, fragmented AVC/AAC with open-ended edits, timed text and DVD subpictures including a leading empty subpicture edit, dedicated HEVC and AV1 sample entries, source-declared Opus seek preroll, QuickTime AAC with fixed and program configurations, including regular version-2 descriptions and fragmented version-1 descriptions, and media playback in the presence of RTP hint tracks | 51 matching open and backward-seek comparisons (`mp4-range`), 7,190 packets on AArch64 Linux | 1.1523 (51/51 pass) | heap ≤0.9956, total RSS ≤0.9682 (51/51 lower) | Additional range playback profiles |
 | AAC in MOV | Raw AAC-LC access units with 1024 samples per plane and all thirteen indexed rates. Supports fixed configurations 1–7, 11, 12 and 14 and out-of-band programs assigning up to eight distinct speaker positions. | The [configured decoder comparison](../harness/features/aac-access-units/contract.json) covers 34 clips, 3,544 access units and 15,575,040 PCM samples. Two fixed-layout QuickTime clips compare the surround pair in the same plane positions with side or back labels. Every other clip compares exact speaker order. | 0.8262 (34/34 pass) | heap ≤0.8066, total RSS ≤0.4586 (34/34 lower) | 960-sample frames and SBR in raw access units |
 | Ogg | Pages with CRC and resync, multiplexed and chained streams, Vorbis, Opus and FLAC mappings with canonical configurations, granule timing, pre-skip and end trims, bisection seeking | Packets against the pinned `ffprobe` (`cargo xtask codecs readers`) on 21 FATE Vorbis files and 13 generated Opus, Vorbis and FLAC files (multiplexed, chained, damaged, truncated), in two views: the FFmpeg-compatible `compat::clock` 31/34 pass, 3 differ only by reviewed FFmpeg behaviours; the reader's own timing 7/34 pass, 25 differ only where `compat::clock` reproduces FFmpeg, 2 by reviewed behaviours ([reader rules](../harness/codecs/reader-rules.json), [frozen differences](../harness/codecs/reader-differences.json)) | within the codec workloads | within the codec workloads | `b_vorbis.ogg`, `chain_vorbis.ogg`: a negative last duration FFmpeg prints modulo 2^32; `crc_bad.opus`: the first packet after a page that fails its CRC, which FFmpeg times from its own page and `compat::clock` from the stream start; Theora and Speex untimed; chained seeks not compared with FFmpeg |
@@ -174,11 +172,19 @@ memory comparisons await gate-build measurement with repository runners.
 ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 `--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
 
-The ISO BMFF row uses the gate build at `f99d893196908d562c897bccb20c6a972cd25d11`
-on a c8g.large pinned to CPU 1, 30 pairs. Runtime comes from the timing collection and
-memory from a separate collection under the kernel RSS bound; both are in the raw
-samples. `cargo xtask grade` cannot join them, because FFmpeg's log lines carry heap
-addresses that differ between runs.
+The ISO BMFF recovery opener handles legacy QuickTime data-handler metadata in
+ISO-branded files with self-contained data references. It also accepts flag 1
+in a version-0 sample dependency table and checks every declared sample row.
+
+The AArch64 ISO BMFF open and index result uses the `static-toolchain-runtime-v1`
+link policy on a c6g.4xlarge, with CPU 1 for timing and CPUs 1–15 for kernel-bound
+memory. It measures 956 distinct open and index operations over
+30 timing and 30 memory pairs. The 16 aliases keep separate parity traces and
+share their operations' measurements. The shared grader joined both collections
+on the same boot and accepted the open and index slice, including all 48
+registered refusals. The source revision and joined report are recorded in the
+[`quicktime-joined-7b399008-aarch64` evidence set](../harness/evidence/index.json).
+Full FATE coverage remains open.
 
 The MP4 forward and range results use the gate build at
 `f5453ef9d88712777aa5b6383250875456e9f334` on a c8g.large pinned to CPU 1, with
@@ -417,7 +423,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Matroska startup and seek, preceding comparison | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
-| ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
+| ISO BMFF open and index runtime and memory | `7b3990083d8305aa46972411f3605a483a2e4b5f` | `371475c620e1da835bba0f3fb12b6227516a5593edfef267a401bf1c3800e6fe` |
+| ISO BMFF open and index, earlier comparison | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
 | MPEG-TS PES | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
 | MPEG-TS access units | `230d1314464d34a04f5f2614298e5b7009292f0c` | `a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697` |
 | MPEG-TS program playback | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |

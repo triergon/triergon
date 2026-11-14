@@ -247,6 +247,11 @@ This lets a compatibility consumer validate sample ranges against the
 declaration and read only the available prefix. `BoxReader::new` still
 rejects boxes extending past the source.
 
+`MovieOpen::new_recovery` also accepts the legacy QuickTime `dhlr`/`cios`
+component inside media information when its media handler is a QuickTime
+`mhlr`. Sample descriptions must still refer to self-contained data. In this
+view, `sdtp` may carry flag 1 with version 0 and exactly one byte per sample.
+
 ## Supported
 
 | Area | Coverage |

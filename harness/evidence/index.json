@@ -20354,6 +20354,102 @@
      "status": 0
     }
    ]
+  },
+  {
+   "name": "quicktime-open-index-interrupted-f5b1559d",
+   "path": "quicktime-open-index-interrupted-f5b1559d",
+   "retention": "retained",
+   "reason": "ISO BMFF open and index parity and the timing samples saved before the first run was interrupted.",
+   "key": "evidence/quicktime-open-index-interrupted-f5b1559d/0eaf28776e7a5c7ffceb98d8937064707e9a2b04f6c19d21ee1aabb64c170023.tar.gz",
+   "sha256": "0eaf28776e7a5c7ffceb98d8937064707e9a2b04f6c19d21ee1aabb64c170023",
+   "bytes": 487223620
+  },
+  {
+   "name": "quicktime-preflight-f5b1559d",
+   "path": "quicktime-preflight-f5b1559d",
+   "retention": "90 days",
+   "reason": "ISO BMFF input and kernel review preflight before measurement",
+   "key": "qualification/quicktime-preflight-f5b1559d/ece4f272af7eebc52f0da210c4e112bdba4fb4e1a14d237f4891f9f719ac01eb.tar.gz",
+   "sha256": "ece4f272af7eebc52f0da210c4e112bdba4fb4e1a14d237f4891f9f719ac01eb",
+   "bytes": 49917684
+  },
+  {
+   "name": "quicktime-full-aed664a1-aarch64",
+   "path": "quicktime-full-aed664a1-aarch64",
+   "retention": "90 days",
+   "reason": "Full ISO BMFF run with standard RSS bounds",
+   "key": "qualification/quicktime-full-aed664a1-aarch64/13aaaae0097f2bf13e7a07b63e151bb6a1d2dc6d02a4f67eb76bda561b70c6d3.tar.zst",
+   "sha256": "13aaaae0097f2bf13e7a07b63e151bb6a1d2dc6d02a4f67eb76bda561b70c6d3",
+   "bytes": 34372280,
+   "results": [
+    {
+     "path": "results/open-index/gate-result.json",
+     "command": "isobmff-bench --benchmark --memory",
+     "key": "d9cad248c347a33974765cb3cf2096879dfa09ae8956b9e534a7c1dcc8d77b06",
+     "status": 1,
+     "report_sha256": "b2990640bd50711f2bf4d95f090ddef28c2eb5e126d4336f47067530744ad029"
+    }
+   ],
+   "source_revision": "aed664a1644ca1b7b6623deb03c79e83cc399872"
+  },
+  {
+   "name": "quicktime-kernel-0489d7ae-aarch64",
+   "path": "quicktime-kernel-0489d7ae-aarch64",
+   "retention": "90 days",
+   "reason": "Complete ISO BMFF timing and kernel-bound memory collections with the join diagnostics",
+   "key": "qualification/quicktime-kernel-0489d7ae-aarch64/5132565f340a1360e8a9ebcc3ce0eb3a161b3bd00fc526b50e5f50001d7f257a.tar.zst",
+   "sha256": "5132565f340a1360e8a9ebcc3ce0eb3a161b3bd00fc526b50e5f50001d7f257a",
+   "bytes": 79728044,
+   "results": [
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "62abbb0efa95152ef8a4d7aa5aebfd5250313e1c54f7c5f8c929db68ca2a3c72",
+     "status": 0,
+     "report_sha256": "c59bbdcfc0c40167117edc3eb0db9a29dd3d6e82f67eb18eec41bdab4ad11909"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "d27488e366d3beabee97760c1ef8dfc8958fe4d56ba167353241f2a11079efce",
+     "status": 0,
+     "report_sha256": "8593fe980da3ac0c77891b975596400b41058e7cdddd714924c6e211904c64da"
+    }
+   ],
+   "source_revision": "0489d7aebbdb26225c1aac88356fb12d4bd16e80"
+  },
+  {
+   "name": "quicktime-joined-7b399008-aarch64",
+   "path": "quicktime-joined-7b399008-aarch64",
+   "retention": "retained",
+   "reason": "Complete ISO BMFF open and index qualification with joined timing and kernel-bound memory",
+   "key": "evidence/quicktime-joined-7b399008-aarch64/371475c620e1da835bba0f3fb12b6227516a5593edfef267a401bf1c3800e6fe.tar.zst",
+   "sha256": "371475c620e1da835bba0f3fb12b6227516a5593edfef267a401bf1c3800e6fe",
+   "bytes": 68960398,
+   "results": [
+    {
+     "path": "results/grade-reviewed/gate-result.json",
+     "command": "grade",
+     "key": "fd10ea2e3e642a6083f167e5f80b5b9c55f6bbd9731e8f4fa032f8c156dc3aa7",
+     "status": 0,
+     "report_sha256": "9731878f3c96781298a85812ecfe235a609139e3cc1610b8fa2f08de9f1a4266"
+    },
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "e014e699ad1bdf037ce32e4c4c196d13e45bdeced48d4a1a0ee255412634fb53",
+     "status": 0,
+     "report_sha256": "1b155d5af389cf3dd9f4caf84049918b1bfef6a0418779bd0cfdd45a1647fb06"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "5cbd6db9bfae978b3f186a50de5558d0c6fa55d31b3763f3aadb006282c06504",
+     "status": 0,
+     "report_sha256": "b687e7592592632e595c6bb5e243f84c29888eb9a174789d4f39c03ed9c4775f"
+    }
+   ],
+   "source_revision": "7b3990083d8305aa46972411f3605a483a2e4b5f"
   }
  ]
 }

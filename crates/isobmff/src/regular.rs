@@ -318,11 +318,18 @@ pub struct SampleTableBuilder {
     recover_sync: bool,
     recover_initial_description: bool,
     recover_descriptions: bool,
+    legacy_dependency_flags: bool,
     initial_description: Option<InitialDescriptionDiagnostic>,
     coverage: [Option<RunCoverage>; 2],
     sync_diagnostic: Option<SyncDiagnostic>,
 }
 impl SampleTableBuilder {
+    /// Allow the dependency flag used by legacy QuickTime exports in the
+    /// recovery view. The version and row count are still checked.
+    pub(crate) fn allow_legacy_dependency_flags(&mut self) {
+        self.legacy_dependency_flags = true;
+    }
+
     pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
         Self::with_timing_policy(raw, budget, limits, TimingRunPolicy::Strict)
     }
@@ -382,6 +389,7 @@ impl SampleTableBuilder {
             recover_sync: false,
             recover_initial_description: false,
             recover_descriptions: false,
+            legacy_dependency_flags: false,
             initial_description: None,
             coverage: [None, None],
             sync_diagnostic: None,
@@ -518,7 +526,11 @@ impl SampleTableBuilder {
                                 .map(|v| Words::parse(v, 4, self.limits))
                                 .transpose()?;
                             if let Some(raw) = &self.parts.dependency {
-                                fields::full_zero(raw.payload())?;
+                                if !self.legacy_dependency_flags
+                                    || raw.payload().get(..4) != Some(&[0, 0, 0, 1])
+                                {
+                                    fields::full_zero(raw.payload())?;
+                                }
                                 fields::exact_rows(raw.payload(), 4, sizes.count, 1)?;
                             }
                             self.table = Some(SampleTable {
