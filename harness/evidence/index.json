@@ -20291,6 +20291,71 @@
    ]
   },
   {
+   "name": "gate-reference-memory-cross-host",
+   "path": "gate-reference-memory-cross-host",
+   "retention": "retained",
+   "reason": "Kernel-bound memory of matroska-demux and the 956 ISO BMFF operations on a second c6g.4xlarge per target with the same worker bytes, against the first hosts' collections: on Linux AArch64 and the ARMv7 gate target, every case's candidate and reference peak heap identical sample for sample and every median total resident peak within the first host's spread; the record of why a cached reference memory would be valid, with the per-case series, the comparisons and the scripts",
+   "key": "evidence/gate-reference-memory-cross-host/bbb23e1dcc112bad020072ffc19ed24ae9f7102642a69298221257bc79abada4.tar.gz",
+   "sha256": "bbb23e1dcc112bad020072ffc19ed24ae9f7102642a69298221257bc79abada4",
+   "bytes": 88985752,
+   "source_revisions": {
+    "first": "a92f2d0a938562ac2f2bb3f5106be639015588de",
+    "second": "e1adf7332946f0e430e3deeb1098048684a4072c"
+   }
+  },
+  {
+   "name": "gate-parallel-memory-isobmff-aarch64",
+   "path": "gate-parallel-memory-isobmff-aarch64",
+   "retention": "retained",
+   "reason": "Memory of ISO BMFF with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on Linux AArch64 on a c6g.4xlarge at a92f2d0a: every case's peak heap identical sample for sample, candidate and reference resident medians within the serial spread, every case passing both ways; with the per-case comparison and verdicts, the step logs, the RSS module proof, and the source bundle",
+   "key": "evidence/gate-parallel-memory-isobmff-aarch64/1a07c01b59d24d65b496dc571350fb362505a9b5ef6a1315ccf359cc74fcce07.tar.zst",
+   "sha256": "1a07c01b59d24d65b496dc571350fb362505a9b5ef6a1315ccf359cc74fcce07",
+   "bytes": 38673923,
+   "source_revisions": {
+    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   },
+   "results": [
+    {
+     "path": "memory-parallel-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "b706119e7cd66f71c3f023399c7b74cdcadda36f460af5a3d273040421301f32",
+     "status": 0
+    },
+    {
+     "path": "memory-serial-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "b706119e7cd66f71c3f023399c7b74cdcadda36f460af5a3d273040421301f32",
+     "status": 0
+    }
+   ]
+  },
+  {
+   "name": "gate-parallel-memory-isobmff-armv7",
+   "path": "gate-parallel-memory-isobmff-armv7",
+   "retention": "retained",
+   "reason": "Memory of ISO BMFF with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on the ARMv7 gate target in the armhf user space on a c6g.4xlarge at a92f2d0a: every case's peak heap identical sample for sample, candidate and reference resident medians within the serial spread, every case passing both ways; with the per-case comparison and verdicts, the step logs, the RSS module proof, and the source bundle",
+   "key": "evidence/gate-parallel-memory-isobmff-armv7/672fd4ba21b3e7de3d062e513c539fd9e111959932e97a4fafb08b07326e84b1.tar.zst",
+   "sha256": "672fd4ba21b3e7de3d062e513c539fd9e111959932e97a4fafb08b07326e84b1",
+   "bytes": 41226788,
+   "source_revisions": {
+    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   },
+   "results": [
+    {
+     "path": "memory-parallel-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "92913f20031f5028fd09ddfc584998cfe75f97605d45d29ba603e1ac377d0db9",
+     "status": 0
+    },
+    {
+     "path": "memory-serial-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "92913f20031f5028fd09ddfc584998cfe75f97605d45d29ba603e1ac377d0db9",
+     "status": 0
+    }
+   ]
+  },
+  {
    "name": "packet-framing-exact-reservation",
    "retention": "retained",
    "key": "evidence/packet-framing-exact-reservation/b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc.tar.gz",
