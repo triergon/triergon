@@ -1,0 +1,62 @@
+# SCFS, MSIRP, ISECT, FLIPPT, FLIPRGON, FLIPRGOFF and UTP in y on an outline, as the specification describes them.
+heights 16384 1000 2000 700 1500
+
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1 500; SCFS; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 4; SRP0; PUSH 1 700; MSIRP[1]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 2 0 3 1 4; ISECT
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7 6 8 9 7; ISECT
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 2 5; FLIPRGOFF
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 0 2; FLIPRGON
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 2; FLIPPT
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]; PUSH 1; UTP; IUP[0]
+  end
+end

@@ -1,0 +1,89 @@
+# Composites of an instructed glyph. Observed: ROUND_XY_TO_GRID rounds a
+# component's offset to whole pixels vertically (half up), never horizontally;
+# a composite's program sees its placed components' points as their original
+# positions; SHPIX moves untouched points in a composite; the programs see the
+# phantom points' x (horizontal ones) and y (vertical ones) on the pixel grid,
+# the vertical ones at half the advance.
+heights 16384 1000 700
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]; PUSH 4; MDAP[1]; IUP[0]
+  end
+end
+glyph advance 600
+  component 0 offset 0 13
+end
+glyph advance 600
+  component 0 offset 0 13 round
+end
+glyph advance 600
+  component 0 offset 37 13 round
+end
+glyph advance 600
+  component 0 offset 37 13
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]
+  end
+end
+glyph advance 600
+  component 0 offset 0 13 round
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]; IUP[0]
+  end
+end
+glyph advance 600
+  component 0 offset 0 13
+  program
+    SVTCA[0]; PUSH 5 2; GC[1]; SCFS; PUSH 0 2; GC[0]; SCFS; PUSH 3 2; MD[1]; PUSH 3; SWAP; SCFS
+  end
+end
+glyph advance 600
+  component 0 offset 0 0
+  component 0 offset 0 400 round
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]; PUSH 8; MDAP[1]; IUP[0]
+  end
+end
+glyph advance 600
+  component 0 offset 0 0
+  program
+    SVTCA[0]; PUSH 0 6; GC[0]; SCFS; PUSH 1 7; GC[0]; SCFS; PUSH 3 8; GC[0]; SCFS; PUSH 4 9; GC[0]; SCFS
+  end
+end
+glyph advance 600
+  component 0 offset 0 13
+  program
+    SVTCA[0]; PUSH 1 13; SHPIX; PUSH 2; MDAP[0]; PUSH 2 13; SHPIX
+  end
+end
+glyph advance 600
+  component 0 offset 0 13 scale 0.75
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]; IUP[0]
+  end
+end
+glyph advance 600
+  component 0 offset 0 -4 round
+end
+glyph advance 600
+  component 0 offset 0 4 round
+end
+glyph advance 600
+  component 0 offset 0 -12 round
+end
+glyph advance 600 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  program
+    SVTCA[1]; PUSH 0 6; GC[0]; SVTCA[0]; SCFS; SVTCA[1]; PUSH 1 7; GC[0]; SVTCA[0]; SCFS; SVTCA[1]; PUSH 3 8; GC[0]; SVTCA[0]; SCFS; SVTCA[1]; PUSH 4 9; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 611 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  program
+    SVTCA[0]; PUSH 0 6; GC[0]; SCFS; PUSH 1 7; GC[0]; SCFS; PUSH 3 8; GC[0]; SCFS; PUSH 4 9; GC[0]; SCFS
+  end
+end

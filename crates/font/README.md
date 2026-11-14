@@ -255,7 +255,22 @@ them when the scale is undefined. A `SizedFont` then gives:
   FontMatrix and its offset; above 2000 pixels per em it loads unhinted, as
   FreeType retries it. A glyph of a TrueType face without bytecode (no `fpgm`,
   a `prep` of at most 7 bytes) goes through FreeType's auto-hinter, as below.
-  Other TrueType glyphs are `Unsupported` there (see below).
+  Other TrueType glyphs go through the TrueType interpreter, as below.
+- The TrueType interpreter (`bytecode`) runs a face's programs as FreeType
+  2.15's default load runs them in backward compatibility mode. At the size
+  the face is first loaded hinted at, the font program defines its functions
+  and instructions and the control value program adjusts the scaled control
+  values, fills the storage area and the twilight zone and sets the graphics
+  state glyphs inherit; each glyph then loads at the hinted scale and its
+  program runs on its points and four phantom points, a composite's after its
+  components', with the control values and storage the control value program
+  left. Every instruction is implemented from the TrueType instruction set;
+  what the specifications leave open (backward compatibility, which keeps
+  glyph points from moving horizontally and stops all moves once IUP has run
+  in both directions; rounding and arithmetic; errors; composites and phantom
+  points) is reproduced as probes of FreeType establish it
+  (`harness/fonts/probes`). The advances are the unhinted ones, rounded; the
+  box is fitted outwards to pixels.
 - The auto-hinter (`autofit`), as FreeType 2.15 builds it without HarfBuzz and
   runs it for `FT_LOAD_DEFAULT`: the glyph is loaded in font units and hinted
   at the size's scales (not the integer-ppem ones). Each glyph takes the style
@@ -349,25 +364,27 @@ WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
 `gvar`, `HVAR`, `avar`), vertical origins and bearings (`VORG`, top side
 bearings beyond the advance), `post` beyond the
-underline, TrueType hinting (`cvt ` is not read, `fpgm`, `prep` and glyph
-programs are only scanned for `INSTCTRL`), CFF stem darkening, StdHW and StdVW
+underline, TrueType hinting outside backward compatibility mode (programs that
+may issue `INSTCTRL` with a selector other than a constant 1 or 2), CFF stem
+darkening, StdHW and StdVW
 (which only darkening reads), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
 1 charstrings (CharstringType 1) and synthetic fonts.
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
 opens it and fails each glyph.
 
-At a size, the default load of an instructed TrueType glyph is `Unsupported`,
-hence its glyph extents and contour points, which libass's HarfBuzz callbacks
-report: it needs the TrueType interpreter, which this crate does not run. So is
-the default-load outline, with points, of an auto-hinted glyph of a CJK or Indic style, whose
-writing systems the auto-hinter here does not run, and HarfBuzz's coverage of
+At a size, the default-load outline, with points, of an auto-hinted glyph of a
+CJK or Indic style is `Unsupported`, hence its glyph extents and contour points,
+which libass's HarfBuzz callbacks report: the auto-hinter here does not run
+those writing systems. So is HarfBuzz's coverage of
 glyphs through OpenType features, which FreeType's auto-hinter has only with
 HarfBuzz built in. The auto-hinter runs only the normal render mode, without
 the light mode's stem darkening.
-`default_advance` is `Unsupported` for tricky fonts known by family name and
-programs that may leave backward compatibility; fonts FreeType finds tricky only
-by their table checksums are not recognised.
+`default_advance` and the default load are `Unsupported` for tricky fonts known
+by family name and programs that may leave backward compatibility; fonts
+FreeType finds tricky only by their table checksums are not recognised. The
+TrueType interpreter's unit vectors along lines and from the stack (SPVTL,
+SFVTL, SDPVTL, SPVFS, SFVFS) are FreeType's for most directions but not all.
 Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
 `Error::Overflow` in an unhinted or CFF load, where FreeType's `FT_Pos` wraps at
 32 bits on 32-bit ARM (libass rejects anything beyond 2^28 itself); the
@@ -381,13 +398,13 @@ The gate covers libass's default configuration, hinting off: unhinted outlines a
 size, with the vertical advances of `@` fonts (`font-hinting-none`), all of which
 match FreeType, the auto-hinted faces' included. The default load itself, every
 glyph's metrics and hinted outline at that size, is gated too
-(`font-hinting-default`): every CFF, CFF2 and CID-keyed face matches FreeType, and
-so does the auto-hinted authored-cmap-formats. DejaVuMathTeXGyre is open under the
-auto-hinter's CJK writing system, which styles most of its glyphs, and the
-instructed TrueType faces under the TrueType interpreter. For libass's default
-configuration that gap is in what HarfBuzz reads to position marks without GPOS
-anchors (glyph extents and contour points) in those fonts; the outlines libass
-draws are unhinted and compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
+(`font-hinting-default`): every CFF, CFF2 and CID-keyed face, every instructed
+TrueType face and the auto-hinted authored-cmap-formats match FreeType.
+DejaVuMathTeXGyre is open under the auto-hinter's CJK writing system, which
+styles most of its glyphs. For libass's default configuration that gap is in
+what HarfBuzz reads to position marks without GPOS anchors (glyph extents and
+contour points) in that font; the outlines libass draws are unhinted and
+compared. For libass's hinting-enabled modes (NATIVE, LIGHT,
 NORMAL), the unhinted outlines and default-load advances at nine other sizes are
 only measured (`font-hinting-modes`), and the hinted outlines those modes draw
 are not compared.
@@ -402,11 +419,18 @@ Private DICT per CFF FDArray entry, variation region scalars and kern subtable
 records. A face FreeType auto-hints also keeps, once a default load needs
 them, the auto-hinter's style of each glyph, its reverse charmap of accented
 characters and each latin style's metrics, charged to that budget, as is the
-scratch storage of an auto-hinted load. An `Outline` charges its points and
-contour ends to its own budget and keeps its capacity across glyphs; a
-`SizedFont` is a small copyable view that allocates nothing.
+scratch storage of an auto-hinted load. A face with TrueType programs keeps, for
+the size it last loaded hinted at, the interpreter's function and instruction
+definitions, control values, storage, twilight zone, stack and the zone one
+glyph is hinted in, charged to that budget and sized by `maxp` as FreeType
+sizes them (the stack 128 values deeper and the twilight zone four points
+larger, at least 64 function definitions); a hinted load holds it locked. An `Outline` charges its points and contour ends to its own
+budget and keeps its capacity across glyphs; a `SizedFont` is a small copyable
+view that allocates nothing.
 
-`Limits` bounds the work of one parse and of one outline (`work`), nested
+`Limits` bounds the work of one parse and of one outline (`work`, which a
+hinted load's instructions also count against, as the font and control value
+programs count against a budget of their own), nested
 composites and subroutine calls (`depth`) and the points of one outline
 (`points`); exceeding one is `Error::Policy`. Format ceilings (48 or 513 operands,
 96 stems, 32 transient slots, 16 nested subroutine calls in CFF, 64 nested

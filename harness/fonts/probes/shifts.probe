@@ -1,0 +1,100 @@
+# SHZ, SHC and SHP in y with and without IUP afterwards, and ISECT.
+# Observed: SHC touches the points it moves, SHZ does not; IUP shifts a point
+# outside the touched pair's range from its current position; ISECT moves
+# glyph points in x too, and after IUP in both directions.
+heights 16384 1000 700
+
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHZ[1]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHZ[1]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHC[1]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHC[1]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 6; MDAP[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHC[1]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 6; SHP[1]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHZ[1]; PUSH 9 6; GC[1]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 0; SHZ[1]; PUSH 9 6; GC[1]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 1; SHC[1]; PUSH 9 6; GC[1]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 2 3 0 1 4; ISECT
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1 0 3 4 2; ISECT
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 6 7 8 9 2; ISECT
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 0 3 6 9 1; ISECT
+  end
+end

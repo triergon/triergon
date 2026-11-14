@@ -1,0 +1,44 @@
+# The same with head flag 3 (integer pixels per em). Observed: control
+# values then scale by the rounded pixels per em.
+# Each glyph's program computes values and writes value i into the y of
+# point i of a 32-point contour (SCFS along y), so the dump shows them.
+heights 16384 1000 700 12345 64
+head-flags 8
+cvt -32768 -1000 -999 -1 0 1 2 3 7 100 999 1234 1500 32767 -3 -7
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 400
+  contour 0 0, 10 0, 20 0, 30 0, 40 0, 50 0, 60 0, 70 0, 80 0, 90 0, 100 0, 110 0, 120 0, 130 0, 140 0, 150 0, 160 0, 170 0, 180 0, 190 0, 200 0, 210 0, 220 0, 230 0, 240 0, 250 0, 260 0, 270 0, 280 0, 290 0, 300 0, 310 0
+  contour 0 0, 300 100, 100 700, -200 50, 1000 999, 3 7, 1500 -1300, 77 1
+  program
+    PUSH 0; PUSH 0; RCVT; SVTCA[0]; SCFS
+    PUSH 1; PUSH 1; RCVT; SVTCA[0]; SCFS
+    PUSH 2; PUSH 2; RCVT; SVTCA[0]; SCFS
+    PUSH 3; PUSH 3; RCVT; SVTCA[0]; SCFS
+    PUSH 4; PUSH 4; RCVT; SVTCA[0]; SCFS
+    PUSH 5; PUSH 5; RCVT; SVTCA[0]; SCFS
+    PUSH 6; PUSH 6; RCVT; SVTCA[0]; SCFS
+    PUSH 7; PUSH 7; RCVT; SVTCA[0]; SCFS
+    PUSH 8; PUSH 8; RCVT; SVTCA[0]; SCFS
+    PUSH 9; PUSH 9; RCVT; SVTCA[0]; SCFS
+    PUSH 10; PUSH 10; RCVT; SVTCA[0]; SCFS
+    PUSH 11; PUSH 11; RCVT; SVTCA[0]; SCFS
+    PUSH 12; PUSH 12; RCVT; SVTCA[0]; SCFS
+    PUSH 13; PUSH 13; RCVT; SVTCA[0]; SCFS
+    PUSH 14; PUSH 14; RCVT; SVTCA[0]; SCFS
+    PUSH 15; PUSH 15; RCVT; SVTCA[0]; SCFS
+    PUSH 16; MPPEM; SVTCA[0]; SCFS
+    PUSH 17; MPS; SVTCA[0]; SCFS
+    PUSH 18; SVTCA[1]; MPPEM; SVTCA[0]; SCFS
+    PUSH 19; PUSH 0x2D41 0x2D41; SPVFS; MPPEM; SVTCA[0]; SCFS
+    PUSH 20; PUSH 16; RCVT; SVTCA[0]; SCFS
+    PUSH 21; PUSH 100; RCVT; SVTCA[0]; SCFS
+    PUSH 22; PUSH 0 1; WCVTF; PUSH 0; RCVT; SVTCA[0]; SCFS
+    PUSH 23; PUSH 0 -1; WCVTF; PUSH 0; RCVT; SVTCA[0]; SCFS
+    PUSH 24; PUSH 0 3; WCVTF; PUSH 0; RCVT; SVTCA[0]; SCFS
+    PUSH 25; PUSH 0 1000; WCVTF; PUSH 0; RCVT; SVTCA[0]; SCFS
+    PUSH 26; PUSH 0 -999; WCVTF; PUSH 0; RCVT; SVTCA[0]; SCFS
+    PUSH 27; PUSH 1; SSW; PUSH 0; RS; SVTCA[0]; SCFS
+  end
+end

@@ -1,0 +1,127 @@
+# Backward compatibility mode. Observed: glyph points never move in x (each
+# x move of point 0 below leaves the x that GC then reads, written into point
+# 1's y), though twilight points do; a move along a diagonal freedom vector
+# keeps its y part; once IUP has run in both directions no glyph point moves;
+# SHPIX moves a glyph point only once it is touched in y.
+heights 16384 1000
+cvt 100 -800
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 0; MDAP[1]
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 0; MDAP[0]; PUSH 0 64; SHPIX
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 0 0; MIAP[1]
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 3; SRP0; PUSH 0; MDRP[00100]
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 3; SRP0; PUSH 0 1; MIRP[00100]
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 0 640; SCFS
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 3; SRP0; PUSH 0 100; MSIRP[0]
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 3; SRP0; PUSH 0; ALIGNRP
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 3; MDAP[1]; IUP[1]
+    SVTCA[1]; PUSH 1 0; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 0; SZP0; SVTCA[1]; PUSH 0 0; MIAP[0]; PUSH 1; SZP0; PUSH 0; SZP2; SVTCA[1]; PUSH 1 0; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SPVTCA[0]; PUSH 0x2D41 0x2D41; SFVFS; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SPVTCA[0]; PUSH 0x2D41 0x2D41; SFVFS; PUSH 1; MDAP[0]; PUSH 1 64; SHPIX
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    IUP[1]; IUP[0]; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    IUP[0]; IUP[1]; SVTCA[0]; PUSH 1 300; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    IUP[1]; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1 64; SHPIX
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1; MDAP[0]; PUSH 1 64; SHPIX
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[1]; PUSH 1; MDAP[0]; SVTCA[0]; PUSH 1 64; SHPIX
+  end
+end
