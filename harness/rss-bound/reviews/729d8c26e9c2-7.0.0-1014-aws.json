@@ -1,0 +1,22 @@
+{
+  "status": "reviewed-conditional-upper-bound",
+  "kernel_release": "7.0.0-1014-aws",
+  "kernel_notes_sha256": "29931135cae299d7058ec1b8cd6ca41af51d8e1531c82b9f026f7bf7d7328932",
+  "architecture": "aarch64",
+  "measurement_user_spaces": [
+    "aarch64",
+    "armv8l"
+  ],
+  "page_size": 4096,
+  "module_source_sha256": "729d8c26e9c276fdc0821e29556948318614704684cab50e013c88b2115ee28c",
+  "prior_module_source_sha256": "4559008eb0914d99bb65c33f00b3ba5dc0781fd6278acb3420a6cf6a2befe90a",
+  "prior_review_sha256": "5104ded66a5272b8269a95fbdd73a20535d04ffd0e460a19c161cdbd5004b4a8",
+  "review": [
+    "The source differs from the prior reviewed module only in how many sessions it admits: the single busy flag and watched session become two arrays of 32 slots, admitted (under session_lock) and watch (armed sessions), the open path reserves a slot through admit() and the release path frees it through dismiss(). The per-session bound, its counters, the probes, the stop_machine arming and disarming, the END ioctl, the compat entry and the invalidation rules are unchanged.",
+    "admit() refuses a second session for an MM that already holds one, so two armed sessions never share an MM, and each RSS counter (mm->rss_stat[...]) belongs to at most one armed session. count_positive() finds that session by comparing the counter with each armed session's three counters and applies the unchanged rules to it alone: an update from another task or MM still sets error 1, a positive amount still adds to that session's sum, and overflow still sets error 2.",
+    "watch[slot] is written only inside stop_machine (start_stopped sets it, end_stopped clears it), as the single watch pointer was. stop_machine runs one callback at a time with every CPU stopped, so no probe handler is mid-flight when a slot is armed or disarmed, and a handler never sees a session that has been dismissed: dismiss() runs after end_stopped returned, or after start_stopped failed before arming.",
+    "The missed-probe check compares global kprobe nmissed counters at arming and disarming, as before. With sessions side by side, a miss anywhere during a session's window still invalidates that session (error 4), so concurrency can only invalidate more sessions, never hide a miss. The control-file write flag stays global and sticky (errors 8 and EACCES).",
+    "The open path checks the single-thread and no-THP admission before allocating, and returns -EBUSY when all 32 slots are taken or the MM already holds a session; every failure path releases the MM reference and the slot. The bound remains initial summed RSS plus every positive counter update of the session's own MM until END; releases are never subtracted, so it bounds that process's resident peak from above whatever other measured processes do.",
+    "check.c gains a hold mode that keeps a session open for one second; prove.sh runs four held checks side by side and requires each to finish with no errors and nothing missed, on the current boot, through the 32-bit entry when the measurement user space is 32-bit. The kernel build notes and page size match the prior proof."
+  ]
+}
