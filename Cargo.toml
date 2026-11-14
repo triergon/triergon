@@ -100,3 +100,8 @@ codegen-units = 16
 # Repository tasks hash and unpack large inputs; optimise them even in dev builds.
 [profile.dev.package.xtask]
 opt-level = 3
+
+# The gate grades from a release build of xtask; it keeps the overflow checks the
+# development build has.
+[profile.release.package.xtask]
+overflow-checks = true

@@ -61,5 +61,6 @@
   ],
   "iterations": 1,
   "minimum_pairs": 30,
-  "confidence": 0.95
+  "confidence": 0.95,
+  "parity_timeout_seconds": 120
 }
