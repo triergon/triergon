@@ -29,5 +29,6 @@
   "pending_module_requirements": [
     "FreeType auto-hinter for FT_LOAD_DEFAULT advances",
     "hinted outlines and extents for NATIVE, LIGHT and NORMAL hinting"
-  ]
+  ],
+  "parity_timeout_seconds": 120
 }

@@ -17,6 +17,7 @@ mod fetch;
 mod fonts;
 mod framing_bench;
 mod fuzz;
+mod gate;
 mod generators;
 mod harness;
 mod isobmff_bench;
@@ -29,6 +30,7 @@ mod progressive_bench;
 mod pyrandom;
 mod python;
 mod raster;
+mod references;
 mod sha256;
 mod shape;
 mod stats;
@@ -63,6 +65,10 @@ commands:
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
                  matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
+  references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
+                 their packs in .research/reference-cache and the evidence archive, which
+                 the prepare commands restore instead of building (see `cargo xtask
+                 references --help`)
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
@@ -98,6 +104,9 @@ commands:
                  [--kernel]
                  before a gate run measures: workers, references, inputs, RSS module review
                  and state; see `cargo xtask preflight --help`
+  gate           plan|preflight|run|summary   the full gate as one plan of steps, split
+                 into shards that run on separate hosts, and their joined result (see
+                 `cargo xtask gate --help`)
   build-workers  [--comparison-build] [--only WORKER] [--all-references]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
@@ -221,6 +230,7 @@ fn main() -> ExitCode {
             playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
         }
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("gate") => return failing(gate::main(&root, &args[1..]), gate::USAGE),
         Some("preflight") => {
             return failing(
                 harness::preflight::main(&root, &args[1..]),
@@ -244,6 +254,7 @@ fn main() -> ExitCode {
             _ => Err(USAGE.to_owned()),
         },
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
+        Some("references") => references::main(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
             [flag] if flag == "--record" => {
@@ -336,13 +347,17 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             println!("{}", evidence::upload(set, Path::new(archive))?);
             Ok(())
         }
+        [command, set, archive] if command == "entry" => {
+            println!("{}", evidence::entry(set, Path::new(archive))?.1);
+            Ok(())
+        }
         [command, set] if command == "promote" => {
             println!("{}", evidence::promote(root, set)?);
             Ok(())
         }
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence promote SET | evidence fetch SET [DIR]"
+                  | evidence entry SET ARCHIVE | evidence promote SET | evidence fetch SET [DIR]"
                 .into(),
         ),
     }
@@ -773,10 +788,10 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
             _ => return Err(USAGE.to_owned()),
         }
     }
-    println!(
-        "{}",
-        prepare::prepare(root, jobs, profile, &fetch::Network)?
-    );
+    let built = references::ffmpeg_build(profile).prepare(root, || {
+        prepare::prepare(root, jobs, profile, &fetch::Network)
+    })?;
+    println!("{built}");
     Ok(())
 }
 
@@ -921,7 +936,7 @@ fn run(command: &mut Command) -> Task {
 
 /// The nightly toolchain of the opt-in HEVC `std::simd` path, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
-const NIGHTLY: &str = "nightly-2026-10-17";
+pub(crate) const NIGHTLY: &str = "nightly-2026-10-17";
 
 /// Everything `check` needs once: each step runs as its own `cargo xtask`
 /// command with the pinned reference first on `PATH`, so the worker build

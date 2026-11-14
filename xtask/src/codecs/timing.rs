@@ -154,6 +154,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("reference", Value::str(sha(&options.reference)?)),
     ]);
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
+    let mut unmeasured = Vec::new();
     for w in &workloads {
         let id = get_str(w, "id").ok_or("workload without id")?.to_owned();
         if only.as_ref().is_some_and(|o| !o.contains(&id.as_str())) {
@@ -307,6 +308,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         );
         set(&mut claims, &key, entry);
         write_claims(claims_path, &claims)?;
+        if state != "measured" {
+            unmeasured.push(id.clone());
+        }
         println!(
             "CODECTIME {id} {state} {} {} {}",
             ratio
@@ -321,7 +325,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         );
     }
     println!("DONE");
-    Ok(())
+    super::memory::measured_all("timing", &unmeasured)
 }
 
 #[cfg(test)]

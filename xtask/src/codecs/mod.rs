@@ -46,9 +46,10 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282,
                  ending early once settled below the ceiling)
   memory --candidate W --reference W --workloads F --root R --out DIR
-         [--pairs N] [--seed S] [--only ID,...] [--full] [--no-early-stop]
+         [--pairs N] [--seed S] [--only ID,...] [--part I/N] [--full] [--no-early-stop]
                  paired peak heap and total resident peak RSS of the decoder workloads
-                 under the shared observer (30 pairs, seed 283)
+                 under the shared observer (30 pairs, seed 283); --part I/N takes
+                 every Nth workload from the Ith
                  a result a kept evidence set holds is reused unless --full
   equivalence --output F [--compare F] [--jobs N]
                  record every decoder output identity; --compare checks an earlier record
@@ -263,6 +264,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "pairs",
                     "seed",
                     "only",
+                    "part",
                 ],
                 &["full", "no-early-stop"],
             )?;
@@ -276,10 +278,12 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 pairs: a.number("pairs")?.unwrap_or(memory::PAIRS),
                 seed: a.number("seed")?.map_or(memory::SEED, |s| s as u64),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                part: a.get("part").map(crate::gate::parse_part).transpose()?,
                 early_stop: a.get("no-early-stop").is_none(),
             };
             let settings = Value::object([
                 ("pairs", Value::int(options.pairs as i64)),
+                ("part", a.get("part").map_or(Value::Null, Value::str)),
                 ("seed", Value::int(options.seed)),
                 (
                     "only",

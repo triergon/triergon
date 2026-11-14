@@ -379,6 +379,16 @@ fn aws_cp(from: &str, to: &str) -> Result<(), String> {
 /// `qualification/SET/`, where it expires 90 days after upload unless promoted,
 /// and print the entry to add to the index.
 pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
+    let (key, entry) = entry(name, archive)?;
+    let location = archive_location()?;
+    aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
+    Ok(entry)
+}
+
+/// The index entry `upload` would print for packed set `name`, and the key under
+/// `qualification/` it goes to, without uploading: for a host that packs a set but
+/// holds no archive credentials, whose upload streams through another machine.
+pub fn entry(name: &str, archive: &Path) -> Result<(String, String), String> {
     if name.is_empty()
         || !name
             .bytes()
@@ -404,14 +414,12 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
         compression.suffix()
     );
     let results = gate_results(archive, compression)?;
-    let location = archive_location()?;
-    aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
     let mut entry = vec![
         ("name", Value::str(name)),
         ("path", Value::str(name)),
         ("retention", Value::str(Retention::Expiring.label())),
         ("reason", Value::str("")),
-        ("key", Value::str(key)),
+        ("key", Value::str(key.clone())),
         ("sha256", Value::str(sha)),
         ("bytes", Value::int(bytes)),
     ];
@@ -419,7 +427,7 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
         entry.push(("results", Value::Array(results)));
     }
     let entry = Value::object(entry);
-    Ok(crate::json::to_python(&entry, Some(1)))
+    Ok((key, crate::json::to_python(&entry, Some(1))))
 }
 
 /// The fresh gate results a packed set holds ([`crate::harness::reuse`]), which a

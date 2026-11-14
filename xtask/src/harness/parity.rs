@@ -574,6 +574,23 @@ fn feed_result(
         ("expected", expected.clone()),
         ("candidate", candidate.unwrap_or(Value::Null)),
         ("reference", reference.unwrap_or(Value::Null)),
+        // How the reference run ended and how long it took, against the run limit.
+        (
+            "reference_run",
+            Value::object([
+                (
+                    "status",
+                    right.get("status").cloned().unwrap_or(Value::Null),
+                ),
+                (
+                    "elapsed_ns",
+                    right
+                        .get("process_elapsed_ns")
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                ),
+            ]),
+        ),
     ];
     if reference_flag && !per_target {
         let status = Value::str("host-dependent-reference");
@@ -669,6 +686,38 @@ mod feed_tests {
         assert_eq!(result.get("status"), Some(&Value::str("pass")));
         assert_eq!(result.get("candidate"), Some(&expected));
         assert_eq!(result.get("reference"), Some(&expected));
+    }
+
+    #[test]
+    fn the_reference_run_s_status_and_elapsed_time_are_recorded() {
+        let work = Value::object([
+            ("packets", Value::int(1)),
+            ("bytes", Value::int(2)),
+            ("digest", Value::int(3)),
+        ]);
+        let mut timed = outcome(&work);
+        if let Value::Object(members) = &mut timed {
+            members.push(("process_elapsed_ns".into(), Value::int(1_250_000_000)));
+        }
+        let result = feed_result(&outcome(&work), &timed, &work, &[], false);
+        assert_eq!(result.get("status"), Some(&Value::str("pass")));
+        assert_eq!(
+            result.get("reference_run"),
+            Some(&Value::object([
+                ("status", Value::str("ok")),
+                ("elapsed_ns", Value::int(1_250_000_000)),
+            ]))
+        );
+        let timeout = Value::object([("status", Value::str("timeout"))]);
+        let result = feed_result(&outcome(&work), &timeout, &work, &[], false);
+        assert_eq!(result.get("status"), Some(&Value::str("mismatch")));
+        assert_eq!(
+            result.get("reference_run"),
+            Some(&Value::object([
+                ("status", Value::str("timeout")),
+                ("elapsed_ns", Value::Null),
+            ]))
+        );
     }
 
     #[test]

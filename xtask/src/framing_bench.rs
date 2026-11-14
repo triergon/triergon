@@ -63,7 +63,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
     Ok(options)
 }
 
-fn generate(output: &Path) -> Result<(), String> {
+pub(crate) fn generate(output: &Path) -> Result<(), String> {
     // Validate the entire set before writing any file. No input is inferred or
     // encoded by a platform codec; these are the original authored script bytes.
     let cases = fixtures::load()?;

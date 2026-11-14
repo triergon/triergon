@@ -68,5 +68,9 @@ pub fn prepare_libass(
     jobs: u32,
     net: &dyn fetch::Transport,
 ) -> Result<PathBuf, String> {
-    reference::prepare(root, jobs, net)
+    crate::references::build("libass")?
+        .prepare(root, || {
+            reference::prepare(root, jobs, net).map(|p| p.display().to_string())
+        })
+        .map(PathBuf::from)
 }

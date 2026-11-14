@@ -301,7 +301,9 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 pub fn run(root: &Path, a: &Options) -> Result<(), String> {
-    fs::create_dir_all(&a.out).map_err(|e| format!("{}: {e}", a.out.display()))?;
+    for dir in [&a.out, &a.inputs] {
+        fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    }
     let cases =
         crate::checks::read_json(&a.cases).map_err(|e| format!("{}: {e}", a.cases.display()))?;
     let mut cases: Vec<Value> = cases
@@ -504,6 +506,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     a.seed + MEMORY_SEED,
                     &args,
                     outputs,
+                    crate::harness::worker::DEFAULT_TIMEOUT,
                 )
             }))?
         } else {

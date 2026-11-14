@@ -37,6 +37,8 @@ pub struct Options {
     pub pairs: usize,
     pub seed: u64,
     pub only: Option<String>,
+    /// Part I of N (zero-based I): every Nth workload from the Ith.
+    pub part: Option<(usize, usize)>,
     /// Let a gate session stop at an early look (`--no-early-stop` clears it).
     pub early_stop: bool,
 }
@@ -112,9 +114,36 @@ fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("workload without {key}"))
 }
 
+/// How long one observer run of `manifest`'s workloads may take on `target`: its
+/// `memory_timeout_seconds` for the target, a whole number of seconds from 1 to
+/// [`worker::MAXIMUM_TIMEOUT_SECONDS`], else [`worker::DEFAULT_TIMEOUT`].
+pub fn run_limit(manifest: &Value, target: &str) -> Result<Duration, String> {
+    let Some(declared) = manifest
+        .get("memory_timeout_seconds")
+        .and_then(|limits| limits.get(target))
+    else {
+        return Ok(worker::DEFAULT_TIMEOUT);
+    };
+    match declared {
+        Value::Number(number) => number.as_i128(),
+        _ => None,
+    }
+    .and_then(|seconds| u64::try_from(seconds).ok())
+    .filter(|seconds| (1..=worker::MAXIMUM_TIMEOUT_SECONDS).contains(seconds))
+    .map(Duration::from_secs)
+    .ok_or_else(|| {
+        format!(
+            "memory_timeout_seconds for {target} must be a whole number of seconds \
+                 from 1 to {}",
+            worker::MAXIMUM_TIMEOUT_SECONDS
+        )
+    })
+}
+
 pub fn run(options: &Options) -> Result<(), String> {
     let manifest = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
+    let limit = run_limit(&manifest, &crate::harness::report::gate_target()?)?;
     let workloads = manifest
         .get("workloads")
         .and_then(Value::as_array)
@@ -155,6 +184,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("cpus", gate_build::cpus()),
         ("pairs", Value::int(options.pairs as i128)),
         ("seed", Value::int(options.seed)),
+        ("run_limit_seconds", Value::int(i128::from(limit.as_secs()))),
         ("utc", Value::str(python::utc_now())),
     ]);
     if let Some(parity) = &parity
@@ -164,9 +194,10 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     write(&options.out.join("identity.json"), &identity)?;
     let mut summary = Vec::new();
-    for w in &workloads {
+    let mut unmeasured = Vec::new();
+    for (index, w) in workloads.iter().enumerate() {
         let id = text(w, "id")?;
-        if only.as_ref().is_some_and(|o| !o.contains(&id)) {
+        if only.as_ref().is_some_and(|o| !o.contains(&id)) || !in_part(index, options.part) {
             continue;
         }
         let operation = text(w, "operation")?;
@@ -211,6 +242,7 @@ pub fn run(options: &Options) -> Result<(), String> {
                                 options.seed,
                                 &arguments,
                                 &expected,
+                                limit,
                             )
                         }))?
                     }
@@ -226,6 +258,9 @@ pub fn run(options: &Options) -> Result<(), String> {
                     ]),
                 }
             };
+        if measured.get("status").and_then(Value::as_str) != Some("qualified") {
+            unmeasured.push(id.to_owned());
+        }
         let parity_matches = parity.as_ref().is_none_or(|parity| {
             parity.matches(
                 measured
@@ -271,7 +306,27 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     write(&options.out.join("summary.json"), &Value::Array(summary))?;
     println!("DONE");
-    Ok(())
+    measured_all("memory", &unmeasured)
+}
+
+/// Whether the workload at `index` is in `part` (zero-based I of N): every Nth
+/// workload from the Ith; every workload without a part.
+pub fn in_part(index: usize, part: Option<(usize, usize)>) -> bool {
+    part.is_none_or(|(i, n)| index % n == i)
+}
+
+/// A collection measures every workload it selects, or it fails naming those it did
+/// not, after writing every record.
+pub fn measured_all(what: &str, unmeasured: &[String]) -> Result<(), String> {
+    if unmeasured.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{what} not measured for {} workloads: {}",
+            unmeasured.len(),
+            unmeasured.join(", ")
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -289,6 +344,43 @@ mod tests {
     fn gates(value: &Value) -> (bool, bool, bool) {
         let flag = |k: &str| value.get(k).is_some_and(Value::truthy);
         (flag("heap_gate"), flag("rss_gate"), flag("memory_gate"))
+    }
+
+    #[test]
+    fn parts_take_every_nth_workload_and_together_take_each_once() {
+        let taken: Vec<Vec<usize>> = (0..3)
+            .map(|i| (0..8).filter(|&w| in_part(w, Some((i, 3)))).collect())
+            .collect();
+        assert_eq!(taken, vec![vec![0, 3, 6], vec![1, 4, 7], vec![2, 5]]);
+        assert!((0..8).all(|w| in_part(w, None)));
+    }
+
+    #[test]
+    fn a_collection_fails_when_any_workload_is_not_measured() {
+        assert_eq!(measured_all("memory", &[]), Ok(()));
+        assert_eq!(
+            measured_all("memory", &["hevc-main10-2160p".into()]),
+            Err("memory not measured for 1 workloads: hevc-main10-2160p".into())
+        );
+    }
+
+    #[test]
+    fn the_run_limit_is_the_workload_list_s_for_the_target() {
+        let manifest = json::parse(
+            r#"{"memory_timeout_seconds": {"aarch64-unknown-linux-gnu": 300}, "workloads": []}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            run_limit(&manifest, "aarch64-unknown-linux-gnu"),
+            Ok(Duration::from_secs(300))
+        );
+        assert_eq!(
+            run_limit(&manifest, "thumbv7neon-unknown-linux-gnueabihf"),
+            Ok(worker::DEFAULT_TIMEOUT)
+        );
+        let invalid =
+            json::parse(r#"{"memory_timeout_seconds": {"aarch64-unknown-linux-gnu": 0}}"#).unwrap();
+        assert!(run_limit(&invalid, "aarch64-unknown-linux-gnu").is_err());
     }
 
     #[test]

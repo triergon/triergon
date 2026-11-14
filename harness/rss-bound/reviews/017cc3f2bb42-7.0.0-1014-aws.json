@@ -1,0 +1,19 @@
+{
+  "status": "reviewed-conditional-upper-bound",
+  "kernel_release": "7.0.0-1014-aws",
+  "kernel_notes_sha256": "29931135cae299d7058ec1b8cd6ca41af51d8e1531c82b9f026f7bf7d7328932",
+  "architecture": "aarch64",
+  "measurement_user_spaces": [
+    "aarch64",
+    "armv8l"
+  ],
+  "page_size": 4096,
+  "module_source_sha256": "017cc3f2bb42ed6353810611b8221b9b4f58c67c1616e234431dd5d5a82ebb50",
+  "prior_module_source_sha256": "729d8c26e9c276fdc0821e29556948318614704684cab50e013c88b2115ee28c",
+  "prior_review_sha256": "a2f5ac62f510387297758bc6831c5420f4a53a9db5e6f88edf024bbe5b36cfd2",
+  "review": [
+    "The source differs from the prior reviewed concurrent-session module only in bound_release: it now checks stop_machine's result when disarming a running session. On success it dismisses the session as before. On failure the session is still armed, so a probe handler may still reach it through watch[slot]; release then leaves it allocated, keeps its MM reference and its admitted slot, and logs one warning, so no armed session is ever freed and no slot is reused while a probe can read it. The leak is bounded by the 32 slots; a later open finds the slot taken.",
+    "Everything else is as in the prior review, which this one carries forward: up to 32 sessions of distinct MMs, admit() refusing a second session for an MM and a 33rd session with -EBUSY (the open fails, so the run fails rather than undercounting), count_positive() crediting each counter update to the one armed session that owns the counter and invalidating it on a foreign update or overflow, watch[slot] written only inside stop_machine, the global missed-probe and control-file checks voiding every session they overlap, and the unchanged bound of initial summed RSS plus every positive counter update until END.",
+    "check.c and prove.sh are unchanged in behaviour apart from prove.sh waiting on each of the four concurrent held checks by its process id, so any failing check fails the proof."
+  ]
+}

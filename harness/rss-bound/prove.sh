@@ -3,14 +3,16 @@
 # registration and write the proof that `cargo xtask build-workers` and
 # `cargo xtask report --memory` accept with TRIERGON_RSS_KERNEL_PROOF.
 #
-#   usage: harness/rss-bound/prove.sh REVIEW OUT [USERSPACE]
+#   usage: harness/rss-bound/prove.sh [--review REVIEW] OUT [USERSPACE]
 #
 # Run from the repository root as the measurement user, with passwordless sudo
 # for insmod, rmmod, chown and reading debugfs, after `cargo xtask build-workers`
-# has built the observer and probe. REVIEW is the source review of this module
-# source for this kernel release; give it, and OUT, relative to the repository
-# root. The module stays loaded and owned by the measurement user on success;
-# unload it with `sudo rmmod triergon_rss_bound` before any timing run.
+# has built the observer and probe. The review of this module source for this
+# kernel release is the committed one, harness/rss-bound/reviews/SOURCE-RELEASE.json
+# (the first 12 hexadecimal digits of the module source's SHA-256, and `uname -r`);
+# --review names another. Give it, and OUT, relative to the repository root. The
+# module stays loaded and owned by the measurement user on success; unload it with
+# `sudo rmmod triergon_rss_bound` before any timing run.
 #
 # The module is built and loaded where the kernel's headers and module tools
 # are. For a 32-bit user space on a 64-bit kernel, run this on the host from the
@@ -18,13 +20,21 @@
 # then built and run, and the architecture and page size recorded, inside it
 # under `setarch linux32`, through the module's 32-bit ioctl entry point.
 set -eu
-review=$1
-out=$2
-userspace=${3:-}
-build=target/rss-bound
-module=$build/triergon_rss_bound.ko
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 release=$(uname -r)
+review=
+if [ "${1:-}" = --review ]; then
+    review=$2
+    shift 2
+fi
+out=$1
+userspace=${2:-}
+build=target/rss-bound
+module=$build/triergon_rss_bound.ko
+if [ -z "$review" ]; then
+    review=harness/rss-bound/reviews/$(sha harness/rss-bound/triergon_rss_bound.c | cut -c1-12)-$release.json
+    [ -f "$review" ] || { echo "no review of this module source for kernel $release: $review" >&2; exit 1; }
+fi
 
 # Run a command in the measurement user space, as the measurement user or as root.
 if [ -n "$userspace" ]; then
@@ -37,12 +47,22 @@ else
     measure_root() { sudo -n sh -c "$*"; }
 fi
 
-grep -q "\"module_source_sha256\": \"$(sha harness/rss-bound/triergon_rss_bound.c)\"" "$review" ||
-    { echo "review does not cover this module source" >&2; exit 1; }
-grep -q "\"kernel_release\": \"$release\"" "$review" ||
-    { echo "review does not cover kernel $release" >&2; exit 1; }
-grep -q '"status": "reviewed-conditional-upper-bound"' "$review" ||
-    { echo "review is not a reviewed upper bound" >&2; exit 1; }
+# The review's own fields, as preflight reads them: a prior source or kernel the
+# review names elsewhere does not count.
+python3 - "$review" "$(sha harness/rss-bound/triergon_rss_bound.c)" "$release" <<'EOF' || exit 1
+import json
+import sys
+
+review, source, release = sys.argv[1:]
+document = json.load(open(review))
+for key, wanted, covers in (
+    ("module_source_sha256", source, "this module source"),
+    ("kernel_release", release, "kernel " + release),
+    ("status", "reviewed-conditional-upper-bound", "a reviewed upper bound"),
+):
+    if document.get(key) != wanted:
+        sys.exit(f"review does not cover {covers}: {review}")
+EOF
 for binary in target/harness/allocations.so target/harness/memory-check; do
     [ -f "$binary" ] || { echo "$binary missing: run cargo xtask build-workers" >&2; exit 1; }
 done
