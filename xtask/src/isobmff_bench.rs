@@ -25,12 +25,15 @@ use crate::sha256;
 type R<T> = Result<T, String>;
 
 pub const USAGE: &str = "usage: cargo xtask isobmff-bench [--benchmark] [--memory]
-    [--subset52] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
+    [--subset52] [--part I/N] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
     [--require-acceptance] [--full]
 
 Always compare all 1020 traces: 972 output labels and 48 explicit refusals.
 The full measurement set has 956 physical operations and 16 explicit aliases.
 --subset52 measures the separate 52-operation manifest, retaining full parity.
+--part I/N measures every Nth physical operation of the set, from the Ith, with the
+aliases of those operations, retaining full parity; the N parts together measure
+the whole set once.
 Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
 qualification, keep the RSS kernel module unloaded and
@@ -517,6 +520,22 @@ impl Suite {
                 .collect()
         }
     }
+
+    /// Part `index` of `count` of `selection`: every `count`th physical operation from
+    /// the `index`th, with the aliases that take its samples.
+    fn part(&self, selection: &[usize], (index, count): (usize, usize)) -> Vec<usize> {
+        let physical: Vec<usize> = selection
+            .iter()
+            .copied()
+            .filter(|&i| self.cases[i].alias.is_none())
+            .collect();
+        let kept: Vec<usize> = physical.into_iter().skip(index).step_by(count).collect();
+        selection
+            .iter()
+            .copied()
+            .filter(|&i| kept.contains(&self.cases[i].alias.unwrap_or(i)))
+            .collect()
+    }
 }
 
 /// ISO BMFF harness inputs to include in the shared build's source bindings.
@@ -729,6 +748,8 @@ struct Options {
     memory_pairs: usize,
     seed: u64,
     full: bool,
+    /// Which part of the measured set to measure, counted from 0, of how many.
+    part: Option<(usize, usize)>,
 }
 
 impl Options {
@@ -750,6 +771,7 @@ impl Options {
             memory_pairs: timing::GATE_PAIRS,
             seed: 37,
             full: false,
+            part: None,
         };
         let mut args = args.iter();
         while let Some(argument) = args.next() {
@@ -759,6 +781,19 @@ impl Options {
                 "--subset52" => options.subset = true,
                 "--require-acceptance" => options.require_acceptance = true,
                 "--full" => options.full = true,
+                "--part" => {
+                    let value = args.next().ok_or("--part needs I/N")?;
+                    options.part = Some(
+                        value
+                            .split_once('/')
+                            .and_then(|(i, n)| Some((i.parse::<usize>().ok()?, n.parse().ok()?)))
+                            .filter(|&(i, n)| (1..=n).contains(&i))
+                            .map(|(i, n)| (i - 1, n))
+                            .ok_or_else(|| {
+                                format!("--part {value}: expected I/N with 1 <= I <= N")
+                            })?,
+                    );
+                }
                 "--output" => {
                     options.output = root.join(args.next().ok_or("--output needs a directory")?);
                 }
@@ -792,7 +827,9 @@ impl Options {
         {
             return Err("need at least 30 pairs and a seed below the signed 64-bit limit".into());
         }
-        if options.require_acceptance && (options.subset || !options.benchmark || !options.memory) {
+        if options.require_acceptance
+            && (options.subset || options.part.is_some() || !options.benchmark || !options.memory)
+        {
             return Err("acceptance requires the full runtime and memory sets".into());
         }
         Ok(options)
@@ -1207,6 +1244,11 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
 }
 
+/// A part as `I/N`, counted from 1, or null for the whole set.
+fn part_value(part: Option<(usize, usize)>) -> Value {
+    part.map_or(Value::Null, |(i, n)| Value::str(format!("{}/{n}", i + 1)))
+}
+
 /// The key of a measuring run: its settings, the suite's inputs and the workers.
 fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
     let command = match (options.benchmark, options.memory) {
@@ -1216,6 +1258,7 @@ fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
     };
     let settings = Value::object([
         ("subset52", Value::Bool(options.subset)),
+        ("part", part_value(options.part)),
         (
             "require_acceptance",
             Value::Bool(options.require_acceptance),
@@ -1243,7 +1286,10 @@ fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
 
 /// Compare every case, then measure the selected set as requested.
 fn compare(root: &Path, options: &Options, suite: &Suite, build: &Build, policy: Value) -> R<i32> {
-    let selection = suite.selection(options.subset);
+    let selection = match options.part {
+        Some(part) => suite.part(&suite.selection(options.subset), part),
+        None => suite.selection(options.subset),
+    };
     let base = Value::object([
         ("schema", Value::int(1)),
         ("contract", Value::str("isobmff-open-index")),
@@ -1255,6 +1301,7 @@ fn compare(root: &Path, options: &Options, suite: &Suite, build: &Build, policy:
         ("corpus_manifest_sha256", Value::str(CORPUS_SHA)),
         ("work_contract_sha256", Value::str(WORK_CONTRACT)),
         ("subset52_sha256", Value::str(SUBSET_SHA)),
+        ("part", part_value(options.part)),
         (
             "selection",
             Value::Array(selection.iter().map(|&i| Value::int(i as i128)).collect()),
@@ -1528,6 +1575,23 @@ mod tests {
         for i in expected {
             assert!(!suite.cases[i].refusal);
             assert!(suite.cases[i].alias.is_none());
+        }
+    }
+
+    #[test]
+    fn parts_measure_every_operation_once_with_its_aliases() {
+        let suite = Suite::load(&root()).unwrap();
+        let all = suite.selection(false);
+        let mut joined: Vec<usize> = (0..3).flat_map(|i| suite.part(&all, (i, 3))).collect();
+        joined.sort_unstable();
+        assert_eq!(joined, all);
+        for i in 0..3 {
+            let part = suite.part(&all, (i, 3));
+            for &index in &part {
+                if let Some(prior) = suite.cases[index].alias {
+                    assert!(part.contains(&prior));
+                }
+            }
         }
     }
 
