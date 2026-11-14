@@ -2,7 +2,8 @@
 /* External measurement experiment only. Never a production Rust dependency.
  * Exact Ubuntu7.0 headers/ABI; no kernel implementation copied.
  * Bound: initial summed RSS + every positive counter update; no releases deducted.
- * OPEN precedes main/input loading. Only one no-THP, single-thread MM is admitted.
+ * OPEN precedes main/input loading. Each session admits one no-THP, single-thread MM;
+ * up to MAX_SESSIONS sessions of distinct MMs run side by side.
  * All probes must stay armed, source coverage must be reviewed and nmissed zero.
  */
 #include <linux/module.h>
@@ -21,8 +22,11 @@
 
 #include "rss_bound.h"
 
+#define MAX_SESSIONS 32
+
 struct session {
     struct mm_struct *mm;
+    unsigned int slot;
     pid_t owner;
     u64 initial, missed[5];
     atomic64_t positive, events;
@@ -31,8 +35,9 @@ struct session {
     struct triergon_rss_bound result;
 };
 static DEFINE_MUTEX(session_lock);
-static bool session_busy;
-static struct session *watch;
+/* Admitted sessions, by slot, under session_lock; armed ones are also in watch. */
+static struct session *admitted[MAX_SESSIONS];
+static struct session *watch[MAX_SESSIONS];
 static struct kprobe probes[5];
 static struct kprobe *probe_ptrs[5];
 static unsigned int probe_count;
@@ -53,16 +58,24 @@ static int global_control_write(struct kprobe *probe, struct pt_regs *regs)
     return 0;
 }
 
+/* Each counter belongs to at most one armed session: sessions hold distinct MMs. */
+static struct session *watching(struct percpu_counter *counter)
+{
+    unsigned int n;
+    for (n = 0; n < MAX_SESSIONS; ++n) {
+        struct session *s = READ_ONCE(watch[n]);
+        if (s && (counter == &s->mm->rss_stat[MM_FILEPAGES] ||
+                  counter == &s->mm->rss_stat[MM_ANONPAGES] ||
+                  counter == &s->mm->rss_stat[MM_SHMEMPAGES])) return s;
+    }
+    return NULL;
+}
 static int count_positive(struct kprobe *probe, struct pt_regs *regs)
 {
-    struct session *s = READ_ONCE(watch);
-    struct percpu_counter *counter;
+    struct session *s;
     s64 amount, total;
+    s = watching((void *)regs_get_kernel_argument(regs, 0));
     if (!s) return 0;
-    counter = (void *)regs_get_kernel_argument(regs, 0);
-    if (counter != &s->mm->rss_stat[MM_FILEPAGES] &&
-        counter != &s->mm->rss_stat[MM_ANONPAGES] &&
-        counter != &s->mm->rss_stat[MM_SHMEMPAGES]) return 0;
     /* External MM updates invalidate admission, even when they release pages. */
     if (current->pid != s->owner || current->mm != s->mm)
         atomic_or(1, &s->errors);
@@ -89,7 +102,7 @@ static int start_stopped(void *data)
     atomic64_set(&s->events, 0);
     atomic_set(&s->errors, 0);
     s->running = true;
-    WRITE_ONCE(watch, s);
+    WRITE_ONCE(watch[s->slot], s);
     return 0;
 }
 static int end_stopped(void *data)
@@ -97,7 +110,7 @@ static int end_stopped(void *data)
     struct session *s = data;
     u64 positive, bytes, upper, missed = 0;
     unsigned int n;
-    WRITE_ONCE(watch, NULL);
+    WRITE_ONCE(watch[s->slot], NULL);
     s->running = false;
     positive = (u64)atomic64_read(&s->positive);
     for (n = 0; n < probe_count; ++n) {
@@ -120,26 +133,45 @@ static int end_stopped(void *data)
     };
     return 0;
 }
+/* Reserve a free slot for the calling process's MM, which must hold none yet. */
+static int admit(struct session *s)
+{
+    unsigned int n, slot = MAX_SESSIONS;
+    int result = 0;
+    mutex_lock(&session_lock);
+    for (n = 0; n < MAX_SESSIONS; ++n) {
+        if (admitted[n] && admitted[n]->mm == s->mm) { result = -EBUSY; break; }
+        if (!admitted[n] && slot == MAX_SESSIONS) slot = n;
+    }
+    if (!result && slot == MAX_SESSIONS) result = -EBUSY;
+    if (!result) { s->slot = slot; admitted[slot] = s; }
+    mutex_unlock(&session_lock);
+    return result;
+}
+static void dismiss(struct session *s)
+{
+    mutex_lock(&session_lock);
+    admitted[s->slot] = NULL;
+    mutex_unlock(&session_lock);
+    mmput(s->mm);
+    kfree(s);
+}
 static int bound_open(struct inode *inode, struct file *file)
 {
     struct session *s;
     int result;
     (void)inode;
-    mutex_lock(&session_lock);
-    if (session_busy) { mutex_unlock(&session_lock); return -EBUSY; }
-    session_busy = true;
-    mutex_unlock(&session_lock);
     if (!current->mm || get_nr_threads(current) != 1 ||
-        !mm_flags_test(MMF_DISABLE_THP_COMPLETELY, current->mm)) {
-        mutex_lock(&session_lock); session_busy = false; mutex_unlock(&session_lock); return -EPERM;
-    }
+        !mm_flags_test(MMF_DISABLE_THP_COMPLETELY, current->mm)) return -EPERM;
     s = kzalloc(sizeof(*s), GFP_KERNEL);
-    if (!s) { mutex_lock(&session_lock); session_busy = false; mutex_unlock(&session_lock); return -ENOMEM; }
+    if (!s) return -ENOMEM;
     s->mm = get_task_mm(current);
-    if (!s->mm) { kfree(s); mutex_lock(&session_lock); session_busy = false; mutex_unlock(&session_lock); return -ESRCH; }
+    if (!s->mm) { kfree(s); return -ESRCH; }
     s->owner = current->pid;
+    result = admit(s);
+    if (result) { mmput(s->mm); kfree(s); return result; }
     result = stop_machine(start_stopped, s, NULL);
-    if (result) { mmput(s->mm); kfree(s); mutex_lock(&session_lock); session_busy = false; mutex_unlock(&session_lock); return result; }
+    if (result) { dismiss(s); return result; }
     file->private_data = s;
     return 0;
 }
@@ -160,12 +192,14 @@ static int bound_release(struct inode *inode, struct file *file)
     struct session *s = file->private_data;
     (void)inode;
     if (s) {
-        if (s->running) stop_machine(end_stopped, s, NULL);
-        mmput(s->mm); kfree(s);
+        /* A session that cannot be disarmed stays armed: the probes may still
+         * reach it, so it is never freed and its slot never reused. */
+        if (s->running && stop_machine(end_stopped, s, NULL)) {
+            pr_warn_once("triergon_rss_bound: a session could not be disarmed and is kept\n");
+            return 0;
+        }
+        dismiss(s);
     }
-    mutex_lock(&session_lock);
-    session_busy = false;
-    mutex_unlock(&session_lock);
     return 0;
 }
 /* The result holds only __u64 fields, so a 32-bit process on a 64-bit kernel
@@ -219,4 +253,4 @@ module_init(bound_init);
 module_exit(bound_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Isolated triergon RSS positive-delta bound experiment");
-MODULE_VERSION("3");
+MODULE_VERSION("4");

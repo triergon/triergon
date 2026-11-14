@@ -17,8 +17,10 @@ pub mod memory;
 pub mod oracle;
 pub mod parity;
 pub mod policy;
+pub mod preflight;
 pub mod provenance;
 pub mod report;
+pub mod reuse;
 pub mod screen;
 #[cfg(test)]
 mod tests;

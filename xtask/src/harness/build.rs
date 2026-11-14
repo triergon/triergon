@@ -15,11 +15,13 @@ use crate::json::Value;
 
 type R<T> = Result<T, String>;
 
-const USAGE: &str = "usage: cargo xtask build-workers [--comparison-build] [--only WORKER]";
+const USAGE: &str =
+    "usage: cargo xtask build-workers [--comparison-build] [--only WORKER] [--all-references]";
 
-fn options(args: &[String]) -> R<(bool, Option<&str>)> {
+fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
     let mut comparison_build = false;
     let mut only = None;
+    let mut all_references = false;
     let mut args = args.iter();
     while let Some(flag) = args.next() {
         match flag.as_str() {
@@ -27,18 +29,16 @@ fn options(args: &[String]) -> R<(bool, Option<&str>)> {
             "--only" if only.is_none() => {
                 only = Some(args.next().ok_or(USAGE)?.as_str());
             }
+            "--all-references" if !all_references => all_references = true,
             _ => return Err(USAGE.into()),
         }
     }
-    Ok((comparison_build, only))
+    Ok((comparison_build, only, all_references))
 }
 
 pub fn main(root: &Path, args: &[String]) -> R<PathBuf> {
-    let (comparison_build, only) = options(args)?;
-    match only {
-        None => build(root, comparison_build),
-        Some(name) => build_selected(root, comparison_build, Some(name)),
-    }
+    let (comparison_build, only, all_references) = options(args)?;
+    build_selected(root, comparison_build, only, all_references)
 }
 
 fn sha(path: &Path) -> R<String> {
@@ -459,7 +459,7 @@ fn additional_candidates(
     for spec in selected {
         let mut command: Vec<String> = [
             "cargo",
-            "build",
+            "rustc",
             "-p",
             spec.package,
             "--release",
@@ -472,12 +472,15 @@ fn additional_candidates(
             root.join("target").display().to_string(),
         ]);
         command.extend(gate_build::target_args()?);
-        if let Some(example) = spec.example {
-            command.extend(["--example".into(), example.into()]);
+        match spec.example {
+            Some(example) => command.extend(["--example".into(), example.into()]),
+            None => command.extend(["--bin".into(), spec.name.into()]),
         }
         if !spec.features.is_empty() {
             command.extend(["--features".into(), spec.features.join(",")]);
         }
+        command.push("--".into());
+        command.extend(gate_build::worker_link_arguments()?);
         let status = Command::new("cargo")
             .args(&command[1..])
             .env("CARGO_INCREMENTAL", "0")
@@ -825,17 +828,21 @@ pub fn measurement_reference_error(contract: &Value) -> Option<String> {
     }
 }
 
-pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
-    build_selected(root, comparison_build, None)
-}
-
-fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<PathBuf> {
+/// Builds the workers and references. A profile reference is built only when every
+/// profile it links is prepared, and `comparison_references` in `identity.json` lists
+/// those built; the others are printed, and with `all_references` fail the build.
+fn build_selected(
+    root: &Path,
+    comparison_build: bool,
+    only: Option<&str>,
+    all_references: bool,
+) -> R<PathBuf> {
     let selected = selected_candidates(only)?;
     gate_build::admit(root, comparison_build)?;
     let linux = cfg!(target_os = "linux");
     let mut candidate_command: Vec<String> = [
         "cargo",
-        "build",
+        "rustc",
         "-p",
         "media-worker",
         "--release",
@@ -848,6 +855,8 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         root.join("target").display().to_string(),
     ]);
     candidate_command.extend(gate_build::target_args()?);
+    candidate_command.extend(["--bin".into(), "media-worker".into(), "--".into()]);
+    candidate_command.extend(gate_build::worker_link_arguments()?);
     let status = Command::new("cargo")
         .args(&candidate_command[1..])
         .env("CARGO_INCREMENTAL", "0")
@@ -893,7 +902,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         "-Werror".into(),
         root.join("harness/reference.c").display().to_string(),
     ];
-    command.extend(shell_words(&flags)?);
+    command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
     command.extend(["-o".into(), worker.display().to_string()]);
     run(&command)?;
     let mut combined_command = vec![command[0].clone(), "-DTRIERGON_COMBINED_REFERENCE=1".into()];
@@ -904,13 +913,23 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
     // source, made only when that profile exists, so the other references and
     // their identity records are unchanged.
     let mut profile_workers = Vec::new();
+    let mut skipped = Vec::new();
     for reference in PROFILE_REFERENCES {
         let path = out.join(reference.binary);
         let build = root.join(reference.profile).join("build.json");
         let profiles =
             || std::iter::once(reference.profile).chain(reference.linked.iter().copied());
-        if !profiles().all(|profile| root.join(profile).join("build.json").exists()) {
+        let missing: Vec<&str> = profiles()
+            .filter(|profile| !root.join(profile).join("build.json").exists())
+            .collect();
+        if !missing.is_empty() {
             let _ = fs::remove_file(&path);
+            println!(
+                "skipped {}: {} not prepared",
+                reference.binary,
+                missing.join(", ")
+            );
+            skipped.push(reference.binary);
             continue;
         }
         if let Some(prepared) = reference.prepared {
@@ -949,10 +968,17 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
             command.push(generate(root)?.display().to_string());
         }
         command.push(root.join(reference.source).display().to_string());
-        command.extend(shell_words(&flags)?);
+        command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
         command.extend(["-o".into(), path.display().to_string()]);
         run(&command)?;
         profile_workers.push((reference, path, build, command));
+    }
+    if all_references && !skipped.is_empty() {
+        return Err(format!(
+            "--all-references: {} reference(s) skipped: {}",
+            skipped.len(),
+            skipped.join(", ")
+        ));
     }
     let commands = instrumentation_commands(&compiler, root, &out, linux);
     for compile in &commands {
@@ -1413,24 +1439,33 @@ mod tests {
 
     #[test]
     fn worker_options_preserve_defaults_and_accept_either_flag_order() {
-        assert_eq!(options(&[]).unwrap(), (false, None));
+        assert_eq!(options(&[]).unwrap(), (false, None, false));
         assert_eq!(
             options(&args(&["--comparison-build"])).unwrap(),
-            (true, None)
+            (true, None, false)
         );
+        assert_eq!(
+            options(&args(&["--all-references"])).unwrap(),
+            (false, None, true)
+        );
+        assert!(options(&args(&["--all-references", "--all-references"])).is_err());
         for name in std::iter::once("media-worker")
             .chain(ADDITIONAL_CANDIDATES.iter().map(|spec| spec.name))
         {
             assert_eq!(
                 options(&args(&["--only", name])).unwrap(),
-                (false, Some(name))
+                (false, Some(name), false)
             );
             for arguments in [
                 args(&["--only", name, "--comparison-build"]),
                 args(&["--comparison-build", "--only", name]),
             ] {
-                assert_eq!(options(&arguments).unwrap(), (true, Some(name)));
+                assert_eq!(options(&arguments).unwrap(), (true, Some(name), false));
             }
+            assert_eq!(
+                options(&args(&["--all-references", "--only", name])).unwrap(),
+                (false, Some(name), true)
+            );
         }
     }
 
