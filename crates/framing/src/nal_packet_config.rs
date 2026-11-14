@@ -1,6 +1,6 @@
 //! Bounded initialization-extradata view of the same pinned packet receiver.
 use crate::nal_packet::{
-    NalConfigurationRefusal, copy_annex_b_piece, freeze_annex_b_output, reserve_annex_b_output,
+    NalConfigurationRefusal, copy_annex_b_segment, freeze_annex_b_output, reserve_annex_b_output,
 };
 use crate::{AvcConfigArrayKind, BuildStep, NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -217,26 +217,19 @@ impl<'a> NalPacketConfigWriter<'a> {
                         self.phase = 4;
                         continue;
                     };
-                    if selected {
-                        let end = b.len().checked_add(prefix).ok_or(Error::Overflow)?;
-                        while self.copied != end {
-                            if work.remaining() == 0 {
-                                return Ok(BuildStep::Yield);
-                            }
-                            let remaining = if self.copied < prefix {
-                                &[0, 0, 0, 1][self.copied..]
-                            } else {
-                                &b[self.copied - prefix..]
-                            };
-                            let out = self
-                                .output
+                    if selected
+                        && !copy_annex_b_segment(
+                            prefix,
+                            b,
+                            self.output
                                 .as_mut()
-                                .ok_or(Error::Invalid("missing config output"))?;
-                            if !copy_annex_b_piece(remaining, out, &mut self.copied, work, cancel)?
-                            {
-                                return Ok(BuildStep::Yield);
-                            }
-                        }
+                                .ok_or(Error::Invalid("missing config output"))?,
+                            &mut self.copied,
+                            work,
+                            cancel,
+                        )?
+                    {
+                        return Ok(BuildStep::Yield);
                     }
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);

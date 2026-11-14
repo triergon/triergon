@@ -4,7 +4,7 @@
 use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacketJob, NalPacketOutput,
     NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase,
-    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_piece,
+    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment,
     freeze_annex_b_output, packet_pool, reserve_annex_b_output,
 };
 use crate::header::NalHeaderError;
@@ -752,24 +752,7 @@ impl PacketEmission {
             .as_mut()
             .ok_or(Error::Invalid("missing packet buffer"))?;
         while let Some(part) = parts.get(self.copy_segment) {
-            let prefix = usize::from(part.prefix_bytes());
-            let end = part.framed_len();
-            // Charge and check cancellation at the prefix, payload chunks
-            // and segment boundary, including when resuming a partial copy.
-            if self.copied < prefix {
-                let start = 4 - prefix + self.copied;
-                copy_annex_b_piece(
-                    &[0, 0, 0, 1][start..],
-                    buffer,
-                    &mut self.copied,
-                    work,
-                    cancel,
-                )?;
-                if self.copied < prefix {
-                    return Ok(YIELD);
-                }
-            }
-            if self.copied < end {
+            if self.copied < part.framed_len() {
                 if work.remaining() == 0 {
                     return Ok(YIELD);
                 }
@@ -781,16 +764,15 @@ impl PacketEmission {
                 let payload = backing
                     .get(part.source_range())
                     .ok_or(Error::Invalid("packet segment range"))?;
-                while self.copied < end {
-                    if !copy_annex_b_piece(
-                        &payload[self.copied - prefix..],
-                        buffer,
-                        &mut self.copied,
-                        work,
-                        cancel,
-                    )? {
-                        return Ok(YIELD);
-                    }
+                if !copy_annex_b_segment(
+                    usize::from(part.prefix_bytes()),
+                    payload,
+                    buffer,
+                    &mut self.copied,
+                    work,
+                    cancel,
+                )? {
+                    return Ok(YIELD);
                 }
             }
             if !work.try_charge(1) {

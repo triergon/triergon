@@ -10,25 +10,34 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, WorkBudget};
 
-/// Copy one piece within the same work and cancellation checkpoints used for
-/// both packet and configuration output.
+/// Resume copying one start code and its payload without crossing a work or
+/// cancellation checkpoint. The cursor is relative to the start code.
 #[inline(never)]
-pub(crate) fn copy_annex_b_piece(
-    remaining: &[u8],
+pub(crate) fn copy_annex_b_segment(
+    prefix: usize,
+    payload: &[u8],
     output: &mut BudgetVec<u8>,
     copied: &mut usize,
     work: &mut WorkBudget,
     cancel: &AtomicBool,
 ) -> Result<bool> {
-    let count = (work.remaining().min(4096) as usize).min(remaining.len());
-    if count == 0 {
-        return Ok(false);
-    }
-    output.try_extend_from_slice(&remaining[..count])?;
-    work.take(count as u64);
-    *copied += count;
-    if cancel.load(Ordering::Relaxed) {
-        return Err(Error::Cancelled);
+    let end = payload.len().checked_add(prefix).ok_or(Error::Overflow)?;
+    while *copied < end {
+        let remaining = if *copied < prefix {
+            &[0, 0, 0, 1][4 - prefix + *copied..]
+        } else {
+            &payload[*copied - prefix..]
+        };
+        let count = (work.remaining().min(4096) as usize).min(remaining.len());
+        if count == 0 {
+            return Ok(false);
+        }
+        output.try_extend_from_slice(&remaining[..count])?;
+        work.take(count as u64);
+        *copied += count;
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
     }
     Ok(true)
 }
