@@ -9,7 +9,8 @@
 //! inputs match their pins, and those of the external vector and capture; that
 //! the RSS module source has a review for this kernel; and that the RSS module
 //! is unloaded, as timing needs it, or, with `--kernel`, loaded under a current
-//! proof, as kernel-bound memory needs it. Anything it cannot establish fails.
+//! proof on a host with the qualified class's memory, as kernel-bound memory needs
+//! it. Anything it cannot establish fails.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -34,7 +35,8 @@ that each named reference was built and is current: those --isobmff, --codecs an
 --capture measure against, and any --reference; that the RSS module review covers
 this module source and kernel (--review), unless
 the run's memory uses the standard bounds (--standard-memory); and that the RSS
-module is unloaded, or with --kernel loaded under a current proof. A feature
+module is unloaded, or with --kernel loaded under a current proof on a host with at
+least 30 GiB of memory, the class kernel-bound memory is qualified on. A feature
 without cases or a workload list without workloads fails. Prints every check and
 exits 1 if any fails.";
 
@@ -184,7 +186,41 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             module_absent()
         },
     );
+    if options.kernel {
+        let meminfo =
+            std::fs::read_to_string("/proc/meminfo").map_err(|e| format!("/proc/meminfo: {e}"));
+        checks.check("host memory", meminfo.and_then(|m| qualified_memory(&m)));
+    }
     Ok(checks.report())
+}
+
+/// The host class kernel-bound memory gates are qualified on.
+const QUALIFIED_HOST: &str = "a c6g.4xlarge with 32 GB";
+
+/// The least `MemTotal` of that class, below its 32 GiB for the kernel's reserve.
+const QUALIFIED_MEMORY_BYTES: u64 = 30 << 30;
+
+/// Kernel-bound memory runs only on hosts with the memory of the qualified class:
+/// on smaller ones another task's updates void pairs (`docs/quality.md`).
+fn qualified_memory(meminfo: &str) -> R<String> {
+    let total = meminfo
+        .lines()
+        .find_map(|line| {
+            let kib = line.strip_prefix("MemTotal:")?.trim().strip_suffix("kB")?;
+            kib.trim().parse::<u64>().ok()
+        })
+        .ok_or("/proc/meminfo has no MemTotal")?
+        * 1024;
+    let gib = |bytes: u64| bytes as f64 / f64::from(1u32 << 30);
+    if total >= QUALIFIED_MEMORY_BYTES {
+        Ok(format!("{:.1} GiB", gib(total)))
+    } else {
+        Err(format!(
+            "{:.1} GiB is below the {:.0} GiB of {QUALIFIED_HOST}, the class kernel-bound memory gates are qualified on",
+            gib(total),
+            gib(QUALIFIED_MEMORY_BYTES)
+        ))
+    }
 }
 
 impl Options {
@@ -512,6 +548,19 @@ mod tests {
             ]
         );
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn kernel_bound_memory_needs_the_qualified_host_memory() {
+        let meminfo = |kib: u64| format!("MemTotal:       {kib} kB\nMemFree:        1 kB\n");
+        // A c6g.4xlarge and a 16 GB host as /proc/meminfo reports them.
+        assert!(qualified_memory(&meminfo(32_239_292)).is_ok());
+        let error = qualified_memory(&meminfo(16_073_336)).unwrap_err();
+        assert!(
+            error.contains("15.3 GiB") && error.contains("c6g.4xlarge"),
+            "{error}"
+        );
+        assert!(qualified_memory("MemFree: 1 kB\n").is_err());
     }
 
     #[test]
