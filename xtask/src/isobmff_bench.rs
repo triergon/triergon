@@ -971,7 +971,7 @@ fn measure_memory(
             &build.candidate,
             &build.reference,
             &input,
-            options.memory_pairs,
+            timing::Pairs::gate(options.memory_pairs, memory::CEILING),
             options.seed,
             memory::Commands {
                 candidate: &candidate,

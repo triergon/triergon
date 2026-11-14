@@ -1123,9 +1123,13 @@ pub(crate) fn collect(
     let mut memory_jobs = Vec::new();
     // A gate comparison stops early once its bound is settled below the ceiling;
     // a comparison with another build runs every pair.
-    let timing_pairs = match options.baseline_worker {
-        None => Pairs::gate(options.pairs, Runtime::load(root)?.ceiling),
-        Some(_) => Pairs::fixed(options.pairs),
+    let planned_memory = options.memory_pairs.unwrap_or(options.pairs);
+    let (timing_pairs, memory_pairs) = match options.baseline_worker {
+        None => (
+            Pairs::gate(options.pairs, Runtime::load(root)?.ceiling),
+            Pairs::gate(planned_memory, super::memory::CEILING),
+        ),
+        Some(_) => (Pairs::fixed(options.pairs), Pairs::fixed(planned_memory)),
     };
     for case in cases {
         let id = s(case, "id").unwrap_or_default().to_owned();
@@ -1336,7 +1340,7 @@ pub(crate) fn collect(
                                     registered,
                                 },
                                 &input,
-                                options.memory_pairs.unwrap_or(options.pairs),
+                                memory_pairs,
                                 options.seed,
                                 &operation,
                             )

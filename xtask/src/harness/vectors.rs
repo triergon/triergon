@@ -202,7 +202,11 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
                 registered: options.baseline_worker.is_none(),
             };
             let job = super::memory::Job::new(&workers, [path.clone()], |slot| {
-                super::memory::collect(slot, root, workers, &path, options.pairs, 280, &timed)
+                let pairs = match options.baseline_worker {
+                    None => Pairs::gate(options.pairs, super::memory::CEILING),
+                    Some(_) => Pairs::fixed(options.pairs),
+                };
+                super::memory::collect(slot, root, workers, &path, pairs, 280, &timed)
             });
             case.push(("memory", super::memory::collect_one(job)?));
         }

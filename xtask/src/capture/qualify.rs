@@ -486,7 +486,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     candidate,
                     reference,
                     &path,
-                    a.memory_pairs,
+                    Pairs::gate(a.memory_pairs, memory::CEILING),
                     a.seed + MEMORY_SEED,
                     &args,
                     outputs,

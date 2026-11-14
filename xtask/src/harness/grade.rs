@@ -497,7 +497,10 @@ fn samples(measurement: &Value, minimum: i128, failed_memory: bool) -> R<&[Value
     } else {
         integer(measurement, "pairs")?
     };
-    if pairs < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
+    // A collection that stopped early by rule set out to run its planned pairs;
+    // the evaluator replays the rule.
+    let planned = timing::planned_pairs(measurement).unwrap_or(pairs);
+    if planned < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
@@ -2261,7 +2264,7 @@ mod tests {
         let result = super::super::memory::evaluate(
             root,
             array(&memory, "samples").unwrap(),
-            30,
+            timing::Pairs::fixed(30),
             280,
             field(&memory, "certificate").unwrap(),
             None,

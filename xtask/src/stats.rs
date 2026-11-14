@@ -78,14 +78,15 @@ pub const EARLY_LOOKS: [(usize, usize); 2] = [(10, 10), (20, 18)];
 /// `k` as its bounds. Whatever the ratios' distribution, the `k`-th smallest of
 /// `n` independent ratios lies below their median at most as often as `k` or
 /// more of `n` fair coin flips land heads, and likewise for the lower bound.
+/// Numerators may be zero, as a peak heap can be.
 pub fn order_interval(pairs: &[(f64, f64)], k: usize) -> Result<Interval, String> {
     let n = pairs.len();
     if !(n / 2 < k && k <= n)
         || pairs
             .iter()
-            .any(|&(a, b)| !a.is_finite() || !b.is_finite() || a <= 0.0 || b <= 0.0)
+            .any(|&(a, b)| !a.is_finite() || !b.is_finite() || a < 0.0 || b <= 0.0)
     {
-        return Err("order bounds require positive finite pairs and k above half".into());
+        return Err("order bounds require finite nonnegative ratios and k above half".into());
     }
     let mut ratios: Vec<f64> = pairs.iter().map(|&(a, b)| a / b).collect();
     ratios.sort_by(f64::total_cmp);
@@ -245,7 +246,13 @@ mod tests {
         assert_eq!(order_interval(&pairs, 8).unwrap().upper_95, 0.8);
         assert!(order_interval(&pairs, 5).is_err());
         assert!(order_interval(&pairs, 11).is_err());
-        assert!(order_interval(&[(0.0, 1.0), (1.0, 1.0)], 2).is_err());
+        assert_eq!(
+            order_interval(&[(0.0, 1.0), (1.0, 2.0)], 2)
+                .unwrap()
+                .upper_95,
+            0.5
+        );
+        assert!(order_interval(&[(1.0, 0.0), (1.0, 1.0)], 2).is_err());
     }
 
     #[test]

@@ -100,7 +100,14 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
             ])
         })
         .collect();
-    let memory = super::memory::evaluate(root(), &samples, 30, 0, &certificate, None);
+    let memory = super::memory::evaluate(
+        root(),
+        &samples,
+        crate::harness::timing::Pairs::fixed(30),
+        0,
+        &certificate,
+        None,
+    );
     let timing = Value::object([
         ("status", Value::str("measured")),
         ("worker_hashes", hashes.clone()),
@@ -173,7 +180,14 @@ fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
             Value::int(0),
         );
     }
-    let memory = super::memory::evaluate(root(), &samples, 30, 0, certificate, None);
+    let memory = super::memory::evaluate(
+        root(),
+        &samples,
+        crate::harness::timing::Pairs::fixed(30),
+        0,
+        certificate,
+        None,
+    );
     assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
     assert_eq!(memory.get("heap_ratio_upper_95"), Some(&Value::float(0.0)));
     assert_eq!(
@@ -218,7 +232,14 @@ fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
             "heap_peak_bytes",
             Value::int(reference),
         );
-        let rejected = super::memory::evaluate(root(), &invalid, 30, 0, certificate, None);
+        let rejected = super::memory::evaluate(
+            root(),
+            &invalid,
+            crate::harness::timing::Pairs::fixed(30),
+            0,
+            certificate,
+            None,
+        );
         assert_eq!(
             rejected.get("status"),
             Some(&Value::str("invalid-memory-observation"))
@@ -279,7 +300,14 @@ fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
                 );
             }
         }
-        let bounded = super::memory::evaluate(root(), &rss, 30, 0, certificate, None);
+        let bounded = super::memory::evaluate(
+            root(),
+            &rss,
+            crate::harness::timing::Pairs::fixed(30),
+            0,
+            certificate,
+            None,
+        );
         assert_eq!(bounded.get("status"), Some(&Value::str("qualified")));
         assert!(super::memory::evidence_valid(
             root(),
@@ -716,7 +744,14 @@ fn per_worker_memory_outputs_reuse_the_same_observation_validation() {
             }
         }
     }
-    let measured = super::memory::evaluate(root(), &samples, 30, 0, certificate, Some(&expected));
+    let measured = super::memory::evaluate(
+        root(),
+        &samples,
+        crate::harness::timing::Pairs::fixed(30),
+        0,
+        certificate,
+        Some(&expected),
+    );
     let valid = |memory: &Value, outputs: &Value| {
         super::memory::evidence_valid_with_outputs(
             root(),

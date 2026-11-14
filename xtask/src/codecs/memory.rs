@@ -204,7 +204,7 @@ pub fn run(options: &Options) -> Result<(), String> {
                                 &options.candidate,
                                 &options.reference,
                                 &input,
-                                options.pairs,
+                                memory::Pairs::gate(options.pairs, memory::CEILING),
                                 options.seed,
                                 &arguments,
                                 &expected,
