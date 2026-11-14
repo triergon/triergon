@@ -2,8 +2,7 @@
 # control value program moves twilight point 1 up a pixel, each glyph
 # twilight point 2, and each glyph writes the two into the y of points 0 and
 # 1. Observed: the second request starts again from the twilight zone the
-# control value program leaves, where the crate keeps what the glyphs left
-# (an open difference).
+# control value program leaves, not from what the glyphs left.
 sequence 1000 1000
 heights 1000
 fpgm

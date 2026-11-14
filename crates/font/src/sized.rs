@@ -143,6 +143,12 @@ impl Font {
     /// so either way (probes `zero-ppem`, `zero-ppem-control-program`,
     /// `zero-ppem-uninstructed`).
     ///
+    /// Each call is a request of the size, as each of libass's is: the face's
+    /// next hinted load runs its TrueType control value program again from
+    /// freshly scaled control values, cleared storage and a fresh twilight
+    /// zone, at the size the face is already at too (probe
+    /// `sizes-same-size-request`).
+    ///
     /// # Errors
     ///
     /// `Invalid` for a negative height, a face whose ascender equals its
@@ -174,6 +180,9 @@ impl Font {
                 scale,
             )),
         };
+        if let Some(bytecode) = &self.bytecode {
+            bytecode.request();
+        }
         if ppem == 0 {
             return Ok(SizedFont {
                 font: self,

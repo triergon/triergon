@@ -3,9 +3,10 @@
 //! in backward compatibility mode.
 //!
 //! The font program runs once for a face, at the first size it loads hinted
-//! at, and defines functions and instructions. At each size the control value
-//! program then scales and adjusts the control value table, fills the storage
-//! area and the twilight zone and sets the graphics state glyphs start from.
+//! at, and defines functions and instructions. At each size request the control
+//! value program then scales and adjusts the control value table, fills the
+//! storage area and the twilight zone and sets the graphics state glyphs start
+//! from.
 //! Each glyph program then runs on the glyph's scaled points and its four
 //! phantom points. Behaviour the specifications leave open is reproduced as observed
 //! by the probes under harness/fonts/probes, each rule naming its probe.
@@ -14,6 +15,7 @@ mod exec;
 mod math;
 mod zone;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use crate::outline::{Outline, Point, PointKind};
@@ -471,6 +473,9 @@ pub(crate) struct Phantoms {
 pub(crate) struct Bytecode {
     budget: Budget,
     setup: Mutex<Option<Setup>>,
+    /// Whether the face has been requested at a size since the size's state
+    /// was made.
+    requested: AtomicBool,
 }
 
 /// What a face's interpreter keeps.
@@ -531,13 +536,21 @@ impl Bytecode {
         Self {
             budget,
             setup: Mutex::new(None),
+            requested: AtomicBool::new(false),
         }
+    }
+
+    /// Records a request of the face at a size: the next hinted load makes
+    /// its size's state afresh, even at the size the state is for (probe
+    /// `sizes-same-size-request`).
+    pub(crate) fn request(&self) {
+        self.requested.store(true, Ordering::Relaxed);
     }
 
     /// Runs `load` with the interpreter at `ppem` and the 16.16 `scale`, made
     /// from `tables` (the face's) within `work` units unless it already is,
-    /// or made and failed: the font program runs at the first size, the
-    /// control value program at each size.
+    /// or made and failed, since the last request: the font program runs at
+    /// the first size, the control value program at each size and request.
     pub(crate) fn with_size<'t, R>(
         &self,
         tables: impl FnOnce() -> Tables<'t>,
@@ -547,8 +560,10 @@ impl Bytecode {
         load: impl FnOnce(&mut State) -> Result<R>,
     ) -> Result<R> {
         let mut guard = self.setup.lock().unwrap_or_else(PoisonError::into_inner);
+        let requested = self.requested.swap(false, Ordering::Relaxed);
         let setup = match guard.take() {
-            Some(setup) if setup.is_for(ppem, scale) => guard.insert(setup),
+            Some(setup @ Setup::Unusable(_)) => guard.insert(setup),
+            Some(setup) if !requested && setup.is_for(ppem, scale) => guard.insert(setup),
             kept => {
                 let tables = tables();
                 let mut budget = WorkBudget::new(work);
@@ -821,6 +836,31 @@ mod tests {
         assert_eq!(at(16), Err(Error::Policy("TrueType instructions")));
         assert_eq!(made.get(), 1);
         assert_eq!(at(17), Err(Error::Policy("TrueType instructions")));
+        assert_eq!(made.get(), 2);
+    }
+
+    #[test]
+    fn a_request_remakes_the_size_it_is_at() {
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        let made = Cell::new(0);
+        let at = |ppem| {
+            bytecode.with_size(
+                || {
+                    made.set(made.get() + 1);
+                    tables(&MAXP, &[], &[])
+                },
+                ppem,
+                i64::from(ppem) << 11,
+                1000,
+                |_| Ok(()),
+            )
+        };
+        at(16).unwrap();
+        at(16).unwrap();
+        assert_eq!(made.get(), 1);
+        bytecode.request();
+        at(16).unwrap();
+        at(16).unwrap();
         assert_eq!(made.get(), 2);
     }
 
