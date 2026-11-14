@@ -1,0 +1,46 @@
+height 40 outlines
+face 0
+size 40 1 1 2621 2621 64 -64 64 64 32 8 39 39 0 0 underline -5 -3 strikeout -
+glyph 0 20 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 24 truetype 1 | 4 | 4 0 1 4 28 1 20 28 1 20 0 1
+bold 1 truetype 1 | 4 | 4 0 1 4 28 1 20 28 1 20 0 1
+oblique 1 truetype 1 | 4 | 4 0 1 14 28 1 30 28 1 20 0 1
+both 1 truetype 1 | 4 | 4 0 1 14 28 1 30 28 1 20 0 1
+glyph 2 24 none 1 | 1 | 12 12 1
+bold 2 none 1 | 1 | 12 12 1
+oblique 2 none 1 | 1 | 16 12 1
+both 2 none 1 | 1 | 16 12 1
+glyph 3 24 none 1 | 4 | 4 0 1 20 28 1 20 0 1 4 28 1
+bold 3 none 1 | 4 | 4 0 1 20 28 1 20 0 1 4 28 1
+oblique 3 none 1 | 4 | 4 0 1 30 28 1 20 0 1 14 28 1
+both 3 none 1 | 4 | 4 0 1 30 28 1 20 0 1 14 28 1
+glyph 4 36 none 2 | 4 8 | 4 0 1 4 16 1 16 16 1 16 0 1 20 0 1 32 0 1 32 16 1 20 16 1
+bold 4 none 2 | 4 8 | 4 0 1 4 16 1 16 16 1 16 0 1 20 0 1 32 0 1 32 16 1 20 16 1
+oblique 4 none 2 | 4 8 | 4 0 1 9 16 1 21 16 1 16 0 1 20 0 1 32 0 1 37 16 1 25 16 1
+both 4 none 2 | 4 8 | 4 0 1 9 16 1 21 16 1 16 0 1 20 0 1 32 0 1 37 16 1 25 16 1
+height 63 outlines
+face 0
+size 63 1 1 4129 4129 64 -64 64 64 50 13 63 63 0 0 underline -8 -5 strikeout -
+glyph 0 32 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 38 truetype 1 | 4 | 6 0 1 6 44 1 32 44 1 32 0 1
+bold 1 truetype 1 | 4 | 6 0 1 6 44 1 32 44 1 32 0 1
+oblique 1 truetype 1 | 4 | 6 0 1 21 44 1 47 44 1 32 0 1
+both 1 truetype 1 | 4 | 6 0 1 21 44 1 47 44 1 32 0 1
+glyph 2 38 none 1 | 1 | 19 19 1
+bold 2 none 1 | 1 | 19 19 1
+oblique 2 none 1 | 1 | 25 19 1
+both 2 none 1 | 1 | 25 19 1
+glyph 3 38 none 1 | 4 | 6 0 1 32 44 1 32 0 1 6 44 1
+bold 3 none 1 | 4 | 6 0 1 32 44 1 32 0 1 6 44 1
+oblique 3 none 1 | 4 | 6 0 1 47 44 1 32 0 1 21 44 1
+both 3 none 1 | 4 | 6 0 1 47 44 1 32 0 1 21 44 1
+glyph 4 57 truetype 2 | 4 8 | 6 0 1 6 25 1 25 25 1 25 0 1 32 0 1 50 0 1 50 25 1 32 25 1
+bold 4 truetype 2 | 4 8 | 6 0 1 6 25 1 25 25 1 25 0 1 32 0 1 50 0 1 50 25 1 32 25 1
+oblique 4 truetype 2 | 4 8 | 6 0 1 14 25 1 33 25 1 25 0 1 32 0 1 50 0 1 58 25 1 40 25 1
+both 4 truetype 2 | 4 8 | 6 0 1 14 25 1 33 25 1 25 0 1 32 0 1 50 0 1 58 25 1 40 25 1
