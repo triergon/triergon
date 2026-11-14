@@ -760,7 +760,9 @@ impl PacketEmission {
                     return Ok(YIELD);
                 }
                 let start = 4 - prefix + self.copied;
-                buffer.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
+                if !buffer.extend_reserved(&[0, 0, 0, 1][start..start + count]) {
+                    return Err(Error::Invalid("packet output reservation"));
+                }
                 work.take(count as u64);
                 self.copied += count;
                 if cancel.load(Ordering::Relaxed) {
@@ -799,7 +801,9 @@ impl PacketEmission {
                         return Ok(YIELD);
                     }
                     let start = self.copied - prefix;
-                    buffer.try_extend_from_slice(&payload[start..start + count])?;
+                    if !buffer.extend_reserved(&payload[start..start + count]) {
+                        return Err(Error::Invalid("packet output reservation"));
+                    }
                     work.take(count as u64);
                     self.copied += count;
                     if cancel.load(Ordering::Relaxed) {

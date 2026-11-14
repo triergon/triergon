@@ -239,13 +239,14 @@ impl<'a> NalPacketConfigWriter<'a> {
                                 .output
                                 .as_mut()
                                 .ok_or(Error::Invalid("missing config output"))?;
-                            if self.copied < prefix {
-                                out.try_extend_from_slice(
-                                    &[0, 0, 0, 1][self.copied..self.copied + count],
-                                )?;
+                            let bytes = if self.copied < prefix {
+                                &[0, 0, 0, 1][self.copied..self.copied + count]
                             } else {
                                 let start = self.copied - prefix;
-                                out.try_extend_from_slice(&b[start..start + count])?;
+                                &b[start..start + count]
+                            };
+                            if !out.extend_reserved(bytes) {
+                                return Err(Error::Invalid("configuration output reservation"));
                             }
                             work.take(count as u64);
                             self.copied += count;

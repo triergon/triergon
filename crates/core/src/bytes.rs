@@ -589,6 +589,20 @@ impl<T> BudgetVec<T> {
         self.data.extend_from_slice(values);
         Ok(())
     }
+    /// Append to the existing reservation. Returns false without changing the
+    /// vector if the remaining charged space cannot hold the whole slice.
+    #[inline]
+    #[must_use]
+    pub fn extend_reserved(&mut self, values: &[T]) -> bool
+    where
+        T: Copy,
+    {
+        if values.len() > self.capacity() - self.len() {
+            return false;
+        }
+        self.data.extend_from_slice(values);
+        true
+    }
     /// Reserve space for all new elements before constructing any of them.
     pub fn try_extend_with(&mut self, count: usize, make: impl FnMut(usize) -> T) -> Result<()> {
         self.try_reserve_exact(count)?;
