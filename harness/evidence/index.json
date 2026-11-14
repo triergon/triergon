@@ -26247,6 +26247,2058 @@
      "sha256": "9c1a76b5f322590ea9d13df55627a30a7b8fa6e34e4573be1d2eed893e6ca44b"
     }
    ]
+  },
+  {
+   "name": "gate-ass-render-79e0ae13",
+   "path": "gate-ass-render-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: ass-render's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-ass-render-79e0ae13/3be9e41e05ab1cb51b1ea0de21d002cb3cce3e83ecca0ca60fbf1d279a55a526.tar.zst",
+   "sha256": "3be9e41e05ab1cb51b1ea0de21d002cb3cce3e83ecca0ca60fbf1d279a55a526",
+   "bytes": 4705594,
+   "results": [
+    {
+     "path": "gate-ass-render-79e0ae13/aarch64/shard-2/benchmark/ass-render/gate-result.json",
+     "command": "report --benchmark",
+     "key": "497c6d0d5d784881ebb6263912acdebb57d4318d2a0e8973b647faff1ab9af95",
+     "status": 0,
+     "report_sha256": "9e8e2d81634fb9759b937905c64365295962f373e85216240fb6cefa65479b62"
+    },
+    {
+     "path": "gate-ass-render-79e0ae13/aarch64/shard-2/graded/ass-render/gate-result.json",
+     "command": "grade",
+     "key": "6bc19185a09b99fdc8433ca8abea6675302ca0bc28a3c4b2716cfab9e3c0f521",
+     "status": 0,
+     "report_sha256": "7fa0a08e9f4fad0693b2b02075ea874dc563dd5ef74cf887d30574da6d9c7b83"
+    },
+    {
+     "path": "gate-ass-render-79e0ae13/aarch64/shard-2/memory/ass-render/gate-result.json",
+     "command": "report --memory",
+     "key": "e5a0662b1a42af7eca1cc3aa013529501287d76673a7e04bef49c546873ab3e5",
+     "status": 0,
+     "report_sha256": "d968c19696640bb02d9bff54bd7166d22f2e7dc70056a243494340a6e422816a"
+    },
+    {
+     "path": "gate-ass-render-79e0ae13/armv7/shard-2/benchmark/ass-render/gate-result.json",
+     "command": "report --benchmark",
+     "key": "07bb2bf4d13001d2c6c4d37820b1739517c48b2d94d2a92b399bd04baa9456c1",
+     "status": 0,
+     "report_sha256": "0b6b4a37cd5ba9ef16e76a00aa7b491c75b9f88c68f2539f0e5958735e172e9c"
+    },
+    {
+     "path": "gate-ass-render-79e0ae13/armv7/shard-2/graded/ass-render/gate-result.json",
+     "command": "grade",
+     "key": "d563eb25d8d22f6722d0446bcb05fa4530763cdd42c4c1de67adf1ef5b17e152",
+     "status": 0,
+     "report_sha256": "7bc02f39549932c62ed65d1e7fcae62501c03e20e2c750e6867f34dc31786530"
+    },
+    {
+     "path": "gate-ass-render-79e0ae13/armv7/shard-2/memory/ass-render/gate-result.json",
+     "command": "report --memory",
+     "key": "45dee4584470ca4b244d704abb26f04413dc25b9e91a781c761b2b241b296a8e",
+     "status": 0,
+     "report_sha256": "b07eb0839c4016c791bb1725507493819a40a50a7caf8ee3e5c07b2157dac549"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-ass-render-host-79e0ae13",
+   "path": "gate-ass-render-host-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: ass-render-host's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-ass-render-host-79e0ae13/39abc38e95f0a3f6d1d72625ade9892e97fa3a87e29f9d6cd65e7cb7bed091b2.tar.zst",
+   "sha256": "39abc38e95f0a3f6d1d72625ade9892e97fa3a87e29f9d6cd65e7cb7bed091b2",
+   "bytes": 974239,
+   "results": [
+    {
+     "path": "gate-ass-render-host-79e0ae13/aarch64/shard-10/benchmark/ass-render-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "b42fbda3156a4289df9d1633668c0418a6a8203abfafedb4d3772c41ae9f055d",
+     "status": 0,
+     "report_sha256": "9e83438907195506718c329dcf65726727c1c99a3f085197b16ad74ce1855c4b"
+    },
+    {
+     "path": "gate-ass-render-host-79e0ae13/aarch64/shard-10/graded/ass-render-host/gate-result.json",
+     "command": "grade",
+     "key": "183bf9f189c2567a16f6b20b3fee854982ba30486361743def66c0c8bca6d69d",
+     "status": 1,
+     "report_sha256": "5c0d0b11426f62075d0b01882a1a8aa4cbacacb14ea3da24dd94f1b8956f6418"
+    },
+    {
+     "path": "gate-ass-render-host-79e0ae13/aarch64/shard-10/memory/ass-render-host/gate-result.json",
+     "command": "report --memory",
+     "key": "d0cad716304f2b8ce0e78420725d79d70f98cc5de7f8fca61a0dc49b928aab70",
+     "status": 0,
+     "report_sha256": "3eb90dc3c25376c68dcc48086026601d04ef2311563664f4f265f043c28a7979"
+    },
+    {
+     "path": "gate-ass-render-host-79e0ae13/armv7/shard-10/benchmark/ass-render-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "2fb90731041e6703d84c98b931644fd7ebb40b5e6526a7e5b8ffe5dfc7070d4c",
+     "status": 0,
+     "report_sha256": "e2f2e7fdf8374ad0fa892f66343ee3596a471c7c22cebbeb85feda7b84ca01c8"
+    },
+    {
+     "path": "gate-ass-render-host-79e0ae13/armv7/shard-10/graded/ass-render-host/gate-result.json",
+     "command": "grade",
+     "key": "293d2b6682224137f7a755f8b07735fecba9ddece3d5bc09589a45a1b3f28d39",
+     "status": 0,
+     "report_sha256": "bd57ff3e30efa689647320deb574f58b57d6de00bf9e11f38f2d652d8ae22ee8"
+    },
+    {
+     "path": "gate-ass-render-host-79e0ae13/armv7/shard-10/memory/ass-render-host/gate-result.json",
+     "command": "report --memory",
+     "key": "86fa26cc80f20f6e0d291b8e41a6710c94c77925d6353309098c321d8458c907",
+     "status": 0,
+     "report_sha256": "bd108426d2801a4ff084ec67608514829b0cabb6676ef438b4a8065ada51311d"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-capture-79e0ae13",
+   "path": "gate-capture-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: every capture case qualified against the FFmpeg capture references; decoded frames and the generated inputs are left out, and the correctness reports record their hashes, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-capture-79e0ae13/a0bd067815114b690cdd1fe3fea5206e3c78e7bdf886886dc73971b0cd35529b.tar.zst",
+   "sha256": "a0bd067815114b690cdd1fe3fea5206e3c78e7bdf886886dc73971b0cd35529b",
+   "bytes": 80537794,
+   "results": [
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-1/capture-c15-noise-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "12456983e2b9d964b15dec74245f0e375d2177190d0d530d90a57abc5ff17b8c",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-10/capture-c02-ui-scroll-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "1e5bb975b7df9c86dbebd751a6389aa7ef952ce6d43662eb19aa944297758ff8",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-10/capture-c04-motion-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "04578b1886a5e38fe6d3e8d4dd0cfeefbc6bf1ef43f577afcb4496d31a4dfdb5",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-10/capture-c13-motion-960-6m/gate-result.json",
+     "command": "capture qualify",
+     "key": "079c76c5b1192883ab632dd8e838b8bfc488893bd34087d2753fe1f4cde934c9",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-2/capture-c10-ui-transition-480-topdown/gate-result.json",
+     "command": "capture qualify",
+     "key": "178c45a5c8a8010a7d7c03a584cd60a9e528e4d7802ade6246fbb9407a8a120f",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-3/capture-c11-motion-960-rate1/gate-result.json",
+     "command": "capture qualify",
+     "key": "cef9f49f585122be9cd28f40aea862d41d5ce290e34f8822bd793dbf83e05e32",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-4/capture-c09-motion-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "08e32b1fee1bbcaabf0b810986e4fcbcb88eb122f0028802f537b76a46985c51",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-5/capture-c08-ui-scroll-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "c13b9896df9f2a6d854fd326bf130c6a878432d02a3c18243689791769f83467",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-6/capture-c07-ui-static-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "1d526f2a5265d3cfe082636162127c0ba271e0267c20ab6089981dd03c53c9ad",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-7/capture-c06-ui-scroll-960-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "11f578f16076b5d731df7bf76a171613dacd2f0ed1499e15d6fe8cebb63b6596",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-8/capture-c05-noise-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "627cc80761731afcc710a266ffaa791aff68afaf88c6edb2d7b70b46c18b232f",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-8/capture-c14-motion-960-rate255/gate-result.json",
+     "command": "capture qualify",
+     "key": "cf732ff0172c78634511a5ea905e98f984fdd70a7401522f530344f716e7a5ed",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-9/capture-c01-ui-static-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "e1ea6fc3fbb044a67e1e65be12c1efc182c7e9eb51f885fe48fcf9d98766b67c",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-9/capture-c03-ui-transition-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "5f32a0a92deee7e69e6f55b546c52ca47d739eee43ca1d2e69bcbb72290f2757",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/aarch64/shard-9/capture-c12-motion-960-1m/gate-result.json",
+     "command": "capture qualify",
+     "key": "711e57b73456298f4f2c8de84532b88ea80d6c12b5e771da482167a9ac32e465",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-1/capture-c15-noise-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "8a2155eee12e4329c93490c6625a2ec21192ec6b7b5e41504fd4e3bff6bbf4f1",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-10/capture-c02-ui-scroll-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "3826b96ef93665b43540c79f090f5c2b96f58a6d446075a605beb2b36bb3eafe",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-10/capture-c04-motion-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "802778f077533553e66cc85cdf3f0631d8b446176aeefd8a019466468aa48c73",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-10/capture-c13-motion-960-6m/gate-result.json",
+     "command": "capture qualify",
+     "key": "da6f27561234383e02ab2da04279432c96abb18916fb7c0d0852187f301aa71f",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-2/capture-c10-ui-transition-480-topdown/gate-result.json",
+     "command": "capture qualify",
+     "key": "35a015962cdca5049ceb38fe84f4383e418b2f4865901deae1ffe41930a0afa4",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-3/capture-c11-motion-960-rate1/gate-result.json",
+     "command": "capture qualify",
+     "key": "a1eb022d973515f33ddb213c3cd38ffe1d0c49f1681ee8a550c9ce30c9b12f29",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-4/capture-c09-motion-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "955f9c276e69d128470232c1b6503d98582d040b613fa7b3ed68817399dcb215",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-5/capture-c08-ui-scroll-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "be2da52caceb60a124ea2ce52e310c2762f5d4c75dc615125b6a5b204c6c8764",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-6/capture-c07-ui-static-480-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "d6e1bf1bed33ad29a9c34b21f53631a21319cb100ec1483e113f26f5c7050725",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-7/capture-c06-ui-scroll-960-bottomup/gate-result.json",
+     "command": "capture qualify",
+     "key": "4cb6632d3ba63d4c13a0831cbe96ffbc061b646acf94809e2ccdecd067673b75",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-8/capture-c05-noise-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "9081c3bd5a5d8187c65354eeaa340e029f5d3923efd96939202442815c55df58",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-8/capture-c14-motion-960-rate255/gate-result.json",
+     "command": "capture qualify",
+     "key": "82a9a710010a2777ee860104b9bd94db6fdd7fd6dce60cf82597a050dc8097a3",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-9/capture-c01-ui-static-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "457e8ba7f00d0b4ae7cd7e62350754eb2faf9fc78fe0d68d9d11a9eac7900f73",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-9/capture-c03-ui-transition-960/gate-result.json",
+     "command": "capture qualify",
+     "key": "ddc2bb5d15d6f5d7a11f027a98aafee003dfd6f996c8d29d88fe2e3083c5d331",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-capture-79e0ae13/armv7/shard-9/capture-c12-motion-960-1m/gate-result.json",
+     "command": "capture qualify",
+     "key": "b854d63839d5c15982b66543ed3d9c16192d7973978c71c7067a81e9d9f1fac5",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-codecs-79e0ae13",
+   "path": "gate-codecs-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the codecs' FATE parity grading and the timing of both codec workload lists; their memory is left out, because two workloads' candidate memory runs passed the 30 s per-run limit, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-codecs-79e0ae13/5ca320791dad42f2a8a31ba7fb182752593a44a343c736b831bd8dbd82423250.tar.zst",
+   "sha256": "5ca320791dad42f2a8a31ba7fb182752593a44a343c736b831bd8dbd82423250",
+   "bytes": 828341,
+   "results": [
+    {
+     "path": "gate-codecs-79e0ae13/aarch64/shard-4/benchmark/codec-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "9668add655bbedd6e68e801fb5b5538ece3840424f0e2ebae93a3bb9c7618fb4",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-codecs-79e0ae13/aarch64/shard-7/benchmark/codec-file-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "a2239f16dce6cc29141226d054868be9235a319d698810449303c8d38da102fd",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-codecs-79e0ae13/armv7/shard-4/benchmark/codec-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "1cc7f1907ee88b4d6cf7dabf85638663093e98a32e8460377c732205a9fa6858",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-codecs-79e0ae13/armv7/shard-7/benchmark/codec-file-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "2ff9858694bb477bd25df7a3cfe721743ca915439a32218c96a9a77986e1f6c5",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-external-vector-79e0ae13",
+   "path": "gate-external-vector-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the mandatory external vector's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-external-vector-79e0ae13/a819cb6715a46cf8b7d2a2ad44236e02d2fb8954cbd6af6c422fe59775f6f7a4.tar.zst",
+   "sha256": "a819cb6715a46cf8b7d2a2ad44236e02d2fb8954cbd6af6c422fe59775f6f7a4",
+   "bytes": 913548,
+   "results": [
+    {
+     "path": "gate-external-vector-79e0ae13/aarch64/shard-2/benchmark/external-vector/gate-result.json",
+     "command": "external-vector --benchmark",
+     "key": "6a19798685c8b5a8a1dcf19d283c96fad8fa0afddde54e54ea56721b67a4a971",
+     "status": 0,
+     "report_sha256": "5617a4f01f012e693b2e529342328bfb54cba09e7023aa4f4f367efc2e0da999"
+    },
+    {
+     "path": "gate-external-vector-79e0ae13/aarch64/shard-2/graded/external-vector/gate-result.json",
+     "command": "grade",
+     "key": "2bf32d556b9c4d9e857fcadcf13107b1128713787b5878d4334a19d73e53fdf7",
+     "status": 0,
+     "report_sha256": "3af602554051be252cb5c2b45629b4d1412f0f8211358778a4617e03fe1f63c8"
+    },
+    {
+     "path": "gate-external-vector-79e0ae13/aarch64/shard-2/memory/external-vector/gate-result.json",
+     "command": "external-vector --memory",
+     "key": "025371569a2161c2d47dc884065cecdfac7cff6fb678b831e45d8f97a538ac3d",
+     "status": 0,
+     "report_sha256": "6b92cd2d927f60f25b3dfdbf65ba5b81ff139e44c3e4b1cd8829e033f677a87b"
+    },
+    {
+     "path": "gate-external-vector-79e0ae13/armv7/shard-2/benchmark/external-vector/gate-result.json",
+     "command": "external-vector --benchmark",
+     "key": "78bf911f3c884f8036ade7ed3cb2f8e5f700f18c03e7b1d66d606eab06ad42b9",
+     "status": 0,
+     "report_sha256": "c16e2dde2c13c50f18e16e3ae05966bd4fd6a098b269a34ab29f78d6b16e0bd3"
+    },
+    {
+     "path": "gate-external-vector-79e0ae13/armv7/shard-2/graded/external-vector/gate-result.json",
+     "command": "grade",
+     "key": "dc2b64daf894ed471c988d857b613ff73fa37ddba25f13c39bb541c75fe09fc4",
+     "status": 0,
+     "report_sha256": "21252772f74213324e71f15cf2ccbb75c1238447c67740058cfc85735b79f40c"
+    },
+    {
+     "path": "gate-external-vector-79e0ae13/armv7/shard-2/memory/external-vector/gate-result.json",
+     "command": "external-vector --memory",
+     "key": "49183dcbb6bb24b47e2228af765c467ccb7f79270f6cdeae071183210db27df3",
+     "status": 0,
+     "report_sha256": "56b65d1d8e69cd4ce2e2161888176effbad2018ec5b792443892765933b63c71"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-font-shape-raster-ass-79e0ae13",
+   "path": "gate-font-shape-raster-ass-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the font, shaping, rasterising and ASS comparisons; the ARMv7 fonts comparison is left out, because a FreeType reference run passed its 30 s per-run limit, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-font-shape-raster-ass-79e0ae13/ada63c33c6f79e413b5a7155cb9b17171196bc7c0a17c1dc3be00ca1ee9abb98.tar.zst",
+   "sha256": "ada63c33c6f79e413b5a7155cb9b17171196bc7c0a17c1dc3be00ca1ee9abb98",
+   "bytes": 661793,
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-hls-segments-79e0ae13",
+   "path": "gate-hls-segments-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: hls-segments's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-hls-segments-79e0ae13/61c2176506f565709670d8fb4f03dfb97dc316fb2d6fa579e4d2cf27f240e9c3.tar.zst",
+   "sha256": "61c2176506f565709670d8fb4f03dfb97dc316fb2d6fa579e4d2cf27f240e9c3",
+   "bytes": 4317978,
+   "results": [
+    {
+     "path": "gate-hls-segments-79e0ae13/aarch64/shard-7/benchmark/hls-segments/gate-result.json",
+     "command": "report --benchmark",
+     "key": "e8ef1a3325641a56086ecbea4d2ee928b32c1276fa15b5bdc6f45cce27b76989",
+     "status": 0,
+     "report_sha256": "b3d3ef5af068e36db3f2039b9fc411b5f8241c57c0db0d1a05d8ca7507c1487c"
+    },
+    {
+     "path": "gate-hls-segments-79e0ae13/aarch64/shard-7/graded/hls-segments/gate-result.json",
+     "command": "grade",
+     "key": "6ae43daa8cd27d10080150b089c9b5dfe50687492103b0e690f3d37ea966a37c",
+     "status": 0,
+     "report_sha256": "099af5a296c6e3804488ce276b57a7e9bd1c10886f0db3bb25c99986ebd5b159"
+    },
+    {
+     "path": "gate-hls-segments-79e0ae13/aarch64/shard-7/memory/hls-segments/gate-result.json",
+     "command": "report --memory",
+     "key": "1b7bcd658c020b76a5ca3bcf57770ba9db0c538d066f3cc41e5c41e8fdd4f397",
+     "status": 0,
+     "report_sha256": "bcfce6732b230e51c22111577ce2329349bf03d1360c6899224337a81f3329e1"
+    },
+    {
+     "path": "gate-hls-segments-79e0ae13/armv7/shard-7/benchmark/hls-segments/gate-result.json",
+     "command": "report --benchmark",
+     "key": "ed8cd439aa4cfe2cf28ed2e6713c8d70398a042b104bfb9b810f6c65bf555a1e",
+     "status": 0,
+     "report_sha256": "e4e40b9fdeacd351eb2d2906297b73bd82d7c34e790b14acb24d9587b7e70a83"
+    },
+    {
+     "path": "gate-hls-segments-79e0ae13/armv7/shard-7/graded/hls-segments/gate-result.json",
+     "command": "grade",
+     "key": "06e3b7807d4939b05781d17744290d9e101b18ecd4f893c20e5077e9b9d9cd05",
+     "status": 0,
+     "report_sha256": "21c22a1bf6e271501a7508cee89a47fa9447541a9d6a5c53a1a06d0466750067"
+    },
+    {
+     "path": "gate-hls-segments-79e0ae13/armv7/shard-7/memory/hls-segments/gate-result.json",
+     "command": "report --memory",
+     "key": "7ba73549372c79e4cb45b9ed41b3745897b92309a40fca7c93c374793c2ac397",
+     "status": 0,
+     "report_sha256": "1083f4232f28b5c3db84fce5ca87f714727aada411a14ba79ddb8ea0a20231a9"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-isobmff-79e0ae13",
+   "path": "gate-isobmff-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the ISO BMFF suite's timing and memory in three parts, each part's comparison of all 1,020 operations, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-isobmff-79e0ae13/76c81aebbb9ca11b79abc4ab0934674d750718fdec15fa88d9b0feb5e2d24880.tar.zst",
+   "sha256": "76c81aebbb9ca11b79abc4ab0934674d750718fdec15fa88d9b0feb5e2d24880",
+   "bytes": 27884008,
+   "results": [
+    {
+     "path": "gate-isobmff-79e0ae13/aarch64/shard-4/benchmark/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "bfa9addaa066a3ea6064de696a52694ea68f7c79918e216f7065aa91d860203b",
+     "status": 0,
+     "report_sha256": "b98603a9818a7b9521ad243e7bfb1926b9752279c41815a173b22c22ea666997"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/aarch64/shard-4/memory/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "53b9dca5da435ac9fae7acfc997ef6620b8623412e7936e0161d6ae37519bfff",
+     "status": 0,
+     "report_sha256": "ea5c0a3b8249a3143a22819036054a0c5567056571b84e9b524bd6fe543f4367"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/aarch64/shard-5/benchmark/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "18e1c605aee7ffaaf576584dfc9e4958bb0d500d9a923eaa74369edd9d4b5174",
+     "status": 0,
+     "report_sha256": "ca4f437684c9dc1cb39683c9751a0442206f2211ba96689a3f1eb893a3ddbf4c"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/aarch64/shard-5/memory/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "ed96290796423a26e7aec6f6cc70b689828fb153bfbf0ecc59c369d69d7207d4",
+     "status": 0,
+     "report_sha256": "3e47cedb852bda3aa5956ef9ebacde61f0659b77cb146fba9720479315b29958"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/aarch64/shard-6/benchmark/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "30913be0dc48b5271c3370af251846ce2cc8f4f5437c0cb94fdca3dfaeac195b",
+     "status": 0,
+     "report_sha256": "5e051d1faf1fa108e44346f866d7295c38e45dcb1a90bda6bdfa8dda7007222d"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/aarch64/shard-6/memory/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "696bcd833206cf808fdf252fba4e4e844452b4943e60f2d1e3a57d505d4472d5",
+     "status": 0,
+     "report_sha256": "b78a93abe9faa8be338cad7ac7c96dc4a1717d74e635c91f5d59e264d3010030"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/armv7/shard-4/benchmark/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "ff62f753d8884584dc743adfc0241975c4fb88d40304a1c747b99d6f2825e187",
+     "status": 0,
+     "report_sha256": "0970ea9f32e803d4f53c825ced16eb0ce0f1762a82775f402712be85aecf9716"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/armv7/shard-4/memory/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "4804b550a4d6e608b5d3cec98010de72c229e847d6588d0506d32b66e5dd4722",
+     "status": 0,
+     "report_sha256": "32a8bf718afb1da5fcc58740cea71e3c88059557cde466ccf56e1a6c64510120"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/armv7/shard-5/benchmark/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "5e0b6ee04fbed4a8aa9aa57d58791763cd02460ef5f9b34fa736e8466fd25575",
+     "status": 0,
+     "report_sha256": "2ef776bfcddad0d92cb425593462620f30b8ca2a8deb11fe2bd2c436064219fe"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/armv7/shard-5/memory/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "9e5dacbf1718d3f258d2e37acfab94cddfe1f8a35af8f0279bd746720d2c3e37",
+     "status": 0,
+     "report_sha256": "3f3f0fb207bf43f6d737945644518d316739df839dfafae366e517c201c75db4"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/armv7/shard-6/benchmark/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "a417fc286d58640fab5577fa2c40a6d2776749168b2c4e7c420f7a28e87197e6",
+     "status": 0,
+     "report_sha256": "26ed9ef0a8415784ddbe8e5787669aefa0ec6914adf004a08afa8942bfa99429"
+    },
+    {
+     "path": "gate-isobmff-79e0ae13/armv7/shard-6/memory/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "2f739c04d5dc6fe52b06b114f24c9920a5f16581289c1e005027a16f5331863a",
+     "status": 0,
+     "report_sha256": "c6a349074d49df1d8c0eb63a2459040a57841803d62d6606bf260636e90f0da9"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-audio-clocks-79e0ae13",
+   "path": "gate-matroska-audio-clocks-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-audio-clocks's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-audio-clocks-79e0ae13/44291f259f00e429f54f2fffb7a75534cb72d54216d53ae1f49afa91a5eff47e.tar.zst",
+   "sha256": "44291f259f00e429f54f2fffb7a75534cb72d54216d53ae1f49afa91a5eff47e",
+   "bytes": 2039643,
+   "results": [
+    {
+     "path": "gate-matroska-audio-clocks-79e0ae13/aarch64/shard-3/benchmark/matroska-audio-clocks/gate-result.json",
+     "command": "report --benchmark",
+     "key": "a3eca0376f936ff27ab55d8798ecd00b24b95c8fe6ff05e2fea3128a5ada4b8a",
+     "status": 0,
+     "report_sha256": "bbca2e9e2f2101761b180a78be1e86d0756d4c6a5bf4823660dfd3330502d5a5"
+    },
+    {
+     "path": "gate-matroska-audio-clocks-79e0ae13/aarch64/shard-3/graded/matroska-audio-clocks/gate-result.json",
+     "command": "grade",
+     "key": "dee92456e6ee67ecab42dd133296123e92405abcc73ff8636b60765b68ff7c27",
+     "status": 0,
+     "report_sha256": "d6876e3ebc9743b3ba103b1ae5a98bcd3e94dbbb5549ec21b7ed8b3dfa758edf"
+    },
+    {
+     "path": "gate-matroska-audio-clocks-79e0ae13/aarch64/shard-3/memory/matroska-audio-clocks/gate-result.json",
+     "command": "report --memory",
+     "key": "9a3b4c06fcffc529d317b239ffd377e19bdd45b6a340fa3f86caec215f10f192",
+     "status": 0,
+     "report_sha256": "c211b878cff19ef218637382cafe41429f436f479c7694bd0d07752464d23b5c"
+    },
+    {
+     "path": "gate-matroska-audio-clocks-79e0ae13/armv7/shard-3/benchmark/matroska-audio-clocks/gate-result.json",
+     "command": "report --benchmark",
+     "key": "165692c42d6ac2683dfb88789db58cac0a3aed47d73c8c3226e99c134f1ac8f0",
+     "status": 0,
+     "report_sha256": "a752622bdd2214937ea5b670f649581e0ebb65d7e46a304dbd349aa329cd5fb7"
+    },
+    {
+     "path": "gate-matroska-audio-clocks-79e0ae13/armv7/shard-3/graded/matroska-audio-clocks/gate-result.json",
+     "command": "grade",
+     "key": "3a6a239e710930aa40d8deba1518d45e02e41203972266e54fbd82820b8befee",
+     "status": 0,
+     "report_sha256": "32f5fbd959939f5587d1f6a1bfad5d7b6ceb1c26cd820e3dcb59c20be04a227d"
+    },
+    {
+     "path": "gate-matroska-audio-clocks-79e0ae13/armv7/shard-3/memory/matroska-audio-clocks/gate-result.json",
+     "command": "report --memory",
+     "key": "9f3f0fd795d20e5ea8e867e7b9e415add530485492a67bdfaf09138d417e10a7",
+     "status": 0,
+     "report_sha256": "b2103508eea2c6cbaa62f7b57bc7ed5d876e3764b9abe2fe92b4b3162e33d3b8"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-colour-79e0ae13",
+   "path": "gate-matroska-colour-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-colour's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-colour-79e0ae13/227c28e62aa64891b437cdd66997b79fe1c6a850960e36fedf3926b49e129742.tar.zst",
+   "sha256": "227c28e62aa64891b437cdd66997b79fe1c6a850960e36fedf3926b49e129742",
+   "bytes": 3211659,
+   "results": [
+    {
+     "path": "gate-matroska-colour-79e0ae13/aarch64/shard-1/benchmark/matroska-colour/gate-result.json",
+     "command": "report --benchmark",
+     "key": "105e679321aff555f41fb0024cd96401839e3102d5e76817d3d0ce9b65bfebca",
+     "status": 0,
+     "report_sha256": "6741a0f4d75faed5fac6f7a4b76e846997b2c0a8dca9f03e4b39389a8395bc74"
+    },
+    {
+     "path": "gate-matroska-colour-79e0ae13/aarch64/shard-1/graded/matroska-colour/gate-result.json",
+     "command": "grade",
+     "key": "ddff27f82bb45ef61942201114aee7df598034855069a196e804a3fdc5133170",
+     "status": 0,
+     "report_sha256": "7a49a51b85462c7cf8d65b84b1e9fd628cb95ca67f7a14289fa1cb04743485ee"
+    },
+    {
+     "path": "gate-matroska-colour-79e0ae13/aarch64/shard-1/memory/matroska-colour/gate-result.json",
+     "command": "report --memory",
+     "key": "5969451c8ca90d453260134b7ab2ce591d45594a01cee37ef7ed813d96c00326",
+     "status": 0,
+     "report_sha256": "d0e1f748d1bd0e2da140ddc2eb4db21e4a586da59e5451777755c5faf534f315"
+    },
+    {
+     "path": "gate-matroska-colour-79e0ae13/armv7/shard-1/benchmark/matroska-colour/gate-result.json",
+     "command": "report --benchmark",
+     "key": "82e6847feaa371b596edc8d62551afb106cdfbf0f395204d1068eff3a0b411c8",
+     "status": 0,
+     "report_sha256": "e52f282d4f8bce767d227e184ee2d827b42da4eb54518d01a3e27b5bb8ab43e2"
+    },
+    {
+     "path": "gate-matroska-colour-79e0ae13/armv7/shard-1/graded/matroska-colour/gate-result.json",
+     "command": "grade",
+     "key": "6dcba068c235917f433a7563742e2bc1a1b6f71f28ca1573b99eb7099c79d404",
+     "status": 0,
+     "report_sha256": "66bf49d26d286ff515b2737f6a7a5939ff8bfceddeebfdc883751f0c5ae27433"
+    },
+    {
+     "path": "gate-matroska-colour-79e0ae13/armv7/shard-1/memory/matroska-colour/gate-result.json",
+     "command": "report --memory",
+     "key": "0fab40718fa68ebf39cb068b0f0afe07fc30a2fcdd4f1d0f148feb8eddc5fff6",
+     "status": 0,
+     "report_sha256": "4cfada2c4b3890e306b16ebc99c752785a1accfb31967cd634e36593e4ca30b6"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-cues-preroll-79e0ae13",
+   "path": "gate-matroska-cues-preroll-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-cues-preroll's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-cues-preroll-79e0ae13/ed64a0ee179cda5453e75b807668b80d2252377226d43d06da520d3e54cff891.tar.zst",
+   "sha256": "ed64a0ee179cda5453e75b807668b80d2252377226d43d06da520d3e54cff891",
+   "bytes": 2172396,
+   "results": [
+    {
+     "path": "gate-matroska-cues-preroll-79e0ae13/aarch64/shard-5/benchmark/matroska-cues-preroll/gate-result.json",
+     "command": "report --benchmark",
+     "key": "db3f53b6d5804fac50c6952c859c53990f8672b3cccdd88ac9204110f3746f8f",
+     "status": 0,
+     "report_sha256": "b660f79461d4deabee5f319d4c81b995b1403ab6448a41a5294cf8604111d01c"
+    },
+    {
+     "path": "gate-matroska-cues-preroll-79e0ae13/aarch64/shard-5/graded/matroska-cues-preroll/gate-result.json",
+     "command": "grade",
+     "key": "38cc8f8b09134080c9c8d9f2cdc48602c17ccf791a57a9f1277f7d02788e27f1",
+     "status": 0,
+     "report_sha256": "7458f5b16c8b37330e571efbd8d1c457e1c3ac689346be4748bdc08ca9640ff8"
+    },
+    {
+     "path": "gate-matroska-cues-preroll-79e0ae13/aarch64/shard-5/memory/matroska-cues-preroll/gate-result.json",
+     "command": "report --memory",
+     "key": "77fe34dec12797c7aec18cfb3605dcf1896c222edd120059187d7596dc428e9b",
+     "status": 0,
+     "report_sha256": "400ad67a42a453299e6c06e106fc28ebc8c1d184c1bbfc38b086c521fdfceb91"
+    },
+    {
+     "path": "gate-matroska-cues-preroll-79e0ae13/armv7/shard-5/benchmark/matroska-cues-preroll/gate-result.json",
+     "command": "report --benchmark",
+     "key": "0fe69ed7a3e498d97c97da69e4a6c551b91f459d61b4ef1628bd346069ce9969",
+     "status": 0,
+     "report_sha256": "03d238e4a9398c40c0ed51ead4f26bd97551da48de9662eae43aa7a600087f4f"
+    },
+    {
+     "path": "gate-matroska-cues-preroll-79e0ae13/armv7/shard-5/graded/matroska-cues-preroll/gate-result.json",
+     "command": "grade",
+     "key": "19e9bff3d723a458c2f4c7e0767d46a98c41c652b7b932ace8da97b2bf01f760",
+     "status": 0,
+     "report_sha256": "d6bb0173f82c690ba780b3deaadddc64c1ade531aecf9173862e97500fe3c673"
+    },
+    {
+     "path": "gate-matroska-cues-preroll-79e0ae13/armv7/shard-5/memory/matroska-cues-preroll/gate-result.json",
+     "command": "report --memory",
+     "key": "fd82d92fe5508bfe14383013234c2ec0afda6df54d47bac6e007371535027f82",
+     "status": 0,
+     "report_sha256": "864ca8d0c9473629653b8d70f858f7c56163604bcce29402bf16bd326593811e"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-demux-79e0ae13",
+   "path": "gate-matroska-demux-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-demux's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-demux-79e0ae13/2ad4e9706184a803da2e6ca2fb567c915e223a9da692da801cf6c0c0dc646f79.tar.zst",
+   "sha256": "2ad4e9706184a803da2e6ca2fb567c915e223a9da692da801cf6c0c0dc646f79",
+   "bytes": 3517572,
+   "results": [
+    {
+     "path": "gate-matroska-demux-79e0ae13/aarch64/shard-8/benchmark/matroska-demux/gate-result.json",
+     "command": "report --benchmark",
+     "key": "0602f21ee8552585af4a1c0108e052c08ffe6ad0b12579be08dbe59dd27405b3",
+     "status": 0,
+     "report_sha256": "1bbda035f9ab05ae2efd18d0eb30a2e9876a71d719f87e94250c3008b690af80"
+    },
+    {
+     "path": "gate-matroska-demux-79e0ae13/aarch64/shard-8/graded/matroska-demux/gate-result.json",
+     "command": "grade",
+     "key": "5e548cdeb220ec547b595a079b244d90e9dafad392b2df1498735c675a2bd617",
+     "status": 0,
+     "report_sha256": "29e59e77fde65884139d30a733787a65ce3cf3888a77aa108edc122728fda522"
+    },
+    {
+     "path": "gate-matroska-demux-79e0ae13/aarch64/shard-8/memory/matroska-demux/gate-result.json",
+     "command": "report --memory",
+     "key": "fd1dddbd397b1f3ba72b0ccc7f65313f371edaaee11a22e83f5633af11cda702",
+     "status": 0,
+     "report_sha256": "b44f4e83183d9a3b32186d3c92dc5d0d47c9c63d9c1adedc735c98f99f3a928b"
+    },
+    {
+     "path": "gate-matroska-demux-79e0ae13/armv7/shard-8/benchmark/matroska-demux/gate-result.json",
+     "command": "report --benchmark",
+     "key": "779c46a47e0a237b49550035945b8b4b138d6fff368b4d17fc4af4b4399199b9",
+     "status": 0,
+     "report_sha256": "fe0bcb7bf31feafdc48f6216e73baf730a42b3750a8d91c04cb3484db00a9438"
+    },
+    {
+     "path": "gate-matroska-demux-79e0ae13/armv7/shard-8/graded/matroska-demux/gate-result.json",
+     "command": "grade",
+     "key": "6015808f13916b03a1ce990f4fbf939307ba155046132e019b1526b33bbe797d",
+     "status": 0,
+     "report_sha256": "7c83e0cb7ac30504beadb7623be4613e0757af28a82f27e6282ef4cdf0ad0fe2"
+    },
+    {
+     "path": "gate-matroska-demux-79e0ae13/armv7/shard-8/memory/matroska-demux/gate-result.json",
+     "command": "report --memory",
+     "key": "8cbadb0bdf3dea18ce2fb59622cba05989d80f17522da5f195db9165d2dcaca7",
+     "status": 0,
+     "report_sha256": "557a26bf56495c563d87162074784ca27120e5c257d3aa467b600a6d0b84099a"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-header-removal-79e0ae13",
+   "path": "gate-matroska-header-removal-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-header-removal's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-header-removal-79e0ae13/51051d5173516db2f18aa374c9b2aa27583a32f69787dae96ead3a8ddac2b5af.tar.zst",
+   "sha256": "51051d5173516db2f18aa374c9b2aa27583a32f69787dae96ead3a8ddac2b5af",
+   "bytes": 1414757,
+   "results": [
+    {
+     "path": "gate-matroska-header-removal-79e0ae13/aarch64/shard-10/benchmark/matroska-header-removal/gate-result.json",
+     "command": "report --benchmark",
+     "key": "c18fcae7e0a34691ab95606c9cbb2c416ca0cbfd30e37c37e7a0e66ffb565878",
+     "status": 0,
+     "report_sha256": "58446953990b165d22e579b5fb04432da58f231c76d704937f792f584b24a194"
+    },
+    {
+     "path": "gate-matroska-header-removal-79e0ae13/aarch64/shard-10/graded/matroska-header-removal/gate-result.json",
+     "command": "grade",
+     "key": "f733605217c666a0438a28f1a0cca1811b0a61cc96b7ca3b610b9368900bf140",
+     "status": 0,
+     "report_sha256": "f461001bfdf0e8c02994af31575231dc62bb0fe3b06b99442dadfedc6ce26f67"
+    },
+    {
+     "path": "gate-matroska-header-removal-79e0ae13/aarch64/shard-10/memory/matroska-header-removal/gate-result.json",
+     "command": "report --memory",
+     "key": "cef51b75068f205d66a630234e7423a19704f42549e1e7b69df67f3f26ee95be",
+     "status": 0,
+     "report_sha256": "ea1ab2fe28cf1492ff5daea0a9feefe27a75b208b4bdedeced5ac0fe3362a874"
+    },
+    {
+     "path": "gate-matroska-header-removal-79e0ae13/armv7/shard-10/benchmark/matroska-header-removal/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9eef4d3196ed72cfd238eda54c0aa9b4b222c24048e86fd1491bd8a71208fd93",
+     "status": 0,
+     "report_sha256": "9e469b221d0881ed54c5c80b05e4d87f128fd4677c7a7c02047e6a1fd92155cd"
+    },
+    {
+     "path": "gate-matroska-header-removal-79e0ae13/armv7/shard-10/graded/matroska-header-removal/gate-result.json",
+     "command": "grade",
+     "key": "1ed38e44dc4813a1328dbab162de1650209581100b169d9f6c30f67089d183f0",
+     "status": 0,
+     "report_sha256": "ba371dcd42b8bb89648b6334f53aeb7d8ca9cc98676e29c3178248d9e1843a26"
+    },
+    {
+     "path": "gate-matroska-header-removal-79e0ae13/armv7/shard-10/memory/matroska-header-removal/gate-result.json",
+     "command": "report --memory",
+     "key": "24eae67042da2237f69b6f067a696ad6a88dcb711bfa0f6a58fdd69d8e979f53",
+     "status": 0,
+     "report_sha256": "c160adf8332c31bbd20ad02d56c1666fefffddd5d367e8c65d960758d7f32309"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-segment-metadata-79e0ae13",
+   "path": "gate-matroska-segment-metadata-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-segment-metadata's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-segment-metadata-79e0ae13/3e0db31f1772c891af7428ddb8cdb84c6f45f8a33218cae1fd2b84784cd99b3c.tar.zst",
+   "sha256": "3e0db31f1772c891af7428ddb8cdb84c6f45f8a33218cae1fd2b84784cd99b3c",
+   "bytes": 4405702,
+   "results": [
+    {
+     "path": "gate-matroska-segment-metadata-79e0ae13/aarch64/shard-10/benchmark/matroska-segment-metadata/gate-result.json",
+     "command": "report --benchmark",
+     "key": "2a6c8a9762228a45e76392546bda60f4255ee88ac2996660e7e89fa4c54ab054",
+     "status": 0,
+     "report_sha256": "15970e12bd09c5055ae9c1b80dbfbfc08e1103c4e6e9ca5872429c5507bb7414"
+    },
+    {
+     "path": "gate-matroska-segment-metadata-79e0ae13/aarch64/shard-10/graded/matroska-segment-metadata/gate-result.json",
+     "command": "grade",
+     "key": "65abffe62cbc578729ccad6efbba261a92ea2b018fabb2f0a46c3f49a3f2238f",
+     "status": 0,
+     "report_sha256": "4555de72efde5d80c1c3cff3d56aba27bd809ccfb063fc7d0b72dbfbb550e248"
+    },
+    {
+     "path": "gate-matroska-segment-metadata-79e0ae13/aarch64/shard-10/memory/matroska-segment-metadata/gate-result.json",
+     "command": "report --memory",
+     "key": "1230d047820305e7049e5ccb32d49cc989ba75469b0b9ceec0c3349ae0eb9c83",
+     "status": 0,
+     "report_sha256": "d36e3d0d343b305033526baf95a40af1c16f463e408cfe45a56824140de46520"
+    },
+    {
+     "path": "gate-matroska-segment-metadata-79e0ae13/armv7/shard-10/benchmark/matroska-segment-metadata/gate-result.json",
+     "command": "report --benchmark",
+     "key": "d117436ad3c8d9af69f4db3d02bb8058ed4da1a735301f7fefdc29300a23fddc",
+     "status": 0,
+     "report_sha256": "ff1f715a8408f5b4893c2f823990b5f2f7e410fa780346638c4c39b93e51157b"
+    },
+    {
+     "path": "gate-matroska-segment-metadata-79e0ae13/armv7/shard-10/graded/matroska-segment-metadata/gate-result.json",
+     "command": "grade",
+     "key": "2c1e13e0f12716f4fce66f147b3132639bd020657264adcdc014979a7a89a87d",
+     "status": 0,
+     "report_sha256": "eea3d3156ba98d3f2af34056d531fd841598484a084175ba45530a5a6f098c17"
+    },
+    {
+     "path": "gate-matroska-segment-metadata-79e0ae13/armv7/shard-10/memory/matroska-segment-metadata/gate-result.json",
+     "command": "report --memory",
+     "key": "305b946eb478e67092ee34c0bb385e7ebf2877e769c51ddbfd141c4423774521",
+     "status": 0,
+     "report_sha256": "cb2af6befdc72b6dd0252caada04113b367e9c488490c76c100befd92ccc4bf2"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-startup-seek-79e0ae13",
+   "path": "gate-matroska-startup-seek-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-startup-seek's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-startup-seek-79e0ae13/cd00f33a0e070c68f46bd887725e7924fe80ebd46ad714779045eb3eb1f0a460.tar.zst",
+   "sha256": "cd00f33a0e070c68f46bd887725e7924fe80ebd46ad714779045eb3eb1f0a460",
+   "bytes": 3572390,
+   "results": [
+    {
+     "path": "gate-matroska-startup-seek-79e0ae13/aarch64/shard-4/benchmark/matroska-startup-seek/gate-result.json",
+     "command": "report --benchmark",
+     "key": "f4f443acdea4fb1a8a21e0ba2bc3a923cf7ab847ca14434c07ce602570f3e244",
+     "status": 0,
+     "report_sha256": "a2f2393b9f0e932f6ca166246c24c905a0481900d2b15e68dd9aa0ec5c3f0ac2"
+    },
+    {
+     "path": "gate-matroska-startup-seek-79e0ae13/aarch64/shard-4/graded/matroska-startup-seek/gate-result.json",
+     "command": "grade",
+     "key": "a7df747c6c241c4d76db73c06cd0f06f0ec6021ba0fd319ed35b23a845e549bf",
+     "status": 0,
+     "report_sha256": "420575a508e8b113113bd0207ec4e4570b6f14c8326d3e9be0d91f5dc0cad0fa"
+    },
+    {
+     "path": "gate-matroska-startup-seek-79e0ae13/aarch64/shard-4/memory/matroska-startup-seek/gate-result.json",
+     "command": "report --memory",
+     "key": "bf2972560568abe5ab5943b5474aa7dd6df623f6ded5bd5ce1ede441ecf17d8c",
+     "status": 0,
+     "report_sha256": "42f1e6e0a86bff9daa8f180ada129955ea885521315435aa828e116fd2f8b8ee"
+    },
+    {
+     "path": "gate-matroska-startup-seek-79e0ae13/armv7/shard-4/benchmark/matroska-startup-seek/gate-result.json",
+     "command": "report --benchmark",
+     "key": "e6eeb52769acdf73a0929c645a7560e484beb0c81d3469d405dca20fbe1545d6",
+     "status": 0,
+     "report_sha256": "4a2e748655278985d33ea28c04b93e94862a7cff47b7d97f55d621e147ddef68"
+    },
+    {
+     "path": "gate-matroska-startup-seek-79e0ae13/armv7/shard-4/graded/matroska-startup-seek/gate-result.json",
+     "command": "grade",
+     "key": "244cb6d4a00eaba281c168d617816c1dd661b791c1e21121a32e141eeeaf3e2a",
+     "status": 0,
+     "report_sha256": "a2692fa7e71790e46686d530bdb1e4ac5ac25bc65d75040a13117fb287f4ec66"
+    },
+    {
+     "path": "gate-matroska-startup-seek-79e0ae13/armv7/shard-4/memory/matroska-startup-seek/gate-result.json",
+     "command": "report --memory",
+     "key": "431dd26733d8d4b4a1ac0816d6ce04b5e1aeab879d564d30c40d19979847a6f4",
+     "status": 0,
+     "report_sha256": "2af4f450897c7e40ac8b166f2ec2099a086e2106c06b6d8033a223d06f0e0316"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-matroska-zlib-79e0ae13",
+   "path": "gate-matroska-zlib-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-zlib's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-matroska-zlib-79e0ae13/169ab805e391d16caddd4bb447b5c30d57f8e6278f87b04bd2bbe683eff9e9f9.tar.zst",
+   "sha256": "169ab805e391d16caddd4bb447b5c30d57f8e6278f87b04bd2bbe683eff9e9f9",
+   "bytes": 2390751,
+   "results": [
+    {
+     "path": "gate-matroska-zlib-79e0ae13/aarch64/shard-1/benchmark/matroska-zlib/gate-result.json",
+     "command": "report --benchmark",
+     "key": "55f0e5abfe8d5cb5abc5a8159fd4d4c24be0f1bc5b02ca4b830db45140fb0e59",
+     "status": 0,
+     "report_sha256": "1934349857204da1a585213f10085e7f689c50a63f65a7bd812ba8910ab54869"
+    },
+    {
+     "path": "gate-matroska-zlib-79e0ae13/aarch64/shard-1/graded/matroska-zlib/gate-result.json",
+     "command": "grade",
+     "key": "1afa1aa8f6a7a70a07bb853ffb819a4f66712c9fa6658edf7621498f204ddbe8",
+     "status": 0,
+     "report_sha256": "fc98eb7bedddf904487c5f1ce6e4faa51abef7fc61b870e7b21a1dbdb4bb30e0"
+    },
+    {
+     "path": "gate-matroska-zlib-79e0ae13/aarch64/shard-1/memory/matroska-zlib/gate-result.json",
+     "command": "report --memory",
+     "key": "db820cfc56d46ed8795e224e8323a9a440a0047d3e4e014daf91cbc745b94415",
+     "status": 0,
+     "report_sha256": "6bcb228cc676c6149b808e2747edc316feb18637bbdaab032ee28a72ecbce284"
+    },
+    {
+     "path": "gate-matroska-zlib-79e0ae13/armv7/shard-1/benchmark/matroska-zlib/gate-result.json",
+     "command": "report --benchmark",
+     "key": "45d527bd679fb978ff6941d33d5e88067a78504baa4c00ebd35f548ff43ed7da",
+     "status": 0,
+     "report_sha256": "3d25c933ac340a256d45825ae0a764126a9f057f3cb044930fe4a16cbbcc941c"
+    },
+    {
+     "path": "gate-matroska-zlib-79e0ae13/armv7/shard-1/graded/matroska-zlib/gate-result.json",
+     "command": "grade",
+     "key": "39eeca706a9b82e74d5fcb22329c7612d3ae4215be1b8c5534959f59f0500532",
+     "status": 0,
+     "report_sha256": "0e89872d928b340479d4057ed6609aa5348606676f896def1b37952324dee26c"
+    },
+    {
+     "path": "gate-matroska-zlib-79e0ae13/armv7/shard-1/memory/matroska-zlib/gate-result.json",
+     "command": "report --memory",
+     "key": "73143aada7b7c335754f5709716d7d3b52c507839479d8a867a7325c384cc55e",
+     "status": 0,
+     "report_sha256": "bfbe3e1d7b59b784a239a47784b77102302f06672cb366212de961b4d5bddecd"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-mp4-forward-79e0ae13",
+   "path": "gate-mp4-forward-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mp4-forward's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-mp4-forward-79e0ae13/f90b882997199ec4f145bf40726100507f6533beb74479889638457629499104.tar.zst",
+   "sha256": "f90b882997199ec4f145bf40726100507f6533beb74479889638457629499104",
+   "bytes": 3578654,
+   "results": [
+    {
+     "path": "gate-mp4-forward-79e0ae13/aarch64/shard-6/benchmark/mp4-forward/gate-result.json",
+     "command": "report --benchmark",
+     "key": "5b693d8e6360befaecc1ce8e37fad46df63db278394fd53e895c46b6077c2f42",
+     "status": 0,
+     "report_sha256": "88bf7e3053b6813b05eecb493d6a76d6e86ade7d0dad2fd976c1f230bde17b91"
+    },
+    {
+     "path": "gate-mp4-forward-79e0ae13/aarch64/shard-6/graded/mp4-forward/gate-result.json",
+     "command": "grade",
+     "key": "bb3fd98cafc2269f4b5d14e94e7e63f35b3135266f94583367ee7e340eb83eb0",
+     "status": 0,
+     "report_sha256": "6a9cf1721b5450867ad8087dc512e82ab6765c1c47d7da77091dfff49a0d1c8a"
+    },
+    {
+     "path": "gate-mp4-forward-79e0ae13/aarch64/shard-6/memory/mp4-forward/gate-result.json",
+     "command": "report --memory",
+     "key": "727b38fed0c1f77e077e305b65ad047361d3cf03f574707fa42efec6291172af",
+     "status": 0,
+     "report_sha256": "9b5575b5dd05cceaf420c91198479bc5f5c96e6e271b68cd6b5342fe855c38fe"
+    },
+    {
+     "path": "gate-mp4-forward-79e0ae13/armv7/shard-6/benchmark/mp4-forward/gate-result.json",
+     "command": "report --benchmark",
+     "key": "cd7226cc2cb914546ffa932b7b9541b170326a162436caa3f852d95eef5ae75d",
+     "status": 0,
+     "report_sha256": "5140bddf5725665b0daa1cec7fdf67a557e0b483bf59c365d4cebb264340fb92"
+    },
+    {
+     "path": "gate-mp4-forward-79e0ae13/armv7/shard-6/graded/mp4-forward/gate-result.json",
+     "command": "grade",
+     "key": "335757f2195a3c32ed1ee7b6f1e97c62bb565bc398f6005478351f3522e789b1",
+     "status": 0,
+     "report_sha256": "701ee02dae1a73ccde7ab71290ec479702b833ddfb48d6fcd965184faf4cd0a7"
+    },
+    {
+     "path": "gate-mp4-forward-79e0ae13/armv7/shard-6/memory/mp4-forward/gate-result.json",
+     "command": "report --memory",
+     "key": "2249f62b85563adca708c33a9d4085f595134635f91337bc83e8136fc1c7ac4a",
+     "status": 0,
+     "report_sha256": "647299e3ee6a049dd9ba8ebc3d0ceb01a1e560f0482b847ea0b1103dffb3a191"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-mp4-range-79e0ae13",
+   "path": "gate-mp4-range-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mp4-range's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-mp4-range-79e0ae13/9e56ed4ed4e3b5f162d61c6a05680d2346c6dae2bd8e4d86a71a06b271c4f82c.tar.zst",
+   "sha256": "9e56ed4ed4e3b5f162d61c6a05680d2346c6dae2bd8e4d86a71a06b271c4f82c",
+   "bytes": 3766846,
+   "results": [
+    {
+     "path": "gate-mp4-range-79e0ae13/aarch64/shard-10/benchmark/mp4-range/gate-result.json",
+     "command": "report --benchmark",
+     "key": "92b5201efe057cde93d74efc8689dc8cc30f3da4ae7ce6c702627c4b6ed0e690",
+     "status": 0,
+     "report_sha256": "cbef9a90dde33d6e336ed9b78e080990eaf34565b1a03e775a92469616832b10"
+    },
+    {
+     "path": "gate-mp4-range-79e0ae13/aarch64/shard-10/graded/mp4-range/gate-result.json",
+     "command": "grade",
+     "key": "57f0a61b6e753698fcabedc4df9e66fb8aee768587f7d1dcaa37012e44c1d8d2",
+     "status": 0,
+     "report_sha256": "91dfddbbbecd75e34a35be6b873b4b07e5752f7bfcd7026a9da25b7680a69278"
+    },
+    {
+     "path": "gate-mp4-range-79e0ae13/aarch64/shard-10/memory/mp4-range/gate-result.json",
+     "command": "report --memory",
+     "key": "7dd0ff808ec7ccc9dbe971e83b117d79b83e9f836de3d963291026209c28fd9c",
+     "status": 0,
+     "report_sha256": "045893997f05ebeb0a3e4f0b4c45656d591c4b4bb49b8d499ee266887aba299f"
+    },
+    {
+     "path": "gate-mp4-range-79e0ae13/armv7/shard-10/benchmark/mp4-range/gate-result.json",
+     "command": "report --benchmark",
+     "key": "1a63486ab38e014befc660c21fffc2890efcb141fc7997cd4ed300acbe1b28ac",
+     "status": 0,
+     "report_sha256": "6cc088a3501bad76a887b72faa413fc5d6f5f62802aabbbf415a5d3aa618c9ce"
+    },
+    {
+     "path": "gate-mp4-range-79e0ae13/armv7/shard-10/graded/mp4-range/gate-result.json",
+     "command": "grade",
+     "key": "b3636c063383702e2c697c9192ded8c9e69647f55f07e026206ea2f587d1987a",
+     "status": 0,
+     "report_sha256": "d5bc931e5a5a96f2b6706b59c7a9fb1c9c1298e9f09bac18f08d3fdad6839a62"
+    },
+    {
+     "path": "gate-mp4-range-79e0ae13/armv7/shard-10/memory/mp4-range/gate-result.json",
+     "command": "report --memory",
+     "key": "af960c5a71d4bceffdc7a89cd2a14f1ab4b66c617c845dd5bb640f070bfaad25",
+     "status": 0,
+     "report_sha256": "70d1eafefe07787be70059d7be68311b1f1df0046771fcfdfcfa198ca64aa82e"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-mpegts-access-units-79e0ae13",
+   "path": "gate-mpegts-access-units-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mpegts-access-units's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-mpegts-access-units-79e0ae13/cb05c21a8f9dfa48a25210a127f502d6ba8929b1827917cff4194fb552b02cbe.tar.zst",
+   "sha256": "cb05c21a8f9dfa48a25210a127f502d6ba8929b1827917cff4194fb552b02cbe",
+   "bytes": 7069621,
+   "results": [
+    {
+     "path": "gate-mpegts-access-units-79e0ae13/aarch64/shard-5/benchmark/mpegts-access-units/gate-result.json",
+     "command": "report --benchmark",
+     "key": "8cddb9cad86cba106a5cba7321a9f9df4409db20fe8bedb145a16b035ca7827a",
+     "status": 0,
+     "report_sha256": "c2fc8279496adddbd3a9d770c9331554795867edc87918955af0218bc5fee983"
+    },
+    {
+     "path": "gate-mpegts-access-units-79e0ae13/aarch64/shard-5/graded/mpegts-access-units/gate-result.json",
+     "command": "grade",
+     "key": "b3e35f12bcc4341535475a989695f650c9bef0987f4ddb36e4f64e6090e2be96",
+     "status": 0,
+     "report_sha256": "144edf5428efd1a721eaf8f7c255476db73aad4ca6c2a23cbd723f79ae6f3fe6"
+    },
+    {
+     "path": "gate-mpegts-access-units-79e0ae13/aarch64/shard-5/memory/mpegts-access-units/gate-result.json",
+     "command": "report --memory",
+     "key": "c1e508dd2c8550961c6f57045876e275380a715a03202526670e58229af1cf0b",
+     "status": 0,
+     "report_sha256": "a2625392f1f16da379852aba8a8ef804f1e94886e796a084acbedeca2932ef64"
+    },
+    {
+     "path": "gate-mpegts-access-units-79e0ae13/armv7/shard-5/benchmark/mpegts-access-units/gate-result.json",
+     "command": "report --benchmark",
+     "key": "c849ad9cbbd0250af36e77570f4ed94b066efe578489066aeefc08989e0987ee",
+     "status": 0,
+     "report_sha256": "dea80675823cab162260a8f7091db0f040641d12535590d613b945679bcdc86e"
+    },
+    {
+     "path": "gate-mpegts-access-units-79e0ae13/armv7/shard-5/graded/mpegts-access-units/gate-result.json",
+     "command": "grade",
+     "key": "ac0af071e76ce703fff8829cc2d354c3f3a1c9c35e0bf4ff4849a7cad85d783b",
+     "status": 0,
+     "report_sha256": "6d9d819795ca28315c0046b38af961a94fafdd5386c736a43b76c9e3b77ba927"
+    },
+    {
+     "path": "gate-mpegts-access-units-79e0ae13/armv7/shard-5/memory/mpegts-access-units/gate-result.json",
+     "command": "report --memory",
+     "key": "609606816b7174300683e4f45d7602bab7a491088dbeb6452a6601af5da458e9",
+     "status": 0,
+     "report_sha256": "b1d31e7cd7386f0e202fbd843a48f0f475177eee3700707c46c04c6fb43bb0d6"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-mpegts-pes-79e0ae13",
+   "path": "gate-mpegts-pes-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mpegts-pes's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-mpegts-pes-79e0ae13/336971ce5b1d94a7a1b8a7d628459c69ba093586896f4d0752c37480d00b77c7.tar.zst",
+   "sha256": "336971ce5b1d94a7a1b8a7d628459c69ba093586896f4d0752c37480d00b77c7",
+   "bytes": 4929432,
+   "results": [
+    {
+     "path": "gate-mpegts-pes-79e0ae13/aarch64/shard-8/benchmark/mpegts-pes/gate-result.json",
+     "command": "report --benchmark",
+     "key": "dd08434dfd6ddd31be96178f6a53890e02161f70ae2b95cad9c00fae8de3774d",
+     "status": 0,
+     "report_sha256": "71bb95355246cf03b9dfb9e8e6a8640ffae438d057b878230a1f2138468086c9"
+    },
+    {
+     "path": "gate-mpegts-pes-79e0ae13/aarch64/shard-8/graded/mpegts-pes/gate-result.json",
+     "command": "grade",
+     "key": "f6caf576c1f90d4649c3aa0e235be4cac527bc8e929dc4281e93040b946bfa41",
+     "status": 0,
+     "report_sha256": "c7cdbf2ab8687ad5867fb0d4416dec204685ebdf2a38f9afe38d664b4bf887ee"
+    },
+    {
+     "path": "gate-mpegts-pes-79e0ae13/aarch64/shard-8/memory/mpegts-pes/gate-result.json",
+     "command": "report --memory",
+     "key": "8f619f759b6bc86e9ac37bd861970a18c827123631ea34c286557a44287f6ffb",
+     "status": 0,
+     "report_sha256": "3b2e9123c7c08fe627c221b2aca9718fe04bd7d6717ab3911721baac0dce0589"
+    },
+    {
+     "path": "gate-mpegts-pes-79e0ae13/armv7/shard-8/benchmark/mpegts-pes/gate-result.json",
+     "command": "report --benchmark",
+     "key": "6346de38e1de22c2f8bd0f9e7bca0fd13c709105360c90447e70a558e9253f07",
+     "status": 0,
+     "report_sha256": "e39c98c33ff1734c49c61fe66cafcbea119ca1edc54611438e7403ca177a9c94"
+    },
+    {
+     "path": "gate-mpegts-pes-79e0ae13/armv7/shard-8/graded/mpegts-pes/gate-result.json",
+     "command": "grade",
+     "key": "f7f258fe59b86b640efc28b8156d36d790d0c4ef88266d5f1c781e4a644e9923",
+     "status": 0,
+     "report_sha256": "396153a1070b53a5fee8e8963b262e894b8f6844198cebcbc29b42d1c3d6cbfc"
+    },
+    {
+     "path": "gate-mpegts-pes-79e0ae13/armv7/shard-8/memory/mpegts-pes/gate-result.json",
+     "command": "report --memory",
+     "key": "f2fab9f84739769cad777d09fd1d547fa8b709ced3ac95a2b44756e9b72009ff",
+     "status": 0,
+     "report_sha256": "fc75e756865877bc0f3ad71e4e211d55c3361c0033e5bfb451d2634a56a31d41"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-packet-framing-79e0ae13",
+   "path": "gate-packet-framing-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: packet framing's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-packet-framing-79e0ae13/5bfaaaf0dc18f27473bff810c9eb5d895bd787bda9a4df5942c27f2370844e76.tar.zst",
+   "sha256": "5bfaaaf0dc18f27473bff810c9eb5d895bd787bda9a4df5942c27f2370844e76",
+   "bytes": 5707345,
+   "results": [
+    {
+     "path": "gate-packet-framing-79e0ae13/aarch64/shard-6/benchmark/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "77e45bf417fc6e223f3a70c4258b46322ee866ffd35802943711a3a452dfcf4a",
+     "status": 0,
+     "report_sha256": "f5ed77608b25091255333b0918f8a07bafe8aac247c4eadbbf980dd7a1b850c0"
+    },
+    {
+     "path": "gate-packet-framing-79e0ae13/aarch64/shard-6/graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "8303d02da355562cc34776f70d1a91eb0af9b0387bb6aed4dfa9aaca4326b275",
+     "status": 0,
+     "report_sha256": "22c09ded58b2d37cbe59b01bdd91812484539e856c7597edc21e9455ba665041"
+    },
+    {
+     "path": "gate-packet-framing-79e0ae13/aarch64/shard-6/memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "a09a7a5a5150119cc4fd02beb802cf5f8d064ec40a30a27b6aa06e496a7cb10d",
+     "status": 0,
+     "report_sha256": "e54affbbbb7f6afa3cd8eaee93b36d409812ea5cdf8753ceb0a3da4b9dc10083"
+    },
+    {
+     "path": "gate-packet-framing-79e0ae13/armv7/shard-6/benchmark/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9b7053e5872db7ee3c011c268d2837edb5e79b96d67cd114dad1a72a845304ea",
+     "status": 0,
+     "report_sha256": "3e1057a9a19912a99175d9c45c36698fd05a0dcd9071c99c04f41c23ddd7975f"
+    },
+    {
+     "path": "gate-packet-framing-79e0ae13/armv7/shard-6/graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "9954412e90070028608d821f1b754873279c9da70277bc51e7886c0835fbf58c",
+     "status": 0,
+     "report_sha256": "30e925980e96e8a3423a7409ea2893277ed554a2e2985950df747a4d6ffc7a70"
+    },
+    {
+     "path": "gate-packet-framing-79e0ae13/armv7/shard-6/memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "3feef13545003665893c2b256ae40045281ce46b111c5bf8ae0868545e287e12",
+     "status": 0,
+     "report_sha256": "c8e24e1aeda15314c6029ad783db115c7283eec6056f2d33fe3a526a42f97f61"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-progressive-ts188-79e0ae13",
+   "path": "gate-progressive-ts188-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the progressive TS suite's timing and memory (on ARMv7 its worker's numeric modes run only on Linux AArch64, so it measures nothing there), with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-progressive-ts188-79e0ae13/508da696a4781a3a1efa9340622f002f93f5184dba647472017600f993be4787.tar.zst",
+   "sha256": "508da696a4781a3a1efa9340622f002f93f5184dba647472017600f993be4787",
+   "bytes": 3308336,
+   "results": [
+    {
+     "path": "gate-progressive-ts188-79e0ae13/aarch64/shard-7/benchmark/progressive/gate-result.json",
+     "command": "report --benchmark",
+     "key": "3400f5fff7f78ad944b19449c617cf16d1559039e8effe4b9a3127994a041964",
+     "status": 0,
+     "report_sha256": "d416c6fd48c7fc9fac1984217358facf8123c91a57a397dcc7702fe9dc68b515"
+    },
+    {
+     "path": "gate-progressive-ts188-79e0ae13/aarch64/shard-7/memory/progressive/gate-result.json",
+     "command": "report --memory",
+     "key": "bed2e55fa29fe3a2648b6a2a40a4474d2e4ca5fb88c436753fc6d8a0b7ad2add",
+     "status": 0,
+     "report_sha256": "50b999d8ef5645425bdd09c5f6eea6f53221c887d92ba8d91898f020d1c93131"
+    },
+    {
+     "path": "gate-progressive-ts188-79e0ae13/armv7/shard-7/benchmark/progressive/gate-result.json",
+     "command": "report --benchmark",
+     "key": "eb286ab30e488e8130264e7821a876e84b5153d911b9de3f20b850e952a52757",
+     "status": 0,
+     "report_sha256": "b21f2fb9c5be15f606b2ca3e4c626b6fd81fb238e32c7b483b9dfb4d75d66e92"
+    },
+    {
+     "path": "gate-progressive-ts188-79e0ae13/armv7/shard-7/memory/progressive/gate-result.json",
+     "command": "report --memory",
+     "key": "518b2b7f92c49e1de29bcc6f5129a072195ace9e1a144b75ed22e991518285d0",
+     "status": 0,
+     "report_sha256": "998664cdee729b06c07a1671af40848223cd78bc4d68f0cd78b9bebd055efb9d"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-raw-annex-b-79e0ae13",
+   "path": "gate-raw-annex-b-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: raw-annex-b's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-raw-annex-b-79e0ae13/72a83617d8541bd35f4ad59dd2f7aebd108279aa195ca7f44b8a7c778d672511.tar.zst",
+   "sha256": "72a83617d8541bd35f4ad59dd2f7aebd108279aa195ca7f44b8a7c778d672511",
+   "bytes": 1885819,
+   "results": [
+    {
+     "path": "gate-raw-annex-b-79e0ae13/aarch64/shard-2/benchmark/raw-annex-b/gate-result.json",
+     "command": "report --benchmark",
+     "key": "022fb218aadf9a60ee1dc81328094d32a3d8fcaa61c647d4fcfe7e16b9b81783",
+     "status": 0,
+     "report_sha256": "2fbdb9b528bc00a461aced717dded2856eff0e2609914a8e41016b8abd64be12"
+    },
+    {
+     "path": "gate-raw-annex-b-79e0ae13/aarch64/shard-2/graded/raw-annex-b/gate-result.json",
+     "command": "grade",
+     "key": "477db799a612c77956e7a8f21ee3c8338185e6f33bbacda61071b0bee576a955",
+     "status": 0,
+     "report_sha256": "14f4d58e7635957dc9fe1b54a6da139993e7ee894b4210f9678daa1f47ba3b9c"
+    },
+    {
+     "path": "gate-raw-annex-b-79e0ae13/aarch64/shard-2/memory/raw-annex-b/gate-result.json",
+     "command": "report --memory",
+     "key": "9c2a14f921115e57428ce6f487aca001d479cf707957a9dd7df4b01436b5b9a0",
+     "status": 0,
+     "report_sha256": "651908d86c95d9b733093e69b0f77a93cc9fa17d7bfba901b92060f7f29e1803"
+    },
+    {
+     "path": "gate-raw-annex-b-79e0ae13/armv7/shard-2/benchmark/raw-annex-b/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9a0bccaa02db4c92a63174f85906c5f046c34d4b8bd158e7775ceaf3e913de09",
+     "status": 0,
+     "report_sha256": "eafdc6e9cfdfc2dc1b0bc6bf6f607d369cc1399ed7ba342bd8b370b71c243f37"
+    },
+    {
+     "path": "gate-raw-annex-b-79e0ae13/armv7/shard-2/graded/raw-annex-b/gate-result.json",
+     "command": "grade",
+     "key": "c64c3444648842eb4db5f1ce0887126c94f4fc4de474387b984b9f216e94913d",
+     "status": 0,
+     "report_sha256": "c40491bcabf327fb8ec501b1b60ade8f1ccb03c2b65d8716f565c188b90cdde7"
+    },
+    {
+     "path": "gate-raw-annex-b-79e0ae13/armv7/shard-2/memory/raw-annex-b/gate-result.json",
+     "command": "report --memory",
+     "key": "55e2ebbb0e372c39667ec5bd787710175da8691cbd716384eddbfe6c5337775d",
+     "status": 0,
+     "report_sha256": "53d5aa4406980cc946c5ee0a018e06278ca2936fedab65fe252ca96c2b04abdb"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-cc-79e0ae13",
+   "path": "gate-subtitle-cc-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-cc's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-cc-79e0ae13/76b7df1d34359f58a0fa967d02db6061c0470c30d663b697c69a3eb57856195d.tar.zst",
+   "sha256": "76b7df1d34359f58a0fa967d02db6061c0470c30d663b697c69a3eb57856195d",
+   "bytes": 7674719,
+   "results": [
+    {
+     "path": "gate-subtitle-cc-79e0ae13/aarch64/shard-2/benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "414397478314a0e217b5f40ff9393f812ebf0758aad8d381d2c1032857597dc6",
+     "status": 0,
+     "report_sha256": "2239e6f340893a9139f8d39aacaee6a1524d1e0761cece06a648e23077f22398"
+    },
+    {
+     "path": "gate-subtitle-cc-79e0ae13/aarch64/shard-2/graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "b95050541c507986f43c03ecb775b61519532801ac4623017a1f84928431b911",
+     "status": 1,
+     "report_sha256": "82078990f564b61aa27963438c1e3af767698d50cee4abedcd1fd76272ba1bb0"
+    },
+    {
+     "path": "gate-subtitle-cc-79e0ae13/aarch64/shard-2/memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "b9da615bbf6fe7ea38910a2555a01cfef048bbcc7ea7dcc60795fcaf307b41f2",
+     "status": 0,
+     "report_sha256": "d82f55b5bd2eea5662a15b806a6b812ef8d5d65022f1819be3c1562920f7429e"
+    },
+    {
+     "path": "gate-subtitle-cc-79e0ae13/armv7/shard-2/benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "211dfbfe4d74c59eba6d0ec05bbb6c041b079f388ce67fa89fa2d7712b7b050e",
+     "status": 0,
+     "report_sha256": "305bf9b48fcc56822747e40f453f3e0b69208e6be2760cb776cf91fcc35e938e"
+    },
+    {
+     "path": "gate-subtitle-cc-79e0ae13/armv7/shard-2/graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "6daa4539e7e5191aa42bddfe166267fef7c2464fbd6a96aa297b2a7e01eabb05",
+     "status": 1,
+     "report_sha256": "909ce16554d6831d331c3c1f69136ab8ccac385e0d2c0ba9b17f9cb20eefdd6c"
+    },
+    {
+     "path": "gate-subtitle-cc-79e0ae13/armv7/shard-2/memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "9625661d9aed508c7313f8493ab1cc076d310ed965f128ae1b7504ee8a901783",
+     "status": 0,
+     "report_sha256": "3d265d772f76e72fb658e3b4e6a6faeb24b70e5f44549b26eb3c659b13427400"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-dvb-79e0ae13",
+   "path": "gate-subtitle-dvb-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-dvb's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-dvb-79e0ae13/31e96b79d2fece24e0c0c9c8d0c1237e972927393be9075a34896a086b7585c9.tar.zst",
+   "sha256": "31e96b79d2fece24e0c0c9c8d0c1237e972927393be9075a34896a086b7585c9",
+   "bytes": 9223595,
+   "results": [
+    {
+     "path": "gate-subtitle-dvb-79e0ae13/aarch64/shard-7/benchmark/subtitle-dvb/gate-result.json",
+     "command": "report --benchmark",
+     "key": "3df35d66bb057d8d2ea978987a69b06d818637b8ba194df0c184dea1c290d7bb",
+     "status": 0,
+     "report_sha256": "1af80e93492545e0b172e4e8074b4d603e05562c20ce9159026b425740e79c33"
+    },
+    {
+     "path": "gate-subtitle-dvb-79e0ae13/aarch64/shard-7/graded/subtitle-dvb/gate-result.json",
+     "command": "grade",
+     "key": "6eb1b78145e87a1eb905f9cd1c5cee50baf1db83ea13e35ec83d505ae110c153",
+     "status": 0,
+     "report_sha256": "d4080021baaca7be34a0ab417634eabdee5a47b9c10c26ef269df8790bafa66f"
+    },
+    {
+     "path": "gate-subtitle-dvb-79e0ae13/aarch64/shard-7/memory/subtitle-dvb/gate-result.json",
+     "command": "report --memory",
+     "key": "c3908bb794cd3cfa0fbc7553f64087994225dfb7177bcee2e2c8c172b87d1b91",
+     "status": 0,
+     "report_sha256": "a5ba6cff55823b20a2239429c50d6effd7e720ed3f335b54966c05c773998e92"
+    },
+    {
+     "path": "gate-subtitle-dvb-79e0ae13/armv7/shard-7/benchmark/subtitle-dvb/gate-result.json",
+     "command": "report --benchmark",
+     "key": "16cf95f33d85b8bcc6f4bc0dfcbbb3f8855ae238b187a252ec1c33448cf4d81c",
+     "status": 0,
+     "report_sha256": "f1401d3349f0848fa8622750d6e055b52445fd356c0e09f9a95a569460ad0a57"
+    },
+    {
+     "path": "gate-subtitle-dvb-79e0ae13/armv7/shard-7/graded/subtitle-dvb/gate-result.json",
+     "command": "grade",
+     "key": "9fd166c73ff0568cbbdc7f42214a576b192b6ed796e3e03d9b843881e6162987",
+     "status": 0,
+     "report_sha256": "3082d807ecde9fb6f144864f561e1135e6599a08b05231675e5a2da75d8d02c4"
+    },
+    {
+     "path": "gate-subtitle-dvb-79e0ae13/armv7/shard-7/memory/subtitle-dvb/gate-result.json",
+     "command": "report --memory",
+     "key": "7f27a01125fa665ad54ab6fd30299869d7cd95c415680cc586f762a3614800b2",
+     "status": 0,
+     "report_sha256": "4f6647c7a513ec18d77bb3aed237c100db5e3596052cdd129ce14b1155e0ae49"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-dvd-79e0ae13",
+   "path": "gate-subtitle-dvd-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-dvd's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-dvd-79e0ae13/0c8ed8d49c9fe2c907a518ac0a1a335cb7d56878baa5fe00b4a9f665966637ac.tar.zst",
+   "sha256": "0c8ed8d49c9fe2c907a518ac0a1a335cb7d56878baa5fe00b4a9f665966637ac",
+   "bytes": 8603978,
+   "results": [
+    {
+     "path": "gate-subtitle-dvd-79e0ae13/aarch64/shard-3/benchmark/subtitle-dvd/gate-result.json",
+     "command": "report --benchmark",
+     "key": "4159d9d1bdbbcee537b786a01606eee367dbe4afe1596bea3cab80481bc6b4bd",
+     "status": 0,
+     "report_sha256": "eacc876ecd153caef5dca83cee38f6de6b6b0df3bf5bbf5eddc5fd7ad6b57c3e"
+    },
+    {
+     "path": "gate-subtitle-dvd-79e0ae13/aarch64/shard-3/graded/subtitle-dvd/gate-result.json",
+     "command": "grade",
+     "key": "59528649ac9b553e2e0e881c3db40ec5e253c3ff3155cf540de7c00e5ee9899f",
+     "status": 0,
+     "report_sha256": "1ad3d551de6d3ddd690c900fc2121d309ed28f3c1b8ba2f71520b01b84922f0d"
+    },
+    {
+     "path": "gate-subtitle-dvd-79e0ae13/aarch64/shard-3/memory/subtitle-dvd/gate-result.json",
+     "command": "report --memory",
+     "key": "9241282dbb626c961f6e64ba70426ecd85be34db38fcb192e064c5b50aa290fb",
+     "status": 0,
+     "report_sha256": "84de0770a39c37df729b5f4684ec49fc902d4300f97fc24f6d1b13346f894fcb"
+    },
+    {
+     "path": "gate-subtitle-dvd-79e0ae13/armv7/shard-3/benchmark/subtitle-dvd/gate-result.json",
+     "command": "report --benchmark",
+     "key": "3b5a63d48c40d16c10726e7681cb5a6e01cdbdd196c0816659ff2e48cbbcf6c8",
+     "status": 0,
+     "report_sha256": "ec4caa7440066a97100b0caf613ba654e3c160982483a5aecb0c6d7b787a1e45"
+    },
+    {
+     "path": "gate-subtitle-dvd-79e0ae13/armv7/shard-3/graded/subtitle-dvd/gate-result.json",
+     "command": "grade",
+     "key": "b79846da14fcb358138545808682d5298d1a6e0fac0fe4f41b75405e58ec7998",
+     "status": 0,
+     "report_sha256": "a68c604be2e478388e713b24a068cc255fc7aae7c2c1b4a883a5f5b6274fb65e"
+    },
+    {
+     "path": "gate-subtitle-dvd-79e0ae13/armv7/shard-3/memory/subtitle-dvd/gate-result.json",
+     "command": "report --memory",
+     "key": "ec728c741c94185c0727517e8e14971e915ebee1a6bbc577c3a9494519274329",
+     "status": 0,
+     "report_sha256": "3f0cc7987f7cd0108f631c38adac452461fb0ca04ef18c0bb15aa8486ff95c84"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-dvd-host-79e0ae13",
+   "path": "gate-subtitle-dvd-host-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-dvd-host's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-dvd-host-79e0ae13/b6726eaf269f89a53d0bc34637f80d79956001487d1db25c2de9f81bf8174abf.tar.zst",
+   "sha256": "b6726eaf269f89a53d0bc34637f80d79956001487d1db25c2de9f81bf8174abf",
+   "bytes": 1158530,
+   "results": [
+    {
+     "path": "gate-subtitle-dvd-host-79e0ae13/aarch64/shard-3/benchmark/subtitle-dvd-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "19e67dac36ca8af15abf218ce8285b7b17979265e2764c47e703cdf00be337e9",
+     "status": 0,
+     "report_sha256": "cc9c102dfa3f305d9ea9e8006a371ab057bfc43012dc7d2e0c971715f0bdc045"
+    },
+    {
+     "path": "gate-subtitle-dvd-host-79e0ae13/aarch64/shard-3/graded/subtitle-dvd-host/gate-result.json",
+     "command": "grade",
+     "key": "8cd6ded3b9776da46c90266bc414df57cb2e338d505d05568067cbc66a554ddb",
+     "status": 1,
+     "report_sha256": "215e7cc4afaaceb03ff780db17395c0444899e42e17acb176e53fc9b5ec22c47"
+    },
+    {
+     "path": "gate-subtitle-dvd-host-79e0ae13/aarch64/shard-3/memory/subtitle-dvd-host/gate-result.json",
+     "command": "report --memory",
+     "key": "569c99eca37a28c04cfa44a772df36f4174e7925ebeb510efe6e58ef4e97a0e3",
+     "status": 0,
+     "report_sha256": "7df25d05626113af86c37b1686adccf7c1149eb6a92c188cddf5f6d7116548b3"
+    },
+    {
+     "path": "gate-subtitle-dvd-host-79e0ae13/armv7/shard-3/benchmark/subtitle-dvd-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "ab02c8ceda6b911da7ab785deec3d973336d288bebdee3f2612fbb2d8e16690d",
+     "status": 0,
+     "report_sha256": "edc2b7dd4c80a027e94570da9444da6563f1a54bf81b66b19d5f388d2460c465"
+    },
+    {
+     "path": "gate-subtitle-dvd-host-79e0ae13/armv7/shard-3/graded/subtitle-dvd-host/gate-result.json",
+     "command": "grade",
+     "key": "61f5460a6dea136fe1a102019c9ce052dfadd5f99d2e705f5f8285460b20ccc4",
+     "status": 0,
+     "report_sha256": "8925f469938c991dd4a5520657d01fc171cd0df73845994ddbad05966265438a"
+    },
+    {
+     "path": "gate-subtitle-dvd-host-79e0ae13/armv7/shard-3/memory/subtitle-dvd-host/gate-result.json",
+     "command": "report --memory",
+     "key": "bfdcaacdd8f5c84fcadb8a42adee521354a0cab8beeedd19f24ad5ad43481466",
+     "status": 0,
+     "report_sha256": "378489aa0ae0e51658058785ad4fe5d4693f25ffe12b18c1d37c5ae2de52e982"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-pgs-79e0ae13",
+   "path": "gate-subtitle-pgs-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-pgs's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-pgs-79e0ae13/a5e044f794746c06a88a18a66faf16f35766302883db8eaf7ce4dd6aea905b7b.tar.zst",
+   "sha256": "a5e044f794746c06a88a18a66faf16f35766302883db8eaf7ce4dd6aea905b7b",
+   "bytes": 11187634,
+   "results": [
+    {
+     "path": "gate-subtitle-pgs-79e0ae13/aarch64/shard-5/benchmark/subtitle-pgs/gate-result.json",
+     "command": "report --benchmark",
+     "key": "4e037f6ce9467274f45a7bb7fb56d5c58287d601bda5053d15381b6b3443d1bd",
+     "status": 0,
+     "report_sha256": "c7425c163d920c6d585d9bb3f0fd0e2f4ca7b7cd1b6c580fb378e1219c0d0ad4"
+    },
+    {
+     "path": "gate-subtitle-pgs-79e0ae13/aarch64/shard-5/graded/subtitle-pgs/gate-result.json",
+     "command": "grade",
+     "key": "177344677f71e5262dd0cccfa4cef838851f1db21b5b6f9e5d8fcb7305c6f1bc",
+     "status": 0,
+     "report_sha256": "e85dc6315676e2c1563e60130382b63a52f672839206e562ebefa1c8320d7d5e"
+    },
+    {
+     "path": "gate-subtitle-pgs-79e0ae13/aarch64/shard-5/memory/subtitle-pgs/gate-result.json",
+     "command": "report --memory",
+     "key": "6d284a5ca599c6a605faeff492a197846c9e7dc1394fb45c0fef55be65fc7552",
+     "status": 0,
+     "report_sha256": "493428c3a4f1a4b2a04980ee40f71743f101c2dab10c6b66a5d87cf65f1c61f1"
+    },
+    {
+     "path": "gate-subtitle-pgs-79e0ae13/armv7/shard-5/benchmark/subtitle-pgs/gate-result.json",
+     "command": "report --benchmark",
+     "key": "f918f7b2f2991e17e971414de4f6beec2e752e37915f20522c30765f2180dc91",
+     "status": 0,
+     "report_sha256": "f8917d9f4e49817b31109c1cbe3fd6ffc7fc5d431c7b83578f9414afb66deb5d"
+    },
+    {
+     "path": "gate-subtitle-pgs-79e0ae13/armv7/shard-5/graded/subtitle-pgs/gate-result.json",
+     "command": "grade",
+     "key": "dc48fda0cf145f682d401df04e8abcf7f389ab5161c4ab0fafdc21d6a1fa832a",
+     "status": 0,
+     "report_sha256": "5146cac7bf44e2b924a956b098ae56e05413ebb7be5a063075a8dbb4787ad9ea"
+    },
+    {
+     "path": "gate-subtitle-pgs-79e0ae13/armv7/shard-5/memory/subtitle-pgs/gate-result.json",
+     "command": "report --memory",
+     "key": "a15f07eda96ecc7cdf02ae0692c116b727a2e0de9e19f72f43230febdf06cfca",
+     "status": 0,
+     "report_sha256": "fe7cd74e5511b5714fb9c5b2eb54ad8ad3aed4042044003f1d92b60f54cc0de4"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-pgs-capsules-79e0ae13",
+   "path": "gate-subtitle-pgs-capsules-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-pgs-capsules's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-pgs-capsules-79e0ae13/a16ebfe68d3039554feb024b2b2fa9cea8cebd4223c15589b0e015c76f387c6b.tar.zst",
+   "sha256": "a16ebfe68d3039554feb024b2b2fa9cea8cebd4223c15589b0e015c76f387c6b",
+   "bytes": 8670824,
+   "results": [
+    {
+     "path": "gate-subtitle-pgs-capsules-79e0ae13/aarch64/shard-8/benchmark/subtitle-pgs-capsules/gate-result.json",
+     "command": "report --benchmark",
+     "key": "85483afee2a6352af59535691437e244ba6500b07a6579eeb3dc42fa5c34cf4e",
+     "status": 0,
+     "report_sha256": "0ba872c181459011f5d97a6248849f60527a6e385dbf0898e2574a3436be41c2"
+    },
+    {
+     "path": "gate-subtitle-pgs-capsules-79e0ae13/aarch64/shard-8/graded/subtitle-pgs-capsules/gate-result.json",
+     "command": "grade",
+     "key": "93d0b5a7a697b79bd9fd0cc1e5322acdfb09dcdde2f40e75628452cd92557b43",
+     "status": 0,
+     "report_sha256": "9e0cc389396c0cf4df685ed69ba1524ea3fd1251372896b53aa58aeba7fa75e1"
+    },
+    {
+     "path": "gate-subtitle-pgs-capsules-79e0ae13/aarch64/shard-8/memory/subtitle-pgs-capsules/gate-result.json",
+     "command": "report --memory",
+     "key": "1952e8592e5307550004fec681faa0c6824b37d037ebada269246422b0de1b8c",
+     "status": 0,
+     "report_sha256": "62e8b3f0c919d3aba594d3aabea1b334a00041053c2d11a5eb01afc262a86c00"
+    },
+    {
+     "path": "gate-subtitle-pgs-capsules-79e0ae13/armv7/shard-8/benchmark/subtitle-pgs-capsules/gate-result.json",
+     "command": "report --benchmark",
+     "key": "7b8d8a1aabc856a07fe1b6dd1bb2760cfa042caa25d80eac3b5d61b8d4c73cb3",
+     "status": 0,
+     "report_sha256": "8135a48ca92736f6f4f679541dc56ccd68721f40fa5f6e7a300433ed6a490004"
+    },
+    {
+     "path": "gate-subtitle-pgs-capsules-79e0ae13/armv7/shard-8/graded/subtitle-pgs-capsules/gate-result.json",
+     "command": "grade",
+     "key": "2113627d2426dd610a9cca07e8ef77c83fbdb34e5303d1b78f1c6293644f168d",
+     "status": 0,
+     "report_sha256": "004a36421d759b3d9b9bc4975f5cb5765022d543c137514854112e2c6db5f7fe"
+    },
+    {
+     "path": "gate-subtitle-pgs-capsules-79e0ae13/armv7/shard-8/memory/subtitle-pgs-capsules/gate-result.json",
+     "command": "report --memory",
+     "key": "96c716dfb521848160ec4e531378b04ecca8f671c71f434e124e0b7c89f40291",
+     "status": 0,
+     "report_sha256": "6dd9ec76e551a4c525f1534eb977386b71e73ee37290f4f1d4ba5cf2a24005ab"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-teletext-79e0ae13",
+   "path": "gate-subtitle-teletext-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-teletext's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-teletext-79e0ae13/3061157c384c874ae2dec8ad092a0e2814ce1df3bee79801ee67f0d457bceefc.tar.zst",
+   "sha256": "3061157c384c874ae2dec8ad092a0e2814ce1df3bee79801ee67f0d457bceefc",
+   "bytes": 4286376,
+   "results": [
+    {
+     "path": "gate-subtitle-teletext-79e0ae13/aarch64/shard-1/benchmark/subtitle-teletext/gate-result.json",
+     "command": "report --benchmark",
+     "key": "433a24568f3224a94058c7d92a509ee6db1c8d45b7df4cf3c24f217854af8936",
+     "status": 0,
+     "report_sha256": "020dc46dbc28a29b017d80c6ac99588563213d573b3baac0ee1c073236bc9dd3"
+    },
+    {
+     "path": "gate-subtitle-teletext-79e0ae13/aarch64/shard-1/graded/subtitle-teletext/gate-result.json",
+     "command": "grade",
+     "key": "dd996dc063404c786509a171d2e864755d45360ee75fe239cd8d2747e58a237c",
+     "status": 0,
+     "report_sha256": "16d7a1d503a802290d0d62a393a60f0dc9ea5149afb0fd11626c5d711bea7297"
+    },
+    {
+     "path": "gate-subtitle-teletext-79e0ae13/aarch64/shard-1/memory/subtitle-teletext/gate-result.json",
+     "command": "report --memory",
+     "key": "586c590ac8670bf0d3de0757536faad43196b0c16a305fd2c9cf3797a3b1632c",
+     "status": 0,
+     "report_sha256": "b7476a882a022e05bfee660e1c1c01f4b2bac81f6022ad98cbe457c7bbd9e833"
+    },
+    {
+     "path": "gate-subtitle-teletext-79e0ae13/armv7/shard-1/benchmark/subtitle-teletext/gate-result.json",
+     "command": "report --benchmark",
+     "key": "b71c5f8fc71350a933577bca7ac13608dffb788f72f5af0d6ea938ff1617abc6",
+     "status": 0,
+     "report_sha256": "cf67f984347280a2efd9ecb1d68e09cbe09c16175bb78e5fc8b3c07190f93961"
+    },
+    {
+     "path": "gate-subtitle-teletext-79e0ae13/armv7/shard-1/graded/subtitle-teletext/gate-result.json",
+     "command": "grade",
+     "key": "2fa0c2bab9e6a7c8af97bb8f08b13681f2279a8884fc19938fc447cfc9b7ad88",
+     "status": 0,
+     "report_sha256": "c75796d04a061401ca327c642204eb5970b2a469adff350a6b1814a3ef2aa67c"
+    },
+    {
+     "path": "gate-subtitle-teletext-79e0ae13/armv7/shard-1/memory/subtitle-teletext/gate-result.json",
+     "command": "report --memory",
+     "key": "32d4664255588c8a4dbc9ef6944c9179d0fcf239b6a2462201b3c71df37b1b80",
+     "status": 0,
+     "report_sha256": "fbfd20a497adceb4e35ed62615773a44736b41f7de26bcda53d267684afcd49d"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-text-79e0ae13",
+   "path": "gate-subtitle-text-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-text's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-text-79e0ae13/13675118ba3b998743aaebb346da8f553992d040071a692b8aba3e67659dee77.tar.zst",
+   "sha256": "13675118ba3b998743aaebb346da8f553992d040071a692b8aba3e67659dee77",
+   "bytes": 13031890,
+   "results": [
+    {
+     "path": "gate-subtitle-text-79e0ae13/aarch64/shard-6/benchmark/subtitle-text/gate-result.json",
+     "command": "report --benchmark",
+     "key": "0561d7b16f374249bf957be7e17a971611a3e752a1cdc13a30809044063ba2c2",
+     "status": 0,
+     "report_sha256": "b4f5faa4d3df26bd6816d15847a9026ad5e83e5a384eff775af65daa9b9923a0"
+    },
+    {
+     "path": "gate-subtitle-text-79e0ae13/aarch64/shard-6/graded/subtitle-text/gate-result.json",
+     "command": "grade",
+     "key": "7fb774d9a03d256131077dd738ea01dd4fc590bee3b61b124fdd49312dd018fc",
+     "status": 0,
+     "report_sha256": "0eadbbd0dcde090527a3cb2852c341d81cadd3ba1bba92a8f893e7c9e671b5b0"
+    },
+    {
+     "path": "gate-subtitle-text-79e0ae13/aarch64/shard-6/memory/subtitle-text/gate-result.json",
+     "command": "report --memory",
+     "key": "cd503f83eb8f61540bf8013591f80e4ee4dcd23ccbd7925ec1bde81fbe196651",
+     "status": 0,
+     "report_sha256": "538a705f74ea1626f5ce145310907c5c1e3ef8ece10de491dfcd24e166d52524"
+    },
+    {
+     "path": "gate-subtitle-text-79e0ae13/armv7/shard-6/benchmark/subtitle-text/gate-result.json",
+     "command": "report --benchmark",
+     "key": "03a97353d75edf521b0bcc6c23dda46b34788e510708bea6bd89ffa7ec94e7aa",
+     "status": 0,
+     "report_sha256": "ac608e652be25131659215371ce0a4f62f3b14aa4c551b3a95c5420f90ae34ba"
+    },
+    {
+     "path": "gate-subtitle-text-79e0ae13/armv7/shard-6/graded/subtitle-text/gate-result.json",
+     "command": "grade",
+     "key": "96222e5e7e0194072e64e98fe9bf9f78e7d7264ed9e223c891c609ef0208a017",
+     "status": 0,
+     "report_sha256": "3f3124b7c6d8f3e8186a9f67b3d5de37bca058be5a706038f62838a2b47ff233"
+    },
+    {
+     "path": "gate-subtitle-text-79e0ae13/armv7/shard-6/memory/subtitle-text/gate-result.json",
+     "command": "report --memory",
+     "key": "ab2a45db61381de0b82ea7b7950bc6e817db0cc17afbe3751b49049c117cccaf",
+     "status": 0,
+     "report_sha256": "e47cd0bb276fb59c5433f5c957236f81c7069ca52d50f43c5b6798656795bdf7"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-subtitle-text-host-79e0ae13",
+   "path": "gate-subtitle-text-host-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-text-host's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-subtitle-text-host-79e0ae13/4c8edb811be6cddf913c23125e71da746bddcc7eb514edd50304e75f97d24476.tar.zst",
+   "sha256": "4c8edb811be6cddf913c23125e71da746bddcc7eb514edd50304e75f97d24476",
+   "bytes": 1628776,
+   "results": [
+    {
+     "path": "gate-subtitle-text-host-79e0ae13/aarch64/shard-4/benchmark/subtitle-text-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "6a9b33dab4cdeae053c3032cb946b38a6547ae3fb154a772dfd4a706085c9a93",
+     "status": 0,
+     "report_sha256": "cc94c11d5839edecd272931e47a0de4fe7e6e88b4f6cbcfc1c7ca8dcacb5fb66"
+    },
+    {
+     "path": "gate-subtitle-text-host-79e0ae13/aarch64/shard-4/graded/subtitle-text-host/gate-result.json",
+     "command": "grade",
+     "key": "eba2bdf96f2df9c07675c77cc150dc624e11f7431ca7cfb1b2dbb92f45fa1df0",
+     "status": 1,
+     "report_sha256": "91a9d4be0a08264ef225b921438f3267a38bb04d790b8bfa863aa725e2961451"
+    },
+    {
+     "path": "gate-subtitle-text-host-79e0ae13/aarch64/shard-4/memory/subtitle-text-host/gate-result.json",
+     "command": "report --memory",
+     "key": "954149ef6252f156c9c5aa0e843a86416da868baa93816e0c81c05661211d1a6",
+     "status": 0,
+     "report_sha256": "3c2e85a69a51d897664606f65c5fa1da68e51f262ec9e41bccff135901d8c127"
+    },
+    {
+     "path": "gate-subtitle-text-host-79e0ae13/armv7/shard-4/benchmark/subtitle-text-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9c791ee33a7587c9e4d352a3304d8186d4865ba131468a34571e4c6738de924e",
+     "status": 0,
+     "report_sha256": "b6b654d5a404593748cf3505880a7d0a688b13d3133e64702a8e26d28328942d"
+    },
+    {
+     "path": "gate-subtitle-text-host-79e0ae13/armv7/shard-4/graded/subtitle-text-host/gate-result.json",
+     "command": "grade",
+     "key": "07d93efe92f84b5dffc64e1b01fc1c3ea1998f2348d7dffe031a489cfeb38dee",
+     "status": 0,
+     "report_sha256": "3356922f092706f68ad5a87748f48bd214d635bcf4842c0db73df72076de608c"
+    },
+    {
+     "path": "gate-subtitle-text-host-79e0ae13/armv7/shard-4/memory/subtitle-text-host/gate-result.json",
+     "command": "report --memory",
+     "key": "f2645bccafb242e560cc1832945ea9962f5fba30e3018c540e547fe5fe8fdd33",
+     "status": 0,
+     "report_sha256": "c71ceed7bc91c09139c31c352abee10f7e9b432b45aafa9b351ddd60bb9c642b"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-tests-79e0ae13",
+   "path": "gate-tests-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the workspace tests in the checked and release profiles and the core time test, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-tests-79e0ae13/46aa709c5f445b438ef94d589fd52979b5de8fb3c1c4605a036ae3445893b73b.tar.zst",
+   "sha256": "46aa709c5f445b438ef94d589fd52979b5de8fb3c1c4605a036ae3445893b73b",
+   "bytes": 10256718,
+   "results": [
+    {
+     "path": "gate-tests-79e0ae13/aarch64/shard-3/tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "23cd3faead6c87fa165eb3a813cdbb54bc1cf55043ff72d8fd8ea60eccbde54f",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-tests-79e0ae13/aarch64/shard-9/tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "c3ba6b2fb71305a1458cdcf3ad761c3de73ac49b46a1f88329c907350eeffc90",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-tests-79e0ae13/armv7/shard-3/tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "1d53c0f5f03ddb180fdfde6b2b8310b395a8a83e68663222b57f3c0ceb0c5005",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "gate-tests-79e0ae13/armv7/shard-9/tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "096f765a6c443765de90c03f6e1ec7e8ee0ec227e6c8bc3622600b590030674b",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-ts-program-79e0ae13",
+   "path": "gate-ts-program-79e0ae13",
+   "retention": "retained",
+   "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: ts-program's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+   "key": "evidence/gate-ts-program-79e0ae13/85136ebd8227a2295ea4d04a5ae380a3aa88aa9602c00b74a4599da36e741f95.tar.zst",
+   "sha256": "85136ebd8227a2295ea4d04a5ae380a3aa88aa9602c00b74a4599da36e741f95",
+   "bytes": 3254742,
+   "results": [
+    {
+     "path": "gate-ts-program-79e0ae13/aarch64/shard-9/benchmark/ts-program/gate-result.json",
+     "command": "report --benchmark",
+     "key": "dc4a4cb3eec6c47c57aff7073454b2c25acea0a1519c0efa1684adb094a61e8d",
+     "status": 0,
+     "report_sha256": "3cadaf6a3a2135cf8f19eb6298887c141d947080675190f8a5615c09863885fe"
+    },
+    {
+     "path": "gate-ts-program-79e0ae13/aarch64/shard-9/graded/ts-program/gate-result.json",
+     "command": "grade",
+     "key": "7dbe5fb4bb28255cb44fbb4d90105bf3d6f49831fa09f6891e1cab8e197e1a6f",
+     "status": 0,
+     "report_sha256": "aadb30de95b37d4e0b27d399c46502fff3f6a9991c7759c1f9fe0f0b8cc00218"
+    },
+    {
+     "path": "gate-ts-program-79e0ae13/aarch64/shard-9/memory/ts-program/gate-result.json",
+     "command": "report --memory",
+     "key": "49105867f163e436dafa105a3239f9967a798122dd8fa24c62b5a7042e3edfa3",
+     "status": 0,
+     "report_sha256": "8a0a80adbde92b6268eec103c2994a4fba251a0a0ad652cd3ddcd1a248c9015a"
+    },
+    {
+     "path": "gate-ts-program-79e0ae13/armv7/shard-9/benchmark/ts-program/gate-result.json",
+     "command": "report --benchmark",
+     "key": "02d0838a114475a5223839049a81258c18f0f075ef8671284d8321eebeaf8c79",
+     "status": 0,
+     "report_sha256": "f536fce7711bff3145aecae22f56c29ae4538abeb05b9241c969031cba45f7af"
+    },
+    {
+     "path": "gate-ts-program-79e0ae13/armv7/shard-9/graded/ts-program/gate-result.json",
+     "command": "grade",
+     "key": "d07917629089707c1af6e1f285a751fc3bc8535e9734c49e549aaa2b1e5d269e",
+     "status": 0,
+     "report_sha256": "8ab6826dbb8e3f77b4f87277b48d33f092f5ace79356bc673fa3bde5bc93c20e"
+    },
+    {
+     "path": "gate-ts-program-79e0ae13/armv7/shard-9/memory/ts-program/gate-result.json",
+     "command": "report --memory",
+     "key": "258ba4133a5c6b45bee4c97c82db7b101d8426432f41771ffd4ae76aef8baf88",
+     "status": 0,
+     "report_sha256": "fdd42ce80e73804c441749a99e394e07380780d47e622c6afa054231ffa0c328"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-run-armv7-79e0ae13",
+   "path": "gate-run-armv7-79e0ae13",
+   "retention": "retained",
+   "reason": "The sharded gate run at 79e0ae13 on 32-bit ARMv7 in the armhf user space, on 10 c6g.4xlarge hosts from the images built at 22d55672: the pre-launch gate check, each shard's run log, host log, plan, build identities, step records and step logs, the run summary, and when each host was launched, ready, done and terminated; for the gate tooling's wall times and shard balance only",
+   "key": "evidence/gate-run-armv7-79e0ae13/612813087738e85133648515bfa55a6760fc8c63338cf3fa5c9fc2f83f3aad3c.tar.zst",
+   "sha256": "612813087738e85133648515bfa55a6760fc8c63338cf3fa5c9fc2f83f3aad3c",
+   "bytes": 489861,
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-79e0ae13",
+   "path": "gate-run-aarch64-79e0ae13",
+   "retention": "retained",
+   "reason": "The sharded gate run at 79e0ae13 on Linux AArch64, on 10 c6g.4xlarge hosts from the images built at 22d55672: the pre-launch gate check, each shard's run log, host log, plan, build identities, step records and step logs, the run summary, and when each host was launched, ready, done and terminated; for the gate tooling's wall times and shard balance only",
+   "key": "evidence/gate-run-aarch64-79e0ae13/b3e4fff20e89cc54f6404088212ba5c1eb20a61acb9a2796d304d54f61ded5a4.tar.zst",
+   "sha256": "b3e4fff20e89cc54f6404088212ba5c1eb20a61acb9a2796d304d54f61ded5a4",
+   "bytes": 489537,
+   "source_revisions": {
+    "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+   }
   }
  ]
 }
