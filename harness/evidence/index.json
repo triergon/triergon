@@ -20363,6 +20363,15 @@
    "key": "evidence/quicktime-open-index-interrupted-f5b1559d/0eaf28776e7a5c7ffceb98d8937064707e9a2b04f6c19d21ee1aabb64c170023.tar.gz",
    "sha256": "0eaf28776e7a5c7ffceb98d8937064707e9a2b04f6c19d21ee1aabb64c170023",
    "bytes": 487223620
+  },
+  {
+   "name": "quicktime-preflight-f5b1559d",
+   "path": "quicktime-preflight-f5b1559d",
+   "retention": "90 days",
+   "reason": "ISO BMFF input and kernel review preflight before measurement",
+   "key": "qualification/quicktime-preflight-f5b1559d/ece4f272af7eebc52f0da210c4e112bdba4fb4e1a14d237f4891f9f719ac01eb.tar.gz",
+   "sha256": "ece4f272af7eebc52f0da210c4e112bdba4fb4e1a14d237f4891f9f719ac01eb",
+   "bytes": 49917684
   }
  ]
 }
