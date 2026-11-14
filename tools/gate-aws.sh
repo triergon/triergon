@@ -104,11 +104,18 @@ session() {
 }
 
 teardown() {
-    local removed=1
+    local removed=1 live
     if [ ${#INSTANCES[@]} -gt 0 ]; then
-        if aws ec2 terminate-instances --instance-ids "${INSTANCES[@]}" >/dev/null &&
-            aws ec2 wait instance-terminated --instance-ids "${INSTANCES[@]}"; then
-            say "terminated ${INSTANCES[*]}"
+        # Hosts terminated earlier may no longer exist; only the others are named.
+        live=$(aws ec2 describe-instances \
+            --filters "Name=instance-id,Values=$(IFS=,; echo "${INSTANCES[*]}")" \
+            "Name=instance-state-name,Values=pending,running,stopping,stopped,shutting-down" \
+            --query 'Reservations[].Instances[].InstanceId' --output text) || removed=0
+        # shellcheck disable=SC2086
+        if [ "$removed" = 1 ] && { [ -z "$live" ] ||
+            { aws ec2 terminate-instances --instance-ids $live >/dev/null &&
+                aws ec2 wait instance-terminated --instance-ids $live; }; }; then
+            say "terminated ${live:-no host left}"
         else
             removed=0
         fi
