@@ -167,11 +167,11 @@ fn an_early_stopped_memory_collection_is_valid_only_under_its_rule() {
     let (contract, rows, identity) = matched_gate_fixture();
     let original = rows[0].get("memory").unwrap();
     let certificate = original.get("certificate").unwrap();
-    let samples = original.get("samples").unwrap().as_array().unwrap()[..10].to_vec();
+    let samples = original.get("samples").unwrap().as_array().unwrap()[..20].to_vec();
     let gate = super::timing::Pairs::gate(30, super::memory::CEILING);
     let memory = super::memory::evaluate(root(), &samples, gate, 0, certificate, None);
     assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
-    assert_eq!(memory.get("pairs"), Some(&Value::int(10)));
+    assert_eq!(memory.get("pairs"), Some(&Value::int(20)));
     let selected = identity.get("binaries").unwrap();
     let valid = |memory: &Value| {
         super::memory::evidence_valid(

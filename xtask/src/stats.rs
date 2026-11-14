@@ -68,11 +68,55 @@ pub fn nonnegative_ratio_interval(
     Ok(bootstrap_ratio_interval(pairs, seed, resamples))
 }
 
-/// The looks at which a timing session may end before its planned pairs, each
-/// with the order statistic that bounds the median ratio there: after `n` pairs,
-/// the `k`-th smallest ratio. A session stops at a look only when that ratio is
-/// below the runtime ceiling.
-pub const EARLY_LOOKS: [(usize, usize); 2] = [(10, 10), (20, 18)];
+/// The pairs after which a gate session may end before its planned pairs: two
+/// blocks of ten.
+pub const EARLY_LOOK: usize = 20;
+
+/// The order statistic of the look's ratios that bounds their median: the 18th
+/// smallest of 20.
+pub const EARLY_BOUND: usize = 18;
+
+/// The largest lag-1 autocorrelation of the look's ratios that lets a session
+/// stop: the 99th percentile of 20 independent ratios.
+pub const EARLY_LAG1_MAX: f64 = 0.42;
+
+/// Whether the look's paired ratios `a / b` have settled below `ceiling`: every
+/// ratio of the second block of ten below it, at least eight of the first ten,
+/// and a lag-1 autocorrelation of at most [`EARLY_LAG1_MAX`]. The 18th smallest
+/// ratio then lies below the ceiling too.
+///
+/// For independent pairs whose median is at the ceiling this happens with
+/// probability at most 2⁻¹⁰ · 56/2¹⁰, and whatever the first block does, at most
+/// 2⁻¹⁰, the chance that ten fair coin flips all land heads: a warm-up or drift
+/// confined to the first pairs cannot stop a session that the second block would
+/// not. The autocorrelation limit refuses sessions whose pairs are not
+/// independent.
+pub fn settled_below(pairs: &[(f64, f64)], ceiling: f64) -> bool {
+    if pairs.len() != EARLY_LOOK {
+        return false;
+    }
+    let ratios: Vec<f64> = pairs.iter().map(|&(a, b)| a / b).collect();
+    let (first, second) = ratios.split_at(EARLY_LOOK / 2);
+    second.iter().all(|&ratio| ratio < ceiling)
+        && first.iter().filter(|&&ratio| ratio < ceiling).count() >= 8
+        && lag1_autocorrelation(&ratios) <= EARLY_LAG1_MAX
+}
+
+/// The lag-1 autocorrelation of a series; 0 for a constant one.
+pub fn lag1_autocorrelation(values: &[f64]) -> f64 {
+    // A constant series, as a deterministic peak heap gives, is uncorrelated;
+    // rounding in its mean must not make it look otherwise.
+    if values.iter().all(|v| v.total_cmp(&values[0]).is_eq()) {
+        return 0.0;
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let deviations: Vec<f64> = values.iter().map(|v| v - mean).collect();
+    let variance: f64 = deviations.iter().map(|d| d * d).sum();
+    if variance == 0.0 {
+        return 0.0;
+    }
+    deviations.windows(2).map(|w| w[0] * w[1]).sum::<f64>() / variance
+}
 
 /// Median of the paired ratios `a / b` with the order statistics `n + 1 - k` and
 /// `k` as its bounds. Whatever the ratios' distribution, the `k`-th smallest of
@@ -221,15 +265,50 @@ mod tests {
     }
 
     #[test]
-    fn early_looks_spend_little_error() {
+    fn the_early_look_spends_little_error() {
+        // Second block all below and at least eight of the first, for independent
+        // pairs at the ceiling; and the bound alone, whatever the first block does.
+        let blocks = order_statistic_error(10, 10) * order_statistic_error(10, 8);
+        assert_eq!(blocks, 56.0 / 1_048_576.0);
         assert_eq!(order_statistic_error(10, 10), 1.0 / 1024.0);
-        assert_eq!(order_statistic_error(20, 18), 211.0 / 1_048_576.0);
+        assert_eq!(
+            order_statistic_error(EARLY_LOOK, EARLY_BOUND),
+            211.0 / 1_048_576.0
+        );
         assert_eq!(order_statistic_error(4, 0), 1.0);
-        let spent: f64 = EARLY_LOOKS
-            .iter()
-            .map(|&(n, k)| order_statistic_error(n, k))
-            .sum();
-        assert!(spent < 0.0012, "{spent}");
+    }
+
+    #[test]
+    fn a_look_settles_only_with_both_blocks_below_and_little_autocorrelation() {
+        let pairs =
+            |ratios: &[f64]| -> Vec<(f64, f64)> { ratios.iter().map(|&r| (r, 1.0)).collect() };
+        // Alternating noise around 0.9: negatively autocorrelated, all below 1.2.
+        let mut ratios: Vec<f64> = (0..20)
+            .map(|i| if i % 2 == 0 { 0.9 } else { 0.91 })
+            .collect();
+        assert!(settled_below(&pairs(&ratios), 1.2));
+        assert!(!settled_below(&pairs(&ratios[..19]), 1.2));
+        ratios[3] = 1.3;
+        ratios[7] = 1.25;
+        assert!(settled_below(&pairs(&ratios), 1.2));
+        ratios[1] = 1.21;
+        assert!(
+            !settled_below(&pairs(&ratios), 1.2),
+            "three of the first ten above"
+        );
+        ratios[1] = 0.91;
+        ratios[15] = 1.2;
+        assert!(
+            !settled_below(&pairs(&ratios), 1.2),
+            "the second block must be strictly below"
+        );
+        // A steady drift is autocorrelated and never settles.
+        let drift: Vec<f64> = (0..20).map(|i| 0.8 + f64::from(i) * 0.01).collect();
+        assert!(lag1_autocorrelation(&drift) > EARLY_LAG1_MAX);
+        assert!(!settled_below(&pairs(&drift), 1.2));
+        assert_eq!(lag1_autocorrelation(&[0.5; 20]), 0.0);
+        assert_eq!(lag1_autocorrelation(&[0.79; 20]), 0.0);
+        assert!(settled_below(&pairs(&[0.5; 20]), 1.2));
     }
 
     #[test]

@@ -554,7 +554,7 @@ impl Pairs {
 }
 
 /// The stopping rule a timing record names when it may stop early.
-pub const EARLY_STOP_RULE: &str = "median-order-statistic-looks-v1";
+pub const EARLY_STOP_RULE: &str = "median-two-blocks-v1";
 
 /// The pairs a session set out to run: its pairs, or the planned pairs of one
 /// that may stop early.
@@ -565,16 +565,15 @@ pub fn planned_pairs(record: &Value) -> Option<i128> {
     }
 }
 
-/// The early look a session stops at after `values`, if any: the look's order
-/// statistic bound is below the ceiling and pairs remain.
+/// The interval a session stops with after `values`, if it stops there: at the
+/// early look, with pairs remaining, settled below the ceiling.
 fn early_stop(values: &[(f64, f64)], pairs: Pairs) -> Option<stats::Interval> {
     let ceiling = pairs.stop_below?;
-    let &(_, k) = stats::EARLY_LOOKS
-        .iter()
-        .find(|&&(n, _)| n == values.len() && n < pairs.planned)?;
-    stats::order_interval(values, k)
-        .ok()
-        .filter(|interval| interval.upper_95 < ceiling)
+    (values.len() == stats::EARLY_LOOK
+        && stats::EARLY_LOOK < pairs.planned
+        && stats::settled_below(values, ceiling))
+    .then(|| stats::order_interval(values, stats::EARLY_BOUND).ok())
+    .flatten()
 }
 
 fn digest(path: &Path) -> Result<String, String> {
@@ -1413,39 +1412,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_gate_session_stops_at_the_first_look_bounded_below_the_ceiling() {
+    fn a_gate_session_stops_at_the_look_once_settled_below_the_ceiling() {
         let pair = |milli: u32| (f64::from(milli), 1000.0);
-        let fast: Vec<_> = (800..830).map(pair).collect();
+        // Alternating, so the pairs show no autocorrelation.
+        let fast: Vec<_> = (0..30)
+            .map(|i| pair(if i % 2 == 0 { 800 } else { 829 }))
+            .collect();
         let gate = Pairs::gate(30, 1.2);
-        assert!((1..10).all(|n| early_stop(&fast[..n], gate).is_none()));
-        let stop = early_stop(&fast[..10], gate).unwrap();
-        assert_eq!(stop.upper_95, 0.809);
-        assert!(early_stop(&fast[..10], Pairs::fixed(30)).is_none());
-        assert!(early_stop(&fast[..10], Pairs::gate(10, 1.2)).is_none());
-        // One slow pair in the first ten defers the stop to the second look,
-        // where two of twenty may lie above the ceiling.
+        assert!(
+            (1..=30)
+                .filter(|&n| n != 20)
+                .all(|n| early_stop(&fast[..n], gate).is_none())
+        );
+        let stop = early_stop(&fast[..20], gate).unwrap();
+        assert_eq!(stop.upper_95, 0.829);
+        assert!(early_stop(&fast[..20], Pairs::fixed(30)).is_none());
+        assert!(early_stop(&fast[..20], Pairs::gate(20, 1.2)).is_none());
+        // Two slow pairs among the first ten still settle; one in the second does not.
         let mut mixed = fast.clone();
         mixed[3] = pair(1250);
-        assert!(early_stop(&mixed[..10], gate).is_none());
-        mixed[14] = pair(1300);
-        assert_eq!(early_stop(&mixed[..20], gate).unwrap().upper_95, 0.819);
-        mixed[15] = pair(1210);
+        mixed[6] = pair(1300);
+        assert!(early_stop(&mixed[..20], gate).is_some());
+        mixed[14] = pair(1210);
         assert!(early_stop(&mixed[..20], gate).is_none());
         let stop = Value::object([
             ("rule", Value::str(EARLY_STOP_RULE)),
             ("planned_pairs", Value::int(30)),
             ("ceiling", Value::float(1.2)),
-            ("stopped_after", Value::int(10)),
+            ("stopped_after", Value::int(20)),
         ]);
         assert_eq!(
-            replay_early_stop(&stop, &fast[..10], 30, 280)
+            replay_early_stop(&stop, &fast[..20], 30, 280)
                 .unwrap()
                 .upper_95,
-            0.809
+            0.829
         );
         // A session must stop where the rule stops, and only there.
-        assert!(replay_early_stop(&stop, &fast[..20], 30, 280).is_err());
         assert!(replay_early_stop(&stop, &fast, 30, 280).is_err());
+        assert!(replay_early_stop(&stop, &fast[..10], 30, 280).is_err());
         let mut ran = stop.clone();
         crate::harness::validation::put(&mut ran, "stopped_after", Value::Null).unwrap();
         assert!(replay_early_stop(&ran, &fast, 30, 280).is_err());

@@ -1006,9 +1006,9 @@ mod tests {
             }
             Value::object(fields)
         };
-        assert_eq!(samples(&record(10, Some(30)), 30, false).unwrap().len(), 10);
-        assert!(samples(&record(10, Some(20)), 30, false).is_err());
-        assert!(samples(&record(10, None), 30, false).is_err());
+        assert_eq!(samples(&record(20, Some(30)), 30, false).unwrap().len(), 20);
+        assert!(samples(&record(20, Some(20)), 30, false).is_err());
+        assert!(samples(&record(20, None), 30, false).is_err());
         assert!(samples(&record(30, None), 30, false).is_ok());
     }
 

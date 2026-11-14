@@ -1049,12 +1049,8 @@ pub fn evaluate(
         .find_map(|n| settled(&heap_ratios[..n], &total_ratios[..n], pairs).map(|s| (n, s)));
     let (heap, total, growth) = match first_stop {
         Some((n, (heap, total))) if n == samples.len() => {
-            let k = stats::EARLY_LOOKS
-                .iter()
-                .find(|&&(looked, _)| looked == n)
-                .map_or(n, |&(_, k)| k);
-            let growth =
-                stats::order_interval(&as_f64(&rss), k).map_or(Value::Null, |i| interval_value(&i));
+            let growth = stats::order_interval(&as_f64(&rss), stats::EARLY_BOUND)
+                .map_or(Value::Null, |i| interval_value(&i));
             (interval_value(&heap), interval_value(&total), growth)
         }
         None if samples.len() as i128 == pairs.planned as i128 => {
@@ -1167,20 +1163,26 @@ fn pair_values(row: &Value, linux: bool) -> Option<PairValues> {
     })
 }
 
-/// The heap and total resident intervals at an early look, when both of the
-/// look's order statistics lie below the ceiling and pairs remain.
+/// The heap and total resident intervals a collection stops with, if it stops
+/// after these pairs: at the early look, with pairs remaining, both ratios
+/// settled below the ceiling.
 fn settled(
     heaps: &[(f64, f64)],
     totals: &[(f64, f64)],
     pairs: Pairs,
 ) -> Option<(stats::Interval, stats::Interval)> {
     let ceiling = pairs.stop_below?;
-    let &(_, k) = stats::EARLY_LOOKS
-        .iter()
-        .find(|&&(n, _)| n == heaps.len() && n < pairs.planned)?;
-    let heap = stats::order_interval(heaps, k).ok()?;
-    let total = stats::order_interval(totals, k).ok()?;
-    (heap.upper_95 < ceiling && total.upper_95 < ceiling).then_some((heap, total))
+    if heaps.len() != stats::EARLY_LOOK
+        || stats::EARLY_LOOK >= pairs.planned
+        || !stats::settled_below(heaps, ceiling)
+        || !stats::settled_below(totals, ceiling)
+    {
+        return None;
+    }
+    Some((
+        stats::order_interval(heaps, stats::EARLY_BOUND).ok()?,
+        stats::order_interval(totals, stats::EARLY_BOUND).ok()?,
+    ))
 }
 
 fn interval_value(interval: &stats::Interval) -> Value {
@@ -2078,22 +2080,24 @@ mod command_tests {
     #[test]
     fn a_memory_session_settles_only_when_heap_and_total_rss_both_do() {
         let heaps = vec![(0.0, 4096.0); 20];
-        let mut totals: Vec<(f64, f64)> = (0..20).map(|i| (900.0 + f64::from(i), 1000.0)).collect();
+        let mut totals: Vec<(f64, f64)> = (0..20)
+            .map(|i| (if i % 2 == 0 { 900.0 } else { 910.0 }, 1000.0))
+            .collect();
         let gate = Pairs::gate(30, CEILING);
-        assert!(settled(&heaps[..9], &totals[..9], gate).is_none());
-        assert!(settled(&heaps[..10], &totals[..10], gate).is_some());
-        assert!(settled(&heaps[..10], &totals[..10], Pairs::fixed(30)).is_none());
-        assert!(settled(&heaps[..10], &totals[..10], Pairs::gate(10, CEILING)).is_none());
-        // Equal to the reference is not lower.
+        assert!(settled(&heaps[..19], &totals[..19], gate).is_none());
+        assert!(settled(&heaps, &totals, gate).is_some());
+        assert!(settled(&heaps, &totals, Pairs::fixed(30)).is_none());
+        assert!(settled(&heaps, &totals, Pairs::gate(20, CEILING)).is_none());
+        // Equal to the reference is not lower; two of the first ten may be.
         totals[2] = (1000.0, 1000.0);
-        assert!(settled(&heaps[..10], &totals[..10], gate).is_none());
-        totals[12] = (1100.0, 1000.0);
-        assert!(settled(&heaps[..20], &totals[..20], gate).is_some());
-        totals[13] = (1001.0, 1000.0);
-        assert!(settled(&heaps[..20], &totals[..20], gate).is_none());
+        totals[5] = (1100.0, 1000.0);
+        assert!(settled(&heaps, &totals, gate).is_some());
+        totals[12] = (1000.0, 1000.0);
+        assert!(settled(&heaps, &totals, gate).is_none());
+        totals[12] = (900.0, 1000.0);
         let mut heavy = heaps.clone();
-        heavy[0] = (4096.0, 4096.0);
-        assert!(settled(&heavy[..10], &totals[..10], gate).is_none());
+        heavy[15] = (4096.0, 4096.0);
+        assert!(settled(&heavy, &totals, gate).is_none());
     }
 
     #[test]
