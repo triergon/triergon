@@ -1,5 +1,5 @@
 //! Bounded initialization-extradata view of the same pinned packet receiver.
-use crate::nal_packet::NalConfigurationRefusal;
+use crate::nal_packet::{NalConfigurationRefusal, copy_annex_b_piece};
 use crate::{AvcConfigArrayKind, BuildStep, NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -148,21 +148,27 @@ impl<'a> NalPacketConfigWriter<'a> {
                 return Err(Error::Cancelled);
             }
             match self.phase {
-                0 => {
-                    if let Some(declared) = self.config.hevc_array_type(self.array) {
-                        if !work.try_charge(1) {
-                            return Ok(BuildStep::Yield);
-                        }
-                        if !matches!(declared, 32 | 33 | 34 | 39 | 40) {
-                            self.rejected_array = Some(declared);
-                            return Err(Error::Unsupported("pinned HEVC decoder array type"));
-                        }
-                        self.array += 1;
+                0 => match self.config.admit_hevc_arrays(&mut self.array, work) {
+                    Ok(true) => self.phase = 1,
+                    Ok(false) => return Ok(BuildStep::Yield),
+                    Err(declared) => {
+                        self.rejected_array = Some(declared);
+                        return Err(Error::Unsupported("pinned HEVC decoder array type"));
+                    }
+                },
+                1 => {
+                    // A successful full sizing pass can use the validated extent.
+                    // Keep the incremental walk for short work budgets and to
+                    // report the first NAL that crosses the output limit.
+                    if self.index == 0
+                        && let Some((len, charge)) = self.config.annex_b_configuration_extent()
+                        && len <= self.maximum
+                        && work.try_charge(charge)
+                    {
+                        self.total = len;
+                        self.phase = 2;
                         continue;
                     }
-                    self.phase = 1;
-                }
-                1 => {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
@@ -220,32 +226,20 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if selected {
                         let end = b.len().checked_add(prefix).ok_or(Error::Overflow)?;
                         while self.copied != end {
-                            let count = if self.copied < prefix {
-                                prefix - self.copied
-                            } else {
-                                (end - self.copied).min(4096)
-                            }
-                            .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
-                            if count == 0 {
+                            if work.remaining() == 0 {
                                 return Ok(BuildStep::Yield);
                             }
+                            let remaining = if self.copied < prefix {
+                                &[0, 0, 0, 1][self.copied..]
+                            } else {
+                                &b[self.copied - prefix..]
+                            };
                             let out = self
                                 .output
                                 .as_mut()
                                 .ok_or(Error::Invalid("missing config output"))?;
-                            if self.copied < prefix {
-                                out.try_extend_from_slice(
-                                    &[0, 0, 0, 1][self.copied..self.copied + count],
-                                )?;
-                            } else {
-                                let start = self.copied - prefix;
-                                out.try_extend_from_slice(&b[start..start + count])?;
-                            }
-                            work.take(count as u64);
-                            self.copied += count;
-                            // The next copy or NAL advance is independently cancellable.
-                            if cancel.load(Ordering::Relaxed) {
-                                return Err(Error::Cancelled);
+                            if !copy_annex_b_piece(remaining, out, &mut self.copied, work, cancel)? {
+                                return Ok(BuildStep::Yield);
                             }
                         }
                     }

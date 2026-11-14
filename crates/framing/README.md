@@ -134,16 +134,22 @@ descriptors inline. The validation pass fills both tables when they fit inline.
 When either exceeds its inline capacity, a second pass fills the tables with
 exact-capacity charged storage for the larger tables. Both paths keep the same
 work checkpoints and retain the original record.
+The HEVC record also retains the first array type the Annex B receiver
+refuses. Configuration and packet writers charge the array checks in order
+and report the refusal at its original work boundary.
+The configuration writer can size its contiguous Annex B output from the
+validated record extent when the available work covers the whole sizing pass.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs keep up to five segment descriptors inline, then spill the
+Stateful packet jobs keep up to six segment descriptors inline, then spill the
 complete table into charged heap storage. The spill can use the exact segment
-count from HEVC lookahead or an upper bound from the AVC configuration. A
-refused hint falls back to ordinary growth. A refused spill keeps the inline
+count from HEVC lookahead or a bound that includes the final AVC NAL and its
+inserted parameter sets. A refused hint falls back to ordinary growth. A
+refused spill keeps the inline
 descriptors intact for retry. Retaining complete outputs in a `BudgetVec`
 charges their full element size, including inline descriptors. Passthrough packets
 share the original payload. Segment descriptors store the wire-bounded NAL
@@ -161,6 +167,14 @@ retain their checked payload ranges.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
+- The AVC packet receiver can emit parameter sets before a buffering-period SEI
+  (H.264 Annex D). It uses in-band sets found before the following slice, then
+  falls back to the active configuration for missing sets. It preserves the
+  original packet NALs and does not parse the SEI payload.
+- With complete AVC sequence and picture parameter-set arrays, the AVC receiver
+  can frame a sample whose required profile extension has zero to three bytes.
+  It preserves that suffix as trailing bytes and reports `Truncated` as the
+  strict source refusal.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps. `append_payload` can consume an interior NAL
   slice while the reader is waiting for input.
@@ -212,7 +226,7 @@ Verification:
   `hevc-aud0.hevc` with an end of sequence before its second VPS and an end of
   bitstream at the end.
 
-From the repository root, `cargo xtask framing` compares all 125 AVC/HEVC
+From the repository root, `cargo xtask framing` compares all 131 AVC/HEVC
 packet-framing scripts with the pinned FFmpeg bitstream-filter API. The
 [contract](../../harness/features/packet-framing/contract.json) covers configuration,
 complete packet fields and side data, malformed input, flush and drain actions,

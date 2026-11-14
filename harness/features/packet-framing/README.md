@@ -1,7 +1,7 @@
 # Packet framing
 
 This contract compares complete AVC and HEVC packet-framing operations against
-FFmpeg's public bitstream-filter API. All 125 scripts are required, including
+FFmpeg's public bitstream-filter API. All 131 scripts are required, including
 configuration boundaries, state transitions, malformed input and packet metadata.
 The inputs are authored synthetic structures; their codec bodies are opaque framing data.
 
@@ -19,6 +19,10 @@ both whole-operation digest words, including iterations with zero output packets
 Both workers fold eight-byte groups with the same polynomial recurrence and
 process any trailing bytes individually.
 
+`avc-profile-extension-inputs.json` adds the five fixed-header lengths and a
+nonempty configuration update. `cargo xtask framing manifest --record` records
+their packet counts and whole-operation folds from the built FFmpeg worker.
+
 The xtask entry point generates all inputs and delegates reports, paired timing,
 memory collection, isolation and gate-build checks to the shared harness. There
 is no case filter. A baseline comparison cannot be an acceptance run. Workers
@@ -28,5 +32,24 @@ framing crate's `reference-trace` feature for comparison-only error codes.
 
 `provenance.json` binds the inputs and observations to their original archive and
 source hashes. The historical measurements used compiler overrides and are not
-current gate results. New qualification requires the pinned stable build and all
-125 cases on native AArch64 Linux.
+current gate results. Qualification requires the pinned stable build and all
+131 cases on native AArch64 Linux.
+
+[`fate.json`](fate.json) lists the upstream
+AVC and HEVC framing cases. Build the ISO BMFF example and use an FFmpeg
+binary with MOV demuxing and muxing, the AVC and HEVC Annex B filters, and
+the H.264 metadata filter, H.264 decoding and the framecrc muxer enabled.
+
+```sh
+CARGO_INCREMENTAL=0 cargo build --locked --release -p triergon-isobmff --example packet_annex_b
+CARGO_INCREMENTAL=0 cargo xtask framing fate --ffmpeg /path/to/ffmpeg \
+  --candidate target/release/examples/packet_annex_b \
+  --output .research/framing-fate
+```
+
+The runner checks the input SHA-256 and upstream output MD5, then compares
+the candidate and reference Annex B streams by SHA-256. For cases with a
+framecrc trace, it uses FFmpeg on both streams to check the decoded frames
+or the remuxed packets against every row of the pinned upstream trace.
+It records every case, the binary hashes and the reference version in
+`report.json`. Any failed check makes the command return failure.

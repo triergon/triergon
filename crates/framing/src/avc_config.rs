@@ -88,6 +88,10 @@ impl AvcConfigFields {
     }
 }
 
+pub(crate) const fn profile_extension_required(profile: u8) -> bool {
+    matches!(profile, 100 | 110 | 122 | 144)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ArrayDescriptor {
     kind: AvcConfigArrayKind,
@@ -164,7 +168,7 @@ impl Scan {
 
     // Single caller per walk; inlining lets the event stay in registers.
     #[inline(always)]
-    fn next(&mut self, raw: &[u8], limits: AvcConfigLimits) -> Result<Event> {
+    fn next(&mut self, raw: &[u8], limits: AvcConfigLimits, receiver: bool) -> Result<Event> {
         match self.phase {
             ScanPhase::Sequence => self.group(
                 AvcConfigArrayKind::Sequence,
@@ -188,17 +192,20 @@ impl Scan {
             ScanPhase::Extension => {
                 // This explicitly selects the acquired2010 edition, whose
                 // branch list includes144. No newer profile list is guessed.
-                if !matches!(raw[1], 100 | 110 | 122 | 144) {
+                if !profile_extension_required(raw[1]) {
                     self.phase = ScanPhase::End;
                     return Ok(Event::End(self.position));
                 }
                 let start = self.position;
                 let end = start.checked_add(4).ok_or(Error::Overflow)?;
-                let bytes: [u8; 4] = raw
-                    .get(start..end)
-                    .ok_or(Error::Truncated)?
-                    .try_into()
-                    .map_err(|_| Error::Truncated)?;
+                let Some(bytes) = raw.get(start..end) else {
+                    if receiver {
+                        self.phase = ScanPhase::End;
+                        return Ok(Event::End(start));
+                    }
+                    return Err(Error::Truncated);
+                };
+                let bytes: [u8; 4] = bytes.try_into().map_err(|_| Error::Truncated)?;
                 self.position = end;
                 self.group(
                     AvcConfigArrayKind::SequenceExtension,
@@ -295,7 +302,7 @@ pub struct AvcConfigParser {
     // spare pool handle or empty replacement vector is kept for either.
     nals: Option<AvcNalStorage>,
     failure: Option<Error>,
-    observed_width_three: bool,
+    receiver: bool,
 }
 
 impl AvcConfigParser {
@@ -333,20 +340,20 @@ impl AvcConfigParser {
             understood_end: 0,
             nals: Some(AvcNalStorage::empty()),
             failure: None,
-            observed_width_three: false,
+            receiver: false,
         })
     }
 
     // Crate-private: only the separately typed observed-record wrapper can
     // publish this result. The ordinary source constructor remains strict.
-    pub(crate) fn new_observed_width(
+    pub(crate) fn new_receiver(
         pool: &Budget,
         source: AvcConfigSource,
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
         let mut parser = Self::new(pool, source, raw, limits)?;
-        parser.observed_width_three = true;
+        parser.receiver = true;
         Ok(parser)
     }
 
@@ -462,7 +469,7 @@ impl AvcConfigParser {
                         .ok_or(Error::Truncated)?
                         .try_into()
                         .map_err(|_| Error::Truncated)?;
-                    if prefix[4] & 3 == 2 && !self.observed_width_three {
+                    if prefix[4] & 3 == 2 && !self.receiver {
                         return Err(Error::Invalid("AVC three-byte sample length"));
                     }
                     self.width = Some(LengthSize::new((prefix[4] & 3) + 1)?);
@@ -474,7 +481,7 @@ impl AvcConfigParser {
                 }
                 Phase::Count | Phase::Fill => {
                     let mut next = *scan;
-                    let event = next.next(raw, self.limits)?;
+                    let event = next.next(raw, self.limits, self.receiver)?;
                     match event {
                         Event::Group {
                             kind,
@@ -725,6 +732,14 @@ impl AvcConfiguration {
     pub fn nal_count(&self) -> usize {
         let last = &self.arrays[self.array_count() - 1];
         usize::from(last.first_nal) + usize::from(last.nal_count)
+    }
+    pub(crate) fn annex_b_configuration_len(&self) -> usize {
+        let picture = &self.arrays[1];
+        let count = picture.nal_indices().end;
+        // The first two arrays occupy the bytes after the six-byte header,
+        // plus the picture count. Replace each two-byte length with four
+        // start-code bytes. The extension array is never emitted here.
+        picture.range.end as usize - 7 + 2 * count
     }
     pub const fn array_count(&self) -> usize {
         if self.fields.extension.is_some() {
