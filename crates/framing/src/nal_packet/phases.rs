@@ -85,7 +85,7 @@ impl PacketPlan {
                 PlanPhase::AvcBuffering => self.lookahead_avc_buffering(state, work, cancel)?,
                 PlanPhase::AvcBufferingInject => self.inject_for_avc_buffering(state, work)?,
                 PlanPhase::Scan => self.scan_nal(state, work, cancel)?,
-                PlanPhase::Inject => self.inject_configuration(state, work)?,
+                PlanPhase::Inject => self.inject_configuration(state, work, cancel)?,
                 PlanPhase::Nal => self.append_nal(state, work)?,
                 PlanPhase::Reserve => return Ok(None),
             };
@@ -565,33 +565,46 @@ impl PacketPlan {
         &mut self,
         state: &mut PacketState<'_, M>,
         work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<Step> {
-        let (which, index) = self
+        let (selection, mut index) = self
             .injection
             .ok_or(Error::Invalid("missing injection plan"))?;
-        if !work.try_charge(1) {
-            return Ok(YIELD);
-        }
-        if let Some(n) = state.config().config_nal(index) {
-            let selected = match (n.kind, which) {
+        loop {
+            if !work.try_charge(1) {
+                self.injection = Some((selection, index));
+                return Ok(YIELD);
+            }
+            let Some(n) = state.config().config_nal(index) else {
+                break;
+            };
+            let selected = match (n.kind, selection) {
                 (None, _) => true,
                 (Some(kind), Injection::All) => kind != AvcConfigArrayKind::SequenceExtension,
                 (Some(kind), Injection::Sps) => kind == AvcConfigArrayKind::Sequence,
                 (Some(kind), Injection::Pps) => kind == AvcConfigArrayKind::Picture,
             };
-            if selected {
-                let segment = NalPacketSegment::configuration(index, n.range, state.total);
-                self.append(state, segment)?;
+            if selected
+                && let Err(error) = self.append(
+                    state,
+                    NalPacketSegment::configuration(index, n.range, state.total),
+                )
+            {
+                self.injection = Some((selection, index));
+                return Err(error);
             }
-            self.injection = Some((which, index + 1));
-        } else {
-            if matches!(which, Injection::Sps) {
-                state.avc.sps = true;
+            index += 1;
+            // Check at the same boundary as the outer phase loop.
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
             }
-            self.injection = None;
-            self.injected_irap = true;
-            self.phase = PlanPhase::Nal;
         }
+        if matches!(selection, Injection::Sps) {
+            state.avc.sps = true;
+        }
+        self.injection = None;
+        self.injected_irap = true;
+        self.phase = PlanPhase::Nal;
         Ok(NEXT)
     }
 
