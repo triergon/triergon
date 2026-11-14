@@ -2,6 +2,7 @@
 //! named on [`crate::compat::nal`].
 //! NAL bodies stay opaque; this does not establish access-unit/decoder validity.
 mod phases;
+use phases::AvcBufferingLookahead;
 
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, AvcConfiguration, BuildStep, Codec, HvcConfiguration, LengthSize};
@@ -316,6 +317,7 @@ struct AvcState {
     sps: bool,
     pps: bool,
     new_idr: bool,
+    injected_for_buffering_period: bool,
 }
 impl Default for AvcState {
     fn default() -> Self {
@@ -323,6 +325,7 @@ impl Default for AvcState {
             sps: false,
             pps: false,
             new_idr: true,
+            injected_for_buffering_period: false,
         }
     }
 }
@@ -839,6 +842,8 @@ enum PlanPhase {
     Verify,
     Arrays,
     Lookahead,
+    AvcBuffering,
+    AvcBufferingInject,
     Scan,
     Inject,
     Nal,
@@ -888,6 +893,7 @@ struct PacketPlan {
     injection: Option<(Injection, usize)>,
     injected_irap: bool,
     has_irap: bool,
+    avc_buffering: Option<AvcBufferingLookahead>,
     look_nals: usize,
     // No fixed storage can be smaller than the budget control allocation.
     // The two smaller values represent an unchecked and a proven bound.
@@ -910,6 +916,7 @@ impl PacketPlan {
             injection: None,
             injected_irap: false,
             has_irap: false,
+            avc_buffering: None,
             look_nals: 0,
             live_base: Self::UNCHECKED_STORAGE,
             segment_hint: None,

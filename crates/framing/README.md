@@ -167,6 +167,10 @@ retain their checked payload ranges.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
+- The AVC packet receiver can emit parameter sets before a buffering-period SEI
+  (H.264 Annex D). It uses in-band sets found before the following slice, then
+  falls back to the active configuration for missing sets. It preserves the
+  original packet NALs and does not parse the SEI payload.
 - With complete AVC sequence and picture parameter-set arrays, the AVC receiver
   can frame a sample whose required profile extension has zero to three bytes.
   It preserves that suffix as trailing bytes and reports `Truncated` as the

@@ -6,7 +6,7 @@ use super::{
     NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase, PacketPlan,
     PacketSegmentStorage, PacketState, PlanPhase,
 };
-use crate::{AvcConfigArrayKind, Codec, NalHeader};
+use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -17,6 +17,16 @@ use triergon_core::{
 type Step = ControlFlow<NalPacketProgress>;
 const NEXT: Step = Step::Continue(());
 const YIELD: Step = Step::Break(NalPacketProgress::Yield);
+
+pub(super) struct AvcBufferingLookahead {
+    offset: usize,
+    length: usize,
+    prefix_read: usize,
+    remaining_nals: usize,
+    sps: Option<std::ops::Range<usize>>,
+    pps: Option<std::ops::Range<usize>>,
+    insertion_index: usize,
+}
 
 #[inline]
 fn extend_length(mut value: usize, bytes: &[u8]) -> usize {
@@ -71,6 +81,8 @@ impl PacketPlan {
                 PlanPhase::Verify => self.verify_update(state, work)?,
                 PlanPhase::Arrays => self.check_arrays(state, work)?,
                 PlanPhase::Lookahead => self.lookahead(state, work, cancel)?,
+                PlanPhase::AvcBuffering => self.lookahead_avc_buffering(state, work, cancel)?,
+                PlanPhase::AvcBufferingInject => self.inject_for_avc_buffering(state, work)?,
                 PlanPhase::Scan => self.scan_nal(state, work, cancel)?,
                 PlanPhase::Inject => self.inject_configuration(state, work)?,
                 PlanPhase::Nal => self.append_nal(state, work)?,
@@ -361,6 +373,33 @@ impl PacketPlan {
             }
         } else {
             match kind {
+                avc::SEI
+                    if state.observed_packet
+                        && !state.avc.sps
+                        && !state.avc.pps
+                        && !state.avc.injected_for_buffering_period
+                        && source
+                            .bytes
+                            .get(self.offset + 1)
+                            .is_none_or(|&first| first == 0) =>
+                {
+                    // H.264 Annex D assigns payload type zero to buffering
+                    // period. The receiver reads the next byte and treats end
+                    // of packet as a zero type. It does not parse the message.
+                    self.avc_buffering = Some(AvcBufferingLookahead {
+                        offset: end,
+                        length: 0,
+                        prefix_read: 0,
+                        remaining_nals: state.session.limits.maximum_nals - self.nals - 1,
+                        sps: None,
+                        pps: None,
+                        insertion_index: 0,
+                    });
+                    self.nal = Some(kind);
+                    self.nals += 1;
+                    self.phase = PlanPhase::AvcBuffering;
+                    return Ok(NEXT);
+                }
                 7 => {
                     state.avc.sps = true;
                     state.avc.new_idr = true;
@@ -368,22 +407,28 @@ impl PacketPlan {
                 8 => {
                     state.avc.pps = true;
                     state.avc.new_idr = true;
-                    if !state.avc.sps {
+                    if !state.avc.sps && !state.avc.injected_for_buffering_period {
                         inject = Some(Injection::Sps);
                     }
                 }
                 5 => {
+                    // The receiver reads the next packet byte, with zero
+                    // padding at the end. The strict path needs a slice byte.
                     let first = *source
                         .bytes
                         .get(self.offset + 1)
-                        .filter(|_| self.length > 1)
+                        .filter(|_| self.length > 1 || state.observed_packet)
+                        .or_else(|| state.observed_packet.then_some(&0))
                         .ok_or(Error::Truncated)?
                         & 128
                         != 0;
                     if first {
                         state.avc.new_idr = true;
                     }
-                    if state.avc.new_idr && !state.avc.pps {
+                    if state.avc.new_idr
+                        && !state.avc.pps
+                        && !state.avc.injected_for_buffering_period
+                    {
                         inject = Some(if state.avc.sps {
                             Injection::Pps
                         } else {
@@ -430,6 +475,94 @@ impl PacketPlan {
         Ok(NEXT)
     }
 
+    #[cold]
+    #[inline(never)]
+    fn lookahead_avc_buffering<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step> {
+        let source = state
+            .source
+            .as_ref()
+            .ok_or(Error::Invalid("missing packet source"))?;
+        let width = usize::from(
+            state
+                .length_width
+                .ok_or(Error::Invalid("missing packet width"))?
+                .bytes(),
+        );
+        let valid = self
+            .avc_buffering
+            .as_mut()
+            .ok_or(Error::Invalid("missing AVC buffering lookahead"))?;
+
+        // Only the rest of this packet can already supply the parameter sets.
+        // Charge each length and header. The regular scan still owns the input
+        // and reports malformed lengths and headers at its original boundary.
+        while valid.remaining_nals != 0 {
+            if valid.offset == source.bytes.len() && valid.prefix_read == 0 {
+                break;
+            }
+            let available = source.bytes.len() - valid.offset;
+            let missing = width - valid.prefix_read;
+            if available < missing {
+                break;
+            }
+            if missing > 0 {
+                let count = work_count(work).min(missing);
+                if count == 0 {
+                    return Ok(YIELD);
+                }
+                valid.length = extend_length(
+                    valid.length,
+                    &source.bytes[valid.offset..valid.offset + count],
+                );
+                work.take(count as u64);
+                valid.offset += count;
+                valid.prefix_read += count;
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+                if valid.prefix_read < width {
+                    return Ok(YIELD);
+                }
+            }
+            if !work.try_charge(1) {
+                return Ok(YIELD);
+            }
+            let Some(end) = valid
+                .offset
+                .checked_add(valid.length)
+                .filter(|&end| end <= source.bytes.len())
+            else {
+                break;
+            };
+            if valid.length > 0 {
+                valid.remaining_nals -= 1;
+                let kind = source.bytes[valid.offset] & 31;
+                if matches!(kind, avc::IDR | avc::SLICE) {
+                    break;
+                }
+                match kind {
+                    avc::SPS => valid.sps = Some(valid.offset..end),
+                    avc::PPS => valid.pps = Some(valid.offset..end),
+                    _ => {}
+                }
+            }
+            valid.offset = end;
+            valid.length = 0;
+            valid.prefix_read = 0;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+        }
+        state.avc.injected_for_buffering_period = true;
+        self.phase = PlanPhase::AvcBufferingInject;
+        Ok(NEXT)
+    }
+
     #[inline]
     fn inject_configuration<M>(
         &mut self,
@@ -462,6 +595,62 @@ impl PacketPlan {
             self.injected_irap = true;
             self.phase = PlanPhase::Nal;
         }
+        Ok(NEXT)
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn inject_for_avc_buffering<M>(
+        &mut self,
+        state: &mut PacketState<'_, M>,
+        work: &mut WorkBudget,
+    ) -> Result<Step> {
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        let lookahead = self
+            .avc_buffering
+            .as_ref()
+            .ok_or(Error::Invalid("missing AVC buffering lookahead"))?;
+        let index = lookahead.insertion_index;
+        let count = state.config().config_nal_count();
+        if index >= count + 2 {
+            self.avc_buffering = None;
+            self.phase = PlanPhase::Nal;
+            return Ok(NEXT);
+        }
+        // Insert the sequence set before the picture set. An in-band copy
+        // uses the packet range; it never changes the configuration record.
+        let (config_index, packet_range) = if index == 0 {
+            (None, lookahead.sps.as_ref())
+        } else if index == count + 1 {
+            (None, lookahead.pps.as_ref())
+        } else {
+            (Some(index - 1), None)
+        };
+        let segment = if let Some(range) = packet_range {
+            Some(NalPacketSegment::packet(range.clone(), 4, state.total))
+        } else if let Some(index) = config_index {
+            let n = state
+                .config()
+                .config_nal(index)
+                .ok_or(Error::Invalid("missing AVC parameter set"))?;
+            let include = match n.kind {
+                Some(AvcConfigArrayKind::Sequence) => lookahead.sps.is_none(),
+                Some(AvcConfigArrayKind::Picture) => lookahead.pps.is_none(),
+                _ => false,
+            };
+            include.then(|| NalPacketSegment::configuration(index, n.range, state.total))
+        } else {
+            None
+        };
+        if let Some(segment) = segment {
+            self.append(state, segment)?;
+        }
+        self.avc_buffering
+            .as_mut()
+            .ok_or(Error::Invalid("missing AVC buffering lookahead"))?
+            .insertion_index += 1;
         Ok(NEXT)
     }
 

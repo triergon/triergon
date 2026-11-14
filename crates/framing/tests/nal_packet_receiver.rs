@@ -520,6 +520,88 @@ fn source_hevc_width_three_refusal_and_observed_header_bits_remain_distinct() {
     assert_eq!(out.configuration_bytes().as_ref(), raw);
 }
 #[test]
+fn buffering_period_uses_later_in_band_sets_and_keeps_the_original_nals() {
+    // The receiver inserts a copy of the following SPS and PPS before the
+    // buffering-period SEI. The original sets stay at their source positions.
+    let p = Budget::new(100000).unwrap();
+    let mut s = session(&p);
+    let raw = [
+        0, 0, 0, 4, 0x06, 0x00, 0x01, 0x80, // buffering period
+        0, 0, 0, 3, 0x67, 0x21, 0x80, // SPS
+        0, 0, 0, 3, 0x68, 0x25, 0x80, // PPS
+        0, 0, 0, 2, 0x65, 0x80, // first IDR slice
+    ];
+    let mut job = s.receiver_packet(packet(&p, &raw), None).unwrap();
+    let out = output(&mut job);
+    assert_eq!(
+        out.bytes().as_ref(),
+        [
+            0, 0, 0, 1, 0x67, 0x21, 0x80, 0, 0, 0, 1, 0x68, 0x25, 0x80, 0, 0, 1, 0x06, 0x00, 0x01,
+            0x80, 0, 0, 0, 1, 0x67, 0x21, 0x80, 0, 0, 0, 1, 0x68, 0x25, 0x80, 0, 0, 1, 0x65, 0x80,
+        ],
+    );
+    assert_eq!(
+        out.segments()[0].origin(),
+        NalPacketOrigin::Packet {
+            source_range: 12..15
+        },
+    );
+    assert_eq!(
+        out.segments()[1].origin(),
+        NalPacketOrigin::Packet {
+            source_range: 19..22
+        },
+    );
+    assert_eq!(out.configuration_bytes().as_ref(), avcc(4));
+}
+
+#[test]
+fn buffering_period_insertion_survives_packet_boundaries_and_flush_rearms_it() {
+    let p = Budget::new(100000).unwrap();
+    let mut s = session(&p);
+    let sei = [0, 0, 0, 4, 0x06, 0x00, 0x01, 0x80];
+    let idr = [0, 0, 0, 2, 0x65, 0x80];
+    let cancelled = AtomicBool::new(true);
+    let initial = {
+        let mut job = s.receiver_packet(packet(&p, &sei), None).unwrap();
+        assert!(matches!(
+            job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
+                .unwrap(),
+            BuildStep::Yield
+        ));
+        output(&mut job)
+    };
+    let subsequent = output(&mut s.receiver_packet(packet(&p, &idr), None).unwrap());
+    assert_eq!(subsequent.bytes().as_ref(), [0, 0, 0, 1, 0x65, 0x80]);
+    assert_eq!(initial.segments().len(), 3);
+    s.flush();
+    {
+        let mut job = s.receiver_packet(packet(&p, &sei), None).unwrap();
+        assert!(matches!(
+            job.step(&mut WorkBudget::new(0), &cancelled),
+            Err(Error::Cancelled)
+        ));
+    }
+    let restarted = output(&mut s.receiver_packet(packet(&p, &sei), None).unwrap());
+    assert_eq!(restarted.bytes().as_ref(), initial.bytes().as_ref());
+}
+
+#[test]
+fn receiver_retains_header_only_idr_with_end_of_packet_padding() {
+    let p = Budget::new(100000).unwrap();
+    let mut s = session(&p);
+    let idr = [0, 0, 0, 1, 0x65];
+    {
+        let mut job = s.packet(packet(&p, &idr), None).unwrap();
+        assert_eq!(error(&mut job), Error::Truncated);
+    }
+    let out = output(&mut s.receiver_packet(packet(&p, &idr), None).unwrap());
+    assert_eq!(out.segments().len(), 3);
+    assert_eq!(out.segment_bytes(2).unwrap(), [0x65]);
+    assert!(out.bytes().ends_with(&[0, 0, 1, 0x65]));
+}
+
+#[test]
 fn observed_avc_update_changes_native_width_but_keeps_source_refusal_and_epoch() {
     let p = Budget::new(100000).unwrap();
     let mut s = session(&p);
