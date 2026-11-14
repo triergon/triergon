@@ -703,8 +703,9 @@ did over it (`host_memory`): `MemAvailable` at its start and end and the change 
 reclaim and compaction counters of `/proc/vmstat`, which count the whole host. Run
 kernel-bound memory gates on a host of the class they are qualified on, a c6g.4xlarge
 with 32 GB, where no archived collection serial or parallel has had a pair voided by
-another task's update of a worker's resident counters. On smaller hosts such pairs
-occur, and a collection measures them again within the limit the [kernel
+another task's update of a worker's resident counters; `preflight --kernel` refuses a
+host with less than 30 GiB of `MemTotal`. On smaller hosts such pairs occur, and a
+collection measures them again within the limit the [kernel
 bound](../harness/rss-bound/README.md#what-it-measures) sets; `host_memory` shows
 whether reclaim ran while they were measured.
 
