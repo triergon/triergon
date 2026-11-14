@@ -14,10 +14,11 @@ shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17;
 rasterising, ASS parsing and ASS rendering against libass 0.17.5
 ([reference pins](quality.md#reference-and-corpus)).
 Every runtime and memory figure below was measured with workers and references linked as
-their toolchains link them, before the [link policy](quality.md#measuring-performance)
-that links the runtime support libraries of both sides from their static archives. The policy
-changes every worker and reference binary, so each row cites its earlier measurement
-until it is measured again under the policy.
+their toolchains link them, before the [link policy](quality.md#measuring-performance) that
+links both sides' toolchain runtime support libraries from their static archives. The policy
+changes every Rust worker and the HarfBuzz and libass references; the FFmpeg and FreeType
+references link as before. Each row cites its earlier measurement until it is measured again
+under the policy.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|

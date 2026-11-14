@@ -98,10 +98,12 @@ commands:
                  [--kernel]
                  before a gate run measures: workers, references, inputs, RSS module review
                  and state; see `cargo xtask preflight --help`
-  build-workers  [--comparison-build] [--only WORKER]
+  build-workers  [--comparison-build] [--only WORKER] [--all-references]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
-                 gate build is refused unless it is for paired comparisons only
+                 gate build is refused unless it is for paired comparisons only; a profile
+                 reference whose profile is not prepared is skipped and printed, and with
+                 --all-references it fails the build
   memory-admission CANDIDATE REFERENCE
                  check the native Linux memory observer (AArch64 or 32-bit ARMv7)
                  for two built workers and print the certificate
