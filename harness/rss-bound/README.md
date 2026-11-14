@@ -38,14 +38,23 @@ collection. It pins:
 - the boot, the kernel's build notes and the loaded module's build-id;
 - a review of this exact module source for this kernel release.
 
+Reviews are committed beside the module, as
+`harness/rss-bound/reviews/SOURCE-RELEASE.json`: SOURCE is the first 12 hexadecimal
+digits of the module source's SHA-256 and RELEASE the kernel release (`uname -r`). A
+review is a reading of one module source for one kernel, so it is versioned with that
+source; a review of a changed source names the review it follows by SHA-256
+(`prior_review_sha256`). `prove.sh` and `cargo xtask preflight` take the review that
+matches the tree's module source and the running kernel, and fail, naming the path
+they looked for, when there is none; `--review FILE` names another.
+
 A proof is valid only on the boot that produced it and is never reused.
 
 The result holds only 64-bit fields, so a 32-bit process on a 64-bit kernel reads the
 same layout through the module's 32-bit ioctl entry point. For such a user space,
-`prove.sh` takes its root as a third argument and runs on the host (see
+`prove.sh` takes its root as its last argument and runs on the host (see
 [32-bit ARMv7](../../docs/quality.md#32-bit-armv7)).
 
-`prove.sh REVIEW OUT [USERSPACE]` builds the module against the running kernel's headers, then:
+`prove.sh [--review REVIEW] OUT [USERSPACE]` builds the module against the running kernel's headers, then:
 
 1. loads it and attests that a control-file write while armed invalidates the session
    (eight errors, none missed);
@@ -65,7 +74,7 @@ The same module binary can be loaded again on the same boot without a new proof
 ```sh
 cargo xtask build-workers
 taskset -c 1 cargo xtask report --benchmark --contract … --manifest … --corpus … --output TIMING
-harness/rss-bound/prove.sh REVIEW .research/rss-bound
+harness/rss-bound/prove.sh .research/rss-bound
 TRIERGON_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
 TRIERGON_RSS_KERNEL_BOUND=1 taskset -c 1-15 cargo xtask report --memory --contract … --manifest … --corpus … --output MEMORY
 cargo xtask grade TIMING/report.json MEMORY/report.json --contract … --manifest … --output GRADED

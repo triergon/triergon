@@ -21,7 +21,7 @@ use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
        [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--external-vector]
-       [--capture CASES] [--reference NAME]... (--review FILE | --standard-memory) [--kernel]
+       [--capture CASES] [--reference NAME]... [--review FILE | --standard-memory] [--kernel]
 
 Check, before a gate run measures anything, that the build identity's workers and
 references are current and the gate build; that each --feature's cases name known
@@ -32,8 +32,9 @@ each workload list's inputs, with --external-vector the mandatory external vecto
 and with --capture the capture cases, their input generator and its numpy Python;
 that each named reference was built and is current: those --isobmff, --codecs and
 --capture measure against, and any --reference; that the RSS module review covers
-this module source and kernel (--review), unless
-the run's memory uses the standard bounds (--standard-memory); and that the RSS
+this module source and kernel (the committed review,
+harness/rss-bound/reviews/SOURCE-RELEASE.json, or --review FILE), unless the run's
+memory uses the standard bounds (--standard-memory); and that the RSS
 module is unloaded, or with --kernel loaded under a current proof. A feature
 without cases or a workload list without workloads fails. Prints every check and
 exits 1 if any fails.";
@@ -90,8 +91,11 @@ impl Options {
                 _ => return Err(USAGE.to_owned()),
             }
         }
-        if options.review.is_some() == options.standard_memory {
-            return Err("give the RSS module review with --review, or --standard-memory for a run without the kernel bound".into());
+        if options.review.is_some() && options.standard_memory {
+            return Err("--review names the RSS module review of a kernel-bound run; --standard-memory is a run without it".into());
+        }
+        if !options.standard_memory && options.review.is_none() {
+            options.review = Some(committed_review(root));
         }
         for id in options.corpora.keys().chain(options.manifests.keys()) {
             if !options.features.contains(id) {
@@ -382,8 +386,27 @@ fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
     Ok(format!("{count} cases, Python and numpy {identity}"))
 }
 
+/// The committed review of the module source in the tree for the running kernel:
+/// `harness/rss-bound/reviews/SOURCE-RELEASE.json`, by the first 12 hexadecimal
+/// digits of the source's SHA-256 and the kernel release. `prove.sh` takes the same.
+pub fn committed_review(root: &Path) -> PathBuf {
+    let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))
+        .unwrap_or_else(|_| "unreadable-module".into());
+    let prefix = source.get(..12).unwrap_or(&source);
+    root.join(format!(
+        "harness/rss-bound/reviews/{prefix}-{}.json",
+        linux::kernel_release()
+    ))
+}
+
 /// The review names this module source and kernel release as a reviewed upper bound.
 fn module_review(root: &Path, review: &Path) -> R<String> {
+    if !review.is_file() {
+        return Err(format!(
+            "no review of this module source for this kernel: {}",
+            review.display()
+        ));
+    }
     let document = read_json(review)?;
     let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
     let text = |key: &str| document.get(key).and_then(Value::as_str);
@@ -468,9 +491,34 @@ mod tests {
     #[test]
     fn a_run_names_its_rss_review_or_its_standard_bounds() {
         let root = Path::new("/repo");
-        assert!(Options::parse(root, &args(&["--feature", "a"])).is_err());
+        let committed = Options::parse(root, &args(&["--feature", "a"])).unwrap();
+        assert_eq!(committed.review, Some(committed_review(root)));
+        assert!(committed_review(root).starts_with(root.join("harness/rss-bound/reviews")));
+        let standard = Options::parse(root, &args(&["--standard-memory"])).unwrap();
+        assert_eq!(standard.review, None);
         assert!(Options::parse(root, &args(&["--review", "r.json"])).is_ok());
         assert!(Options::parse(root, &args(&["--review", "r.json", "--standard-memory"])).is_err());
+    }
+
+    #[test]
+    fn the_module_source_in_the_tree_has_a_committed_review() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
+        let reviews = std::fs::read_dir(root.join("harness/rss-bound/reviews")).unwrap();
+        let reviewed = reviews.flatten().any(|entry| {
+            let review = read_json(&entry.path()).unwrap();
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(&source[..12])
+                && review.get("module_source_sha256").and_then(Value::as_str)
+                    == Some(source.as_str())
+        });
+        assert!(
+            reviewed,
+            "commit the review of module source {}",
+            &source[..12]
+        );
     }
 
     #[test]
