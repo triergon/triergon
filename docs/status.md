@@ -597,7 +597,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Linux AArch64: ISO BMFF with the code-size change | `4dbbd545d2d452220cd0e35ff11807f6c2fd2703` | `da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f` |
 | ARMv7: the resident pages of both framing workers by libc's load address, and the earlier packet framing row under the link policy | `4a932ef908ca783976c56e187c0563ce955f15b5` | `e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1` |
 | ARMv7: the closed caption row; the earlier Matroska, startup and seek, HLS, ISO BMFF, audio clock, MPEG-TS, playback and packet framing bounds; the third collection of `charset-cp950-nomapping-a240` and `long-movie-mkv` | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda` |
-| ARMv7: the tests, the rasterising, shaping and ASS parsing comparisons, `subtitle-text-host`'s runtime and the video codec timings; the earlier bounds of the other rows | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
+| ARMv7: the tests, the rasterising, shaping and ASS parsing comparisons and the video codec timings; the earlier bounds of the other rows | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
 | Earlier ARMv7, before the page-cache eviction: the container, playback, ASS rendering and capture rows; the A32 and NEON codec comparisons | `22ed8232b28a285f1439772b91713df3aa64ea91` | `abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e` |
 | Earlier ARMv7, A32: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | Earlier ARMv7, A32: ISO BMFF / MP4 | `f99d893196908d562c897bccb20c6a972cd25d11` | `bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1` |
@@ -702,11 +702,11 @@ diagnostics: no codec contract is gated on this target.
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 53/53 at `8154812e`, as on AArch64 | not measured | not measured |
 | Shaping | `shape-libass` 209/209 and `shape-text` 208/209 at `dc792ea4b25af0e64db6b73b47ce66dc89b6e045` (the same open case as on AArch64), `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1 | not measured | not measured |
 | ASS rendering | `ass-render` 78/78 and `ass-render-host` 4/4 pass; the crate's tests pass | `ass-render` 0.7985 (78/78 pass), `ass-render-host` 0.7320 (4/4 pass) | heap ≤0.9283, total RSS ≤0.9578 (82/82 lower) |
-| Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9985 (367/367 pass); `subtitle-text-host` 0.0783 at `3df7ae6d` (23/23 pass) | `subtitle-text` heap ≤0.3358, total RSS ≤0.9890 (367/367 lower); `subtitle-text-host` 23/23 lower |
+| Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9985 (367/367 pass); `subtitle-text-host` 0.0800 (23/23 pass) | `subtitle-text` heap ≤0.3358, total RSS ≤0.9890 (367/367 lower); `subtitle-text-host` heap ≤0.0075, total RSS ≤0.9288 (23/23 lower) |
 | Subtitles, PGS | 319/319 (`subtitle-pgs`) | 0.9975 (319/319 pass) | heap ≤0.9678, total RSS ≤0.9867 (319/319 lower) |
 | Subtitles, PGS capsules | 229/229 (`subtitle-pgs-capsules`) | 0.7987 (229/229 pass) | heap ≤0.5966, total RSS ≤0.7965 (229/229 lower) |
 | Subtitles, DVB | 241/241 (`subtitle-dvb`) | 0.8378 (241/241 pass) | heap ≤0.7118, total RSS ≤0.8567 (241/241 lower) |
-| Subtitles, DVD | 228/228 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | `subtitle-dvd` 1.0360 (228/228 pass); `subtitle-dvd-host` 5/5 pass | `subtitle-dvd` heap ≤0.9657, total RSS ≤0.8592 (228/228 lower); `subtitle-dvd-host` 5/5 lower |
+| Subtitles, DVD | 228/228 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | `subtitle-dvd` 1.0360 (228/228 pass); `subtitle-dvd-host` 0.7691 (5/5 pass) | `subtitle-dvd` heap ≤0.9657, total RSS ≤0.8592 (228/228 lower); `subtitle-dvd-host` heap ≤0.2037, total RSS ≤0.7994 (5/5 lower) |
 | Closed captions | 201/205 (`subtitle-cc`; the 4 open `hevc-eos-ts` cases, as on AArch64) | 0.8253 (201/201 pass) at `4fc96a49`; instructions at `4d81cde0` against main at `339ec261`: 0.9941 of main's in sum, median of the cases 0.9986, no case above main but `hevc-cra-ts` (1.0013) and `hevc-reserved-ts` (1.0012), whose difference follows the input path's length in the ARMv7 chroot, not the code: main's count steps up with a longer path and the candidate's stays flat | heap ≤0.127, total RSS ≤0.7984 (201/201 lower; below) at `4fc96a49` |
 | Teletext | 72/72 (`subtitle-teletext`) | 0.5284 (72/72 pass) | heap ≤0.6256, total RSS ≤0.7972 (72/72 lower) |
 
@@ -863,17 +863,18 @@ FFmpeg worker it is compared with, which links 12 demuxers (`ass`, `h264`, `hevc
 `Engine` links every container backend.
 
 At `79e0ae13` packet framing's total RSS is lower than the reference's in all 125 cases
-(worst 0.9972). At `4a932ef9` it was lower in 73, with a worst bound of 1.010086455331412
-(`bad-packet-good-update`) and a median of the 125 bounds of 0.9971. Both workers' resident pages move in 64 KiB steps, the
-kernel's fault-around window, depending on where libc is loaded. In 40 runs of each worker on
-`bad-packet-good-update`, sorted by libc's load address modulo 64 KiB, the framing worker
-holds 15 to 16 more pages of libc than the reference at the same address, and 31 to 32 more
-at four of the sixteen: before `main`, the Rust runtime's main-thread stack-guard lookup
-reads `/proc/self/maps` through glibc's `pthread_getattr_np` and `sscanf`, which brings in
-libc's printf and scanf code, and the reference never runs that code. The worker's own
-binary is 15 pages smaller (53 resident pages against 68), so the two totals overlap, and a
-case falls below the reference when most of the reference's 30 runs land on an address that
-costs it an extra window.
+(worst 0.9972). At `4a932ef9` it was lower in 73, with a worst bound of
+1.010086455331412 (`bad-packet-good-update`) and a median of the 125 bounds of 0.9971.
+Both workers' resident pages move in 64 KiB steps, the kernel's fault-around window,
+depending on where libc is loaded. In 40 runs of each worker on
+`bad-packet-good-update`, sorted by libc's load address modulo 64 KiB, the framing
+worker holds 15 to 16 more pages of libc than the reference at the same address, and 31
+to 32 more at four of the sixteen: before `main`, the Rust runtime's main-thread
+stack-guard lookup reads `/proc/self/maps` through glibc's `pthread_getattr_np` and
+`sscanf`, which brings in libc's printf and scanf code, and the reference never runs
+that code. The worker's own binary is 15 pages smaller (53 resident pages against 68),
+so the two totals overlap, and a case falls below the reference when most of the
+reference's 30 runs land on an address that costs it an extra window.
 
 The collections at `3df7ae6d` were the first ARMv7 collections with the page-cache eviction. At `22ed8232`, without
 it, how much of each executable was resident at the start of the operation varied between
