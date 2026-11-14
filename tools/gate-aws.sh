@@ -130,7 +130,7 @@ detached() {
         if state=$(on "$i" "tail -1 ~/gate-host.log; pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
             failures=0
             case $state in *"$marker"*) return 0;; esac
-            case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
+            case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
         else
             failures=$((failures + 1))
             [ "$failures" -lt 5 ] || { say "host $i: no answer to five polls"; return 1; }
