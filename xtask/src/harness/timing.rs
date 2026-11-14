@@ -113,6 +113,27 @@ impl Drop for Lock {
     }
 }
 
+/// Run the timing phase on a pinned thread, leaving the caller's CPUs available
+/// for subsequent memory collection. Without an explicit CPU, use the caller.
+pub(crate) fn on_cpu<T: Send>(
+    cpu: Option<usize>,
+    run: impl FnOnce() -> Result<T, String> + Send,
+) -> Result<T, String> {
+    let Some(cpu) = cpu else {
+        return run();
+    };
+    std::thread::scope(|scope| {
+        std::thread::Builder::new()
+            .spawn_scoped(scope, move || {
+                super::gate_build::pin_thread(cpu)?;
+                run()
+            })
+            .map_err(|error| format!("start timing thread: {error}"))?
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+    })
+}
+
 fn is_linux() -> bool {
     cfg!(target_os = "linux")
 }
@@ -644,11 +665,11 @@ impl Lock {
                 Some(cpus) if cpus.len() == 1 => {}
                 Some(cpus) => {
                     return Err(format!(
-                        "timing runs alone on one CPU, but this process may use {}: run it under taskset -c CPU",
+                        "timing runs alone on one CPU, but this thread may use {}: run it under taskset -c CPU",
                         cpus.len()
                     ));
                 }
-                None => return Err("cannot read the CPUs this process may use".into()),
+                None => return Err("cannot read the CPUs this thread may use".into()),
             }
         }
         let mut prepare = Some(prepare);
@@ -1410,6 +1431,37 @@ impl Lock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn timing_cpu_is_inherited_by_workers_and_leaves_the_caller_untouched() {
+        use crate::harness::gate_build::allowed_cpu_list;
+
+        let original = allowed_cpu_list().unwrap();
+        let cpu = original[0];
+        let observed = on_cpu(Some(cpu), || {
+            assert_eq!(allowed_cpu_list(), Some(vec![cpu]));
+            let worker = Command::new("taskset")
+                .args(["-p", "-c", "0"])
+                .output()
+                .unwrap();
+            assert!(worker.status.success());
+            let affinity = String::from_utf8(worker.stdout).unwrap();
+            assert_eq!(
+                affinity.split_whitespace().last(),
+                Some(cpu.to_string().as_str())
+            );
+            Ok(std::thread::current().id())
+        })
+        .unwrap();
+        assert_ne!(observed, std::thread::current().id());
+        assert_eq!(allowed_cpu_list(), Some(original.clone()));
+        assert_eq!(
+            on_cpu(Some(cpu), || Err::<(), _>("failed".into())),
+            Err("failed".into())
+        );
+        assert_eq!(allowed_cpu_list(), Some(original));
+    }
 
     #[test]
     fn a_gate_session_stops_at_the_look_once_settled_below_the_ceiling() {

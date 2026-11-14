@@ -431,11 +431,12 @@ pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<Str
     reasons
 }
 
-/// The CPUs this process may run on and those online on the machine, as Linux lists
-/// them; null elsewhere. A bound measured pinned to one CPU is not comparable with one
-/// measured unpinned.
+const THREAD_STATUS: &str = "/proc/thread-self/status";
+
+/// The CPUs the calling thread may use and those online on the machine, as Linux
+/// lists them. The values are null elsewhere.
 pub fn cpus() -> Value {
-    let allowed = std::fs::read_to_string("/proc/self/status")
+    let allowed = std::fs::read_to_string(THREAD_STATUS)
         .ok()
         .as_deref()
         .and_then(allowed_cpus)
@@ -445,11 +446,30 @@ pub fn cpus() -> Value {
     Value::object([("allowed", allowed), ("online", online)])
 }
 
-/// The CPUs this process may use, as Linux lists them in `Cpus_allowed_list`;
-/// `None` where the system does not say.
+/// The CPUs the calling thread may use, as Linux lists them in `Cpus_allowed_list`.
 pub fn allowed_cpu_list() -> Option<Vec<usize>> {
-    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let status = std::fs::read_to_string(THREAD_STATUS).ok()?;
     parse_cpu_list(allowed_cpus(&status)?)
+}
+
+/// Pin the calling thread, so any worker it spawns inherits that CPU alone.
+pub fn pin_thread(cpu: usize) -> Result<(), String> {
+    let link = std::fs::read_link("/proc/thread-self")
+        .map_err(|error| format!("/proc/thread-self: {error}"))?;
+    let thread = link.file_name().ok_or("unreadable thread id")?;
+    let status = Command::new("taskset")
+        .args(["-p", "-c", &cpu.to_string()])
+        .arg(thread)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .map_err(|error| format!("taskset: {error}"))?;
+    if status.success() && allowed_cpu_list().as_deref() == Some(&[cpu]) {
+        Ok(())
+    } else {
+        Err(format!(
+            "could not pin the calling thread to CPU {cpu}: {status}"
+        ))
+    }
 }
 
 /// A Linux CPU list such as `1-3,7` as CPU numbers.

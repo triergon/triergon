@@ -328,6 +328,9 @@ and rebuild workers before running the container and packet-framing commands.
 48 refusals. `--benchmark --memory` measures the 972 output labels, with 956
 physical operations and 16 explicit aliases. `--subset52` selects the separate
 52-operation measurement set while retaining the full correctness comparison.
+On Linux, add `--timing-cpu N` to pin timing to CPU N while allowing the subsequent
+memory phase to use the calling process's CPU set. Keep the RSS module unloaded for
+this combined run, which uses the standard memory bounds.
 `cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.
 Their contracts and input manifests are in `harness/features/isobmff-open-index/`
 and `harness/features/packet-framing/`.
