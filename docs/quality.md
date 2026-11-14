@@ -892,17 +892,19 @@ the build packages, the kernel headers and Rust; the kernel the committed RSS mo
 review of REVISION's module source covers, as GRUB's default, with every kernel package
 held and unattended and periodic apt runs masked and off, so the image never boots
 another (the image step launches a host from the new image and removes the image
-unless that host runs the reviewed kernel with the holds in place); for ARMv7 the armhf user space with
-its own Rust and the gate target; the repository at REVISION with every reference
-build (restored from the archive's packs where it holds their keys, the packs of the
-others uploaded), the generated fixtures, vectors, font corpus and manifests, and the
-workers; and each INPUT, an archive of media inputs the repository does not generate,
-with repository-relative paths: evidence set `gate-media-inputs` holds the FATE
-samples, the codec workload inputs and the subtitle corpus the gate reads
-(`s3:evidence/gate-media-inputs/SHA.tar.gz`, its key in the
-[index](../harness/evidence/index.json)). The image is tagged
-`Name=triergon-gate-TARGET`, and the earlier images of the target and their snapshots
-are removed. Run it again when the reference builds' keys or the media inputs change,
+unless that host runs the reviewed kernel with the holds in place); for ARMv7 the
+armhf user space with its own Rust and the gate target; the repository at REVISION
+with every reference build (restored from the archive's packs where it holds their
+keys, the packs of the others uploaded), the generated fixtures, vectors, font corpus
+and manifests, and the workers; and each INPUT, an archive of media inputs the
+repository does not generate, with repository-relative paths: evidence set
+`gate-media-inputs` holds the FATE samples, the codec workload inputs and the
+subtitle corpus the gate reads, and set `codec-file-workload-inputs` the inputs of
+[file-workloads.json](../harness/codecs/file-workloads.json)
+(`s3:evidence/SET/SHA.tar.gz`, their keys in the
+[index](../harness/evidence/index.json)); a gate image is built with both. The image
+is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
+their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
 
 `tools/gate-aws.sh run TARGET N REVISION OUT` launches N hosts from the image,
