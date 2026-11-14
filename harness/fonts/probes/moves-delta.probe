@@ -1,0 +1,48 @@
+# DELTA in y on an outline, as the specification describes them.
+heights 1000 700 1500 2000
+cvt 700
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; MPPEM; PUSH 9; SUB; PUSH 16; MUL; PUSH 15; ADD; PUSH 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1; MDAP[0]; MPPEM; PUSH 9; SUB; PUSH 16; MUL; PUSH 15; ADD; PUSH 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1; MDAP[0]; IUP[0]; MPPEM; PUSH 9; SUB; PUSH 16; MUL; PUSH 2; ADD; PUSH 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1; MDAP[0]; IUP[0]; IUP[1]; MPPEM; PUSH 9; SUB; PUSH 16; MUL; PUSH 2; ADD; PUSH 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; MPPEM; PUSH 25; SUB; PUSH 16; MUL; PUSH 12; ADD; PUSH 0 1; DELTAC2; PUSH 1 0; MIAP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 1; SDS; MPPEM; PUSH 9; SUB; PUSH 16; MUL; PUSH 3; ADD; PUSH 0 1; DELTAC1; PUSH 1 0; MIAP[0]
+  end
+end

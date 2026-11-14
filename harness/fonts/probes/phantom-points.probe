@@ -1,0 +1,27 @@
+# The phantom points the programs see, written into points' y: x of the
+# horizontal ones and of the vertical ones, then their y. Observed: the
+# horizontal phantom points' x and the vertical ones' y are on the pixel
+# grid; the vertical ones sit at half the advance.
+heights 16384 1000 700
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 611 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  program
+    SVTCA[1]; PUSH 0 6; GC[0]; SVTCA[0]; SCFS; SVTCA[1]; PUSH 1 7; GC[0]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 3 8; GC[0]; SVTCA[0]; SCFS; SVTCA[1]; PUSH 4 9; GC[0]; SVTCA[0]; SCFS
+  end
+end
+glyph advance 611 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  program
+    SVTCA[0]; PUSH 0 6; GC[0]; SCFS; PUSH 1 7; GC[0]; SCFS; PUSH 3 8; GC[0]; SCFS; PUSH 4 9; GC[0]; SCFS
+  end
+end
+glyph advance 600
+  component 1 offset 0 13
+  program
+    SVTCA[0]; PUSH 0 6; GC[0]; SCFS; PUSH 1 7; GC[0]; SCFS; PUSH 3 8; GC[0]; SCFS; PUSH 4 9; GC[0]; SCFS
+  end
+end

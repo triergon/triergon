@@ -10,6 +10,7 @@
 // Pending: `missing_docs`, `clippy::expect_used`.
 
 mod autofit;
+mod bytecode;
 mod cff;
 mod cmap;
 mod fixed;
@@ -265,6 +266,8 @@ pub struct Font {
     default_load: sized::Hinting,
     /// The auto-hinter's state, for a face FreeType auto-hints.
     autofit: Option<autofit::Autofit>,
+    /// The TrueType interpreter, for a face whose programs it runs.
+    bytecode: Option<bytecode::Bytecode>,
     limits: Limits,
 }
 
@@ -391,11 +394,16 @@ impl Font {
             underline,
             default_load: sized::Hinting::Unhinted,
             autofit: None,
+            bytecode: None,
             limits,
         };
         font.default_load = font.hinting();
-        if font.default_load == sized::Hinting::Auto {
-            font.autofit = Some(autofit::Autofit::new(budget.clone()));
+        match font.default_load {
+            sized::Hinting::Auto => font.autofit = Some(autofit::Autofit::new(budget.clone())),
+            sized::Hinting::Unhinted if matches!(font.outlines, Outlines::Glyf(_)) => {
+                font.bytecode = Some(bytecode::Bytecode::new(budget.clone()));
+            }
+            _ => {}
         }
         Ok(font)
     }
@@ -784,7 +792,14 @@ impl Font {
         let advances = match &self.outlines {
             Outlines::Glyf(table) => {
                 outline.begin(self.limits.points);
-                let m = table.outline(&self.glyf_context(), glyph, scale, outline, work)?;
+                let m = table.outline(
+                    &self.glyf_context(),
+                    glyph,
+                    scale,
+                    outline,
+                    work,
+                    &mut glyf::Unhinted,
+                )?;
                 let (origin, advances) = self.glyf_advances(m, scale);
                 if origin != 0 {
                     glyf::translate(outline.points_mut(), (-origin, 0))?;
@@ -843,6 +858,30 @@ impl Font {
             vertical_units,
         };
         (pp1, advances)
+    }
+
+    /// The four phantom points of a TrueType glyph whose metrics are `m`,
+    /// in font units: its origin and advance on the baseline, then its top
+    /// origin and the end of its vertical advance.
+    fn phantom_points(&self, m: glyf::Metrics) -> [Point; 4] {
+        let data = self.data.as_ref();
+        let origin = i32::from(m.x_min) - self.bearing(m.glyph);
+        let advance = i32::from(self.hmtx.advance(data, m.glyph));
+        let (top, height) = if let Some(vmtx) = self.vmtx {
+            (
+                i32::from(m.y_max) + i32::from(vmtx.bearing(data, m.glyph)),
+                i32::from(vmtx.advance(data, m.glyph)),
+            )
+        } else {
+            let ascender = self.os2.map_or(self.hhea.ascender, |o| o.typo_ascender);
+            (i32::from(ascender), self.made_up_vertical_advance() as i32)
+        };
+        [
+            Point::new(origin, 0),
+            Point::new(origin + advance, 0),
+            Point::new(origin, top),
+            Point::new(origin, top - height),
+        ]
     }
 
     /// The advances of a CFF glyph at `scale`, through the FontMatrix.

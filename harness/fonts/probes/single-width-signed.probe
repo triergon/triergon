@@ -1,0 +1,61 @@
+# The single-width cut-in on negative distances: points 1 and 2 sit 100
+# units above and below rp0, the single width is 90 units (or -90) and the
+# cut-in 128 (16 units at 16384), so a distance of -100 units is within the
+# cut-in of minus the single width but not of the single width. MDRP and MIRP
+# (control values 100 and -100, auto flip on and off).
+# Observed: the cut-in compares the signed distance (or control value,
+# before the auto flip) with the single width as set, and a distance within
+# it becomes the single width, negated for a negative distance.
+heights 16384 1000
+cvt 100 -100
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 90; SSW; PUSH 128; SSWCI; PUSH 1; MDRP[00000]; PUSH 2; MDRP[00000]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH -90; SSW; PUSH 128; SSWCI; PUSH 1; MDRP[00000]; PUSH 2; MDRP[00000]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 90; SSW; PUSH 128; SSWCI; PUSH 1 0; MIRP[00000]; PUSH 2 1; MIRP[00000]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 90; SSW; PUSH 128; SSWCI; PUSH 1 1; MIRP[00000]; PUSH 2 0; MIRP[00000]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    FLIPOFF; SVTCA[0]; PUSH 0; SRP0; PUSH 90; SSW; PUSH 128; SSWCI; PUSH 1 1; MIRP[00000]; PUSH 2 0; MIRP[00000]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH -90; SSW; PUSH 128; SSWCI; PUSH 1 0; MIRP[00000]; PUSH 2 1; MIRP[00000]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 90; SSW; PUSH 128; SSWCI; PUSH 1 0; MIRP[00100]; PUSH 2 1; MIRP[00100]
+  end
+end
+glyph advance 600
+  contour 0 0, 100 100, 200 -100, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 90; SSW; PUSH 128; SSWCI; PUSH 1; MDRP[00100]; PUSH 2; MDRP[00100]
+  end
+end

@@ -1,0 +1,251 @@
+# MDRP in y on an outline, as the specification describes them.
+heights 16384 1000 2000 700 1500
+
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00000]; PUSH 7; MDRP[00000]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00001]; PUSH 7; MDRP[00001]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00010]; PUSH 7; MDRP[00010]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00011]; PUSH 7; MDRP[00011]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00100]; PUSH 7; MDRP[00100]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00101]; PUSH 7; MDRP[00101]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00110]; PUSH 7; MDRP[00110]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[00111]; PUSH 7; MDRP[00111]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01000]; PUSH 7; MDRP[01000]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01001]; PUSH 7; MDRP[01001]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01010]; PUSH 7; MDRP[01010]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01011]; PUSH 7; MDRP[01011]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01100]; PUSH 7; MDRP[01100]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01101]; PUSH 7; MDRP[01101]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01110]; PUSH 7; MDRP[01110]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[01111]; PUSH 7; MDRP[01111]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10000]; PUSH 7; MDRP[10000]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10001]; PUSH 7; MDRP[10001]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10010]; PUSH 7; MDRP[10010]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10011]; PUSH 7; MDRP[10011]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10100]; PUSH 7; MDRP[10100]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10101]; PUSH 7; MDRP[10101]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10110]; PUSH 7; MDRP[10110]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[10111]; PUSH 7; MDRP[10111]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11000]; PUSH 7; MDRP[11000]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11001]; PUSH 7; MDRP[11001]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11010]; PUSH 7; MDRP[11010]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11011]; PUSH 7; MDRP[11011]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11100]; PUSH 7; MDRP[11100]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11101]; PUSH 7; MDRP[11101]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11110]; PUSH 7; MDRP[11110]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 1; MDRP[11111]; PUSH 7; MDRP[11111]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 4; MDAP[1]; PUSH 6; MDRP[11100]; PUSH 9; MDRP[01100]; PUSH 3; MDRP[10101]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 300; SMD; PUSH 6; MDAP[1]; PUSH 7; MDRP[01100]; PUSH 8; MDRP[01000]; IUP[0]
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 40; SSW; PUSH 30; SSWCI; PUSH 6; MDAP[1]; PUSH 7; MDRP[00100]; IUP[0]
+  end
+end

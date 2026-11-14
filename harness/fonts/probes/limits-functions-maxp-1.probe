@@ -1,0 +1,15 @@
+# A version 1.0 maxp allowing 1 function definitions, and a font program
+# defining function 0: the glyph calls it and moves point 1 by what it leaves.
+# Observed: the definition holds.
+heights 16384
+maxp functions 1
+fpgm
+  PUSH 0; FDEF; PUSH 640; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 1; PUSH 0; CALL; SVTCA[0]; SCFS
+  end
+end
