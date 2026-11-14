@@ -193,7 +193,7 @@ fn read_retrying(source: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<u
 pub struct Feed<S> {
     source: S,
     pool: Budget,
-    shared_input: Option<Bytes>,
+    shared_input: Option<fn(&S) -> &Bytes>,
     /// The source's offset after the last response; unknown after a failed read.
     position: Option<u64>,
 }
@@ -238,7 +238,8 @@ impl<S: Read + Seek> Feed<S> {
                     Err(error)
                 }
             }
-        } else if let Some(bytes) = &self.shared_input {
+        } else if let Some(shared_input) = self.shared_input {
+            let bytes = shared_input(&self.source);
             let start = usize::try_from(request.offset).map_err(|_| Error::Overflow)?;
             if start >= bytes.len() {
                 return input.finish(request.source, request.token);
@@ -336,7 +337,7 @@ impl<'a> Feed<std::io::Cursor<&'a OwnedInputBytes>> {
             return Err(Error::ForeignPool);
         }
         let mut out = Self::new(std::io::Cursor::new(source), pool)?;
-        out.shared_input = Some(bytes.clone());
+        out.shared_input = Some(|cursor| cursor.get_ref().as_bytes());
         Ok(out)
     }
 }
