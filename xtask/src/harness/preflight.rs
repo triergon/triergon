@@ -21,7 +21,7 @@ use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
        [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--external-vector]
-       [--capture CASES] (--review FILE | --standard-memory) [--kernel]
+       [--capture CASES] [--reference NAME]... (--review FILE | --standard-memory) [--kernel]
 
 Check, before a gate run measures anything, that the build identity's workers and
 references are current and the gate build; that each --feature's cases name known
@@ -30,7 +30,9 @@ manifest's recorded directory, else .research/fixtures; --manifest replaces the
 contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with --codecs
 each workload list's inputs, with --external-vector the mandatory external vector
 and with --capture the capture cases, their input generator and its numpy Python;
-that the RSS module review covers this module source and kernel (--review), unless
+that each named reference was built and is current: those --isobmff, --codecs and
+--capture measure against, and any --reference; that the RSS module review covers
+this module source and kernel (--review), unless
 the run's memory uses the standard bounds (--standard-memory); and that the RSS
 module is unloaded, or with --kernel loaded under a current proof. A feature
 without cases or a workload list without workloads fails. Prints every check and
@@ -47,6 +49,7 @@ struct Options {
     codecs: Vec<PathBuf>,
     external_vector: bool,
     capture: Option<PathBuf>,
+    references: Vec<String>,
     review: Option<PathBuf>,
     standard_memory: bool,
     kernel: bool,
@@ -80,6 +83,7 @@ impl Options {
                 "--codecs" => options.codecs.push(root.join(value()?)),
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
+                "--reference" => options.references.push(value()?),
                 "--review" => options.review = Some(root.join(value()?)),
                 "--standard-memory" => options.standard_memory = true,
                 "--kernel" => options.kernel = true,
@@ -159,6 +163,13 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     if options.external_vector {
         checks.check("external vector", external_vector(root));
     }
+    for name in options.measured_references() {
+        let result = match &identity {
+            Ok(identity) => built_reference(root, identity, &name),
+            Err(_) => Err("no build identity".into()),
+        };
+        checks.check(format!("reference {name}"), result);
+    }
     if let Some(cases) = &options.capture {
         checks.check("capture inputs", capture_inputs(root, cases));
     }
@@ -174,6 +185,45 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         },
     );
     Ok(checks.report())
+}
+
+impl Options {
+    /// The references the selected runs other than features measure against,
+    /// which name them by path rather than through a contract.
+    fn measured_references(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        if self.isobmff {
+            names.push(crate::isobmff_bench::REFERENCE.to_owned());
+        }
+        if !self.codecs.is_empty() {
+            names.push("ffmpeg-decode-native".to_owned());
+        }
+        if self.capture.is_some() {
+            names
+                .extend(["ffmpeg-capture-native", "ffmpeg-capture-small-native"].map(String::from));
+        }
+        for name in &self.references {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+        names
+    }
+}
+
+/// A reference the build identity holds and that is on disk with its hash: a
+/// profile `build-workers` skipped, because it was not prepared, has none.
+fn built_reference(root: &Path, identity: &Value, name: &str) -> R<String> {
+    let record = validation::field(validation::field(identity, "comparison_references")?, name)
+        .map_err(|_| "not built: prepare its reference and rebuild the workers".to_owned())?;
+    let path = root.join(validation::text(record, "path")?);
+    if linux::file_sha(&path)? != validation::hash(record, "sha256")? {
+        return Err(format!(
+            "{} changed since the build identity",
+            path.display()
+        ));
+    }
+    Ok(path.display().to_string())
 }
 
 /// The gate build's workers and every comparison reference match the identity.
@@ -421,6 +471,47 @@ mod tests {
         assert!(Options::parse(root, &args(&["--feature", "a"])).is_err());
         assert!(Options::parse(root, &args(&["--review", "r.json"])).is_ok());
         assert!(Options::parse(root, &args(&["--review", "r.json", "--standard-memory"])).is_err());
+    }
+
+    #[test]
+    fn a_reference_preflight_names_must_have_been_built() {
+        let root = crate::walk::scratch("preflight-references");
+        std::fs::create_dir_all(root.join("target/harness")).unwrap();
+        std::fs::write(root.join("target/harness/ffmpeg-decode-worker"), b"decode").unwrap();
+        let identity = Value::object([(
+            "comparison_references",
+            Value::object([(
+                "ffmpeg-decode-native",
+                Value::object([
+                    ("path", Value::str("target/harness/ffmpeg-decode-worker")),
+                    ("sha256", Value::str(sha256::hex(b"decode"))),
+                ]),
+            )]),
+        )]);
+        assert!(built_reference(&root, &identity, "ffmpeg-decode-native").is_ok());
+        assert!(built_reference(&root, &identity, "ffmpeg-capture-native").is_err());
+        std::fs::write(root.join("target/harness/ffmpeg-decode-worker"), b"rebuilt").unwrap();
+        assert!(built_reference(&root, &identity, "ffmpeg-decode-native").is_err());
+        let mut all = args(&[
+            "--codecs",
+            "w.json",
+            "--capture",
+            "c.json",
+            "--reference",
+            "ffmpeg-decode-native",
+        ]);
+        all.push("--standard-memory".into());
+        assert_eq!(
+            Options::parse(Path::new("/repo"), &all)
+                .unwrap()
+                .measured_references(),
+            [
+                "ffmpeg-decode-native",
+                "ffmpeg-capture-native",
+                "ffmpeg-capture-small-native"
+            ]
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

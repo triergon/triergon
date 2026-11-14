@@ -124,52 +124,37 @@ pub fn release_dir() -> Result<String, String> {
     Ok(format!("target/{}", release_subdir()?))
 }
 
-/// How workers and references link the support libraries of their language runtimes. On a
-/// GNU/Linux target both sides take every runtime support library from its static archive:
-/// the Rust workers libgcc's unwinder (`libgcc_eh`) and libm, the C and C++ references
-/// libm, libstdc++, libgcc and libatomic. A process then maps only the support code its own
-/// libraries use. libc and third-party libraries stay shared on both sides, and so does
-/// libm on x86, where glibc's `libm.a` selects its implementations through the static libc
-/// and links only into a static program. Elsewhere both sides link as their toolchains do.
-pub const LINK_POLICY: &str = "static-runtime-support-v1";
+/// How workers and references link their toolchains' runtime support libraries. On a
+/// GNU/Linux target both sides take them from their static archives: the Rust workers
+/// libgcc's unwinder (`libgcc_eh`), the C and C++ references libgcc, libstdc++ and
+/// libatomic. A process then maps only the toolchain support code its own libraries use.
+/// The C library, libc with libm, and third-party libraries stay shared on both sides.
+/// Elsewhere both sides link as their toolchains do.
+pub const LINK_POLICY: &str = "static-toolchain-runtime-v1";
 
 /// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
 fn static_runtime(target: &str) -> bool {
     target.contains("-linux-gnu")
 }
 
-/// Whether glibc's `libm.a` links into a program that uses the shared libc on `target`.
-fn static_libm(target: &str) -> bool {
-    static_runtime(target)
-        && !["x86_64-", "i586-", "i686-"]
-            .iter()
-            .any(|x86| target.starts_with(x86))
-}
-
 /// The arguments `cargo rustc` passes to a worker's own compile, after `--`, to link
 /// it under [`LINK_POLICY`]. Placed with the worker's native libraries, ahead of the
-/// standard library's `-lgcc_s` and `-lm`, the static archives resolve every unwinder
-/// and libm import, and the linker leaves the unneeded shared libraries out.
+/// standard library's `-lgcc_s`, libgcc's static unwinder resolves every unwinder
+/// import, and the linker leaves the unneeded `libgcc_s` out.
 pub fn worker_link_arguments() -> Result<Vec<String>, String> {
     worker_target().map(worker_link_flags)
 }
 
 fn worker_link_flags(target: &str) -> Vec<String> {
-    let mut libraries = Vec::new();
     if static_runtime(target) {
-        libraries.push("gcc_eh");
+        vec!["-l".to_owned(), "static:-bundle=gcc_eh".to_owned()]
+    } else {
+        Vec::new()
     }
-    if static_libm(target) {
-        libraries.push("m");
-    }
-    libraries
-        .into_iter()
-        .flat_map(|library| ["-l".to_owned(), format!("static:-bundle={library}")])
-        .collect()
 }
 
-/// A reference's link flags under [`LINK_POLICY`]: libm, libstdc++ and libatomic from
-/// their static archives, and libgcc from its own with `-static-libgcc`.
+/// A reference's link flags under [`LINK_POLICY`]: libstdc++ and libatomic from their
+/// static archives, and libgcc from its own with `-static-libgcc`.
 pub fn reference_link_flags(flags: Vec<String>) -> Result<Vec<String>, String> {
     Ok(reference_flags(worker_target()?, flags))
 }
@@ -178,11 +163,9 @@ fn reference_flags(target: &str, flags: Vec<String>) -> Vec<String> {
     if !static_runtime(target) {
         return flags;
     }
-    let libm = static_libm(target);
     let mut linked: Vec<String> = flags
         .into_iter()
         .map(|flag| match flag.as_str() {
-            "-lm" if libm => "-l:libm.a".to_owned(),
             "-lstdc++" => "-l:libstdc++.a".to_owned(),
             "-latomic" => "-l:libatomic.a".to_owned(),
             _ => flag,
@@ -638,49 +621,34 @@ mod tests {
         let earlier = record("link_policy", Some(Value::str("toolchain-default")));
         assert_eq!(
             refusals(&earlier, PIN),
-            ["link policy toolchain-default, not static-runtime-support-v1"]
+            ["link policy toolchain-default, not static-toolchain-runtime-v1"]
         );
     }
 
     #[test]
-    fn gnu_linux_workers_and_references_take_runtime_support_from_static_archives() {
+    fn gnu_linux_workers_and_references_take_toolchain_runtime_from_static_archives() {
         let flags = ["-L/p", "-lharfbuzz", "-lstdc++", "-lm", "-lz", "-latomic"];
         let flags = || flags.map(String::from).to_vec();
-        for target in [ARM32_TARGET, "aarch64-unknown-linux-gnu"] {
-            assert_eq!(
-                worker_link_flags(target),
-                ["-l", "static:-bundle=gcc_eh", "-l", "static:-bundle=m"]
-            );
+        for target in [
+            ARM32_TARGET,
+            "aarch64-unknown-linux-gnu",
+            "x86_64-unknown-linux-gnu",
+        ] {
+            assert_eq!(worker_link_flags(target), ["-l", "static:-bundle=gcc_eh"]);
+            // The C library, libc with libm, and third-party libraries stay shared.
             assert_eq!(
                 reference_flags(target, flags()),
                 [
                     "-L/p",
                     "-lharfbuzz",
                     "-l:libstdc++.a",
-                    "-l:libm.a",
+                    "-lm",
                     "-lz",
                     "-l:libatomic.a",
                     "-static-libgcc"
                 ]
             );
         }
-        // glibc's libm.a on x86 links only into a static program: libm stays shared.
-        assert_eq!(
-            worker_link_flags("x86_64-unknown-linux-gnu"),
-            ["-l", "static:-bundle=gcc_eh"]
-        );
-        assert_eq!(
-            reference_flags("x86_64-unknown-linux-gnu", flags()),
-            [
-                "-L/p",
-                "-lharfbuzz",
-                "-l:libstdc++.a",
-                "-lm",
-                "-lz",
-                "-l:libatomic.a",
-                "-static-libgcc"
-            ]
-        );
         for target in ["aarch64-apple-darwin", "aarch64-unknown-linux-musl"] {
             assert!(worker_link_flags(target).is_empty());
             assert_eq!(reference_flags(target, flags()), flags());
