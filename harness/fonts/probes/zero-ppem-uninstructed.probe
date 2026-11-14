@@ -1,0 +1,13 @@
+# As zero-ppem, for a face without programs, which the default load auto-hints
+# at a size of a pixel or more.
+heights 0 20 40
+modes default outlines advances vertical
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+end
+glyph advance 700 lsb 10
+  component 0 offset 31 -17 round
+  component 0 offset 300 0 scale 0.5
+end
+glyph advance 300
+end

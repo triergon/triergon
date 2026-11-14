@@ -10,6 +10,8 @@
 //!   the em);
 //! - `heights H...`: the 26.6 pixel heights a probe loads the face at, as
 //!   libass sizes a face (default 16384);
+//! - `modes M...`: the `font-sized` modes a probe reads at each height
+//!   (default `default`; also `outlines`, `advances` and `vertical`);
 //! - `wraps-at-32-bits`: the probe's results depend on the reference's
 //!   integer width; its record, from 32-bit ARMv7, stands for a 64-bit
 //!   reference that differs from it (a 32-bit reference must match it);
@@ -84,6 +86,7 @@ const UNSCALED_COMPONENT_OFFSET: u16 = 0x1000;
 #[derive(Debug, Default)]
 pub(super) struct Description {
     pub(super) heights: Vec<i32>,
+    pub(super) modes: Vec<String>,
     pub(super) wraps_at_32_bits: bool,
     units_per_em: u16,
     head_flags: u16,
@@ -124,6 +127,7 @@ impl Description {
     pub(super) fn parse(text: &str) -> Result<Self, String> {
         let mut d = Self {
             heights: vec![16384],
+            modes: vec!["default".to_owned()],
             units_per_em: 2048,
             ..Self::default()
         };
@@ -144,6 +148,13 @@ impl Description {
                     _ => return Err(fail("metrics ASCENDER DESCENDER".into())),
                 },
                 "heights" => d.heights = numbers(&args).map_err(fail)?,
+                "modes" => {
+                    let known = ["default", "outlines", "advances", "vertical"];
+                    if args.is_empty() || args.iter().any(|m| !known.contains(m)) {
+                        return Err(fail("modes default|outlines|advances|vertical...".into()));
+                    }
+                    d.modes = args.iter().map(|&m| m.to_owned()).collect();
+                }
                 "wraps-at-32-bits" if args.is_empty() => d.wraps_at_32_bits = true,
                 "maxp" => {
                     if !args.len().is_multiple_of(2) {
@@ -969,6 +980,7 @@ mod tests {
         # A square with a program, and a composite of it.
         units-per-em 1000
         heights 16384 640
+        modes default vertical
         maxp twilight 4 storage 8
         cvt 100 -20
         gasp 65535 0x000F
@@ -998,6 +1010,8 @@ mod tests {
     fn a_description_builds_a_consistent_face() {
         let d = Description::parse(SQUARE).unwrap();
         assert_eq!(d.heights, [16384, 640]);
+        assert_eq!(d.modes, ["default", "vertical"]);
+        assert!(Description::parse("modes hinted\nglyph\nend").is_err());
         let font = d.build().unwrap();
         assert_eq!(font.len() % 4, 0);
         assert_eq!(checksum(&font), 0xB1B0_AFBA);

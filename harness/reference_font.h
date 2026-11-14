@@ -18,7 +18,8 @@
  *                (FT_LOAD_NO_SCALE).
  *   font-sized   per face, as libass loads it at the 26.6 pixel HEIGHT: libass's GDI
  *                face metrics (`set_font_metrics`) and the size request libass makes
- *                (`ass_face_set_size`: REAL_DIM); then by MODE
+ *                (`ass_face_set_size`: REAL_DIM), whose error is ignored where the
+ *                size has zero pixels per em; then by MODE
  *     outlines   the size metrics, libass's ascent and descent, HarfBuzz scale,
  *                emboldening strength, PostScript flag and decoration bands; the
  *                kerning at the size of every pair the `kern` table lists
@@ -651,7 +652,11 @@ static int font_read(FT_Library library, const FT_Byte *data, FT_Long size, Font
             rq.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
             rq.height = height;
             FT_Error error = FT_Request_Size(face, &rq);
-            if (error || !face->size->metrics.x_ppem || !face->size->metrics.y_ppem)
+            /* At zero pixels per em the request fails for TrueType faces and
+             * succeeds for CFF ones, and both then load glyphs unscaled: such a
+             * size is read like any other (probe: zero-ppem). */
+            int zero_ppem = !face->size->metrics.x_ppem || !face->size->metrics.y_ppem;
+            if (error && !zero_ppem)
                 font_error(w, FONT_SIZE_ERROR, "size", height);
             else if (operation == FONT_SCALED)
                 font_scaled(library, face, height, w);

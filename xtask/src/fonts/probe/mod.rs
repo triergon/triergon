@@ -4,9 +4,10 @@
 //! workers to establish and check how a face's programs run.
 //!
 //! A probe is a description file `NAME.probe`; its leading comment says what it
-//! shows. Next to it, `NAME.dump` records the reference's default load of every
-//! glyph at each of the probe's heights (`font-sized-dump FILE default
-//! HEIGHT`), as the reference gives it on 32-bit ARMv7. `probe` compares the
+//! shows. Next to it, `NAME.dump` records what the reference reads at each of
+//! the probe's heights in each of its modes (`font-sized-dump FILE MODE
+//! HEIGHT`, by default the default load of every glyph), as the reference
+//! gives it on 32-bit ARMv7. `probe` compares the
 //! reference with that record and the candidate with the reference.
 
 mod asm;
@@ -32,7 +33,8 @@ pub(super) const PROBE_USAGE: &str =
 
   Assemble each PROBE (a .probe description, or a directory of them, such as
   harness/fonts/probes) into DIR (default target/probes) and load it with the
-  font workers at each of its heights (`font-sized-dump FONT default HEIGHT`).
+  font workers at each of its heights in each of its modes (`font-sized-dump
+  FONT MODE HEIGHT`, MODE default unless the probe names others).
   The reference must match the probe's recorded .dump, which --record rewrites
   (record on 32-bit ARMv7); the candidate must match the reference. Fails on any
   difference. Probes that take parts of corpus fonts find them in --fonts
@@ -125,7 +127,7 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
         let font_path = o.output.join(format!("{name}.ttf"));
         let font = description.build().map_err(|e| format!("{name}: {e}"))?;
         fs::write(&font_path, font).map_err(|e| format!("{}: {e}", font_path.display()))?;
-        let mut reference = dump(&o.reference, &font_path, &description.heights)?;
+        let mut reference = dump(&o.reference, &font_path, &description)?;
         let record = probe.with_extension("dump");
         let mut differences = Vec::new();
         let mut note = "";
@@ -149,7 +151,7 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
             }
         }
         if let Some(candidate) = &o.candidate {
-            let candidate = dump(candidate, &font_path, &description.heights)?;
+            let candidate = dump(candidate, &font_path, &description)?;
             differences.extend(compare("reference", &reference, &candidate));
         }
         if differences.is_empty() {
@@ -185,19 +187,29 @@ fn is_64_bit(worker: &str) -> Result<bool, String> {
     })
 }
 
-/// The worker's default-load dump of `font` at each height, each after a line
-/// `height H`; a failing run is recorded as its exit code and error output.
-fn dump(worker: &str, font: &Path, heights: &[i32]) -> Result<String, String> {
+/// The worker's dump of `font` at each of the description's heights in each
+/// of its modes, each after a line `height H`, followed by the mode for a mode
+/// other than `default`; a failing run is recorded as its exit code and error
+/// output.
+fn dump(worker: &str, font: &Path, description: &Description) -> Result<String, String> {
     let mut out = String::new();
-    for height in heights {
+    let runs = description
+        .heights
+        .iter()
+        .flat_map(|h| description.modes.iter().map(move |m| (h, m)));
+    for (height, mode) in runs {
         let argv = [
             worker.to_owned(),
             "font-sized-dump".to_owned(),
             font.display().to_string(),
-            "default".to_owned(),
+            mode.clone(),
             height.to_string(),
         ];
-        out.push_str(&format!("height {height}\n"));
+        if mode == "default" {
+            out.push_str(&format!("height {height}\n"));
+        } else {
+            out.push_str(&format!("height {height} {mode}\n"));
+        }
         match run_text(&argv, TIMEOUT) {
             Ok(done) if done.code == 0 => out.push_str(&done.stdout),
             Ok(done) => {
