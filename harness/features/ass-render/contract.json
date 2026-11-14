@@ -26,8 +26,6 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "triergon-shape's open shape-libass cases, which block qualifying triergon-ass: the default-load advances FreeType's auto-hinter sets (DejaVuMathTeXGyre, authored-cmap-formats and six Noto Emoji variants)"
-  ],
+  "pending_module_requirements": [],
   "open_cases": []
 }
