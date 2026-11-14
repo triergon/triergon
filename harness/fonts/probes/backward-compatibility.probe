@@ -1,8 +1,9 @@
 # Backward compatibility mode. Observed: glyph points never move in x (each
 # x move of point 0 below leaves the x that GC then reads, written into point
-# 1's y), though twilight points do; a move along a diagonal freedom vector
-# keeps its y part; once IUP has run in both directions no glyph point moves;
-# SHPIX moves a glyph point only once it is touched in y.
+# 1's y), while MIAP places a twilight point's x along the projection vector
+# (other twilight moves: twilight-moves); a move along a diagonal freedom
+# vector keeps its y part; once IUP has run in both directions no glyph point
+# moves; SHPIX moves a glyph point only once it is touched in y.
 heights 16384 1000
 cvt 100 -800
 fpgm
