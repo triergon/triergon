@@ -703,7 +703,14 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             .find(|r| sample.require_within((*r).clone()).is_ok())
             .cloned()
             .ok_or(Error::Invalid("consumer sample outside media extents"))?;
-        let mut reader = SampleReader::new(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?;
+        // Reuse a complete packet's charged window on ordinary reads. Tiny
+        // windows retain the incremental copy path and its work schedule.
+        let read = if self.window >= 4096 {
+            SampleReader::new_with_shared_window
+        } else {
+            SampleReader::new
+        };
+        let mut reader = read(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?;
         loop {
             match reader.poll(
                 &mut self.input,
