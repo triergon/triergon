@@ -4,7 +4,7 @@
 
 use super::bits::BitWriter;
 use super::tables::{
-    COEFFICIENTS, DC_SIZE_CHROMA, DC_SIZE_LUMA, DCT_ESCAPE, END_OF_BLOCK, INTRA_MATRIX, SCAN_INDEX,
+    COEFFICIENTS, DC_SIZE_CHROMA, DC_SIZE_LUMA, DCT_ESCAPE, END_OF_BLOCK, INTRA_MATRIX, SCAN_BIT,
     ZIGZAG,
 };
 
@@ -56,7 +56,7 @@ impl Quantizer {
         let mask = nonzero(levels) & !1;
         let mut scan = 0u64;
         for position in bits(mask) {
-            scan |= 1 << SCAN_INDEX[position];
+            scan |= SCAN_BIT[position];
         }
         let mut next = 1;
         for index in bits(scan) {
@@ -139,24 +139,17 @@ fn refine_intra_same_bits(
     best
 }
 
-/// Raster bit mask of the non-zero entries.
+/// Raster bit mask of the non-zero entries, built as two 32-bit halves (one
+/// compare, select and OR-reduction per half, all in vector lanes).
 #[inline]
 fn nonzero(levels: &[i32; 64]) -> u64 {
-    // Most quantised blocks are empty: an OR-reduction answers that cheaply.
-    if levels.iter().fold(0, |a, &v| a | v) == 0 {
-        return 0;
-    }
-    let mut mask = 0u64;
-    for (i, chunk) in levels.chunks_exact(8).enumerate() {
-        // Eight 0/1 bytes gathered into one byte by a single multiply.
-        let mut flags = [0u8; 8];
-        for (f, &v) in flags.iter_mut().zip(chunk) {
-            *f = (v != 0) as u8;
-        }
-        let byte = u64::from_le_bytes(flags).wrapping_mul(0x0102_0408_1020_4080) >> 56;
-        mask |= byte << (8 * i);
-    }
-    mask
+    let half = |levels: &[i32]| {
+        levels
+            .iter()
+            .enumerate()
+            .fold(0u32, |mask, (i, &v)| mask | (u32::from(v != 0) << i))
+    };
+    u64::from(half(&levels[..32])) | u64::from(half(&levels[32..])) << 32
 }
 
 /// Iterate the set bits of `mask`, lowest first.
@@ -236,7 +229,7 @@ pub(crate) fn write_dc(w: &mut BitWriter, diff: i32, luma: bool) {
 pub(crate) fn write_coefficients(w: &mut BitWriter, levels: &[i32; 64], mask: u64, intra: bool) {
     let mut scan = 0u64;
     for p in bits(mask) {
-        scan |= 1 << SCAN_INDEX[p];
+        scan |= SCAN_BIT[p];
     }
     let mut next = usize::from(intra);
     let mut first = !intra;
