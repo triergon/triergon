@@ -583,10 +583,13 @@ may override that count for diagnostic comparisons.
 1. Build the workers, then run `cargo xtask preflight` with every feature the run will
    measure (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
    takes them), `--isobmff`, `--codecs` for each workload list, `--external-vector`,
-   `--capture` for the capture cases, and `--review` for the RSS module review (or
+   `--capture` for the capture cases, `--reference NAME` for any other reference a
+   run names by path, and `--review` for the RSS module review (or
    `--standard-memory` for a run without the kernel bound). It checks that the gate
    build's workers and references match the build identity, that every case names a
    reference the identity holds and has each input it reads with its pinned hash, that
+   the references ISO BMFF, the codecs and capture measure against were built (a
+   profile `build-workers` skipped because it was not prepared has none), that
    the capture input generator's Python has numpy, that the review covers this module
    source and kernel, and that the module is unloaded. A feature without cases or a
    workload list without workloads fails, and every failure is printed at once. Run
