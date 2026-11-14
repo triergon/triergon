@@ -11,21 +11,26 @@ use std::{
 };
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, SourceCapabilities, SourceId, Step,
-    Time, WorkBudget, blocking::Feed,
+    Time, TimeBase, WorkBudget, blocking::Feed,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder,
-    FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, MovieHeader,
-    MovieSeekClocks, MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner,
+    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, ConfigurationLimits, EditList,
+    FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy,
+    MovieHeader, MovieSeekClocks, MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner,
     RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample,
     SampleDescription, SampleReader, SampleStep, SampleTable, SampleTableBuilder,
     SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader, TrackSampleCursor, Trex,
     compat::mov::{
+        edits::{
+            EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
+            EncodedEditProfile,
+        },
+        encoded::{EncodedSelection, EncodedStream, EncodedStreamJob},
         packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, StreamView},
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
             DescriptionRecoveryProfile, PartialSampleReader, PayloadBounds, RecoveryTrackHeader,
-            RunRecoveryProfile,
+            RunRecoveryProfile, complete_edit_rows,
         },
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
@@ -76,6 +81,14 @@ pub enum DemuxOperation {
     Index,
     Seek(DemuxSeekRequest),
 }
+
+#[derive(Clone, Copy)]
+enum Delivery {
+    All,
+    ApplyEncodedTrim,
+    AfterSeek(u32),
+}
+
 impl DemuxOperation {
     fn trace_name(self) -> &'static str {
         match self {
@@ -85,35 +98,11 @@ impl DemuxOperation {
         }
     }
 }
-trait DemuxRows {
-    fn poll(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> triergon_core::Result<CursorStatus>;
-    fn take(
-        &mut self,
-    ) -> triergon_core::Result<triergon_isobmff::compat::mov::packets::PacketOccurrence>;
-}
-impl DemuxRows for PacketCursor<'_> {
-    fn poll(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> triergon_core::Result<CursorStatus> {
-        PacketCursor::poll(self, work, cancel)
-    }
-    fn take(
-        &mut self,
-    ) -> triergon_core::Result<triergon_isobmff::compat::mov::packets::PacketOccurrence> {
-        self.take_occurrence()
-    }
-}
 fn append<T>(target: &mut BudgetVec<T>, value: T) -> Result<()> {
     target.try_push(value).map_err(|e| Failure::Core(e.error))
 }
 fn demux_catalogue(
-    streams: &[StreamView],
+    streams: &[protocol::CatalogueStream],
     stats: &mut Stats,
     mut trace: Option<&mut String>,
 ) -> Result<()> {
@@ -515,6 +504,7 @@ pub struct OpenPolicy {
     pub tables: SampleTablePolicy,
     pub media_data: MediaDataPolicy,
     pub regular_recovery: bool,
+    pub edit_rows: bool,
 }
 impl<'a, T: Read + Seek> Driver<'a, T> {
     pub fn new(source: &'a mut T, length: u64, window: usize, quantum: u64) -> Result<Self> {
@@ -677,10 +667,16 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             let edits = optional(track, b"edts")?
                 .map(|raw| {
                     child(&raw, b"elst").and_then(|raw| {
-                        EditList::parse(raw, Limits::default()).map_err(Failure::Core)
+                        let parse = if policy.edit_rows {
+                            complete_edit_rows
+                        } else {
+                            EditList::parse
+                        };
+                        parse(raw, Limits::default()).map_err(Failure::Core)
                     })
                 })
                 .transpose()?;
+            let edits = edits.filter(|list| !policy.edit_rows || !list.is_empty());
             append(
                 &mut records,
                 Record {
@@ -863,7 +859,11 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             }
             retention.retain(packet);
         }
-        demux_catalogue(&[stream], stats, trace.as_deref_mut())?;
+        demux_catalogue(
+            &[protocol::CatalogueStream::from(stream)],
+            stats,
+            trace.as_deref_mut(),
+        )?;
         if matches!(operation, DemuxOperation::Index) {
             let mut index = table.description_index_cursor(
                 &self.budget,
@@ -949,6 +949,7 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
         }
         let mut tracks = BudgetVec::new(&self.budget);
         let mut streams = BudgetVec::new(&self.budget);
+        let mut encoded_edits = BudgetVec::new(&self.budget);
         let movie_base = model.movie.time_base()?;
         for record in model.records.as_slice() {
             let mut entries = RawVisualEntriesJob::new(
@@ -965,17 +966,73 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                 .as_slice()
                 .iter()
                 .any(|f| f.track_id() == record.header.track_id);
-            append(
-                &mut streams,
-                StreamView::for_source(&record.header, &record.table, has_fragments, model.brand)?,
-            )?;
+            let media_base = record.header.time_base()?;
+            let mut encoded_edit = None;
+            let stream = match record
+                .table
+                .descriptions()
+                .first()
+                .map(|entry| entry.format)
+            {
+                Some(b) if b != *b"raw " && b != *b"tx3g" => {
+                    let mut job = EncodedStreamJob::new_demux_catalogue(
+                        &record.header,
+                        &record.table,
+                        &self.input,
+                        EncodedSelection {
+                            major_brand: model.brand,
+                            description: 1,
+                            limits: ConfigurationLimits::default(),
+                        },
+                    )?;
+                    while job.poll(
+                        &mut self.input,
+                        &mut WorkBudget::new(self.quantum),
+                        &self.cancel,
+                    )? != CursorStatus::Ready
+                    {}
+                    let configuration = job.take(&mut self.input, &self.cancel)?;
+                    let stream =
+                        protocol::CatalogueStream::encoded(&configuration, &record.header)?;
+                    if !has_fragments
+                        && matches!(operation, DemuxOperation::Open | DemuxOperation::Index)
+                        && let Some(edits) = record.edits.as_ref()
+                        && edits.len() == 1
+                        && !record.table.has_avc_composition_offsets()
+                    {
+                        encoded_edit =
+                            Some(self.encoded_edit(record, edits, configuration, movie_base)?);
+                    }
+                    stream
+                }
+                _ => StreamView::for_source(
+                    &record.header,
+                    &record.table,
+                    has_fragments,
+                    model.brand,
+                )?
+                .into(),
+            };
+            append(&mut streams, stream)?;
+            if encoded_edit.is_some() && encoded_edits.is_empty() {
+                for _ in 0..tracks.len() {
+                    append(&mut encoded_edits, None)?;
+                }
+            }
+            if encoded_edit.is_some() || !encoded_edits.is_empty() {
+                append(&mut encoded_edits, encoded_edit)?;
+            }
             append(
                 &mut tracks,
                 DemuxTrack {
                     track_id: record.header.track_id,
                     table: &record.table,
-                    fragments: model.fragments.as_slice(),
-                    media_base: record.header.time_base()?,
+                    fragments: if has_fragments {
+                        model.fragments.as_slice()
+                    } else {
+                        &[]
+                    },
+                    media_base,
                     edits: record.edits.as_ref().map(|e| (e, movie_base)),
                 },
             )?;
@@ -1066,23 +1123,45 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             self.deliver_rows(
                 model,
                 &mut cursor,
-                seek.map(|r| r.count),
+                Delivery::AfterSeek(seek.ok_or(Error::Invalid("missing seek request"))?.count),
                 stats,
                 retention,
                 trace.as_deref_mut(),
             )?
         } else {
-            let mut cursor = PacketCursor::new_complete_source(
-                &self.budget,
-                tracks.as_slice(),
-                model.media.as_slice(),
-                PacketLimits::default(),
-                DemuxProfile::NoParseNoFillin,
-            )?;
+            let mut cursor = if encoded_edits.is_empty() {
+                PacketCursor::new_complete_source(
+                    &self.budget,
+                    tracks.as_slice(),
+                    model.media.as_slice(),
+                    PacketLimits::default(),
+                    DemuxProfile::NoParseNoFillin,
+                )?
+            } else {
+                PacketCursor::new_encoded_regular(
+                    &self.budget,
+                    tracks.as_slice(),
+                    model.media.as_slice(),
+                    PacketLimits::default(),
+                    encoded_edits.as_slice(),
+                    EncodedEditProfile,
+                )?
+            };
+            if tracks
+                .as_slice()
+                .iter()
+                .any(|track| track.edits.is_some() && track.table.has_avc_composition_offsets())
+            {
+                cursor.enable_reordered_avc_edits()?;
+            }
             let result = self.deliver_rows(
                 model,
                 &mut cursor,
-                None,
+                if encoded_edits.is_empty() {
+                    Delivery::All
+                } else {
+                    Delivery::ApplyEncodedTrim
+                },
                 stats,
                 retention,
                 trace.as_deref_mut(),
@@ -1113,15 +1192,57 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
         }
         Ok(())
     }
+    fn encoded_edit(
+        &mut self,
+        record: &Record,
+        edits: &EditList,
+        configuration: EncodedStream,
+        movie_base: TimeBase,
+    ) -> Result<EncodedEditPlan> {
+        let configs = [configuration];
+        let mut job = EncodedEditJob::new_range_playback(
+            EncodedEditContext {
+                table: &record.table,
+                edits,
+                stream: &configs[0],
+                media_base: record.header.time_base()?,
+                movie_base,
+            },
+            &configs,
+            &self.input,
+            EncodedEditLimits::default(),
+        )?;
+        loop {
+            match job.poll(
+                &mut self.input,
+                &mut WorkBudget::new(self.quantum),
+                &self.cancel,
+            ) {
+                Ok(CursorStatus::Ready) => {
+                    return Ok(job.take(&mut self.input, &self.cancel)?);
+                }
+                Ok(CursorStatus::Yield) => {}
+                Ok(CursorStatus::End) => {
+                    return Err(Error::Invalid("encoded edit ended without a plan").into());
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+
     fn deliver_rows(
         &mut self,
         model: &Model,
-        cursor: &mut impl DemuxRows,
-        limit: Option<u32>,
+        cursor: &mut PacketCursor<'_>,
+        delivery: Delivery,
         stats: &mut Stats,
         retention: &mut Retention,
         mut trace: Option<&mut String>,
     ) -> Result<(u64, bool)> {
+        let limit = match delivery {
+            Delivery::AfterSeek(count) => Some(count),
+            _ => None,
+        };
         let (mut reads, mut first) = (0u64, true);
         let mut short_end = None;
         while limit.is_none_or(|maximum| stats.packets < u64::from(maximum)) {
@@ -1135,7 +1256,12 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                     CursorStatus::Ready => break,
                 }
             }
-            let item = cursor.take()?;
+            let skip = if matches!(delivery, Delivery::ApplyEncodedTrim) {
+                cursor.ready_encoded_skip()?
+            } else {
+                None
+            };
+            let item = cursor.take_occurrence()?;
             let index = model
                 .records
                 .as_slice()
@@ -1168,6 +1294,7 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                 self.packet(item.source, model.media.as_slice())?.payload
             };
             let mut packet = Packet::from_view(index, item.track_id, &item.demux, payload)?;
+            packet.skip_samples = skip;
             if terminal.is_some() {
                 packet.flags |= protocol::CORRUPT_PACKET;
             }

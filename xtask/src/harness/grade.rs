@@ -1440,7 +1440,7 @@ mod tests {
             ("matroska-startup-seek", 44),
             ("hls-segments", 71),
             ("packet-framing", 125),
-            ("isobmff-open-index", 1020),
+            ("isobmff-open-index", 1076),
             ("font-outlines", 53),
             ("font-hinting-none", 159),
             ("font-hinting-default", 53),

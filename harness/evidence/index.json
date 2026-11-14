@@ -20446,6 +20446,34 @@
     "candidate": "dc792ea4b25af0e64db6b73b47ce66dc89b6e045",
     "baseline": "51977abacdfe2e8086c124e37c0ad303168423f3"
    }
+  },
+  {
+   "name": "isobmff-upstream-catalogue-464fb140-aarch64",
+   "path": "isobmff-upstream-catalogue-464fb140-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 open and index comparison of the expanded MOV corpus. All 1,076 outcomes match. Runtime and heap failures remain in the new cases.",
+   "key": "evidence/isobmff-upstream-catalogue-464fb140-aarch64/93308f598d42918d624b0c973e09e71959478be12c700962beccebcd229a3fb1.tar.zst",
+   "sha256": "93308f598d42918d624b0c973e09e71959478be12c700962beccebcd229a3fb1",
+   "bytes": 33618338,
+   "results": [
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "c78db4db657d6b142e8a0294f17a9fcfd91f0a2f84036a31a5d489e0a7d17418",
+     "status": 1,
+     "report_sha256": "fb0a053a44329b5d3236199dd24fde554faa7786d29038b1e0fa7abca6637a38"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "c1f899c989a8216bcdfcb6f299b91a03541e082ddb2a7e3e8b887825040519e1",
+     "status": 1,
+     "report_sha256": "04d915bdda284e1bdfd1670c88c9b90fee6b31dd7e2b59d61a2eebeeaa421096"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "464fb1406d21668558dde244ffbbc6c455372b85"
+   }
   }
  ]
 }

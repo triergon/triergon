@@ -99,6 +99,12 @@ impl SampleTable {
         self.ctts.is_some()
     }
 
+    /// An AVC sample description with a composition table.
+    pub fn has_avc_composition_offsets(&self) -> bool {
+        self.has_composition_offsets()
+            && matches!(self.descriptions(), [entry] if matches!(&entry.format, b"avc1" | b"avc3"))
+    }
+
     /// Borrow compact validated wire runs for the separate demux observation
     /// view. Their source version, raw bytes and per-sample meaning stay intact.
     pub(crate) fn composition_runs(&self) -> Option<&Words> {

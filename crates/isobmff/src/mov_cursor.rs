@@ -520,6 +520,7 @@ pub struct PacketCursor<'a> {
     ready: Option<PacketOccurrence>,
     failed: Option<Error>,
     complete_source: bool,
+    reordered_avc: bool,
     front_source: bool,
     forward_encoded_end: Option<u64>,
     terminal: Option<crate::TerminalMdat>,
@@ -720,6 +721,7 @@ impl<'a> PacketCursor<'a> {
             ready: None,
             failed: None,
             complete_source: false,
+            reordered_avc: false,
             front_source: false,
             forward_encoded_end: None,
             terminal: None,
@@ -932,6 +934,27 @@ impl<'a> PacketCursor<'a> {
         self.validated
     }
 
+    /// Admit rate-one AVC edit lists with version-0 composition offsets.
+    /// Use this on a fresh complete-source cursor before polling it.
+    pub fn enable_reordered_avc_edits(&mut self) -> Result<()> {
+        if !self.complete_source
+            || self.front_source
+            || !matches!(self.phase, Phase::Media)
+            || self.at != 0
+            || self.failed.is_some()
+        {
+            return Err(Error::Invalid(
+                "AVC edit policy requires a fresh complete source",
+            ));
+        }
+        self.reordered_avc = true;
+        Ok(())
+    }
+
+    pub(crate) fn reordered_avc_edits(&self) -> bool {
+        self.reordered_avc
+    }
+
     /// Validate every source extent and project only selected track ordinals.
     /// Demux clocks and edits are required only for the selected tracks.
     /// Supply any edit plans in source order.
@@ -1102,7 +1125,10 @@ impl<'a> PacketCursor<'a> {
         Ok(replay)
     }
 
-    pub(crate) fn fork_index_track(&self, track_id: u32) -> Result<(Self, DemuxTrack<'a>)> {
+    pub(crate) fn fork_index_track(
+        &self,
+        track_id: u32,
+    ) -> Result<(Self, DemuxTrack<'a>, Option<&'a crate::EncodedEditPlan>)> {
         if !matches!(self.phase, Phase::End)
             || self.failed.is_some()
             || !self.complete_source
@@ -1120,12 +1146,10 @@ impl<'a> PacketCursor<'a> {
             .iter()
             .find(|slot| slot.track.track_id == track_id)
             .ok_or(Error::Invalid("index replay track is absent"))?;
-        if slot.encoded_edit.is_some() {
-            return Err(Error::Invalid("index replay requires a source track"));
-        }
         Ok((
             self.fork_checked_slots(std::slice::from_ref(slot))?,
             slot.track,
+            slot.encoded_edit,
         ))
     }
 
@@ -1143,6 +1167,7 @@ impl<'a> PacketCursor<'a> {
         let mut replay = Self::from_slots(slots, self.media, self.limits);
         replay.source_tracks = self.source_tracks;
         replay.complete_source = true;
+        replay.reordered_avc = self.reordered_avc;
         replay.phase = Phase::Initialize;
         replay.validated = self.validated;
         Ok(replay)
@@ -1419,12 +1444,13 @@ impl<'a> PacketCursor<'a> {
                                 "fragment edit needs a complete source",
                             ));
                         } else {
-                            let cursor = EditCursor::new(
+                            let cursor = EditCursor::with_reordered_avc(
                                 slot.track.table,
                                 edits,
                                 slot.track.media_base,
                                 movie_base,
                                 self.limits.edit,
+                                self.reordered_avc,
                             )?;
                             // The checked replay keeps its edit cursor allocation.
                             if let Some(mut storage) = slot.edited.take() {
