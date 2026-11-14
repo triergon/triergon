@@ -1223,6 +1223,12 @@ mod packed_plan_boundary_guards {
         assert_eq!(part.len(), length);
         assert_eq!(part.output_offset(), usize::MAX);
         assert_eq!(part.prefix_bytes(), 4);
+        // A synthetic wire-range descriptor may exceed a real 32-bit slice.
+        let length = length.min(isize::MAX as usize);
+        assert_eq!(
+            NalPacketSegment::packet(0..length, 4, 0).framed_len(),
+            length + 4
+        );
     }
 
     #[test]
@@ -1235,6 +1241,7 @@ mod packed_plan_boundary_guards {
             }
         );
         assert_eq!(part.len(), usize::MAX);
+        assert_eq!(part.framed_len(), usize::MAX);
         assert_eq!(part.output_offset(), 0);
         assert_eq!(part.prefix_bytes(), 0);
         assert_eq!(
