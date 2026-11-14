@@ -5,7 +5,10 @@
 mod model;
 #[path = "isobmff_consumer/protocol.rs"]
 mod protocol;
-use model::{DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result, SourceRequest};
+use model::{
+    DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, PARSER_BUDGET, Result,
+    SourceRequest,
+};
 use protocol::{Retention, Stats};
 use std::{
     env,
@@ -14,7 +17,7 @@ use std::{
     path::Path,
     time::Instant,
 };
-use triergon_core::{Budget, Error, OwnedInputBytes, Time};
+use triergon_core::{Budget, Bytes, Error, OwnedInputBytes, Time};
 use triergon_isobmff::{
     MediaDataPolicy, RecoveryKind, RecoverySyntax, SampleTablePolicy, SyncSamplePolicy,
     TimingRunPolicy,
@@ -99,7 +102,15 @@ fn operation(
     stats.start(o.retain, o.window)?;
     if o.window >= 4096 {
         input.rewind()?;
-        let pool = Budget::new(64 * 1024 * 1024)?;
+        // Count the existing input and its shared header without reducing the
+        // same 64 MiB allowance for allocations made by the parser.
+        let total_budget = input
+            .get_ref()
+            .capacity()
+            .checked_add(Bytes::owner_overhead_bytes())
+            .and_then(|source| source.checked_add(PARSER_BUDGET))
+            .ok_or(Error::Overflow)?;
+        let pool = Budget::new(total_budget)?;
         let bytes = std::mem::take(input.get_mut());
         let source = match OwnedInputBytes::try_from_vec(&pool, bytes) {
             Ok(source) => source,

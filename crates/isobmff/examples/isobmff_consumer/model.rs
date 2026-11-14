@@ -471,6 +471,7 @@ pub struct Driver<F> {
     quantum: u64,
     cancel: AtomicBool,
 }
+pub const PARSER_BUDGET: usize = 64 * 1024 * 1024;
 struct Scanned {
     movie: BoxView,
     media: BudgetVec<Range<u64>>,
@@ -508,7 +509,7 @@ pub struct OpenPolicy {
 }
 impl<'a, T: Read + Seek> Driver<&'a mut T> {
     pub fn new(source: &'a mut T, length: u64, window: usize, quantum: u64) -> Result<Self> {
-        let budget = Budget::new(64 * 1024 * 1024)?;
+        let budget = Budget::new(PARSER_BUDGET)?;
         let feed = Feed::new(source, &budget)?;
         Self::with_feed(feed, budget, length, window, quantum)
     }
