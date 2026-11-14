@@ -12,8 +12,8 @@ when it passes all three gates on every case in its corpus.
 | Gate | Requirement |
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
-| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
-| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
+| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval ([early stop](#early-stop)). The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
+| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
 corpus manifest live in `harness/features/<feature>/`.
@@ -535,7 +535,7 @@ may override that count for diagnostic comparisons.
   process startup and serialisation outside the timing.
 - Use 30 or more randomised A/B pairs per case after warm-up, keep every raw sample,
   and report p50, p95 and the confidence bound per case. An aggregate never hides a
-  failing case.
+  failing case. A gate session may end earlier, by the rule [below](#early-stop).
 - Measure on an isolated machine. Never time while compiling, fuzzing or running
   another benchmark; the runner watches the whole run and rejects it if a tracked
   process uses CPU or steal time grows.
@@ -599,6 +599,45 @@ may override that count for diagnostic comparisons.
 4. Grade with the module loaded.
 
 Never time while memory, a build or anything else runs on the host.
+
+#### Early stop
+
+A gate timing session (`report`, `isobmff-bench`, `external-vector`, `codecs time`,
+`capture qualify`) may end at an early look: after 10 pairs, when all 10 ratios
+`T_triergon / T_reference` lie strictly below the ceiling, or after 20, when 18 of them
+do. A gate memory collection uses the same looks on two ratios at once: it stops only
+when every peak heap ratio and every total resident ratio of the 10, or the 18th of each
+of the 20, lies strictly below 1. Otherwise either runs all 30 pairs and is graded by the
+paired bootstrap as before. A session that stops records the rule (`early_stop`) and,
+as its interval, the median of its ratios bounded by the order statistics the look used:
+the largest of 10, or the 18th of 20. The validator and the memory evaluator replay the
+rule on the recorded pairs, so a session that stopped where the rule does not, or ran on
+where it stops, does not count, and grading holds the planned pairs to the contract's
+minimum. Comparisons with another build (`--baseline-worker`, quick checks) always run
+every pair.
+
+The bound is a sign test. For independent pairs, the `k`-th smallest of `n` ratios lies
+below the true median ratio only if at least `k` of the `n` ratios do, which, whatever
+their distribution, happens with probability at most `P(Binomial(n, ½) ≥ k)`: 2⁻¹⁰ =
+0.098% at the first look and 211/2²⁰ = 0.020% at the second. A case whose true median
+ratio is at or above its ceiling therefore stops early as a pass with probability at most
+0.118%, in addition to the unchanged error of the 30-pair bound, which the early looks do
+not touch: the design spends its alpha at fixed looks rather than peeking at the
+bootstrap bound. A case close to its ceiling rarely has every early ratio below it, so it
+runs on to 30 pairs.
+
+Replayed on the archived ARMv7 run at `3df7ae6d` (`armv7-thumb2-3df7ae6d-linux-armv7`):
+of its 3,037 distinct 30-pair timing sessions, 3,011 would stop at 10 pairs and 4 at
+20, none of them one whose 30-pair bound is above the ceiling, and all 22 that fail at 30
+pairs run on to 30; timing runs 34% of the pairs it did. Of its 5,945 memory
+collections, 5,585 would stop early, none of them failing at 30 pairs, and all 318 that
+fail run on; memory runs 38% of its pairs. Simulated by drawing pairs from those
+sessions' own ratios, scaled so the true median is exactly at the ceiling: timing passes
+3.09% of 128,000 sessions with 30 pairs always and 3.15% with the early looks (0.10%
+early), and memory 2.50% and 2.56% of 60,000 (0.12% early). A true median beyond the
+ceiling (4% for timing, 2% for memory) passes at under 0.011% either way, and one inside
+it (4% for timing, 2% for memory) passes as often with the early looks as without:
+93.60% against 93.59%, and 79.50% against 79.45%.
 
 #### Memory in parallel
 
