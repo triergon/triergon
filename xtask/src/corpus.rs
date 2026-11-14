@@ -667,6 +667,31 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         [],
         (202, 47_093, 7_610_120_524_339_765_167),
     ));
+    let overlapping_file = "forward-avc-empty-edit-overlapping-sync.mp4";
+    let overlapping = fs::read(
+        paths
+            .root
+            .join("crates/playback/tests/fixtures/mp4")
+            .join(overlapping_file),
+    )
+    .map_err(|error| format!("{overlapping_file}: {error}"))?;
+    write(&output.join(overlapping_file), &overlapping)?;
+    cases.extend([
+        mp4_range_case(
+            "leading-video-edit-overlapping-sync-open",
+            overlapping_file,
+            &overlapping,
+            [],
+            (18, 2_827, 2_951_212_463_114_411_726),
+        ),
+        mp4_range_case(
+            "leading-video-edit-overlapping-sync-seek",
+            overlapping_file,
+            &overlapping,
+            ["27"],
+            (17, 2_651, 7_260_646_860_981_280_469),
+        ),
+    ]);
     cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
     paths.manifest(

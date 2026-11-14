@@ -427,6 +427,7 @@ struct LeadingVideoEdit {
     gap: i64,
     prefix: u64,
     first_decode: i128,
+    overlapping_sync: Option<i128>,
     first_visible_decode: Option<i128>,
     last_sample: Option<u64>,
     waiting_for_sync: bool,
@@ -710,6 +711,7 @@ impl<'a> EncodedEditJob<'a> {
                 gap: leading_ticks,
                 prefix: 0,
                 first_decode: 0,
+                overlapping_sync: None,
                 first_visible_decode: None,
                 last_sample: None,
                 waiting_for_sync: false,
@@ -983,7 +985,15 @@ impl<'a> EncodedEditJob<'a> {
                     return Ok(CursorStatus::Yield);
                 }
                 let presentation_end = self.end;
-                let anchor = self.anchor.ok_or(Error::Unsupported(
+                // A short edit can overlap a single sync sample without
+                // containing its start. MOV retains that packet as discard
+                // and places it at the end of the leading empty edit.
+                let overlapping_sync = self.leading_video.and_then(|video| {
+                    (video.last_sample == Some(video.prefix + 1))
+                        .then_some(video.overlapping_sync)
+                        .flatten()
+                });
+                let anchor = overlapping_sync.or(self.anchor).ok_or(Error::Unsupported(
                     "encoded edit has no presentation anchor",
                 ))?;
                 if self.dts_scale.is_some() {
@@ -1081,6 +1091,7 @@ impl<'a> EncodedEditJob<'a> {
                             // sample, while packet DTS retains the composition lead.
                             let first_visible = video
                                 .first_visible_decode
+                                .or(overlapping_sync.map(|_| video.first_decode))
                                 .ok_or(Error::Invalid("missing video presentation start"))?;
                             let seek_offset =
                                 anchor.checked_sub(first_visible).ok_or(Error::Overflow)?;
@@ -1214,11 +1225,15 @@ impl<'a> EncodedEditJob<'a> {
                         return Err(Error::Unsupported("encoded edit initial source/key origin"));
                     }
                     if let Some(video) = &mut self.leading_video {
+                        let duration = i128::from(s.duration_ticks);
                         // Keep the decode dependencies from the last sync
                         // sample at or before the media edit's start.
                         if c <= media_start && s.is_container_sync() {
                             video.prefix = s.ordinal - 1;
                             video.first_decode = d;
+                            video.overlapping_sync = (c < media_start
+                                && c.checked_add(duration).ok_or(Error::Overflow)? >= self.end)
+                                .then_some(c);
                             video.first_visible_decode = None;
                             video.last_sample = None;
                             video.waiting_for_sync = false;
@@ -1237,7 +1252,6 @@ impl<'a> EncodedEditJob<'a> {
                                 video.first_visible_decode = Some(d);
                             }
                             video.last_cts = video.last_cts.max(c);
-                            let duration = i128::from(s.duration_ticks);
                             video.last_decode_end =
                                 d.checked_add(duration).ok_or(Error::Overflow)?;
                             // Continue through a sync boundary so the decoder

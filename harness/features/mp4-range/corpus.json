@@ -828,6 +828,34 @@
       }
     },
     {
+      "id": "leading-video-edit-overlapping-sync-open",
+      "profile": "leading-video-edit-overlapping-sync-open",
+      "file": "forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 18,
+        "bytes": 2827,
+        "digest": 2951212463114411726
+      }
+    },
+    {
+      "id": "leading-video-edit-overlapping-sync-seek",
+      "profile": "leading-video-edit-overlapping-sync-seek",
+      "file": "forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "27"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 2651,
+        "digest": 7260646860981280469
+      }
+    },
+    {
       "id": "fate-non-sync-prefix-open",
       "profile": "fate-non-sync-prefix-open",
       "file": "mov/mp4-init-nonkeyframe.mp4",

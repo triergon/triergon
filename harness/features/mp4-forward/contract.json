@@ -68,7 +68,8 @@
     "progressive-leading-video-edit",
     "progressive-leading-video-edit-trimmed",
     "progressive-leading-video-edit-single-sync",
-    "progressive-leading-video-edit-rounded-end"
+    "progressive-leading-video-edit-rounded-end",
+    "progressive-leading-video-edit-overlapping-sync"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

@@ -91,7 +91,9 @@
     "leading-video-edit-trimmed-seek",
     "unrepresentable-video-edit-audio-only",
     "signed-video-edit-endpoint-audio-only",
-    "leading-video-edit-short-reordered"
+    "leading-video-edit-short-reordered",
+    "leading-video-edit-overlapping-sync-open",
+    "leading-video-edit-overlapping-sync-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

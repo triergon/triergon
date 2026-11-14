@@ -751,6 +751,21 @@
         "bytes": 4430,
         "digest": 381571246720305686
       }
+    },
+    {
+      "id": "progressive-leading-video-edit-overlapping-sync",
+      "profile": "progressive-leading-video-edit-overlapping-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 2827,
+        "digest": 12073540634008711887
+      }
     }
   ]
 }
