@@ -184,3 +184,10 @@ from a build of the same libass without its zeroed locals, whose code layout
 alone slows small glyphs by up to 40%, and its timed region holds only the work
 the candidate's does, without libass's per-run cache reset; see the libass pin
 in [docs/quality.md](../../docs/quality.md#reference-and-corpus).
+
+## Licence
+
+MIT or Apache-2.0, at your option, with libass 0.17.5's ISC licence: the outline,
+stroking, rasterising, blur, composition and clipping stages are translated from
+libass. `LICENSE` holds the notice, and
+[docs/provenance.md](../../docs/provenance.md#triergon-raster) lists the modules.

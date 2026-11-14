@@ -73,11 +73,45 @@ pub struct ExternalOptions {
     /// Time and measure against this worker of another build instead of the
     /// reference. Correctness is still compared with the reference.
     pub baseline_worker: Option<PathBuf>,
+    /// Measure even when a cited evidence set holds this run's result.
+    pub full: bool,
 }
 
-/// Qualify the mandatory external metadata vector; returns the exit code.
+const CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
+
+/// Qualify the mandatory external metadata vector; returns the exit code. A
+/// timing or memory run against the reference is a gate step.
 pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
-    let contract_path = root.join("harness/features/matroska-segment-metadata/contract.json");
+    let mode = match (options.benchmark, options.memory) {
+        _ if options.baseline_worker.is_some() => return qualify(root, options),
+        (false, false) => return qualify(root, options),
+        (true, false) => "external-vector --benchmark",
+        (false, true) => "external-vector --memory",
+        (true, true) => "external-vector --benchmark --memory",
+    };
+    let (candidate, reference, _) = workers(root)?;
+    let settings = Value::object([
+        ("pairs", Value::int(options.pairs as i64)),
+        ("iterations", Value::int(options.iterations)),
+        (
+            "kernel_bound",
+            std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+        ),
+    ]);
+    let key = super::reuse::Key::new(
+        root,
+        mode,
+        settings,
+        &[&root.join(CONTRACT)],
+        &[("candidate", &candidate), ("reference", &reference)],
+    )?;
+    super::reuse::step(root, &options.output, &key, options.full, || {
+        qualify(root, options)
+    })
+}
+
+fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
+    let contract_path = root.join(CONTRACT);
     let contract = read_json(&contract_path)?;
     let contract_sha = sha(&contract_path)?;
     let timeout = super::worker::contract_timeout(&contract)?;
@@ -158,21 +192,15 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
             ));
         }
         if options.memory {
-            case.push((
-                "memory",
-                super::memory::collect(
-                    root,
-                    super::memory::WorkerPaths {
-                        candidate: &candidate,
-                        reference: comparison,
-                        registered: options.baseline_worker.is_none(),
-                    },
-                    &path,
-                    options.pairs,
-                    280,
-                    &timed,
-                )?,
-            ));
+            let workers = super::memory::WorkerPaths {
+                candidate: &candidate,
+                reference: comparison,
+                registered: options.baseline_worker.is_none(),
+            };
+            let job = super::memory::Job::new(&workers, [path.clone()], |slot| {
+                super::memory::collect(slot, root, workers, &path, options.pairs, 280, &timed)
+            });
+            case.push(("memory", super::memory::collect_one(job)?));
         }
     }
     let case = Value::object(case);

@@ -192,16 +192,24 @@ pub fn run(options: &Options) -> Result<(), String> {
                             Value::object([("candidate", candidate), ("reference", reference)]);
                         record.push(("expected_outputs".into(), expected.clone()));
                         let arguments = [format!("{operation}-memory"), python::path(&input)];
-                        memory::collect_command(
-                            &options.repository,
-                            &options.candidate,
-                            &options.reference,
-                            &input,
-                            options.pairs,
-                            options.seed,
-                            &arguments,
-                            &expected,
-                        )?
+                        let workers = memory::WorkerPaths {
+                            candidate: &options.candidate,
+                            reference: &options.reference,
+                            registered: false,
+                        };
+                        memory::collect_one(memory::Job::new(&workers, [input.clone()], |slot| {
+                            memory::collect_command(
+                                slot,
+                                &options.repository,
+                                &options.candidate,
+                                &options.reference,
+                                &input,
+                                options.pairs,
+                                options.seed,
+                                &arguments,
+                                &expected,
+                            )
+                        }))?
                     }
                     (Ok(candidate), Ok(reference)) => Value::object([
                         ("status", Value::str("unequal-memory-work")),

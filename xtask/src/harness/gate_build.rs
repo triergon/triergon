@@ -1,5 +1,5 @@
 //! The gate build: workers compiled by the toolchain in `rust-toolchain.toml` with no
-//! extra compiler configuration.
+//! extra compiler configuration, workers and references linked under [`LINK_POLICY`].
 //!
 //! Compiler version and flags move a runtime bound by more than a gate's margin, so a
 //! gate result only means something for one build. `build-workers` refuses any other
@@ -124,6 +124,57 @@ pub fn release_dir() -> Result<String, String> {
     Ok(format!("target/{}", release_subdir()?))
 }
 
+/// How workers and references link their toolchains' runtime support libraries. On a
+/// GNU/Linux target both sides take them from their static archives: the Rust workers
+/// libgcc's unwinder (`libgcc_eh`), the C and C++ references libgcc, libstdc++ and
+/// libatomic. A process then maps only the toolchain support code its own libraries use.
+/// The C library, libc with libm, and third-party libraries stay shared on both sides.
+/// Elsewhere both sides link as their toolchains do.
+pub const LINK_POLICY: &str = "static-toolchain-runtime-v1";
+
+/// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
+fn static_runtime(target: &str) -> bool {
+    target.contains("-linux-gnu")
+}
+
+/// The arguments `cargo rustc` passes to a worker's own compile, after `--`, to link
+/// it under [`LINK_POLICY`]. Placed with the worker's native libraries, ahead of the
+/// standard library's `-lgcc_s`, libgcc's static unwinder resolves every unwinder
+/// import, and the linker leaves the unneeded `libgcc_s` out.
+pub fn worker_link_arguments() -> Result<Vec<String>, String> {
+    worker_target().map(worker_link_flags)
+}
+
+fn worker_link_flags(target: &str) -> Vec<String> {
+    if static_runtime(target) {
+        vec!["-l".to_owned(), "static:-bundle=gcc_eh".to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// A reference's link flags under [`LINK_POLICY`]: libstdc++ and libatomic from their
+/// static archives, and libgcc from its own with `-static-libgcc`.
+pub fn reference_link_flags(flags: Vec<String>) -> Result<Vec<String>, String> {
+    Ok(reference_flags(worker_target()?, flags))
+}
+
+fn reference_flags(target: &str, flags: Vec<String>) -> Vec<String> {
+    if !static_runtime(target) {
+        return flags;
+    }
+    let mut linked: Vec<String> = flags
+        .into_iter()
+        .map(|flag| match flag.as_str() {
+            "-lstdc++" => "-l:libstdc++.a".to_owned(),
+            "-latomic" => "-l:libatomic.a".to_owned(),
+            _ => flag,
+        })
+        .collect();
+    linked.push("-static-libgcc".to_owned());
+    linked
+}
+
 /// Whether an environment variable changes how cargo compiles a worker.
 fn compiler_variable(name: &str) -> bool {
     matches!(
@@ -238,6 +289,7 @@ pub fn current(root: &Path) -> Result<Vec<(String, Value)>, String> {
             "cargo_configuration".to_owned(),
             Value::strings(configuration(root, cargo_home().as_deref())),
         ),
+        ("link_policy".to_owned(), Value::str(LINK_POLICY)),
     ])
 }
 
@@ -272,6 +324,11 @@ pub fn refusals(identity: &Value, pinned: &str) -> Vec<String> {
             reasons.push(format!("Cargo configuration: {}", keys.join(", ")));
         }
         None => reasons.push("records no Cargo configuration".to_owned()),
+    }
+    match identity.get("link_policy").and_then(Value::as_str) {
+        Some(LINK_POLICY) => {}
+        Some(found) => reasons.push(format!("link policy {found}, not {LINK_POLICY}")),
+        None => reasons.push("records no link policy".to_owned()),
     }
     reasons
 }
@@ -388,11 +445,47 @@ pub fn cpus() -> Value {
     Value::object([("allowed", allowed), ("online", online)])
 }
 
+/// The CPUs this process may use, as Linux lists them in `Cpus_allowed_list`;
+/// `None` where the system does not say.
+pub fn allowed_cpu_list() -> Option<Vec<usize>> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    parse_cpu_list(allowed_cpus(&status)?)
+}
+
+/// A Linux CPU list such as `1-3,7` as CPU numbers.
+fn parse_cpu_list(list: &str) -> Option<Vec<usize>> {
+    let mut cpus = Vec::new();
+    for part in list.split(',').filter(|part| !part.is_empty()) {
+        let (first, last) = part.split_once('-').unwrap_or((part, part));
+        let first: usize = first.trim().parse().ok()?;
+        let last: usize = last.trim().parse().ok()?;
+        if first > last {
+            return None;
+        }
+        cpus.extend(first..=last);
+    }
+    Some(cpus)
+}
+
 fn allowed_cpus(status: &str) -> Option<&str> {
     status
         .lines()
         .find_map(|line| line.strip_prefix("Cpus_allowed_list:"))
         .map(str::trim)
+}
+
+#[cfg(test)]
+mod cpu_list_tests {
+    use super::parse_cpu_list;
+
+    #[test]
+    fn cpu_lists_expand_ranges() {
+        assert_eq!(parse_cpu_list("1"), Some(vec![1]));
+        assert_eq!(parse_cpu_list("0-2,7"), Some(vec![0, 1, 2, 7]));
+        assert_eq!(parse_cpu_list("1-15").map(|c| c.len()), Some(15));
+        assert_eq!(parse_cpu_list("3-1"), None);
+        assert_eq!(parse_cpu_list("a"), None);
+    }
 }
 
 #[cfg(test)]
@@ -444,6 +537,7 @@ mod tests {
             ("rustc", Value::str(format!("rustc\nrelease: {PIN}\n"))),
             ("build_environment", Value::Object(Vec::new())),
             ("cargo_configuration", Value::Array(Vec::new())),
+            ("link_policy", Value::str(LINK_POLICY)),
         ];
         Value::Object(
             base.into_iter()
@@ -516,8 +610,48 @@ mod tests {
             ("rustc", "records no compiler"),
             ("build_environment", "records no build environment"),
             ("cargo_configuration", "records no Cargo configuration"),
+            ("link_policy", "records no link policy"),
         ] {
             assert_eq!(refusals(&record(key, None), PIN), [reason]);
+        }
+    }
+
+    #[test]
+    fn a_build_linked_under_another_policy_is_refused() {
+        let earlier = record("link_policy", Some(Value::str("toolchain-default")));
+        assert_eq!(
+            refusals(&earlier, PIN),
+            ["link policy toolchain-default, not static-toolchain-runtime-v1"]
+        );
+    }
+
+    #[test]
+    fn gnu_linux_workers_and_references_take_toolchain_runtime_from_static_archives() {
+        let flags = ["-L/p", "-lharfbuzz", "-lstdc++", "-lm", "-lz", "-latomic"];
+        let flags = || flags.map(String::from).to_vec();
+        for target in [
+            ARM32_TARGET,
+            "aarch64-unknown-linux-gnu",
+            "x86_64-unknown-linux-gnu",
+        ] {
+            assert_eq!(worker_link_flags(target), ["-l", "static:-bundle=gcc_eh"]);
+            // The C library, libc with libm, and third-party libraries stay shared.
+            assert_eq!(
+                reference_flags(target, flags()),
+                [
+                    "-L/p",
+                    "-lharfbuzz",
+                    "-l:libstdc++.a",
+                    "-lm",
+                    "-lz",
+                    "-l:libatomic.a",
+                    "-static-libgcc"
+                ]
+            );
+        }
+        for target in ["aarch64-apple-darwin", "aarch64-unknown-linux-musl"] {
+            assert!(worker_link_flags(target).is_empty());
+            assert_eq!(reference_flags(target, flags()), flags());
         }
     }
 
