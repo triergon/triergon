@@ -421,8 +421,9 @@ as do the numpy table-recovery chains under `harness/codecs/` and the capture in
 generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draws the
 cited capture inputs depend on. `cargo xtask codecs` grades, times, measures the memory
 of and records the identities of the codec crates against the pinned FFmpeg decoders,
-and compares the packets of the audio container readers with its `ffprobe`
-(`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
+and compares the packets of the audio container readers, and the Ogg reader's
+packets after seeks, with its `ffprobe` (`harness/codecs/STATUS.md`; the gate runs the
+Ogg lanes); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask codecs aac-access-units` prepares the [configured AAC
 workloads](../harness/features/aac-access-units/contract.json) from the pinned
@@ -953,10 +954,11 @@ keys, the packs of the others uploaded), the generated fixtures, vectors, font c
 and manifests, and the workers; and each INPUT, an archive of media inputs the
 repository does not generate, with repository-relative paths: evidence set
 `gate-media-inputs` holds the FATE samples, the codec workload inputs and the
-subtitle corpus the gate reads, and set `codec-file-workload-inputs` the inputs of
-[file-workloads.json](../harness/codecs/file-workloads.json)
+subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
+[file-workloads.json](../harness/codecs/file-workloads.json), and set
+`ogg-reader-inputs` the inputs of the Ogg reader comparison
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/index.json)); a gate image is built with both. The image
+[index](../harness/evidence/index.json)); a gate image is built with all three. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.

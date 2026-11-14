@@ -21,18 +21,21 @@ use crate::json::Value;
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
-       [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--external-vector]
-       [--capture CASES] [--reference NAME]... [--review FILE | --standard-memory] [--kernel]
+       [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--readers LANE,...]
+       [--external-vector] [--capture CASES] [--reference NAME]...
+       [--review FILE | --standard-memory] [--kernel]
 
 Check, before a gate run measures anything, that the build identity's workers and
 references are current and the gate build; that each --feature's cases name known
 references and have every input with its pinned hash (in --corpus, else the
 manifest's recorded directory, else .research/fixtures; --manifest replaces the
 contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with --codecs
-each workload list's inputs, with --external-vector the mandatory external vector
+each workload list's inputs, with --readers the reader comparison's inputs of those
+lanes (harness/codecs/reader-manifest.json; reader-ogg-seek is reader-ogg's seek
+cases, harness/codecs/reader-seeks.json), with --external-vector the mandatory external vector
 and with --capture the capture cases, their input generator and its numpy Python;
-that each named reference was built and is current: those --isobmff, --codecs and
---capture measure against, and any --reference; that the RSS module review covers
+that each named reference was built and is current: those --isobmff, --codecs,
+--readers and --capture measure against, and any --reference; that the RSS module review covers
 this module source and kernel (the committed review,
 harness/rss-bound/reviews/SOURCE-RELEASE.json, or --review FILE), unless the run's
 memory uses the standard bounds (--standard-memory); and that the RSS module is
@@ -50,6 +53,8 @@ struct Options {
     manifests: BTreeMap<String, PathBuf>,
     isobmff: bool,
     codecs: Vec<PathBuf>,
+    /// Reader comparison lanes.
+    readers: Vec<String>,
     external_vector: bool,
     capture: Option<PathBuf>,
     references: Vec<String>,
@@ -84,6 +89,9 @@ impl Options {
                 "--manifest" => pair(&mut options.manifests, value()?)?,
                 "--isobmff" => options.isobmff = true,
                 "--codecs" => options.codecs.push(root.join(value()?)),
+                "--readers" => options
+                    .readers
+                    .extend(value()?.split(',').map(str::to_owned)),
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
                 "--reference" => options.references.push(value()?),
@@ -164,6 +172,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         checks.check(
             format!("codec workloads {}", workloads.display()),
             codec_inputs(root, workloads),
+        );
+    }
+    if !options.readers.is_empty() {
+        checks.check(
+            format!("reader inputs {}", options.readers.join(",")),
+            reader_inputs(root, &options.readers),
         );
     }
     if options.external_vector {
@@ -254,7 +268,7 @@ impl Options {
         if self.isobmff {
             names.push(crate::isobmff_bench::REFERENCE.to_owned());
         }
-        if !self.codecs.is_empty() {
+        if !self.codecs.is_empty() || !self.readers.is_empty() {
             names.push("ffmpeg-decode-native".to_owned());
         }
         if self.capture.is_some() {
@@ -387,6 +401,64 @@ fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
     }
 }
 
+/// The reader comparison's manifest and seek cases.
+const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
+const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
+/// The lane of the seek cases, which read reader-ogg's vectors.
+const SEEK_LANE: &str = "reader-ogg-seek";
+
+/// The reader comparison's vectors of `lanes`, as paths with their pins, after the
+/// manifests that list them.
+fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = vec![(root.join(READER_MANIFEST), None)];
+    let mut wanted: Vec<&str> = lanes.iter().map(String::as_str).collect();
+    if wanted.contains(&SEEK_LANE) {
+        files.push((root.join(READER_SEEKS), None));
+        wanted.push("reader-ogg");
+    }
+    let manifest = read_json(&root.join(READER_MANIFEST))?;
+    let mut vectors = 0;
+    for vector in manifest
+        .get("vectors")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let text = |key| vector.get(key).and_then(Value::as_str);
+        if !text("lane").is_some_and(|lane| wanted.contains(&lane)) {
+            continue;
+        }
+        let path = text("path").ok_or("a reader vector without a path")?;
+        let pin = text("sha256").ok_or("a reader vector without a hash")?;
+        files.push((root.join(path), Some(pin.to_owned())));
+        vectors += 1;
+    }
+    if vectors == 0 {
+        return Err(format!("no reader vectors of {}", lanes.join(",")));
+    }
+    Ok(files)
+}
+
+/// Every reader vector of `lanes` exists with its pinned hash.
+fn reader_inputs(root: &Path, lanes: &[String]) -> R<String> {
+    let files = reader_files(root, lanes)?;
+    let mut problems = Vec::new();
+    let mut vectors = 0;
+    for (path, pin) in &files {
+        let Some(pin) = pin else { continue };
+        vectors += 1;
+        match sha256::file_hex(path) {
+            Ok(actual) if actual == *pin => {}
+            Ok(_) => problems.push(format!("{} differs from its pin", path.display())),
+            Err(error) => problems.push(format!("{}: {error}", path.display())),
+        }
+    }
+    if problems.is_empty() {
+        Ok(format!("{vectors} inputs"))
+    } else {
+        Err(problems.join("; "))
+    }
+}
+
 /// The contract that names the mandatory external vectors.
 const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
 
@@ -484,6 +556,11 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
             let (path, pin) =
                 input.ok_or_else(|| format!("{}: {id}: no path or hash", list.display()))?;
             add(root.join(path), Some(pin));
+        }
+    }
+    if !options.readers.is_empty() {
+        for (path, pin) in reader_files(root, &options.readers)? {
+            add(path, pin.as_deref());
         }
     }
     if options.external_vector {
