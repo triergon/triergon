@@ -910,11 +910,14 @@ or to take a new base image.
 `tools/gate-aws.sh run TARGET N REVISION OUT` launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
 archive's packs (building and uploading the others), gets each host ready and runs
-shard I of N on host I. The shards' outputs are archived under
-`qualification/gate-runs/`, where they expire after 90 days unless promoted, and the
-logs, step records and the summary are copied to OUT; each host is terminated once its
-outputs are collected. The command exits non-zero when a shard did not finish or the
-summary fails. Every host is a c6g.4xlarge, the class kernel-bound memory is qualified
+shard I of N on host I. When a shard ends, finished or not, its host's outputs are
+archived under `qualification/gate-runs/`, where they expire after 90 days unless
+promoted, and checked by downloading them back on the host; its logs and step records
+are copied to OUT, and the host is terminated. The last shard to end keeps its host
+for the summary when every shard finished, and a host whose outputs could not be
+archived stays until the command ends. OUT/hosts.txt records when each host was
+launched, ready, done and terminated. The command exits non-zero when a shard did not
+finish or the summary fails. Every host is a c6g.4xlarge, the class kernel-bound memory is qualified
 on, SSH is open to one address (`TRIERGON_SSH_CIDR`, a /32), and a timer on the host's
 disk powers it off, and so terminates it, 72 hours after it boots.
 

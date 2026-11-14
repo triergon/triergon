@@ -17,7 +17,8 @@
 #       archive, gets ready, and runs its shard (tools/gate-host.sh); the
 #       shards' outputs are archived under qualification/gate-runs/, their logs
 #       and records copied to OUT, and joined by `cargo xtask gate summary`
-#       into OUT/summary.json. The RSS module review is the one REVISION commits
+#       into OUT/summary.json. Each host is terminated as soon as its shard's
+#       outputs are archived and checked. The RSS module review is the one REVISION commits
 #       for its module source and the image's kernel
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
@@ -70,7 +71,7 @@ systemctl enable --now triergon-expire.timer
 # disturb what it times on CPU 1.
 POLL=60
 STATE=
-ARCHIVE_RUN=
+RUN_OBJECT=
 NAME=
 SG=
 INSTANCES=()
@@ -289,29 +290,97 @@ image() {
     echo "$ami"
 }
 
-# Get host I ready for shard I of COUNT, run it, and collect its outputs: archived
-# whole under ARCHIVE_RUN, their logs and records copied to OUT/shard-I. Host 1 stays
-# for the summary; every other host is terminated once its outputs are collected.
+# Get host I ready for shard I of COUNT and run it. However it ends, collect what
+# the host has (see collect) and release it (see release).
 shard() {
     local i=$1 count=$2 target=$3 revision=$4 out=$5 full=$6
-    local inside repository run=".research/gate/$revision"
-    inside=$(inside_command "$target"); repository=$(repository_path "$target")
+    mkdir -p "$out/shard-$i"
+    trap 'collect "$i" "$target" "$revision" "$out"; release "$i" "$count" "$out"' EXIT
     reachable "$i"
     copy "$i" "$HERE/gate-host.sh" gate-host.sh
-    on "$i" "bash ~/gate-host.sh checkout $revision" | tail -n +2 | fetch_packs "$i" "$repository"
+    on "$i" "bash ~/gate-host.sh checkout $revision" | tail -n +2 |
+        fetch_packs "$i" "$(repository_path "$target")"
     detached "$i" "READY" ready "$i/$count"
-    detached "$i" "DONE" run "$i/$count" "$run" "$full"
-    mkdir -p "$out/shard-$i"
-    on "$i" "cat ~/gate-host.log" > "$out/shard-$i/gate-host.log"
-    on "$i" "cd $repository/$run && tar -cf - . | zstd -q -T0" |
-        aws s3 cp --only-show-errors - "$ARCHIVE_RUN/shard-$i.tar.zst"
-    on "$i" "cd $repository/$run && tar -cf - shard.json identity-*.json run.log steps logs" |
+    detached "$i" "DONE" run "$i/$count" ".research/gate/$revision" "$full"
+    touch "$out/shard-$i/finished"
+}
+
+# Collect what host I holds of its shard: its outputs archived whole as
+# RUN_OBJECT/shard-I.tar.zst and checked by downloading them back on the host
+# (OUT/shard-I/verified on a match), their logs and records copied to OUT/shard-I,
+# and the packs of reference builds it made uploaded. Best effort: a host that
+# failed or hangs gives what it can.
+collect() {
+    local i=$1 target=$2 revision=$3 out=$4
+    local inside repository run=".research/gate/$revision" object="$RUN_OBJECT/shard-$i.tar.zst"
+    set +e
+    inside=$(inside_command "$target"); repository=$(repository_path "$target")
+    on "$i" "cat ~/gate-host.log" > "$out/shard-$i/gate-host.log" < /dev/null
+    local packed
+    packed=$(on "$i" "cd $repository/$run && tar -cf - . | zstd -q -T0 > ~/shard.tar.zst && sha256sum < ~/shard.tar.zst | cut -c1-64" < /dev/null)
+    if [ -n "$packed" ] &&
+        on "$i" "cat ~/shard.tar.zst" < /dev/null | aws s3 cp --only-show-errors - "$ARCHIVE/$object" &&
+        [ "$(on "$i" "curl -fsS --retry 3 '$(presign "$object")' | sha256sum | cut -c1-64" < /dev/null)" = "$packed" ]; then
+        echo "$packed" > "$out/shard-$i/verified"
+    else
+        say "host $i: its outputs are not archived"
+    fi
+    on "$i" "cd $repository/$run && tar -cf - shard.json identity-*.json run.log steps logs 2>/dev/null" < /dev/null |
         tar -xf - -C "$out/shard-$i"
     upload_packs "$i" "$inside" "$repository"
-    if [ "$i" != 1 ]; then
-        aws ec2 terminate-instances --instance-ids "${INSTANCES[$((i - 1))]}" >/dev/null
-        say "host $i collected and terminated"
+}
+
+# Release host I once its shard has ended: the last shard to end keeps its host for
+# the summary (OUT/summary-host) when every shard finished; any other host is
+# terminated, unless its outputs are not archived, when it stays for the session's
+# teardown.
+release() {
+    local i=$1 count=$2 out=$3
+    until mkdir "$out/.release" 2>/dev/null; do sleep 1; done
+    echo "$i" >> "$out/ended"
+    if [ "$(wc -l < "$out/ended")" -eq "$count" ] &&
+        [ "$(find "$out" -path "$out/shard-*/finished" | wc -l)" -eq "$count" ]; then
+        echo "$i" > "$out/summary-host"
+        rmdir "$out/.release"
+        say "host $i kept for the summary"
+    else
+        rmdir "$out/.release"
+        if [ -f "$out/shard-$i/verified" ]; then
+            terminate "$i" "$out"
+        else
+            say "host $i kept until the session ends: its outputs are not archived"
+        fi
     fi
+}
+
+# Terminate host I, recording when in OUT/terminated-I.
+terminate() {
+    local i=$1 out=$2
+    aws ec2 terminate-instances --instance-ids "${INSTANCES[$((i - 1))]}" >/dev/null &&
+        date -u +%FT%TZ > "$out/terminated-$i" && say "host $i collected and terminated"
+}
+
+# Join every shard's records on host I into OUT/summary.json (archived beside the
+# shards' outputs) with `cargo xtask gate summary`, then terminate the host.
+summarise() {
+    local host=$1 target=$2 count=$3 out=$4
+    local i repository inside shards="" status=0
+    repository=$(repository_path "$target"); inside=$(inside_command "$target")
+    for i in $(seq 1 "$count"); do
+        [ -f "$out/shard-$i/shard.json" ] || continue
+        (cd "$out" && COPYFILE_DISABLE=1 tar -cf - "shard-$i"/shard.json "shard-$i"/steps "shard-$i"/identity-*.json) |
+            on "$host" "mkdir -p $repository/.research/gate/shards && tar -xf - -C $repository/.research/gate/shards"
+        shards="$shards .research/gate/shards/shard-$i"
+    done
+    if ! on "$host" "$inside 'cd ~/triergon && . ~/.cargo/env && cargo xtask gate summary --output .research/gate/summary.json$shards'" \
+        > "$out/summary.txt"; then
+        say "the summary fails: $out/summary.txt"
+        status=1
+    fi
+    on "$host" "cat $repository/.research/gate/summary.json" > "$out/summary.json" || true
+    aws s3 cp --only-show-errors "$out/summary.json" "$ARCHIVE/$RUN_OBJECT/summary.json" || true
+    terminate "$host" "$out"
+    return "$status"
 }
 
 run() {
@@ -323,8 +392,10 @@ run() {
         --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
     session "triergon-gate-run-$target-$stamp"
     POLL=300
-    ARCHIVE_RUN="$ARCHIVE/qualification/gate-runs/$revision-$target-$stamp"
+    RUN_OBJECT="qualification/gate-runs/$revision-$target-$stamp"
     mkdir -p "$out"
+    rm -f "$out/ended" "$out/summary-host" "$out"/terminated-* "$out"/shard-*/finished "$out"/shard-*/verified
+    rmdir "$out/.release" 2>/dev/null || true
     launch "$ami" "$count"
     say "$count hosts from $ami: ${INSTANCES[*]}"
     local i pids=()
@@ -336,27 +407,18 @@ run() {
     for i in "${!pids[@]}"; do
         wait "${pids[$i]}" || { say "shard $((i + 1)) did not finish"; failed=1; }
     done
-    local repository inside shards=""
-    repository=$(repository_path "$target"); inside=$(inside_command "$target")
-    for i in $(seq 1 "$count"); do
-        [ -f "$out/shard-$i/shard.json" ] || continue
-        (cd "$out" && COPYFILE_DISABLE=1 tar -cf - "shard-$i"/shard.json "shard-$i"/steps "shard-$i"/identity-*.json) |
-            on 1 "mkdir -p $repository/.research/gate/shards && tar -xf - -C $repository/.research/gate/shards"
-        shards="$shards .research/gate/shards/shard-$i"
-    done
-    if ! on 1 "$inside 'cd ~/triergon && . ~/.cargo/env && cargo xtask gate summary --output .research/gate/summary.json$shards'" \
-        > "$out/summary.txt"; then
-        say "the summary fails: $out/summary.txt"
-        failed=1
+    if [ -f "$out/summary-host" ]; then
+        summarise "$(cat "$out/summary-host")" "$target" "$count" "$out" || failed=1
+    else
+        say "no summary: not every shard finished"
     fi
-    on 1 "cat $repository/.research/gate/summary.json" > "$out/summary.json" || true
-    aws s3 cp --only-show-errors "$out/summary.json" "$ARCHIVE_RUN/summary.json" || true
     for i in $(seq 1 "$count"); do
         echo "host $i: launched $(cat "$STATE/launched-$i")" \
+            "terminated $(cat "$out/terminated-$i" 2>/dev/null || echo "with the session")" \
             "$(grep -m1 READY "$out/shard-$i/gate-host.log" 2>/dev/null)" \
             "$(grep DONE "$out/shard-$i/gate-host.log" 2>/dev/null | tail -1)"
     done | tee "$out/hosts.txt"
-    say "outputs archived under ${ARCHIVE_RUN#"$ARCHIVE"/}/"
+    say "outputs archived under $RUN_OBJECT/"
     return "$failed"
 }
 
