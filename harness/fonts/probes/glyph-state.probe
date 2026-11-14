@@ -1,0 +1,31 @@
+# What glyph programs start from. Observed: each glyph starts from the control
+# values and storage the control value program left, whatever earlier
+# glyphs wrote. The control value program writes cvt 0 = 640 and storage 0 =
+# 320; glyph 0 reads both into point 1 and point 0, glyph 1 overwrites both,
+# glyph 2 reads them again.
+heights 16384
+cvt 100 200
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  PUSH 0 640; WCVTP; PUSH 0 320; WS
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1 0; RCVT; SCFS; PUSH 0 0; RS; SCFS
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    PUSH 0 1280; WCVTP; PUSH 0 1000; WS; SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1 0; RCVT; SCFS; PUSH 0 0; RS; SCFS
+  end
+end

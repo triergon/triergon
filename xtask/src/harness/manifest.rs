@@ -130,7 +130,7 @@ pub fn sources(root: &Path, path: &Path) -> Vec<PathBuf> {
 
 /// The generated manifest for a `corpus.json` path beside a generated feature's
 /// contract.
-fn generated(root: &Path, path: &Path) -> Option<Result<Value, String>> {
+pub(crate) fn generated(root: &Path, path: &Path) -> Option<Result<Value, String>> {
     if path.file_name().is_none_or(|n| n != "corpus.json")
         || !path.with_file_name("contract.json").is_file()
     {

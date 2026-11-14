@@ -377,11 +377,10 @@ event's horizontal border for the width of its box. Built with GCC it wraps,
 and the renderer doubles it in wrapping `int` arithmetic too, so a
 `BorderStyle` 4 event whose horizontal border exceeds 2³⁰ frame pixels loses
 its box as it does in libass. The case is `ass-render-host`'s, pinned per
-target: libass built with GCC for `aarch64-unknown-linux-gnu` converts the
-event box's top, height, left and width from `double` to `int` together, with
-vector instructions that keep the low 32 bits of each where 32-bit ARM
-saturates, so there it also loses the box of a vertical border beyond 2³⁰
-frame pixels, and a huge border moves colliding events elsewhere. The renderer
+target: libass built with GCC for `aarch64-unknown-linux-gnu` gives an event
+box value outside the signed 32-bit range (its top, height, left or width) its
+low 32 bits, where libass on 32-bit ARM saturates it, so there it also loses the
+box of a vertical border beyond 2³⁰ frame pixels, and a huge border moves colliding events elsewhere. The renderer
 follows 32-bit ARM.
 
 ## Behaviour and limits

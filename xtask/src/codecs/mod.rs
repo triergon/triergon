@@ -46,9 +46,10 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282,
                  ending early once settled below the ceiling)
   memory --candidate W --reference W --workloads F --root R --out DIR
-         [--pairs N] [--seed S] [--only ID,...] [--full] [--no-early-stop]
+         [--pairs N] [--seed S] [--only ID,...] [--part I/N] [--full] [--no-early-stop]
                  paired peak heap and total resident peak RSS of the decoder workloads
-                 under the shared observer (30 pairs, seed 283)
+                 under the shared observer (30 pairs, seed 283); --part I/N takes
+                 every Nth workload from the Ith
                  a result a kept evidence set holds is reused unless --full
   equivalence --output F [--compare F] [--jobs N]
                  record every decoder output identity; --compare checks an earlier record
@@ -97,6 +98,56 @@ impl Gate<'_> {
         )?;
         crate::harness::reuse::step(repository, self.out, &key, full, || run().map(|()| 0))
     }
+}
+
+/// The verdict of a codec collection's bounds, `results` each workload's id and whether
+/// its bound held. Where the gate applies (`gated`: native Linux AArch64, the gate
+/// build) a failed bound fails the collection, as a failed case fails a grade, and its
+/// lines tell failures that are only the list's `open_workloads` from others, as a
+/// grade's do; elsewhere the bounds are diagnostics and fail nothing. Returns the lines
+/// to print and whether the collection fails.
+pub fn bounds(
+    list: &Value,
+    name: &str,
+    what: &str,
+    results: &[(String, bool)],
+    gated: bool,
+) -> (Vec<String>, bool) {
+    let passed = results.iter().filter(|(_, held)| *held).count();
+    let total = results.len();
+    if !gated {
+        return (
+            vec![format!(
+                "{name} {what}: diagnostic on this target, not gated: {passed} of {total} within the bound"
+            )],
+            false,
+        );
+    }
+    let open: Vec<&str> = list
+        .get("open_workloads")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let failed: Vec<&str> = results
+        .iter()
+        .filter(|(_, held)| !held)
+        .map(|(id, _)| id.as_str())
+        .collect();
+    let (listed, other): (Vec<&str>, Vec<&str>) = failed.iter().partition(|id| open.contains(id));
+    let mut lines = vec![format!("{name} {what}: {passed} of {total} cases pass")];
+    if !listed.is_empty() {
+        lines.push(format!(
+            "{name} {what}: {} open failures, as listed: {}",
+            listed.len(),
+            listed.join(", ")
+        ));
+    }
+    if !other.is_empty() {
+        lines.push(format!("{name} {what}: failing: {}", other.join(", ")));
+    }
+    (lines, !failed.is_empty())
 }
 
 /// `--name value` and `--name=value` options and positional arguments, as
@@ -263,6 +314,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "pairs",
                     "seed",
                     "only",
+                    "part",
                 ],
                 &["full", "no-early-stop"],
             )?;
@@ -276,10 +328,12 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 pairs: a.number("pairs")?.unwrap_or(memory::PAIRS),
                 seed: a.number("seed")?.map_or(memory::SEED, |s| s as u64),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                part: a.get("part").map(crate::gate::parse_part).transpose()?,
                 early_stop: a.get("no-early-stop").is_none(),
             };
             let settings = Value::object([
                 ("pairs", Value::int(options.pairs as i64)),
+                ("part", a.get("part").map_or(Value::Null, Value::str)),
                 ("seed", Value::int(options.seed)),
                 (
                     "only",

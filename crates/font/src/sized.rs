@@ -3,14 +3,15 @@
 //! hinted advances HarfBuzz receives, vertical advances, kerning and decoration
 //! lines.
 
+use crate::bytecode::{GlyphPoints, Hinter, Programs, Tables};
 use crate::fixed::Scale;
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Glyf};
 use crate::long;
-use crate::outline::Outline;
+use crate::outline::{Outline, Point};
 use crate::synthesis::Synthesis;
 use crate::{Font, GlyphId, GlyphMetrics, Outlines, VerticalMetrics};
-use triergon_core::{Error, Result, WorkBudget};
+use triergon_core::{BudgetVec, Error, Result, WorkBudget};
 
 /// libass's largest outline coordinate, `OUTLINE_MAX`.
 const OUTLINE_MAX: i64 = (1 << 28) - 1;
@@ -390,14 +391,20 @@ impl<'f> SizedFont<'f> {
     ///   phantom points (the scaled advance in a fixed-pitch face and for
     ///   digits of one width), its vertical advance is scaled by the style's
     ///   vertical scale, which the latin writing system fits to the x height;
+    /// - a glyph of a TrueType face with bytecode through the TrueType
+    ///   interpreter, as FreeType's runs it in backward compatibility mode:
+    ///   loaded at the hinted scale, each glyph's program run on its points
+    ///   as it loads, a composite's after its components'; its advances are
+    ///   the unhinted ones;
     /// - at zero pixels per em, the unscaled, unhinted load.
     ///
     /// # Errors
     ///
-    /// For [`Load::Default`], `Unsupported` for TrueType glyphs that need
-    /// FreeType's TrueType interpreter, for glyphs of the auto-hinter's CJK
-    /// and Indic styles, and where [`Self::default_advance`] is; `Policy`
-    /// when `work` runs out; otherwise those of [`Self::outline_into`].
+    /// For [`Load::Default`], `Unsupported` for glyphs of the auto-hinter's
+    /// CJK and Indic styles and where [`Self::default_advance`] is;
+    /// `Invalid` for a face whose font or control value program stops on an
+    /// error; `Policy` when `work` runs out; otherwise those of
+    /// [`Self::outline_into`].
     pub fn load(
         &self,
         glyph: GlyphId,
@@ -421,10 +428,9 @@ impl<'f> SizedFont<'f> {
             return autofit.load(font, glyph, self.scaler(), outline, work);
         }
         let index = font.check(glyph)?;
-        let Outlines::Cff(cff) = &font.outlines else {
-            return Err(Error::Unsupported(
-                "hinted outlines of FreeType's TrueType interpreter",
-            ));
+        let cff = match &font.outlines {
+            Outlines::Glyf(table) => return self.load_instructed(table, glyph, outline, work),
+            Outlines::Cff(cff) => cff,
         };
         cff.load_hinted(
             font.data.as_ref(),
@@ -435,6 +441,75 @@ impl<'f> SizedFont<'f> {
             work,
         )?;
         let advances = font.cff_advances(cff, glyph, index, self.hinted_scale)?;
+        let mut metrics = GlyphMetrics::of(advances, outline)?;
+        metrics.linear_vertical_advance =
+            long::linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
+        self.fit_box(&mut metrics);
+        metrics.advance = glyf::narrow(self.fit(i64::from(metrics.advance)))?;
+        metrics.vertical_advance = glyf::narrow(self.fit(i64::from(metrics.vertical_advance)))?;
+        Ok(metrics)
+    }
+
+    /// The default load of a glyph of a face with TrueType programs: its
+    /// points loaded at the hinted scale, each glyph's program run on them
+    /// as it loads, and the metrics fitted to the grid.
+    // Out of line: inlined into `load`, it makes every other default load
+    // dearer.
+    #[inline(never)]
+    fn load_instructed(
+        &self,
+        table: &Glyf,
+        glyph: GlyphId,
+        outline: &mut Outline,
+        work: &mut WorkBudget,
+    ) -> Result<GlyphMetrics> {
+        let font = self.font;
+        let Some(bytecode) = &font.bytecode else {
+            return Err(Error::Unsupported(
+                "hinted outlines without the TrueType interpreter",
+            ));
+        };
+        let data = font.data.as_ref();
+        let bytes = |t: Option<crate::sfnt::Table>| t.map_or(&[][..], |t| t.bytes(data));
+        let programs = Programs {
+            font: bytes(font.tables.fpgm),
+            control: bytes(font.tables.prep),
+        };
+        let (ppem, scale) = (self.metrics.y_ppem, self.hinted_scale);
+        // The interpreter runs the font and control value programs once per
+        // size, and keeps the state they leave for the size's glyphs.
+        let tables = || {
+            let table = |tag| font.table(tag).unwrap_or_default();
+            Tables {
+                programs,
+                cvt: table(*b"cvt "),
+                maxp: table(*b"maxp"),
+                gasp: table(*b"gasp"),
+            }
+        };
+        let m = bytecode.with_size(tables, ppem, scale.y, font.limits.work, |state| {
+            state.units.clear();
+            let mut hinting = GlyfHinting {
+                font,
+                hinter: &mut state.hinter,
+                programs,
+                units: &mut state.units,
+                ends: &mut state.ends,
+            };
+            outline.begin(font.limits.points);
+            table.outline(
+                &font.glyf_context(),
+                glyph,
+                scale,
+                outline,
+                work,
+                &mut hinting,
+            )
+        })?;
+        let (origin, advances) = font.glyf_advances(m, scale);
+        if origin != 0 {
+            glyf::translate(outline.points_mut(), (-origin, 0))?;
+        }
         let mut metrics = GlyphMetrics::of(advances, outline)?;
         metrics.linear_vertical_advance =
             long::linear_advance(metrics.linear_vertical_advance, self.metrics.y_scale);
@@ -610,9 +685,102 @@ impl<'f> SizedFont<'f> {
     }
 }
 
+/// The phantom points `units` (font units) as the programs see them at the
+/// 16.16 `scale`. Observed: the horizontal ones' x and the vertical ones' y
+/// on the pixel grid, the vertical ones at half the advance
+/// (`phantom-points`). `Overflow` for a point outside 32 bits.
+fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<[Point; 4]> {
+    let scaled = |u: i32| i32::try_from(mul_fix(i64::from(u), scale)).map_err(|_| Error::Overflow);
+    let fitted = |u: i32| {
+        scaled(u)?
+            .checked_add(32)
+            .map(|v| v & !63)
+            .ok_or(Error::Overflow)
+    };
+    let [pp1, pp2, pp3, pp4] = units;
+    let middle = scaled(((i64::from(pp2.x) - i64::from(pp1.x)) / 2) as i32)?;
+    Ok([
+        Point::new(fitted(pp1.x)?, 0),
+        Point::new(fitted(pp2.x)?, 0),
+        Point::new(middle, fitted(pp3.y)?),
+        Point::new(middle, fitted(pp4.y)?),
+    ])
+}
+
+/// Runs each glyph's program as a hinted TrueType load builds its outline.
+struct GlyfHinting<'h> {
+    font: &'h Font,
+    hinter: &'h mut Hinter,
+    programs: Programs<'h>,
+    /// The font-unit positions of the outline's points.
+    units: &'h mut BudgetVec<Point>,
+    /// One glyph's contour ends, relative to its first point.
+    ends: &'h mut BudgetVec<u32>,
+}
+
+impl glyf::Hint for GlyfHinting<'_> {
+    const ACTIVE: bool = true;
+
+    fn unit(&mut self, unit: Point) -> Result<()> {
+        self.units.try_push(unit).map_err(|e| e.error)
+    }
+
+    fn grid_fitting(&self) -> bool {
+        self.hinter.grid_fitting()
+    }
+
+    fn glyph(
+        &mut self,
+        glyph: glyf::Loaded<'_>,
+        outline: &mut Outline,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let glyf::Loaded {
+            metrics,
+            composite,
+            base,
+            ends,
+            instructions,
+        } = glyph;
+        let first = u32::try_from(base).map_err(|_| Error::Overflow)?;
+        self.ends.clear();
+        for &end in &outline.contour_ends()[ends..] {
+            let end = end.checked_sub(first).ok_or(Error::Overflow)?;
+            self.ends.try_push(end).map_err(|e| e.error)?;
+        }
+        let units = self.font.phantom_points(metrics);
+        let scaled = scaled_phantom_points(units, self.hinter.scale())?;
+        let points = GlyphPoints {
+            outline,
+            base,
+            ends: self.ends.as_slice(),
+            units: (!composite).then(|| &self.units.as_slice()[base..]),
+            phantoms: (scaled, units),
+        };
+        self.hinter.hint(self.programs, instructions, points, work)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::keeps_compatibility;
+    use super::{keeps_compatibility, scaled_phantom_points};
+    use crate::outline::Point;
+    use triergon_core::Error;
+
+    #[test]
+    fn phantom_points_outside_32_bits_are_an_overflow() {
+        let units = [(0, 0), (1000, 0), (0, 800), (0, -200)].map(|(x, y)| Point::new(x, y));
+        // Height 1000 at 2048 units per em.
+        assert_eq!(
+            scaled_phantom_points(units, 32000),
+            Ok([(0, 0), (512, 0), (244, 384), (244, -128)].map(|(x, y)| Point::new(x, y)))
+        );
+        let wide = [(0, 0), (32767, 0), (0, 0), (0, 0)].map(|(x, y)| Point::new(x, y));
+        assert_eq!(scaled_phantom_points(wide, 1 << 33), Err(Error::Overflow));
+        // A scaled value just under 2^31 that rounding would carry over.
+        let edge = 0x7FFF_FFF0_i64 * 65536 / 32767;
+        assert_eq!(scaled_phantom_points(wide, edge + 1), Err(Error::Overflow));
+    }
 
     #[test]
     fn instruction_control_needs_a_constant_harmless_selector() {
