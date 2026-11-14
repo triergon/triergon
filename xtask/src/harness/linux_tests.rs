@@ -1065,7 +1065,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     let result = super::memory::evaluate(
         std::path::Path::new("."),
         &samples,
-        2,
+        crate::harness::timing::Pairs::fixed(2),
         0,
         &certificate,
         None,
@@ -1084,8 +1084,14 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
             "kernel_rss_requested",
             Value::int(1),
         );
-        let refused =
-            super::memory::evaluate(std::path::Path::new("."), &kernel, 2, 0, &certificate, None);
+        let refused = super::memory::evaluate(
+            std::path::Path::new("."),
+            &kernel,
+            crate::harness::timing::Pairs::fixed(2),
+            0,
+            &certificate,
+            None,
+        );
         assert_eq!(
             refused.get("status").and_then(Value::as_str),
             Some("observer-unqualified")
@@ -1110,7 +1116,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         super::memory::evaluate(
             std::path::Path::new("."),
             &[sample.clone(), sample.clone()],
-            2,
+            crate::harness::timing::Pairs::fixed(2),
             0,
             &certificate,
             outputs,
@@ -1163,7 +1169,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     let without_growth = super::memory::evaluate(
         std::path::Path::new("."),
         &samples,
-        2,
+        crate::harness::timing::Pairs::fixed(2),
         0,
         &certificate,
         None,
