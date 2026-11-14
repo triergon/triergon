@@ -58,7 +58,9 @@ When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
 Regular AVC with a leading empty edit keeps its video start delay in range and
 forward playback. A media edit can start at a later sync sample, and a backward
-seek accounts for the composition lead. An empty edit does not produce a packet.
+seek accounts for the composition lead. A short edit retains enough of the next
+decode interval to complete its displayed pictures. An empty edit does not
+produce a packet.
 QuickTime range playback reads AAC configuration from version 1 and version 2
 sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison

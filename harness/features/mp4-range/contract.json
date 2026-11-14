@@ -29,7 +29,7 @@
     "compare the video landing extent, audio sync and start ordinals, and preroll in 48 kHz samples before comparing the complete suffix",
     "the reference uses the public MOV index, the source composition offsets and a complete roll map to select both track starts, then seeks once and reads the exact suffix",
     "compare a regular reordered AVC track with a leading empty edit through EOF and after backward seek at either side of a sync boundary",
-    "compare a leading AVC edit starting on a later sync sample and keep audio when an edited video clock cannot be represented"
+    "compare a leading AVC edit starting on a later sync sample, with and without a reordered decode tail, and keep audio at or beyond the signed video endpoint limit"
   ],
   "required_profiles": [
     "regular-open",
@@ -89,7 +89,9 @@
     "leading-video-edit-seek-at-sync",
     "leading-video-edit-trimmed-open",
     "leading-video-edit-trimmed-seek",
-    "unrepresentable-video-edit-audio-only"
+    "unrepresentable-video-edit-audio-only",
+    "signed-video-edit-endpoint-audio-only",
+    "leading-video-edit-short-reordered"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

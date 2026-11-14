@@ -621,7 +621,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         ),
     ]);
     let unrepresentable_file = "avc-unrepresentable-edit.mp4";
-    let unrepresentable = unrepresentable_video_edit_fixture(&leading_video);
+    let unrepresentable = wide_video_edit_fixture(&leading_video, (1_u64 << 59) - 64, 4_000);
     write(&output.join(unrepresentable_file), &unrepresentable)?;
     cases.push(mp4_range_case(
         "unrepresentable-video-edit-audio-only",
@@ -629,6 +629,43 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         &unrepresentable,
         [],
         (189, 32_517, 3_117_005_324_307_362_295),
+    ));
+    let signed_endpoint_file = "avc-signed-endpoint-edit.mp4";
+    let mut exact_clock = leading_video.clone();
+    // Use the video time base as the movie time base. Scale the audio
+    // edit to preserve its duration while putting the video end at i64::MAX.
+    exact_clock[81_554..81_558].copy_from_slice(&16_000_u32.to_be_bytes());
+    exact_clock[81_558..81_562].copy_from_slice(&(4_096_u32 * 16).to_be_bytes());
+    let audio_edit = exact_clock[81_790..]
+        .windows(4)
+        .position(|kind| kind == b"elst")
+        .expect("audio edit list")
+        + 81_790;
+    let span = audio_edit + 12..audio_edit + 16;
+    let duration = u32::from_be_bytes(exact_clock[span.clone()].try_into().expect("edit duration"));
+    exact_clock[span].copy_from_slice(&(duration * 16).to_be_bytes());
+    let signed_endpoint = wide_video_edit_fixture(&exact_clock, i64::MAX as u64 - 64_000, 64_000);
+    write(&output.join(signed_endpoint_file), &signed_endpoint)?;
+    cases.push(mp4_range_case(
+        "signed-video-edit-endpoint-audio-only",
+        signed_endpoint_file,
+        &signed_endpoint,
+        [],
+        (189, 32_517, 3_117_005_324_307_362_295),
+    ));
+    let short_file = "avc-leading-edit-short-reordered.mp4";
+    let mut short = leading_video.clone();
+    // Cut between presentation ticks 1328 and 1344 relative to the
+    // second sync sample, leaving a reordered decode tail.
+    short[81_778..81_782].copy_from_slice(&84_u32.to_be_bytes());
+    short[81_782..81_786].copy_from_slice(&18_672_u32.to_be_bytes());
+    write(&output.join(short_file), &short)?;
+    cases.push(mp4_range_case(
+        "leading-video-edit-short-reordered",
+        short_file,
+        &short,
+        [],
+        (202, 47_093, 7_610_120_524_339_765_167),
     ));
     cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
@@ -660,17 +697,15 @@ fn leading_video_edit_fixture(seed: &[u8]) -> Vec<u8> {
     data
 }
 
-fn unrepresentable_video_edit_fixture(seed: &[u8]) -> Vec<u8> {
+fn wide_video_edit_fixture(seed: &[u8], gap: u64, duration: u64) -> Vec<u8> {
     let mut data = seed.to_vec();
     for at in [81_526, 81_642, 81_742, 81_750] {
         let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
         data[at..at + 4].copy_from_slice(&(size + 16).to_be_bytes());
     }
     data[81_758] = 1;
-    // The empty duration fits the track clock, but the sum with the
-    // following edit would exceed the signed packet clock range.
     let mut edits = Vec::new();
-    for (duration, media_start) in [((1_u64 << 59) - 64, -1_i64), (4_000, 2_672)] {
+    for (duration, media_start) in [(gap, -1_i64), (duration, 2_672)] {
         edits.extend(duration.to_be_bytes());
         edits.extend(media_start.to_be_bytes());
         edits.extend((1_u32 << 16).to_be_bytes());

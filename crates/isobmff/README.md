@@ -27,8 +27,9 @@ The crate exposes two views of the same file:
   facts. The `compat::mov` documentation names the FFmpeg revision it reproduces.
   Encoded AVC playback preserves a leading empty edit before its rate-one video
   edit, with both packet clocks shifted by the start delay. Playback starts decode
-  at the retained sync sample and accounts for composition lead when seeking.
-  An unrepresentable edited video timeline produces no video packets.
+  at the retained sync sample, keeps the decode tail needed for a short edit,
+  and accounts for composition lead when seeking. An edited endpoint at or
+  beyond the signed clock limit produces no video packets.
 
 Values that only make sense when comparing traces with FFmpeg, such as its return
 codes, log lines and models of its input layer, are compiled only with the
