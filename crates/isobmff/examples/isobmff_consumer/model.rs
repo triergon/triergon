@@ -462,8 +462,8 @@ fn index_fragments(
 }
 
 /// Drives the readers over one source, fed through the library's [`Feed`].
-pub struct Driver<'a, T> {
-    feed: Feed<&'a mut T>,
+pub struct Driver<F> {
+    feed: Feed<F>,
     pub input: InputCursor,
     pub budget: Budget,
     length: u64,
@@ -506,13 +506,38 @@ pub struct OpenPolicy {
     pub regular_recovery: bool,
     pub edit_rows: bool,
 }
-impl<'a, T: Read + Seek> Driver<'a, T> {
+impl<'a, T: Read + Seek> Driver<&'a mut T> {
     pub fn new(source: &'a mut T, length: u64, window: usize, quantum: u64) -> Result<Self> {
+        let budget = Budget::new(64 * 1024 * 1024)?;
+        let feed = Feed::new(source, &budget)?;
+        Self::with_feed(feed, budget, length, window, quantum)
+    }
+}
+
+impl<'a> Driver<io::Cursor<&'a triergon_core::OwnedInputBytes>> {
+    pub fn from_owned(
+        source: &'a triergon_core::OwnedInputBytes,
+        budget: Budget,
+        window: usize,
+        quantum: u64,
+    ) -> Result<Self> {
+        let length = u64::try_from(source.as_ref().len()).map_err(|_| Error::Overflow)?;
+        let feed = Feed::from_owned(source, &budget)?;
+        Self::with_feed(feed, budget, length, window, quantum)
+    }
+}
+
+impl<F: Read + Seek> Driver<F> {
+    fn with_feed(
+        feed: Feed<F>,
+        budget: Budget,
+        length: u64,
+        window: usize,
+        quantum: u64,
+    ) -> Result<Self> {
         if window == 0 || window > 65536 || quantum == 0 {
             return Err(Error::Invalid("consumer window/work policy").into());
         }
-        let budget = Budget::new(64 * 1024 * 1024)?;
-        let feed = Feed::new(source, &budget)?;
         let input = InputCursor::new(
             &budget,
             SourceId(1),
@@ -1496,7 +1521,7 @@ pub struct SourceRequest {
     pub kind: RecoveryKind,
     pub syntax: RecoverySyntax,
 }
-impl<T: Read + Seek> Driver<'_, T> {
+impl<T: Read + Seek> Driver<T> {
     fn source_row(
         &mut self,
         model: &Model,

@@ -2,8 +2,8 @@
 //! source.
 use crate::container::{ContainerReader, Event, SeekRequest};
 use crate::{
-    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
-    SourceCapabilities, SourceFailure, Step, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, OwnedInputBytes,
+    Result, SourceCapabilities, SourceFailure, Step, WorkBudget,
 };
 use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
@@ -186,13 +186,14 @@ fn read_retrying(source: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<u
 
 /// Serves the requests of a parser's [`InputCursor`] from a blocking seekable source, for
 /// parsers driven below the [`ContainerReader`] level. The source is seeked only when a
-/// request does not continue the previous response. A response that fits the cursor's
-/// inline storage is copied there without an allocation; a larger one is copied into
+/// request does not continue the previous response. Short responses use the cursor's
+/// inline storage. Larger responses either share a caller's immutable input or use
 /// storage charged to the pool, sized to the bytes read.
 #[derive(Debug)]
 pub struct Feed<S> {
     source: S,
     pool: Budget,
+    shared_input: Option<Bytes>,
     /// The source's offset after the last response; unknown after a failed read.
     position: Option<u64>,
 }
@@ -204,6 +205,7 @@ impl<S: Read + Seek> Feed<S> {
         Ok(Self {
             source,
             pool: pool.clone(),
+            shared_input: None,
             position: Some(0),
         })
     }
@@ -236,6 +238,23 @@ impl<S: Read + Seek> Feed<S> {
                     Err(error)
                 }
             }
+        } else if let Some(bytes) = &self.shared_input {
+            let start = usize::try_from(request.offset).map_err(|_| Error::Overflow)?;
+            if start >= bytes.len() {
+                return input.finish(request.source, request.token);
+            }
+            let end = start + maximum.min(bytes.len() - start);
+            let response = bytes.slice(start..end)?;
+            input.provide_owned(InputWindow::new(
+                request.source,
+                request.token,
+                request.offset,
+                response,
+            )?)?;
+            // Only the inline branch reads through std::io::Read. It must
+            // seek even if its next request follows this shared response.
+            self.position = None;
+            Ok(())
         } else if maximum <= 4096 {
             self.supply_large::<4096>(input, request)
         } else {
@@ -305,5 +324,19 @@ impl<S: Read + Seek> Feed<S> {
                 bytes,
             )?)
         }
+    }
+}
+
+impl<'a> Feed<std::io::Cursor<&'a OwnedInputBytes>> {
+    /// Feed preloaded immutable bytes charged to the parser's budget.
+    /// The backing allocation remains charged while any of its views live.
+    pub fn from_owned(source: &'a OwnedInputBytes, pool: &Budget) -> Result<Self> {
+        let bytes = source.as_bytes();
+        if !bytes.belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        let mut out = Self::new(std::io::Cursor::new(source), pool)?;
+        out.shared_input = Some(bytes.clone());
+        Ok(out)
     }
 }

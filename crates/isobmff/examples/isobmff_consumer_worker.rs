@@ -14,7 +14,7 @@ use std::{
     path::Path,
     time::Instant,
 };
-use triergon_core::{Error, Time};
+use triergon_core::{Budget, Error, OwnedInputBytes, Time};
 use triergon_isobmff::{
     MediaDataPolicy, RecoveryKind, RecoverySyntax, SampleTablePolicy, SyncSamplePolicy,
     TimingRunPolicy,
@@ -93,12 +93,42 @@ fn operation(
     o: Options,
     op: DemuxOperation,
     policy: OpenPolicy,
-    mut trace: Option<&mut String>,
+    trace: Option<&mut String>,
 ) -> Result<Stats> {
-    let length = length(input)?;
     let mut stats = Stats::default();
     stats.start(o.retain, o.window)?;
-    let mut driver = Driver::new(input, length, o.window, o.quantum)?;
+    if o.window >= 4096 {
+        input.rewind()?;
+        let pool = Budget::new(64 * 1024 * 1024)?;
+        let bytes = std::mem::take(input.get_mut());
+        let source = match OwnedInputBytes::try_from_vec(&pool, bytes) {
+            Ok(source) => source,
+            Err(refused) => {
+                let error = refused.error();
+                *input.get_mut() = refused.into_vec();
+                return Err(error.into());
+            }
+        };
+        let result = Driver::from_owned(&source, pool, o.window, o.quantum)
+            .and_then(|driver| consume(driver, stats, o, op, policy, trace));
+        *input.get_mut() = source
+            .try_into_vec()
+            .map_err(|_| Error::Invalid("open output still retains input"))?;
+        return result;
+    }
+    let length = length(input)?;
+    let driver = Driver::new(input, length, o.window, o.quantum)?;
+    consume(driver, stats, o, op, policy, trace)
+}
+
+fn consume(
+    mut driver: Driver<impl Read + Seek>,
+    mut stats: Stats,
+    o: Options,
+    op: DemuxOperation,
+    policy: OpenPolicy,
+    mut trace: Option<&mut String>,
+) -> Result<Stats> {
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
     if policy.regular_recovery {

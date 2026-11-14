@@ -567,6 +567,7 @@ mod tests {
             duration: 1,
             position: i64::from(value),
             flags: 1,
+            skip_samples: None,
             payload: Bytes::copy_from_slice(&pool, &[value, value + 1, value + 2]).unwrap(),
         };
         let second = packet(20);

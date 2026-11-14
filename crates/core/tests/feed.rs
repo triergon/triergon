@@ -1,7 +1,9 @@
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
 use triergon_core::blocking::Feed;
-use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_core::{
+    Budget, Error, InputCursor, OwnedInputBytes, SourceCapabilities, SourceId, Step, WorkBudget,
+};
 
 fn cursor(pool: &Budget, length: u64, window: usize) -> InputCursor {
     InputCursor::new(
@@ -116,4 +118,31 @@ fn a_short_source_ends_the_entity() {
     let mut input = cursor(&pool, 3, 2);
     let mut feed = Feed::new(Cursor::new(vec![1, 2, 3]), &pool).unwrap();
     assert_eq!(drain(&mut input, &mut feed), [1, 2, 3]);
+}
+
+#[test]
+fn owned_feed_shares_large_windows_and_resumes_with_inline_bytes() {
+    let pool = Budget::new(4096).unwrap();
+    let bytes: Vec<_> = (0..37_u8).collect();
+    let storage = OwnedInputBytes::try_from_vec(&pool, bytes.clone()).unwrap();
+    let mut input = cursor(&pool, bytes.len() as u64, 32);
+    let mut feed = Feed::from_owned(&storage, &pool).unwrap();
+    let request = input.request();
+    let before = pool.used();
+    feed.supply(&mut input, request).unwrap();
+    let retained = input.retained_window().unwrap();
+    assert!(retained.shares_storage_with(storage.as_bytes()));
+    assert_eq!(pool.used(), before);
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        input
+            .read_discard(32, &mut WorkBudget::new(32), &cancel)
+            .unwrap(),
+        Step::Ready(32)
+    ));
+    assert_eq!(drain(&mut input, &mut feed), &bytes[32..]);
+    assert_eq!(retained.as_ref(), &bytes[..32]);
+    drop(feed);
+    drop(retained);
+    assert_eq!(storage.try_into_vec().unwrap(), bytes);
 }
