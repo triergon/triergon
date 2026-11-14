@@ -18,28 +18,44 @@
    "id": "fate-h264-bsf-mp4toannexb-new-extradata",
    "sample": "h264/extradata-reload-multi-stsd.mov",
    "projection": "avc-metadata",
-   "annex_b_md5": "a48f175bf3458410d1dd1907682b92d3"
+   "annex_b_md5": "a48f175bf3458410d1dd1907682b92d3",
+   "framecrc": {
+    "mode": "decoded-frames",
+    "reference_sha256": "0f6b15cc42e5136a7597840dcdce2db24c4bda936d7609973c45d3d9af9434c8"
+   }
   },
   {
    "id": "fate-h264_mp4toannexb_ticket2991",
    "sample": "h264/wwwq_cut.mp4",
    "projection": "avc-explicit",
    "candidate_reader": "avc-recovery",
-   "annex_b_md5": "b6ff5910928ad0b2a7eec481dcc41594"
+   "annex_b_md5": "b6ff5910928ad0b2a7eec481dcc41594",
+   "framecrc": {
+    "mode": "remuxed-packets",
+    "reference_sha256": "f8d2e71db3d33cb7509bf1a462327e0d420467afd375e680f16bf1e1c3f3c3cf"
+   }
   },
   {
    "id": "fate-h264_mp4toannexb_ticket5927",
    "sample": "h264/thezerotheorem-cut.mp4",
    "projection": "avc-explicit",
    "candidate_reader": "avc-recovery",
-   "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f"
+   "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f",
+   "framecrc": {
+    "mode": "remuxed-packets",
+    "reference_sha256": "b51592f3302fea090244d1c92810ae9c7583d053274d4446f335da2e089b5ed2"
+   }
   },
   {
    "id": "fate-h264_mp4toannexb_ticket5927_2",
    "sample": "h264/thezerotheorem-cut.mp4",
    "projection": "avc",
    "candidate_reader": "avc-recovery",
-   "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f"
+   "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f",
+   "framecrc": {
+    "mode": "remuxed-packets",
+    "reference_sha256": "3cd4c6ff0d1600b9caa52f2bb4712768beb034232ac1efae85b72a1049846923"
+   }
   },
   {
    "id": "fate-hevc-bsf-mp4toannexb",

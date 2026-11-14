@@ -331,6 +331,8 @@ physical operations and 16 explicit aliases. `--subset52` selects the separate
 `cargo xtask framing --benchmark --memory` measures all 131 packet-framing scripts.
 Their contracts and input manifests are in `harness/features/isobmff-open-index/`
 and `harness/features/packet-framing/`.
+`cargo xtask framing fate` also checks seven upstream Annex B streams and the
+four corresponding framecrc traces where FATE defines them.
 
 `report --memory-pairs N` selects a separate memory sample count, with
 `--pairs` applying to both measurements by default.

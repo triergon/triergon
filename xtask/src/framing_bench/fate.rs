@@ -1,4 +1,4 @@
-//! The Annex B byte projections of the upstream AVC and HEVC framing cases.
+//! Annex B output and follow-up checks for upstream AVC and HEVC framing cases.
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;
@@ -10,6 +10,7 @@ use crate::{checks::read_json, corpus::write_json, fetch, json::Value, sha256};
 
 const MANIFEST: &str = "harness/features/packet-framing/fate.json";
 const MAXIMUM_BYTES: usize = 16 << 20;
+const MAXIMUM_TRACE_BYTES: usize = 64 << 10;
 const USAGE: &str = "usage: cargo xtask framing fate --ffmpeg FILE --candidate FILE --output DIR\n\
                      Optional: --samples DIR (default: .research/fate-samples)";
 
@@ -99,6 +100,116 @@ struct Case<'a> {
     expected: &'a str,
     projection: Projection,
     recover_avc: bool,
+    framecrc: Option<FrameCrc<'a>>,
+}
+
+struct FrameCrc<'a> {
+    encoder: &'static str,
+    expected_sha256: &'a str,
+}
+
+impl<'a> FrameCrc<'a> {
+    fn read(row: &'a Value) -> Result<Self, String> {
+        let encoder = match field(row, "mode")? {
+            "decoded-frames" => "rawvideo",
+            "remuxed-packets" => "copy",
+            name => return Err(format!("unknown framecrc mode {name}")),
+        };
+        Ok(Self {
+            encoder,
+            expected_sha256: field(row, "reference_sha256")?,
+        })
+    }
+
+    fn trace(&self, ffmpeg: &Path, annex_b: &Path) -> Result<String, String> {
+        let mut command = ffmpeg_args(ffmpeg);
+        command.extend(
+            [
+                "-noauto_conversion_filters",
+                "-filter_threads",
+                "1",
+                "-flags",
+                "+bitexact",
+                "-fflags",
+                "+bitexact",
+                "-idct",
+                "simple",
+                "-threads",
+                "1",
+                "-i",
+            ]
+            .map(arg),
+        );
+        command.push(annex_b.into());
+        command.extend(
+            [
+                "-flags",
+                "+bitexact",
+                "-fflags",
+                "+bitexact",
+                "-threads",
+                "1",
+                "-c:v",
+                self.encoder,
+                "-f",
+                "framecrc",
+                "-",
+            ]
+            .map(arg),
+        );
+        command_output(&command)
+    }
+
+    fn compare(
+        &self,
+        case: &Case<'_>,
+        options: &Options,
+        revision: &str,
+        directory: &Path,
+        candidate: &Path,
+        reference: &Path,
+    ) -> Result<String, String> {
+        let name = case.id.trim_start_matches("fate-");
+        let url = format!(
+            "https://raw.githubusercontent.com/FFmpeg/FFmpeg/{revision}/tests/ref/fate/{name}"
+        );
+        let bytes = fetch::pinned(
+            &fetch::Network,
+            &[fetch::Source::Url(&url)],
+            self.expected_sha256,
+            MAXIMUM_TRACE_BYTES,
+            "triergon-fate",
+        )?;
+        let upstream = std::str::from_utf8(&bytes).map_err(|e| e.to_string())?;
+        let mut lines = upstream.lines();
+        let checksum = lines.next().and_then(|line| line.split_whitespace().next());
+        let length = lines
+            .next()
+            .and_then(|line| line.split_whitespace().next())
+            .and_then(|field| field.parse::<u64>().ok());
+        if checksum != Some(case.expected)
+            || length != Some(fs::metadata(candidate).map_err(|e| e.to_string())?.len())
+        {
+            return Err("upstream framecrc header disagrees with Annex B output".into());
+        }
+        let expected = normalize_trace(lines);
+        for (role, stream) in [("reference", reference), ("candidate", candidate)] {
+            let trace = self.trace(&options.ffmpeg, stream)?;
+            fs::write(directory.join(format!("{role}.framecrc")), &trace)
+                .map_err(|e| e.to_string())?;
+            if normalize_trace(trace.lines()) != expected {
+                return Err(format!("{role} framecrc differs from the upstream trace"));
+            }
+        }
+        sha256::file_hex(&directory.join("candidate.framecrc")).map_err(|e| e.to_string())
+    }
+}
+
+fn normalize_trace<'a>(lines: impl Iterator<Item = &'a str>) -> Vec<Vec<&'a str>> {
+    // Ignore column padding in framecrc while preserving every field and row.
+    lines
+        .map(|line| line.split_ascii_whitespace().collect())
+        .collect()
 }
 
 impl<'a> Case<'a> {
@@ -127,11 +238,12 @@ impl<'a> Case<'a> {
             sha256: field(pin, "sha256")?,
             expected: field(row, "annex_b_md5")?,
             projection: Projection::parse(field(row, "projection")?)?,
-            recover_avc: match row.get("candidate_reader").and_then(Value::as_str) {
-                Some("avc-recovery") => true,
+            recover_avc: match row.get("candidate_reader") {
+                Some(value) if value.as_str() == Some("avc-recovery") => true,
                 None => false,
-                Some(name) => return Err(format!("unknown Annex B candidate reader {name}")),
+                Some(_) => return Err("unknown Annex B candidate reader".into()),
             },
+            framecrc: row.get("framecrc").map(FrameCrc::read).transpose()?,
         })
     }
 
@@ -154,7 +266,12 @@ impl<'a> Case<'a> {
         Ok(path)
     }
 
-    fn compare(&self, options: &Options, directory: &Path) -> Result<String, String> {
+    fn compare(
+        &self,
+        options: &Options,
+        revision: &str,
+        directory: &Path,
+    ) -> Result<(String, Option<String>), String> {
         let sample = self.sample(&options.samples)?;
         let input = if matches!(self.projection, Projection::Hevc) {
             let mov = directory.join("input.mov");
@@ -192,7 +309,12 @@ impl<'a> Case<'a> {
         if expected != actual {
             return Err(format!("Annex B SHA-256 {actual} differs from {expected}"));
         }
-        Ok(actual)
+        let framecrc = self
+            .framecrc
+            .as_ref()
+            .map(|trace| trace.compare(self, options, revision, directory, &candidate, &reference))
+            .transpose()?;
+        Ok((actual, framecrc))
     }
 }
 
@@ -290,12 +412,17 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
     for case in &cases {
         let directory = options.output.join(case.id);
         fs::create_dir(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
-        let (status, digest, error) = match case.compare(&options, &directory) {
-            Ok(sha) => {
+        let (status, digest, framecrc, error) = match case.compare(&options, revision, &directory) {
+            Ok((sha, trace)) => {
                 passed += 1;
-                ("pass", Value::str(sha), Value::Null)
+                (
+                    "pass",
+                    Value::str(sha),
+                    trace.map_or(Value::Null, Value::str),
+                    Value::Null,
+                )
             }
-            Err(error) => ("fail", Value::Null, Value::str(error)),
+            Err(error) => ("fail", Value::Null, Value::Null, Value::str(error)),
         };
         println!("{} {status}", case.id);
         comparisons.push(Value::object([
@@ -303,6 +430,7 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
             ("sample_sha256", Value::str(case.sha256)),
             ("expected_md5", Value::str(case.expected)),
             ("output_sha256", digest),
+            ("framecrc_sha256", framecrc),
             ("status", Value::str(status)),
             ("error", error),
         ]));
@@ -310,7 +438,7 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
     write_json(
         &options.output.join("report.json"),
         &Value::object([
-            ("operation", Value::str("annex-b-byte-projection")),
+            ("operation", Value::str("annex-b-framing-replay")),
             ("upstream_revision", Value::str(revision)),
             ("reference_version", Value::str(version)),
             ("reference_sha256", Value::str(reference_sha)),
@@ -318,6 +446,6 @@ pub(super) fn compare(root: &Path, args: &[String]) -> Result<i32, String> {
             ("cases", Value::Array(comparisons)),
         ]),
     )?;
-    println!("{passed}/{} Annex B byte projections match", cases.len());
+    println!("{passed}/{} upstream framing cases match", cases.len());
     Ok(i32::from(passed != cases.len()))
 }

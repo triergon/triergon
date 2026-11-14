@@ -173,10 +173,12 @@ memory comparisons await gate-build measurement with repository runners.
 
 ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 `--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
-The packet framing harness also checks upstream [Annex B byte projections](../harness/features/packet-framing/README.md).
-All seven byte projections match, including the truncated MP4 and legacy
-QuickTime track handlers through the recovery reader. The upstream decoded-frame
-and second-remux checks are open.
+The packet framing harness also replays seven upstream
+[Annex B cases](../harness/features/packet-framing/README.md). All seven
+byte streams match, including the truncated MP4 and legacy QuickTime
+track handlers through the recovery reader. The decoded-frame trace and
+three stream-copy remux traces also match the pinned upstream outputs
+when FFmpeg 9.0.2 reads the produced streams.
 
 The ISO BMFF row uses the gate build at `f99d893196908d562c897bccb20c6a972cd25d11`
 on a c8g.large pinned to CPU 1, 30 pairs. Runtime comes from the timing collection and
