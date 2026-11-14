@@ -39,7 +39,7 @@ binary.
   code names the probes of each.
   `cargo xtask codecs aac-ps-tables` reruns the recovery and writes
   `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`;
-  `--check` compares them. Not recovered: the three open cases of
+  `--check` compares them. Not recovered: the seven open cases of
   [ps-open-manifest.json](ps-open-manifest.json), graded with `codecs grade` like the
   other manifests and listed in its `open_cases`, so `codecs summarize` fails once one
   of them matches (see the crate's known differences).

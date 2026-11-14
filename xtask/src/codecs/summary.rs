@@ -69,6 +69,18 @@ fn disposition(key: &str) -> Option<&'static str> {
         "ps-open-ipd-after-iid34.adts" => {
             "IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands; steady frames match (harness/codecs/aac/ps/README.md)"
         }
+        "ps-open-noext-after-error.adts" => {
+            "a Parametric Stereo header without the extension after an error frame while IPD/OPD was on; FFmpeg's output equals IPD/OPD indices 0 there (harness/codecs/aac/ps/README.md)"
+        }
+        "ps-open-dt-envelope-reference.adts" => {
+            "a time-differential IID envelope after a 4-envelope 10-band frame; FFmpeg's reference values differ from this decoder's above the 10 coded bands (harness/codecs/aac/ps/README.md)"
+        }
+        "ps-open-sbr-after-missing.adts" => {
+            "the frame after a missing SBR element whose previous frame's envelope crossed the frame border; an SBR matter, with or without Parametric Stereo (harness/codecs/aac/ps/README.md)"
+        }
+        "ps-open-sbr-truncated.adts" => {
+            "an SBR payload cut short; this decoder drops the frame, FFmpeg outputs it (harness/codecs/aac/ps/README.md)"
+        }
         "ac3" | "eac3" => {
             "AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (harness/codecs/STATUS.md)"
         }

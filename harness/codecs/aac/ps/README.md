@@ -153,6 +153,39 @@ candidate, and this form fits every probe to the float floor.
 - A PS frame without its SBR element: the difference from the reference output lies in QMF
   bands 31..35 of that frame (up to 5.2e-4); an HE-AAC v1 stream with the same frame
   matches.
+- A header without the PS extension after an error frame, while IPD/OPD was on
+  (`ps-open-noext-after-error`): 8.9e-3 rms in that frame and more in the next. The
+  decoder keeps the last extension's enable bit and its IPD/OPD values. The reference's
+  output there is bit-identical to an extension with the enable bit 1 and every index 0
+  (o41). It differs from one with the enable bit 0 by 7.2e-3. Without the error frame, or
+  with an extension in that frame, the decoder matches. Whether the error frame or the
+  missing extension resets the values is not separated.
+- A time-differential IID envelope after a frame with more envelopes and fewer coded bands
+  (`ps-open-dt-envelope-reference`, from a random stream; 7.4e-3 rms, and the composed model
+  misses the same way). In the hand-built shape of o41 the frames are:
+  - a 1-envelope 20-band frame;
+  - a 4-envelope 10-band frame;
+  - a dt-coded 20-band frame.
+
+  There the reference's output is bit-identical to the following rule. The dt reference is
+  kept per envelope index: one array of 34 per envelope, of which a frame writes the first
+  n entries of each of its envelopes. Envelope 0 is coded against the array of the previous
+  frame's last envelope. Entries 10..19 of envelope 3's array were never written, so they
+  are 0. The decoder keeps one array per parameter and takes entries 10..19 from the
+  20-band frame's last envelope. With a 4-envelope 20-band frame first, both agree. Only
+  this shape is checked.
+- SBR, with and without PS: the frame after a missing SBR element, when the frame before
+  the missing one had an envelope ending after the frame border (FIXVAR, 3 time slots), in
+  `ps-open-sbr-after-missing` (HE-AAC v1). The missing frame itself misses by 2.3e-4 because
+  the reference drops the overlapping high band there. The next frame misses by 2.8e-4, and
+  about 1.6e-7 persists in later frames (o31, o40). That level is about the lowest noise
+  floor. The cause is not probed; candidates are SBR state carried over the missing frame:
+  the noise and sinusoid indices, or the high-frequency generator's history.
+- An SBR payload cut short (`ps-open-sbr-truncated`: the first 30 bits kept, neutral PS).
+  The reference reports reading past the SBR data and an invalid envelope value, and still
+  outputs the frame. This decoder refuses the access unit, so its output is one frame short
+  from there, which accounts for the 2.4e-2 rms and more. What the reference outputs in that
+  frame is not probed. The same holds without PS (o31 trunc).
 
 The crafted streams of these cases are the open cases of
 [../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`).
