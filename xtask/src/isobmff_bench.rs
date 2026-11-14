@@ -27,7 +27,7 @@ type R<T> = Result<T, String>;
 
 pub const USAGE: &str = "usage: cargo xtask isobmff-bench [--benchmark] [--memory]
     [--subset52] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
-    [--require-acceptance] [--full] [--no-early-stop]
+    [--require-acceptance] [--timing-cpu CPU] [--full] [--no-early-stop]
 
 Always compare all 1020 traces: 972 output labels and 48 explicit refusals.
 The full measurement set has 956 physical operations and 16 explicit aliases.
@@ -35,7 +35,9 @@ The full measurement set has 956 physical operations and 16 explicit aliases.
 Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
 qualification, keep the RSS kernel module unloaded and
-TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.";
+TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.
+For combined Linux diagnostics, --timing-cpu pins timing alone and leaves the
+caller's CPUs for standard-memory collection. Use separate commands for the gate.";
 
 pub const CANDIDATE: &str = "isobmff-worker";
 pub const REFERENCE: &str = "ffmpeg-isobmff-native";
@@ -722,6 +724,7 @@ fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
 
 struct Options {
     benchmark: bool,
+    timing_cpu: Option<usize>,
     memory: bool,
     subset: bool,
     require_acceptance: bool,
@@ -741,6 +744,7 @@ impl Options {
             .as_nanos();
         let mut options = Self {
             benchmark: false,
+            timing_cpu: None,
             memory: false,
             subset: false,
             require_acceptance: false,
@@ -780,6 +784,14 @@ impl Options {
                         .parse()
                         .map_err(|e| format!("memory pairs: {e}"))?;
                 }
+                "--timing-cpu" => {
+                    options.timing_cpu = Some(
+                        args.next()
+                            .ok_or("--timing-cpu needs a CPU number")?
+                            .parse()
+                            .map_err(|e| format!("timing CPU: {e}"))?,
+                    );
+                }
                 "--seed" => {
                     options.seed = args
                         .next()
@@ -798,6 +810,13 @@ impl Options {
         }
         if options.require_acceptance && (options.subset || !options.benchmark || !options.memory) {
             return Err("acceptance requires the full runtime and memory sets".into());
+        }
+        if options.timing_cpu.is_some()
+            && (!options.benchmark || !options.memory || options.require_acceptance)
+        {
+            return Err(
+                "--timing-cpu requires combined timing and standard-memory diagnostics".into(),
+            );
         }
         Ok(options)
     }
@@ -1191,6 +1210,21 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let options = Options::parse(&root, args)?;
+    if let Some(cpu) = options.timing_cpu {
+        if std::env::var("TRIERGON_RSS_KERNEL_BOUND").is_ok_and(|value| value != "0")
+            || std::env::var_os("TRIERGON_RSS_KERNEL_PROOF").is_some()
+            || Path::new("/sys/module/triergon_rss_bound").exists()
+        {
+            return Err("--timing-cpu requires the standard memory observer".into());
+        }
+        let allowed = gate_build::allowed_cpu_list()
+            .ok_or("--timing-cpu requires a Linux CPU affinity list")?;
+        if !allowed.contains(&cpu) {
+            return Err(format!(
+                "timing CPU {cpu} is outside the caller's CPU affinity"
+            ));
+        }
+    }
     let suite = Suite::load(&root)?;
     let policy = read_json(&root.join("harness/policy.json"))?;
     let build = Build::load(&root)?;
@@ -1227,6 +1261,12 @@ fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
             Value::Bool(options.require_acceptance),
         ),
         ("pairs", Value::int(options.pairs as i128)),
+        (
+            "timing_cpu",
+            options
+                .timing_cpu
+                .map_or(Value::Null, |cpu| Value::int(cpu as i128)),
+        ),
         ("memory_pairs", Value::int(options.memory_pairs as i128)),
         ("seed", Value::int(options.seed)),
         ("iterations", Value::int(ITERATIONS)),
@@ -1284,6 +1324,12 @@ fn compare(root: &Path, options: &Options, suite: &Suite, build: &Build, policy:
                 ),
                 ("load", report::load_average()),
                 ("cpus", gate_build::cpus()),
+                (
+                    "timing_cpu",
+                    options
+                        .timing_cpu
+                        .map_or(Value::Null, |cpu| Value::int(cpu as i128)),
+                ),
             ]),
         ),
         ("native_aarch64_linux", Value::Bool(native())),
@@ -1335,39 +1381,42 @@ fn compare(root: &Path, options: &Options, suite: &Suite, build: &Build, policy:
     if all_parity && unchanged && (options.benchmark || options.memory) {
         // Every operation is timed before any memory runs; memory then fills the
         // CPUs, and aliases take the samples of the operation they repeat.
-        let mut measured = Vec::new();
-        for &index in &selection {
-            let case = &suite.cases[index];
-            if let Some(prior) = case.alias {
-                if !selection.contains(&prior)
-                    || !alias_traces_match(&options.output, index, prior)?
-                {
-                    return Err(format!(
-                        "alias {index} has no identical selected operation {prior}"
-                    ));
+        let measured = timing::on_cpu(options.timing_cpu, || {
+            let mut measured = Vec::new();
+            for &index in &selection {
+                let case = &suite.cases[index];
+                if let Some(prior) = case.alias {
+                    if !selection.contains(&prior)
+                        || !alias_traces_match(&options.output, index, prior)?
+                    {
+                        return Err(format!(
+                            "alias {index} has no identical selected operation {prior}"
+                        ));
+                    }
+                    continue;
                 }
-                continue;
+                if let Err(error) = verify_input(root, case) {
+                    unchanged = false;
+                    field(&mut rows[index], "measurement_error", Value::str(error));
+                    checkpoint(&options.output, &base, &rows, &selection, options, false)?;
+                    break;
+                }
+                let time = measure_time(root, build, case, options, &suite.contract, &rows[index])?;
+                if time != Value::Null {
+                    field(&mut rows[index], "timing", time);
+                    checkpoint(
+                        &options.output,
+                        &base,
+                        &rows,
+                        &selection,
+                        options,
+                        unchanged,
+                    )?;
+                }
+                measured.push(index);
             }
-            if let Err(error) = verify_input(root, case) {
-                unchanged = false;
-                field(&mut rows[index], "measurement_error", Value::str(error));
-                checkpoint(&options.output, &base, &rows, &selection, options, false)?;
-                break;
-            }
-            let time = measure_time(root, build, case, options, &suite.contract, &rows[index])?;
-            if time != Value::Null {
-                field(&mut rows[index], "timing", time);
-                checkpoint(
-                    &options.output,
-                    &base,
-                    &rows,
-                    &selection,
-                    options,
-                    unchanged,
-                )?;
-            }
-            measured.push(index);
-        }
+            Ok(measured)
+        })?;
         if options.memory && unchanged {
             let workers = memory::WorkerPaths {
                 candidate: &build.candidate,
@@ -1865,6 +1914,28 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn timing_cpu_requires_combined_diagnostics() {
+        for flags in [
+            &[][..],
+            &["--benchmark"][..],
+            &["--memory"][..],
+            &["--benchmark", "--memory", "--require-acceptance"][..],
+        ] {
+            let args = flags
+                .iter()
+                .copied()
+                .chain(["--timing-cpu", "2"])
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            assert!(Options::parse(&root(), &args).is_err());
+        }
+        let args = ["--benchmark", "--memory", "--timing-cpu", "2"].map(str::to_owned);
+        assert_eq!(Options::parse(&root(), &args).unwrap().timing_cpu, Some(2));
+        let args = ["--benchmark", "--timing-cpu"].map(str::to_owned);
+        assert!(Options::parse(&root(), &args).is_err());
     }
 
     #[test]

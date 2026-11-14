@@ -1586,30 +1586,13 @@ pub(crate) struct Slot {
 }
 
 impl Slot {
-    /// Pin the calling thread to the slot's CPU, so the workers it starts inherit
-    /// that CPU alone (`taskset -p` on the thread's own id).
+    /// Pin the calling thread to the slot's CPU.
     fn pin(&self) -> R<()> {
         let Some(cpu) = self.cpu else {
             return Ok(());
         };
-        let link =
-            fs::read_link("/proc/thread-self").map_err(|e| format!("/proc/thread-self: {e}"))?;
-        let thread = link
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or("unreadable thread id")?;
-        let status = std::process::Command::new("taskset")
-            .args(["-p", "-c", &cpu.to_string(), thread])
-            .stdout(std::process::Stdio::null())
-            .status()
-            .map_err(|e| format!("taskset: {e}"))?;
-        if !status.success() {
-            return Err(format!(
-                "could not pin memory slot {} to CPU {cpu}: {status}",
-                self.index
-            ));
-        }
-        Ok(())
+        super::gate_build::pin_thread(cpu)
+            .map_err(|error| format!("memory slot {}: {error}", self.index))
     }
 }
 
