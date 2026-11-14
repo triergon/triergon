@@ -211,7 +211,10 @@ image() {
         --description "Gate host for $target at $revision" \
         --tag-specifications "$(tags image "$name")" "$(tags snapshot "$name")" \
         --query ImageId --output text)
-    aws ec2 wait image-available --image-ids "$ami" || aws ec2 wait image-available --image-ids "$ami"
+    local state
+    while state=$(aws ec2 describe-images --image-ids "$ami" --query 'Images[0].State' --output text); do
+        case $state in available) break ;; pending) sleep 60 ;; *) say "image $ami $state"; return 1 ;; esac
+    done
     say "image $ami available"
     local old snapshots
     for old in $(aws ec2 describe-images --owners self \
