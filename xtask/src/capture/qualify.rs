@@ -309,6 +309,17 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         .and_then(Value::as_array)
         .ok_or("cases file without cases")?
         .to_vec();
+    let open = {
+        let ids: Vec<&str> = cases
+            .iter()
+            .map(|case| {
+                case.get("id")
+                    .and_then(Value::as_str)
+                    .ok_or("case without id")
+            })
+            .collect::<Result<_, _>>()?;
+        open_cases(root, &ids)?
+    };
     if !a.only.is_empty() {
         cases.retain(|c| {
             c.get("id")
@@ -325,7 +336,6 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     if observer != Value::str(file_sha(&root.join("target/harness/allocations.so"))?) {
         return Err("capture requires the observer built in target/harness".into());
     }
-    let open = open_cases(root)?;
     let gate = policy::Runtime::load(root)?;
     let refusals =
         gate_build::pair_refusals(root, Path::new(&a.candidate), Path::new(&a.reference));
@@ -357,6 +367,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     )?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let mut summary = Vec::new();
+    let mut now_passing = Vec::new();
     for case in &cases {
         let text = |key: &str| python::str(case.get(key).unwrap_or(&Value::Null));
         let id = text("id");
@@ -429,9 +440,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         record.push(("correctness_summary".into(), correctness.clone()));
         let open_on_target = open.contains(&id);
         if open_on_target && correctness.get("conversion").is_some_and(Value::truthy) {
-            return Err(format!(
-                "{id}: listed open case now passes; remove it from open_cases"
-            ));
+            now_passing.push(id.clone());
         }
         let outputs = correctness.get("outputs");
         let iterations = u32::try_from(a.iterations).map_err(|e| e.to_string())?;
@@ -565,16 +574,29 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     write(
         &a.out.join("summary.json"),
         json::to_python(&Value::Array(summary), Some(1)),
-    )
+    )?;
+    if now_passing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "listed open cases now pass; remove them from open_cases: {}",
+            now_passing.join(", ")
+        ))
+    }
 }
 
 /// The cases `harness/capture/contract.json` lists in `open_cases` for this
 /// host's worker target: their conversion is compared and reported, and fails.
-fn open_cases(root: &Path) -> Result<Vec<String>, String> {
+fn open_cases(root: &Path, ids: &[&str]) -> Result<Vec<String>, String> {
     let path = root.join("harness/capture/contract.json");
     let contract =
         crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let target = gate_build::worker_target()?;
+    listed_open(&contract, gate_build::worker_target()?, ids)
+}
+
+/// The `open_cases` of `contract` listed for `target`. Every listed id must be a
+/// case in `ids`.
+fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<String>, String> {
     let Some(entries) = contract.get("open_cases") else {
         return Ok(Vec::new());
     };
@@ -585,6 +607,9 @@ fn open_cases(root: &Path) -> Result<Vec<String>, String> {
             .get("id")
             .and_then(Value::as_str)
             .ok_or("open case without id")?;
+        if !ids.contains(&id) {
+            return Err(format!("open case {id} is not a case in the cases file"));
+        }
         let targets = entry
             .get("targets")
             .and_then(Value::as_array)
@@ -636,5 +661,30 @@ mod tests {
         assert!(outputs_match(&warmups(0xab), &outputs));
         assert!(!outputs_match(&warmups(0xff), &outputs));
         assert!(!outputs_match(&warmups(0xab), &Value::Object(vec![])));
+    }
+
+    #[test]
+    fn open_cases_are_listed_per_target_and_must_be_cases() {
+        let contract = json::parse(
+            r#"{"open_cases": [
+                {"id": "c01", "targets": ["aarch64-unknown-linux-gnu"]},
+                {"id": "c02", "targets": ["thumbv7neon-unknown-linux-gnueabihf"]}]}"#,
+        )
+        .unwrap();
+        let ids = ["c01", "c02", "c03"];
+        assert_eq!(
+            listed_open(&contract, "aarch64-unknown-linux-gnu", &ids).unwrap(),
+            ["c01"]
+        );
+        assert!(
+            listed_open(&contract, "aarch64-unknown-linux-gnu", &ids[1..])
+                .unwrap_err()
+                .contains("c01")
+        );
+        assert!(
+            listed_open(&Value::Object(vec![]), "x", &ids)
+                .unwrap()
+                .is_empty()
+        );
     }
 }

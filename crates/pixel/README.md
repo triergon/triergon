@@ -63,7 +63,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 |---|---|
 | Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar`, `Colour` (H.273 `matrix` code and `full_range`) |
 | Coded picture | `Picture` at the macroblock-aligned size of a `Geometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
-| RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; FFmpeg's ARMv7 result, which depends on the width (`block_path`) |
+| RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; FFmpeg's ARMv7 result, which depends on the width |
 | Letterbox input | 4:2:0, 8-bit and high bit depth (10-bit verified); limited and full range |
 | Palette Y'CbCr → RGB | `YcbcrMatrix::BT601` and `BT709`, studio range in, full range out, `ChannelRounding::Nearest` or `HalfDown`; `rgb(y, cr, cb, rounding)` gives `0xRRGGBB` |
 | Letterbox matrices | H.273 codes 1 (BT.709), 4 (FCC), 7 (SMPTE 240M) and 9 (BT.2020 NCL) select their coefficients; every other code uses BT.601. The same-size 8-bit path also maps code 10 to BT.2020 |
@@ -77,7 +77,7 @@ rounds each dimension up to 16; `luma_stride` is `16 × macroblock_width()` and
 
 **RGBA → YUV.** The conversion is the one FFmpeg 9.0.2's `swscale` (`SWS_BILINEAR`,
 RGBA to NV12) gives when built for 32-bit ARMv7, on every target. Its result depends
-on the width; `block_path(geometry)` tells which applies:
+on the width:
 
 - Widths of at least 16 that are a multiple of 4 take the block path: luma is
   `(66 R + 129 G + 25 B + 4224) >> 8`; each chroma sample comes from the 2×2 block it
@@ -90,7 +90,8 @@ on the width; `block_path(geometry)` tells which applies:
   1/8 over rows 2k−1 … 2k+2 with the edge rows replicated, rounded once. Below a
   width of 16 this is what FFmpeg's ARMv7 build does too, within 1 for pictures of at
   least 8 rows. At widths of 2 modulo 4 from 18 up, FFmpeg's ARMv7 build faults
-  instead of converting, and this is FFmpeg's AArch64 result.
+  instead of converting, and this path decimates chroma as FFmpeg's AArch64 build
+  does, within 1 of that build's output.
 
 FFmpeg built for AArch64 takes the filtered path at every width. Input shorter than
 `width × height × 4` is `Error::InputLength`; longer input is ignored past that

@@ -13,7 +13,8 @@
 //!   over rows 2k−1 … 2k+2 with the edge rows replicated, from 16-bit
 //!   fixed-point coefficients in one rounding step. Below a width of 16 this is
 //!   the ARMv7 result too; at widths of 2 modulo 4 from 18 up the ARMv7 build
-//!   gives no result (it faults), and this is FFmpeg's AArch64 result.
+//!   gives no result (it faults), and this path decimates chroma as FFmpeg's
+//!   AArch64 build does, within 1 of that build's output.
 //!
 //! FFmpeg built for AArch64 takes the filtered path at every width.
 
@@ -28,20 +29,18 @@ pub enum Orientation {
 }
 
 /// Whether `geometry` takes the block path (see the module documentation).
-pub const fn block_path(geometry: Geometry) -> bool {
+pub(crate) const fn block_path(geometry: Geometry) -> bool {
     geometry.width >= 16 && geometry.width.is_multiple_of(4)
 }
 
 /// Reusable conversion scratch, sized for one geometry.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Converter {
     scratch: Scratch,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 enum Scratch {
-    #[default]
-    Empty,
     /// Per-column channel sums (R, G, B, A) of the current row pair.
     Block { width: usize, sums: [Vec<u16>; 4] },
     /// Four source rows of pair-summed chroma terms.
@@ -72,7 +71,6 @@ impl Scratch {
 
     fn fits(&self, geometry: Geometry) -> bool {
         match self {
-            Scratch::Empty => false,
             Scratch::Block { width, .. } => block_path(geometry) && *width == geometry.width,
             Scratch::Filtered { half, .. } => !block_path(geometry) && *half == geometry.width / 2,
         }
@@ -115,7 +113,6 @@ impl Converter {
         match &mut self.scratch {
             Scratch::Block { sums, .. } => block::convert(source_row, sums, out),
             Scratch::Filtered { cb, cr, .. } => filtered::convert(source_row, cb, cr, out),
-            Scratch::Empty => unreachable!("scratch was just sized"),
         }
         out.pad_edges();
         Ok(())
