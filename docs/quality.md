@@ -639,7 +639,10 @@ timing step whose report holds a case not `measured`, or a memory step one not
 they did not measure, after writing every record. So no feature measures nothing in
 silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
 run limit per target triple (30 s when absent), and every memory observation records how
-long its run took (`process_elapsed_ns`).
+long its run took (`process_elapsed_ns`). Each list sets four times its slowest observed
+run on each target, rounded up, from a run at `8154812e`: `workloads.json` 221 s on Linux
+AArch64 and 208 s on 32-bit ARMv7 (`hevc-main10-2160p`, 55.16 s and 51.97 s), and
+`file-workloads.json` 170 s and 134 s (`flac-24-96k-5.1`, 42.44 s and 33.48 s).
 
 `cargo xtask gate check --shards N` runs on any machine in a second, before a host
 exists: it resolves the preflight of every shard as the shard resolves it, and fails,
