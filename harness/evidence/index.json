@@ -20262,6 +20262,15 @@
    "key": "evidence/packet-framing-bounded-prefix-768b50ab-aarch64/f07378d8a1452f9d4bd268a3f185ceae311ed886915056af8e4894b577a2e6fb.tar.zst",
    "sha256": "f07378d8a1452f9d4bd268a3f185ceae311ed886915056af8e4894b577a2e6fb",
    "bytes": 42930285
+  },
+  {
+   "name": "packet-framing-gate-768b50ab-aarch64",
+   "path": "packet-framing-gate-768b50ab-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison using the merged link policy, including the remaining runtime failure, all paired samples, both workers and the kernel RSS proof.",
+   "key": "evidence/packet-framing-gate-768b50ab-aarch64/808f84fc8925b5ae201603c9ecf5a35a954554566c1135c3a48052026cceaaca.tar.zst",
+   "sha256": "808f84fc8925b5ae201603c9ecf5a35a954554566c1135c3a48052026cceaaca",
+   "bytes": 681644343
   }
  ]
 }
