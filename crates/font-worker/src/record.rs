@@ -108,6 +108,8 @@ pub enum Record<'a> {
     GlyphError(u16),
     /// A face of the scaled and hinted operations.
     SizedFace(u32),
+    /// The next of several heights a face is requested at in turn.
+    Request(i32),
     Size(&'a Size),
     /// A size the face cannot be loaded at.
     SizeError(i32),
@@ -171,6 +173,7 @@ const STYLED: u64 = 24;
 const HINTED: u64 = 25;
 const VERTICAL: u64 = 26;
 const DEFAULT: u64 = 27;
+const REQUEST: u64 = 28;
 const ABSENT: u64 = u64::MAX;
 
 const fn point_tag(kind: PointKind) -> u8 {
@@ -316,6 +319,7 @@ impl Sink for Work {
             }
             Record::GlyphError(index) => self.words(&[GLYPH_ERROR, index.into()]),
             Record::SizedFace(index) => self.words(&[SIZED_FACE, index.into()]),
+            Record::Request(height) => self.words(&[REQUEST, signed(height.into())]),
             Record::Size(size) => {
                 let m = &size.metrics;
                 self.words(&[
@@ -493,6 +497,7 @@ impl<W: Write> Sink for Dump<W> {
             }
             Record::GlyphError(index) => writeln!(self.0, "glyph {index} error"),
             Record::SizedFace(index) => writeln!(self.0, "face {index}"),
+            Record::Request(height) => writeln!(self.0, "request {height}"),
             Record::Size(size) => {
                 let m = &size.metrics;
                 write!(

@@ -6,8 +6,9 @@
 //! A probe is a description file `NAME.probe`; its leading comment says what it
 //! shows. Next to it, `NAME.dump` records what the reference reads at each of
 //! the probe's heights in each of its modes (`font-sized-dump FILE MODE
-//! HEIGHT`, by default the default load of every glyph), as the reference
-//! gives it on 32-bit ARMv7. `probe` compares the
+//! HEIGHT`, by default the default load of every glyph), each height in a
+//! process of its own or a sequence of them in one, as the reference gives
+//! it on 32-bit ARMv7. `probe` compares the
 //! reference with that record and the candidate with the reference.
 
 mod asm;
@@ -34,7 +35,8 @@ pub(super) const PROBE_USAGE: &str =
   Assemble each PROBE (a .probe description, or a directory of them, such as
   harness/fonts/probes) into DIR (default target/probes) and load it with the
   font workers at each of its heights in each of its modes (`font-sized-dump
-  FONT MODE HEIGHT`, MODE default unless the probe names others).
+  FONT MODE HEIGHT`, MODE default unless the probe names others), and at each
+  of its sequences of heights in one process (HEIGHT,HEIGHT...).
   The reference must match the probe's recorded .dump, which --record rewrites
   (record on 32-bit ARMv7); the candidate must match the reference. Fails on any
   difference. Probes that take parts of corpus fonts find them in --fonts
@@ -187,28 +189,30 @@ fn is_64_bit(worker: &str) -> Result<bool, String> {
     })
 }
 
-/// The worker's dump of `font` at each of the description's heights in each
-/// of its modes, each after a line `height H`, followed by the mode for a mode
-/// other than `default`; a failing run is recorded as its exit code and error
-/// output.
+/// The worker's dump of `font` for each of the description's runs in each of
+/// its modes, each after a line `height H` (or `heights H,H...` for a sequence
+/// loaded in one process), followed by the mode for a mode other than
+/// `default`; a failing run is recorded as its exit code and error output.
 fn dump(worker: &str, font: &Path, description: &Description) -> Result<String, String> {
     let mut out = String::new();
     let runs = description
-        .heights
+        .runs
         .iter()
-        .flat_map(|h| description.modes.iter().map(move |m| (h, m)));
-    for (height, mode) in runs {
+        .flat_map(|r| description.modes.iter().map(move |m| (r, m)));
+    for (run, mode) in runs {
+        let heights = run.iter().map(i32::to_string).collect::<Vec<_>>().join(",");
         let argv = [
             worker.to_owned(),
             "font-sized-dump".to_owned(),
             font.display().to_string(),
             mode.clone(),
-            height.to_string(),
+            heights.clone(),
         ];
+        let key = if run.len() == 1 { "height" } else { "heights" };
         if mode == "default" {
-            out.push_str(&format!("height {height}\n"));
+            out.push_str(&format!("{key} {heights}\n"));
         } else {
-            out.push_str(&format!("height {height} {mode}\n"));
+            out.push_str(&format!("{key} {heights} {mode}\n"));
         }
         match run_text(&argv, TIMEOUT) {
             Ok(done) if done.code == 0 => out.push_str(&done.stdout),

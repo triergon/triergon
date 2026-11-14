@@ -2,11 +2,12 @@
 //! program and glyph programs, run as the reference's default load runs them
 //! in backward compatibility mode.
 //!
-//! The font program runs once at a size, then the control value program
-//! scales and adjusts the control value table, fills the storage area and the
-//! twilight zone and sets the graphics state glyphs start from. Each glyph
-//! program then runs on the glyph's scaled points and its four phantom
-//! points. Behaviour the specifications leave open is reproduced as observed
+//! The font program runs once for a face, at the first size it loads hinted
+//! at, and defines functions and instructions. At each size the control value
+//! program then scales and adjusts the control value table, fills the storage
+//! area and the twilight zone and sets the graphics state glyphs start from.
+//! Each glyph program then runs on the glyph's scaled points and its four
+//! phantom points. Behaviour the specifications leave open is reproduced as observed
 //! by the probes under harness/fonts/probes, each rule naming its probe.
 
 mod exec;
@@ -67,6 +68,18 @@ struct Profile {
 }
 
 impl Profile {
+    /// Observed: the stack holds 128 values more than `maxp` asks for
+    /// (`limits-stack`).
+    fn stack_limit(self) -> usize {
+        usize::from(self.stack) + 128
+    }
+
+    /// Observed: the twilight zone holds four points more than `maxp` asks
+    /// for (`limits-twilight`).
+    fn twilight_len(self) -> usize {
+        usize::from(self.twilight_points) + 4
+    }
+
     /// The limits a `maxp` table sets. Observed: up to `maxp`'s count of
     /// function definitions or 64, whichever is more, and none at all with a
     /// `maxp` other than version 1.0, which leaves every other limit at zero
@@ -91,29 +104,98 @@ impl Profile {
     }
 }
 
-/// A face's interpreter state at one size, after its font and control value
-/// programs.
+/// What a face's programs define, which every size keeps: the functions and
+/// instruction definitions of the font program, run once for the face at the
+/// first size it loads hinted at, and of the control value program at each
+/// size since (observed, `sizes-definitions`, `sizes-control-definitions`).
+#[derive(Debug)]
+pub(crate) struct Definitions {
+    functions: Functions,
+    instructions: Instructions,
+    /// Whether the font program stopped on an error, which fails every hinted
+    /// load of the face at every size (observed, `errors-font-program`,
+    /// `sizes-font-program-error`).
+    failed: bool,
+}
+
+impl Definitions {
+    /// Runs the font program at `ppem` and the 16.16 `scale`. Observed: it
+    /// reads control values and storage as zero, and what it writes there,
+    /// in the twilight zone or to the graphics state is not what the control
+    /// value program or a glyph program find (`sizes-storage`,
+    /// `sizes-font-program-reads`, `sizes-graphics-state`).
+    fn new(
+        tables: Tables<'_>,
+        ppem: u16,
+        scale: i64,
+        budget: &Budget,
+        work: &mut WorkBudget,
+    ) -> Result<Self> {
+        let profile = Profile::read(tables.maxp);
+        // A unit of work for each value the run fills.
+        let filled =
+            usize::from(profile.storage) + usize::from(profile.twilight_points) + profile.functions;
+        if !work.try_charge(filled as u64) {
+            return Err(Error::Policy("TrueType instructions"));
+        }
+        let mut definitions = Self {
+            functions: Functions::new(budget, profile.functions)?,
+            instructions: Instructions::new(budget, profile.instruction_defs)?,
+            failed: false,
+        };
+        let mut stack = BudgetVec::new(budget);
+        stack.try_reserve_exact(profile.stack_limit())?;
+        let mut storage = BudgetVec::try_filled(budget, 0, usize::from(profile.storage))?;
+        let mut twilight = Zone::new(budget);
+        twilight.reset(profile.twilight_len())?;
+        let mut glyph = Zone::new(budget);
+        let mut machine = Machine {
+            code: [tables.programs.font, tables.programs.control, &[]],
+            stack: &mut stack,
+            stack_limit: profile.stack_limit(),
+            cvt: &mut [],
+            storage: storage.as_mut_slice(),
+            functions: &mut definitions.functions,
+            instructions: &mut definitions.instructions,
+            twilight: &mut twilight,
+            glyph: &mut glyph,
+            state: GraphicsState::default(),
+            size: Size {
+                ppem,
+                scale,
+                symmetric: symmetric_rendering(tables.gasp, ppem),
+            },
+            work,
+            program: Program::Font,
+            instruct_control: 0,
+            interpolated: [false; 2],
+        };
+        definitions.failed = !machine.run(Program::Font)?;
+        Ok(definitions)
+    }
+}
+
+/// A face's interpreter state at one size, after its control value program.
 #[derive(Debug)]
 pub(crate) struct Hinter {
     ppem: u16,
     scale: i64,
     /// Whether GETINFO reports symmetric rendering at the size.
     symmetric: bool,
+    definitions: Box<Definitions>,
     /// The control values and storage the control value program left; each
     /// glyph starts from them (observed, `glyph-state`).
     cvt: BudgetVec<i32>,
     storage: BudgetVec<i32>,
     state: GraphicsState,
     instruct_control: u8,
-    functions: Functions,
-    instructions: Instructions,
     /// The twilight zone, which keeps what each glyph program leaves in it
     /// (observed, `twilight`).
     twilight: Zone,
     stack_limit: usize,
-    /// Whether the font or control value program stopped on an error, which
-    /// fails every hinted load at the size (observed,
-    /// `errors-font-program`, `errors-control-program`).
+    /// Whether the control value program stopped on an error, which fails
+    /// every hinted load at the size (observed, `errors-control-program`,
+    /// `sizes-control-program-error`).
     failed: bool,
     /// Scratch for one glyph: its stack, control values, storage and zone.
     stack: BudgetVec<i32>,
@@ -122,34 +204,27 @@ pub(crate) struct Hinter {
     glyph: Zone,
 }
 
-/// INSTCTRL flag 1: glyph programs do not run.
-const INHIBIT_GRID_FITTING: u8 = 1;
-/// INSTCTRL flag 2: glyphs start from the default graphics state.
-const IGNORE_CONTROL_STATE: u8 = 2;
+/// What each size starts from before its control value program: the control
+/// values scaled to it, zeroed storage, a twilight zone at the origin and an
+/// empty stack (observed, `sizes-storage`, `sizes-twilight`).
+struct Fresh {
+    cvt: BudgetVec<i32>,
+    storage: BudgetVec<i32>,
+    twilight: Zone,
+    stack: BudgetVec<i32>,
+}
 
-impl Hinter {
-    /// Runs the font and control value programs at `ppem` and the 16.16
-    /// `scale`, the control values `cvt` (`cvt `, font units) scaled by it.
-    pub(crate) fn new(
-        tables: Tables<'_>,
-        ppem: u16,
+impl Fresh {
+    fn new(
+        cvt: &[u8],
+        profile: Profile,
         scale: i64,
         budget: &Budget,
         work: &mut WorkBudget,
     ) -> Result<Self> {
-        let Tables {
-            programs,
-            cvt,
-            maxp,
-            gasp,
-        } = tables;
-        let profile = Profile::read(maxp);
-        let symmetric = symmetric_rendering(gasp, ppem);
-        // A unit of work for each value the setup fills.
-        let filled = cvt.len() / 2
-            + usize::from(profile.storage)
-            + usize::from(profile.twilight_points)
-            + profile.functions;
+        // A unit of work for each value filled.
+        let filled =
+            cvt.len() / 2 + usize::from(profile.storage) + usize::from(profile.twilight_points);
         if !work.try_charge(filled as u64) {
             return Err(Error::Policy("TrueType instructions"));
         }
@@ -161,69 +236,93 @@ impl Hinter {
                 .try_push(math::scale(unit, scale))
                 .map_err(|e| e.error)?;
         }
-        // Observed: the twilight zone holds four points more than `maxp`
-        // asks for, and the stack 128 values more (`limits-twilight`,
-        // `limits-stack`).
         let mut twilight = Zone::new(budget);
-        twilight.reset(usize::from(profile.twilight_points) + 4)?;
+        twilight.reset(profile.twilight_len())?;
+        let mut stack = BudgetVec::new(budget);
+        stack.try_reserve_exact(profile.stack_limit())?;
+        Ok(Self {
+            cvt: values,
+            storage: BudgetVec::try_filled(budget, 0, usize::from(profile.storage))?,
+            twilight,
+            stack,
+        })
+    }
+}
+
+/// INSTCTRL flag 1: glyph programs do not run.
+const INHIBIT_GRID_FITTING: u8 = 1;
+/// INSTCTRL flag 2: glyphs start from the default graphics state.
+const IGNORE_CONTROL_STATE: u8 = 2;
+
+impl Hinter {
+    /// Runs the control value program at `ppem` and the 16.16 `scale`, with
+    /// the control values `cvt ` (font units) scaled by it, after the
+    /// face's `definitions`, which it may add to. A limit the program runs
+    /// into is returned with the definitions, which the face keeps.
+    pub(crate) fn new(
+        tables: Tables<'_>,
+        ppem: u16,
+        scale: i64,
+        definitions: Box<Definitions>,
+        budget: &Budget,
+        work: &mut WorkBudget,
+    ) -> std::result::Result<Self, (Error, Box<Definitions>)> {
+        let profile = Profile::read(tables.maxp);
+        let fresh = match Fresh::new(tables.cvt, profile, scale, budget, work) {
+            Ok(fresh) => fresh,
+            Err(e) => return Err((e, definitions)),
+        };
+        let symmetric = symmetric_rendering(tables.gasp, ppem);
         let mut hinter = Self {
             ppem,
             scale,
             symmetric,
-            cvt: values,
-            storage: BudgetVec::try_filled(budget, 0, usize::from(profile.storage))?,
+            definitions,
+            cvt: fresh.cvt,
+            storage: fresh.storage,
             state: GraphicsState::default(),
             instruct_control: 0,
-            functions: Functions::new(budget, profile.functions)?,
-            instructions: Instructions::new(budget, profile.instruction_defs)?,
-            twilight,
-            stack_limit: usize::from(profile.stack) + 128,
+            twilight: fresh.twilight,
+            stack_limit: profile.stack_limit(),
             failed: false,
-            stack: BudgetVec::new(budget),
+            stack: fresh.stack,
             glyph_cvt: BudgetVec::new(budget),
             glyph_storage: BudgetVec::new(budget),
             glyph: Zone::new(budget),
         };
-        hinter.stack.try_reserve_exact(hinter.stack_limit)?;
-        // The font program runs at each size, where the specifications run
-        // it once per face. Open: the probes load one size per process and
-        // cannot tell the two apart; they differ only for a font program
-        // that reads the size or leaves values the control value program
-        // reads.
-        for program in [Program::Font, Program::Control] {
-            let mut machine = Machine {
-                code: [programs.font, programs.control, &[]],
-                stack: &mut hinter.stack,
-                stack_limit: hinter.stack_limit,
-                cvt: hinter.cvt.as_mut_slice(),
-                storage: hinter.storage.as_mut_slice(),
-                functions: &mut hinter.functions,
-                instructions: &mut hinter.instructions,
-                twilight: &mut hinter.twilight,
-                glyph: &mut hinter.glyph,
-                state: if program == Program::Control {
-                    GraphicsState::default()
-                } else {
-                    hinter.state
-                },
-                size: Size {
-                    ppem,
-                    scale,
-                    symmetric,
-                },
-                work,
-                program,
-                instruct_control: hinter.instruct_control,
-                interpolated: [false; 2],
-            };
-            hinter.failed |= !machine.run(program)?;
-            if program == Program::Control {
-                hinter.state = machine.state;
-                hinter.instruct_control = machine.instruct_control;
+        let mut machine = Machine {
+            code: [tables.programs.font, tables.programs.control, &[]],
+            stack: &mut hinter.stack,
+            stack_limit: hinter.stack_limit,
+            cvt: hinter.cvt.as_mut_slice(),
+            storage: hinter.storage.as_mut_slice(),
+            functions: &mut hinter.definitions.functions,
+            instructions: &mut hinter.definitions.instructions,
+            twilight: &mut hinter.twilight,
+            glyph: &mut hinter.glyph,
+            state: GraphicsState::default(),
+            size: Size {
+                ppem,
+                scale,
+                symmetric,
+            },
+            work,
+            program: Program::Control,
+            instruct_control: 0,
+            interpolated: [false; 2],
+        };
+        let ran = machine.run(Program::Control);
+        let (state, instruct_control) = (machine.state, machine.instruct_control);
+        match ran {
+            Ok(ran) => {
+                hinter.failed = !ran;
+                hinter.state = state;
+                hinter.instruct_control = instruct_control;
+                hinter.stack.clear();
+                Ok(hinter)
             }
-            hinter.stack.clear();
+            Err(e) => Err((e, hinter.definitions)),
         }
-        Ok(hinter)
     }
 
     /// The 16.16 scale the hinter was made for.
@@ -254,7 +353,7 @@ impl Hinter {
         glyph: GlyphPoints<'_>,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        if self.failed {
+        if self.failed || self.definitions.failed {
             return Err(Error::Invalid("TrueType font or control value program"));
         }
         // Without a program to run the points stay as they are.
@@ -303,8 +402,8 @@ impl Hinter {
             stack_limit: self.stack_limit,
             cvt: self.glyph_cvt.as_mut_slice(),
             storage: self.glyph_storage.as_mut_slice(),
-            functions: &mut self.functions,
-            instructions: &mut self.instructions,
+            functions: &mut self.definitions.functions,
+            instructions: &mut self.definitions.instructions,
             twilight: &mut self.twilight,
             glyph: &mut self.glyph,
             state,
@@ -347,29 +446,55 @@ pub(crate) struct GlyphPoints<'o> {
     pub(crate) phantoms: ([Point; 4], [Point; 4]),
 }
 
-/// A face's interpreter, made on the first hinted load and kept for the size
-/// it was last made at; a size whose font or control value program could not
-/// run within the face's limits keeps that error.
+/// A face's interpreter: the definitions its font program made at the first
+/// hinted load, and the state of the size it last loaded hinted at, or why it
+/// could not be made. A failure for want of memory the budget may later have
+/// (`Backpressure`) is not kept.
 #[derive(Debug)]
 pub(crate) struct Bytecode {
     budget: Budget,
     setup: Mutex<Option<Setup>>,
 }
 
-/// The interpreter at one size, or why it could not be made.
+/// What a face's interpreter keeps.
 #[derive(Debug)]
 enum Setup {
+    /// The font program could not run within the face's limits, which fails
+    /// every hinted load of the face.
+    Unusable(Error),
+    /// The interpreter at a size.
     Ready(Box<State>),
-    Failed { ppem: u16, scale: i64, error: Error },
+    /// A size whose control value program could not run within the face's
+    /// limits; one that ran out of memory the budget may later have is made
+    /// again.
+    Failed {
+        ppem: u16,
+        scale: i64,
+        error: Error,
+        definitions: Box<Definitions>,
+    },
 }
 
 impl Setup {
     fn is_for(&self, ppem: u16, scale: i64) -> bool {
         match self {
+            Self::Unusable(_) => true,
             Self::Ready(state) => state.hinter.is_for(ppem, scale),
             Self::Failed {
-                ppem: p, scale: s, ..
-            } => (*p, *s) == (ppem, scale),
+                ppem: p,
+                scale: s,
+                error,
+                ..
+            } => (*p, *s) == (ppem, scale) && !matches!(error, Error::Backpressure { .. }),
+        }
+    }
+
+    /// The face's definitions, leaving the size.
+    fn into_definitions(self) -> Option<Box<Definitions>> {
+        match self {
+            Self::Unusable(_) => None,
+            Self::Failed { definitions, .. } => Some(definitions),
+            Self::Ready(state) => Some(state.hinter.definitions),
         }
     }
 }
@@ -392,10 +517,10 @@ impl Bytecode {
         }
     }
 
-    /// Runs `load` with the interpreter at `ppem` and the 16.16 `scale`,
-    /// made from `tables` (the face's) within `work` units unless it already
-    /// is, or made and failed. A failure for want of memory the budget may
-    /// later have (`Backpressure`) is not kept.
+    /// Runs `load` with the interpreter at `ppem` and the 16.16 `scale`, made
+    /// from `tables` (the face's) within `work` units unless it already is,
+    /// or made and failed: the font program runs at the first size, the
+    /// control value program at each size.
     pub(crate) fn with_size<'t, R>(
         &self,
         tables: impl FnOnce() -> Tables<'t>,
@@ -405,33 +530,56 @@ impl Bytecode {
         load: impl FnOnce(&mut State) -> Result<R>,
     ) -> Result<R> {
         let mut guard = self.setup.lock().unwrap_or_else(PoisonError::into_inner);
-        // The old size's state goes before the new one is made.
-        let kept = guard.take().filter(|s| s.is_for(ppem, scale));
-        let setup = if let Some(setup) = kept {
-            guard.insert(setup)
-        } else {
-            let mut budget = WorkBudget::new(work);
-            let setup = match Hinter::new(tables(), ppem, scale, &self.budget, &mut budget) {
-                Ok(hinter) => Setup::Ready(Box::new(State {
-                    hinter,
-                    units: BudgetVec::new(&self.budget),
-                    ends: BudgetVec::new(&self.budget),
-                })),
-                Err(e @ Error::Backpressure { .. }) => return Err(e),
-                Err(error) => Setup::Failed { ppem, scale, error },
-            };
-            guard.insert(setup)
+        let setup = match guard.take() {
+            Some(setup) if setup.is_for(ppem, scale) => guard.insert(setup),
+            kept => {
+                let tables = tables();
+                let mut budget = WorkBudget::new(work);
+                // The old size's state goes before the new one is made.
+                let definitions = match kept.map(Setup::into_definitions) {
+                    Some(Some(definitions)) => definitions,
+                    _ => match Definitions::new(tables, ppem, scale, &self.budget, &mut budget) {
+                        Ok(definitions) => Box::new(definitions),
+                        Err(e @ Error::Backpressure { .. }) => return Err(e),
+                        Err(error) => {
+                            *guard = Some(Setup::Unusable(error));
+                            return Err(error);
+                        }
+                    },
+                };
+                let setup = match Hinter::new(
+                    tables,
+                    ppem,
+                    scale,
+                    definitions,
+                    &self.budget,
+                    &mut budget,
+                ) {
+                    Ok(hinter) => Setup::Ready(Box::new(State {
+                        hinter,
+                        units: BudgetVec::new(&self.budget),
+                        ends: BudgetVec::new(&self.budget),
+                    })),
+                    Err((error, definitions)) => Setup::Failed {
+                        ppem,
+                        scale,
+                        error,
+                        definitions,
+                    },
+                };
+                guard.insert(setup)
+            }
         };
         match setup {
             Setup::Ready(state) => load(state),
-            Setup::Failed { error, .. } => Err(*error),
+            Setup::Unusable(error) | Setup::Failed { error, .. } => Err(*error),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Bytecode, GlyphPoints, Hinter, Programs, Tables};
+    use super::{Bytecode, Definitions, GlyphPoints, Hinter, Programs, Tables};
     use crate::outline::{Outline, Point, PointKind};
     use std::cell::Cell;
     use triergon_core::{Budget, Error, WorkBudget};
@@ -480,7 +628,16 @@ mod tests {
         let budget = Budget::new(1 << 24)?;
         let programs = tables.programs;
         let mut setup = WorkBudget::new(setup);
-        let mut hinter = Hinter::new(tables, 16, 0x8000, &budget, &mut setup)?;
+        let definitions = Definitions::new(tables, 16, 0x8000, &budget, &mut setup)?;
+        let mut hinter = Hinter::new(
+            tables,
+            16,
+            0x8000,
+            Box::new(definitions),
+            &budget,
+            &mut setup,
+        )
+        .map_err(|(e, _)| e)?;
         let units = [(100, 3), (100, 703), (501, 703), (501, 3)].map(|(x, y)| Point::new(x, y));
         let mut outline = Outline::new(&budget);
         outline.begin(usize::MAX);
@@ -660,5 +817,86 @@ mod tests {
         // prep: PUSHB 1 1; INSTCTRL
         let points = hint(&[], &[0xB1, 1, 1, 0x8E], &[0x00, 0xB0, 1, 0x2F], 100).unwrap();
         assert_eq!(ys(&points), [1, 351, 351, 1]);
+    }
+
+    /// Loads at `ppem` through `bytecode`, made from `tables`, and returns
+    /// what `CALL 1` leaves on the stack of a glyph program, or the error.
+    fn function_1_at(bytecode: &Bytecode, tables: Tables<'_>, ppem: u16) -> Result<i32, Error> {
+        bytecode.with_size(
+            || tables,
+            ppem,
+            i64::from(ppem) << 11,
+            10_000,
+            |state| {
+                let points = [(0, 0), (0, 0)].map(|(x, y)| Point::new(x, y));
+                let mut outline = Outline::new(&Budget::new(1 << 20)?);
+                outline.begin(usize::MAX);
+                for p in points {
+                    outline.push_point(p, PointKind::On)?;
+                }
+                outline.end_contour()?;
+                let phantoms = [Point::default(); 4];
+                let glyph = GlyphPoints {
+                    outline: &mut outline,
+                    base: 0,
+                    ends: &[2],
+                    units: Some(&points),
+                    phantoms: (phantoms, phantoms),
+                };
+                // SVTCA[0]; PUSHB 0 1; CALL; SCFS: function 1's value into
+                // point 0's y.
+                let program = [0x00, 0xB1, 0, 1, 0x2B, 0x48];
+                state
+                    .hinter
+                    .hint(tables.programs, &program, glyph, &mut WorkBudget::new(1000))?;
+                Ok(outline.points()[0].point.y)
+            },
+        )
+    }
+
+    #[test]
+    fn the_font_program_runs_once_for_the_face() {
+        // fpgm: MPPEM; PUSHB 12; LT; IF; PUSHB 1; FDEF; PUSHB 111; ENDF; ELSE;
+        // PUSHB 1; FDEF; PUSHB 222; ENDF; EIF: function 1 by the first size.
+        let fpgm = [
+            0x4B, 0xB0, 12, 0x50, 0x58, 0xB0, 1, 0x2C, 0xB0, 111, 0x2D, 0x1B, 0xB0, 1, 0x2C, 0xB0,
+            222, 0x2D, 0x59,
+        ];
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        let face = tables(&MAXP, &fpgm, &[]);
+        assert_eq!(function_1_at(&bytecode, face, 16), Ok(222));
+        assert_eq!(function_1_at(&bytecode, face, 10), Ok(222));
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        assert_eq!(function_1_at(&bytecode, face, 10), Ok(111));
+        assert_eq!(function_1_at(&bytecode, face, 16), Ok(111));
+    }
+
+    #[test]
+    fn control_value_program_definitions_stay_with_the_face() {
+        // prep: MPPEM; PUSHB 12; LT; IF; PUSHB 1; FDEF; PUSHB 111; ENDF; EIF:
+        // function 1 only below 12 ppem.
+        let prep = [
+            0x4B, 0xB0, 12, 0x50, 0x58, 0xB0, 1, 0x2C, 0xB0, 111, 0x2D, 0x59,
+        ];
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        let face = tables(&MAXP, &[], &prep);
+        // An undefined function ends the program, leaving the point at 0.
+        assert_eq!(function_1_at(&bytecode, face, 16), Ok(0));
+        assert_eq!(function_1_at(&bytecode, face, 10), Ok(111));
+        assert_eq!(function_1_at(&bytecode, face, 16), Ok(111));
+    }
+
+    #[test]
+    fn a_failed_font_program_fails_every_size() {
+        // fpgm: MPPEM; PUSHB 12; LT; IF; ELSE; an undefined opcode; EIF.
+        let fpgm = [0x4B, 0xB0, 12, 0x50, 0x58, 0x1B, 0x28, 0x59];
+        let face = tables(&MAXP, &fpgm, &[]);
+        let failed = Err(Error::Invalid("TrueType font or control value program"));
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        assert_eq!(function_1_at(&bytecode, face, 16), failed);
+        assert_eq!(function_1_at(&bytecode, face, 10), failed);
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        assert_eq!(function_1_at(&bytecode, face, 10), Ok(0));
+        assert_eq!(function_1_at(&bytecode, face, 16), Ok(0));
     }
 }

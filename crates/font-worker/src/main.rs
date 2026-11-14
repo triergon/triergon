@@ -20,33 +20,43 @@ const USAGE: &str = "usage: font-worker OPERATION-fold FILE [MODE HEIGHT]
        | OPERATION-bench FILE ITERATIONS [MODE HEIGHT]
        | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]
   OPERATION is font (no MODE or HEIGHT) or font-sized, with MODE outlines, advances,
-  vertical or default and HEIGHT in 26.6 pixels";
+  vertical or default and HEIGHT in 26.6 pixels, or several heights separated by
+  commas, requested in turn";
+
+/// The most heights one operation requests in turn.
+const MAX_HEIGHTS: usize = 64;
 
 /// What one operation reads from every face.
-#[derive(Clone, Copy)]
 enum Operation {
     /// Face data and unscaled outlines.
     Faces,
-    /// What libass obtains at a size with hinting off: size metrics, kerning, and
-    /// every glyph's unhinted outline and advance with its synthetic styles.
-    Scaled(i32),
-    /// The default-load (hinted) advance of every glyph at a size.
-    Hinted(i32),
-    /// The vertical advances of every glyph at a size, unhinted and of the
-    /// default load.
-    Vertical(i32),
-    /// The default-load metrics and outline of every glyph at a size.
-    Default(i32),
+    /// What a face reads at each of the heights, requested in turn on the same
+    /// face as libass resizes one.
+    Sized(Mode, Vec<i32>),
+}
+
+/// What a `font-sized` operation reads at a size.
+#[derive(Clone, Copy)]
+enum Mode {
+    /// What libass obtains with hinting off: size metrics, kerning, and every
+    /// glyph's unhinted outline and advance with its synthetic styles.
+    Scaled,
+    /// The default-load (hinted) advance of every glyph.
+    Hinted,
+    /// The vertical advances of every glyph, unhinted and of the default load.
+    Vertical,
+    /// The default-load metrics and outline of every glyph.
+    Default,
 }
 
 impl Operation {
-    const fn name(self) -> &'static str {
+    const fn name(&self) -> &'static str {
         match self {
             Self::Faces => "font-outlines",
-            Self::Scaled(_) => "font-sized-outlines",
-            Self::Hinted(_) => "font-sized-advances",
-            Self::Vertical(_) => "font-sized-vertical",
-            Self::Default(_) => "font-sized-default",
+            Self::Sized(Mode::Scaled, _) => "font-sized-outlines",
+            Self::Sized(Mode::Hinted, _) => "font-sized-advances",
+            Self::Sized(Mode::Vertical, _) => "font-sized-vertical",
+            Self::Sized(Mode::Default, _) => "font-sized-default",
         }
     }
 }
@@ -87,38 +97,34 @@ fn kerning_pairs(font: &Font) -> Vec<(GlyphId, GlyphId)> {
 }
 
 /// One operation: parse every face of `file` and read what `operation` covers.
-fn read(file: &Bytes, budget: &Budget, operation: Operation, sink: &mut impl Sink) -> Result<()> {
+fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Sink) -> Result<()> {
     let faces = Font::face_count(file.as_ref())?;
     for index in 0..faces {
         let Ok(font) = Font::new(file.clone(), index, budget, Limits::default()) else {
             sink.record(Record::FaceError(index))?;
             continue;
         };
-        match operation {
-            Operation::Faces => face(&font, &mut Outline::new(budget), sink)?,
-            Operation::Scaled(height) => {
-                sink.record(Record::SizedFace(index))?;
-                match font.at_size(height) {
-                    Ok(sized) => scaled(&font, &sized, height, budget, sink)?,
-                    Err(_) => sink.record(Record::SizeError(height))?,
-                }
+        let Operation::Sized(mode, heights) = operation else {
+            face(&font, &mut Outline::new(budget), sink)?;
+            continue;
+        };
+        sink.record(Record::SizedFace(index))?;
+        for &height in heights {
+            if heights.len() > 1 {
+                sink.record(Record::Request(height))?;
             }
-            Operation::Hinted(height)
-            | Operation::Vertical(height)
-            | Operation::Default(height) => {
-                sink.record(Record::SizedFace(index))?;
-                let Ok(sized) = font.at_size(height) else {
-                    sink.record(Record::SizeError(height))?;
-                    continue;
-                };
-                match operation {
-                    Operation::Hinted(_) => hinted(&font, &sized, sink),
-                    Operation::Vertical(_) => {
-                        vertical(&font, &sized, &mut Outline::new(budget), sink)
-                    }
-                    _ => default(&font, &sized, &mut Outline::new(budget), sink),
-                }
-                .map_err(|e| format!("face {index} at {height}: {e}"))?;
+            let Ok(sized) = font.at_size(height) else {
+                sink.record(Record::SizeError(height))?;
+                continue;
+            };
+            match mode {
+                Mode::Scaled => scaled(&font, &sized, height, budget, sink)?,
+                Mode::Hinted => hinted(&font, &sized, sink)
+                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
+                Mode::Vertical => vertical(&font, &sized, &mut Outline::new(budget), sink)
+                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
+                Mode::Default => default(&font, &sized, &mut Outline::new(budget), sink)
+                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
             }
         }
     }
@@ -327,6 +333,18 @@ enum Action {
     Dump,
 }
 
+/// A height, or several separated by commas.
+fn heights(text: &str) -> Result<Vec<i32>> {
+    let heights = text
+        .split(',')
+        .map(str::parse)
+        .collect::<std::result::Result<Vec<i32>, _>>()?;
+    if heights.len() > MAX_HEIGHTS {
+        return Err(USAGE.into());
+    }
+    Ok(heights)
+}
+
 fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
     let (mode, rest) = args.split_first().ok_or(USAGE)?;
     let (operation, action) = mode.rsplit_once('-').ok_or(USAGE)?;
@@ -340,12 +358,16 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
     let (path, arguments) = rest;
     let operation = match (operation, arguments) {
         ("font", []) => Operation::Faces,
-        ("font-sized", [mode, height]) if mode == "outlines" => Operation::Scaled(height.parse()?),
-        ("font-sized", [mode, height]) if mode == "advances" => Operation::Hinted(height.parse()?),
-        ("font-sized", [mode, height]) if mode == "vertical" => {
-            Operation::Vertical(height.parse()?)
+        ("font-sized", [mode, height]) => {
+            let mode = match mode.as_str() {
+                "outlines" => Mode::Scaled,
+                "advances" => Mode::Hinted,
+                "vertical" => Mode::Vertical,
+                "default" => Mode::Default,
+                _ => return Err(USAGE.into()),
+            };
+            Operation::Sized(mode, heights(height)?)
         }
-        ("font-sized", [mode, height]) if mode == "default" => Operation::Default(height.parse()?),
         _ => return Err(USAGE.into()),
     };
     Ok((action, operation, path))
@@ -370,7 +392,7 @@ fn run(args: &[String]) -> Result<()> {
     let mut out = io::stdout().lock();
     if let Action::Dump = action {
         let mut dump = Dump(BufWriter::new(out));
-        read(&file, &budget, operation, &mut dump)?;
+        read(&file, &budget, &operation, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
     let memory = matches!(action, Action::Memory);
@@ -382,7 +404,7 @@ fn run(args: &[String]) -> Result<()> {
     let mut total = Work::default();
     for _ in 0..iterations {
         let mut work = Work::default();
-        read(std::hint::black_box(&file), &budget, operation, &mut work)?;
+        read(std::hint::black_box(&file), &budget, &operation, &mut work)?;
         total.accumulate(&work);
         if budget.used() != retained {
             return Err("font operation retained charged storage".into());

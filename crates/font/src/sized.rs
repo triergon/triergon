@@ -481,8 +481,9 @@ impl<'f> SizedFont<'f> {
             control: bytes(font.tables.prep),
         };
         let (ppem, scale) = (self.metrics.y_ppem, self.hinted_scale);
-        // The interpreter runs the font and control value programs once per
-        // size, and keeps the state they leave for the size's glyphs.
+        // The interpreter runs the font program once for the face and the
+        // control value program once per size, and keeps the state they
+        // leave for the size's glyphs.
         let tables = || {
             let table = |tag| font.table(tag).unwrap_or_default();
             Tables {

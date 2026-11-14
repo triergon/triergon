@@ -9,7 +9,10 @@
 //!   the baseline and the rest below it, so the ascender to descender span is
 //!   the em);
 //! - `heights H...`: the 26.6 pixel heights a probe loads the face at, as
-//!   libass sizes a face (default 16384);
+//!   libass sizes a face, each in a process of its own (default 16384 when
+//!   the probe names no heights or sequences);
+//! - `sequence H...`: heights requested in turn in one process, on the same
+//!   face, as libass resizes a face; a probe may give several sequences;
 //! - `modes M...`: the `font-sized` modes a probe reads at each height
 //!   (default `default`; also `outlines`, `advances` and `vertical`);
 //! - `wraps-at-32-bits`: the probe's results depend on the reference's
@@ -85,7 +88,8 @@ const UNSCALED_COMPONENT_OFFSET: u16 = 0x1000;
 /// A parsed description.
 #[derive(Debug, Default)]
 pub(super) struct Description {
-    pub(super) heights: Vec<i32>,
+    /// The heights loaded in each worker process, in order.
+    pub(super) runs: Vec<Vec<i32>>,
     pub(super) modes: Vec<String>,
     pub(super) wraps_at_32_bits: bool,
     units_per_em: u16,
@@ -126,7 +130,6 @@ struct Component {
 impl Description {
     pub(super) fn parse(text: &str) -> Result<Self, String> {
         let mut d = Self {
-            heights: vec![16384],
             modes: vec!["default".to_owned()],
             units_per_em: 2048,
             ..Self::default()
@@ -147,7 +150,14 @@ impl Description {
                     [ascender, descender] => d.metrics = Some((ascender, descender)),
                     _ => return Err(fail("metrics ASCENDER DESCENDER".into())),
                 },
-                "heights" => d.heights = numbers(&args).map_err(fail)?,
+                "heights" => {
+                    let heights: Vec<i32> = numbers(&args).map_err(fail)?;
+                    d.runs.extend(heights.into_iter().map(|h| vec![h]));
+                }
+                "sequence" => match numbers(&args).map_err(fail)? {
+                    heights if heights.len() >= 2 => d.runs.push(heights),
+                    _ => return Err(fail("sequence H H...".into())),
+                },
                 "modes" => {
                     let known = ["default", "outlines", "advances", "vertical"];
                     if args.is_empty() || args.iter().any(|m| !known.contains(m)) {
@@ -203,6 +213,9 @@ impl Description {
         }
         if d.glyphs.is_empty() {
             return Err("a description needs at least one glyph".into());
+        }
+        if d.runs.is_empty() {
+            d.runs.push(vec![16384]);
         }
         if d.units_per_em == 0 {
             return Err("units-per-em must not be zero".into());
@@ -980,6 +993,7 @@ mod tests {
         # A square with a program, and a composite of it.
         units-per-em 1000
         heights 16384 640
+        sequence 1000 640 1000
         modes default vertical
         maxp twilight 4 storage 8
         cvt 100 -20
@@ -1009,7 +1023,12 @@ mod tests {
     #[test]
     fn a_description_builds_a_consistent_face() {
         let d = Description::parse(SQUARE).unwrap();
-        assert_eq!(d.heights, [16384, 640]);
+        assert_eq!(d.runs, [vec![16384], vec![640], vec![1000, 640, 1000]]);
+        assert!(Description::parse("sequence 1000\nglyph\nend").is_err());
+        assert_eq!(
+            Description::parse("glyph\nend").unwrap().runs,
+            [vec![16384]]
+        );
         assert_eq!(d.modes, ["default", "vertical"]);
         assert!(Description::parse("modes hinted\nglyph\nend").is_err());
         let font = d.build().unwrap();
