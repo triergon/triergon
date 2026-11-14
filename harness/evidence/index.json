@@ -20433,6 +20433,41 @@
     "candidate": "218065d60fb7520fc5e636c8451b46a4d6bda61f",
     "baseline": "2886a3fd7b84392b75a98369e8426e0dd6f9edda"
    }
+  },
+  {
+   "name": "mp4-range-shorter-track-df8e76b8-aarch64",
+   "path": "mp4-range-shorter-track-df8e76b8-aarch64",
+   "retention": "retained",
+   "reason": "MP4 range startup and seek, with two upstream QuickTime samples. The AArch64 gate build passed all 53 cases with 30 pairs each for timing and kernel-bound memory.",
+   "key": "evidence/mp4-range-shorter-track-df8e76b8-aarch64/c931c162d04fdbde96b7a9cc2272fb0b22134aadbf44d749c684aedd952944db.tar.zst",
+   "sha256": "c931c162d04fdbde96b7a9cc2272fb0b22134aadbf44d749c684aedd952944db",
+   "bytes": 23974638,
+   "results": [
+    {
+     "path": "results/grade/gate-result.json",
+     "command": "grade",
+     "key": "d52adaad4afa619eb03c0ae4bed7f7e30fe8781fe8db170776d99ad2e97a094d",
+     "status": 0,
+     "report_sha256": "8d4cc4ef8425165e426ae1a05fdf91f6c107557fd147a7d7a8936b3d8b3132af"
+    },
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "report --memory",
+     "key": "9f8c9d4fca8dac073d09e5c3bbcb5d11535de900099817e865e91790678544dc",
+     "status": 0,
+     "report_sha256": "6814175d8a0a5c14e5d8b92b403392dc6bc89445a9609bdd5cf917f51367c5a8"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "6c45239af4dcc925a3c125ef83b0b673ff0a2b3886159bd613f08f894761a22f",
+     "status": 0,
+     "report_sha256": "c4be3a4ae6127344602e721ddb899f721a70772d4d1f2c504f79b37d177e6a2f"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "df8e76b816e05904db6b3c57615ef8f235dd50b3"
+   }
   }
  ]
 }
