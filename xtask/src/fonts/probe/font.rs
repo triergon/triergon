@@ -11,13 +11,15 @@
 //! - `heights H...`: the 26.6 pixel heights a probe loads the face at, as
 //!   libass sizes a face (default 16384);
 //! - `wraps-at-32-bits`: the probe's results depend on the reference's
-//!   integer width; its record, from 32-bit ARMv7, stands for the reference
-//!   on every target;
+//!   integer width; its record, from 32-bit ARMv7, stands for a 64-bit
+//!   reference that differs from it (a 32-bit reference must match it);
 //! - `maxp KEY N...`: `maxp` fields, overriding the defaults and the values
 //!   computed from the glyphs: `zones` (2), `twilight` (16), `storage` (64),
 //!   `functions` (64), `instruction-defs` (0), `stack` (256), `points`,
 //!   `contours`, `composite-points`, `composite-contours`,
 //!   `instruction-size`, `components` and `depth`;
+//! - `maxp-version 0.5`: a version 0.5 `maxp`, which holds only the glyph
+//!   count, in place of version 1.0;
 //! - `cvt V...`: control values in font units, appended in order;
 //! - `gasp PPEM BEHAVIOUR`: one `gasp` range, in order;
 //! - `fpgm` and `prep`: a program up to a line `end`, in the assembler's
@@ -88,6 +90,8 @@ pub(super) struct Description {
     metrics: Option<(i16, i16)>,
     borrowed: Vec<(String, Vec<String>)>,
     maxp: Vec<(String, u16)>,
+    /// Whether `maxp` is version 0.5.
+    short_maxp: bool,
     cvt: Vec<i16>,
     gasp: Vec<(u16, u16)>,
     fpgm: Option<Vec<u8>>,
@@ -153,6 +157,11 @@ impl Description {
                         d.maxp.push((pair[0].to_owned(), value));
                     }
                 }
+                "maxp-version" => match args[..] {
+                    ["0.5"] => d.short_maxp = true,
+                    ["1.0"] => d.short_maxp = false,
+                    _ => return Err(fail("maxp-version 0.5 or 1.0".into())),
+                },
                 "cvt" => d.cvt.extend(numbers::<i16>(&args).map_err(fail)?),
                 "gasp" => match numbers::<u16>(&args).map_err(fail)?[..] {
                     [ppem, behaviour] => d.gasp.push((ppem, behaviour)),
@@ -507,6 +516,11 @@ impl Description {
     }
 
     fn maxp(&self) -> Result<Vec<u8>, String> {
+        if self.short_maxp {
+            let mut t = vec![0, 0, 0x50, 0];
+            t.extend((self.glyphs.len() as u16).to_be_bytes());
+            return Ok(t);
+        }
         let simple = || self.glyphs.iter().filter(|g| g.components.is_empty());
         let composite_sizes = (0..self.glyphs.len())
             .filter(|&i| !self.glyphs[i].components.is_empty())
@@ -1044,6 +1058,13 @@ mod tests {
     }
 
     #[test]
+    fn a_version_0_5_maxp_holds_only_the_glyph_count() {
+        let text = format!("maxp-version 0.5\n{SQUARE}");
+        let font = Description::parse(&text).unwrap().build().unwrap();
+        assert_eq!(table(&tables(&font), b"maxp"), [0, 0, 0x50, 0, 0, 3]);
+    }
+
+    #[test]
     fn mistakes_are_reported_with_their_line() {
         let fail = |text: &str| Description::parse(text).unwrap_err();
         assert!(
@@ -1055,5 +1076,6 @@ mod tests {
         assert!(fail("fpgm\n  FOO\nend").starts_with("line 2"));
         assert!(fail("maxp bogus 1\nglyph\nend").starts_with("line 1"));
         assert!(fail("prep\n  ADD").contains("without `end`"));
+        assert!(fail("maxp-version 2\nglyph\nend").starts_with("line 1"));
     }
 }

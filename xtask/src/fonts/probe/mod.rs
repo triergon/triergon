@@ -134,8 +134,13 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
         } else {
             match fs::read_to_string(&record) {
                 // A 64-bit reference keeps values the 32-bit one wraps; the
-                // candidate follows the 32-bit record.
-                Ok(recorded) if description.wraps_at_32_bits && recorded != reference => {
+                // candidate follows the 32-bit record. A 32-bit reference must
+                // match it.
+                Ok(recorded)
+                    if description.wraps_at_32_bits
+                        && recorded != reference
+                        && is_64_bit(&o.reference)? =>
+                {
                     note = " (this reference computes in 64 bits; compared with the record)";
                     reference = recorded;
                 }
@@ -166,6 +171,18 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
             failed.join(", ")
         ))
     }
+}
+
+/// Whether the executable `worker` is a 64-bit ELF or Mach-O binary.
+fn is_64_bit(worker: &str) -> Result<bool, String> {
+    let mut header = [0_u8; 5];
+    let mut file = fs::File::open(worker).map_err(|e| format!("{worker}: {e}"))?;
+    std::io::Read::read_exact(&mut file, &mut header).map_err(|e| format!("{worker}: {e}"))?;
+    Ok(match header {
+        [0x7F, b'E', b'L', b'F', class] => class == 2,
+        [0xCF, 0xFA, 0xED, 0xFE, _] | [0xFE, 0xED, 0xFA, 0xCF, _] => true,
+        _ => false,
+    })
 }
 
 /// The worker's default-load dump of `font` at each height, each after a line
@@ -237,7 +254,15 @@ fn value_differences(a: &str, b: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::compare;
+    use super::{compare, is_64_bit};
+
+    #[test]
+    fn the_reference_width_is_read_from_its_executable() {
+        let exe = std::env::current_exe().unwrap();
+        let exe = exe.to_str().unwrap();
+        assert_eq!(is_64_bit(exe), Ok(cfg!(target_pointer_width = "64")));
+        assert!(is_64_bit("/nonexistent/worker").is_err());
+    }
 
     #[test]
     fn differences_name_the_values_that_changed() {
