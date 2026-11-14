@@ -537,7 +537,12 @@ fn correctness_and_timing(
 }
 
 /// Grade a case with its memory, write its result and return its summary line.
-fn finish_case(a: &Options, case: MeasuredCase, measured: Value) -> Result<Value, String> {
+fn finish_case(
+    a: &Options,
+    case: MeasuredCase,
+    measured: Value,
+    open_on_target: bool,
+) -> Result<Value, String> {
     let correctness = case.correctness().clone();
     let timed = case.field("runtime");
     let runtime_gate =
@@ -590,6 +595,7 @@ fn finish_case(a: &Options, case: MeasuredCase, measured: Value) -> Result<Value
         ("heap_gate".to_owned(), Value::Bool(heap_gate)),
         ("rss_gate".to_owned(), Value::Bool(rss_gate)),
         ("memory_status".to_owned(), memory_status),
+        ("open_on_target".to_owned(), Value::Bool(open_on_target)),
         (
             "all_gates".to_owned(),
             Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
@@ -620,6 +626,7 @@ fn memory_stage(
     root: &Path,
     a: &Options,
     refusals: &[String],
+    open: &[String],
     measured_cases: Vec<MeasuredCase>,
 ) -> Result<Vec<Value>, String> {
     let workers = memory::WorkerPaths {
@@ -686,7 +693,8 @@ fn memory_stage(
             let memory = memory.unwrap_or_else(|| {
                 Value::object([("status", Value::str("missing-correctness-output"))])
             });
-            finish_case(a, measured, memory)
+            let open_on_target = open.contains(&measured.id);
+            finish_case(a, measured, memory, open_on_target)
         })
         .collect()
 }
@@ -700,6 +708,17 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         .and_then(Value::as_array)
         .ok_or("cases file without cases")?
         .to_vec();
+    let open = {
+        let ids: Vec<&str> = cases
+            .iter()
+            .map(|case| {
+                case.get("id")
+                    .and_then(Value::as_str)
+                    .ok_or("case without id")
+            })
+            .collect::<Result<_, _>>()?;
+        open_cases(root, &ids)?
+    };
     if !a.only.is_empty() {
         cases.retain(|c| {
             c.get("id")
@@ -792,14 +811,74 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             measured
         }
     };
+    // A listed open case whose conversion now passes fails the run once every
+    // case is measured, so the list cannot go stale.
+    let now_passing: Vec<String> = measured_cases
+        .iter()
+        .filter(|case| {
+            open.contains(&case.id)
+                && case
+                    .correctness()
+                    .get("conversion")
+                    .is_some_and(Value::truthy)
+        })
+        .map(|case| case.id.clone())
+        .collect();
+    let still_open = || {
+        if now_passing.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "listed open cases now pass; remove them from open_cases: {}",
+                now_passing.join(", ")
+            ))
+        }
+    };
     if matches!(a.stage, Stage::Timing) {
-        return Ok(());
+        return still_open();
     }
-    let summary = memory_stage(root, a, &refusals, measured_cases)?;
+    let summary = memory_stage(root, a, &refusals, &open, measured_cases)?;
     write(
         &a.out.join("summary.json"),
         json::to_python(&Value::Array(summary), Some(1)),
-    )
+    )?;
+    still_open()
+}
+
+/// The cases `harness/capture/contract.json` lists in `open_cases` for this
+/// host's worker target: their conversion is compared and reported, and fails.
+fn open_cases(root: &Path, ids: &[&str]) -> Result<Vec<String>, String> {
+    let path = root.join("harness/capture/contract.json");
+    let contract =
+        crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    listed_open(&contract, gate_build::worker_target()?, ids)
+}
+
+/// The `open_cases` of `contract` listed for `target`. Every listed id must be a
+/// case in `ids`.
+fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<String>, String> {
+    let Some(entries) = contract.get("open_cases") else {
+        return Ok(Vec::new());
+    };
+    let entries = entries.as_array().ok_or("open_cases is not a list")?;
+    let mut open = Vec::new();
+    for entry in entries {
+        let id = entry
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or("open case without id")?;
+        if !ids.contains(&id) {
+            return Err(format!("open case {id} is not a case in the cases file"));
+        }
+        let targets = entry
+            .get("targets")
+            .and_then(Value::as_array)
+            .ok_or("open case without targets")?;
+        if targets.iter().any(|t| t.as_str() == Some(target)) {
+            open.push(id.to_owned());
+        }
+    }
+    Ok(open)
 }
 
 #[cfg(test)]
@@ -891,5 +970,30 @@ mod tests {
         assert!(outputs_match(&warmups(0xab), &outputs));
         assert!(!outputs_match(&warmups(0xff), &outputs));
         assert!(!outputs_match(&warmups(0xab), &Value::Object(vec![])));
+    }
+
+    #[test]
+    fn open_cases_are_listed_per_target_and_must_be_cases() {
+        let contract = json::parse(
+            r#"{"open_cases": [
+                {"id": "c01", "targets": ["aarch64-unknown-linux-gnu"]},
+                {"id": "c02", "targets": ["thumbv7neon-unknown-linux-gnueabihf"]}]}"#,
+        )
+        .unwrap();
+        let ids = ["c01", "c02", "c03"];
+        assert_eq!(
+            listed_open(&contract, "aarch64-unknown-linux-gnu", &ids).unwrap(),
+            ["c01"]
+        );
+        assert!(
+            listed_open(&contract, "aarch64-unknown-linux-gnu", &ids[1..])
+                .unwrap_err()
+                .contains("c01")
+        );
+        assert!(
+            listed_open(&Value::Object(vec![]), "x", &ids)
+                .unwrap()
+                .is_empty()
+        );
     }
 }
