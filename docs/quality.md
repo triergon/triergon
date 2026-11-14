@@ -604,20 +604,21 @@ may override that count for diagnostic comparisons.
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the packet-framing suite, the codecs, a part of the capture cases, the
-tests, and the font, shaping, rasterising and ASS comparisons. `cargo xtask gate plan
---shards N` splits them into N shards of about equal planning weight, each for its own
-host. On one host, a shard's run is:
+measurements, the packet-framing suite, the codecs' parity or their timing, a capture
+case, the debug or the release tests, and the font, shaping, rasterising and ASS
+comparisons. `cargo xtask gate plan --shards N` splits them into N shards of about
+equal planning weight, each for its own host. On one host, a shard's run is:
 
-1. `tools/gate-host.sh ready I/N REVIEW`: the prepare commands, the workers with
+1. `tools/gate-host.sh ready I/N`: the prepare commands, the workers with
    `cargo xtask build-workers --all-references`, so that every profile reference is
    built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
    everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
    `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--codecs` for each
-   workload list, `--external-vector`, `--capture` for the capture cases) and
-   `--review` for the RSS module review (`cargo xtask preflight` also takes
-   `--reference NAME` for any other reference a run names by path, and
-   `--standard-memory` instead of `--review` for a run without the kernel bound).
+   workload list, `--external-vector`, `--capture` for the capture cases), with the
+   [committed RSS module review](../harness/rss-bound/README.md#proof) of the tree's
+   module source for the running kernel (`cargo xtask preflight` also takes
+   `--reference NAME` for any other reference a run names by path, `--review FILE`
+   for another review, and `--standard-memory` for a run without the kernel bound).
    Preflight checks that the gate build's workers and references match the build
    identity, that every case names a reference the identity holds and has each input it
    reads with its pinned hash, that the references ISO BMFF, the codecs and capture
@@ -627,7 +628,7 @@ host. On one host, a shard's run is:
    fails, and every failure is printed at once. Then `prove.sh` runs once into a
    scratch directory and the module is unloaded again, so a module that will not
    build, load or prove itself stops the run here.
-2. `tools/gate-host.sh run I/N REVIEW OUT` times the shard alone on one CPU with the RSS
+2. `tools/gate-host.sh run I/N OUT` times the shard alone on one CPU with the RSS
    module unloaded (`taskset -c 1`, `cargo xtask gate run --stage timing`), after its
    parity steps.
 3. It [proves](../harness/rss-bound/README.md) the kernel bound, rebuilds the workers
@@ -643,6 +644,33 @@ and a record of its command, status and time, go under OUT. `cargo xtask gate su
 planned step did not run exactly once, a step failed, or the shards measured different
 source revisions or timing builds, and names the failed grades whose only failures are
 the contract's listed open cases.
+
+`cargo xtask build-workers --all-references` builds a worker for every reference profile
+and exits 1, writing no build identity, when a profile is not prepared, so that no gate
+run can measure without one of its references. Prepare them first, in this order (libass
+links the FreeType, FriBidi and HarfBuzz builds):
+
+```sh
+for profile in matroska formats video subtitles decode capture capture-small; do
+    cargo xtask prepare-ffmpeg --jobs 8 --profile "$profile"
+done
+cargo xtask fonts prepare --jobs 8
+cargo xtask shape prepare --jobs 8
+cargo xtask ass prepare --jobs 8      # the libass build, as raster prepare makes it
+cargo xtask build-workers --all-references
+```
+
+`cargo xtask preflight`, with or without `--kernel`, takes the committed review of the
+tree's module source for the running kernel unless `--review FILE` names another. `cargo
+xtask grade` joins one feature's timing and memory collections: it takes the paths of
+their `report.json` files and a new output directory, as a shard's grade step does:
+
+```sh
+cargo xtask grade OUT/benchmark/mp4-forward/report.json OUT/memory/mp4-forward/report.json \
+    --contract harness/features/mp4-forward/contract.json \
+    --manifest harness/features/mp4-forward/corpus.json \
+    --output OUT/graded/mp4-forward
+```
 
 #### Early stop
 
@@ -819,7 +847,7 @@ size, inside it:
 ```sh
 sudo mount --bind /sys/kernel/debug /srv/armhf/sys/kernel/debug
 cd /srv/armhf/home/ubuntu/triergon
-harness/rss-bound/prove.sh .research/rss-bound/RSS-REVIEW.json .research/rss-bound /srv/armhf
+harness/rss-bound/prove.sh .research/rss-bound /srv/armhf
 ```
 
 Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
@@ -845,7 +873,7 @@ samples, the codec workload inputs and the subtitle corpus the gate reads
 are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
 
-`tools/gate-aws.sh run TARGET N REVISION REVIEW OUT` launches N hosts from the image,
+`tools/gate-aws.sh run TARGET N REVISION OUT` launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
 archive's packs (building and uploading the others), gets each host ready and runs
 shard I of N on host I. The shards' outputs are archived under

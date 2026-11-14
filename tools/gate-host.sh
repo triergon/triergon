@@ -17,11 +17,11 @@
 #   tools/gate-host.sh checkout REVISION
 #       the repository at REVISION (fetched from origin, or from the bundle
 #       $BUNDLE), with the keys of the reference builds it needs
-#   tools/gate-host.sh ready I/N REVIEW
-#       the prepare step, then the preflight of shard I of N with the RSS module
-#       review REVIEW (a path in the repository) and one proof into a scratch
+#   tools/gate-host.sh ready I/N
+#       the prepare step, then the preflight of shard I of N with the committed RSS
+#       module review and one proof into a scratch
 #       directory: the host can measure
-#   tools/gate-host.sh run I/N REVIEW OUT [--full]
+#   tools/gate-host.sh run I/N OUT [--full]
 #       shard I of N into OUT (in the repository): timing alone on CPU 1, the
 #       kernel proof, the workers rebuilt with it, its preflight, memory on CPUs 1
 #       to the last and the grades with the module loaded; then the module is
@@ -67,6 +67,11 @@ setup() {
     local target=$1 revision=$2
     # Nothing may install or upgrade packages, or change the kernel, while a gate runs.
     sudo systemctl disable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+    # A crashing process dumps core in place rather than through a crash reporter,
+    # which can take longer than the tests and fuzzing allow a crash to take.
+    sudo systemctl disable --now apport.service >/dev/null 2>&1 || true
+    echo kernel.core_pattern=core | sudo tee /etc/sysctl.d/60-core-pattern.conf >/dev/null
+    sudo sysctl -q -p /etc/sysctl.d/60-core-pattern.conf
     sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
     # shellcheck disable=SC2086
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $PACKAGES >/dev/null
@@ -124,34 +129,34 @@ checkout() {
 }
 
 prove() { # OUT: build, load and prove the module, leaving it loaded
-    local review=$1 out=$2
+    local out=$1
     [ ! -e /sys/module/triergon_rss_bound ] || sudo rmmod triergon_rss_bound
     if armv7; then
-        (cd "$(repository)" && harness/rss-bound/prove.sh "$review" "$out" "$USERSPACE")
+        (cd "$(repository)" && harness/rss-bound/prove.sh "$out" "$USERSPACE")
     else
-        (cd "$(repository)" && harness/rss-bound/prove.sh "$review" "$out")
+        (cd "$(repository)" && harness/rss-bound/prove.sh "$out")
     fi
 }
 
 ready() {
-    local shard=$1 review=$2
+    local shard=$1
     prepare
     # The grades run from a release build of xtask; build it before anything is timed.
     step xtask-release inside "cargo build --release --locked -p xtask"
-    step preflight inside "cargo xtask gate preflight --shard $shard --review $review"
-    step prove-scratch prove "$review" .research/rss-bound-scratch
+    step preflight inside "cargo xtask gate preflight --shard $shard"
+    step prove-scratch prove .research/rss-bound-scratch
     sudo rmmod triergon_rss_bound
     log READY
 }
 
 run() {
-    local shard=$1 review=$2 out=$3 full=${4:-}
+    local shard=$1 out=$2 full=${3:-}
     local proof=.research/rss-bound
     [ ! -e /sys/module/triergon_rss_bound ] || sudo rmmod triergon_rss_bound
     step "timing $shard" inside "cargo xtask gate run --stage timing --shard $shard --output $out $full" || true
-    step prove prove "$review" "$proof"
+    step prove prove "$proof"
     step build-workers-kernel inside "TRIERGON_RSS_KERNEL_PROOF=$proof/RSS-PROOF.json cargo xtask build-workers --all-references"
-    step preflight-kernel inside "cargo xtask gate preflight --shard $shard --review $review --kernel"
+    step preflight-kernel inside "cargo xtask gate preflight --shard $shard --kernel"
     step "memory $shard" inside "cargo xtask gate run --stage memory --shard $shard --output $out $full" || true
     sudo rmmod triergon_rss_bound
     log DONE

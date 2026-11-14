@@ -22,7 +22,7 @@ use crate::sha256;
 type R<T> = Result<T, String>;
 
 pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
-       cargo xtask gate preflight [--shard I/N] --review FILE [--kernel]
+       cargo xtask gate preflight [--shard I/N] [--review FILE] [--kernel]
        cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full]
        cargo xtask gate summary --output FILE DIR...
        cargo xtask gate test --profile debug|release --output DIR [--full]
@@ -30,7 +30,8 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
   plan       print the gate's items and their planning weights (minutes on a
              32-bit ARMv7 c6g.4xlarge), split into N shards (default 1)
   preflight  `cargo xtask preflight` over everything shard I of N measures, with
-             the RSS module review; --kernel after the kernel proof
+             the committed RSS module review or --review FILE; --kernel after the
+             kernel proof
   run        the steps of shard I of N (default 1/1) in one stage: timing (parity
              steps, then timing on CPU 1) or memory (memory on CPUs 1 to the last,
              then the grades); each step's output goes under DIR, its log to
@@ -99,22 +100,22 @@ pub struct Item {
 
 /// The features the gate measures through `report`, with their corpus
 /// directory and planning weight: the minutes their timing, memory and grade took
-/// on a 32-bit ARMv7 c6g.4xlarge.
+/// with early stop on a 32-bit ARMv7 c6g.4xlarge.
 const FEATURES: [(&str, Option<&str>, u32); 23] = [
-    ("mp4-forward", None, 10),
-    ("ts-program", None, 8),
-    ("matroska-audio-clocks", None, 3),
-    ("raw-annex-b", None, 2),
-    ("mpegts-pes", None, 20),
-    ("hls-segments", Some("harness/fixtures/hls"), 17),
+    ("mp4-forward", None, 2),
+    ("ts-program", None, 2),
+    ("matroska-audio-clocks", None, 1),
+    ("raw-annex-b", None, 1),
+    ("mpegts-pes", None, 3),
+    ("hls-segments", Some("harness/fixtures/hls"), 4),
     (
         "matroska-startup-seek",
         Some(".research/startup-seek-fixtures"),
-        10,
+        2,
     ),
-    ("matroska-colour", Some(".research/colour-fixtures"), 8),
-    ("matroska-cues-preroll", Some(".research/seek-fixtures"), 2),
-    ("matroska-demux", Some(".research/fixtures"), 3),
+    ("matroska-colour", Some(".research/colour-fixtures"), 2),
+    ("matroska-cues-preroll", Some(".research/seek-fixtures"), 1),
+    ("matroska-demux", Some(".research/fixtures"), 1),
     (
         "matroska-header-removal",
         Some(".research/header-fixtures"),
@@ -123,24 +124,23 @@ const FEATURES: [(&str, Option<&str>, u32); 23] = [
     (
         "matroska-segment-metadata",
         Some(".research/catalogue-fixtures"),
-        13,
+        5,
     ),
-    ("matroska-zlib", Some(".research/zlib-fixtures"), 2),
-    ("ass-render", Some(""), 39),
-    ("ass-render-host", Some(""), 2),
-    ("subtitle-text", Some(""), 79),
-    ("subtitle-text-host", Some(""), 5),
-    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 74),
-    ("subtitle-dvb", Some(SUBTITLE_CORPUS), 55),
-    ("subtitle-dvd", Some(SUBTITLE_CORPUS), 48),
+    ("matroska-zlib", Some(".research/zlib-fixtures"), 1),
+    ("ass-render", Some(""), 20),
+    ("ass-render-host", Some(""), 1),
+    ("subtitle-text", Some(""), 16),
+    ("subtitle-text-host", Some(""), 1),
+    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 17),
+    ("subtitle-dvb", Some(SUBTITLE_CORPUS), 13),
+    ("subtitle-dvd", Some(SUBTITLE_CORPUS), 9),
     ("subtitle-dvd-host", Some(SUBTITLE_CORPUS), 1),
-    ("subtitle-cc", Some(SUBTITLE_CORPUS), 44),
-    ("subtitle-teletext", Some(SUBTITLE_CORPUS), 18),
+    ("subtitle-cc", Some(SUBTITLE_CORPUS), 9),
+    ("subtitle-teletext", Some(SUBTITLE_CORPUS), 5),
 ];
 const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
-/// How many parts the ISO BMFF suite's measurements and the capture cases are split into.
+/// How many parts the ISO BMFF suite's measurements are split into.
 const ISOBMFF_PARTS: usize = 3;
-const CAPTURE_PARTS: usize = 4;
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
@@ -316,7 +316,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             ]))
         };
         items.push(Item {
-            weight: 45,
+            weight: 9,
             steps: collections(
                 &name,
                 bench("benchmark", "--pairs"),
@@ -349,7 +349,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     ));
     items.push(Item {
         name: "framing".into(),
-        weight: 23,
+        weight: 3,
         steps,
         preflight: owned(&[
             "--feature",
@@ -376,86 +376,85 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
          cp {release}/examples/decode_hevc {bin}/codec-hevc-decode"
     ));
     let codec_worker = format!("{release}/codec-worker");
+    let codecs = vec![
+        step("codec-bin", Stage::Timing, Placement::Free, build_codecs),
+        step(
+            "codecs-manifest",
+            Stage::Timing,
+            Placement::Free,
+            xtask(&[
+                "codecs",
+                "manifest",
+                "--out",
+                &format!("{out}/codecs-fate-manifest.json"),
+                "h264=.research/fate-samples/h264-conformance",
+                "hevc=.research/fate-samples/hevc-conformance",
+            ]),
+        ),
+        step(
+            "codecs-grade",
+            Stage::Timing,
+            Placement::Free,
+            xtask(&[
+                "codecs",
+                "grade",
+                "--manifest",
+                &format!("{out}/codecs-fate-manifest.json"),
+                "--root",
+                ".",
+                "--bin",
+                &bin,
+                "--ffmpeg",
+                &format!("{FFMPEG_BIN}/ffmpeg"),
+                "--ffprobe",
+                &format!("{FFMPEG_BIN}/ffprobe"),
+                "--codec-worker",
+                &codec_worker,
+                "--reference",
+                "target/harness/ffmpeg-decode-worker",
+                "--out",
+                &format!("{out}/codecs-grade.jsonl"),
+            ]),
+        ),
+    ];
     items.push(Item {
         name: "codecs".into(),
-        weight: 49,
-        steps: vec![
-            step("codec-bin", Stage::Timing, Placement::Free, build_codecs),
-            step(
-                "codecs-manifest",
-                Stage::Timing,
-                Placement::Free,
-                xtask(&[
-                    "codecs",
-                    "manifest",
-                    "--out",
-                    &format!("{out}/codecs-fate-manifest.json"),
-                    "h264=.research/fate-samples/h264-conformance",
-                    "hevc=.research/fate-samples/hevc-conformance",
-                ]),
-            ),
-            step(
-                "codecs-grade",
-                Stage::Timing,
-                Placement::Free,
-                xtask(&[
-                    "codecs",
-                    "grade",
-                    "--manifest",
-                    &format!("{out}/codecs-fate-manifest.json"),
-                    "--root",
-                    ".",
-                    "--bin",
-                    &bin,
-                    "--ffmpeg",
-                    &format!("{FFMPEG_BIN}/ffmpeg"),
-                    "--ffprobe",
-                    &format!("{FFMPEG_BIN}/ffprobe"),
-                    "--codec-worker",
-                    &codec_worker,
-                    "--reference",
-                    "target/harness/ffmpeg-decode-worker",
-                    "--out",
-                    &format!("{out}/codecs-grade.jsonl"),
-                ]),
-            ),
-            step(
-                "benchmark-codecs",
-                Stage::Timing,
-                Placement::Timed,
-                with_full(xtask(&[
-                    "codecs",
-                    "time",
-                    "--candidate",
-                    &codec_worker,
-                    "--reference",
-                    "target/harness/ffmpeg-decode-worker",
-                    "--workloads",
-                    "harness/codecs/workloads.json",
-                    "--root",
-                    ".",
-                    "--ledger",
-                    &format!("{out}/codecs-ledger.jsonl"),
-                    "--out",
-                    &format!("{out}/benchmark/codecs"),
-                    "--label",
-                    target,
-                ])),
-            ),
-        ],
+        weight: 23,
+        steps: codecs,
+        preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
+    });
+    items.push(Item {
+        name: "codecs-time".into(),
+        weight: 19,
+        steps: vec![step(
+            "benchmark-codecs",
+            Stage::Timing,
+            Placement::Timed,
+            with_full(xtask(&[
+                "codecs",
+                "time",
+                "--candidate",
+                &codec_worker,
+                "--reference",
+                "target/harness/ffmpeg-decode-worker",
+                "--workloads",
+                "harness/codecs/workloads.json",
+                "--root",
+                ".",
+                "--ledger",
+                &format!("{out}/codecs-ledger.jsonl"),
+                "--out",
+                &format!("{out}/benchmark/codecs"),
+                "--label",
+                target,
+            ])),
+        )],
         preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
     });
 
-    // The capture cases in CAPTURE_PARTS parts, dealt out in turn, so that each
-    // holds sizes and rates alike.
-    for part in 0..CAPTURE_PARTS {
-        let name = format!("capture-{}", part + 1);
-        let ids: Vec<&str> = capture
-            .iter()
-            .skip(part)
-            .step_by(CAPTURE_PARTS)
-            .map(String::as_str)
-            .collect();
+    // Each capture case on its own: one is up to a quarter of an hour on ARMv7.
+    for id in capture {
+        let name = format!("capture-{id}");
         let mut command = xtask(&[
             "capture",
             "qualify",
@@ -475,7 +474,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             &format!("{out}/{name}"),
             "--only",
         ]);
-        command.extend(ids.iter().map(|id| (*id).to_owned()));
+        command.push(id.clone());
         let mut qualify = step(
             name.clone(),
             Stage::Timing,
@@ -485,7 +484,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         qualify.environment.push(("TRIERGON_PYTHON", "python3"));
         items.push(Item {
             name,
-            weight: 48,
+            weight: 10,
             steps: vec![qualify],
             preflight: owned(&["--capture", CAPTURE_CASES]),
         });
@@ -503,8 +502,26 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         core_time.extend(owned(&["--target", target]));
     }
     items.push(Item {
+        name: "tests-release".into(),
+        weight: 20,
+        steps: vec![step(
+            "test-release",
+            Stage::Timing,
+            Placement::Free,
+            with_full(xtask(&[
+                "gate",
+                "test",
+                "--profile",
+                "release",
+                "--output",
+                &format!("{out}/tests/release"),
+            ])),
+        )],
+        preflight: Vec::new(),
+    });
+    items.push(Item {
         name: "tests".into(),
-        weight: 50,
+        weight: 32,
         steps: vec![
             step(
                 "test-debug",
@@ -517,19 +534,6 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                     "debug",
                     "--output",
                     &format!("{out}/tests/debug"),
-                ])),
-            ),
-            step(
-                "test-release",
-                Stage::Timing,
-                Placement::Free,
-                with_full(xtask(&[
-                    "gate",
-                    "test",
-                    "--profile",
-                    "release",
-                    "--output",
-                    &format!("{out}/tests/release"),
                 ])),
             ),
             step(
@@ -698,12 +702,13 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             Ok(0)
         }
         "preflight" => {
-            let review = options.review.ok_or("gate preflight needs --review FILE")?;
             let mut args = vec!["preflight".to_owned()];
             for item in shard_items(root, "OUT", false, options.shard)? {
                 args.extend(item.preflight);
             }
-            args.extend(["--review".to_owned(), review]);
+            if let Some(review) = options.review {
+                args.extend(["--review".to_owned(), review]);
+            }
             if options.kernel {
                 args.push("--kernel".into());
             }
@@ -1305,7 +1310,8 @@ mod tests {
         }
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
-        assert!(names.contains(&"capture-4"));
+        assert!(names.contains(&"capture-c04"));
+        assert!(names.contains(&"benchmark-codecs") && names.contains(&"test-release"));
     }
 
     #[test]
