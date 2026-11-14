@@ -621,20 +621,20 @@ measured thing: a feature's timing, memory and grade, a part of the ISO BMFF sui
 measurements, the packet-framing and progressive TS suites, the codecs' parity, a codec
 workload list's timing, a part of its memory (`codecs memory --part I/N`, every Nth
 workload), a capture case (`capture qualify --stage timing`, then `--stage memory` from
-its records under the kernel bound), the checked or the release tests, and the font, shaping,
-rasterising and ASS comparisons. Every registered feature is either one of them or
-named, in `xtask/src/gate.rs`, with the reason it is not gated (an on-demand or
+its records under the kernel bound), the checked or the release tests, and the font,
+shaping, rasterising and ASS comparisons. Every registered feature is either one of them
+or named, in `xtask/src/gate.rs`, with the reason it is not gated (an on-demand or
 diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
-target leaves out an item that cannot measure there, with the reason `gate plan
---target TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback
-worker runs its numeric modes only on native Linux AArch64. `cargo xtask gate plan
---shards N` splits the items into N shards of about equal planning weight, each for
-its own host; the weights are the minutes each item took on a c6g.4xlarge, the more of
-the two targets. `--items NAME,...`, given to every gate command of a run, narrows the
-plan to those items, for a run of part of the gate; the shards record it, and `gate
-summary` checks them against the same narrowed plan, prints that the run is partial and
-writes `"partial": true` with the selection at the top of its result. A result cited as
-the full gate is a summary whose `partial` is false; a partial one is cited only for the
+target leaves out an item that cannot measure there, with the reason `gate plan --target
+TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback worker runs
+its numeric modes only on native Linux AArch64. `cargo xtask gate plan --shards N`
+splits the items into N shards of about equal planning weight, each for its own host;
+the weights are the minutes each item took on a c6g.4xlarge, the more of the two
+targets. `--items NAME,...`, given to every gate command of a run, narrows the plan to
+those items, for a run of part of the gate; the shards record it, and `gate summary`
+checks them against the same narrowed plan, prints that the run is partial and writes
+`"partial": true` with the selection at the top of its result. A result cited as the
+full gate is a summary whose `partial` is false; a partial one is cited only for the
 items it ran.
 
 A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
