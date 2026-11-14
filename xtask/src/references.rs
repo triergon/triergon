@@ -240,18 +240,54 @@ impl Build {
             println!("{}: restored from {}", self.name, pack.display());
             return Ok(built);
         }
-        let _ = fs::remove_file(dir.join(RECORD));
+        // A miss builds from nothing: no configure state, objects or prefix of an
+        // earlier build survives into this one, only the pinned source archives.
+        self.clear(root)?;
         let made = make()?;
         let record = Value::object([
             ("key", Value::str(&key.sha256)),
+            ("installed_sha256", Value::str(installed_digest(&dir)?)),
             ("components", key.components),
         ]);
         crate::corpus::write_json(&dir.join(RECORD), &record)?;
         Ok(made)
     }
 
+    /// Removes everything in the build's directory but the downloaded source
+    /// archives, whose hashes the build checks.
+    fn clear(&self, root: &Path) -> R<()> {
+        let dir = self.path(root);
+        let Ok(entries) = fs::read_dir(&dir) else {
+            return Ok(());
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let archive = [".tar.gz", ".tar.xz"].iter().any(|s| name.ends_with(s));
+            let kind = entry.file_type().map_err(|e| e.to_string())?;
+            if kind.is_dir() {
+                fs::remove_dir_all(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            } else if !(archive && kind.is_file()) {
+                fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// The SHA-256 of the installed tree its record names, read again from disk.
+    fn recorded_install(dir: &Path) -> Option<String> {
+        crate::checks::read_json(&dir.join(RECORD))
+            .ok()
+            .and_then(|record| {
+                record
+                    .get("installed_sha256")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+    }
+
     /// Replaces the build's directory with the contents of `pack`, which must
-    /// record `key`.
+    /// record `key` and hold the installed tree its record names.
     fn restore(&self, root: &Path, key: &Key, pack: &Path) -> R<()> {
         let dir = self.path(root);
         let staged = dir.with_extension("restoring");
@@ -285,6 +321,13 @@ impl Build {
             let _ = fs::remove_dir_all(&staged);
             return Err(format!("{}: packs another build", pack.display()));
         }
+        if Self::recorded_install(&staged) != Some(installed_digest(&staged)?) {
+            let _ = fs::remove_dir_all(&staged);
+            return Err(format!(
+                "{}: its installed tree is not the one its build recorded",
+                pack.display()
+            ));
+        }
         if dir.exists() {
             fs::remove_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         }
@@ -292,10 +335,18 @@ impl Build {
     }
 
     /// Packs the current build into the cache, unless it is there already, and
-    /// returns the pack.
+    /// returns the pack. Only a build whose installed tree is still the one its
+    /// build recorded is packed.
     fn pack(&self, root: &Path, key: &Key) -> R<PathBuf> {
         if !self.holds(root, key) {
             return Err(format!("{}: not built with key {}", self.name, key.sha256));
+        }
+        let dir = self.path(root);
+        if Self::recorded_install(&dir) != Some(installed_digest(&dir)?) {
+            return Err(format!(
+                "{}: its installed tree is not the one its build recorded; prepare it again",
+                self.name
+            ));
         }
         let pack = self.pack_path(root, key);
         if pack.is_file() {
@@ -328,6 +379,46 @@ impl Build {
         fs::rename(&partial, &pack).map_err(|e| format!("{}: {e}", pack.display()))?;
         Ok(pack)
     }
+}
+
+/// The SHA-256 of a build's `build.json` and of every file and link under its
+/// `install` directory, by relative path.
+fn installed_digest(dir: &Path) -> R<String> {
+    fn visit(dir: &Path, base: &Path, lines: &mut Vec<String>) -> R<()> {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return Ok(());
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let relative = path
+                .strip_prefix(base)
+                .expect("under the base")
+                .display()
+                .to_string();
+            let kind = fs::symlink_metadata(&path)
+                .map_err(|e| format!("{}: {e}", path.display()))?
+                .file_type();
+            if kind.is_symlink() {
+                let target =
+                    fs::read_link(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                lines.push(format!("link {}  {relative}", target.display()));
+            } else if kind.is_dir() {
+                visit(&path, base, lines)?;
+            } else {
+                let sha =
+                    sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                lines.push(format!("{sha}  {relative}"));
+            }
+        }
+        Ok(())
+    }
+    let mut lines = Vec::new();
+    let build = dir.join("build.json");
+    let sha = sha256::file_hex(&build).map_err(|e| format!("{}: {e}", build.display()))?;
+    lines.push(format!("{sha}  build.json"));
+    visit(&dir.join("install"), dir, &mut lines)?;
+    lines.sort();
+    Ok(sha256::hex(lines.join("\n").as_bytes()))
 }
 
 /// The installed packages and their versions, where `dpkg` keeps the list.
@@ -554,6 +645,34 @@ mod tests {
         fs::copy(&pack, freetype.pack_path(&root, &other)).unwrap();
         assert!(freetype.prepare(&root, unused).is_err());
         assert!(dir.join("install/lib/libfreetype.a").is_file());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_miss_builds_from_nothing_and_only_a_clean_tree_is_packed() {
+        let root = crate::walk::scratch("reference-clean");
+        repository(&root);
+        let freetype = build("freetype").unwrap();
+        let dir = root.join(freetype.directory);
+        fs::create_dir_all(dir.join("freetype-2.15.0")).unwrap();
+        fs::write(dir.join("freetype-2.15.0/config.mk"), b"stale").unwrap();
+        fs::write(dir.join("configure-argv.json"), b"[]").unwrap();
+        fs::write(dir.join("freetype-2.15.0.tar.xz"), b"pinned").unwrap();
+        let make = || {
+            assert!(!dir.join("freetype-2.15.0").exists());
+            assert!(!dir.join("configure-argv.json").exists());
+            assert!(dir.join("freetype-2.15.0.tar.xz").is_file());
+            fs::create_dir_all(dir.join("install/lib")).unwrap();
+            fs::write(dir.join("install/lib/libfreetype.a"), b"archive").unwrap();
+            fs::write(dir.join("build.json"), b"{}").unwrap();
+            Ok("made".to_owned())
+        };
+        freetype.prepare(&root, make).unwrap();
+        let key = freetype.key(&root).unwrap();
+        fs::write(dir.join("install/lib/libfreetype.a"), b"changed").unwrap();
+        assert!(freetype.pack(&root, &key).is_err());
+        fs::write(dir.join("install/lib/libfreetype.a"), b"archive").unwrap();
+        assert!(freetype.pack(&root, &key).is_ok());
         fs::remove_dir_all(root).unwrap();
     }
 }
