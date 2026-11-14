@@ -123,6 +123,52 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
+fn same_case(timed: &Value, measured: &Value) -> R<()> {
+    let case = |row: &Value| -> R<Value> {
+        let mut case = without(row, &["timing", "memory"])?;
+        // The reference can log process addresses. Keep both raw traces in
+        // their collections and compare the trace status, exit and stdout.
+        if let Some(trace) = case.get("reference_trace")
+            && let Some(stderr) = trace.get("stderr")
+        {
+            let stderr = stderr.as_str().ok_or("reference stderr must be text")?;
+            if hash(trace, "stderr_sha256")? != sha256::hex(stderr.as_bytes()) {
+                return Err("reference diagnostic hash mismatch".into());
+            }
+            let mut stable = without(trace, &["stderr", "stderr_sha256"])?;
+            put(
+                &mut stable,
+                "stderr",
+                Value::str(reference_diagnostics(stderr)),
+            )?;
+            put(&mut case, "reference_trace", stable)?;
+        }
+        Ok(case)
+    };
+    require_same(&case(timed)?, &case(measured)?, "case fields/parity")
+}
+
+fn reference_diagnostics(stderr: &str) -> String {
+    let mut normalized = String::with_capacity(stderr.len());
+    for line in stderr.split_inclusive('\n') {
+        if let Some((header, rest)) = line
+            .strip_prefix('[')
+            .and_then(|line| line.split_once(" @ 0x"))
+            && let Some((address, message)) = rest.split_once(']')
+            && !address.is_empty()
+            && address.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            normalized.push('[');
+            normalized.push_str(header);
+            normalized.push(']');
+            normalized.push_str(message);
+        } else {
+            normalized.push_str(line);
+        }
+    }
+    normalized
+}
+
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let value = json::parse_observations(
@@ -551,11 +597,7 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// memory are not. A listed case that passes must leave the list, which only
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
-    require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
-        "case fields/parity",
-    )?;
+    same_case(timed, measured)?;
     if super::acceptance::parity_passes(timed) {
         return Err("listed open case now passes; remove it from open_cases".into());
     }
@@ -575,11 +617,7 @@ fn join_case(
     target: &str,
     ceiling: f64,
 ) -> R<Value> {
-    require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
-        "case fields/parity",
-    )?;
+    same_case(timed, measured)?;
     let workers = selected(timed, expected, contract, identity)?;
     if expected.get("outcome").and_then(Value::as_str) == Some("refusal") {
         if [timed, measured].iter().any(|row| {
@@ -797,6 +835,8 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         println!("{USAGE}");
         return Ok(0);
     }
+    let root = root.canonicalize().map_err(|error| error.to_string())?;
+    let root = root.as_path();
     let options = Options::parse(root, args)?;
     super::report::create_output(&options.output)?;
     // A grade binds the gate results recorded beside the reports it joins.
@@ -1666,6 +1706,54 @@ mod tests {
         assert!(joined.get("memory").is_none());
         put(&mut fixture.measured, "memory", object(&[])).unwrap();
         assert!(fixture.join().unwrap_err().contains("refusal"));
+    }
+
+    #[test]
+    fn matching_refusals_may_log_different_diagnostic_addresses() {
+        let mut fixture = Fixture::new();
+        put(&mut fixture.expected, "outcome", Value::str("refusal")).unwrap();
+        for (row, diagnostics) in [
+            (&mut fixture.timed, "[mov,mp4 @ 0x1234] invalid box\n"),
+            (&mut fixture.measured, "[mov,mp4 @ 0x4321] invalid box\n"),
+        ] {
+            *row = without(row, &["timing", "memory"]).unwrap();
+            put(row, "outcome", Value::str("refusal")).unwrap();
+            put(
+                row,
+                "reference_trace",
+                object(&[
+                    ("exit_code", Value::int(1)),
+                    ("status", Value::str("finished")),
+                    ("stdout_sha256", Value::str(digest('0'))),
+                    ("stderr", Value::str(diagnostics)),
+                    (
+                        "stderr_sha256",
+                        Value::str(sha256::hex(diagnostics.as_bytes())),
+                    ),
+                ]),
+            )
+            .unwrap();
+        }
+        let joined = fixture.join().unwrap();
+        assert_eq!(
+            joined.get("reference_trace"),
+            fixture.timed.get("reference_trace")
+        );
+        assert_ne!(
+            reference_diagnostics("[mov,mp4 @ 0x1234] invalid box\n"),
+            reference_diagnostics("[mov,mp4 @ 0x4321] unsupported box\n")
+        );
+        assert_eq!(
+            reference_diagnostics("packet at 0x1234\n"),
+            "packet at 0x1234\n"
+        );
+        change(
+            &mut fixture.measured,
+            &["reference_trace"],
+            "exit_code",
+            Value::int(2),
+        );
+        assert!(fixture.join().unwrap_err().contains("case fields/parity"));
     }
 
     #[test]
