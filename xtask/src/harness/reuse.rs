@@ -105,6 +105,7 @@ impl Key {
                 ]),
             ),
             ("target", Value::str(super::report::gate_target()?)),
+            ("environment", build_environment()),
             ("host", host()?),
         ]);
         Ok(Self {
@@ -404,6 +405,34 @@ fn code(root: &Path) -> R<Value> {
         ("files", Value::int(files.len() as i64)),
         ("sha256", Value::str(all.finish_hex())),
     ]))
+}
+
+/// The environment variables that change how cargo, rustc or the C compiler build
+/// what a gate command runs, as they are set.
+fn build_environment() -> Value {
+    const NAMES: [&str; 12] = [
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "RUSTDOCFLAGS",
+        "RUSTC",
+        "RUSTC_WRAPPER",
+        "RUSTC_WORKSPACE_WRAPPER",
+        "CARGO_INCREMENTAL",
+        "CC",
+        "CXX",
+        "CFLAGS",
+        "CXXFLAGS",
+        "LDFLAGS",
+    ];
+    const PREFIXES: [&str; 3] = ["CARGO_PROFILE_", "CARGO_BUILD_", "CARGO_TARGET_"];
+    let mut set: Vec<(String, Value)> = std::env::vars()
+        .filter(|(name, _)| {
+            NAMES.contains(&name.as_str()) || PREFIXES.iter().any(|p| name.starts_with(p))
+        })
+        .map(|(name, value)| (name, Value::str(value)))
+        .collect();
+    set.sort_by(|a, b| a.0.cmp(&b.0));
+    Value::Object(set)
 }
 
 /// The host class: architecture and personality, kernel, CPU model, machine

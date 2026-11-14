@@ -787,8 +787,10 @@ library their loader resolves, the allocation observer and probe, every shared i
 of the build identity (oracles, specification sources, reference headers, generator
 inputs), every file of `xtask/src` and `harness/*.py`, the reviewed input lists, the
 observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml` and
-`harness/policy.json`, the Rust, C and Python versions with numpy's, the gate target,
-and the host class (architecture and personality, kernel release, CPU model and
+`harness/policy.json`, the Rust, C and Python versions with numpy's, the environment
+variables that change a build (`RUSTFLAGS`, `RUSTC_WRAPPER`, `CARGO_PROFILE_*`,
+`CARGO_BUILD_*`, `CARGO_TARGET_*`, `CC`, `CFLAGS` and the like), the gate target, and
+the host class (architecture and personality, kernel release, CPU model and
 features, machine type, page size, the CPUs online and, for a timed step, those the
 process may use). A
 probe that fails is an error. A `grade` key also binds the two collections it joins:
@@ -804,8 +806,8 @@ reused collection beside a measured one cannot be graded, so measure both with
 
 `cargo xtask gate test --profile debug|release` runs the workspace tests for the gate
 target and is reused the same way. Its key adds every tracked file as the working tree
-holds it, the untracked files git does not ignore, and the test inputs the crate tests
-read when present (`.research/fate-samples`, `.research/flac-generated`,
+holds it and the untracked files git does not ignore, but the evidence index (which a
+promotion changes) and `docs/`, and the test inputs the crate tests read when present (`.research/fate-samples`, `.research/flac-generated`,
 `.research/flac-test-files`). The gate runs both profiles once: the debug tests run
 with overflow checks and debug assertions (the library's `debug_assert!`s and the tests
 that expect them), which the release profile turns off, and the release tests run the

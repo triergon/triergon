@@ -1180,17 +1180,27 @@ fn test(root: &Path, output: &Path, release: bool, full: bool) -> R<i32> {
     })
 }
 
+/// What no test reads: the evidence index, which changes when a result is
+/// promoted, and the project documents.
+const NOT_TEST_INPUTS: [&str; 2] = ["harness/evidence/", "docs/"];
+
 /// The SHA-256 of every tracked file as the working tree holds it, and of the
-/// untracked files git does not ignore.
+/// untracked files git does not ignore, but [`NOT_TEST_INPUTS`].
 fn sources_digest(root: &Path) -> R<String> {
+    let input = |path: &str| !NOT_TEST_INPUTS.iter().any(|p| path.starts_with(p));
     let mut digest = sha256::Sha256::default();
-    digest.update(git(root, &["ls-files", "-s"])?.as_bytes());
+    for line in git(root, &["ls-files", "-s"])?.lines() {
+        if line.split_once('\t').is_some_and(|(_, path)| input(path)) {
+            digest.update(line.as_bytes());
+            digest.update(b"\n");
+        }
+    }
     let changed = git(root, &["diff", "HEAD", "--name-only", "-z"])?;
     let untracked = git(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
     for path in changed
         .split('\0')
         .chain(untracked.split('\0'))
-        .filter(|p| !p.is_empty())
+        .filter(|p| !p.is_empty() && input(p))
     {
         let file = root.join(path);
         let sha = if file.is_file() {
@@ -1561,6 +1571,9 @@ mod tests {
         assert_ne!(sources_digest(&root).unwrap(), changed);
         fs::remove_file(root.join("new.rs")).unwrap();
         fs::write(root.join("lib.rs"), b"a").unwrap();
+        assert_eq!(sources_digest(&root).unwrap(), committed);
+        fs::create_dir_all(root.join("harness/evidence")).unwrap();
+        fs::write(root.join("harness/evidence/index.json"), b"{}").unwrap();
         assert_eq!(sources_digest(&root).unwrap(), committed);
         assert_eq!(tree_digest(&root.join("absent")).unwrap(), "absent");
         fs::remove_dir_all(root).unwrap();
