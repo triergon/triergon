@@ -123,6 +123,28 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
+// A parity probe has its own process duration in each stage. Keep the
+// probe's status and output in the comparison, and validate each duration.
+fn case_fields(row: &Value) -> R<Value> {
+    let mut fields = without(row, &["timing", "memory"])?;
+    if let Some(parity) = fields.get("parity")
+        && let Some(run) = parity.get("reference_run")
+    {
+        let elapsed = run.get("elapsed_ns").ok_or("missing elapsed_ns")?;
+        let has_duration = *elapsed != Value::Null;
+        if has_duration {
+            u64::try_from(integer(run, "elapsed_ns")?)
+                .map_err(|_| "reference process duration must fit u64")?;
+        }
+        let mut parity = parity.clone();
+        let mut run = run.clone();
+        put(&mut run, "elapsed_ns", Value::Bool(has_duration))?;
+        put(&mut parity, "reference_run", run)?;
+        put(&mut fields, "parity", parity)?;
+    }
+    Ok(fields)
+}
+
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let value = json::parse_observations(
@@ -552,8 +574,8 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &case_fields(timed)?,
+        &case_fields(measured)?,
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
@@ -576,8 +598,8 @@ fn join_case(
     ceiling: f64,
 ) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &case_fields(timed)?,
+        &case_fields(measured)?,
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
@@ -1834,6 +1856,34 @@ mod tests {
         put(&mut fixture.timed, "memory", Value::Null).unwrap();
         put(&mut fixture.measured, "timing", Value::Null).unwrap();
         assert!(fixture.join().is_ok());
+    }
+
+    #[test]
+    fn independent_framing_probes_may_take_different_time() {
+        let row = |status: &str, elapsed, digest| {
+            object(&[(
+                "parity",
+                object(&[
+                    ("reference", object(&[("digest", Value::int(digest))])),
+                    (
+                        "reference_run",
+                        object(&[("elapsed_ns", elapsed), ("status", Value::str(status))]),
+                    ),
+                ]),
+            )])
+        };
+        let timed = case_fields(&row("ok", Value::int(100), 1)).unwrap();
+        let other = case_fields(&row("ok", Value::int(200), 1)).unwrap();
+        assert!(require_same(&timed, &other, "case fields/parity").is_ok());
+        for different in [
+            row("timeout", Value::int(200), 1),
+            row("ok", Value::int(200), 2),
+            row("ok", Value::Null, 1),
+        ] {
+            let different = case_fields(&different).unwrap();
+            assert!(require_same(&timed, &different, "case fields/parity").is_err());
+        }
+        assert!(case_fields(&row("ok", Value::int(-1), 1)).is_err());
     }
 
     #[test]
