@@ -20733,6 +20733,39 @@
    "key": "qualification/framing-packed-avc-401fbcca/9b42701fd46439e7a405f89afb354af16595d73a6e869802db6fefb1166cfc9d.tar.gz",
    "sha256": "9b42701fd46439e7a405f89afb354af16595d73a6e869802db6fefb1166cfc9d",
    "bytes": 307481526
+  },
+  {
+   "name": "framing-full-0ce0e738-aarch64",
+   "path": "framing-full-0ce0e738-aarch64",
+   "retention": "90 days",
+   "reason": "AArch64 packet framing timing and kernel-bound memory on all 131 cases",
+   "key": "qualification/framing-full-0ce0e738-aarch64/d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a.tar.zst",
+   "sha256": "d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a",
+   "bytes": 26848727,
+   "results": [
+    {
+     "path": "results/grade/gate-result.json",
+     "command": "grade",
+     "key": "808f560e1359d7345c2e0bb86e5d15061363615b636349f0f2fb74c4684e6bd6",
+     "status": 0,
+     "report_sha256": "dfa1f59d5e25b1bba740f1a3db60285b8e7559fac6c31bcc276408ec446cbf1c"
+    },
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "report --memory",
+     "key": "81c47e37837dfd0f2b672a477b4c56ddb1faa2ffe528deaeb376ccc89d55519b",
+     "status": 0,
+     "report_sha256": "ee94dde4c214c8d790dae4c89bbebe53ebd7b00069333acdf1f1184671216a42"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9af5da359f5be4a0cfebf34ff74165cf23edbe48919c6f4e572e5e6a14869bb9",
+     "status": 0,
+     "report_sha256": "aa98233a721b5db3d5a08eb7d19b47c59f51ac220e55f5a94348584fa96996b2"
+    }
+   ],
+   "source_revision": "0ce0e7389c4f7232701558b7fdf614e69b393a3f"
   }
  ]
 }
