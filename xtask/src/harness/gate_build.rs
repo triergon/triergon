@@ -124,14 +124,13 @@ pub fn release_dir() -> Result<String, String> {
     Ok(format!("target/{}", release_subdir()?))
 }
 
-/// How workers and references link the support libraries of their language runtimes.
-/// On a GNU/Linux target both sides take every runtime support library from its static
-/// archive: the Rust workers libgcc's unwinder (`libgcc_eh`) and libm, the C and C++
-/// references libm, libstdc++ and libgcc. A process then maps only the support code its
-/// own libraries use. libc and third-party libraries stay shared on both sides, and so
-/// does libm on x86, where glibc's `libm.a` selects its implementations through the
-/// static libc and links only into a static program. Elsewhere both sides link as their
-/// toolchains do.
+/// How workers and references link the support libraries of their language runtimes. On a
+/// GNU/Linux target both sides take every runtime support library from its static archive:
+/// the Rust workers libgcc's unwinder (`libgcc_eh`) and libm, the C and C++ references
+/// libm, libstdc++, libgcc and libatomic. A process then maps only the support code its own
+/// libraries use. libc and third-party libraries stay shared on both sides, and so does
+/// libm on x86, where glibc's `libm.a` selects its implementations through the static libc
+/// and links only into a static program. Elsewhere both sides link as their toolchains do.
 pub const LINK_POLICY: &str = "static-runtime-support-v1";
 
 /// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
@@ -169,8 +168,8 @@ fn worker_link_flags(target: &str) -> Vec<String> {
         .collect()
 }
 
-/// A reference's link flags under [`LINK_POLICY`]: libm and libstdc++ from their
-/// static archives, and libgcc from its own with `-static-libgcc`.
+/// A reference's link flags under [`LINK_POLICY`]: libm, libstdc++ and libatomic from
+/// their static archives, and libgcc from its own with `-static-libgcc`.
 pub fn reference_link_flags(flags: Vec<String>) -> Result<Vec<String>, String> {
     Ok(reference_flags(worker_target()?, flags))
 }
@@ -185,6 +184,7 @@ fn reference_flags(target: &str, flags: Vec<String>) -> Vec<String> {
         .map(|flag| match flag.as_str() {
             "-lm" if libm => "-l:libm.a".to_owned(),
             "-lstdc++" => "-l:libstdc++.a".to_owned(),
+            "-latomic" => "-l:libatomic.a".to_owned(),
             _ => flag,
         })
         .collect();
@@ -623,7 +623,7 @@ mod tests {
                     "-l:libstdc++.a",
                     "-l:libm.a",
                     "-lz",
-                    "-latomic",
+                    "-l:libatomic.a",
                     "-static-libgcc"
                 ]
             );
@@ -641,7 +641,7 @@ mod tests {
                 "-l:libstdc++.a",
                 "-lm",
                 "-lz",
-                "-latomic",
+                "-l:libatomic.a",
                 "-static-libgcc"
             ]
         );
