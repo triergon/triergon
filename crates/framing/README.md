@@ -145,13 +145,11 @@ validated record extent when the available work covers the whole sizing pass.
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs keep up to four segment descriptors inline, then spill the
-complete table into charged heap storage. When HEVC lookahead proves an exact
-segment count above four, the first append can reserve that heap capacity while
-leaving conservative headroom for the complete payload copy and its storage
-header. AVC upper bounds only size a later spill and never reserve eagerly.
-A refused exact reservation falls back to inline storage; a refused spill keeps
-the inline descriptors intact for retry. Retaining complete outputs in a `BudgetVec`
+Stateful packet jobs keep up to five segment descriptors inline, then spill the
+complete table into charged heap storage. The spill can use the exact segment
+count from HEVC lookahead or an upper bound from the AVC configuration. A
+refused hint falls back to ordinary growth. A refused spill keeps the inline
+descriptors intact for retry. Retaining complete outputs in a `BudgetVec`
 charges their full element size, including inline descriptors. Passthrough packets
 share the original payload. Segment descriptors store the wire-bounded NAL
 length once, with full-width source and output offsets. Whole-packet passthrough
