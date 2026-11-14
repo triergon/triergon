@@ -123,6 +123,9 @@ pub struct Encoder {
     /// Per macroblock, the quantiser at which the previous picture skipped it
     /// after its residual quantised to zero; 0 where it did not.
     skipped_at: BudgetVec<u8>,
+    /// Macroblocks skipped again from `skipped_at` without coding a residual.
+    #[cfg(test)]
+    reused_skips: usize,
     /// Macroblocks identical to the previous source (scene-score scratch).
     unchanged: BudgetVec<u32>,
     /// Per-block quantised levels of the macroblock being coded; entries are
@@ -211,6 +214,8 @@ impl Encoder {
                 2 * g.chroma_stride() * g.macroblock_height() * 8,
             )?,
             skipped_at: BudgetVec::try_filled(budget, 0, mbs)?,
+            #[cfg(test)]
+            reused_skips: 0,
             unchanged: BudgetVec::try_filled(budget, 0, mbs)?,
             levels: [[0; 64]; 6],
             index: 0,
@@ -327,16 +332,15 @@ impl Encoder {
                 }
             });
             s.target_q = q;
-            censored |= self.encode_row(
-                input,
-                mb_y,
-                &mut s,
-                kind,
+            let picture = Inter {
+                mv: Mv::ZERO,
                 f_code,
+                edge: false,
+                tight: false,
                 repeated,
-                economy,
-                plan.hard_limit,
-            );
+            };
+            censored |=
+                self.encode_row(input, mb_y, &mut s, kind, picture, economy, plan.hard_limit);
             slice = Some(s);
             activity_done += self.row_activity[mb_y];
         }
@@ -617,6 +621,8 @@ impl Encoder {
         Ok(())
     }
 
+    /// Code one macroblock row. `picture` carries the picture's `f_code` and
+    /// whether it repeats the previous source; each macroblock sets the rest.
     #[allow(clippy::too_many_arguments)]
     fn encode_row(
         &mut self,
@@ -624,8 +630,7 @@ impl Encoder {
         mb_y: usize,
         s: &mut SliceState,
         kind: Kind,
-        f_code: u32,
-        repeated: bool,
+        picture: Inter,
         economy: bool,
         hard_limit: f64,
     ) -> bool {
@@ -650,10 +655,9 @@ impl Encoder {
                         let mv = if a.intra { Mv::ZERO } else { a.mv };
                         let inter = Inter {
                             mv,
-                            f_code,
                             edge,
                             tight,
-                            repeated,
+                            ..picture
                         };
                         self.inter_mb(input, mb_x, mb_y, address, s, inter);
                     }
@@ -767,6 +771,10 @@ impl Encoder {
             // The previous picture skipped this macroblock and the picture is
             // repeated, so its residual is the one that quantised to zero
             // there, at a quantiser no coarser than this one: skip again.
+            #[cfg(test)]
+            {
+                self.reused_skips += 1;
+            }
             s.skipped += 1;
             s.pmv = Mv::ZERO;
             self.copy_reference(mb_x, mb_y);

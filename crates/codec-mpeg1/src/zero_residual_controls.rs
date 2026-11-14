@@ -245,16 +245,18 @@ fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
     let mut reused = Encoder::new(cfg).unwrap();
     let mut computed = Encoder::new(cfg).unwrap();
     let (mut a, mut b) = (Vec::new(), Vec::new());
-    let mut reuse_seen = false;
     for _ in 0..12 {
         // `computed` never sees a repeated picture, so it codes every
         // macroblock from its residual.
         computed.previous_chroma.fill(0);
-        reuse_seen |= reused.skipped_at.iter().any(|&q| q != 0);
         reused.encode(&input, &mut a).unwrap();
         computed.encode(&input, &mut b).unwrap();
         assert_eq!(a, b);
         assert_eq!(reused.reference.y(), computed.reference.y());
     }
-    assert!(reuse_seen, "no macroblock was skipped for reuse");
+    assert!(
+        reused.reused_skips > 0,
+        "no macroblock was skipped for reuse"
+    );
+    assert_eq!(computed.reused_skips, 0);
 }
