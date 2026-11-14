@@ -20578,6 +20578,24 @@
      "report_sha256": "f151f21cb8455c90b9a39e2103103c9ed81f136da3faca6eac17ae9d6082acf1"
     }
    ]
+  },
+  {
+   "name": "framing-borrowed-pool-e791da7c",
+   "path": "framing-borrowed-pool-e791da7c",
+   "retention": "retained",
+   "reason": "The AArch64 borrow-and-reserve timing comparison and the Thumb-2 executable-page observations.",
+   "key": "evidence/framing-borrowed-pool-e791da7c/9fc3ad5489bf07c756f54380b84cd6a3588f616968c46ba736f8343b2d21d5c4.tar.gz",
+   "sha256": "9fc3ad5489bf07c756f54380b84cd6a3588f616968c46ba736f8343b2d21d5c4",
+   "bytes": 331301069,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "02d3e58a4fbfdb7a48c6f55f8b2bee4a41c89912a88c244bce9faa5041febb6f",
+     "status": 0,
+     "report_sha256": "d5ea6ae60c237a9075446dd643ca1051c75db869f6a768d2f67ca617c15cd212"
+    }
+   ]
   }
  ]
 }
