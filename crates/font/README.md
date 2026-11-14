@@ -391,7 +391,11 @@ the light mode's stem darkening.
 by family name and programs that may leave backward compatibility; fonts
 FreeType finds tricky only by their table checksums are not recognised. The
 TrueType interpreter's unit vectors along lines and from the stack (SPVTL,
-SFVTL, SDPVTL, SPVFS, SFVFS) are FreeType's for most directions but not all.
+SFVTL, SDPVTL, SPVFS, SFVFS) are FreeType's for most directions but not all. At
+sizes other than 256 pixels some instructed glyphs still differ from FreeType's
+(between one and about 250 per face at 26.6 heights 1000 and 640; measured, not
+gated). At zero pixels per em FreeType refuses the size request of an instructed
+face, where this crate loads its glyphs unscaled.
 Sizes beyond 65535 pixels per em are refused. Coordinates are `i32`; a scaled coordinate beyond it is
 `Error::Overflow` in an unhinted or CFF load, where FreeType's `FT_Pos` wraps at
 32 bits on 32-bit ARM (libass rejects anything beyond 2^28 itself); the
