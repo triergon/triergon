@@ -617,7 +617,11 @@ run, so one slot's eviction never touches an executable another slot runs. Input
 not evicted: they stay in the page cache as in a serial run, and cases that read a
 common file (the input, an ordered entity or a companion) run in the same slot one
 after another. Workers measured from their own paths are such a file, so their cases
-run one at a time. Pinned to one CPU, collection runs exactly as before.
+run one at a time. Pinned to one CPU, collection runs exactly as before. The reference's
+memory is measured afresh in every pair, not reused from earlier runs: on a second host
+of the same class it gives the same heaps and resident peaks within their spread
+(evidence set `gate-reference-memory-cross-host`), but caching it would save a few
+minutes and give up the interleaving of both workers within each pair.
 Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves

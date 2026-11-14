@@ -20072,6 +20072,19 @@
     "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
     "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
    }
+  },
+  {
+   "name": "gate-reference-memory-cross-host",
+   "path": "gate-reference-memory-cross-host",
+   "retention": "retained",
+   "reason": "Kernel-bound memory of matroska-demux and the 956 ISO BMFF operations on a second c6g.4xlarge per target with the same worker bytes, against the first hosts' collections: on Linux AArch64 and the ARMv7 gate target, every case's candidate and reference peak heap identical sample for sample and every median total resident peak within the first host's spread; the record of why a cached reference memory would be valid, with the per-case series, the comparisons and the scripts",
+   "key": "evidence/gate-reference-memory-cross-host/bbb23e1dcc112bad020072ffc19ed24ae9f7102642a69298221257bc79abada4.tar.gz",
+   "sha256": "bbb23e1dcc112bad020072ffc19ed24ae9f7102642a69298221257bc79abada4",
+   "bytes": 88985752,
+   "source_revisions": {
+    "first": "a92f2d0a938562ac2f2bb3f5106be639015588de",
+    "second": "e1adf7332946f0e430e3deeb1098048684a4072c"
+   }
   }
  ]
 }
