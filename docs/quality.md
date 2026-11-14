@@ -584,18 +584,18 @@ may override that count for diagnostic comparisons.
 ### Running the gates
 
 1. Build the workers with `cargo xtask build-workers --all-references`, so that every
-   profile reference is built, then run `cargo xtask preflight` with every feature the run will
-   measure (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
-   takes them), `--isobmff`, `--codecs` for each workload list, `--external-vector`,
-   `--capture` for the capture cases, and `--review` for the RSS module review (or
-   `--standard-memory` for a run without the kernel bound). It checks that the gate
-   build's workers and references match the build identity, that every case names a
-   reference the identity holds and has each input it reads with its pinned hash, that
-   the capture input generator's Python has numpy, that the review covers this module
-   source and kernel, and that the module is unloaded. A feature without cases or a
-   workload list without workloads fails, and every failure is printed at once. Run
-   `prove.sh` once into a scratch directory and unload the module again, so a module
-   that will not build, load or prove itself stops the run here.
+   profile reference is built, then run `cargo xtask preflight` with every feature the
+   run will measure (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as
+   `report` takes them), `--isobmff`, `--codecs` for each workload list,
+   `--external-vector`, `--capture` for the capture cases, and `--review` for the RSS
+   module review (or `--standard-memory` for a run without the kernel bound). It checks
+   that the gate build's workers and references match the build identity, that every
+   case names a reference the identity holds and has each input it reads with its pinned
+   hash, that the capture input generator's Python has numpy, that the review covers
+   this module source and kernel, and that the module is unloaded. A feature without
+   cases or a workload list without workloads fails, and every failure is printed at
+   once. Run `prove.sh` once into a scratch directory and unload the module again, so a
+   module that will not build, load or prove itself stops the run here.
 2. Time every feature, alone on one CPU with the RSS module unloaded (`taskset -c 1`).
 3. [Prove](../harness/rss-bound/README.md) the kernel bound, rebuild the workers with
    the proof, check it with `cargo xtask preflight --kernel`, and collect memory on the
