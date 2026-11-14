@@ -20488,6 +20488,60 @@
    "key": "evidence/packet-framing-gate-768b50ab-aarch64/808f84fc8925b5ae201603c9ecf5a35a954554566c1135c3a48052026cceaaca.tar.zst",
    "sha256": "808f84fc8925b5ae201603c9ecf5a35a954554566c1135c3a48052026cceaaca",
    "bytes": 681644343
+  },
+  {
+   "name": "framing-comparison-7a80e17e",
+   "path": "framing-comparison-7a80e17e",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/framing-comparison-7a80e17e/c6bb06161ca73a9b262d809c86e2a9fe38b1558b9f6f89e82d42e93328eb32c3.tar.gz",
+   "sha256": "c6bb06161ca73a9b262d809c86e2a9fe38b1558b9f6f89e82d42e93328eb32c3",
+   "bytes": 287766997,
+   "results": [
+    {
+     "path": "results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "3f814e8af169e23bf1a0e2452e73a438cc3fbf423352e2d4a4edf5e8745fe992",
+     "status": 0,
+     "report_sha256": "369c7e50e22d9c7b7aad76d47e9c2bafbd3b78acb3b2a92b2b67db87f4a1e25f"
+    }
+   ]
+  },
+  {
+   "name": "packet-framing-native-checks-7a80e17e",
+   "path": "packet-framing-native-checks-7a80e17e",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/packet-framing-native-checks-7a80e17e/21709e0ea4aa18e59d8cfa2b06d63285cb8f9b986611dc092e963dbc39efae2d.tar.gz",
+   "sha256": "21709e0ea4aa18e59d8cfa2b06d63285cb8f9b986611dc092e963dbc39efae2d",
+   "bytes": 50153224
+  },
+  {
+   "name": "framing-fate-trace-7a80e17e",
+   "path": "framing-fate-trace-7a80e17e",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/framing-fate-trace-7a80e17e/c04b4812020f57a3ca506417e3bd47842528f69e936a739c162cc70cf9aa1493.tar.gz",
+   "sha256": "c04b4812020f57a3ca506417e3bd47842528f69e936a739c162cc70cf9aa1493",
+   "bytes": 92700
+  },
+  {
+   "name": "framing-validated-copy-ea310015",
+   "path": "framing-validated-copy-ea310015",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/framing-validated-copy-ea310015/ae28a2ec6c9e6750607a25a4f1238eb96c21777a9611622741922bed18ad315f.tar.gz",
+   "sha256": "ae28a2ec6c9e6750607a25a4f1238eb96c21777a9611622741922bed18ad315f",
+   "bytes": 289412690,
+   "results": [
+    {
+     "path": "results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "37649c6cb5529c18c5411c701ab1f800658864da18ca05d07b3038af927fd321",
+     "status": 0,
+     "report_sha256": "adb47621c52b182d6ae631e40fcdf042d934d97a945533851eb66367d54b1c38"
+    }
+   ]
   }
  ]
 }
