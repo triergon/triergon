@@ -94,6 +94,10 @@ commands:
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance]
                  join complete reports, recompute runtime and memory bounds, then apply gates
+  preflight      [--feature ID]... [--corpus ID=DIR]... [--isobmff] [--codecs F]... [--review F]
+                 [--kernel]
+                 before a gate run measures: workers, references, inputs, RSS module review
+                 and state; see `cargo xtask preflight --help`
   build-workers  [--comparison-build] [--only WORKER]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
@@ -213,6 +217,12 @@ fn main() -> ExitCode {
             playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
         }
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("preflight") => {
+            return failing(
+                harness::preflight::main(&root, &args[1..]),
+                harness::preflight::USAGE,
+            );
+        }
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
         Some("build-workers") => {

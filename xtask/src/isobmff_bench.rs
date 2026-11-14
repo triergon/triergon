@@ -547,6 +547,17 @@ pub fn source_inputs(root: &Path) -> R<Vec<String>> {
     Ok(files)
 }
 
+/// Every suite input matches its pin; for `cargo xtask preflight`.
+pub fn verify_inputs(root: &Path) -> R<String> {
+    let suite = Suite::load(root)?;
+    let mut inputs: Vec<&Case> = suite.cases.iter().collect();
+    inputs.dedup_by(|a, b| a.input == b.input);
+    for case in &inputs {
+        verify_input(root, case)?;
+    }
+    Ok(format!("{} cases", suite.cases.len()))
+}
+
 fn verify_input(root: &Path, case: &Case) -> R<()> {
     let (_, actual) = provenance::file_identity(root, &case.path(root))?;
     let length = fs::metadata(case.path(root))

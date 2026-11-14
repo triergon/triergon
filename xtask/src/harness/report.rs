@@ -698,6 +698,33 @@ fn input_failure(
     Ok(failure)
 }
 
+/// Why a case cannot be measured from `corpus`, before anything runs: a missing
+/// or changed input, ordered entity or companion.
+pub(super) fn input_problem(
+    corpus: &Path,
+    case: &Value,
+    prefix: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    let file = s(case, "file").ok_or("case without input path")?;
+    if Path::new(file)
+        .components()
+        .any(|c| !matches!(c, std::path::Component::Normal(_)))
+    {
+        return Err("input escapes corpus".into());
+    }
+    let path = corpus.join(file);
+    if !path.is_file() {
+        return Ok(Some("missing-sample"));
+    }
+    input_failure(
+        corpus,
+        case,
+        &path,
+        s(case, "sha256").unwrap_or_default(),
+        prefix,
+    )
+}
+
 /// Every corpus file a case reads: its input, ordered entities and companions.
 fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
     let mut files = vec![corpus.join(s(case, "file").ok_or("case without input path")?)];
