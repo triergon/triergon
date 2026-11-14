@@ -20289,6 +20289,41 @@
     "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
     "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
    }
+  },
+  {
+   "name": "framing-armv7-static-toolchain-4a932ef9",
+   "path": "framing-armv7-static-toolchain-4a932ef9",
+   "retention": "retained",
+   "reason": "Packet framing on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf at 4a932ef9, the link policy static-toolchain-runtime-v1, in the armhf user space on a c6g.4xlarge: every profile reference built (build-workers --all-references), preflight, 30 timing pairs on CPU 1 with the RSS module unloaded, the kernel proof, 30 kernel-bound memory pairs in parallel on CPUs 1-15, grading with the module loaded; parity 125/125, runtime <=1.110566929819581, heap <=0.7652811735941321, total RSS <=1.010086455331412 with 73/125 lower. With the first attempt, which stopped before measuring, the RSS module review and proof, 40 resident-page snapshots per worker of bad-packet-good-update by mapping and libc load address, the scripts and a bundle of the source",
+   "key": "evidence/framing-armv7-static-toolchain-4a932ef9/e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1.tar.gz",
+   "sha256": "e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1",
+   "bytes": 754032839,
+   "source_revisions": {
+    "candidate": "4a932ef908ca783976c56e187c0563ce955f15b5"
+   },
+   "results": [
+    {
+     "path": "gate/out/gate/graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "ddcc0c83262d486675bda4777432bb3ec52420f01fc11d909cdc79af30aba764",
+     "status": 0,
+     "report_sha256": "cc0437186d3fad00573fc21b319a7954e3f1b84251fef25e9da7ae53698af5ef"
+    },
+    {
+     "path": "gate/out/gate/memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "2a5f9f1bc82358472d38bbc7c50e2df78076fe2d37c2a7923ce9f6f64ba66c03",
+     "status": 0,
+     "report_sha256": "137276ea6b87b1ce63a8947ec029db4ecfc33606b7ff0c68ec414bc13720048a"
+    },
+    {
+     "path": "gate/out/gate/timing/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "312fa83087df3570a09899b6a71a16346c5eff9f7d2c0ec756455df9e854edbc",
+     "status": 0,
+     "report_sha256": "d0df228620ab6739967a8f47e8ee9a5557f4a733b85f057bd9feb0077e178be1"
+    }
+   ]
   }
  ]
 }
