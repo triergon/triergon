@@ -29,7 +29,8 @@
   "confidence": 0.95,
   "pending_module_requirements": [
     "H.264 packets without DTS and with a B picture among the first seven pictures: the reference's duration estimate passes over a run of packets after the B picture that the extractor does not reproduce, so the prepared packets' durations differ",
-    "H.264 in Matroska without block durations, DefaultDuration or VUI timing: the reference gives the first frames a duration of 0 before its estimate, so the prepared packets' durations differ"
+    "H.264 in Matroska without block durations, DefaultDuration or VUI timing: the reference gives the first frames a duration of 0 before its estimate, so the prepared packets' durations differ",
+    "H.264 packets without a time for more than the first 4096 packets: the extractor's duration estimate settles after 4096 packets, so that the frames waiting for it stay bounded, while the reference takes the times that come later, so the prepared packets' durations differ"
   ],
   "open_cases": [
     {
@@ -63,6 +64,22 @@
     {
       "id": "h264-nodur-mkv-second",
       "requirement": "H.264 in Matroska without block durations, DefaultDuration or VUI timing: the reference gives the first frames a duration of 0 before its estimate, so the prepared packets' durations differ"
+    },
+    {
+      "id": "h264-untimed-far-ts",
+      "requirement": "H.264 packets without a time for more than the first 4096 packets: the extractor's duration estimate settles after 4096 packets, so that the frames waiting for it stay bounded, while the reference takes the times that come later, so the prepared packets' durations differ"
+    },
+    {
+      "id": "h264-untimed-far-ts-realtime",
+      "requirement": "H.264 packets without a time for more than the first 4096 packets: the extractor's duration estimate settles after 4096 packets, so that the frames waiting for it stay bounded, while the reference takes the times that come later, so the prepared packets' durations differ"
+    },
+    {
+      "id": "h264-untimed-far-ts-first",
+      "requirement": "H.264 packets without a time for more than the first 4096 packets: the extractor's duration estimate settles after 4096 packets, so that the frames waiting for it stay bounded, while the reference takes the times that come later, so the prepared packets' durations differ"
+    },
+    {
+      "id": "h264-untimed-far-ts-second",
+      "requirement": "H.264 packets without a time for more than the first 4096 packets: the extractor's duration estimate settles after 4096 packets, so that the frames waiting for it stay bounded, while the reference takes the times that come later, so the prepared packets' durations differ"
     }
   ]
 }

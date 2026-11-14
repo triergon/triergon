@@ -160,11 +160,52 @@ fn observed_hevc_room_is_made_before_the_reference_picture_set_applies() {
 }
 
 #[test]
+fn the_oldest_pictures_not_waiting_are_removed_beyond_a_bound() {
+    // Trailing pictures alternating order counts 0 and 1, each referring to
+    // -1 and +1 and to the long-term pictures of LSBs 0 and 1: every picture
+    // stored stays a reference, so without a bound the buffer grows by one
+    // picture per step.
+    let limits = HevcLimits {
+        max_dec_pic_buffering: None,
+        ..HevcLimits::from_sps(4, 0, 0)
+    };
+    let mut dpb = DecodedPictures::new(&pool());
+    let mut seen = Seen::default();
+    for n in 0..40u32 {
+        let poc = (n % 2) as i32;
+        dpb.retain_references(|stored, _| {
+            stored == poc - 1 || stored == poc + 1 || (0..=1).contains(&stored)
+        });
+        dpb.hevc_remove(HevcPicture::default(), limits, seen.leave());
+        dpb.remove_oldest_beyond(6, seen.leave());
+        dpb.hevc_store(poc, true, n, limits, seen.leave())
+            .expect("store");
+        assert!(dpb.len() <= 7, "{} stored at {n}", dpb.len());
+    }
+    // Every picture was output; those removed had been, the newest stay.
+    assert_eq!(seen.output, (0..40).collect::<Vec<_>>());
+    assert!(seen.discarded.is_empty());
+    assert_eq!(
+        dpb.payloads().copied().collect::<Vec<_>>(),
+        (33..40).collect::<Vec<_>>()
+    );
+    // A picture waiting for output stays, beyond the bound too.
+    let mut dpb = DecodedPictures::new(&pool());
+    let waiting = HevcLimits::from_sps(4, 4, 0);
+    for poc in 0..4 {
+        dpb.hevc_store(poc, true, poc.unsigned_abs(), waiting, |_| {})
+            .expect("store");
+    }
+    dpb.remove_oldest_beyond(1, |_| {});
+    assert_eq!(dpb.len(), 4);
+}
+
+#[test]
 fn avc_bumps_when_the_buffer_is_full_and_outputs_a_leading_non_reference_picture_directly() {
     // C.4.5.1/C.4.5.2 with two frame buffers: I0 P6 B2 B4 P12.
     let mut dpb = DecodedPictures::new(&pool());
     let mut seen = Seen::default();
-    let store = |poc, reference: bool| AvcStore {
+    let store = |poc, reference: bool| NewPicture {
         poc,
         marking: if reference {
             Marking::ShortTerm
@@ -209,7 +250,7 @@ fn avc_idr_picture_discards_or_outputs_the_prior_pictures() {
         let mut dpb = DecodedPictures::new(&pool());
         let mut seen = Seen::default();
         for (n, poc) in [0, 2].into_iter().enumerate() {
-            let store = AvcStore {
+            let store = NewPicture {
                 poc,
                 marking: Marking::ShortTerm,
                 output: true,
@@ -340,6 +381,23 @@ fn avc_type2_counts_across_a_frame_num_gap() {
 }
 
 #[test]
+fn avc_frame_num_width_shrinking_without_an_idr_picture_counts_on() {
+    // An SPS may not change log2_max_frame_num_minus4 but at an IDR picture
+    // (7.4.1.2.1); one that does takes PrevRefFrameNum in the new width.
+    let mut order = AvcOrder::default();
+    order.next(&avc_type2(0, true));
+    let wide = |frame_num| AvcPocFields {
+        log2_max_frame_num: 8,
+        ..avc_type2(frame_num, false)
+    };
+    order.next(&wide(200));
+    // 200 is 8 in four bits: 10 follows a gap of 9.
+    assert_eq!(order.gap(10, 4).collect::<Vec<_>>(), [9]);
+    assert_eq!(order.gap(9, 4).count(), 0);
+    order.next(&avc_type2(10, false));
+}
+
+#[test]
 fn avc_frame_num_counts_modulo_max_frame_num_and_as_0_after_operation_5() {
     let mut order = AvcOrder::default();
     order.next(&avc_type2(0, true));
@@ -398,8 +456,8 @@ fn hevc_order_counts_carry_into_the_msb() {
     assert_eq!(pocs, [0, 6, 12, 18, 14]);
 }
 
-fn field_store(poc: i32, field: Parity, hold: bool) -> AvcStore {
-    AvcStore {
+fn field_store(poc: i32, field: Parity, hold: bool) -> NewPicture {
+    NewPicture {
         poc,
         marking: Marking::ShortTerm,
         output: true,
@@ -497,7 +555,7 @@ fn avc_second_field_of_a_frame_already_output_is_output_on_its_own() {
 #[test]
 fn avc_store_reports_a_buffer_full_of_references() {
     let mut dpb = DecodedPictures::new(&pool());
-    let reference = |poc| AvcStore {
+    let reference = |poc| NewPicture {
         poc,
         marking: Marking::ShortTerm,
         output: false,

@@ -704,32 +704,53 @@ def hevc_set_ordering(au, dpb, reorder, latency):
     """An HEVC access unit whose SPS states sps_max_dec_pic_buffering_minus1
     `dpb`, sps_max_num_reorder_pics `reorder` and
     sps_max_latency_increase_plus1 `latency` for every sub-layer."""
-    def change(nal):
-        if (nal[0] >> 1) & 0x3F != 33:
-            return nal
-        b = Copy(nal, 2)
-        b.u(4)
-        sub = b.u(3)
+    return map_nals(au, lambda nal: hevc_set_ordering_nal(nal, dpb, reorder, latency)
+                    if (nal[0] >> 1) & 0x3F == 33 else nal)
+
+
+def hevc_sps_id(nal, sps_id):
+    """An HEVC SPS NAL unit with `sps_seq_parameter_set_id` `sps_id`."""
+    b = Copy(nal, 2)
+    b.u(4)
+    sub = b.u(3)
+    b.u(1)
+    hevc_ptl_copy(b, sub)
+    b.src.ue()
+    b.dst.ue(sps_id)
+    return b.finish()
+
+
+def hevc_sps_latency(nal, latency):
+    """An HEVC SPS NAL unit with `sps_max_latency_increase_plus1` `latency`
+    for every sub-layer."""
+    return hevc_set_ordering_nal(nal, None, None, latency)
+
+
+def hevc_set_ordering_nal(nal, dpb, reorder, latency):
+    """An HEVC SPS NAL unit with the sub-layer ordering values that are not
+    None replaced for every sub-layer."""
+    b = Copy(nal, 2)
+    b.u(4)
+    sub = b.u(3)
+    b.u(1)
+    hevc_ptl_copy(b, sub)
+    b.ue()
+    if b.ue() == 3:
         b.u(1)
-        hevc_ptl_copy(b, sub)
-        b.ue()
-        if b.ue() == 3:
-            b.u(1)
-        b.ue()
-        b.ue()
-        if b.u(1):
-            for _ in range(4):
-                b.ue()
-        b.ue()
-        b.ue()
-        b.ue()
-        all_layers = b.u(1)
-        for _ in range(0 if all_layers else sub, sub + 1):
-            for value in (dpb, reorder, latency):
-                b.src.ue()
-                b.dst.ue(value)
-        return b.finish()
-    return map_nals(au, change)
+    b.ue()
+    b.ue()
+    if b.u(1):
+        for _ in range(4):
+            b.ue()
+    b.ue()
+    b.ue()
+    b.ue()
+    all_layers = b.u(1)
+    for _ in range(0 if all_layers else sub, sub + 1):
+        for value in (dpb, reorder, latency):
+            old = b.src.ue()
+            b.dst.ue(old if value is None else value)
+    return b.finish()
 
 
 def set_vui_timing(au, old, new, hevc):
@@ -1045,8 +1066,8 @@ def ts_rewrite_video(ts, transform, pts=None):
     """`ts` with each video PES payload n replaced by transform(n, payload), or
     dropped when it returns None; the PES headers (PTS, DTS) and the other
     packets stay, but for the PTS of a PES without DTS, which pts(n) gives
-    when passed. The rewritten PES has PES_packet_length 0 and is cut into
-    packets, the last stuffed."""
+    when passed (None leaves the PES without a time). The rewritten PES has
+    PES_packet_length 0 and is cut into packets, the last stuffed."""
     packets = [ts[i:i + 188] for i in range(0, len(ts), 188)]
     video = None
     for p in packets:
@@ -1068,9 +1089,13 @@ def ts_rewrite_video(ts, transform, pts=None):
         payload = transform(flush.count, bytes(data[header_length:]))
         if payload is not None and pts is not None:
             assert header[7] >> 6 == 2, "a PES with a DTS"
-            t = pts(flush.count) % (1 << 33)
-            header[9:14] = bytes([0x21 | (t >> 29) & 0x0E, (t >> 22) & 0xFF, 0x01 | (t >> 14) & 0xFE,
-                                  (t >> 7) & 0xFF, 0x01 | (t << 1) & 0xFE])
+            t = pts(flush.count)
+            if t is None:
+                header = header[:7] + bytes([header[7] & 0x3F, header[8] - 5]) + header[14:]
+            else:
+                t %= 1 << 33
+                header[9:14] = bytes([0x21 | (t >> 29) & 0x0E, (t >> 22) & 0xFF, 0x01 | (t >> 14) & 0xFE,
+                                      (t >> 7) & 0xFF, 0x01 | (t << 1) & 0xFE])
         flush.count += 1
         pes.clear()
         if payload is None:
@@ -1538,9 +1563,9 @@ def picture_output_cases(tmp_dir):
             au, [sei_nal(sei_messages_t35(data[ranks[n]]), hevc)], hevc))
         out.append((name + "-ts", write(name + ".ts", ts), ["cc"]))
 
-    def base(codec, name, **options):
+    def base(codec, name, frames=300, **options):
         path = os.path.join(tmp_dir, name + ".ts")
-        encode(codec, 300, path, **options)
+        encode(codec, frames, path, **options)
         return open(path, "rb").read()
 
     eos = b"\x00\x00\x00\x01\x48\x01"
@@ -1561,6 +1586,22 @@ def picture_output_cases(tmp_dir):
     # VUI timing changing at CRA pictures: each starts a new sequence.
     captioned("hevc-sps-change", hevc_open, True, lambda n, au: set_vui_timing(
         au, (1001, 30000), (1001, 240000), True) if (n + 26) // 48 % 2 else au)
+    # The SPS repeated with a copy as id 1 before every CRA picture, the copy
+    # changed (in its latency limit, which changes no order) every other 48
+    # access units and the SPS itself for 48 of them: only the changes of the
+    # SPS the CRA picture activates start a new sequence (probe p94).
+    def sps_ids(n, au):
+        def change(nal):
+            if (nal[0] >> 1) & 0x3F != 33:
+                return nal
+            one = hevc_sps_id(nal, 1)
+            if (n + 26) // 48 % 2:
+                one = hevc_sps_latency(one, 1000)
+            if (n + 26) // 48 == 3:
+                nal = hevc_sps_latency(nal, 1000)
+            return nal + b"\x00\x00\x00\x01" + one
+        return map_nals(au, change)
+    captioned("hevc-sps-ids", hevc_open, True, sps_ids)
 
     pyramid = "bframes=3:b-adapt=0:b-pyramid=strict"
     h264_pyr = base("h264", "h264-pyr", params=pyramid)
@@ -1624,7 +1665,7 @@ def picture_output_cases(tmp_dir):
     carrier32 = base("h264", "h264-carrier32", params="bframes=0")
 
     def written(name, pictures, restriction=None, size=(2, 2), level=30, pts=None, gaps=False,
-                recovery=None, mkv_ns=None):
+                recovery=None, mkv_ns=None, carrier=carrier32):
         """A case of `pictures` in the carrier's packets (or, with mkv_ns(n)
         times in nanoseconds, in a Matroska file without durations), with a
         recovery point of recovery_frame_cnt `recovery` on the first."""
@@ -1643,7 +1684,7 @@ def picture_output_cases(tmp_dir):
             units = [(mkv_ns(n), au(n, b"")) for n in range(len(pictures))]
             out.append((name + "-mkv", write(name + ".mkv", matroska(units)), ["cc"]))
         else:
-            out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au, pts)), ["cc"]))
+            out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier, au, pts)), ["cc"]))
 
     # The start hold and depth growth without a bitstream restriction: a B
     # picture below 5 P frames at decode index 6 is kept (nothing leaves
@@ -1684,6 +1725,14 @@ def picture_output_cases(tmp_dir):
     out += hold_and_field_cases(written, carrier, fields, data)
     rate_cases(written)
     output_rule_cases(written)
+    # Packets without a time (probes p93, p93b): none at all, where every
+    # frame lasts one tick; and none for the first 4300, where the estimate
+    # settles after 4096 packets with no time (one tick) and the reference
+    # takes the times after them (3003; open).
+    written("h264-untimed", frame_pictures(300), pts=lambda n: None)
+    long_carrier = base("h264", "h264-carrier-long", frames=4400, params="bframes=0")
+    written("h264-untimed-far", frame_pictures(4400), carrier=long_carrier,
+            pts=lambda n: None if n < 4300 else 90000 + 3003 * n)
     shutil.rmtree(tmp_dir)
     return out
 

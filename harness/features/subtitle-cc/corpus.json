@@ -7499,6 +7499,219 @@
         "digest": 17159508474545030286,
         "input_digest": 4147412483498398204
       }
+    },
+    {
+      "id": "h264-untimed-ts",
+      "profile": "h264-untimed-ts",
+      "file": "cc/h264-untimed.ts",
+      "sha256": "8349e1d282f7c4aed0256e56ebc979209e2e7f06f0853e4215f7c1c6f2517099",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5062026062766143945,
+        "input_digest": 13621172362031268716
+      }
+    },
+    {
+      "id": "h264-untimed-ts-realtime",
+      "profile": "h264-untimed-ts",
+      "file": "cc/h264-untimed.ts",
+      "sha256": "8349e1d282f7c4aed0256e56ebc979209e2e7f06f0853e4215f7c1c6f2517099",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 6043196614982751357,
+        "input_digest": 13621172362031268716
+      }
+    },
+    {
+      "id": "h264-untimed-ts-first",
+      "profile": "h264-untimed-ts",
+      "file": "cc/h264-untimed.ts",
+      "sha256": "8349e1d282f7c4aed0256e56ebc979209e2e7f06f0853e4215f7c1c6f2517099",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 5062026062766143945,
+        "input_digest": 13621172362031268716
+      }
+    },
+    {
+      "id": "h264-untimed-ts-second",
+      "profile": "h264-untimed-ts",
+      "file": "cc/h264-untimed.ts",
+      "sha256": "8349e1d282f7c4aed0256e56ebc979209e2e7f06f0853e4215f7c1c6f2517099",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 13679552312354294494,
+        "input_digest": 13621172362031268716
+      }
+    },
+    {
+      "id": "h264-untimed-far-ts",
+      "profile": "h264-untimed-far-ts",
+      "file": "cc/h264-untimed-far.ts",
+      "sha256": "9704855cd4768c829fa8c991c3a91a58aeda37d2997e71c5fd5c20c6752b059d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 5810,
+        "digest": 4158450534586420841,
+        "input_digest": 12912274751710525994
+      }
+    },
+    {
+      "id": "h264-untimed-far-ts-realtime",
+      "profile": "h264-untimed-far-ts",
+      "file": "cc/h264-untimed-far.ts",
+      "sha256": "9704855cd4768c829fa8c991c3a91a58aeda37d2997e71c5fd5c20c6752b059d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 55,
+        "bytes": 8703,
+        "digest": 15741255068683046080,
+        "input_digest": 12912274751710525994
+      }
+    },
+    {
+      "id": "h264-untimed-far-ts-first",
+      "profile": "h264-untimed-far-ts",
+      "file": "cc/h264-untimed-far.ts",
+      "sha256": "9704855cd4768c829fa8c991c3a91a58aeda37d2997e71c5fd5c20c6752b059d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 5810,
+        "digest": 4158450534586420841,
+        "input_digest": 12912274751710525994
+      }
+    },
+    {
+      "id": "h264-untimed-far-ts-second",
+      "profile": "h264-untimed-far-ts",
+      "file": "cc/h264-untimed-far.ts",
+      "sha256": "9704855cd4768c829fa8c991c3a91a58aeda37d2997e71c5fd5c20c6752b059d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 99,
+        "bytes": 10496,
+        "digest": 3483482530043268515,
+        "input_digest": 12912274751710525994
+      }
+    },
+    {
+      "id": "hevc-sps-ids-ts",
+      "profile": "hevc-sps-ids-ts",
+      "file": "cc/hevc-sps-ids.ts",
+      "sha256": "6a5b163c216ced774137bfd9bf39123f8e25704e73e7058ff55f14cc67458a34",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16250122987785657933,
+        "input_digest": 4131427052913709388
+      }
+    },
+    {
+      "id": "hevc-sps-ids-ts-realtime",
+      "profile": "hevc-sps-ids-ts",
+      "file": "cc/hevc-sps-ids.ts",
+      "sha256": "6a5b163c216ced774137bfd9bf39123f8e25704e73e7058ff55f14cc67458a34",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 1102164562742722076,
+        "input_digest": 4131427052913709388
+      }
+    },
+    {
+      "id": "hevc-sps-ids-ts-first",
+      "profile": "hevc-sps-ids-ts",
+      "file": "cc/hevc-sps-ids.ts",
+      "sha256": "6a5b163c216ced774137bfd9bf39123f8e25704e73e7058ff55f14cc67458a34",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 16250122987785657933,
+        "input_digest": 4131427052913709388
+      }
+    },
+    {
+      "id": "hevc-sps-ids-ts-second",
+      "profile": "hevc-sps-ids-ts",
+      "file": "cc/hevc-sps-ids.ts",
+      "sha256": "6a5b163c216ced774137bfd9bf39123f8e25704e73e7058ff55f14cc67458a34",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 3998241632398926937,
+        "input_digest": 4131427052913709388
+      }
     }
   ]
 }

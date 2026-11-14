@@ -49,19 +49,19 @@ struct Deltas {
 
 impl Deltas {
     /// Negative deltas come first, so they are pushed before the positive.
-    fn push_negative(&mut self, delta: i64) {
-        if self.len < self.values.len() {
-            self.values[self.len] = delta as i32;
-            self.len += 1;
-            self.negative += 1;
-        }
+    fn push_negative(&mut self, delta: i64) -> std::result::Result<(), Failure> {
+        self.push(delta)?;
+        self.negative += 1;
+        Ok(())
     }
 
-    fn push_positive(&mut self, delta: i64) {
-        if self.len < self.values.len() {
-            self.values[self.len] = delta as i32;
-            self.len += 1;
-        }
+    /// A set of more than 32 pictures is refused: 7.4.8 allows at most
+    /// `sps_max_dec_pic_buffering_minus1`, which is below 16.
+    fn push(&mut self, delta: i64) -> std::result::Result<(), Failure> {
+        let slot = self.values.get_mut(self.len).ok_or(Failure::Invalid)?;
+        *slot = delta as i32;
+        self.len += 1;
+        Ok(())
     }
 
     fn as_slice(&self) -> &[i32] {
@@ -127,6 +127,9 @@ pub(crate) struct Slice {
 pub(crate) struct Tables {
     pool: Budget,
     sps: BudgetVec<Option<Sps>>,
+    /// The payload of the SPS stored under each id, so that a set repeated
+    /// unchanged is told from a change whatever came between.
+    sps_payloads: BudgetVec<LastPayload>,
     pps: BudgetVec<Option<Pps>>,
     last_sps: LastPayload,
     last_pps: LastPayload,
@@ -160,6 +163,7 @@ impl Tables {
         Self {
             pool: pool.clone(),
             sps: BudgetVec::new(pool),
+            sps_payloads: BudgetVec::new(pool),
             pps: BudgetVec::new(pool),
             last_sps: LastPayload::new(pool),
             last_pps: LastPayload::new(pool),
@@ -171,20 +175,31 @@ impl Tables {
     }
 
     /// Reads an SPS NAL unit payload (after the two header bytes) and stores
-    /// it, returning its id and the set it replaces; a repeated set changes
-    /// nothing. An SPS cut short, out of range or not taken by the reference
-    /// is ignored.
+    /// it, returning its id and the set it replaces; a set repeating the one
+    /// stored under its id changes nothing, whatever sets came between. An
+    /// SPS cut short, out of range or not taken by the reference is ignored.
     pub(crate) fn put_sps(&mut self, payload: &[u8]) -> Result<Option<(u8, Option<Sps>)>> {
         if self.sps.is_empty() {
             self.sps.try_extend_with(SPS_IDS, |_| None)?;
         }
-        if self.last_sps.repeats(payload) {
+        if self.sps_payloads.is_empty() {
+            let pool = &self.pool;
+            self.sps_payloads
+                .try_extend_with(SPS_IDS, |_| LastPayload::new(pool))?;
+        }
+        // The id is part of the payload: a payload stored under some id
+        // repeats that id's set.
+        if self.last_sps.repeats(payload) || self.sps_payloads.iter().any(|p| p.repeats(payload)) {
             return Ok(None);
         }
         self.last_sps.remember(payload)?;
         let mut bits = Rbsp::lenient(payload);
         match self.read_sps(&mut bits) {
-            Ok((id, sps)) => Ok(Some((id, self.sps[usize::from(id)].replace(sps)))),
+            Ok((id, sps)) => {
+                let at = usize::from(id);
+                self.sps_payloads[at].remember(payload)?;
+                Ok(Some((id, self.sps[at].replace(sps))))
+            }
             Err(Failure::Memory(error)) => Err(error),
             Err(Failure::Invalid) => Ok(None),
         }
@@ -209,6 +224,9 @@ impl Tables {
     pub(crate) fn forget_repeats(&mut self) {
         self.last_sps.forget();
         self.last_pps.forget();
+        for payload in self.sps_payloads.iter_mut() {
+            payload.forget();
+        }
     }
 
     pub(crate) fn restore_sps(&mut self, id: u8, old: Option<Sps>) {
@@ -275,8 +293,10 @@ impl Tables {
         }
         bits.ue()?; // bit_depth_luma_minus8
         bits.ue()?; // bit_depth_chroma_minus8
-        // log2_max_pic_order_cnt_lsb plus 4, summed in 32 bits; above 16 the
-        // reference refuses the set.
+        // log2_max_pic_order_cnt_lsb_minus4 plus 4, summed in 32 bits, and
+        // refused above 16 (7.4.3.2 allows 0 to 12). Probe p95: the reference
+        // takes 16-bit LSBs and outputs nothing with 17 or 24; a coded
+        // 0xFFFFFFFE gives two-bit LSBs, whose slices it then decodes.
         let log2_max_lsb = bits.ue()?.wrapping_add(4);
         if log2_max_lsb > 16 {
             return Err(Failure::Invalid);
@@ -520,32 +540,32 @@ fn st_set(
         for j in (0..reference.positive).rev() {
             let d = delta(reference.negative + j) + delta_rps;
             if d < 0 && used[reference.negative + j] {
-                out.push_negative(d);
+                out.push_negative(d)?;
             }
         }
         if delta_rps < 0 && used[len] {
-            out.push_negative(delta_rps);
+            out.push_negative(delta_rps)?;
         }
         for j in 0..reference.negative {
             let d = delta(j) + delta_rps;
             if d < 0 && used[j] {
-                out.push_negative(d);
+                out.push_negative(d)?;
             }
         }
         // 7-62: S1 likewise.
         for j in (0..reference.negative).rev() {
             let d = delta(j) + delta_rps;
             if d > 0 && used[j] {
-                out.push_positive(d);
+                out.push(d)?;
             }
         }
         if delta_rps > 0 && used[len] {
-            out.push_positive(delta_rps);
+            out.push(delta_rps)?;
         }
         for j in 0..reference.positive {
             let d = delta(reference.negative + j) + delta_rps;
             if d > 0 && used[reference.negative + j] {
-                out.push_positive(d);
+                out.push(d)?;
             }
         }
         return Ok(out);
@@ -559,13 +579,13 @@ fn st_set(
     for _ in 0..negative {
         poc -= i64::from(bits.ue()?) + 1;
         bits.flag()?; // used_by_curr_pic_s0_flag
-        out.push_negative(poc);
+        out.push_negative(poc)?;
     }
     poc = 0;
     for _ in 0..positive {
         poc += i64::from(bits.ue()?) + 1;
         bits.flag()?; // used_by_curr_pic_s1_flag
-        out.push_positive(poc);
+        out.push(poc)?;
     }
     Ok(out)
 }
@@ -638,6 +658,7 @@ mod tests {
 
     #[test]
     fn hevc_poc_lsb_lengths_above_16_bits_refuse_the_parameter_set() {
+        // Probe p95: w16 taken, w17 and w24 refused, w2-fffffffe taken.
         let expected = (
             true,
             Some(Timing {
@@ -648,7 +669,7 @@ mod tests {
         assert_eq!(timing(&hevc_sps(12)), expected);
         assert_eq!(timing(&hevc_sps(13)), (false, None));
         assert_eq!(timing(&hevc_sps(0xffff_fffb)), (false, None));
-        // The reference sums in 32 bits: 0xFFFFFFFE codes two-bit LSBs.
+        // Summed in 32 bits: 0xFFFFFFFE codes two-bit LSBs.
         assert_eq!(timing(&hevc_sps(0xffff_fffe)), expected);
     }
 
@@ -666,6 +687,65 @@ mod tests {
             Ok(Some((0, Some(_))))
         ));
         assert!(matches!(tables.put_sps(&sps[2..]), Ok(Some((0, Some(_))))));
+    }
+
+    #[test]
+    fn sets_of_two_ids_repeated_in_turn_change_nothing() {
+        let pool = Budget::new(1 << 20).expect("pool");
+        let mut tables = Tables::new(&pool);
+        let (zero, one) = (hevc_sps_of(4, 0), hevc_sps_of(4, 1));
+        assert!(matches!(tables.put_sps(&zero[2..]), Ok(Some((0, None)))));
+        assert!(matches!(tables.put_sps(&one[2..]), Ok(Some((1, None)))));
+        for _ in 0..3 {
+            assert!(matches!(tables.put_sps(&zero[2..]), Ok(None)));
+            assert!(matches!(tables.put_sps(&one[2..]), Ok(None)));
+        }
+        // A changed set of either id replaces that id's alone.
+        let changed = hevc_sps_of(5, 1);
+        assert!(matches!(
+            tables.put_sps(&changed[2..]),
+            Ok(Some((1, Some(_))))
+        ));
+        assert!(matches!(tables.put_sps(&zero[2..]), Ok(None)));
+    }
+
+    #[test]
+    fn a_predicted_set_of_more_than_32_pictures_is_refused() {
+        // An SPS set of deltas -1 to -16 and 2 to 17, then one predicted from
+        // it with deltaRps -1 using all 33 pictures (7-61, 7-62).
+        let mut bits = BitWriter::default();
+        bits.ue(16).ue(16);
+        for _ in 0..16 {
+            bits.ue(0).flag(true);
+        }
+        bits.ue(1).flag(true);
+        for _ in 0..15 {
+            bits.ue(0).flag(true);
+        }
+        let mut predicted = BitWriter::default();
+        predicted.flag(true).flag(true).ue(0);
+        for _ in 0..33 {
+            predicted.flag(true);
+        }
+        let mut stream = bits.bits.clone();
+        stream.extend(&predicted.bits);
+        stream.extend([true; 8]);
+        let bytes: Vec<u8> = stream
+            .chunks(8)
+            .map(|byte| byte.iter().fold(0u8, |b, &bit| b << 1 | u8::from(bit)) << (8 - byte.len()))
+            .collect();
+        let mut reader = Rbsp::lenient(&bytes);
+        let first = st_set(&mut reader, &[], &[], 0, 2).ok().expect("first set");
+        assert_eq!((first.negative, first.len), (16, 32));
+        let sets = [StSet {
+            start: 0,
+            negative: 16,
+            positive: 16,
+        }];
+        assert!(matches!(
+            st_set(&mut reader, &sets, first.as_slice(), 1, 2),
+            Err(Failure::Invalid)
+        ));
     }
 
     /// Writes RBSP bits and frames them as a NAL unit.
@@ -717,10 +797,15 @@ mod tests {
     /// `log2_max_pic_order_cnt_lsb_minus4` is coded as `poc_lsb_minus4`, with one
     /// long-term reference picture whose POC LSBs take that many bits plus four.
     fn hevc_sps(poc_lsb_minus4: u32) -> Vec<u8> {
+        hevc_sps_of(poc_lsb_minus4, 0)
+    }
+
+    /// [`hevc_sps`] with SPS id `id`.
+    fn hevc_sps_of(poc_lsb_minus4: u32, id: u32) -> Vec<u8> {
         let mut bits = BitWriter::default();
         bits.put(0, 4).put(0, 3).flag(true); // VPS, one sub-layer, nesting
         bits.put(0x0160_0000, 32).put(0, 32).put(0, 24).put(93, 8); // profile_tier_level
-        bits.ue(0).ue(1).ue(1920).ue(1080).flag(false); // id, 4:2:0, size, no window
+        bits.ue(id).ue(1).ue(1920).ue(1080).flag(false); // id, 4:2:0, size, no window
         bits.ue(0).ue(0).ue(poc_lsb_minus4);
         bits.flag(true).ue(4).ue(0).ue(0); // sub-layer ordering
         for _ in 0..6 {

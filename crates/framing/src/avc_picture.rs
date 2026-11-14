@@ -49,18 +49,6 @@ pub struct AvcVui {
     pub max_dec_frame_buffering: Option<u32>,
 }
 
-impl AvcVui {
-    /// Whether the bitstream restriction keeps E.2.1's ranges:
-    /// `max_num_reorder_frames` ≤ `max_dec_frame_buffering` ≤ MaxDpbFrames.
-    #[must_use]
-    pub fn within(&self, max_dpb_frames: u32) -> bool {
-        match (self.max_num_reorder_frames, self.max_dec_frame_buffering) {
-            (Some(reorder), Some(buffering)) => reorder <= buffering && buffering <= max_dpb_frames,
-            _ => true,
-        }
-    }
-}
-
 /// The fields of a sequence parameter set.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcSps {
@@ -131,6 +119,12 @@ impl AvcSliceHeader {
     #[must_use]
     pub fn intra(&self) -> bool {
         matches!(self.slice_type, 2 | 4)
+    }
+
+    /// A B slice.
+    #[must_use]
+    pub fn bipredictive(&self) -> bool {
+        self.slice_type == 1
     }
 }
 
@@ -564,7 +558,7 @@ fn read_marking(
     sps: &AvcSps,
     pps: &AvcPps,
 ) -> Result<()> {
-    let (p, b) = (matches!(header.slice_type, 0 | 3), header.slice_type == 1);
+    let (p, b) = (matches!(header.slice_type, 0 | 3), header.bipredictive());
     if b {
         bits.flag()?; // direct_spatial_mv_pred_flag
     }

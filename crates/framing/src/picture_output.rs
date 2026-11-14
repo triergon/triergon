@@ -203,6 +203,7 @@ pub struct NewPicture {
     pub poc: i32,
     /// OutputFlag (H.264) or PicOutputFlag (H.265).
     pub output: bool,
+    /// Its marking after decoding; `Unused` for a non-reference picture.
     pub marking: Marking,
     /// The field, for a field picture.
     pub field: Option<Parity>,
@@ -290,23 +291,6 @@ pub struct AvcPicture {
     /// `no_output_of_prior_pics_flag` of an IDR picture, or 1 where it is
     /// inferred from a change of picture or buffer size (C.4.4).
     pub no_output_of_prior_pics: bool,
-}
-
-/// How the current H.264 picture is stored (C.4.5).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AvcStore {
-    /// `PicOrderCnt( )` of the picture (after decoding: 0 after
-    /// `memory_management_control_operation` 5).
-    pub poc: i32,
-    /// Its marking after decoding; `Unused` for a non-reference picture.
-    pub marking: Marking,
-    /// OutputFlag.
-    pub output: bool,
-    /// The field, for a field picture.
-    pub field: Option<Parity>,
-    /// Keep the picture out of bumping, as a first field waiting for its
-    /// second.
-    pub hold: bool,
 }
 
 impl<P> DecodedPictures<P> {
@@ -489,6 +473,22 @@ impl<P> DecodedPictures<P> {
         while self.stored.len() >= pictures && self.bump(&mut leave) {}
     }
 
+    /// Empties the buffers of the oldest pictures not needed for output
+    /// while more than `pictures` are stored, whatever their marking: a bound
+    /// for streams whose reference picture sets keep more pictures than a
+    /// buffer can hold, which no output depends on. Pictures waiting for
+    /// output or held stay.
+    pub fn remove_oldest_beyond(&mut self, pictures: usize, mut leave: impl FnMut(Leave<'_, P>)) {
+        let mut at = 0;
+        while self.stored.len() > pictures && at < self.stored.len() {
+            if self.stored[at].waiting || self.stored[at].held {
+                at += 1;
+            } else {
+                self.remove(at, &mut leave);
+            }
+        }
+    }
+
     /// H.264 C.4.4: removal of pictures before the current picture is stored,
     /// after it is decoded and the marking of 8.2.5 applied. An IDR picture
     /// marks every picture unused here.
@@ -519,7 +519,7 @@ impl<P> DecodedPictures<P> {
     /// the memory. The picture is given back.
     pub fn avc_store(
         &mut self,
-        current: AvcStore,
+        current: NewPicture,
         picture: P,
         dpb_frames: usize,
         mut leave: impl FnMut(Leave<'_, P>),
@@ -552,14 +552,7 @@ impl<P> DecodedPictures<P> {
                 return Err(StoreError::Full(picture));
             }
         }
-        let new = NewPicture {
-            poc: current.poc,
-            output: current.output,
-            marking: current.marking,
-            field: current.field,
-            hold: current.hold,
-        };
-        self.store(new, picture)
+        self.store(current, picture)
             .map(Some)
             .map_err(StoreError::Refused)
     }
@@ -577,7 +570,7 @@ impl<P> DecodedPictures<P> {
     pub fn avc_store_second_field(
         &mut self,
         first: PictureId,
-        current: AvcStore,
+        current: NewPicture,
         picture: P,
         mut leave: impl FnMut(Leave<'_, P>),
         merge: impl FnOnce(&mut P, P),

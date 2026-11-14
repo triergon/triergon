@@ -8,10 +8,23 @@
 //! candidate frame rate is scored by how far the times of the second to the
 //! twenty-first packets lie from its frame grid, and the duration is one frame
 //! at the best rate, rounded down to the time base; with no candidate close
-//! enough it is one tick of the time base.
+//! enough, or fewer than three times, it is one tick of the time base.
+//!
+//! The estimate settles once it has its times, at the end of the stream, or
+//! after [`LOOK_AHEAD`] packets, so that the frames waiting for it stay
+//! bounded. The reference looks further when packets go without a time
+//! (probe p93b: times after 60000 untimed packets of 40 bytes count, after
+//! 4000 of 1.6 kB they do not); an estimate that settles at the bound with
+//! fewer times than the reference finds differs from it.
 
 /// The packets whose times the estimate takes (probes p71, p77).
 pub(super) const TAKEN: usize = 21;
+
+/// The estimate settles after this many packets at the latest. MPEG-TS
+/// codes a PTS at least every 0.7 s (ISO/IEC 13818-1, 2.7.4), so a
+/// conforming stream gives its times within 4096 packets up to 280 frames per
+/// second.
+pub(super) const LOOK_AHEAD: u32 = 4096;
 
 /// The divisor takes the steps from the fourth packet taken (probe p77:
 /// moving the second or third packet leaves the divisor).
@@ -97,20 +110,22 @@ impl RateEstimate {
         self.ended = true;
     }
 
-    /// Whether the estimate has every time it takes: all of them, or those
-    /// of a stream that ended.
+    /// Whether the estimate has every time it takes: all of them, those of
+    /// a stream that ended, or those of the first [`LOOK_AHEAD`] packets.
     pub(super) fn settled(&self) -> bool {
-        self.taken >= TAKEN || self.ended
+        self.taken >= TAKEN || self.ended || self.seen >= LOOK_AHEAD
     }
 
-    /// The estimated duration in ticks of `time_base`, or `None` without a
-    /// packet time; one tick with fewer than three (probe p42: one or two
-    /// packets last 1, three 3003).
-    pub(super) fn duration(&self, time_base: (u32, u32)) -> Option<i64> {
+    /// The estimated duration in ticks of `time_base`: one tick with fewer
+    /// than three times (probe p42: one or two packets last 1, three 3003;
+    /// probe p93: packets without any time last 1).
+    pub(super) fn duration(&self, time_base: (u32, u32)) -> i64 {
         let times = &self.times[..self.taken];
-        let (&first, &last) = (times.first()?, times.last()?);
+        let [first, .., last] = *times else {
+            return 1;
+        };
         if times.len() < 3 {
-            return Some(1);
+            return 1;
         }
         let (num, den) = (u64::from(time_base.0.max(1)), u64::from(time_base.1.max(1)));
         let divisor = times
@@ -122,10 +137,13 @@ impl RateEstimate {
         if u128::from(divisor) * u128::from(num) * DIVISOR_ABOVE.1
             > u128::from(den) * DIVISOR_ABOVE.0
         {
-            return i64::try_from(divisor).ok();
+            return i64::try_from(divisor).unwrap_or(i64::MAX);
         }
         let tick = num as f64 / den as f64;
-        let mean_rate = (times.len() - 1) as f64 / ((last - first) as f64 * tick);
+        // Times too far apart for a step leave no candidate out.
+        let mean_rate = last
+            .checked_sub(first)
+            .map_or(0.0, |span| (times.len() - 1) as f64 / (span as f64 * tick));
         // The fitted times in seconds, as each candidate scales them.
         let mut seconds = [0.0; TAKEN];
         for (s, &t) in seconds.iter_mut().zip(&times[FIT_FROM..]) {
@@ -143,11 +161,11 @@ impl RateEstimate {
                 best = Some((score, (p, q)));
             }
         }
-        Some(best.map_or(1, |(_, (p, q))| {
+        best.map_or(1, |(_, (p, q))| {
             // One frame rounded down: q / (p * tick) = den * q / (num * p).
             let ticks = u128::from(den) * u128::from(q) / (u128::from(num) * u128::from(p));
             i64::try_from(ticks).unwrap_or(i64::MAX)
-        }))
+        })
     }
 }
 
@@ -204,7 +222,7 @@ mod tests {
 
     const TB: (u32, u32) = (1, 90_000);
 
-    fn estimate(times: impl IntoIterator<Item = i64>) -> Option<i64> {
+    fn estimate(times: impl IntoIterator<Item = i64>) -> i64 {
         let mut e = RateEstimate::default();
         for t in times {
             e.packet(Some(t), true, false);
@@ -225,37 +243,38 @@ mod tests {
         // Probes p73 eq-180, eq-181 and p79 gcd-3100 (29 fps would fit
         // 3103).
         let equal = |s: i64| (0..TAKEN as i64).map(move |n| 90_000 + n * s);
-        assert_eq!(estimate(equal(181)), Some(181));
-        assert_eq!(estimate(equal(180)), Some(1));
-        assert_eq!(estimate(equal(3100)), Some(3100));
+        assert_eq!(estimate(equal(181)), 181);
+        assert_eq!(estimate(equal(180)), 1);
+        assert_eq!(estimate(equal(3100)), 3100);
     }
 
     #[test]
     fn each_candidate_is_picked_for_its_own_rate() {
         // Probe p79.
-        assert_eq!(estimate(at_rate(30_000, 1001)), Some(3003));
-        assert_eq!(estimate(at_rate(359, 12)), Some(3008));
-        assert_eq!(estimate(at_rate(80, 1)), Some(1125));
+        assert_eq!(estimate(at_rate(30_000, 1001)), 3003);
+        assert_eq!(estimate(at_rate(359, 12)), 3008);
+        assert_eq!(estimate(at_rate(80, 1)), 1125);
         // Not candidates: 11/12 gives 22/12, 70 the fallback.
-        assert_eq!(estimate(at_rate(11, 12)), Some(49_090));
-        assert_eq!(estimate(at_rate(70, 1)), Some(1));
+        assert_eq!(estimate(at_rate(11, 12)), 49_090);
+        assert_eq!(estimate(at_rate(70, 1)), 1);
     }
 
     #[test]
     fn fewer_than_three_times_give_one_tick() {
-        // Probe p42: streams of one, two and three packets 3003 apart.
-        assert_eq!(estimate([]), None);
-        assert_eq!(estimate([90_000]), Some(1));
-        assert_eq!(estimate([90_000, 93_003]), Some(1));
-        assert_eq!(estimate([90_000, 93_003, 96_006]), Some(3003));
+        // Probe p42: streams of one, two and three packets 3003 apart; probe
+        // p93: none.
+        assert_eq!(estimate([]), 1);
+        assert_eq!(estimate([90_000]), 1);
+        assert_eq!(estimate([90_000, 93_003]), 1);
+        assert_eq!(estimate([90_000, 93_003, 96_006]), 3003);
     }
 
     #[test]
     fn a_score_below_one_hundredth_is_close_enough() {
         // Probe p83: every other packet A ticks late at 25 fps.
         let late = |a: i64| (0..TAKEN as i64).map(move |n| 90_000 + 3600 * n + a * (n % 2));
-        assert_eq!(estimate(late(719)), Some(3600));
-        assert_eq!(estimate(late(721)), Some(1));
+        assert_eq!(estimate(late(719)), 3600);
+        assert_eq!(estimate(late(721)), 1);
     }
 
     #[test]
@@ -279,6 +298,13 @@ mod tests {
     }
 
     #[test]
+    fn times_too_far_apart_for_a_step_leave_no_candidate_out() {
+        // The span from the first time to the last does not fit a time.
+        let times = (0..TAKEN as i64).map(|n| if n == 0 { i64::MIN } else { i64::MAX - n });
+        assert!(estimate(times) > 0);
+    }
+
+    #[test]
     fn the_end_of_the_stream_settles_the_estimate() {
         let mut e = RateEstimate::default();
         for t in [90_000, 93_003] {
@@ -287,7 +313,21 @@ mod tests {
         assert!(!e.settled());
         e.end();
         assert!(e.settled());
-        assert_eq!(e.duration(TB), Some(1));
+        assert_eq!(e.duration(TB), 1);
+    }
+
+    #[test]
+    fn the_estimate_settles_after_its_look_ahead() {
+        // Probe p93b: the reference also finds times after 4096 untimed
+        // packets; the estimate stops looking there, with what it has.
+        let mut e = RateEstimate::default();
+        for _ in 1..super::LOOK_AHEAD {
+            e.packet(None, false, false);
+        }
+        assert!(!e.settled());
+        e.packet(None, false, false);
+        assert!(e.settled());
+        assert_eq!(e.duration(TB), 1);
     }
 
     #[test]

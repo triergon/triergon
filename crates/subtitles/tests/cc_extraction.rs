@@ -249,6 +249,107 @@ fn h264_frames_leave_in_order_count_order_with_their_times() {
     assert!(frames.iter().all(|f| f.1 == Some(3003)));
 }
 
+/// An SEI NAL unit (`header`) of messages given as (payload type, payload).
+fn sei_of(header: &[u8], messages: &[(u8, Vec<u8>)]) -> Vec<u8> {
+    let mut bits = Bits::default();
+    for (kind, payload) in messages {
+        bits.u(u64::from(*kind), 8).u(payload.len() as u64, 8);
+        for &byte in payload {
+            bits.u(u64::from(byte), 8);
+        }
+    }
+    bits.nal(header)
+}
+
+/// A `user_data_registered_itu_t_t35` payload: country and provider code,
+/// then `ATSC_user_data()` with `cc_data()` of `flags` (A/53 Part 4: bit 6
+/// `process_cc_data_flag`, bits 0-4 `cc_count`) and its constructs.
+fn t35(country_provider: [u8; 3], flags: u8, constructs: &[u8]) -> Vec<u8> {
+    [
+        &country_provider[..],
+        b"GA94\x03",
+        &[flags, 0xff],
+        constructs,
+        &[0xff],
+    ]
+    .concat()
+}
+
+/// SEI messages around picture `n`'s captions: an ATSC message with
+/// `tag(n)`, then messages whose constructs are not caption data (T.35 of
+/// DirecTV, of another country, ATSC with `process_cc_data_flag` 0, and
+/// `user_data_unregistered`), then a second ATSC message with
+/// `FC 80|n 81`.
+fn mixed_messages(n: u8) -> Vec<(u8, Vec<u8>)> {
+    const ATSC: [u8; 3] = [0xb5, 0x00, 0x31];
+    let ignored = [0xfc, 0xff, 0xff];
+    vec![
+        (4, t35(ATSC, 0x41, &tag(n))),
+        (4, t35([0xb5, 0x00, 0x2f], 0x41, &ignored)),
+        (4, t35([0x26, 0x00, 0x31], 0x41, &ignored)),
+        (4, t35(ATSC, 0x01, &ignored)),
+        (
+            5,
+            [&[0x47; 16][..], &t35(ATSC, 0x41, &ignored)[3..]].concat(),
+        ),
+        (4, t35(ATSC, 0x41, &[0xfc, 0x80 | n, 0x81])),
+    ]
+}
+
+#[test]
+fn sei_captions_are_the_processed_atsc_t35_constructs_in_presentation_order() {
+    // ITU-T T.35 names the United States 0xB5 and A/53 Part 4 the ATSC
+    // provider 0x0031; H.264 D.1.6 and H.265 D.2.6 carry T.35 data as SEI
+    // payload type 4. Only ATSC cc_data with process_cc_data_flag 1 is
+    // caption data; payload type 5 (user_data_unregistered) is not. Picture
+    // 3 carries only the others and gives no frame.
+    let sps = AvcSps::default();
+    let units: Vec<_> = avc_gop(0)
+        .into_iter()
+        .enumerate()
+        .map(|(n, (slice_type, reference, lsb, frame_num))| {
+            let n = n as u8;
+            let slice = AvcSlice {
+                idr: n == 0,
+                reference,
+                slice_type,
+                frame_num,
+                poc_lsb: lsb,
+                ..AvcSlice::default()
+            };
+            let mut messages = mixed_messages(n);
+            if n == 3 {
+                messages.retain(|(_, payload)| payload.ends_with(&[0xfc, 0xff, 0xff, 0xff]));
+            }
+            let mut nals = Vec::new();
+            if n == 0 {
+                nals.extend([avc_sps(&sps), avc_pps()]);
+            }
+            nals.extend([sei_of(&[0x06], &messages), avc_slice(&slice, 0)]);
+            (annex_b(&nals), 90_000 + i64::from(lsb) / 2 * 3003)
+        })
+        .collect();
+    let coding = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let frames = extract(coding, ts_packets(&units));
+    let expected: Vec<Vec<u8>> = [0, 2, 1, 5, 6, 4]
+        .into_iter()
+        .map(|n| [tag(n), [0xfc, 0x80 | n, 0x81]].concat())
+        .collect();
+    let data: Vec<_> = frames.into_iter().map(|(_, _, data)| data).collect();
+    assert_eq!(data, expected);
+    // The same in an HEVC prefix SEI NAL unit.
+    let coding = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
+    let au = annex_b(&[
+        hevc_sps(4, 1, 0),
+        hevc_pps(),
+        sei_of(&[0x4e, 0x01], &mixed_messages(7)),
+        hevc_slice(19, 0, &[], false),
+    ]);
+    let frames = extract(coding, ts_packets(&[(au, 0)]));
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].2, [tag(7), [0xfc, 0x87, 0x81]].concat());
+}
+
 #[test]
 fn h264_ignores_no_output_of_prior_pics_flag() {
     // Case h264-noout-ts: the P picture waiting at an IDR picture
@@ -1072,6 +1173,64 @@ fn hevc_reference_picture_sets_in_every_coding_are_read() {
         tags(&extract(coding, ts_packets(&units))),
         [[0], [1], [2], [3], [4], [5]]
     );
+}
+
+#[test]
+fn hevc_pictures_kept_for_reference_beyond_the_buffer_are_let_go() {
+    // Trailing pictures alternating order counts 1 and 0 after an IDR
+    // picture, each with short-term deltas -1 and +1 and, in the second
+    // stream, long-term pictures named by LSBs 0 and 1: there every picture
+    // stays a reference. The pictures stored beyond the SPS's buffer size are
+    // removed once output, so memory does not grow with the stream.
+    let coding = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
+    let sps = hevc_sps_with(4, 1, 0, &[StSet::Explicit(vec![-1])], &[0]);
+    let long_term = [
+        LongTerm::Own {
+            lsb: 0,
+            msb_cycle: None,
+        },
+        LongTerm::Own {
+            lsb: 1,
+            msb_cycle: None,
+        },
+    ];
+    for named in [&long_term[..0], &long_term[..]] {
+        let pool = Budget::new(1 << 24).expect("pool");
+        let mut work = WorkBudget::new(1 << 32);
+        let mut extractor = CaptionExtractor::new(&pool, coding, (1, 90_000));
+        let mut frames = 0;
+        let mut used = Vec::new();
+        for n in 0..4000u32 {
+            let au = if n == 0 {
+                hevc_au_with(Some(sps.clone()), 0, hevc_slice(19, 0, &[], false))
+            } else {
+                let rps = SliceRps::Own(StSet::Explicit(vec![-1, 1]));
+                let slice = hevc_slice_with(1, n % 2, &rps, Some((1, named)));
+                hevc_au_with(None, (n % 128) as u8, slice)
+            };
+            let packet = VideoPacket {
+                data: &au,
+                pts: Some(90_000 + i64::from(n) * 3003),
+                dts: Some(i64::from(n) * 3003),
+                duration: None,
+            };
+            extractor.push(packet, &mut work).expect("push");
+            while extractor.pop().expect("pop").is_some() {
+                frames += 1;
+            }
+            used.push(pool.used());
+        }
+        extractor.finish().expect("finish");
+        while extractor.pop().expect("pop").is_some() {
+            frames += 1;
+        }
+        assert_eq!(frames, 4000);
+        // The caption bytes are compacted from 4096 on: past that, the most
+        // memory used stays put.
+        let early = used[1500..2750].iter().max().copied();
+        let late = used[2750..].iter().max().copied();
+        assert!(late <= early, "{late:?} after {early:?}");
+    }
 }
 
 /// Access units of `pictures` (slice type, reference, LSB, frame_num) from a

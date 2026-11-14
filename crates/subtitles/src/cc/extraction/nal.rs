@@ -43,8 +43,11 @@
 //! output dropped), at the twenty-first picture at a deeper depth, or at the
 //! picture whose depth equals MaxDpbFrames (probes p27, p47, p62, p64-p69;
 //! `h264-start-hold-ts`, `h264-hold-depth1-ts`, `h264-hold-jump-ts`,
-//! `h264-hold-step3-ts`, `h264-hold-dpb-ts`). The output of a first picture
-//! that is a non-IDR intra picture with `frame_num` 0 does not count (probes
+//! `h264-hold-step3-ts`, `h264-hold-dpb-ts`). Where those outputs keep being
+//! dropped, the hold ends once more pictures are stored than MaxDpbFrames
+//! and 32 (probe p92: order counts 0, 600, 620, then 100 up by two, where
+//! the reference outputs every picture in order). The output of a first
+//! picture that is a non-IDR intra picture with `frame_num` 0 does not count (probes
 //! p89b, p89c; `h264-start-fn0-ts`). Among the first 20 pictures at least one
 //! waits (probe p27). A picture below each of the last 16 decoded makes those
 //! waiting leave first, does not raise the depth and is not dropped for being
@@ -95,9 +98,13 @@
 //! an IDR or BLA picture, the first picture, and the first after an end of
 //! sequence or end of bitstream NAL unit (8.1.3), and, observed, for an IRAP
 //! picture that activates another SPS or one whose content changed, the
-//! pictures waiting being output first (`hevc-sps-change-ts`). A picture that
-//! is not decoded, or an access unit without a picture, passes its caption
-//! bytes on to the next picture decoded. Output follows C.5.2.2 and C.5.2.3
+//! pictures waiting being output first (`hevc-sps-change-ts`). An SPS has
+//! changed when it comes with other content than the last SPS of its id: sets
+//! of two ids repeated in turn change nothing, and a changed set of an id the
+//! IRAP picture does not activate starts no sequence (probe p94;
+//! `hevc-sps-ids-ts`). A picture that is not decoded, or an access unit
+//! without a picture, passes its caption bytes on to the next picture
+//! decoded. Output follows C.5.2.2 and C.5.2.3
 //! with `sps_max_num_reorder_pics`, `sps_max_latency_increase_plus1` and
 //! NoOutputOfPriorPicsFlag: an IRAP picture with NoRaslOutputFlag equal to 1
 //! discards the pictures still waiting, with their captions, when it is a CRA
@@ -110,7 +117,10 @@
 //! above 15 is not taken (`hevc-dpb-ts`, `hevc-dpb-raise-ts`). A picture that
 //! is not an IRAP picture but follows an end of sequence or end of bitstream
 //! NAL unit outputs every picture waiting before it is decoded
-//! (`hevc-eos-rasl-ts`).
+//! (`hevc-eos-rasl-ts`). Pictures already output are removed, oldest first,
+//! once more are stored than the SPS's buffer size and 2: a conforming stream
+//! stores no more than its buffer size (C.4), but reference picture sets
+//! naming pictures by their order count LSBs can keep any number.
 //!
 //! **Times.** A frame keeps its packet's PTS. It lasts its packet's duration
 //! when the container gives one above 0; otherwise the frame period of its
@@ -126,7 +136,9 @@
 //! estimate no time, up to the first B picture (probes p81, p82, p84;
 //! `h264-rate-jump-ts`). Frames
 //! that need the estimate wait, with those after them, until it has its 21
-//! times or the stream ends.
+//! times, 4096 packets have passed or the stream ends; without any time it is
+//! one tick (probe p93; `h264-untimed-ts`). The reference looks further for
+//! times (probe p93b; `h264-untimed-far-ts`, open).
 //!
 //! A picture whose parameter sets are missing or invalid is not decoded.
 //!
@@ -149,11 +161,11 @@ use triergon_bitstream::{BitSource, Rbsp};
 use triergon_core::{Budget, BudgetVec, Result};
 use triergon_framing::picture_output::levels::max_dpb_frames;
 use triergon_framing::picture_output::order::{
-    AfterGap, AfterMmco5, AvcOrder, AvcPocCoding, AvcPocFields, Bottom, HevcOrder, HevcPocFields,
+    AfterGap, AfterMmco5, AvcOrder, AvcPocCoding, AvcPocFields, HevcOrder, HevcPocFields,
 };
 use triergon_framing::picture_output::{
-    AvcStore, DecodedPictures, HevcLimits, HevcPicture, LateOutput, Leave, Marking, NewPicture,
-    Parity, PictureId,
+    DecodedPictures, HevcLimits, HevcPicture, LateOutput, Leave, Marking, NewPicture, Parity,
+    PictureId,
 };
 use triergon_framing::{AvcPocSyntax, hevc as kinds};
 
@@ -169,6 +181,19 @@ const EARLY_OUTPUTS: u32 = 7;
 /// H.264 without a bitstream restriction: from this depth the start hold
 /// lasts until index [`START_WINDOW`] (probes p48, p50, p69, p70).
 const DEEP: u32 = 3;
+
+/// H.264 without a bitstream restriction: the start hold ends at the latest
+/// once more pictures are stored than MaxDpbFrames and this many. A bound
+/// for streams whose early outputs keep being dropped, such as order counts
+/// 0, 30000, 30010, then 50, 51, 52 and on, where the seven outputs never
+/// come; the probes' holds all end by index 24 (probe p70).
+const HOLD_MARGIN: usize = 32;
+
+/// HEVC: the pictures stored beyond the SPS's buffer size and this many are
+/// removed, oldest first, once they have been output. A conforming stream
+/// stores no more than the buffer size (C.4); reference picture sets naming
+/// pictures by order count LSBs can keep more, without bound.
+const HEVC_SLACK: usize = 2;
 
 /// H.264: the order counts of the last pictures decoded that a picture's
 /// displacement counts (probes p47, p57).
@@ -296,12 +321,17 @@ impl EarlyHold {
         }
     }
 
-    /// Whether the hold ends at picture `index`: once [`EARLY_OUTPUTS`]
-    /// pictures have left at a depth below [`DEEP`] (probes p64, p66,
-    /// p68: 7, 8, 9 or 10 pictures by the drops and raises before), at
-    /// index [`START_WINDOW`] at a deeper depth (probes p69, p70), or when
-    /// the depth equals MaxDpbFrames (probe p67).
-    fn ends(&self, index: u32, dpb_frames: u32) -> bool {
+    /// Whether the hold ends at picture `index`, with `stored` pictures
+    /// stored before it: once [`EARLY_OUTPUTS`] pictures have left at a
+    /// depth below [`DEEP`] (probes p64, p66, p68: 7, 8, 9 or 10 pictures by
+    /// the drops and raises before), at index [`START_WINDOW`] at a deeper
+    /// depth (probes p69, p70), when the depth equals MaxDpbFrames (probe
+    /// p67), and at the latest once more than MaxDpbFrames and
+    /// [`HOLD_MARGIN`] pictures are stored.
+    fn ends(&self, index: u32, dpb_frames: u32, stored: usize) -> bool {
+        if stored > dpb_frames as usize + HOLD_MARGIN {
+            return true;
+        }
         if self.depth < DEEP {
             self.outputs >= EARLY_OUTPUTS || self.depth == dpb_frames
         } else {
@@ -750,7 +780,7 @@ impl NalDecode {
         hevc.after_end = unit.after_end;
         hevc.changed_sps |= unit.changed_sps;
         let b_picture = match &unit.picture {
-            Picture::Avc { slice, .. } => slice.header.slice_type % 5 == 1,
+            Picture::Avc { slice, .. } => slice.header.bipredictive(),
             _ => false,
         };
         self.progress
@@ -908,26 +938,26 @@ impl NalDecode {
                 )
                 .next()
                 .is_some();
+        let parity = header
+            .bottom_field
+            .map(|bottom| if bottom { Parity::Bottom } else { Parity::Top });
         let poc = state.order.next(&AvcPocFields {
             idr: slice.idr,
             reference: slice.reference,
             frame_num: u32::from(header.frame_num),
             log2_max_frame_num: u32::from(fields.frame_num_bits),
-            field: header.bottom_field.map(Bottom),
+            field: parity,
             mmco5: header.mmco5,
             coding,
         });
         // The second field of a pair joins the first's frame.
-        let parity = header
-            .bottom_field
-            .map(|bottom| if bottom { Parity::Bottom } else { Parity::Top });
         if let Some(first) = state.first_field.take() {
             if let Some(parity) = parity
                 && parity != first.parity
                 && first.frame_num == header.frame_num
                 && !slice.idr
             {
-                let store = AvcStore {
+                let store = NewPicture {
                     poc: poc.stored_poc,
                     marking: Marking::Unused,
                     output: true,
@@ -991,7 +1021,7 @@ impl NalDecode {
         let state = &mut self.progress.avc;
         state.decoded = state.decoded.saturating_add(1);
         if state.b_window == BWindow::Open {
-            if header.slice_type % 5 == 1 && state.decoded <= START_WINDOW + 1 {
+            if header.bipredictive() && state.decoded <= START_WINDOW + 1 {
                 state.b_window = BWindow::Seen;
                 self.choose_start();
             } else if state.decoded > START_WINDOW + 1 {
@@ -1013,7 +1043,7 @@ impl NalDecode {
             self.progress.avc.floor = None;
         } else if !state.stated {
             state.depth = state.depth.max(displaced);
-            if header.slice_type % 5 == 1 {
+            if header.bipredictive() {
                 // After a B picture at least one picture waits (probe
                 // p50 k0: a B picture in order at index 1).
                 state.b_seen = true;
@@ -1032,7 +1062,7 @@ impl NalDecode {
                     self.progress.timing.untime_through(UNTIMED_THROUGH);
                 }
             }
-        } else if displaced > 0 && header.slice_type % 5 == 1 && state.decoded <= START_WINDOW + 1 {
+        } else if displaced > 0 && header.bipredictive() && state.decoded <= START_WINDOW + 1 {
             // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
             // p3-h264-pyr-r0).
             state.depth = state.depth.max(1);
@@ -1044,9 +1074,11 @@ impl NalDecode {
         if !state.early.ended {
             state
                 .early
-                .picture(order, displaced, header.slice_type % 5 == 1, gap);
+                .picture(order, displaced, header.bipredictive(), gap);
             let index = state.decoded.saturating_sub(1);
-            state.early.ended = state.early.ends(index, state.dpb_frames);
+            state.early.ended = state
+                .early
+                .ends(index, state.dpb_frames, self.pictures.len());
         }
         state.recent.push(order);
         state.previous = Some(order);
@@ -1397,6 +1429,10 @@ impl NalDecode {
             limits,
             collect(&mut self.leaving),
         );
+        self.pictures.remove_oldest_beyond(
+            sps.max_dec_pic_buffering as usize + HEVC_SLACK,
+            collect(&mut self.leaving),
+        );
         // Within the room reserved, the store neither allocates nor fails.
         let _ = self.pictures.hevc_store(
             poc,
@@ -1439,8 +1475,10 @@ impl NalDecode {
             out.push_kept(held.pts, held.duration, bytes);
             return;
         }
-        let duration = held.duration.or_else(|| estimate(progress, self.time_base));
-        out.push_reserved(held.pts, duration, bytes);
+        let duration = held
+            .duration
+            .unwrap_or_else(|| estimate(progress, self.time_base));
+        out.push_reserved(held.pts, Some(duration), bytes);
     }
 
     /// Releases the frames kept once the duration estimate they need is
@@ -1453,11 +1491,10 @@ impl NalDecode {
         {
             return;
         }
-        let estimate = if self.progress.needs_estimate {
-            estimate(&mut self.progress, self.time_base)
-        } else {
-            None
-        };
+        let estimate = self
+            .progress
+            .needs_estimate
+            .then(|| estimate(&mut self.progress, self.time_base));
         out.release(estimate, self.progress.skip);
         self.progress.holding = false;
         self.progress.needs_estimate = false;
@@ -1545,19 +1582,19 @@ fn keep<T>(list: &mut BudgetVec<T>, item: T) {
 }
 
 /// The settled duration estimate, worked out once.
-fn estimate(progress: &mut Progress, time_base: (u32, u32)) -> Option<i64> {
-    if progress.estimate.is_none() {
-        progress.estimate = progress.timing.duration(time_base);
-    }
-    progress.estimate
+fn estimate(progress: &mut Progress, time_base: (u32, u32)) -> i64 {
+    *progress
+        .estimate
+        .get_or_insert_with(|| progress.timing.duration(time_base))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::EarlyHold;
+    use super::{EarlyHold, HOLD_MARGIN};
 
     /// The index at which the start hold ends for pictures given as (order
-    /// count, B picture), without frame_num gaps.
+    /// count, B picture), without frame_num gaps, every picture before it
+    /// stored.
     fn hold_end(pictures: &[(i32, bool)], dpb_frames: u32) -> Option<u32> {
         hold_end_from(EarlyHold::default(), pictures, dpb_frames)
     }
@@ -1567,16 +1604,19 @@ mod tests {
         pictures: &[(i32, bool)],
         dpb_frames: u32,
     ) -> Option<u32> {
-        let mut recent: Vec<i32> = Vec::new();
         for (index, &(poc, b)) in (0u32..).zip(pictures) {
-            let displaced = recent.iter().rev().take(16).filter(|&&q| q > poc).count();
-            hold.picture(poc, u32::try_from(displaced).unwrap(), b, false);
-            recent.push(poc);
-            if hold.ends(index, dpb_frames) {
+            hold.picture(poc, displaced(&pictures[..index as usize], poc), b, false);
+            if hold.ends(index, dpb_frames, index as usize) {
                 return Some(index);
             }
         }
         None
+    }
+
+    /// How many of the last 16 order counts are above `poc`.
+    fn displaced(before: &[(i32, bool)], poc: i32) -> u32 {
+        let above = before.iter().rev().take(16).filter(|&&(q, _)| q > poc);
+        u32::try_from(above.count()).unwrap()
     }
 
     /// P frames from order count `first` in steps of 2, with B pictures at
@@ -1627,5 +1667,27 @@ mod tests {
         assert_eq!(hold_end(&stream(2, &[(4, 2)], 30), 2), Some(4));
         assert_eq!(hold_end(&stream(2, &[(5, 3)], 30), 3), Some(5));
         assert_eq!(hold_end(&stream(2, &[(4, 3)], 30), 2), Some(20));
+    }
+
+    #[test]
+    fn the_hold_ends_once_more_pictures_are_stored_than_it_can_hold() {
+        // 0, 30000 (a step raising the depth to 1), 30010, then 50, 51, 52
+        // and on (depth 2): every later picture leaves below the last output
+        // and is dropped, so the seven outputs never come. The hold ends
+        // once more than MaxDpbFrames (3) and the margin are stored.
+        let pictures: Vec<_> = [0, 30_000, 30_010]
+            .into_iter()
+            .chain(50..30_000)
+            .map(|poc| (poc, false))
+            .collect();
+        assert_eq!(
+            hold_end(&pictures, 3),
+            Some(3 + u32::try_from(HOLD_MARGIN).unwrap() + 1)
+        );
+        let mut hold = EarlyHold::default();
+        for (index, &(poc, b)) in pictures.iter().enumerate().take(1000) {
+            hold.picture(poc, displaced(&pictures[..index], poc), b, false);
+        }
+        assert_eq!((hold.depth, hold.outputs), (2, 2));
     }
 }

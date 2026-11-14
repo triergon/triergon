@@ -1,5 +1,7 @@
 //! Picture order counts: H.264 8.2.1 (all three types) and H.265 8.3.1.
 
+use super::Parity;
+
 /// How an H.264 picture codes its order count (the SPS's
 /// `pic_order_cnt_type` and the slice header's fields).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,16 +34,13 @@ pub struct AvcPocFields<'a> {
     pub frame_num: u32,
     /// `log2_max_frame_num_minus4 + 4`.
     pub log2_max_frame_num: u32,
-    /// `field_pic_flag` and `bottom_field_flag`.
-    pub field: Option<Bottom>,
+    /// The field of a field picture (`field_pic_flag` and
+    /// `bottom_field_flag`).
+    pub field: Option<Parity>,
     /// The picture has `memory_management_control_operation` equal to 5.
     pub mmco5: bool,
     pub coding: AvcPocCoding<'a>,
 }
-
-/// Whether a field is the bottom field.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Bottom(pub bool);
 
 /// What a type 0 order count takes from a reference picture with
 /// `memory_management_control_operation` 5 for the pictures after it.
@@ -116,13 +115,21 @@ impl AvcOrder {
         self.prev_ref_frame_num
     }
 
+    /// PrevRefFrameNum modulo MaxFrameNum `max`: an SPS may only change
+    /// `log2_max_frame_num_minus4` at an IDR picture (7.4.1.2.1), and one
+    /// that does so elsewhere counts on from the value as the new width takes
+    /// it.
+    fn prev_ref_within(&self, max: u32) -> Option<u32> {
+        self.prev_ref_frame_num.map(|prev| prev & (max - 1))
+    }
+
     /// The `frame_num` values of the frames a gap before a picture with
     /// `frame_num` infers (8.2.5.2): those after PrevRefFrameNum up to the
     /// picture's, modulo MaxFrameNum. None after an IDR picture's.
     pub fn gap(&self, frame_num: u32, log2_max_frame_num: u32) -> impl Iterator<Item = u32> {
         let max = 1u32 << log2_max_frame_num.min(16);
         let frame_num = frame_num & (max - 1);
-        let (first, count) = match self.prev_ref_frame_num {
+        let (first, count) = match self.prev_ref_within(max) {
             Some(prev) if frame_num != prev && frame_num != (prev + 1) % max => {
                 ((prev + 1) % max, (frame_num + max - prev - 1) % max)
             }
@@ -168,7 +175,7 @@ impl AvcOrder {
             self.prev_frame_num_offset
         };
         if self.after_gap == AfterGap::OffsetKept
-            && let Some(prev_ref) = self.prev_ref_frame_num
+            && let Some(prev_ref) = self.prev_ref_within(max)
             && !f.idr
             && frame_num != prev_ref
             && frame_num != (prev_ref + 1) % max
@@ -210,7 +217,7 @@ impl AvcOrder {
                 if f.reference {
                     (self.prev_msb, self.prev_lsb) = if !f.mmco5 {
                         (msb as i32, lsb as i32)
-                    } else if f.field == Some(Bottom(true)) {
+                    } else if f.field == Some(Parity::Bottom) {
                         (0, 0)
                     } else {
                         match self.after_mmco5 {
@@ -261,11 +268,11 @@ impl AvcOrder {
                             .wrapping_add(delta[1]);
                         (top, bottom)
                     }
-                    Some(Bottom(false)) => {
+                    Some(Parity::Top) => {
                         let top = expected.wrapping_add(delta[0]);
                         (top, top)
                     }
-                    Some(Bottom(true)) => {
+                    Some(Parity::Bottom) => {
                         let bottom = expected
                             .wrapping_add(offset_for_top_to_bottom_field)
                             .wrapping_add(delta[0]);
@@ -298,11 +305,11 @@ impl AvcOrder {
     }
 
     /// PicOrderCnt( ) (8-1).
-    fn pic_order_cnt(top: i32, bottom: i32, field: Option<Bottom>) -> i32 {
+    fn pic_order_cnt(top: i32, bottom: i32, field: Option<Parity>) -> i32 {
         match field {
             None => top.min(bottom),
-            Some(Bottom(false)) => top,
-            Some(Bottom(true)) => bottom,
+            Some(Parity::Top) => top,
+            Some(Parity::Bottom) => bottom,
         }
     }
 }
