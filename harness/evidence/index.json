@@ -20253,6 +20253,15 @@
    "key": "evidence/packet-framing-parallel-bb57273d-aarch64/7d7f2805ee7835963e2d68d771cd5bda5a61f59a077bfee84a80dee6552aa53b.tar.zst",
    "sha256": "7d7f2805ee7835963e2d68d771cd5bda5a61f59a077bfee84a80dee6552aa53b",
    "bytes": 55066769
+  },
+  {
+   "name": "packet-framing-bounded-prefix-768b50ab-aarch64",
+   "path": "packet-framing-bounded-prefix-768b50ab-aarch64",
+   "retention": "retained",
+   "reason": "Paired AArch64 comparison of complete NAL prefix reads and descriptor checks. Includes both workers, all 131 reference folds and paired timing results, and unchanged work-budget traces.",
+   "key": "evidence/packet-framing-bounded-prefix-768b50ab-aarch64/f07378d8a1452f9d4bd268a3f185ceae311ed886915056af8e4894b577a2e6fb.tar.zst",
+   "sha256": "f07378d8a1452f9d4bd268a3f185ceae311ed886915056af8e4894b577a2e6fb",
+   "bytes": 42930285
   }
  ]
 }
