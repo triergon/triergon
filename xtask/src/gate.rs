@@ -148,7 +148,7 @@ const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor in [`FEATURES`].
-const COVERED: [(&str, Coverage); 22] = [
+const COVERED: [(&str, Coverage); 23] = [
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
@@ -182,6 +182,10 @@ const COVERED: [(&str, Coverage); 22] = [
     (
         "raster-simd",
         Coverage::Excluded("diagnostic: the host's SIMD engine, not a reference build"),
+    ),
+    (
+        "aac-access-units",
+        Coverage::Excluded("on demand: prepared and compared by codecs aac-access-units"),
     ),
 ];
 
