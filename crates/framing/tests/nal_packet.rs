@@ -625,7 +625,7 @@ fn reserved_pool_pressure_recovers_without_publishing_partial_bytes() {
 
 #[test]
 fn inline_and_spilled_segments_retain_all_bytes_after_session_drop() {
-    for count in [0, 4, 5, 9] {
+    for count in [0, 4, 5, 6, 9, 11] {
         for quantum in [1, 4096] {
             let p = pool();
             let mut s = session(&p);
@@ -649,8 +649,8 @@ fn inline_and_spilled_segments_retain_all_bytes_after_session_drop() {
                 assert_eq!(out.segment_bytes(index), Some(NON));
             }
             let descriptor_capacity = match count {
-                0..=4 => 0,
-                5..=8 => 8,
+                0..=5 => 0,
+                6..=8 => 8,
                 _ => 16,
             };
             let retained = Budget::control_storage_bytes()
@@ -720,10 +720,10 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
         let p = pool();
         let mut s = session(&p);
         let update = avc(&p, 129);
-        let mut source = packet(&p, &[NON; 5]);
+        let mut source = packet(&p, &[NON; 6]);
         source.new_extradata = Some(update.source_bytes().clone());
         let blocker = p
-            .reserve(p.available() - 4 * size_of::<NalPacketSegment>())
+            .reserve(p.available() - 5 * size_of::<NalPacketSegment>())
             .unwrap();
         let charge = p.used();
         let mut j = s.packet(source, Some(update)).unwrap();
@@ -772,9 +772,9 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
             };
             drop(j);
             assert_eq!(out.receiver_epoch(), 1);
-            assert_eq!(out.segments().len(), 5);
+            assert_eq!(out.segments().len(), 6);
             assert_eq!(out.configuration_bytes().as_ref(), avcc(129));
-            let expected: Vec<_> = (0..5)
+            let expected: Vec<_> = (0..6)
                 .flat_map(|i| framed(if i == 0 { 4 } else { 3 }, NON))
                 .collect();
             assert_eq!(out.bytes().as_ref(), expected);
@@ -792,8 +792,8 @@ fn refused_hevc_hint_keeps_inline_progress_and_retries_the_same_packet() {
         let p = pool();
         let mut s =
             NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p)), limits()).unwrap();
-        // Lookahead already proves two packet NALs plus three injected NALs.
-        let source = packet(&p, &[&hn(19), &hn(1)]);
+        // Lookahead already proves three packet NALs plus three injected NALs.
+        let source = packet(&p, &[&hn(19), &hn(1), &hn(2)]);
         let original = source.bytes.to_vec();
         let mut blocker = under_pressure.then(|| p.reserve(p.available()).unwrap());
         let charge = p.used();
@@ -821,15 +821,15 @@ fn refused_hevc_hint_keeps_inline_progress_and_retries_the_same_packet() {
         assert_eq!(pressure_count, if under_pressure { 2 } else { 0 });
         assert_eq!(s.receiver_epoch(), 0);
         drop(s);
-        let expected: Vec<_> = [32, 33, 34, 19, 1]
+        let expected: Vec<_> = [32, 33, 34, 19, 1, 2]
             .into_iter()
             .flat_map(|kind| framed(4, &hn(kind)))
             .collect();
         assert_eq!(out.bytes().as_ref(), expected);
         assert_eq!(out.source().bytes.as_ref(), original);
         assert_eq!(out.source().fields, fields());
-        assert_eq!(out.segments().len(), 5);
-        for (index, kind) in [32, 33, 34, 19, 1].into_iter().enumerate() {
+        assert_eq!(out.segments().len(), 6);
+        for (index, kind) in [32, 33, 34, 19, 1, 2].into_iter().enumerate() {
             assert_eq!(out.segment_bytes(index), Some(hn(kind).as_slice()));
         }
         drop(out);
@@ -892,7 +892,7 @@ fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capaci
             packet(p, &[&[0x68, 0xee, 0x3c]]),
         )
     }
-    for (count, output_bytes) in [(2, 21), (4, 35)] {
+    for (count, output_bytes) in [(2, 21), (4, 35), (5, 43)] {
         let raw = record(count);
         // Include the actual parsed configuration-table charge when it spills.
         let base = {
@@ -900,10 +900,11 @@ fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capaci
             let _inputs = setup(&probe, &raw);
             probe.used()
         };
-        let spare = if count == 2 {
-            120 // The five-entry upper hint fits, but the three-entry output must stay inline.
-        } else {
-            9 * size_of::<NalPacketSegment>() + Bytes::owner_overhead_bytes() + output_bytes
+        let output_storage = Bytes::owner_overhead_bytes() + output_bytes;
+        let spare = match count {
+            2 => 120,            // The hint fits, but the three-entry output stays inline.
+            4 => output_storage, // Five actual entries stay inline.
+            _ => 11 * size_of::<NalPacketSegment>() + output_storage,
         };
         for quantum in [1, 4096] {
             let p = Budget::new(base + spare).unwrap();
@@ -930,10 +931,7 @@ fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capaci
             assert_eq!(out.source().fields, fields());
             assert_eq!(s.receiver_epoch(), 0);
             if count == 2 {
-                assert_eq!(
-                    p.used(),
-                    base + Bytes::owner_overhead_bytes() + output_bytes
-                );
+                assert_eq!(p.used(), base + output_storage);
             } else {
                 assert_eq!(p.used(), p.limit());
             }

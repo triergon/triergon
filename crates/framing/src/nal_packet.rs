@@ -584,7 +584,7 @@ impl NalPacketSegment {
     }
 }
 
-const INLINE_PACKET_SEGMENTS: usize = 4;
+const INLINE_PACKET_SEGMENTS: usize = 5;
 
 // Fixed descriptor metadata travels with the job/output. Only a heap table
 // allocates; its complete capacity stays charged through output retention.
@@ -654,10 +654,9 @@ impl PacketSegmentStorage {
         }
         let needed = INLINE_PACKET_SEGMENTS + 1;
         if parts.capacity() < needed {
-            // Match ordinary four-to-eight growth, including an exact-size
-            // retry when the geometric capacity cannot fit the pool.
+            // Try the first heap capacity, then the exact size if necessary.
             parts
-                .try_reserve_exact(INLINE_PACKET_SEGMENTS * 2)
+                .try_reserve_exact(needed.next_power_of_two())
                 .or_else(|error| {
                     if matches!(
                         error,
@@ -862,7 +861,7 @@ struct PacketPlan {
     has_irap: bool,
     look_nals: usize,
     live_base: Option<usize>,
-    // Hints size only a later fifth-descriptor spill, never an early allocation.
+    // A hint sizes a later spill without reserving while descriptors fit inline.
     segment_hint: Option<usize>,
 }
 impl PacketPlan {
@@ -1213,8 +1212,8 @@ mod inline_packet_segments {
     }
 
     #[test]
-    fn large_hints_keep_four_inline_appends_uncharged_then_size_the_spill() {
-        for hint in [5, 9] {
+    fn large_hints_keep_inline_appends_uncharged_then_size_the_spill() {
+        for hint in [6, 9] {
             let pool = Budget::new(4096).unwrap();
             let base = pool.used();
             let mut parts = PacketSegmentStorage::new();
@@ -1224,9 +1223,9 @@ mod inline_packet_segments {
                 assert_eq!(pool.used(), base);
                 assert_eq!(pool.peak(), base);
             }
-            parts.try_push(&pool, Some(hint), segment(4)).unwrap();
+            parts.try_push(&pool, Some(hint), segment(5)).unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
-                panic!("fifth descriptor did not spill");
+                panic!("sixth descriptor did not spill");
             };
             assert_eq!(heap.capacity(), hint);
             assert_eq!(pool.used(), base + hint * size_of::<NalPacketSegment>());
@@ -1239,20 +1238,20 @@ mod inline_packet_segments {
     }
 
     #[test]
-    fn four_descriptors_are_inline_and_spill_keeps_every_entry() {
+    fn initial_descriptors_are_inline_and_spill_keeps_every_entry() {
         let pool = Budget::new(4096).unwrap();
         let base = pool.used();
         let mut parts = PacketSegmentStorage::new();
         assert!(parts.as_slice().is_empty());
-        for index in 0..4 {
+        for index in 0..INLINE_PACKET_SEGMENTS {
             parts.try_push(&pool, None, segment(index)).unwrap();
             assert_eq!(pool.used(), base);
             assert_eq!(parts.len(), index + 1);
         }
-        for index in 4..9 {
+        for index in INLINE_PACKET_SEGMENTS..9 {
             parts.try_push(&pool, None, segment(index)).unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
-                panic!("fifth descriptor did not spill");
+                panic!("sixth descriptor did not spill");
             };
             assert_eq!(
                 pool.used(),
@@ -1271,14 +1270,14 @@ mod inline_packet_segments {
     fn refused_spill_keeps_inline_progress_and_resumes_with_exact_capacity() {
         let pool = Budget::new(4096).unwrap();
         let blocker = pool
-            .reserve(pool.available() - 4 * size_of::<NalPacketSegment>())
+            .reserve(pool.available() - INLINE_PACKET_SEGMENTS * size_of::<NalPacketSegment>())
             .unwrap();
         let charge = pool.used();
         let mut parts = PacketSegmentStorage::new();
         assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
         assert!(parts.as_slice().is_empty());
         assert_eq!(pool.used(), charge);
-        for index in 0..4 {
+        for index in 0..INLINE_PACKET_SEGMENTS {
             parts.try_push(&pool, Some(9), segment(index)).unwrap();
             assert_eq!(parts.len(), index + 1);
             assert_eq!(parts.as_slice()[index], segment(index));
@@ -1287,7 +1286,7 @@ mod inline_packet_segments {
         let before = parts.as_slice().to_vec();
         for _ in 0..2 {
             assert!(matches!(
-                parts.try_push(&pool, Some(9), segment(4)),
+                parts.try_push(&pool, Some(9), segment(5)),
                 Err(Error::Backpressure { .. })
             ));
             assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
@@ -1296,13 +1295,13 @@ mod inline_packet_segments {
         }
         drop(blocker);
         let blocker = pool
-            .reserve(pool.available() - 5 * size_of::<NalPacketSegment>())
+            .reserve(pool.available() - 6 * size_of::<NalPacketSegment>())
             .unwrap();
-        parts.try_push(&pool, Some(9), segment(4)).unwrap();
+        parts.try_push(&pool, Some(9), segment(5)).unwrap();
         let PacketSegmentStorage::Heap(heap) = &parts else {
             panic!("retry did not spill");
         };
-        assert_eq!(heap.capacity(), 5);
+        assert_eq!(heap.capacity(), 6);
         for (index, part) in parts.as_slice().iter().enumerate() {
             assert_eq!(*part, segment(index));
         }
@@ -1313,12 +1312,12 @@ mod inline_packet_segments {
 
     #[test]
     fn lower_bound_excludes_inline_metadata_and_checks_heap_overflow() {
-        for count in 0..=4 {
+        for count in 0..=INLINE_PACKET_SEGMENTS {
             assert_eq!(PacketSegmentStorage::required_heap_bytes(count), Ok(0));
         }
         assert_eq!(
-            PacketSegmentStorage::required_heap_bytes(5),
-            Ok(5 * size_of::<NalPacketSegment>())
+            PacketSegmentStorage::required_heap_bytes(6),
+            Ok(6 * size_of::<NalPacketSegment>())
         );
         assert_eq!(
             PacketSegmentStorage::required_heap_bytes(usize::MAX),
@@ -1327,8 +1326,8 @@ mod inline_packet_segments {
     }
 
     #[test]
-    fn upper_bounds_preserve_inline_progress_across_the_fifth_descriptor() {
-        for actual in [3, 4, 5] {
+    fn upper_bounds_preserve_inline_progress_across_the_spill() {
+        for actual in [3, 4, 5, 6] {
             let pool = Budget::new(4096).unwrap();
             let base = pool.used();
             let hint = 9;
@@ -1342,7 +1341,7 @@ mod inline_packet_segments {
                     assert_eq!(pool.used(), base);
                 } else {
                     let PacketSegmentStorage::Heap(heap) = &parts else {
-                        panic!("fifth descriptor did not spill");
+                        panic!("sixth descriptor did not spill");
                     };
                     assert_eq!(heap.capacity(), hint);
                     assert_eq!(pool.used(), base + hint * size_of::<NalPacketSegment>());
