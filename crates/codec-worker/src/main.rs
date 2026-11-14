@@ -280,9 +280,20 @@ fn main() {
         }
         return;
     }
+    if let [_, command, format, path, track, seconds, policy] = args.as_slice()
+        && command == "seek"
+    {
+        if let Err(error) = packets::Seek::parse(track, seconds, policy)
+            .and_then(|seek| packets::seek(format, path, &seek))
+        {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+        return;
+    }
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK]"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [TRACK_ID@MICROSECONDS] | seek ogg FILE TRACK SECONDS exact|preroll"
         );
         std::process::exit(2);
     };

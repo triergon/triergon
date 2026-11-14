@@ -1,0 +1,214 @@
+{
+ "schema": "triergon.codecs.reader-seeks.v1",
+ "contract": "Each case opens its vector with triergon_ogg::BlockingReader, seeks the track at `track` (its index once the reader is open) to `seconds` with `policy` (exact: SeekPolicy::PreviousRandomAccess; preroll: SeekPolicy::PlaybackPreroll) and reads every packet to the end of the file (codec-worker seek). The reader lands on the packet containing the target, the Vorbis packet before it, or the Theora keyframe the target frame needs, for preroll on the same for the target less the mapping's preroll (Opus 80 ms), in the chain link that holds the target. The reference is ffprobe -read_intervals `reference_seconds`% of the same file with the demuxer forced, `reference_seconds` being the target less that preroll. FFmpeg lands on a page start at or before the reader's landing: its packets before the reader's landing are counted, not compared (rule ogg-seek-cases); every other packet of both sides is aligned by position and size and compared in both views under harness/codecs/reader-rules.json like a whole-file case, and its differences are reviewed per case in reader-differences.json under the case name.",
+ "cases": [
+  {
+   "name": "chain_opus.opus@0.5",
+   "input": "chain_opus.opus",
+   "track": 0,
+   "seconds": "0.5",
+   "policy": "exact",
+   "reference_seconds": "0.5"
+  },
+  {
+   "name": "chain_opus.opus@0.5+preroll",
+   "input": "chain_opus.opus",
+   "track": 0,
+   "seconds": "0.5",
+   "policy": "preroll",
+   "reference_seconds": "0.42"
+  },
+  {
+   "name": "chain_opus.opus@1.5",
+   "input": "chain_opus.opus",
+   "track": 0,
+   "seconds": "1.5",
+   "policy": "exact",
+   "reference_seconds": "1.5"
+  },
+  {
+   "name": "chain_opus.opus@1.5+preroll",
+   "input": "chain_opus.opus",
+   "track": 0,
+   "seconds": "1.5",
+   "policy": "preroll",
+   "reference_seconds": "1.42"
+  },
+  {
+   "name": "chain_vorbis.ogg@0.3",
+   "input": "chain_vorbis.ogg",
+   "track": 0,
+   "seconds": "0.3",
+   "policy": "exact",
+   "reference_seconds": "0.3"
+  },
+  {
+   "name": "chain_vorbis.ogg@1.4",
+   "input": "chain_vorbis.ogg",
+   "track": 0,
+   "seconds": "1.4",
+   "policy": "exact",
+   "reference_seconds": "1.4"
+  },
+  {
+   "name": "chain_vorbis.ogg@1.4+preroll",
+   "input": "chain_vorbis.ogg",
+   "track": 0,
+   "seconds": "1.4",
+   "policy": "preroll",
+   "reference_seconds": "1.4"
+  },
+  {
+   "name": "ogg-opus/chained-meta.ogg@0.05",
+   "input": "ogg-opus/chained-meta.ogg",
+   "track": 0,
+   "seconds": "0.05",
+   "policy": "exact",
+   "reference_seconds": "0.05"
+  },
+  {
+   "name": "ogg-opus/chained-meta.ogg@0.15",
+   "input": "ogg-opus/chained-meta.ogg",
+   "track": 0,
+   "seconds": "0.15",
+   "policy": "exact",
+   "reference_seconds": "0.15"
+  },
+  {
+   "name": "ogg-vorbis/chained-meta.ogg@0.01",
+   "input": "ogg-vorbis/chained-meta.ogg",
+   "track": 0,
+   "seconds": "0.01",
+   "policy": "exact",
+   "reference_seconds": "0.01"
+  },
+  {
+   "name": "ogg-vorbis/chained-meta.ogg@0.04",
+   "input": "ogg-vorbis/chained-meta.ogg",
+   "track": 0,
+   "seconds": "0.04",
+   "policy": "exact",
+   "reference_seconds": "0.04"
+  },
+  {
+   "name": "ogg-flac/chained-meta.ogg@0.1",
+   "input": "ogg-flac/chained-meta.ogg",
+   "track": 0,
+   "seconds": "0.1",
+   "policy": "exact",
+   "reference_seconds": "0.1"
+  },
+  {
+   "name": "ogg-flac/chained-meta.ogg@0.3",
+   "input": "ogg-flac/chained-meta.ogg",
+   "track": 0,
+   "seconds": "0.3",
+   "policy": "exact",
+   "reference_seconds": "0.3"
+  },
+  {
+   "name": "chain_speex.spx@0.5",
+   "input": "chain_speex.spx",
+   "track": 0,
+   "seconds": "0.5",
+   "policy": "exact",
+   "reference_seconds": "0.5"
+  },
+  {
+   "name": "chain_speex.spx@1.5",
+   "input": "chain_speex.spx",
+   "track": 0,
+   "seconds": "1.5",
+   "policy": "exact",
+   "reference_seconds": "1.5"
+  },
+  {
+   "name": "mux2.opus@0.3",
+   "input": "mux2.opus",
+   "track": 0,
+   "seconds": "0.3",
+   "policy": "exact",
+   "reference_seconds": "0.3"
+  },
+  {
+   "name": "mux2.opus@0.6+track1",
+   "input": "mux2.opus",
+   "track": 1,
+   "seconds": "0.6",
+   "policy": "exact",
+   "reference_seconds": "0.6"
+  },
+  {
+   "name": "bear.ogv@0.5",
+   "input": "bear.ogv",
+   "track": 0,
+   "seconds": "0.5",
+   "policy": "exact",
+   "reference_seconds": "0.5"
+  },
+  {
+   "name": "bear.ogv@0.5+track1",
+   "input": "bear.ogv",
+   "track": 1,
+   "seconds": "0.5",
+   "policy": "exact",
+   "reference_seconds": "0.5"
+  },
+  {
+   "name": "a_opus.opus@0.3",
+   "input": "a_opus.opus",
+   "track": 0,
+   "seconds": "0.3",
+   "policy": "exact",
+   "reference_seconds": "0.3"
+  },
+  {
+   "name": "a_opus.opus@0.3+preroll",
+   "input": "a_opus.opus",
+   "track": 0,
+   "seconds": "0.3",
+   "policy": "preroll",
+   "reference_seconds": "0.22"
+  },
+  {
+   "name": "a_vorbis.ogg@0.6",
+   "input": "a_vorbis.ogg",
+   "track": 0,
+   "seconds": "0.6",
+   "policy": "exact",
+   "reference_seconds": "0.6"
+  },
+  {
+   "name": "a_flac.oga@0.6",
+   "input": "a_flac.oga",
+   "track": 0,
+   "seconds": "0.6",
+   "policy": "exact",
+   "reference_seconds": "0.6"
+  },
+  {
+   "name": "chain-test2_small.ogg@4",
+   "input": "chain-test2_small.ogg",
+   "track": 0,
+   "seconds": "4",
+   "policy": "exact",
+   "reference_seconds": "4"
+  },
+  {
+   "name": "speex_uwb_stereo.spx@0.5",
+   "input": "speex_uwb_stereo.spx",
+   "track": 0,
+   "seconds": "0.5",
+   "policy": "exact",
+   "reference_seconds": "0.5"
+  },
+  {
+   "name": "offset_test.ogv@5.5",
+   "input": "offset_test.ogv",
+   "track": 0,
+   "seconds": "5.5",
+   "policy": "exact",
+   "reference_seconds": "5.5"
+  }
+ ]
+}

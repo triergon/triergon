@@ -37,11 +37,13 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
   summarize RUN.jsonl OUT.json
                  classify a grading run against the declared lane selection
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
-          [--only SUBSTR,...]
+          [--seeks S.json] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
                  with ffprobe by harness/codecs/reader-rules.json and the reviewed
-                 difference lists of reader-differences.json; appends one row per input
-                 and view, and writes the observed lists to OUT.differences.json
+                 difference lists of reader-differences.json, and the packets after
+                 each seek case of S.json (lane reader-ogg-seek); appends one row per
+                 case, writes the observed lists to OUT.differences.json, and fails
+                 when a case fails
   isobmff-reader --ffprobe FP --codec-worker W --out OUT.jsonl [--only SUBSTR,...]
                  compare every packet the neutral ISO BMFF reader emits, read through and
                  after a seek, with ffprobe by harness/features/isobmff-reader/rules.json and
@@ -296,7 +298,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         "readers" => {
             let a = Args::parse(
                 rest,
-                &["manifest", "root", "ffprobe", "codec-worker", "out", "only"],
+                &[
+                    "manifest",
+                    "root",
+                    "ffprobe",
+                    "codec-worker",
+                    "out",
+                    "only",
+                    "seeks",
+                ],
                 &[],
             )?;
             readers::run(&readers::Options {
@@ -307,6 +317,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
                 rules: readers::Rules::load(root)?,
+                seeks: match a.get("seeks") {
+                    Some(seeks) => readers::SeekCase::load(Path::new(seeks))?,
+                    None => Vec::new(),
+                },
             })?;
         }
         "isobmff-reader" => {

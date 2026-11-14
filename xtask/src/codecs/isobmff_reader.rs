@@ -708,7 +708,7 @@ impl<'a> Comparison<'a> {
             .map(|track| {
                 let ours = packets_of(candidate, track);
                 let theirs = packets_of(reference, track);
-                (track, align(&keys(ours), &keys(theirs)))
+                (track, align(&keys(ours), &keys(theirs), false))
             })
             .collect();
         Comparison {
