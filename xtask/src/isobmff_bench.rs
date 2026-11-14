@@ -35,7 +35,8 @@ The full measurement set has 956 physical operations and 16 explicit aliases.
 Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
 qualification, keep the RSS kernel module unloaded and
-TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.";
+TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.
+For kernel-bound memory, collect the phases separately and use cargo xtask grade.";
 
 pub const CANDIDATE: &str = "isobmff-worker";
 pub const REFERENCE: &str = "ffmpeg-isobmff-native";
