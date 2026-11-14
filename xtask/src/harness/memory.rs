@@ -1764,7 +1764,8 @@ fn shared_file_groups(jobs: &[Job<'_>]) -> Vec<Vec<usize>> {
 pub(crate) struct WorkerPaths<'a> {
     pub candidate: &'a Path,
     pub reference: &'a Path,
-    /// Both executables come from the runner's registered build.
+    /// Both executables come from the runner's registered build, so each slot may
+    /// measure its own copies of them.
     pub registered: bool,
 }
 
@@ -1848,8 +1849,7 @@ pub fn collect(
 pub(crate) fn collect_command(
     slot: &Slot,
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     input: &Path,
     pairs: Pairs,
     seed: u64,
@@ -1859,11 +1859,7 @@ pub(crate) fn collect_command(
     collect_invocation(
         slot,
         root,
-        WorkerPaths {
-            candidate,
-            reference,
-            registered: false,
-        },
+        workers,
         pairs,
         seed,
         Invocation {

@@ -65,6 +65,26 @@ pub struct Options {
     pub seed: u64,
     /// Let a gate session stop at an early look (`--no-early-stop` clears it).
     pub early_stop: bool,
+    /// Which half of the qualification this run does.
+    pub stage: Stage,
+}
+
+/// `capture qualify --stage`: correctness and timing, the memory of cases a
+/// timing run recorded, or both in one run.
+pub enum Stage {
+    Both,
+    Timing,
+    Memory { timing: PathBuf },
+}
+
+impl Stage {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Both => "both",
+            Self::Timing => "timing",
+            Self::Memory { .. } => "memory",
+        }
+    }
 }
 
 /// The key of a qualification run as a gate step: its settings, the cases and
@@ -81,6 +101,7 @@ pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, 
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
         ),
+        ("stage", Value::str(a.stage.name())),
     ]);
     let generator = root.join("harness/capture/generate_inputs.py");
     let oracle = Path::new(&a.oracle_bin);
@@ -94,13 +115,23 @@ pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, 
     if let Some(small) = &a.reference_small {
         workers.push(("reference-small", Path::new(small)));
     }
-    crate::harness::reuse::Key::new(
-        root,
-        "capture qualify",
-        settings,
-        &[&a.cases, &generator, Path::new(&a.observer)],
-        &workers,
-    )
+    let mut files = vec![a.cases.clone(), generator, PathBuf::from(&a.observer)];
+    if let Stage::Memory { timing } = &a.stage {
+        // A memory run measures what its timing run recorded.
+        let mut recorded = vec![timing.join("identity.json")];
+        if let Ok(entries) = fs::read_dir(timing) {
+            for entry in entries.flatten() {
+                let record = entry.path().join(TIMING_RECORD);
+                if record.is_file() {
+                    recorded.push(record);
+                }
+            }
+        }
+        recorded.sort();
+        files.extend(recorded);
+    }
+    let files: Vec<&Path> = files.iter().map(PathBuf::as_path).collect();
+    crate::harness::reuse::Key::new(root, "capture qualify", settings, &files, &workers)
 }
 
 /// Source files whose digest identifies a qualification run.
@@ -300,6 +331,318 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// A case once its correctness and timing are known, before its memory: its
+/// record, which `--stage timing` writes as `ID/timing.json`.
+struct MeasuredCase {
+    id: String,
+    input: PathBuf,
+    record: Vec<(String, Value)>,
+}
+
+impl MeasuredCase {
+    /// The case's correctness summary, which holds both workers' outputs.
+    fn correctness(&self) -> &Value {
+        self.field("correctness_summary")
+    }
+
+    fn field(&self, key: &str) -> &Value {
+        self.record
+            .iter()
+            .find_map(|(k, v)| (k == key).then_some(v))
+            .unwrap_or(&Value::Null)
+    }
+
+    /// The observed worker arguments of the case's memory runs.
+    fn memory_arguments(&self) -> Vec<String> {
+        let mut arguments = vec!["memory".to_owned()];
+        arguments.extend(case_args(self.field("case"), &SESSION));
+        arguments.push(python::path(&self.input));
+        arguments
+    }
+
+    /// The case `--stage timing` recorded in `timing/ID/timing.json`.
+    fn read(timing: &Path, case: &Value) -> Result<Self, String> {
+        let id = python::str(case.get("id").unwrap_or(&Value::Null));
+        let path = timing.join(&id).join(TIMING_RECORD);
+        let Value::Object(record) =
+            crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?
+        else {
+            return Err(format!("{}: not a timing record", path.display()));
+        };
+        let measured = Self {
+            id,
+            input: PathBuf::new(),
+            record,
+        };
+        if !crate::harness::diff::equal(measured.field("case"), case) {
+            return Err(format!("{}: records another case", path.display()));
+        }
+        let input = PathBuf::from(python::str(measured.field("input")));
+        if file_sha(&input).ok().as_deref() != measured.field("input_sha256").as_str() {
+            return Err(format!(
+                "{}: its input changed since timing",
+                input.display()
+            ));
+        }
+        Ok(Self { input, ..measured })
+    }
+}
+
+/// Each case's record after `--stage timing`.
+const TIMING_RECORD: &str = "timing.json";
+
+/// Generate the case's input if needed, compare both workers' outputs and time
+/// them.
+fn correctness_and_timing(
+    root: &Path,
+    a: &Options,
+    exe: &Path,
+    gate: policy::Runtime,
+    refusals: &[String],
+    case: &Value,
+) -> Result<MeasuredCase, String> {
+    let text = |key: &str| python::str(case.get(key).unwrap_or(&Value::Null));
+    let id = text("id");
+    let directory = a.out.join(&id);
+    fs::create_dir_all(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
+    let path = a.inputs.join(format!(
+        "{}-{}x{}-{}.rgba",
+        text("content"),
+        text("width"),
+        text("height"),
+        text("frames")
+    ));
+    let path_text = python::path(&path);
+    if !path.exists() {
+        let generator = python::path(&root.join("harness/capture/generate_inputs.py"));
+        let python = python::interpreter();
+        let status = Command::new(&python)
+            .args([
+                generator,
+                text("content"),
+                text("width"),
+                text("height"),
+                text("frames"),
+            ])
+            .arg(&path_text)
+            .status()
+            .map_err(|e| format!("{python}: {e}"))?;
+        if !status.success() {
+            return Err(format!("input generation failed: {status}"));
+        }
+    }
+    let mut record = vec![
+        ("case".to_owned(), case.clone()),
+        ("input".to_owned(), Value::str(path_text.as_str())),
+        ("input_sha256".to_owned(), Value::str(file_sha(&path)?)),
+    ];
+    let compare = Command::new(exe)
+        .args([
+            "capture",
+            "compare",
+            "--candidate",
+            &a.candidate,
+            "--reference",
+            &a.reference,
+        ])
+        .args([
+            "--ffmpeg-bin",
+            &a.oracle_bin,
+            "--case",
+            &json::to_python(case, None),
+        ])
+        .args([
+            "--input",
+            &path_text,
+            "--out",
+            &python::path(&directory.join("correctness")),
+        ])
+        .output()
+        .map_err(|e| format!("{}: {e}", exe.display()))?;
+    let code = exit_code(compare.status);
+    record.push(("correctness_exit".into(), Value::int(code)));
+    let correctness = if code == 0 {
+        python::loads(&python::text(&compare.stdout)).ok_or("compare printed no summary")?
+    } else {
+        Value::object([(
+            "error",
+            Value::str(python::tail(&python::text(&compare.stderr), 2000)),
+        )])
+    };
+    record.push(("correctness_summary".into(), correctness.clone()));
+    let outputs = correctness.get("outputs");
+    let iterations = u32::try_from(a.iterations).map_err(|e| e.to_string())?;
+    let mut timed = runtime(
+        gate,
+        &a.candidate,
+        &a.reference,
+        case,
+        &path,
+        Pairs::gate(a.pairs, gate.ceiling).early_stop(a.early_stop),
+        iterations,
+        a.seed,
+        outputs,
+    )?;
+    if !refusals.is_empty() {
+        withhold_gates(&mut timed);
+    }
+    record.push(("runtime".into(), timed));
+    if let Some(small) = &a.reference_small {
+        record.push((
+            "runtime_vs_small_config".into(),
+            runtime(
+                gate,
+                &a.candidate,
+                small,
+                case,
+                &path,
+                Pairs::fixed(10.max(a.pairs / 3)),
+                iterations,
+                a.seed + SMALL_CONFIG_SEED,
+                None,
+            )?,
+        ));
+    }
+    Ok(MeasuredCase {
+        id,
+        input: path,
+        record,
+    })
+}
+
+/// Grade a case with its memory, write its result and return its summary line.
+fn finish_case(a: &Options, case: MeasuredCase, measured: Value) -> Result<Value, String> {
+    let correctness = case.correctness().clone();
+    let timed = case.field("runtime");
+    let runtime_gate =
+        correctness.get("outputs").is_some() && timed.get("gate_pass").is_some_and(Value::truthy);
+    let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
+    // The validator's interval: a refused record has none.
+    let runtime_upper = timed
+        .get("ratio")
+        .and_then(|ratio| ratio.get("upper_95"))
+        .and_then(Value::as_f64)
+        .filter(|bound| bound.is_finite());
+    let MeasuredCase { id, mut record, .. } = case;
+    let memory_status = measured
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("invalid-memory-observation");
+    let admitted = memory_status == "qualified"
+        && a.memory_pairs >= 30
+        && cfg!(all(
+            target_os = "linux",
+            any(target_arch = "aarch64", target_arch = "arm"),
+            target_env = "gnu"
+        ));
+    let lower = |name| {
+        measured
+            .get(name)
+            .and_then(Value::as_f64)
+            .is_some_and(|ratio| ratio < 1.0)
+    };
+    let heap_gate = admitted
+        && lower("heap_ratio_upper_95")
+        && measured
+            .get("heap_lower_in_each_pair")
+            .is_some_and(Value::truthy);
+    let rss_gate = admitted && lower("total_rss_ratio_upper_95");
+    let memory_status = Value::str(memory_status);
+    record.push(("memory".into(), measured));
+    let flag = |key: &str| correctness.get(key).is_some_and(Value::truthy);
+    let pipeline = flag("pipeline");
+    let verdict = vec![
+        ("conversion".to_owned(), Value::Bool(flag("conversion"))),
+        ("mux".to_owned(), Value::Bool(flag("mux"))),
+        ("encoder".to_owned(), Value::Bool(flag("encoder"))),
+        ("pipeline_parity".to_owned(), Value::Bool(pipeline)),
+        ("runtime_gate".to_owned(), Value::Bool(runtime_gate)),
+        (
+            "runtime_target_0_80".to_owned(),
+            Value::Bool(runtime_target),
+        ),
+        ("heap_gate".to_owned(), Value::Bool(heap_gate)),
+        ("rss_gate".to_owned(), Value::Bool(rss_gate)),
+        ("memory_status".to_owned(), memory_status),
+        (
+            "all_gates".to_owned(),
+            Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
+        ),
+    ];
+    record.push(("verdict".into(), Value::Object(verdict.clone())));
+    let directory = a.out.join(&id);
+    fs::create_dir_all(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
+    write(
+        &directory.join("result.json"),
+        json::to_python(&Value::Object(record), Some(1)),
+    )?;
+    let mut line = vec![("id".to_owned(), Value::str(id.as_str()))];
+    line.extend(verdict);
+    line.push((
+        "runtime_upper95".into(),
+        runtime_upper.map_or(Value::Null, |bound| Value::float(python::round(bound, 4))),
+    ));
+    line.push(("correctness".into(), correctness));
+    let line = Value::Object(line);
+    println!("{}", json::to_python(&line, None));
+    Ok(line)
+}
+
+/// Collect the memory of every case in one collection, side by side, each slot
+/// measuring its own copies of the gate build's workers, and finish each case.
+fn memory_stage(
+    root: &Path,
+    a: &Options,
+    refusals: &[String],
+    measured_cases: Vec<MeasuredCase>,
+) -> Result<Vec<Value>, String> {
+    let workers = memory::WorkerPaths {
+        candidate: Path::new(&a.candidate),
+        reference: Path::new(&a.reference),
+        registered: refusals.is_empty(),
+    };
+    let pairs = Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop);
+    let arguments: Vec<Vec<String>> = measured_cases
+        .iter()
+        .map(MeasuredCase::memory_arguments)
+        .collect();
+    let mut jobs = Vec::new();
+    let mut collected = Vec::new();
+    for (index, (measured, args)) in measured_cases.iter().zip(&arguments).enumerate() {
+        let Some(outputs) = measured.correctness().get("outputs") else {
+            continue;
+        };
+        let path = &measured.input;
+        jobs.push(memory::Job::new(&workers, [path.clone()], move |slot| {
+            memory::collect_command(
+                slot,
+                root,
+                workers,
+                path,
+                pairs,
+                a.seed + MEMORY_SEED,
+                args,
+                outputs,
+            )
+        }));
+        collected.push(index);
+    }
+    let mut memories: Vec<Option<Value>> = vec![None; measured_cases.len()];
+    for (index, memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
+        memories[index] = Some(memory?);
+    }
+    measured_cases
+        .into_iter()
+        .zip(memories)
+        .map(|(measured, memory)| {
+            let memory = memory.unwrap_or_else(|| {
+                Value::object([("status", Value::str("missing-correctness-output"))])
+            });
+            finish_case(a, measured, memory)
+        })
+        .collect()
+}
+
 pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     fs::create_dir_all(&a.out).map_err(|e| format!("{}: {e}", a.out.display()))?;
     let cases =
@@ -348,6 +691,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         ("observer_sha256", observer),
         ("cases_sha256", Value::str(file_sha(&a.cases)?)),
         ("host", uname()),
+        ("stage", Value::str(a.stage.name())),
         ("utc", Value::float(python::time())),
     ]);
     write(
@@ -355,205 +699,55 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         json::to_python(&identity, Some(1)),
     )?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    let mut summary = Vec::new();
-    for case in &cases {
-        let text = |key: &str| python::str(case.get(key).unwrap_or(&Value::Null));
-        let id = text("id");
-        let cdir = a.out.join(&id);
-        fs::create_dir_all(&cdir).map_err(|e| format!("{}: {e}", cdir.display()))?;
-        let path = a.inputs.join(format!(
-            "{}-{}x{}-{}.rgba",
-            text("content"),
-            text("width"),
-            text("height"),
-            text("frames")
-        ));
-        let path_text = python::path(&path);
-        if !path.exists() {
-            let generator = python::path(&root.join("harness/capture/generate_inputs.py"));
-            let python = python::interpreter();
-            let status = Command::new(&python)
-                .args([
-                    generator,
-                    text("content"),
-                    text("width"),
-                    text("height"),
-                    text("frames"),
-                ])
-                .arg(&path_text)
-                .status()
-                .map_err(|e| format!("{python}: {e}"))?;
-            if !status.success() {
-                return Err(format!("input generation failed: {status}"));
-            }
-        }
-        let mut record = vec![
-            ("case".to_owned(), case.clone()),
-            ("input".to_owned(), Value::str(path_text.as_str())),
-            ("input_sha256".to_owned(), Value::str(file_sha(&path)?)),
-        ];
-        let compare = Command::new(&exe)
-            .args([
-                "capture",
-                "compare",
-                "--candidate",
-                &a.candidate,
-                "--reference",
-                &a.reference,
-            ])
-            .args([
-                "--ffmpeg-bin",
-                &a.oracle_bin,
-                "--case",
-                &json::to_python(case, None),
-            ])
-            .args([
-                "--input",
-                &path_text,
-                "--out",
-                &python::path(&cdir.join("correctness")),
-            ])
-            .output()
-            .map_err(|e| format!("{}: {e}", exe.display()))?;
-        let code = exit_code(compare.status);
-        record.push(("correctness_exit".into(), Value::int(code)));
-        let correctness = if code == 0 {
-            python::loads(&python::text(&compare.stdout)).ok_or("compare printed no summary")?
-        } else {
-            Value::object([(
-                "error",
-                Value::str(python::tail(&python::text(&compare.stderr), 2000)),
-            )])
-        };
-        record.push(("correctness_summary".into(), correctness.clone()));
-        let outputs = correctness.get("outputs");
-        let iterations = u32::try_from(a.iterations).map_err(|e| e.to_string())?;
-        let mut timed = runtime(
-            gate,
-            &a.candidate,
-            &a.reference,
-            case,
-            &path,
-            Pairs::gate(a.pairs, gate.ceiling).early_stop(a.early_stop),
-            iterations,
-            a.seed,
-            outputs,
-        )?;
-        if !refusals.is_empty() {
-            withhold_gates(&mut timed);
-        }
-        let runtime_gate = outputs.is_some() && timed.get("gate_pass").is_some_and(Value::truthy);
-        let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
-        // The validator's interval: a refused record has none.
-        let runtime_upper = timed
-            .get("ratio")
-            .and_then(|ratio| ratio.get("upper_95"))
-            .and_then(Value::as_f64)
-            .filter(|bound| bound.is_finite());
-        record.push(("runtime".into(), timed));
-        if let Some(small) = &a.reference_small {
-            record.push((
-                "runtime_vs_small_config".into(),
-                runtime(
-                    gate,
-                    &a.candidate,
-                    small,
-                    case,
-                    &path,
-                    Pairs::fixed(10.max(a.pairs / 3)),
-                    iterations,
-                    a.seed + SMALL_CONFIG_SEED,
-                    None,
-                )?,
-            ));
-        }
-        let measured = if let Some(outputs) = outputs {
-            let mut args = vec!["memory".to_owned()];
-            args.extend(case_args(case, &SESSION));
-            args.push(path_text);
-            let (candidate, reference) = (Path::new(&a.candidate), Path::new(&a.reference));
-            let workers = memory::WorkerPaths {
-                candidate,
-                reference,
-                registered: false,
+    // Every case's correctness and timing first, then the memory of all cases in
+    // one collection, so timing never runs beside memory. `--stage` runs either
+    // half alone: timing on one CPU, memory on the CPUs its slots may use.
+    let measured_cases = match &a.stage {
+        Stage::Memory { timing } => {
+            let recorded = timing.join("identity.json");
+            let recorded = crate::checks::read_json(&recorded)
+                .map_err(|e| format!("{}: {e}", recorded.display()))?;
+            let unstamped = |identity: &Value| match identity {
+                Value::Object(fields) => Value::Object(
+                    fields
+                        .iter()
+                        // What differs between the two runs by design.
+                        .filter(|(k, _)| !["utc", "stage", "cpus"].contains(&k.as_str()))
+                        .cloned()
+                        .collect(),
+                ),
+                other => other.clone(),
             };
-            memory::collect_one(memory::Job::new(&workers, [path.clone()], |slot| {
-                memory::collect_command(
-                    slot,
-                    root,
-                    candidate,
-                    reference,
-                    &path,
-                    Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop),
-                    a.seed + MEMORY_SEED,
-                    &args,
-                    outputs,
-                )
-            }))?
-        } else {
-            Value::object([("status", Value::str("missing-correctness-output"))])
-        };
-        let memory_status = measured
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or("invalid-memory-observation");
-        let admitted = memory_status == "qualified"
-            && a.memory_pairs >= 30
-            && cfg!(all(
-                target_os = "linux",
-                any(target_arch = "aarch64", target_arch = "arm"),
-                target_env = "gnu"
-            ));
-        let lower = |name| {
+            if !crate::harness::diff::equal(&unstamped(&recorded), &unstamped(&identity)) {
+                return Err(format!(
+                    "{}: timed other sources, workers, cases or host",
+                    timing.display()
+                ));
+            }
+            cases
+                .iter()
+                .map(|case| MeasuredCase::read(timing, case))
+                .collect::<Result<Vec<_>, _>>()?
+        }
+        Stage::Timing | Stage::Both => {
+            let mut measured = Vec::new();
+            for case in &cases {
+                let case = correctness_and_timing(root, a, &exe, gate, &refusals, case)?;
+                if matches!(a.stage, Stage::Timing) {
+                    write(
+                        &a.out.join(&case.id).join(TIMING_RECORD),
+                        json::to_python(&Value::Object(case.record.clone()), Some(1)),
+                    )?;
+                }
+                measured.push(case);
+            }
             measured
-                .get(name)
-                .and_then(Value::as_f64)
-                .is_some_and(|ratio| ratio < 1.0)
-        };
-        let heap_gate = admitted
-            && lower("heap_ratio_upper_95")
-            && measured
-                .get("heap_lower_in_each_pair")
-                .is_some_and(Value::truthy);
-        let rss_gate = admitted && lower("total_rss_ratio_upper_95");
-        let memory_status = Value::str(memory_status);
-        record.push(("memory".into(), measured));
-        let flag = |key: &str| correctness.get(key).is_some_and(Value::truthy);
-        let pipeline = flag("pipeline");
-        let verdict = vec![
-            ("conversion".to_owned(), Value::Bool(flag("conversion"))),
-            ("mux".to_owned(), Value::Bool(flag("mux"))),
-            ("encoder".to_owned(), Value::Bool(flag("encoder"))),
-            ("pipeline_parity".to_owned(), Value::Bool(pipeline)),
-            ("runtime_gate".to_owned(), Value::Bool(runtime_gate)),
-            (
-                "runtime_target_0_80".to_owned(),
-                Value::Bool(runtime_target),
-            ),
-            ("heap_gate".to_owned(), Value::Bool(heap_gate)),
-            ("rss_gate".to_owned(), Value::Bool(rss_gate)),
-            ("memory_status".to_owned(), memory_status),
-            (
-                "all_gates".to_owned(),
-                Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
-            ),
-        ];
-        record.push(("verdict".into(), Value::Object(verdict.clone())));
-        write(
-            &cdir.join("result.json"),
-            json::to_python(&Value::Object(record), Some(1)),
-        )?;
-        let mut line = vec![("id".to_owned(), Value::str(id.as_str()))];
-        line.extend(verdict);
-        line.push((
-            "runtime_upper95".into(),
-            runtime_upper.map_or(Value::Null, |bound| Value::float(python::round(bound, 4))),
-        ));
-        line.push(("correctness".into(), correctness));
-        let line = Value::Object(line);
-        println!("{}", json::to_python(&line, None));
-        summary.push(line);
+        }
+    };
+    if matches!(a.stage, Stage::Timing) {
+        return Ok(());
     }
+    let summary = memory_stage(root, a, &refusals, measured_cases)?;
     write(
         &a.out.join("summary.json"),
         json::to_python(&Value::Array(summary), Some(1)),
@@ -588,6 +782,43 @@ mod tests {
                 ]),
             ),
         ])
+    }
+
+    #[test]
+    fn a_memory_run_reads_only_the_cases_its_timing_run_recorded() {
+        let dir = crate::walk::scratch("capture-timing-records");
+        let input = dir.join("noise-64x48-2.rgba");
+        fs::create_dir_all(dir.join("timing/noise")).unwrap();
+        fs::write(&input, b"pixels").unwrap();
+        let case = json::parse(
+            r#"{"id": "noise", "content": "noise", "width": 64, "height": 48, "frames": 2}"#,
+        )
+        .unwrap();
+        let record = Value::object([
+            ("case", case.clone()),
+            ("input", Value::str(python::path(&input))),
+            ("input_sha256", Value::str(file_sha(&input).unwrap())),
+            (
+                "correctness_summary",
+                Value::object([("pipeline", Value::Bool(true))]),
+            ),
+        ]);
+        fs::write(
+            dir.join("timing/noise").join(TIMING_RECORD),
+            json::to_python(&record, Some(1)),
+        )
+        .unwrap();
+        let read = MeasuredCase::read(&dir.join("timing"), &case).unwrap();
+        assert_eq!(read.input, input);
+        assert_eq!(read.memory_arguments().last(), Some(&python::path(&input)));
+        let other = json::parse(r#"{"id": "noise", "content": "bars"}"#).unwrap();
+        assert!(MeasuredCase::read(&dir.join("timing"), &other).is_err());
+        fs::write(&input, b"changed").unwrap();
+        let error = MeasuredCase::read(&dir.join("timing"), &case)
+            .err()
+            .unwrap();
+        assert!(error.contains("changed since timing"), "{error}");
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
