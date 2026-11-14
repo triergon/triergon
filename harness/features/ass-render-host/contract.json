@@ -27,33 +27,33 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves int's range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC"
+    "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC"
   ],
   "open_cases": [
     {
       "id": "border-x-overflow-ass-1080p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves int's range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "border-x-overflow-ass-720p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves int's range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "collision-far-tops-ass-1080p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves int's range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
     },
     {
       "id": "collision-far-tops-ass-720p",
-      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves int's range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
+      "requirement": "a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu places an event box whose top, height, left or width leaves the signed 32-bit range at that value's low 32 bits, where libass on 32-bit ARM saturates it, so it also loses the box of a BorderStyle 4 event whose vertical border exceeds 2^30 frame pixels and moves events colliding with such a border elsewhere; the renderer follows libass on 32-bit ARM with GCC",
       "targets": [
         "aarch64-unknown-linux-gnu"
       ]
