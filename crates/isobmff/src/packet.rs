@@ -190,6 +190,7 @@ impl SampleReader {
             failed: None,
         })
     }
+    #[inline]
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -251,6 +252,7 @@ impl SampleReader {
         }
         result
     }
+    #[inline]
     fn poll_inner(
         &mut self,
         input: &mut InputCursor,
@@ -260,11 +262,12 @@ impl SampleReader {
         // Even a zero-byte sample or a completed buffer must observe cancellation
         // and transport failure before producing a packet.
         input.read_into(&mut [], work, cancel)?;
-        if self.source != input.source() {
-            return Err(Error::SourceMismatch);
-        }
         let current = input.token();
+        // Equal tokens bind the same source, request and generation.
         if self.token != current {
+            if self.source != input.source() {
+                return Err(Error::SourceMismatch);
+            }
             if current.generation() != self.token.generation() {
                 return Err(Error::StaleGeneration {
                     expected: self.token.generation(),
@@ -329,8 +332,13 @@ impl SampleReader {
             }
             let maximum = self.length - buffer.len();
             match input.read_append(buffer, maximum, work, cancel)? {
-                Step::Ready(_) => {
+                Step::Ready(count) => {
                     self.position = input.position();
+                    if count < maximum
+                        && let Some(request) = input.pending_request(cancel)?
+                    {
+                        return Ok(Step::NeedInput(request));
+                    }
                 }
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::Yield => return Ok(Step::Yield),

@@ -224,10 +224,18 @@ impl<S: Read + Seek> Feed<S> {
     #[inline(always)]
     pub fn supply(&mut self, input: &mut InputCursor, request: InputRequest) -> Result<()> {
         let maximum = request.maximum;
-        if maximum <= 1 {
-            self.supply_from::<1>(input, request)
-        } else if maximum <= InputCursor::INLINE_CAPACITY {
-            self.supply_from::<{ InputCursor::INLINE_CAPACITY }>(input, request)
+        if maximum <= InputCursor::INLINE_CAPACITY {
+            let count = input.fill_inline(&request, |buffer| self.read_at(request.offset, buffer));
+            match count {
+                Ok(count) => {
+                    self.position = Some(request.offset + count as u64);
+                    Ok(())
+                }
+                Err(error) => {
+                    self.position = None;
+                    Err(error)
+                }
+            }
         } else if maximum <= 4096 {
             self.supply_large::<4096>(input, request)
         } else {
@@ -250,7 +258,6 @@ impl<S: Read + Seek> Feed<S> {
     #[inline(always)]
     fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> std::io::Result<usize> {
         if self.position != Some(offset) {
-            self.position = None;
             self.source.seek(SeekFrom::Start(offset))?;
         }
         loop {
