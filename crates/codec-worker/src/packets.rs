@@ -3,7 +3,8 @@
 //!
 //! FORMAT names the reader as FFmpeg is told the demuxer: `ogg` opens
 //! `triergon_ogg::BlockingReader`; `flac`, `mp3`, `aac`, `ac3` and `eac3` open the
-//! `triergon_elementary` reader of that format. Each packet line holds exactly what the
+//! `triergon_elementary` reader of that format; `mov` opens the neutral ISO BMFF reader
+//! and prints what [`super::isobmff_packets`] describes. Each packet line holds exactly what the
 //! reader reports: the track index, `pts`, `dts`, `duration` and `trim_start`/`trim_end`
 //! in the packet's time base, the payload size, the source position (Ogg: the page that
 //! completes the packet; elementary streams: the first byte) and whether the access unit
@@ -84,20 +85,20 @@ impl Row {
     }
 }
 
-fn field(line: &mut String, name: &str, value: &str) {
+pub(super) fn field(line: &mut String, name: &str, value: &str) {
     let _ = write!(line, ",\"{name}\":{value}");
 }
 
-fn number(value: Option<i64>) -> String {
+pub(super) fn number(value: Option<i64>) -> String {
     value.map_or_else(|| "null".to_owned(), |v| v.to_string())
 }
 
-fn time_base(base: TimeBase) -> String {
+pub(super) fn time_base(base: TimeBase) -> String {
     format!("[{},{}]", base.numerator(), base.denominator())
 }
 
 /// A JSON string literal.
-fn string(text: &str) -> String {
+pub(super) fn string(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + 2);
     out.push('"');
     for c in text.chars() {
@@ -114,7 +115,7 @@ fn string(text: &str) -> String {
     out
 }
 
-fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
+pub(super) fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
     format!(
         "{{\"index\":{index},\"codec\":{},\"codec_tag\":{}{extra}}}",
         string(&format!("{:?}", track.codec())),
@@ -122,7 +123,7 @@ fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
     )
 }
 
-fn finish(
+pub(super) fn finish(
     out: &mut impl Write,
     tracks: &[String],
     end: Result<(), triergon::Error>,
@@ -206,12 +207,21 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
     finish(out, &tracks, end)
 }
 
-/// Print the packets of `path` read as `format`; `Err` for an unknown format or an
-/// unreadable file.
-pub fn run(format: &str, path: &str) -> Result<(), String> {
+/// Print the packets of `path` read as `format`, after the seek `seek` names (only
+/// `mov` seeks); `Err` for an unknown format, an unreadable file or a bad seek.
+pub fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
     let file = File::open(path).map_err(|e| format!("{path}: {e}"))?;
     let mut out = BufWriter::new(std::io::stdout().lock());
+    if let Some(seek) = seek
+        && format != "mov"
+    {
+        return Err(format!("{format} does not seek ({seek})"));
+    }
     let written = match format {
+        "mov" => {
+            let seek = seek.map(super::isobmff_packets::Seek::parse).transpose()?;
+            super::isobmff_packets::packets(file, seek, &mut out)
+        }
         "ogg" => ogg_packets(file, &mut out),
         "flac" => elementary_packets::<Flac>(file, &mut out),
         "mp3" => elementary_packets::<MpegAudio>(file, &mut out),

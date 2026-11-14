@@ -68,3 +68,12 @@ Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
 (`triergon_ogg::compat::clock`), and the reader's `resync` and `lost` events are lines
 of their own. The last line lists the tracks and how reading ended (`eof`, or `error` with the
 reader's message).
+
+`packets mov FILE [TRACK_ID@MICROSECONDS]` reads through the neutral ISO BMFF reader
+(`triergon_isobmff::Reader`), for `cargo xtask codecs isobmff-reader`. Each line holds
+the track index and `track_id`, `time_base`, `pts`, `dts`, `duration`, the payload
+`size`, the sample's source `position`, `sync` (1, 0, or `null` where the source states
+nothing), the payload's MD5 as `hash`, the sample `ordinal` and its `description`.
+With a seek, `request_seek` asks for that track's time once the movie is open and the
+receipt is a line of its own (`{"event":"seek", ...}`). The last line lists the tracks,
+with their edit lists and the movie timescale, and how reading ended.
