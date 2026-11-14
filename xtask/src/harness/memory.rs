@@ -5,10 +5,12 @@
 //! Linux additionally certifies its link closure and active-window guard (see
 //! [`super::linux`]). Unknown or invalid coverage is never a pass.
 
+use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use super::acceptance::active_cpu;
@@ -212,11 +214,16 @@ fn observe(
             ]);
         }
     }
+    // Slots observe side by side: the count keeps their directories apart.
+    static RUNS: AtomicU64 = AtomicU64::new(0);
+    let run = RUNS.fetch_add(1, Ordering::Relaxed);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
-    let directory =
-        std::env::temp_dir().join(format!("triergon-memory-{}-{nanos}", std::process::id()));
+    let directory = std::env::temp_dir().join(format!(
+        "triergon-memory-{}-{nanos}-{run}",
+        std::process::id()
+    ));
     if let Err(error) = fs::create_dir(&directory) {
         return obj(vec![
             ("status", Value::str("observer-failed")),
@@ -1294,6 +1301,193 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
     result
 }
 
+/// The most collections that run side by side: the sessions the kernel RSS bound
+/// admits at once (`MAX_SESSIONS` in `harness/rss-bound/triergon_rss_bound.c`).
+const MAX_SLOTS: usize = 32;
+
+/// One of the CPUs this process may use. A slot measures one case at a time,
+/// from its own copies of the workers, on its own CPU; only [`collect_all`]
+/// makes one.
+pub(crate) struct Slot {
+    index: usize,
+    /// The CPU the slot's thread, and so every worker it starts, is pinned to,
+    /// where the system lists the CPUs this process may use.
+    cpu: Option<usize>,
+}
+
+impl Slot {
+    /// Pin the calling thread to the slot's CPU, so the workers it starts inherit
+    /// that CPU alone (`taskset -p` on the thread's own id).
+    fn pin(&self) -> R<()> {
+        let Some(cpu) = self.cpu else {
+            return Ok(());
+        };
+        let link =
+            fs::read_link("/proc/thread-self").map_err(|e| format!("/proc/thread-self: {e}"))?;
+        let thread = link
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("unreadable thread id")?;
+        let status = std::process::Command::new("taskset")
+            .args(["-p", "-c", &cpu.to_string(), thread])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .map_err(|e| format!("taskset: {e}"))?;
+        if !status.success() {
+            return Err(format!(
+                "could not pin memory slot {} to CPU {cpu}: {status}",
+                self.index
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A collection, run in whichever slot is free.
+type Collection<'a> = Box<dyn FnOnce(&Slot) -> R<Value> + Send + 'a>;
+
+/// A memory collection waiting for a slot: every file its runs read, and the
+/// collection itself.
+pub(crate) struct Job<'a> {
+    files: Vec<PathBuf>,
+    collect: Collection<'a>,
+}
+
+impl<'a> Job<'a> {
+    /// A collection of `workers` that reads `inputs`. Workers measured from their
+    /// own files rather than a slot's copies are files the job reads too.
+    pub fn new(
+        workers: &WorkerPaths<'_>,
+        inputs: impl IntoIterator<Item = PathBuf>,
+        collect: impl FnOnce(&Slot) -> R<Value> + Send + 'a,
+    ) -> Self {
+        let mut files: Vec<PathBuf> = inputs.into_iter().collect();
+        if !relocated(workers) {
+            files.extend([workers.candidate, workers.reference].map(Path::to_path_buf));
+        }
+        Self {
+            files,
+            collect: Box::new(collect),
+        }
+    }
+}
+
+/// Run every collection under the measurement lock, side by side on the CPUs
+/// this process may use, and return their results in job order. Jobs that share
+/// a file run one after another in one slot, so a run's page-cache eviction
+/// never reaches a file another run reads.
+pub(crate) fn collect_all(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
+    let _lock = lock()?;
+    run_in_slots(jobs)
+}
+
+fn run_in_slots(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
+    let groups = shared_file_groups(&jobs);
+    let cpus = super::gate_build::allowed_cpu_list();
+    let slots = cpus
+        .as_ref()
+        .map_or_else(
+            || std::thread::available_parallelism().map_or(1, std::num::NonZero::get),
+            Vec::len,
+        )
+        .min(MAX_SLOTS)
+        .min(groups.len())
+        .max(1);
+    if jobs.len() > 1 {
+        println!(
+            "memory: {} collections in {} groups of shared files on {slots} CPUs",
+            jobs.len(),
+            groups.len()
+        );
+    }
+    let count = jobs.len();
+    let mut pending: Vec<Option<Job<'_>>> = jobs.into_iter().map(Some).collect();
+    let queue: Mutex<VecDeque<Vec<(usize, Job<'_>)>>> = Mutex::new(
+        groups
+            .into_iter()
+            .map(|group| {
+                group
+                    .into_iter()
+                    .map(|index| (index, pending[index].take().expect("one group per job")))
+                    .collect()
+            })
+            .collect(),
+    );
+    let results: Mutex<Vec<Option<R<Value>>>> = Mutex::new((0..count).map(|_| None).collect());
+    std::thread::scope(|scope| {
+        for index in 0..slots {
+            let (queue, results, cpus) = (&queue, &results, &cpus);
+            scope.spawn(move || {
+                let slot = Slot {
+                    index,
+                    cpu: cpus.as_ref().map(|cpus| cpus[index]),
+                };
+                let pinned = slot.pin();
+                loop {
+                    let next = queue.lock().expect("no memory slot panics").pop_front();
+                    let Some(group) = next else { break };
+                    for (job, Job { collect, .. }) in group {
+                        let result = match &pinned {
+                            Ok(()) => collect(&slot),
+                            Err(error) => Err(error.clone()),
+                        };
+                        results.lock().expect("no memory slot panics")[job] = Some(result);
+                    }
+                }
+            });
+        }
+    });
+    results
+        .into_inner()
+        .expect("no memory slot panics")
+        .into_iter()
+        .map(|result| result.ok_or_else(|| "a memory collection did not run".to_owned()))
+        .collect()
+}
+
+/// One collection on its own: [`collect_all`] with a single job.
+pub(crate) fn collect_one(job: Job<'_>) -> R<Value> {
+    collect_all(vec![job])?
+        .pop()
+        .ok_or_else(|| "a memory collection did not run".to_owned())?
+}
+
+/// Job indices grouped so that jobs reading a common file share a group, each
+/// group in job order, groups in order of their first job.
+fn shared_file_groups(jobs: &[Job<'_>]) -> Vec<Vec<usize>> {
+    let mut owner: Vec<(PathBuf, usize)> = Vec::new();
+    let mut parent: Vec<usize> = (0..jobs.len()).collect();
+    fn root(parent: &mut [usize], mut index: usize) -> usize {
+        while parent[index] != index {
+            parent[index] = parent[parent[index]];
+            index = parent[index];
+        }
+        index
+    }
+    for (index, job) in jobs.iter().enumerate() {
+        for file in &job.files {
+            let file = fs::canonicalize(file).unwrap_or_else(|_| file.clone());
+            match owner.iter().find(|(path, _)| *path == file) {
+                Some(&(_, first)) => {
+                    let (a, b) = (root(&mut parent, first), root(&mut parent, index));
+                    parent[a.max(b)] = a.min(b);
+                }
+                None => owner.push((file, index)),
+            }
+        }
+    }
+    let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
+    for index in 0..jobs.len() {
+        let first = root(&mut parent, index);
+        match groups.iter_mut().find(|(group, _)| *group == first) {
+            Some((_, members)) => members.push(index),
+            None => groups.push((first, vec![index])),
+        }
+    }
+    groups.into_iter().map(|(_, members)| members).collect()
+}
+
+#[derive(Clone, Copy)]
 pub(crate) struct WorkerPaths<'a> {
     pub candidate: &'a Path,
     pub reference: &'a Path,
@@ -1301,9 +1495,19 @@ pub(crate) struct WorkerPaths<'a> {
     pub registered: bool,
 }
 
-/// One memory collection under the measurement lock, rejected (but kept) when
-/// tracked processes used CPU meanwhile.
+/// Whether both workers run from a slot's copies: registered Linux workers whose
+/// loader resolves nothing relative to the executable.
+fn relocated(workers: &WorkerPaths<'_>) -> bool {
+    workers.registered
+        && cfg!(target_os = "linux")
+        && linux::relocatable_worker(workers.candidate)
+        && linux::relocatable_worker(workers.reference)
+}
+
+/// One memory collection in `slot`, rejected (but kept) when tracked processes
+/// used CPU meanwhile.
 pub fn collect(
+    slot: &Slot,
     root: &Path,
     workers: WorkerPaths<'_>,
     input: &Path,
@@ -1326,6 +1530,7 @@ pub fn collect(
         let candidate_arguments = arguments(true)?;
         let reference_arguments = arguments(false)?;
         return collect_invocation(
+            slot,
             root,
             workers,
             pairs,
@@ -1348,6 +1553,7 @@ pub fn collect(
         .map(|arg| arg.to_string_lossy().into_owned())
         .collect();
     collect_invocation(
+        slot,
         root,
         workers,
         pairs,
@@ -1365,8 +1571,9 @@ pub fn collect(
 }
 
 /// Observe workers with explicit arguments and a correctness-checked output per role.
-#[allow(clippy::too_many_arguments)] // The command, input and paired measurement settings.
+#[allow(clippy::too_many_arguments)] // The slot, command, input and paired measurement settings.
 pub(crate) fn collect_command(
+    slot: &Slot,
     root: &Path,
     candidate: &Path,
     reference: &Path,
@@ -1377,6 +1584,7 @@ pub(crate) fn collect_command(
     expected_outputs: &Value,
 ) -> R<Value> {
     collect_invocation(
+        slot,
         root,
         WorkerPaths {
             candidate,
@@ -1405,7 +1613,9 @@ pub(crate) struct Commands<'a> {
 }
 
 /// Observe distinct role commands under the shared allocation and RSS checks.
+#[allow(clippy::too_many_arguments)] // The slot, workers, input and paired measurement settings.
 pub(crate) fn collect_commands(
+    slot: &Slot,
     root: &Path,
     candidate: &Path,
     reference: &Path,
@@ -1415,6 +1625,7 @@ pub(crate) fn collect_commands(
     commands: Commands<'_>,
 ) -> R<Value> {
     collect_invocation(
+        slot,
         root,
         WorkerPaths {
             candidate,
@@ -1435,24 +1646,32 @@ pub(crate) fn collect_commands(
     )
 }
 
-fn prepare_workers(root: &Path, candidate: &Path, reference: &Path) -> R<[PathBuf; 2]> {
+/// The slot's own copies of both workers, so evicting them never touches a file
+/// another slot is running.
+fn prepare_workers(
+    slot: &Slot,
+    root: &Path,
+    candidate: &Path,
+    reference: &Path,
+) -> R<[PathBuf; 2]> {
     let workers = worker::WorkerPair::read(candidate, reference)?;
     // Grading rechecks the worker paths in the observer certificate. Keep the
     // measured copies in the build tree and reuse their paths for these bytes.
     let directory = root
         .join("target/harness/.memory-workers")
-        .join(workers.content_key());
+        .join(workers.content_key())
+        .join(format!("slot-{:03}", slot.index));
     workers.write(&directory)
 }
 
 fn collect_invocation(
+    slot: &Slot,
     root: &Path,
     workers: WorkerPaths<'_>,
     pairs: usize,
     seed: u64,
     invocation: Invocation<'_>,
 ) -> R<Value> {
-    let _lock = lock()?;
     let busy = competing_builds()?;
     if !busy.is_empty() {
         return Ok(obj(vec![
@@ -1466,19 +1685,11 @@ fn collect_invocation(
         root,
         timeout: invocation.timeout,
     };
-    let WorkerPaths {
-        candidate,
-        reference,
-        registered,
-    } = workers;
-    let prepared = registered
-        && host.linux()
-        && linux::relocatable_worker(candidate)
-        && linux::relocatable_worker(reference);
+    let prepared = relocated(&workers);
     let [candidate, reference] = if prepared {
-        prepare_workers(root, candidate, reference)?
+        prepare_workers(slot, root, workers.candidate, workers.reference)?
     } else {
-        [candidate.to_path_buf(), reference.to_path_buf()]
+        [workers.candidate, workers.reference].map(Path::to_path_buf)
     };
     let certificate = qualification(&host, root, &candidate, &reference);
     let mut result = measure(
@@ -1675,13 +1886,31 @@ mod command_tests {
         let reference = root.join("longer-reference-name");
         fs::write(&candidate, b"candidate").unwrap();
         fs::write(&reference, b"reference").unwrap();
-        let paths = prepare_workers(&root, &candidate, &reference).unwrap();
+        let slot = Slot {
+            index: 0,
+            cpu: None,
+        };
+        let paths = prepare_workers(&slot, &root, &candidate, &reference).unwrap();
         let first = paths.each_ref().map(|path| fs::File::open(path).unwrap());
         assert_eq!(paths[0].as_os_str().len(), paths[1].as_os_str().len());
         assert_eq!(
             paths,
-            prepare_workers(&root, &candidate, &reference).unwrap()
+            prepare_workers(&slot, &root, &candidate, &reference).unwrap()
         );
+        let other = prepare_workers(
+            &Slot {
+                index: 11,
+                cpu: None,
+            },
+            &root,
+            &candidate,
+            &reference,
+        )
+        .unwrap();
+        for (path, own) in other.iter().zip(&paths) {
+            assert_ne!(path, own);
+            assert_eq!(path.as_os_str().len(), own.as_os_str().len());
+        }
         for (path, before) in paths.iter().zip(first) {
             assert_ne!(
                 fs::metadata(path).unwrap().ino(),
@@ -1715,7 +1944,7 @@ mod command_tests {
         ]);
 
         fs::write(&reference, b"rebuilt reference").unwrap();
-        let rebuilt = prepare_workers(&root, &candidate, &reference).unwrap();
+        let rebuilt = prepare_workers(&slot, &root, &candidate, &reference).unwrap();
         assert_ne!(rebuilt, paths);
         assert!(linux::measured_workers_current(&certificate));
         fs::write(&paths[1], b"different bytes").unwrap();
@@ -1723,6 +1952,67 @@ mod command_tests {
         fs::remove_file(&paths[1]).unwrap();
         assert!(!linux::measured_workers_current(&certificate));
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn slots_never_outnumber_the_kernel_sessions() {
+        let module = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../harness/rss-bound/triergon_rss_bound.c"),
+        )
+        .unwrap();
+        assert!(module.contains(&format!("#define MAX_SESSIONS {MAX_SLOTS}\n")));
+    }
+
+    #[test]
+    fn jobs_sharing_a_file_share_a_group_in_job_order() {
+        let workers = WorkerPaths {
+            candidate: Path::new("candidate"),
+            reference: Path::new("reference"),
+            registered: true,
+        };
+        let job = |files: &[&str]| {
+            Job::new(&workers, files.iter().map(PathBuf::from), |_: &Slot| {
+                Ok(Value::Null)
+            })
+        };
+        let jobs = vec![
+            job(&["a"]),
+            job(&["b"]),
+            job(&["c", "d"]),
+            job(&["e"]),
+            job(&["d", "b"]),
+            job(&["a"]),
+        ];
+        // Missing workers are not relocatable: their own files join every job.
+        assert_eq!(shared_file_groups(&jobs), vec![vec![0, 1, 2, 3, 4, 5]]);
+        let relocated_jobs: Vec<Job<'_>> =
+            [&["a"][..], &["b"], &["c", "d"], &["e"], &["d", "b"], &["a"]]
+                .into_iter()
+                .map(|files| Job {
+                    files: files.iter().map(PathBuf::from).collect(),
+                    collect: Box::new(|_: &Slot| Ok(Value::Null)),
+                })
+                .collect();
+        assert_eq!(
+            shared_file_groups(&relocated_jobs),
+            vec![vec![0, 5], vec![1, 2, 4], vec![3]]
+        );
+    }
+
+    #[test]
+    fn collections_return_in_job_order() {
+        let jobs = (0..40)
+            .map(|n| Job {
+                files: vec![PathBuf::from(format!("input-{}", n % 7))],
+                collect: Box::new(move |_: &Slot| Ok(Value::int(n))),
+            })
+            .collect();
+        let results: Vec<Value> = run_in_slots(jobs)
+            .unwrap()
+            .into_iter()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(results, (0..40).map(Value::int).collect::<Vec<_>>());
     }
 
     #[test]
