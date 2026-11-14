@@ -3,10 +3,10 @@
 //! archive that `TRIERGON_EVIDENCE_ARCHIVE` names (an `s3://` location reached
 //! with the `aws` CLI).
 //!
-//! A pack is a `.tar.gz` whose bytes depend only on the files: entries sorted by
-//! path, zero timestamps and owners, and gzip stored blocks with no name or time.
-//! A set archived whole may instead be a `.tar.zst`, decompressed with the
-//! system `zstd`.
+//! A pack is a tar with entries sorted by path and zero timestamps and owners. As
+//! a `.tar.gz` it sits in gzip stored blocks with no name or time, so its bytes
+//! depend only on the files; as a `.tar.zst` the system `zstd` compresses and
+//! decompresses it.
 //!
 //! Every upload lands under `qualification/`, which the archive expires 90 days
 //! after upload. A set moves under `evidence/`, which is kept, only when a result
@@ -245,28 +245,28 @@ fn pack_files<W: Write>(files: &[(String, PathBuf)], out: W, out_name: &str) -> 
     gzip.finish().map_err(written)
 }
 
-/// `cargo xtask evidence pack DIR OUT`: write the pack and print its SHA-256. The
-/// pack is written to `OUT.part` and renamed once complete.
+/// `cargo xtask evidence pack DIR OUT`: write the pack and print its SHA-256. `OUT`
+/// names the compression: `.tar.gz` stores the tar in gzip blocks, whose bytes depend
+/// only on the files; `.tar.zst` compresses it with the system `zstd`, whose bytes
+/// also depend on its version. The pack is written to `OUT.part` and renamed once
+/// complete.
 pub fn pack_command(dir: &Path, out: &Path) -> Result<String, String> {
+    let compression = out
+        .file_name()
+        .and_then(|n| n.to_str())
+        .and_then(Compression::of)
+        .ok_or_else(|| format!("{}: name the pack .tar.gz or .tar.zst", out.display()))?;
     let files = files(dir)?;
     let mut partial = out.as_os_str().to_owned();
     partial.push(".part");
     let partial = PathBuf::from(partial);
     let name = partial.display().to_string();
     let file = File::create(&partial).map_err(|e| format!("{name}: {e}"))?;
-    let hashed = Hashed {
-        out: BufWriter::new(file),
-        hash: sha256::Sha256::default(),
+    let packed = match compression {
+        Compression::Gzip => pack_gzip(&files, file, &name),
+        Compression::Zstd => pack_zstd(&files, file, &name)
+            .and_then(|()| sha256::file_hex(&partial).map_err(|e| format!("{name}: {e}"))),
     };
-    let packed = pack_files(&files, hashed, &name).and_then(
-        |Hashed {
-             out: mut written,
-             hash,
-         }| {
-            written.flush().map_err(|e| format!("{name}: {e}"))?;
-            Ok(hash.finish_hex())
-        },
-    );
     match packed {
         Ok(digest) => {
             fs::rename(&partial, out).map_err(|e| format!("{}: {e}", out.display()))?;
@@ -276,6 +276,47 @@ pub fn pack_command(dir: &Path, out: &Path) -> Result<String, String> {
             let _ = fs::remove_file(&partial);
             Err(error)
         }
+    }
+}
+
+/// Write the stored-gzip pack of `files` to `file` and return its SHA-256.
+fn pack_gzip(files: &[(String, PathBuf)], file: File, name: &str) -> Result<String, String> {
+    let hashed = Hashed {
+        out: BufWriter::new(file),
+        hash: sha256::Sha256::default(),
+    };
+    let Hashed {
+        out: mut written,
+        hash,
+    } = pack_files(files, hashed, name)?;
+    written.flush().map_err(|e| format!("{name}: {e}"))?;
+    Ok(hash.finish_hex())
+}
+
+/// Stream the tar of `files` through the system `zstd` into `file`.
+fn pack_zstd(files: &[(String, PathBuf)], file: File, name: &str) -> Result<(), String> {
+    use std::process::Stdio;
+    let mut child = Command::new("zstd")
+        .args(["--quiet", "-19", "-T0", "--stdout"])
+        .stdin(Stdio::piped())
+        .stdout(file)
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("zstd: {e}"))?;
+    let mut input = BufWriter::new(child.stdin.take().expect("piped stdin"));
+    let written = write_tar(&mut input, name, files)
+        .and_then(|()| input.flush().map_err(|e| format!("{name}: {e}")));
+    drop(input);
+    let output = child.wait_with_output().map_err(|e| format!("zstd: {e}"))?;
+    written?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "zstd failed: {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
     }
 }
 
@@ -816,6 +857,35 @@ mod tests {
                 .unpack(&dir.join("bad.tar.zst"), &mut Vec::new())
                 .is_err()
         );
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_pack_name_picks_its_compression() {
+        let dir = crate::walk::scratch("evidence-pack-zstd");
+        fs::create_dir_all(dir.join("in/a")).unwrap();
+        fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
+        fs::write(dir.join("in/b.json"), "[1, 2, 3]\n".repeat(50_000)).unwrap();
+        let (gz, zst) = (dir.join("set.tar.gz"), dir.join("set.tar.zst"));
+        pack_command(&dir.join("in"), &gz).unwrap();
+        let digest = pack_command(&dir.join("in"), &zst).unwrap();
+        assert_eq!(sha256::file_hex(&zst).unwrap(), digest);
+        assert_eq!(
+            &fs::read(&zst).unwrap()[..4],
+            b"\x28\xb5\x2f\xfd",
+            "a zstd frame"
+        );
+        assert!(fs::metadata(&zst).unwrap().len() * 20 < fs::metadata(&gz).unwrap().len());
+        // The same tar inside either compression.
+        let (mut from_gz, mut from_zst) = (Vec::new(), Vec::new());
+        Compression::Gzip.unpack(&gz, &mut from_gz).unwrap();
+        Compression::Zstd.unpack(&zst, &mut from_zst).unwrap();
+        assert_eq!(from_gz, from_zst);
+        for name in ["set.tar", "set.tgz", "set.tar.xz"] {
+            let error = pack_command(&dir.join("in"), &dir.join(name)).unwrap_err();
+            assert!(error.contains(".tar.gz or .tar.zst"), "{error}");
+            assert!(!dir.join(name).exists());
+        }
         fs::remove_dir_all(dir).unwrap();
     }
 

@@ -25,6 +25,16 @@ and reports:
 
 Any violation invalidates the session.
 
+A memory collection measures a pair again when its only fault is the third condition:
+the module reports (error 1) that another task updated a measured worker's resident
+counters during its window, which the kernel's own memory management can do to any
+process, for instance when it reclaims the worker's pages. The module decides this
+from the updating task, never from a value, so measuring the pair again, in the same
+order, favours neither worker. A collection measures at most two pairs again and
+records each voided pair under `retried_pairs`; the report and grading check that each
+was voided only in this way, and a third such pair, or any other fault, fails the
+collection.
+
 ## Proof
 
 `cargo xtask report --memory` uses the bound only with `TRIERGON_RSS_KERNEL_BOUND=1`

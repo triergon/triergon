@@ -92,7 +92,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             GENERATOR.manifest_command(root, rest, USAGE)
         }
         [command, rest @ ..] if command == "tables" => tables::main(root, rest),
-        [command, rest @ ..] if command == "assemble" => probe::assemble_command(rest),
+        [command, rest @ ..] if command == "assemble" => probe::assemble_command(root, rest),
         [command, rest @ ..] if command == "probe" => probe::probe_command(root, rest),
         _ => Err(USAGE.into()),
     }

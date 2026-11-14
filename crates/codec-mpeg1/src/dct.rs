@@ -71,13 +71,46 @@ fn idct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
     ]
 }
 
-/// Forward DCT of an 8×8 block of samples or residuals (raster order).
+/// Forward DCT of an 8×8 block of samples or residuals (raster order). Both
+/// passes run down columns, so every column runs in its own vector lane: the
+/// row pass on the transposed block, which is then transposed back.
 pub(crate) fn fdct(block: &mut [i32; 64]) {
-    for row in block.chunks_exact_mut(8) {
-        let out = fdct_1d(row.try_into().unwrap(), BITS - PASS);
-        row.copy_from_slice(&out);
+    transpose(block);
+    columns_in_place(block, BITS - PASS, fdct_1d);
+    transpose(block);
+    columns_in_place(block, BITS + PASS, fdct_1d);
+}
+
+#[inline(always)]
+fn transpose(block: &mut [i32; 64]) {
+    for r in 0..8 {
+        for c in r + 1..8 {
+            block.swap(r * 8 + c, c * 8 + r);
+        }
     }
-    columns(block, BITS + PASS, fdct_1d);
+}
+
+/// Apply a 1-D transform down every column, in place. The loop body touches
+/// the same lane of eight rows, so the compiler runs all columns in vector
+/// lanes.
+#[inline(always)]
+fn columns_in_place(block: &mut [i32; 64], shift: u32, f: impl Fn([i32; 8], u32) -> [i32; 8]) {
+    for c in 0..8 {
+        let col = [
+            block[c],
+            block[8 + c],
+            block[16 + c],
+            block[24 + c],
+            block[32 + c],
+            block[40 + c],
+            block[48 + c],
+            block[56 + c],
+        ];
+        let t = f(col, shift);
+        for r in 0..8 {
+            block[r * 8 + c] = t[r];
+        }
+    }
 }
 
 /// Inverse DCT of dequantised coefficients (raster order), producing samples
@@ -92,31 +125,7 @@ pub(crate) fn idct(block: &mut [i32; 64]) {
         let out = idct_1d(row.try_into().unwrap(), BITS - PASS);
         row.copy_from_slice(&out);
     }
-    columns(block, BITS + PASS, idct_1d);
-}
-
-/// Apply a 1-D transform down every column. The loop body touches the same
-/// lane of eight rows, so the compiler runs all columns in vector lanes.
-#[inline(always)]
-fn columns(block: &mut [i32; 64], shift: u32, f: impl Fn([i32; 8], u32) -> [i32; 8]) {
-    let mut out = [0i32; 64];
-    for c in 0..8 {
-        let col = [
-            block[c],
-            block[8 + c],
-            block[16 + c],
-            block[24 + c],
-            block[32 + c],
-            block[40 + c],
-            block[48 + c],
-            block[56 + c],
-        ];
-        let t = f(col, shift);
-        for r in 0..8 {
-            out[r * 8 + c] = t[r];
-        }
-    }
-    *block = out;
+    columns_in_place(block, BITS + PASS, idct_1d);
 }
 
 #[cfg(test)]

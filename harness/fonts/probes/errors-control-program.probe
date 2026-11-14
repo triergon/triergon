@@ -1,0 +1,14 @@
+# An error in the control value program. Observed: glyph programs still run.
+heights 16384
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  PUSH 0; SMD; BYTES 0x28
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end

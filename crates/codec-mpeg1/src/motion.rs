@@ -92,6 +92,13 @@ fn byte_pairs(bytes: &[u8]) -> u32 {
     (word & LOW_BYTES) + ((word >> 8) & LOW_BYTES)
 }
 
+/// Sum of the 16 per-lane SAD accumulators. Each lane holds at most 16 rows of
+/// 255, so the total, at most 65,280, is summed in 16-bit lanes.
+#[inline(always)]
+fn lane_sum(acc: &[u16; 16]) -> u32 {
+    u32::from(acc.iter().sum::<u16>())
+}
+
 /// SAD of two 16×16 blocks; per-lane accumulation keeps it vectorisable.
 #[inline(never)]
 pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
@@ -107,7 +114,7 @@ pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride:
             acc[i] += a[i].abs_diff(b[i]) as u16;
         }
     }
-    acc.iter().map(|&v| v as u32).sum()
+    lane_sum(&acc)
 }
 
 /// SAD of two 16×16 blocks, abandoned once it reaches `limit`: the result is
@@ -134,7 +141,7 @@ pub(crate) fn sad16_within(
                 acc[i] += a[i].abs_diff(b[i]) as u16;
             }
         }
-        total += acc.iter().map(|&v| v as u32).sum::<u32>();
+        total += lane_sum(&acc);
         if total >= limit {
             return total;
         }
@@ -165,7 +172,7 @@ pub(crate) fn sad16_half(
             acc[i] += a[i].abs_diff(pred[i]) as u16;
         }
     }
-    acc.iter().map(|&v| v as u32).sum()
+    lane_sum(&acc)
 }
 
 /// One 16-sample row of the half-sample prediction starting at `at`.
