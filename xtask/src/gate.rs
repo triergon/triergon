@@ -244,6 +244,8 @@ fn coverage_problems(root: &Path) -> R<Vec<String>> {
 const ISOBMFF_PARTS: usize = 3;
 /// The open and index contract qualifies this target.
 const ISOBMFF_GRADE_TARGET: &str = "aarch64-unknown-linux-gnu";
+/// Placeholder for the host output directory in summary command templates.
+const SUMMARY_OUTPUT: &str = "OUT";
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
@@ -1246,6 +1248,7 @@ fn run(root: &Path, output: &Path, stage: Stage, shard: (usize, usize), full: bo
             ("revision", Value::str(&revision)),
             ("changes", Value::str(&changes)),
             ("target", Value::str(crate::harness::report::gate_target()?)),
+            ("output", Value::str(&out)),
             (
                 "items",
                 Value::strings(items.iter().map(|item| item.name.clone())),
@@ -1562,7 +1565,7 @@ fn only_open_cases(record: &Value) -> bool {
 fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
     let mut problems = coverage_problems(root)?;
     let mut shards = Vec::new();
-    let mut steps = Vec::new();
+    let mut records_by_shard = Vec::new();
     let mut identities: Vec<(String, String)> = Vec::new();
     for directory in directories {
         let shard = crate::checks::read_json(&directory.join(SHARD))
@@ -1603,7 +1606,7 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
             ("shard", shard.clone()),
             ("step_seconds", Value::float(seconds.round())),
         ]));
-        steps.extend(records);
+        records_by_shard.push(records);
     }
     let field = |shard: &Value, key: &str| shard.get("shard").and_then(|s| s.get(key)).cloned();
     let count = shards
@@ -1651,20 +1654,15 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
         .as_ref()
         .and_then(Value::as_str)
         .ok_or("gate summary needs at least one shard with a target")?;
-    let planned = items("OUT", false, target, "target/release", &capture);
+    let planned = items(SUMMARY_OUTPUT, false, target, "target/release", &capture);
     // Each shard ran the items the plan gives it.
     let count = count.unwrap_or(0.0) as usize;
     if count > 0 {
-        let names =
-            |items: Vec<Item>| -> Vec<String> { items.into_iter().map(|i| i.name).collect() };
-        let plan: Vec<Vec<String>> = self::shards(
-            items("OUT", false, target, "target/release", &capture),
+        let plan = self::shards(
+            items(SUMMARY_OUTPUT, false, target, "target/release", &capture),
             count,
-        )
-        .into_iter()
-        .map(names)
-        .collect();
-        for shard in &shards {
+        );
+        for (shard, records) in shards.iter().zip(&records_by_shard) {
             let index = field(shard, "index")
                 .and_then(|i| i.as_f64())
                 .unwrap_or(0.0) as usize;
@@ -1674,13 +1672,23 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .iter()
                 .filter_map(|v| v.as_str().map(str::to_owned))
                 .collect();
-            if index == 0 || index > count || ran != plan[index - 1] {
+            let Some(assigned) = index.checked_sub(1).and_then(|i| plan.get(i)) else {
+                problems.push(format!("invalid shard {index} of {count}"));
+                continue;
+            };
+            if !ran.iter().eq(assigned.iter().map(|item| &item.name)) {
                 problems.push(format!(
                     "shard {index} of {count} did not run its planned items"
                 ));
             }
+            if target == ISOBMFF_GRADE_TARGET {
+                let output = field(shard, "output");
+                let output = output.as_ref().and_then(Value::as_str);
+                problems.extend(isobmff_step_problems(assigned, output, records));
+            }
         }
     }
+    let steps: Vec<_> = records_by_shard.into_iter().flatten().collect();
     for item in &planned {
         let times = ran_items.iter().filter(|name| **name == item.name).count();
         if times != 1 {
@@ -1693,20 +1701,6 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .count();
             if ran != 1 {
                 problems.push(format!("{}: {ran} records", step.name));
-            }
-        }
-    }
-    if target == ISOBMFF_GRADE_TARGET {
-        for part in 1..=ISOBMFF_PARTS {
-            let name = format!("isobmff-{part}");
-            let step = format!("grade-{name}");
-            for record in steps
-                .iter()
-                .filter(|row| row.get("step").and_then(Value::as_str) == Some(&step))
-            {
-                if !isobmff_grade_step(record, &name, &format!("{part}/{ISOBMFF_PARTS}")) {
-                    problems.push(format!("{step}: missing or mismatched ISO BMFF part"));
-                }
             }
         }
     }
@@ -1772,22 +1766,61 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
     Ok(i32::from(!failed.is_empty() || !problems.is_empty()))
 }
 
-fn isobmff_grade_step(record: &Value, item: &str, part: &str) -> bool {
-    record.get("item").and_then(Value::as_str) == Some(item)
-        && record.get("stage").and_then(Value::as_str) == Some(Stage::Memory.name())
-        && record
-            .get("command")
-            .and_then(Value::as_array)
-            .is_some_and(|args| {
-                let mut args = args.iter().map(Value::as_str);
-                if args.next() != Some(Some("xtask")) || args.next() != Some(Some("grade")) {
-                    return false;
-                }
-                let mut parts = args.skip_while(|arg| *arg != Some("--isobmff-part"));
-                parts.next().is_some()
-                    && parts.next() == Some(Some(part))
-                    && !parts.any(|arg| arg == Some("--isobmff-part"))
-            })
+// A part's collection and grade commands must all be on its assigned shard,
+// with the exact stage, inputs and arguments written by the plan.
+fn isobmff_step_problems(plan: &[Item], output: Option<&str>, records: &[Value]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for item in plan.iter().filter(|item| item.name.starts_with("isobmff-")) {
+        for step in &item.steps {
+            let mut matching = records
+                .iter()
+                .filter(|record| record.get("step").and_then(Value::as_str) == Some(&step.name));
+            let matches = matching.next().zip(output).is_some_and(|(record, output)| {
+                Path::new(output).is_absolute()
+                    && record.get("item").and_then(Value::as_str) == Some(&item.name)
+                    && record.get("stage").and_then(Value::as_str) == Some(step.stage.name())
+                    && isobmff_command_matches(step, record, output)
+            });
+            if !matches || matching.next().is_some() {
+                problems.push(format!(
+                    "{}: expected one planned command on its assigned shard",
+                    step.name
+                ));
+            }
+        }
+    }
+    problems
+}
+
+fn isobmff_command_matches(step: &Step, record: &Value, output: &str) -> bool {
+    let Some(args) = record.get("command").and_then(Value::as_array) else {
+        return false;
+    };
+    let expected_environment =
+        Value::object(step.environment.iter().map(|(k, v)| (*k, Value::str(*v))));
+    if record.get("environment") != Some(&expected_environment) {
+        return false;
+    }
+    let mut args = args.iter().map(Value::as_str);
+    if matches!(step.placement, Placement::Timed | Placement::Memory) {
+        if args.next() != Some(Some("taskset")) || args.next() != Some(Some("-c")) {
+            return false;
+        }
+        let cpu = args.next().flatten();
+        match step.placement {
+            Placement::Timed if cpu != Some("1") => return false,
+            Placement::Memory if !cpu.is_some_and(|cpu| cpu.starts_with("1-")) => return false,
+            _ => {}
+        }
+    }
+    args.len() == step.command.len()
+        && step.command.iter().zip(args).all(|(expected, actual)| {
+            if let Some(relative) = expected.strip_prefix(SUMMARY_OUTPUT) {
+                actual.and_then(|arg| arg.strip_prefix(output)) == Some(relative)
+            } else {
+                actual == Some(expected)
+            }
+        })
 }
 
 #[cfg(test)]
@@ -1838,34 +1871,80 @@ mod tests {
     }
 
     #[test]
-    fn aarch64_plan_grades_each_isobmff_part_once() {
-        let plan = items(
-            "/o",
-            false,
-            "aarch64-unknown-linux-gnu",
-            "target/release",
-            &[],
+    fn aarch64_plan_binds_each_isobmff_grade_to_its_shard_and_collections() {
+        let realized = items("/run", false, ISOBMFF_GRADE_TARGET, "target/release", &[]);
+        let mut records = BTreeMap::new();
+        for item in realized.iter().filter(|i| i.name.starts_with("isobmff-")) {
+            let steps = item.steps.iter().map(|step| {
+                let mut command = step.command.clone();
+                let cpus = match step.placement {
+                    Placement::Timed => Some("1"),
+                    Placement::Memory => Some("1-15"),
+                    _ => None,
+                };
+                if let Some(cpus) = cpus {
+                    command.splice(0..0, owned(&["taskset", "-c", cpus]));
+                }
+                Value::object([
+                    ("step", Value::str(&step.name)),
+                    ("item", Value::str(&item.name)),
+                    ("stage", Value::str(step.stage.name())),
+                    ("command", Value::strings(command)),
+                    (
+                        "environment",
+                        Value::object(step.environment.iter().map(|(k, v)| (*k, Value::str(*v)))),
+                    ),
+                ])
+            });
+            records.insert(item.name.as_str(), steps.collect::<Vec<_>>());
+        }
+        let plan = shards(
+            items(
+                SUMMARY_OUTPUT,
+                false,
+                ISOBMFF_GRADE_TARGET,
+                "target/release",
+                &[],
+            ),
+            3,
         );
-        for i in 1..=ISOBMFF_PARTS {
-            let name = format!("isobmff-{i}");
-            let item = plan.iter().find(|item| item.name == name).unwrap();
-            let grade = item
-                .steps
+        assert_eq!(records.len(), ISOBMFF_PARTS);
+        for shard in &plan {
+            let assigned: Vec<_> = shard
                 .iter()
-                .filter(|step| step.placement == Placement::Grade)
-                .collect::<Vec<_>>();
-            assert_eq!(grade.len(), 1);
-            let record = Value::object([
-                ("item", Value::str(&name)),
-                ("stage", Value::str(grade[0].stage.name())),
-                ("command", Value::strings(grade[0].command.clone())),
-            ]);
-            assert!(isobmff_grade_step(
-                &record,
-                &name,
-                &format!("{i}/{ISOBMFF_PARTS}")
-            ));
-            assert!(!isobmff_grade_step(&record, &name, "1/1"));
+                .filter_map(|item| records.get(item.name.as_str()))
+                .flatten()
+                .cloned()
+                .collect();
+            assert!(isobmff_step_problems(shard, Some("/run"), &assigned).is_empty());
+            for (index, record) in assigned.iter().enumerate() {
+                let name = record.get("step").and_then(Value::as_str).unwrap();
+                if !name.starts_with("grade-") {
+                    continue;
+                }
+                let mut missing = assigned.clone();
+                missing.remove(index);
+                assert!(!isobmff_step_problems(shard, Some("/run"), &missing).is_empty());
+
+                let change = |edit: fn(&mut Vec<Value>)| {
+                    let mut changed = assigned.clone();
+                    let Value::Object(fields) = &mut changed[index] else {
+                        unreachable!()
+                    };
+                    let Some((_, Value::Array(args))) =
+                        fields.iter_mut().find(|(key, _)| key == "command")
+                    else {
+                        unreachable!()
+                    };
+                    edit(args);
+                    assert!(!isobmff_step_problems(shard, Some("/run"), &changed).is_empty());
+                };
+                change(|args| args[2] = Value::str("/run/benchmark/other/collection.json"));
+                change(|args| args[3] = Value::str("/run/memory/other/collection.json"));
+                change(|args| {
+                    assert_eq!(args.pop(), Some(Value::str("--full")));
+                });
+            }
         }
     }
 

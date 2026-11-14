@@ -521,6 +521,18 @@ fn has_measurement(row: &Value) -> bool {
         .any(|key| row.get(key).is_some_and(|value| *value != Value::Null))
 }
 
+fn unmeasured_output(timed: &Value, memory: &Value) -> R<()> {
+    same_case(timed, memory)?;
+    if has_measurement(timed)
+        || has_measurement(memory)
+        || !super::acceptance::parity_passes(timed)
+        || text(field(timed, "parity")?, "comparison")? != "output"
+    {
+        return Err("part requires matching output parity without measurements".into());
+    }
+    Ok(())
+}
+
 fn part_selection(
     root: &Path,
     contract: &Value,
@@ -999,12 +1011,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
                 continue;
             }
             let (a, b) = (timed_rows[id], memory_rows[id]);
-            same_case(a, b).map_err(|error| format!("{id}: {error}"))?;
-            if has_measurement(a) || has_measurement(b) || !super::acceptance::parity_passes(a) {
-                return Err(format!(
-                    "{id}: part requires matching parity without measurements"
-                ));
-            }
+            unmeasured_output(a, b).map_err(|error| format!("{id}: {error}"))?;
             selected(a, spec, &contract, identity)?;
         }
     }
@@ -1170,6 +1177,31 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
+
+    #[test]
+    fn an_unmeasured_isobmff_output_must_match_as_an_output() {
+        let row = |comparison| {
+            Value::object([
+                ("outcome", Value::str("output")),
+                (
+                    "parity",
+                    Value::object([
+                        ("status", Value::str("pass")),
+                        ("source_timing_status", Value::str("pass")),
+                        ("comparison", Value::str(comparison)),
+                    ]),
+                ),
+            ])
+        };
+        let output = row("output");
+        let refusal = row("refusal");
+        assert!(unmeasured_output(&output, &output).is_ok());
+        assert!(unmeasured_output(&refusal, &refusal).is_err());
+        assert!(unmeasured_output(&output, &refusal).is_err());
+        let mut unexpected_measurement = output.clone();
+        put(&mut unexpected_measurement, "timing", Value::Bool(true)).unwrap();
+        assert!(unmeasured_output(&output, &unexpected_measurement).is_err());
+    }
 
     #[test]
     fn isobmff_parts_bind_the_registered_selection_and_cover_all_outputs() {
