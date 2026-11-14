@@ -3,7 +3,7 @@
 //! hinted advances HarfBuzz receives, vertical advances, kerning and decoration
 //! lines.
 
-use crate::bytecode::{GlyphPoints, Hinter, Programs, Tables};
+use crate::bytecode::{GlyphPoints, Hinter, Phantoms, Programs, Tables};
 use crate::fixed::Scale;
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Glyf};
@@ -688,10 +688,11 @@ impl<'f> SizedFont<'f> {
 }
 
 /// The phantom points `units` (font units) as the programs see them at the
-/// 16.16 `scale`. Observed: the horizontal ones' x and the vertical ones' y
-/// on the pixel grid, the vertical ones at half the advance
-/// (`phantom-points`). `Overflow` for a point outside 32 bits.
-fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<[Point; 4]> {
+/// 16.16 `scale`. Observed: scaled, the vertical ones at half the advance,
+/// they start there, and the horizontal ones' x and the vertical ones' y
+/// are then moved to the pixel grid (`phantom-points`, `phantom-originals`).
+/// `Overflow` for a point outside 32 bits.
+fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<Phantoms> {
     let scaled = |u: i32| i32::try_from(mul_fix(i64::from(u), scale)).map_err(|_| Error::Overflow);
     let fitted = |u: i32| {
         scaled(u)?
@@ -701,12 +702,21 @@ fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<[Point; 4]> {
     };
     let [pp1, pp2, pp3, pp4] = units;
     let middle = scaled(((i64::from(pp2.x) - i64::from(pp1.x)) / 2) as i32)?;
-    Ok([
-        Point::new(fitted(pp1.x)?, 0),
-        Point::new(fitted(pp2.x)?, 0),
-        Point::new(middle, fitted(pp3.y)?),
-        Point::new(middle, fitted(pp4.y)?),
-    ])
+    Ok(Phantoms {
+        current: [
+            Point::new(fitted(pp1.x)?, 0),
+            Point::new(fitted(pp2.x)?, 0),
+            Point::new(middle, fitted(pp3.y)?),
+            Point::new(middle, fitted(pp4.y)?),
+        ],
+        original: [
+            Point::new(scaled(pp1.x)?, 0),
+            Point::new(scaled(pp2.x)?, 0),
+            Point::new(middle, scaled(pp3.y)?),
+            Point::new(middle, scaled(pp4.y)?),
+        ],
+        units,
+    })
 }
 
 /// Runs each glyph's program as a hinted TrueType load builds its outline.
@@ -751,13 +761,12 @@ impl glyf::Hint for GlyfHinting<'_> {
             self.ends.try_push(end).map_err(|e| e.error)?;
         }
         let units = self.font.phantom_points(metrics);
-        let scaled = scaled_phantom_points(units, self.hinter.scale())?;
         let points = GlyphPoints {
             outline,
             base,
             ends: self.ends.as_slice(),
             units: (!composite).then(|| &self.units.as_slice()[base..]),
-            phantoms: (scaled, units),
+            phantoms: scaled_phantom_points(units, self.hinter.scale())?,
         };
         self.hinter.hint(self.programs, instructions, points, work)
     }
@@ -773,9 +782,13 @@ mod tests {
     fn phantom_points_outside_32_bits_are_an_overflow() {
         let units = [(0, 0), (1000, 0), (0, 800), (0, -200)].map(|(x, y)| Point::new(x, y));
         // Height 1000 at 2048 units per em.
+        let points = |p: [(i32, i32); 4]| p.map(|(x, y)| Point::new(x, y));
         assert_eq!(
-            scaled_phantom_points(units, 32000),
-            Ok([(0, 0), (512, 0), (244, 384), (244, -128)].map(|(x, y)| Point::new(x, y)))
+            scaled_phantom_points(units, 32000).map(|p| (p.current, p.original)),
+            Ok((
+                points([(0, 0), (512, 0), (244, 384), (244, -128)]),
+                points([(0, 0), (488, 0), (244, 391), (244, -98)])
+            ))
         );
         let wide = [(0, 0), (32767, 0), (0, 0), (0, 0)].map(|(x, y)| Point::new(x, y));
         assert_eq!(scaled_phantom_points(wide, 1 << 33), Err(Error::Overflow));

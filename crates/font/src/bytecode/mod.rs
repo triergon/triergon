@@ -245,8 +245,8 @@ impl Hinter {
     /// Runs a glyph program on the points of `outline` from `base` on, whose
     /// contours end at `ends` (relative to `base`) and that started at
     /// `units` in font units, with the glyph's four phantom points
-    /// `phantoms` (scaled, and in font units), and moves the outline's
-    /// points as the program leaves them.
+    /// `phantoms`, and moves the outline's points as the program leaves
+    /// them.
     pub(crate) fn hint(
         &mut self,
         programs: Programs<'_>,
@@ -281,10 +281,16 @@ impl Hinter {
         zone.font_units = units.is_some();
         for (i, p) in points.iter().enumerate() {
             let u = units.map_or(p.point, |u| u[i]);
-            zone.push(p.point, u, p.kind == PointKind::On)?;
+            zone.push(p.point, p.point, u, p.kind == PointKind::On)?;
         }
-        for (p, u) in phantoms.0.into_iter().zip(phantoms.1) {
-            zone.push(p, if units.is_some() { u } else { p }, true)?;
+        for i in 0..4 {
+            let original = phantoms.original[i];
+            let u = if units.is_some() {
+                phantoms.units[i]
+            } else {
+                original
+            };
+            zone.push(phantoms.current[i], original, u, true)?;
         }
         zone.ends.try_extend_from_slice(ends)?;
         self.glyph_cvt.clear();
@@ -343,8 +349,19 @@ pub(crate) struct GlyphPoints<'o> {
     pub(crate) ends: &'o [u32],
     /// The points' font-unit positions; none for a composite glyph.
     pub(crate) units: Option<&'o [Point]>,
-    /// The phantom points, scaled and in font units.
-    pub(crate) phantoms: ([Point; 4], [Point; 4]),
+    pub(crate) phantoms: Phantoms,
+}
+
+/// A glyph's four phantom points as its program starts from them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Phantoms {
+    /// Their current positions, partly on the pixel grid.
+    pub(crate) current: [Point; 4],
+    /// Their original positions: scaled, off the grid (observed,
+    /// `phantom-originals`).
+    pub(crate) original: [Point; 4],
+    /// Their positions in font units.
+    pub(crate) units: [Point; 4],
 }
 
 /// A face's interpreter, made on the first hinted load and kept for the size
@@ -431,7 +448,7 @@ impl Bytecode {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bytecode, GlyphPoints, Hinter, Programs, Tables};
+    use super::{Bytecode, GlyphPoints, Hinter, Phantoms, Programs, Tables};
     use crate::outline::{Outline, Point, PointKind};
     use std::cell::Cell;
     use triergon_core::{Budget, Error, WorkBudget};
@@ -494,7 +511,11 @@ mod tests {
             base: 0,
             ends: &[4],
             units: Some(&units),
-            phantoms: (phantoms, phantoms),
+            phantoms: Phantoms {
+                current: phantoms,
+                original: phantoms,
+                units: phantoms,
+            },
         };
         hinter.hint(programs, program, points, &mut WorkBudget::new(work))?;
         Ok(outline.points().iter().map(|p| p.point).collect())
