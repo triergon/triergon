@@ -20097,6 +20097,34 @@
     "candidate": "dcf51398e97c781d517c2c577194a9d92f8c7f15",
     "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
    }
+  },
+  {
+   "name": "capture-held-5aa55488-aarch64",
+   "path": "capture-held-5aa55488-aarch64",
+   "retention": "retained",
+   "reason": "Capture at 5aa55488, linked under the link policy, on Linux AArch64 (c6g.4xlarge, kernel 7.0.0-1014-aws): the crate and xtask tests, gate-build workers with every profile reference, preflight with the capture cases and the RSS review, the capture qualification of all 15 cases with 30 timing pairs on CPU 1 with the RSS module unloaded, the kernel RSS proof, the workers rebuilt with it, preflight --kernel and 30 kernel-bound memory pairs, the summaries, the workers' digests and build identities, the scripts that ran them, and the CPU, kernel and package list; the capture inputs and decoded frames are left out and regenerate from the cases",
+   "key": "evidence/capture-held-5aa55488-aarch64/c8a13c1a1388ffdcc928206334410d0d6d7556943d432f694fcbdbc881d47921.tar.gz",
+   "sha256": "c8a13c1a1388ffdcc928206334410d0d6d7556943d432f694fcbdbc881d47921",
+   "bytes": 158827882,
+   "results": [
+    {
+     "path": "memory/gate-result.json",
+     "command": "capture qualify",
+     "key": "0b51967f12f6f0031b14dabd4b46d8d4cd706a52f5c524289e0ac6ce2e9f2d3a",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "timing/gate-result.json",
+     "command": "capture qualify",
+     "key": "fc7725ff86c92416983526afada481468975b09ea7c6e26bf0aca1c99c84d661",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "5aa554886320b59d220523032d9b81e998a60deb"
+   }
   }
  ]
 }
