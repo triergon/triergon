@@ -20002,6 +20002,60 @@
    "key": "evidence/packet-framing-memory-clock-ee052323-aarch64/f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183.tar.zst",
    "sha256": "f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183",
    "bytes": 42091880
+  },
+  {
+   "name": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
+   "path": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with short AVC profile extensions",
+   "key": "evidence/packet-framing-avc-profile-extension-cc7e59d2-aarch64/05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320.tar.zst",
+   "sha256": "05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320",
+   "bytes": 74607220
+  },
+  {
+   "name": "packet-framing-resident-state-9d3d1f58-aarch64",
+   "path": "packet-framing-resident-state-9d3d1f58-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 comparison of compact AVC and HEVC packet framing with short AVC profile extensions.",
+   "key": "evidence/packet-framing-resident-state-9d3d1f58-aarch64/bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b.tar.zst",
+   "sha256": "bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b",
+   "bytes": 696141192
+  },
+  {
+   "name": "packet-framing-validated-lengths-fe155a8c-aarch64",
+   "path": "packet-framing-validated-lengths-fe155a8c-aarch64",
+   "retention": "retained",
+   "reason": "Records the full AArch64 packet framing comparison and mapping measurements after reusing validated NAL lengths and array checks.",
+   "key": "evidence/packet-framing-validated-lengths-fe155a8c-aarch64/63b1acf21312e56d2d5b128f1fce3084181fe7814ff1f43f598d531077ad1a79.tar.zst",
+   "sha256": "63b1acf21312e56d2d5b128f1fce3084181fe7814ff1f43f598d531077ad1a79",
+   "bytes": 41983089
+  },
+  {
+   "name": "packet-framing-clock-faults-9d3d1f58-aarch64",
+   "path": "packet-framing-clock-faults-9d3d1f58-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 clock page-fault measurements on three packet framing cases.",
+   "key": "evidence/packet-framing-clock-faults-9d3d1f58-aarch64/3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f.tar.zst",
+   "sha256": "3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f",
+   "bytes": 2758327
+  },
+  {
+   "name": "packet-framing-configuration-length-58546a66-aarch64",
+   "path": "packet-framing-configuration-length-58546a66-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 packet framing comparison using the validated Annex B configuration size.",
+   "key": "evidence/packet-framing-configuration-length-58546a66-aarch64/d39ec483eb8cdd99bf49145ece64421b10614e0de7a088bdc2c49ce1e56af68d.tar.zst",
+   "sha256": "d39ec483eb8cdd99bf49145ece64421b10614e0de7a088bdc2c49ce1e56af68d",
+   "bytes": 41672511
+  },
+  {
+   "name": "packet-framing-cycles-ee052323-aarch64",
+   "path": "packet-framing-cycles-ee052323-aarch64",
+   "retention": "90 days",
+   "reason": "Samples packet framing cycles on six configuration and packet cases.",
+   "key": "qualification/packet-framing-cycles-ee052323-aarch64/646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e.tar.zst",
+   "sha256": "646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e",
+   "bytes": 366419
   }
  ]
 }

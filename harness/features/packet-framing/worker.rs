@@ -126,6 +126,26 @@ mod tests {
     }
 
     #[test]
+    fn avc_profile_extensions_match_recorded_reference_folds() {
+        let fixtures = fixtures::load_extensions().unwrap();
+        assert_eq!(fixtures.len(), 6);
+        for fixture in fixtures {
+            let case = Case::parse(&fixture.bytes).unwrap();
+            let actual = execute(&case, 1).unwrap();
+            let expected = fixture.expected;
+            assert_eq!(actual.packets, expected.packets, "{} packets", fixture.id);
+            assert_eq!(actual.bytes, expected.bytes, "{} bytes", fixture.id);
+            assert_eq!(actual.digest.0, expected.digest, "{} digest", fixture.id);
+            assert_eq!(
+                actual.digest.1, expected.digest_b,
+                "{} digest_b",
+                fixture.id
+            );
+            assert_eq!(case.pool.used(), case.baseline, "{} retention", fixture.id);
+        }
+    }
+
+    #[test]
     fn timed_iterations_fold_both_words_in_order_and_reset_each_session() {
         for fixture in fixtures::load().unwrap() {
             let case = Case::parse(&fixture.bytes).unwrap();
