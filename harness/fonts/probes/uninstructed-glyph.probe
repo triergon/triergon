@@ -1,0 +1,10 @@
+# A glyph without instructions in a face with a font program: the default
+# load scales its points and the phantom points, and grid-fits the metrics,
+# with no instruction moving a point.
+heights 16384 1000 700
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 1100
+  contour 100 0, 100 1400, 900 1400 off, 900 0
+end
