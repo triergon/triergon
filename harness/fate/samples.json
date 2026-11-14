@@ -61,6 +61,11 @@
       "path": "fate/mov/mp4-init-nonkeyframe.mp4",
       "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
       "source": "https://fate-suite.ffmpeg.org/mov/mp4-init-nonkeyframe.mp4"
+    },
+    {
+      "path": "fate/mov/mov_stream_shorter_than_movie.mov",
+      "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov_stream_shorter_than_movie.mov"
     }
   ]
 }

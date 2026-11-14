@@ -7,6 +7,10 @@ sits above `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
 `triergon-framing` and `triergon-subtitles`. It does not fetch over HTTP,
 parse playlists, retry transports, decode media or render.
 
+The MP4 range comparison includes two upstream samples, one with an initial
+non-sync AVC prefix and one with tracks shorter than the declared movie.
+It checks startup and backward seek through EOF for both.
+
 ## Usage
 
 ```rust
