@@ -75,13 +75,13 @@ fn the_source_is_seeked_only_when_a_request_does_not_continue() {
         seeks: 0,
     };
     let mut feed = Feed::new(source, &pool).unwrap();
-    let rewinds = feed.source_mut().seeks;
+    let rewinds = feed.source().seeks;
     assert_eq!(drain(&mut input, &mut feed), bytes);
-    assert_eq!(feed.source_mut().seeks, rewinds);
+    assert_eq!(feed.source().seeks, rewinds);
 
     let request = input.request_range(40).unwrap();
     feed.supply(&mut input, request).unwrap();
-    assert_eq!(feed.source_mut().seeks, rewinds + 1);
+    assert_eq!(feed.source().seeks, rewinds + 1);
     assert_eq!(input.buffered(), &[40]);
 }
 
@@ -133,6 +133,7 @@ fn owned_feed_shares_large_windows_and_resumes_with_inline_bytes() {
     let retained = input.retained_window().unwrap();
     assert!(retained.shares_storage_with(storage.as_bytes()));
     assert_eq!(pool.used(), before);
+    assert_eq!(feed.source().position(), 32);
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         input
@@ -142,7 +143,26 @@ fn owned_feed_shares_large_windows_and_resumes_with_inline_bytes() {
     ));
     assert_eq!(drain(&mut input, &mut feed), &bytes[32..]);
     assert_eq!(retained.as_ref(), &bytes[..32]);
-    drop(feed);
+    assert_eq!(feed.into_inner().position(), 37);
     drop(retained);
     assert_eq!(storage.try_into_vec().unwrap(), bytes);
+}
+
+#[test]
+fn a_mutated_source_is_repositioned_before_the_next_read() {
+    let pool = Budget::new(4096).unwrap();
+    let mut input = cursor(&pool, 8, 4);
+    let mut feed = Feed::new(Cursor::new((0..8_u8).collect::<Vec<_>>()), &pool).unwrap();
+    let request = input.request();
+    feed.supply(&mut input, request).unwrap();
+    assert!(matches!(
+        input
+            .read_discard(4, &mut WorkBudget::new(4), &AtomicBool::new(false))
+            .unwrap(),
+        Step::Ready(4)
+    ));
+    feed.source_mut().set_position(0);
+    let request = input.request();
+    feed.supply(&mut input, request).unwrap();
+    assert_eq!(input.buffered(), [4, 5, 6, 7]);
 }

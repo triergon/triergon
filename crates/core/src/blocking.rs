@@ -210,7 +210,18 @@ impl<S: Read + Seek> Feed<S> {
         })
     }
 
+    /// Borrow the source without invalidating the cached position.
+    pub fn source(&self) -> &S {
+        &self.source
+    }
+
+    /// Access the source for mutation. The next request seeks explicitly and
+    /// reads into a new window, because immutable backing can no longer be
+    /// assumed. To switch entities, reset the input cursor and construct a
+    /// new feed.
     pub fn source_mut(&mut self) -> &mut S {
+        self.position = None;
+        self.shared_input = None;
         &mut self.source
     }
 
@@ -242,7 +253,10 @@ impl<S: Read + Seek> Feed<S> {
             let bytes = shared_input(&self.source);
             let start = usize::try_from(request.offset).map_err(|_| Error::Overflow)?;
             if start >= bytes.len() {
-                return input.finish(request.source, request.token);
+                input.finish(request.source, request.token)?;
+                self.source.seek(SeekFrom::Start(request.offset))?;
+                self.position = Some(request.offset);
+                return Ok(());
             }
             let end = start + maximum.min(bytes.len() - start);
             let response = bytes.slice(start..end)?;
@@ -252,9 +266,9 @@ impl<S: Read + Seek> Feed<S> {
                 request.offset,
                 response,
             )?)?;
-            // Only the inline branch reads through std::io::Read. It must
-            // seek even if its next request follows this shared response.
-            self.position = None;
+            let end = u64::try_from(end).map_err(|_| Error::Overflow)?;
+            self.source.seek(SeekFrom::Start(end))?;
+            self.position = Some(end);
             Ok(())
         } else if maximum <= 4096 {
             self.supply_large::<4096>(input, request)

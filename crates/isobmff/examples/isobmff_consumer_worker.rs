@@ -74,17 +74,27 @@ fn options(args: &[String], offset: usize) -> Result<Options> {
 type Input = Cursor<Vec<u8>>;
 fn load(path: &Path) -> Result<Input> {
     let mut input = File::open(path)?;
-    let length = input.metadata()?.len();
-    if length > 64 * 1024 * 1024 {
+    let metadata = input.metadata()?;
+    if !metadata.is_file() {
+        return Err(Error::Unsupported("input needs a regular file").into());
+    }
+    if metadata.len() > 64 * 1024 * 1024 {
         return Err(Error::Unsupported("input exceeds 64 MiB").into());
     }
+    let length = usize::try_from(metadata.len()).map_err(|_| Error::Overflow)?;
     let mut bytes = Vec::new();
     bytes
-        .try_reserve_exact(usize::try_from(length).map_err(|_| Error::Overflow)?)
+        .try_reserve_exact(length)
         .map_err(|_| Error::Allocation)?;
-    input.read_to_end(&mut bytes)?;
-    if u64::try_from(bytes.len()).map_err(|_| Error::Overflow)? != length {
-        return Err(Error::Transport.into());
+    bytes.resize(length, 0);
+    input.read_exact(&mut bytes)?;
+    loop {
+        match input.read(&mut [0]) {
+            Ok(0) => break,
+            Ok(_) => return Err(Error::Transport.into()),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error.into()),
+        }
     }
     Ok(Cursor::new(bytes))
 }
