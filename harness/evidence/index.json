@@ -20072,6 +20072,19 @@
     "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
     "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
    }
+  },
+  {
+   "name": "fonts-truetype-interpreter-e110f29c",
+   "path": "fonts-truetype-interpreter-e110f29c",
+   "retention": "retained",
+   "reason": "The TrueType bytecode interpreter in triergon-font at e110f29c against main at 4a932ef9 on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the ass-render timing (30 pairs, CPU 1), kernel-bound memory (30 pairs) and grades with their proofs and module review, the build identities, logs, scripts, and the kernel, CPU, compilers and ARMv7 package list",
+   "key": "evidence/fonts-truetype-interpreter-e110f29c/aa45ccdbeecec1d775a19639afae3d4559dd2cdbd91570a6bb07af9d84155033.tar.gz",
+   "sha256": "aa45ccdbeecec1d775a19639afae3d4559dd2cdbd91570a6bb07af9d84155033",
+   "bytes": 966990401,
+   "source_revisions": {
+    "candidate": "e110f29cb904c0a4f3925fc90a2d1a10a67aeff4",
+    "baseline": "4a932ef908ca783976c56e187c0563ce955f15b5"
+   }
   }
  ]
 }
