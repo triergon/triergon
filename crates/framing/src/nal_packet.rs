@@ -48,13 +48,7 @@ pub enum NalPacketConfiguration {
 }
 impl NalPacketConfiguration {
     pub fn bytes(&self) -> &Bytes {
-        match self {
-            Self::Avc(v) => v.source_bytes(),
-            Self::Hevc(v) => v.source_bytes(),
-            Self::ReceiverAvc(v) => v.source_bytes(),
-            Self::ReceiverHevc(v) => v.source_bytes(),
-            Self::Passthrough { raw, .. } => raw,
-        }
+        self.record().bytes()
     }
     pub fn codec(&self) -> Codec {
         match self {
@@ -89,16 +83,18 @@ impl NalPacketConfiguration {
             _ => None,
         }
     }
+    fn record(&self) -> ConfigurationRef<'_> {
+        match self {
+            Self::Avc(record) => ConfigurationRef::Avc(record),
+            Self::Hevc(record) => ConfigurationRef::Hevc(record),
+            Self::ReceiverAvc(record) => ConfigurationRef::Avc(record.record()),
+            Self::ReceiverHevc(record) => ConfigurationRef::Hevc(record.record()),
+            Self::Passthrough { raw, .. } => ConfigurationRef::Passthrough(raw),
+        }
+    }
     /// Literal source identity, independently of a record-validity conclusion.
     pub fn source_identity(&self) -> Option<(SourceLocation, u64)> {
-        let (source, offset, generation) = if let Some(c) = self.avc_record() {
-            let s = c.source();
-            (s.source, s.offset, s.generation)
-        } else {
-            let s = self.hevc_record()?.source();
-            (s.source, s.offset, s.generation)
-        };
-        Some((SourceLocation { source, offset }, generation))
+        self.record().source_identity()
     }
     /// Element-count lower bound for live descriptor storage.
     pub(crate) fn descriptor_lower_bound(&self) -> Result<usize> {
@@ -142,27 +138,7 @@ impl NalPacketConfiguration {
     }
     /// Configuration NAL, or None past the last NAL or for passthrough.
     pub(crate) fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
-        if let Some(c) = self.avc_record() {
-            c.nal(index).map(|n| ConfigNal {
-                kind: Some(n.array_kind()),
-                storage: c.source_bytes(),
-                range: n.source_range(),
-            })
-        } else {
-            let c = self.hevc_record()?;
-            c.nal(index).map(|n| ConfigNal {
-                kind: None,
-                storage: c.source_bytes(),
-                range: n.source_range(),
-            })
-        }
-    }
-    /// Number of configuration NALs; an upper bound on one injection.
-    pub(crate) fn config_nal_count(&self) -> usize {
-        self.avc_record()
-            .map(AvcConfiguration::nal_count)
-            .or_else(|| self.hevc_record().map(HvcConfiguration::nal_count))
-            .unwrap_or(0)
+        self.record().config_nal(index)
     }
     /// The materialized configuration size and the sizing walk's work charge.
     pub(crate) fn annex_b_configuration_extent(&self) -> Option<(usize, u64)> {
@@ -234,56 +210,55 @@ impl AvcUpdate {
     }
 }
 
-// Borrow the active configuration without widening an in-flight AVC update.
+// The writers read the same records for strict and receiver configurations.
 enum ConfigurationRef<'a> {
-    Current(&'a NalPacketConfiguration),
-    Update(&'a AvcUpdate),
+    Avc(&'a AvcConfiguration),
+    Hevc(&'a HvcConfiguration),
+    Passthrough(&'a Bytes),
 }
 impl<'a> ConfigurationRef<'a> {
-    fn bytes(self) -> &'a Bytes {
+    fn bytes(&self) -> &'a Bytes {
         match self {
-            Self::Current(configuration) => configuration.bytes(),
-            Self::Update(update) => update.bytes(),
+            Self::Avc(record) => record.source_bytes(),
+            Self::Hevc(record) => record.source_bytes(),
+            Self::Passthrough(bytes) => bytes,
         }
     }
     fn source_identity(self) -> Option<(SourceLocation, u64)> {
-        match self {
-            Self::Current(configuration) => configuration.source_identity(),
-            Self::Update(update) => {
-                let source = update.record().source();
-                Some((
-                    SourceLocation {
-                        source: source.source,
-                        offset: source.offset,
-                    },
-                    source.generation,
-                ))
+        let (source, offset, generation) = match self {
+            Self::Avc(record) => {
+                let source = record.source();
+                (source.source, source.offset, source.generation)
             }
-        }
-    }
-    fn refusal(self) -> NalConfigurationRefusal {
-        match self {
-            Self::Current(configuration) => configuration.refusal(),
-            Self::Update(update) => update.refusal(),
-        }
+            Self::Hevc(record) => {
+                let source = record.source();
+                (source.source, source.offset, source.generation)
+            }
+            Self::Passthrough(_) => return None,
+        };
+        Some((SourceLocation { source, offset }, generation))
     }
     fn config_nal(self, index: usize) -> Option<ConfigNal<'a>> {
         match self {
-            Self::Current(configuration) => configuration.config_nal(index),
-            Self::Update(update) => {
-                let record = update.record();
-                record.nal(index).map(|nal| ConfigNal {
-                    kind: Some(nal.array_kind()),
-                    storage: record.source_bytes(),
-                    range: nal.source_range(),
-                })
-            }
+            Self::Avc(record) => record.nal(index).map(|nal| ConfigNal {
+                kind: Some(nal.array_kind()),
+                storage: record.source_bytes(),
+                range: nal.source_range(),
+            }),
+            Self::Hevc(record) => record.nal(index).map(|nal| ConfigNal {
+                kind: None,
+                storage: record.source_bytes(),
+                range: nal.source_range(),
+            }),
+            Self::Passthrough(_) => None,
         }
     }
+    /// Number of NALs in the record, an upper bound on one injection.
     fn config_nal_count(self) -> usize {
         match self {
-            Self::Current(configuration) => configuration.config_nal_count(),
-            Self::Update(update) => update.record().nal_count(),
+            Self::Avc(record) => record.nal_count(),
+            Self::Hevc(record) => record.nal_count(),
+            Self::Passthrough(_) => 0,
         }
     }
 }
@@ -978,8 +953,8 @@ fn packet_pool<M>(source: Option<&NalPacket<M>>) -> Result<&Budget> {
 impl<M> PacketState<'_, M> {
     fn config(&self) -> ConfigurationRef<'_> {
         match &self.update {
-            Some(update) => ConfigurationRef::Update(update),
-            None => ConfigurationRef::Current(&self.session.configuration),
+            Some(update) => ConfigurationRef::Avc(update.record()),
+            None => self.session.configuration.record(),
         }
     }
     fn source(&self) -> Option<&NalPacket<M>> {
