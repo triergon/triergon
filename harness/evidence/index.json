@@ -20614,6 +20614,24 @@
      "report_sha256": "01ecc08e2a0a8313c52f153322b191f503934741d74a533f5c62d32ee873c4c7"
     }
    ]
+  },
+  {
+   "name": "framing-annex-b-slices-6ac355f7",
+   "path": "framing-annex-b-slices-6ac355f7",
+   "retention": "retained",
+   "reason": "Native AArch64 paired timing of Annex B source slice reuse across all packet-framing workloads.",
+   "key": "evidence/framing-annex-b-slices-6ac355f7/cc9d7301f72be437757153b02ba65af9c01ff0baa463715a36f344425d7ff853.tar.gz",
+   "sha256": "cc9d7301f72be437757153b02ba65af9c01ff0baa463715a36f344425d7ff853",
+   "bytes": 307907033,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "1596e0b29f8c20d79b7e7619518881ade8116ae80b767887539b082853bfde21",
+     "status": 0,
+     "report_sha256": "3530659a7c211d244834092d6e577f1f7ec8009aa4473424002f17545369271b"
+    }
+   ]
   }
  ]
 }
