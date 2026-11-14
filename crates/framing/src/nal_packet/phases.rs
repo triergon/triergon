@@ -8,8 +8,11 @@ use super::{
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
-use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    num::NonZeroU32,
+    ops::{ControlFlow, Range},
+};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
 };
@@ -20,26 +23,121 @@ const NEXT: Step = Step::Continue(());
 const YIELD: Step = Step::Break(NalPacketProgress::Yield);
 
 pub(super) struct AvcBufferingLookahead {
-    offset: usize,
-    length: usize,
-    prefix_read: usize,
+    cursor: NalLength,
     remaining_nals: usize,
-    sps: Option<std::ops::Range<usize>>,
-    pps: Option<std::ops::Range<usize>>,
+    sps: Option<NalSpan>,
+    pps: Option<NalSpan>,
     insertion_index: usize,
 }
 
-#[inline]
-fn extend_length(mut value: usize, bytes: &[u8]) -> usize {
-    // Length fields have at most four bytes. A four-byte chunk therefore
-    // starts a fresh field; partial chunks retain the accumulated prefix.
-    if let [a, b, c, d] = bytes {
-        return u32::from_be_bytes([*a, *b, *c, *d]) as usize;
+// Wire lengths occupy at most 32 bits. Packet positions stay full-width.
+#[derive(Default)]
+pub(super) struct NalLength {
+    offset: usize,
+    length: u32,
+    prefix_read: u8,
+}
+
+#[derive(Clone, Copy)]
+struct NalSpan {
+    start: usize,
+    length: NonZeroU32,
+}
+
+impl NalSpan {
+    fn range(self) -> Range<usize> {
+        self.start..self.start + self.length.get() as usize
     }
-    for &byte in bytes {
-        value = (value << 8) | usize::from(byte);
+}
+
+#[derive(PartialEq, Eq)]
+enum LengthRead {
+    Yield,
+    Complete,
+    Incomplete,
+}
+
+impl NalLength {
+    fn at(offset: usize) -> Self {
+        Self {
+            offset,
+            ..Self::default()
+        }
     }
-    value
+
+    #[inline]
+    fn poll(
+        &mut self,
+        input: &[u8],
+        width: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LengthRead> {
+        if width == 4
+            && self.prefix_read == 0
+            && work.remaining() >= 4
+            && let Some(tail) = input.get(self.offset..)
+            && let Some(bytes) = tail.first_chunk()
+        {
+            work.take(4);
+            self.length = u32::from_be_bytes(*bytes);
+            self.offset += 4;
+            self.prefix_read = 4;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+        } else {
+            return self.poll_partial(input, width, work, cancel);
+        }
+        Ok(Self::charge_header(work))
+    }
+
+    #[inline(never)]
+    fn poll_partial(
+        &mut self,
+        input: &[u8],
+        width: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LengthRead> {
+        while usize::from(self.prefix_read) < width {
+            let count = (width - usize::from(self.prefix_read))
+                .min(work.remaining().min(4) as usize)
+                .min(input.len().saturating_sub(self.offset));
+            if count == 0 {
+                // A missing byte costs one unit, including in a partial prefix.
+                return Ok(if work.try_charge(1) {
+                    LengthRead::Incomplete
+                } else {
+                    LengthRead::Yield
+                });
+            }
+            let chunk = &input[self.offset..self.offset + count];
+            self.length = if let [a, b, c, d] = chunk {
+                // Four bytes are only possible at the start of a prefix.
+                u32::from_be_bytes([*a, *b, *c, *d])
+            } else {
+                chunk
+                    .iter()
+                    .fold(self.length, |length, &byte| (length << 8) | u32::from(byte))
+            };
+            work.take(count as u64);
+            self.offset += count;
+            self.prefix_read += count as u8;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+        }
+        Ok(Self::charge_header(work))
+    }
+
+    fn charge_header(work: &mut WorkBudget) -> LengthRead {
+        if work.try_charge(1) {
+            LengthRead::Complete
+        } else {
+            LengthRead::Yield
+        }
+    }
 }
 
 impl<M> NalPacketJob<'_, M> {
@@ -111,8 +209,8 @@ impl PacketPlan {
             if extra.len() != raw.len() {
                 return Err(Error::Invalid("configuration update bytes differ"));
             }
-            if self.offset < raw.len() {
-                let count = (raw.len() - self.offset)
+            if self.cursor.offset < raw.len() {
+                let count = (raw.len() - self.cursor.offset)
                     .min(4096)
                     .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
                 if count == 0 {
@@ -120,20 +218,20 @@ impl PacketPlan {
                 }
                 // Parsed side data usually retains the same immutable input span.
                 if !std::ptr::eq(extra.as_ref(), raw.as_ref())
-                    && extra[self.offset..self.offset + count]
-                        != raw[self.offset..self.offset + count]
+                    && extra[self.cursor.offset..self.cursor.offset + count]
+                        != raw[self.cursor.offset..self.cursor.offset + count]
                 {
                     return Err(Error::Invalid("configuration update bytes differ"));
                 }
                 work.take(count as u64);
-                self.offset += count;
-                if self.offset < raw.len() {
+                self.cursor.offset += count;
+                if self.cursor.offset < raw.len() {
                     return Ok(NEXT);
                 }
             }
         }
         state.update_verified = true;
-        self.offset = 0;
+        self.cursor.offset = 0;
         self.phase = PlanPhase::Scan;
         Ok(NEXT)
     }
@@ -147,13 +245,13 @@ impl PacketPlan {
         match state
             .session
             .configuration
-            .admit_hevc_arrays(&mut self.offset, work)
+            .admit_hevc_arrays(&mut self.cursor.offset, work)
         {
             Ok(true) => {}
             Ok(false) => return Ok(YIELD),
             Err(_) => return Err(Error::Unsupported("pinned HEVC decoder array type")),
         }
-        self.offset = 0;
+        self.cursor.offset = 0;
         self.phase = if state.length_width.is_some() {
             PlanPhase::Lookahead
         } else {
@@ -171,54 +269,14 @@ impl PacketPlan {
         cancel: &AtomicBool,
         refusal: &mut Option<NalPacketReceiverErrorKind>,
     ) -> Result<bool> {
-        if width == 4
-            && self.prefix_read == 0
-            && work.remaining() >= 4
-            && let Some(tail) = input.get(self.offset..)
-            && let Some(bytes) = tail.first_chunk()
-        {
-            work.take(4);
-            self.length = u32::from_be_bytes(*bytes) as usize;
-            self.offset += 4;
-            self.prefix_read = 4;
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            return Ok(work.try_charge(1));
-        }
-        self.read_partial_length(input, width, work, cancel, refusal)
-    }
-
-    #[inline(never)]
-    fn read_partial_length(
-        &mut self,
-        input: &[u8],
-        width: usize,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-        refusal: &mut Option<NalPacketReceiverErrorKind>,
-    ) -> Result<bool> {
-        while self.prefix_read < width {
-            let count = (width - self.prefix_read)
-                .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
-                .min(input.len().saturating_sub(self.offset));
-            if count == 0 {
-                // The failed read costs one unit, including at a partial prefix.
-                if !work.try_charge(1) {
-                    return Ok(false);
-                }
+        match self.cursor.poll(input, width, work, cancel)? {
+            LengthRead::Yield => Ok(false),
+            LengthRead::Complete => Ok(true),
+            LengthRead::Incomplete => {
                 *refusal = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
-                return Err(Error::Truncated);
-            }
-            work.take(count as u64);
-            self.length = extend_length(self.length, &input[self.offset..self.offset + count]);
-            self.offset += count;
-            self.prefix_read += count;
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
+                Err(Error::Truncated)
             }
         }
-        Ok(work.try_charge(1))
     }
 
     #[inline]
@@ -238,9 +296,9 @@ impl PacketPlan {
                 .ok_or(Error::Invalid("missing packet width"))?
                 .bytes(),
         );
-        if self.offset == source.bytes.len() && self.prefix_read == 0 {
-            self.offset = 0;
-            self.length = 0;
+        if self.cursor.offset == source.bytes.len() && self.cursor.prefix_read == 0 {
+            self.cursor.offset = 0;
+            self.cursor.length = 0;
             self.phase = PlanPhase::Scan;
             return Ok(NEXT);
         }
@@ -253,7 +311,7 @@ impl PacketPlan {
         )? {
             return Ok(YIELD);
         }
-        if self.length == 0 {
+        if self.cursor.length == 0 {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
             return Err(Error::Invalid("pinned HEVC empty NAL"));
         }
@@ -264,25 +322,27 @@ impl PacketPlan {
             });
         }
         let end = self
+            .cursor
             .offset
-            .checked_add(self.length)
+            .checked_add(self.cursor.length as usize)
             .ok_or(Error::Overflow)?;
         if end > source.bytes.len() {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
             return Err(Error::Truncated);
         }
-        let kind = match NalHeader::parse_compact(Codec::Hevc, &source.bytes[self.offset..end]) {
-            Ok(h) => h.nal_unit_type(),
-            Err(e) if state.observed_packet => {
-                state.packet_source_refusal.get_or_insert(e);
-                (source.bytes[self.offset] >> 1) & 63
-            }
-            Err(e) => return Err(e.error()),
-        };
+        let kind =
+            match NalHeader::parse_compact(Codec::Hevc, &source.bytes[self.cursor.offset..end]) {
+                Ok(h) => h.nal_unit_type(),
+                Err(e) if state.observed_packet => {
+                    state.packet_source_refusal.get_or_insert(e);
+                    (source.bytes[self.cursor.offset] >> 1) & 63
+                }
+                Err(e) => return Err(e.error()),
+            };
         self.has_irap |= (16..=23).contains(&kind);
-        self.offset = end;
-        self.prefix_read = 0;
-        self.length = 0;
+        self.cursor.offset = end;
+        self.cursor.prefix_read = 0;
+        self.cursor.length = 0;
         self.look_nals += 1;
         Ok(NEXT)
     }
@@ -309,11 +369,11 @@ impl PacketPlan {
             return Ok(NEXT);
         };
         let width = usize::from(width.bytes());
-        if self.offset == 0 && source.bytes.is_empty() && state.codec == Codec::Avc {
+        if self.cursor.offset == 0 && source.bytes.is_empty() && state.codec == Codec::Avc {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
             return Err(Error::Invalid("pinned AVC empty packet"));
         }
-        if self.offset == source.bytes.len() && self.prefix_read == 0 {
+        if self.cursor.offset == source.bytes.len() && self.cursor.prefix_read == 0 {
             self.phase = PlanPhase::Reserve;
             return Ok(NEXT);
         }
@@ -327,19 +387,20 @@ impl PacketPlan {
             return Ok(YIELD);
         }
         let end = self
+            .cursor
             .offset
-            .checked_add(self.length)
+            .checked_add(self.cursor.length as usize)
             .ok_or(Error::Overflow)?;
         if end > source.bytes.len() {
             state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
             return Err(Error::Truncated);
         }
-        if self.length == 0 {
+        if self.cursor.length == 0 {
             if state.codec == Codec::Hevc {
                 state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
                 return Err(Error::Invalid("pinned HEVC empty NAL"));
             }
-            self.prefix_read = 0;
+            self.cursor.prefix_read = 0;
             return Ok(NEXT);
         }
         if self.nals == state.session.limits.maximum_nals {
@@ -349,7 +410,7 @@ impl PacketPlan {
             });
         }
         let codec = state.codec;
-        let header = source.bytes[self.offset];
+        let header = source.bytes[self.cursor.offset];
         let kind = if codec == Codec::Hevc {
             // Width-framed HEVC reaches Scan only after Lookahead
             // accepted every header or retained the first observed
@@ -380,16 +441,14 @@ impl PacketPlan {
                         && !state.avc.injected_for_buffering_period
                         && source
                             .bytes
-                            .get(self.offset + 1)
+                            .get(self.cursor.offset + 1)
                             .is_none_or(|&first| first == 0) =>
                 {
                     // H.264 Annex D assigns payload type zero to buffering
                     // period. The receiver reads the next byte and treats end
                     // of packet as a zero type. It does not parse the message.
                     self.avc_buffering = Some(AvcBufferingLookahead {
-                        offset: end,
-                        length: 0,
-                        prefix_read: 0,
+                        cursor: NalLength::at(end),
                         remaining_nals: state.session.limits.maximum_nals - self.nals - 1,
                         sps: None,
                         pps: None,
@@ -412,10 +471,10 @@ impl PacketPlan {
                     }
                 }
                 5 => {
-                    let next = self.offset + 1;
+                    let next = self.cursor.offset + 1;
                     // The receiver reads the next packet byte, with zero
                     // padding at the end. The strict path needs a slice byte.
-                    let first_byte = if self.length > 1 {
+                    let first_byte = if self.cursor.length > 1 {
                         source.bytes[next]
                     } else if state.observed_packet {
                         source.bytes.get(next).copied().unwrap_or(0)
@@ -499,58 +558,40 @@ impl PacketPlan {
         // Charge each length and header. The regular scan still owns the input
         // and reports malformed lengths and headers at its original boundary.
         while valid.remaining_nals != 0 {
-            if valid.offset == source.bytes.len() && valid.prefix_read == 0 {
+            let cursor = &mut valid.cursor;
+            // The ordinary scan reports incomplete prefixes in source order.
+            // Lookahead charges only a prefix that can be read in full.
+            let missing = width - usize::from(cursor.prefix_read);
+            if source.bytes.len() - cursor.offset < missing {
                 break;
             }
-            let available = source.bytes.len() - valid.offset;
-            let missing = width - valid.prefix_read;
-            if available < missing {
-                break;
+            match cursor.poll(&source.bytes, width, work, cancel)? {
+                LengthRead::Complete => {}
+                LengthRead::Yield => return Ok(YIELD),
+                LengthRead::Incomplete => break,
             }
-            if missing > 0 {
-                let count = work_count(work).min(missing);
-                if count == 0 {
-                    return Ok(YIELD);
-                }
-                valid.length = extend_length(
-                    valid.length,
-                    &source.bytes[valid.offset..valid.offset + count],
-                );
-                work.take(count as u64);
-                valid.offset += count;
-                valid.prefix_read += count;
-                if cancel.load(Ordering::Relaxed) {
-                    return Err(Error::Cancelled);
-                }
-                if valid.prefix_read < width {
-                    return Ok(YIELD);
-                }
-            }
-            if !work.try_charge(1) {
-                return Ok(YIELD);
-            }
-            let Some(end) = valid
+            let Some(end) = cursor
                 .offset
-                .checked_add(valid.length)
+                .checked_add(cursor.length as usize)
                 .filter(|&end| end <= source.bytes.len())
             else {
                 break;
             };
-            if valid.length > 0 {
+            if let Some(length) = NonZeroU32::new(cursor.length) {
                 valid.remaining_nals -= 1;
-                let kind = source.bytes[valid.offset] & 31;
+                let start = cursor.offset;
+                let kind = source.bytes[start] & 31;
                 if matches!(kind, avc::IDR | avc::SLICE) {
                     break;
                 }
+                let span = NalSpan { start, length };
                 match kind {
-                    avc::SPS => valid.sps = Some(valid.offset..end),
-                    avc::PPS => valid.pps = Some(valid.offset..end),
+                    avc::SPS => valid.sps = Some(span),
+                    avc::PPS => valid.pps = Some(span),
                     _ => {}
                 }
             }
-            valid.offset = end;
-            valid.length = 0;
-            valid.prefix_read = 0;
+            *cursor = NalLength::at(end);
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
@@ -619,14 +660,14 @@ impl PacketPlan {
         // Insert the sequence set before the picture set. An in-band copy
         // uses the packet range; it never changes the configuration record.
         let (config_index, packet_range) = if index == 0 {
-            (None, lookahead.sps.as_ref())
+            (None, lookahead.sps)
         } else if index == count + 1 {
-            (None, lookahead.pps.as_ref())
+            (None, lookahead.pps)
         } else {
             (Some(index - 1), None)
         };
-        let segment = if let Some(range) = packet_range {
-            Some(NalPacketSegment::packet(range.clone(), 4, state.total))
+        let segment = if let Some(span) = packet_range {
+            Some(NalPacketSegment::packet(span.range(), 4, state.total))
         } else if let Some(index) = config_index {
             let n = state
                 .config()
@@ -667,12 +708,12 @@ impl PacketPlan {
             3
         };
         // Scan verified the complete NAL before entering this phase.
-        let end = self.offset + self.length;
-        let segment = NalPacketSegment::packet(self.offset..end, prefix, state.total);
+        let end = self.cursor.offset + self.cursor.length as usize;
+        let segment = NalPacketSegment::packet(self.cursor.offset..end, prefix, state.total);
         self.append(state, segment)?;
-        self.offset = end;
-        self.length = 0;
-        self.prefix_read = 0;
+        self.cursor.offset = end;
+        self.cursor.length = 0;
+        self.cursor.prefix_read = 0;
         self.nal = None;
         self.phase = PlanPhase::Scan;
         Ok(NEXT)

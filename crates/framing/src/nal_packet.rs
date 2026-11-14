@@ -2,7 +2,7 @@
 //! named on [`crate::compat::nal`].
 //! NAL bodies stay opaque; this does not establish access-unit/decoder validity.
 mod phases;
-use phases::AvcBufferingLookahead;
+use phases::{AvcBufferingLookahead, NalLength};
 
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, AvcConfiguration, BuildStep, Codec, HvcConfiguration, LengthSize};
@@ -892,9 +892,7 @@ struct PacketPlan {
     phase: PlanPhase,
     // Verification, array admission, lookahead and scanning run in order.
     // The cursor is reset before its next role; source offsets stay full width.
-    offset: usize,
-    length: usize,
-    prefix_read: usize,
+    cursor: NalLength,
     nals: usize,
     nal: Option<u8>,
     injection: Option<(Injection, usize)>,
@@ -915,9 +913,7 @@ impl PacketPlan {
     fn new(phase: PlanPhase) -> Self {
         Self {
             phase,
-            offset: 0,
-            length: 0,
-            prefix_read: 0,
+            cursor: NalLength::default(),
             nals: 0,
             nal: None,
             injection: None,
