@@ -698,6 +698,16 @@ by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread
 passes every case either way; the collection took 82 instead of 252 minutes on AArch64
 and 96 instead of 296 on ARMv7.
 
+Each collection records the number of slots (`memory_slots`) and what the host's memory
+did over it (`host_memory`): `MemAvailable` at its start and end and the change of the
+reclaim and compaction counters of `/proc/vmstat`, which count the whole host. Run
+kernel-bound memory gates on a host of the class they are qualified on, a c6g.4xlarge
+with 32 GB, where no archived collection serial or parallel has had a pair voided by
+another task's update of a worker's resident counters. On smaller hosts such pairs
+occur, and a collection measures them again within the limit the [kernel
+bound](../harness/rss-bound/README.md#what-it-measures) sets; `host_memory` shows
+whether reclaim ran while they were measured.
+
 #### Reuse
 
 Every gate command (`report --benchmark`, `report --memory`, `grade`, `isobmff-bench`,

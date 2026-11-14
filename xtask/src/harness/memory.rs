@@ -91,6 +91,58 @@ pub(super) fn voided_by_foreign_update(row: &Value, observer_sha256: Option<&Val
     voided
 }
 
+/// Host-wide reclaim counters of `/proc/vmstat` a collection records the change of.
+const RECLAIM_COUNTERS: [&str; 6] = [
+    "pgscan_kswapd",
+    "pgscan_direct",
+    "pgsteal_kswapd",
+    "pgsteal_direct",
+    "compact_stall",
+    "allocstall_normal",
+];
+
+/// The host's available memory and reclaim counters, on Linux; `None` elsewhere.
+fn host_memory() -> Option<(i128, Vec<(String, i128)>)> {
+    let meminfo = fs::read_to_string("/proc/meminfo").ok()?;
+    let available = meminfo.lines().find_map(|line| {
+        let kib = line
+            .strip_prefix("MemAvailable:")?
+            .trim()
+            .strip_suffix("kB")?;
+        kib.trim().parse::<i128>().ok().map(|kib| kib * 1024)
+    })?;
+    let vmstat = fs::read_to_string("/proc/vmstat").ok()?;
+    let counters = vmstat
+        .lines()
+        .filter_map(|line| {
+            let (name, value) = line.split_once(' ')?;
+            RECLAIM_COUNTERS
+                .contains(&name)
+                .then(|| Some((name.to_owned(), value.trim().parse().ok()?)))?
+        })
+        .collect();
+    Some((available, counters))
+}
+
+/// What the host's memory did over one collection: available memory at its start
+/// and end and the change of every reclaim counter, which counts the whole host,
+/// so it includes collections running beside this one.
+fn host_memory_change(
+    start: Option<(i128, Vec<(String, i128)>)>,
+    end: Option<(i128, Vec<(String, i128)>)>,
+) -> Option<Value> {
+    let ((before, counters), (after, later)) = (start?, end?);
+    let change = counters.iter().filter_map(|(name, value)| {
+        let (_, later) = later.iter().find(|(n, _)| n == name)?;
+        Some((name.clone(), Value::int(later - value)))
+    });
+    Some(Value::object([
+        ("mem_available_start_bytes", Value::int(before)),
+        ("mem_available_end_bytes", Value::int(after)),
+        ("reclaim", Value::object(change)),
+    ]))
+}
+
 /// Whether a collection's discarded pairs (`retried_pairs`) were each voided by
 /// the kernel bound alone, within [`MAX_RETRIES`], at pairs it measured.
 pub(super) fn retries_valid(
@@ -1379,6 +1431,7 @@ fn measure(
         Value::Object(row)
     };
     let observer_sha256 = certificate.get("observer_sha256");
+    let memory_at_start = host_memory();
     let mut samples = Vec::new();
     let mut retried = Vec::new();
     let (mut heaps, mut totals) = (Vec::new(), Vec::new());
@@ -1456,6 +1509,9 @@ fn measure(
     };
     if !retried.is_empty() {
         push(&mut result, "retried_pairs", Value::Array(retried));
+    }
+    if let Some(memory) = host_memory_change(memory_at_start, host_memory()) {
+        push(&mut result, "host_memory", memory);
     }
     push(&mut result, "input_sha256", Value::str(&input_sha));
     match file_sha(invocation.input) {
@@ -1642,7 +1698,10 @@ fn run_in_slots(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
                     let Some(group) = next else { break };
                     for (job, Job { collect, .. }) in group {
                         let result = match &pinned {
-                            Ok(()) => collect(&slot),
+                            Ok(()) => collect(&slot).map(|mut collection| {
+                                push(&mut collection, "memory_slots", Value::int(slots as i128));
+                                collection
+                            }),
                             Err(error) => Err(error.clone()),
                         };
                         results.lock().expect("no memory slot panics")[job] = Some(result);
@@ -2091,6 +2150,34 @@ pub fn evidence_valid_with_outputs(
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
+    #[test]
+    fn host_memory_records_available_memory_and_reclaim_changes() {
+        let counters = |scan: i128, steal: i128| {
+            vec![
+                ("pgscan_kswapd".to_owned(), scan),
+                ("pgsteal_kswapd".to_owned(), steal),
+            ]
+        };
+        let change = host_memory_change(
+            Some((8 << 30, counters(100, 40))),
+            Some((6 << 30, counters(160, 70))),
+        )
+        .unwrap();
+        assert_eq!(
+            py_int(change.get("mem_available_start_bytes")),
+            Some(8 << 30)
+        );
+        assert_eq!(py_int(change.get("mem_available_end_bytes")), Some(6 << 30));
+        let reclaim = change.get("reclaim").unwrap();
+        assert_eq!(py_int(reclaim.get("pgscan_kswapd")), Some(60));
+        assert_eq!(py_int(reclaim.get("pgsteal_kswapd")), Some(30));
+        assert!(host_memory_change(None, Some((1, vec![]))).is_none());
+        if cfg!(target_os = "linux") {
+            let (available, counters) = host_memory().unwrap();
+            assert!(available > 0 && counters.iter().any(|(n, _)| n == "pgscan_kswapd"));
+        }
+    }
 
     #[cfg(unix)]
     #[test]
