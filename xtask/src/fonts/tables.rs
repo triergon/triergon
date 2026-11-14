@@ -835,7 +835,7 @@ fn generate_autofit(texts: &[String]) -> Result<String, String> {
     }
     out.push_str("];\n");
 
-    // The blue strings of the styles of the latin writing system.
+    // The blue strings of the styles of the latin and CJK writing systems.
     let strings = enumeration(&afblue_h, "AF_Blue_String")?;
     let stringsets = enumeration(&afblue_h, "AF_Blue_Stringset")?;
     let pool: Vec<u8> = arguments(afblue_c.array("af_blue_strings[]")?)
@@ -866,7 +866,16 @@ fn generate_autofit(texts: &[String]) -> Result<String, String> {
             sets.len()
         ));
     }
-    let properties: Vec<(&str, u64)> = [
+    // Each writing system's properties. `AF_BLUE_PROPERTY_CJK_RIGHT`, another
+    // name for `AF_BLUE_PROPERTY_CJK_TOP`, is used only by the zones of
+    // `AF_CONFIG_OPTION_CJK_BLUE_HANI_VERT`, which is off.
+    let property_values = |names: &[&'static str]| -> Result<Vec<(&'static str, u64)>, String> {
+        names
+            .iter()
+            .map(|&name| Ok((name, shift_value(afblue_h.define(name)?)?)))
+            .collect()
+    };
+    let latin_properties = property_values(&[
         "AF_BLUE_PROPERTY_LATIN_TOP",
         "AF_BLUE_PROPERTY_LATIN_SUB_TOP",
         "AF_BLUE_PROPERTY_LATIN_NEUTRAL",
@@ -874,10 +883,9 @@ fn generate_autofit(texts: &[String]) -> Result<String, String> {
         "AF_BLUE_PROPERTY_LATIN_LONG",
         "AF_BLUE_PROPERTY_LATIN_CAPITAL_BOTTOM",
         "AF_BLUE_PROPERTY_LATIN_SMALL_BOTTOM",
-    ]
-    .into_iter()
-    .map(|name| Ok((name, shift_value(afblue_h.define(name)?)?)))
-    .collect::<Result<_, String>>()?;
+    ])?;
+    let cjk_properties =
+        property_values(&["AF_BLUE_PROPERTY_CJK_TOP", "AF_BLUE_PROPERTY_CJK_HORIZ"])?;
     let value_of = |name: &str| -> Result<u64, String> {
         strings
             .iter()
@@ -888,7 +896,12 @@ fn generate_autofit(texts: &[String]) -> Result<String, String> {
     let max_string = value_of("AF_BLUE_STRING_MAX")?;
     let mut emitted: HashMap<String, String> = HashMap::new();
     let mut blue_sets = String::new();
-    for style in styles.iter().filter(|s| s.writing_system == "Latin") {
+    for style in &styles {
+        let properties = match style.writing_system {
+            "Latin" => &latin_properties,
+            "Cjk" => &cjk_properties,
+            _ => continue,
+        };
         let set = style
             .stringset
             .as_ref()
@@ -944,15 +957,16 @@ fn generate_autofit(texts: &[String]) -> Result<String, String> {
     }
     out.push_str(&format!(
         "\n/// `af_style_classes`: the styles of `afstyles.h` in order: their writing\n\
-         /// system, script, blue strings (for the latin writing system) and whether\n\
-         /// they cover characters by the script's ranges (`AF_COVERAGE_DEFAULT`)\n\
-         /// rather than by an OpenType feature, which needs HarfBuzz.\n\
+         /// system, script, blue strings (for the latin and CJK writing systems) and\n\
+         /// whether they cover characters by the script's ranges\n\
+         /// (`AF_COVERAGE_DEFAULT`) rather than by an OpenType feature, which needs\n\
+         /// HarfBuzz.\n\
          pub(crate) static STYLES: [Style; {}] = [\n",
         styles.len()
     ));
     for style in &styles {
         let blues = match (&style.stringset, style.writing_system) {
-            (Some(set), "Latin") => format!("&{}", emitted[set]),
+            (Some(set), "Latin" | "Cjk") => format!("&{}", emitted[set]),
             _ => "&[]".to_owned(),
         };
         out.push_str(&format!(

@@ -279,6 +279,39 @@ pub fn truetype_tables(weight: u16, fs_selection: u16, family: &str, subfamily: 
     ]
 }
 
+/// A TrueType face without bytecode whose glyph 1, a box at x 110..290 and
+/// y -20..730 with an advance of 400, is the ideographs' first standard
+/// character, 田 (U+7530), and a character of both of their blue strings,
+/// 他 (U+4ED6); glyph 2, the same box, is Tibetan KA (U+0F40).
+pub fn cjk_tables() -> Tables {
+    let bar: &[(i16, i16, bool)] = &[
+        (110, -20, true),
+        (110, 730, true),
+        (290, 730, true),
+        (290, -20, true),
+    ];
+    let (glyf, loca) = glyf(&[Vec::new(), simple(&[bar]), simple(&[bar])]);
+    vec![
+        (*b"head", head(1000, false, 0)),
+        (*b"hhea", hhea(3)),
+        (*b"maxp", maxp(3)),
+        (*b"OS/2", os2(400, 0)),
+        (*b"hmtx", hmtx(&[(500, 0), (400, 110), (400, 110)])),
+        (*b"cmap", cmap(&[(0x0f40, 2), (0x4ed6, 1), (0x7530, 1)])),
+        (
+            *b"name",
+            name(&[
+                (1, "Test Han"),
+                (2, "Regular"),
+                (4, "Test Han Regular"),
+                (6, "TestHan-Regular"),
+            ]),
+        ),
+        (*b"glyf", glyf),
+        (*b"loca", loca),
+    ]
+}
+
 /// A CFF table: glyph 1 a square drawn with a width, hints, a hintmask and a local
 /// subroutine; glyph 2 a curve through a global subroutine and a flex.
 pub fn cff_table() -> Vec<u8> {
