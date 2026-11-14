@@ -730,7 +730,7 @@ pub(super) fn input_problem(
 }
 
 /// Every corpus file a case reads: its input, ordered entities and companions.
-fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
     let mut files = vec![corpus.join(s(case, "file").ok_or("case without input path")?)];
     for key in ["entities", "companions"] {
         for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {
@@ -1024,6 +1024,7 @@ pub(crate) fn collect(
     let contract = read_json(&options.contract)?;
     let work_fields = super::comparison::work_fields(&contract)?;
     let timeout = worker::contract_timeout(&contract)?;
+    let parity_timeout = worker::contract_parity_timeout(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
@@ -1196,7 +1197,7 @@ pub(crate) fn collect(
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
-                timeout,
+                timeout: parity_timeout,
             };
             timed = Some((
                 measured.clone(),
@@ -1242,7 +1243,7 @@ pub(crate) fn collect(
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
-                timeout,
+                timeout: parity_timeout,
             };
             let comparison = rule.map(|rule| Comparison {
                 rule,

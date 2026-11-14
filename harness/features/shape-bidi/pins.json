@@ -4,64 +4,64 @@
   "note": "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
   "pins": {
     "bidi-authored-ltr": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 111244024427606984
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 12372712408440653356
     },
     "bidi-authored-ltr-brackets": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 3835402817601403978
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 16096871201614450350
     },
     "bidi-authored-rtl": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 5047270072697580746
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 8472870401617933642
     },
     "bidi-authored-rtl-brackets": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 9953568061495654599
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 13379168390416007495
     },
     "bidi-authored-on": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 7689741829597032870
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 1504466139900527626
     },
     "bidi-authored-on-brackets": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 6169882899316524837
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 18431351283329571209
     },
     "bidi-authored-lines-ltr": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 1555524665229127549
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 16471651862718026787
     },
     "bidi-authored-lines-ltr-brackets": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 16412912965242342015
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 16193850912157699813
     },
     "bidi-authored-lines-rtl": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 8204459668052112305
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 9379696230293321716
     },
     "bidi-authored-lines-rtl-brackets": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 10042149961814116206
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 12350722049635591473
     },
     "bidi-authored-lines-on": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 6117799861478946531
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 7483032125308013127
     },
     "bidi-authored-lines-on-brackets": {
-      "packets": 76,
-      "bytes": 3189,
-      "digest": 8969402560880776226
+      "packets": 78,
+      "bytes": 3202,
+      "digest": 7262439306412746118
     },
     "bidi-random-ltr": {
       "packets": 2000,
@@ -96,32 +96,32 @@
     "bidi-random-lines-ltr": {
       "packets": 2000,
       "bytes": 49319,
-      "digest": 2124551028026075753
+      "digest": 2239987882312395473
     },
     "bidi-random-lines-ltr-brackets": {
       "packets": 2000,
       "bytes": 49319,
-      "digest": 15834287714372191237
+      "digest": 956133424066563693
     },
     "bidi-random-lines-rtl": {
       "packets": 2000,
       "bytes": 49319,
-      "digest": 15610278686059017800
+      "digest": 10265164890496985828
     },
     "bidi-random-lines-rtl-brackets": {
       "packets": 2000,
       "bytes": 49319,
-      "digest": 10529173134729566723
+      "digest": 13293105755947711967
     },
     "bidi-random-lines-on": {
       "packets": 2000,
       "bytes": 49319,
-      "digest": 15558232278626704541
+      "digest": 12622186856478688388
     },
     "bidi-random-lines-on-brackets": {
       "packets": 2000,
       "bytes": 49319,
-      "digest": 3539281654876232523
+      "digest": 3544416072265567410
     }
   }
 }

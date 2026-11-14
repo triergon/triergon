@@ -861,20 +861,22 @@ impl Machine<'_> {
                     let r = self.state.rp[0];
                     if r < self.zone(0).len() {
                         if self.state.zp[1] == 0 {
-                            // Observed: MSIRP places a twilight point at rp0
-                            // moved by the distance along the freedom vector,
-                            // x included, and its original position with it
-                            // (`twilight-relative`, `twilight-moves`).
-                            let c = self.current(0, r);
+                            // Observed: MSIRP places a twilight point, original
+                            // and current, at rp0's original position moved by
+                            // the distance along the freedom vector, x
+                            // included, or at rp0's original position where
+                            // the vectors are perpendicular; the move below
+                            // then measures from rp0's current position
+                            // (`twilight-relative`, `twilight-moves`,
+                            // `twilight-msirp-perpendicular`).
+                            let o = self.original(0, r);
                             let (dx, dy) = self.displacement(d).unwrap_or_default();
-                            let at = Point::new(c.x.wrapping_add(dx), c.y.wrapping_add(dy));
+                            let at = Point::new(o.x.wrapping_add(dx), o.y.wrapping_add(dy));
                             let z = self.zone_mut(1);
                             z.original.as_mut_slice()[p] = at;
                             z.current.as_mut_slice()[p] = at;
-                            self.touch(1, p);
-                        } else {
-                            self.move_to_distance(1, p, 0, r, d);
                         }
+                        self.move_to_distance(1, p, 0, r, d);
                         self.state.rp[1] = r;
                         self.state.rp[2] = p;
                         if op == 0x3B {
