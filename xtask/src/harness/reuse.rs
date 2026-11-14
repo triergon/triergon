@@ -29,11 +29,15 @@ const RESULT_SCHEMA: &str = "gate-result-v1";
 /// The file each gate command writes in its output directory.
 pub const RESULT: &str = "gate-result.json";
 
-/// Everything a gate command's result depends on beyond its own settings: the
-/// code that measures, records and grades, and the observers it loads. Any
-/// change re-measures every feature.
-const CODE: [&str; 11] = [
+/// Everything a gate command's result depends on beyond its own settings and
+/// the build's shared inputs ([`super::provenance::shared_inputs`]): the code
+/// that measures, records and grades, the oracles, the reviewed input lists and
+/// the observers it loads. Any change re-measures every feature.
+const CODE: [&str; 14] = [
     "xtask/src",
+    "harness/oracles.py",
+    "harness/fate/samples.json",
+    "harness/fonts/corpus.json",
     "xtask/Cargo.toml",
     "Cargo.lock",
     "rust-toolchain.toml",
@@ -95,12 +99,13 @@ impl Key {
             (
                 "toolchain",
                 Value::object([
-                    ("rustc", Value::str(output("rustc", &["-vV"]))),
-                    ("cc", Value::str(output("cc", &["--version"]))),
+                    ("rustc", Value::str(output("rustc", &["-vV"])?)),
+                    ("cc", Value::str(output("cc", &["--version"])?)),
+                    ("python", python()?),
                 ]),
             ),
             ("target", Value::str(super::report::gate_target()?)),
-            ("host", host()),
+            ("host", host()?),
         ]);
         Ok(Self {
             sha256: sha256::hex(json::canonical(&components).as_bytes()),
@@ -108,18 +113,28 @@ impl Key {
         })
     }
 
-    /// A key that also binds earlier gate results, read from their output
-    /// directories: `grade` binds the collections it joins.
-    pub fn with_inputs(mut self, inputs: &[&Path]) -> R<Self> {
-        let keys = inputs
+    /// A key that also binds the reports it reads, each with the gate result
+    /// recorded beside it: `grade` binds the collections it joins. A measured
+    /// report is bound by its bytes, so measuring again with `--full` changes the
+    /// key; a reused collection, which has no report, by the cited report's hash.
+    pub fn with_inputs(mut self, reports: &[&Path]) -> R<Self> {
+        let inputs = reports
             .iter()
-            .map(|directory| {
-                let result = read(directory)?;
-                Ok(result.get("key").cloned().unwrap_or(Value::Null))
+            .map(|report| {
+                let result = read(report.parent().unwrap_or(Path::new(".")))?;
+                let bytes = if report.is_file() {
+                    Value::str(file_sha(report)?)
+                } else {
+                    result.get("report_sha256").cloned().unwrap_or(Value::Null)
+                };
+                Ok(Value::object([
+                    ("key", result.get("key").cloned().unwrap_or(Value::Null)),
+                    ("report_sha256", bytes),
+                ]))
             })
             .collect::<R<Vec<_>>>()?;
         if let Value::Object(fields) = &mut self.components {
-            fields.push(("inputs".into(), Value::Array(keys)));
+            fields.push(("inputs".into(), Value::Array(inputs)));
         }
         self.sha256 = sha256::hex(json::canonical(&self.components).as_bytes());
         Ok(self)
@@ -159,6 +174,10 @@ pub fn cited(root: &Path, key: &Key) -> R<Option<Value>> {
                 "status",
                 result.get("status").cloned().unwrap_or(Value::Null),
             ),
+            (
+                "report_sha256",
+                result.get("report_sha256").cloned().unwrap_or(Value::Null),
+            ),
         ]))
     }))
 }
@@ -193,12 +212,20 @@ pub fn step(
     Ok(status)
 }
 
-/// Record the result of a gate command in `output`.
+/// Record the result of a gate command in `output`. A measured result binds the
+/// report it wrote (`report.json`), if any; a reused one, the cited report's.
 pub fn record(output: &Path, key: &Key, status: i32, reused: Option<Value>) -> R<()> {
+    let report = output.join("report.json");
+    let report_sha256 = match &reused {
+        Some(cited) => cited.get("report_sha256").cloned().unwrap_or(Value::Null),
+        None if report.is_file() => Value::str(file_sha(&report)?),
+        None => Value::Null,
+    };
     let result = Value::object([
         ("schema", Value::str(RESULT_SCHEMA)),
         ("key", Value::str(&key.sha256)),
         ("status", Value::int(status)),
+        ("report_sha256", report_sha256),
         ("reused", reused.unwrap_or(Value::Null)),
         ("components", key.components.clone()),
     ]);
@@ -247,6 +274,10 @@ pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
                 "status",
                 result.get("status").cloned().unwrap_or(Value::Null),
             ),
+            (
+                "report_sha256",
+                result.get("report_sha256").cloned().unwrap_or(Value::Null),
+            ),
         ]));
     }
     Ok(results)
@@ -271,12 +302,31 @@ fn relative(root: &Path, path: &Path) -> String {
         .into_owned()
 }
 
-fn output(program: &str, args: &[&str]) -> String {
-    Command::new(program)
+/// A probe's output; a probe that cannot run or fails is an error.
+fn output(program: &str, args: &[&str]) -> R<String> {
+    let probe = Command::new(program)
         .args(args)
         .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-        .unwrap_or_default()
+        .map_err(|e| format!("{program}: {e}"))?;
+    if !probe.status.success() {
+        return Err(format!("{program} {}: {}", args.join(" "), probe.status));
+    }
+    Ok(String::from_utf8_lossy(&probe.stdout).trim().to_owned())
+}
+
+/// The Python that runs the oracles and the capture input generator
+/// (`TRIERGON_PYTHON`, else `python3`), with numpy's version where it has one.
+pub fn python() -> R<Value> {
+    let program = std::env::var("TRIERGON_PYTHON").unwrap_or_else(|_| "python3".into());
+    let version = output(
+        &program,
+        &[
+            "-I",
+            "-c",
+            "import sys\ntry:\n import numpy; n = numpy.__version__\nexcept ImportError:\n n = None\nprint(sys.version.split()[0], n)",
+        ],
+    )?;
+    Ok(Value::str(version))
 }
 
 /// A worker's bytes and, on Linux, every shared library its loader resolves.
@@ -306,9 +356,20 @@ fn worker(path: &Path) -> R<Value> {
     Ok(Value::object(fields))
 }
 
-/// The SHA-256 of every file under [`CODE`], by path, and of them all.
+/// The SHA-256 of every file under [`CODE`] and every shared build input, by
+/// path, and of them all.
 fn code(root: &Path) -> R<Value> {
-    let mut files: Vec<PathBuf> = Vec::new();
+    let mut files: Vec<PathBuf> = super::provenance::shared_inputs(root)?
+        .iter()
+        .map(|name| root.join(name))
+        .collect();
+    let oracles = fs::read_dir(root.join("harness")).map_err(|e| format!("harness: {e}"))?;
+    for entry in oracles {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if path.extension().is_some_and(|e| e == "py") {
+            files.push(path);
+        }
+    }
     for entry in CODE {
         let path = root.join(entry);
         if path.is_dir() {
@@ -322,6 +383,7 @@ fn code(root: &Path) -> R<Value> {
         }
     }
     files.sort();
+    files.dedup();
     let mut all = sha256::Sha256::default();
     for file in &files {
         let line = format!("{}  {}\n", file_sha(file)?, relative(root, file));
@@ -334,8 +396,8 @@ fn code(root: &Path) -> R<Value> {
 }
 
 /// The host class: architecture and personality, kernel, CPU model, machine
-/// type, page size and CPUs online.
-fn host() -> Value {
+/// type, page size, CPUs online and the CPUs this process may use.
+fn host() -> R<Value> {
     let read = |path: &str| fs::read_to_string(path).map_or(Value::Null, |t| Value::str(t.trim()));
     let cpu: Vec<String> = fs::read_to_string("/proc/cpuinfo")
         .unwrap_or_default()
@@ -361,15 +423,15 @@ fn host() -> Value {
             }
             lines
         });
-    Value::object([
+    Ok(Value::object([
         ("architecture", Value::str(std::env::consts::ARCH)),
-        ("machine", Value::str(output("uname", &["-m"]))),
-        ("kernel_release", Value::str(output("uname", &["-r"]))),
+        ("machine", Value::str(output("uname", &["-m"])?)),
+        ("kernel_release", Value::str(output("uname", &["-r"])?)),
         ("cpu", Value::strings(cpu)),
         ("product", read("/sys/devices/virtual/dmi/id/product_name")),
-        ("cpus_online", read("/sys/devices/system/cpu/online")),
-        ("page_size", Value::str(output("getconf", &["PAGESIZE"]))),
-    ])
+        ("cpus", super::gate_build::cpus()),
+        ("page_size", Value::str(output("getconf", &["PAGESIZE"])?)),
+    ]))
 }
 
 #[cfg(test)]
@@ -427,6 +489,38 @@ mod tests {
         assert_eq!(
             step(&root, &root.join("other"), &key, false, measured).unwrap(),
             7
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_grade_key_binds_the_reports_it_joins() {
+        let root = crate::walk::scratch("gate-grade-key");
+        let collection = root.join("timing");
+        let key = |sha: &str| Key {
+            sha256: sha.repeat(64),
+            components: Value::object([("command", Value::str("grade"))]),
+        };
+        fs::create_dir_all(&collection).unwrap();
+        fs::write(collection.join("report.json"), b"{\"pairs\": 30}").unwrap();
+        record(&collection, &key("t"), 0, None).unwrap();
+        let report = collection.join("report.json");
+        let first = key("g").with_inputs(&[&report]).unwrap().sha256;
+        assert_eq!(first, key("g").with_inputs(&[&report]).unwrap().sha256);
+        // Measuring again (--full) writes other samples under the same key.
+        fs::write(&report, b"{\"pairs\": 30, \"again\": true}").unwrap();
+        record(&collection, &key("t"), 0, None).unwrap();
+        assert_ne!(first, key("g").with_inputs(&[&report]).unwrap().sha256);
+        // A reused collection has no report and binds the cited report's hash.
+        let reused = root.join("reused");
+        let cited = Value::object([("report_sha256", Value::str(file_sha(&report).unwrap()))]);
+        record(&reused, &key("t"), 0, Some(cited)).unwrap();
+        assert_eq!(
+            key("g")
+                .with_inputs(&[&reused.join("report.json")])
+                .unwrap()
+                .sha256,
+            key("g").with_inputs(&[&report]).unwrap().sha256
         );
         fs::remove_dir_all(root).unwrap();
     }

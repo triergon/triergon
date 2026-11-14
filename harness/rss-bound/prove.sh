@@ -74,9 +74,13 @@ sudo -n cat /sys/kernel/debug/kprobes/enabled > "$out/fresh-armed.stdout"
 [ "$(cat "$out/fresh-armed.stdout")" = 1 ]
 measure "$build/kernel-check" > "$out/positive.stdout"
 # Concurrent sessions: four processes held open side by side, each bound on its own.
-for n in 1 2 3; do measure "$build/kernel-check hold" > "$out/concurrent-$n.stdout" & done
+pids=""
+for n in 1 2 3; do
+    measure "$build/kernel-check hold" > "$out/concurrent-$n.stdout" &
+    pids="$pids $!"
+done
 measure "$build/kernel-check hold" > "$out/concurrent-4.stdout"
-wait
+for pid in $pids; do wait "$pid"; done
 for n in 1 2 3 4; do grep -q '"missed":0,"errors":0,' "$out/concurrent-$n.stdout"; done
 cat "$out"/concurrent-[1-4].stdout > "$out/concurrent.stdout"
 

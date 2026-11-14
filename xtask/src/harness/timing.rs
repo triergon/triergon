@@ -577,6 +577,14 @@ impl Lock {
         operation: &Operation,
         prepare: impl FnOnce() -> Result<(), String>,
     ) -> Result<Value, String> {
+        if let Some(cpus) = super::gate_build::allowed_cpu_list()
+            && cpus.len() != 1
+        {
+            return Err(format!(
+                "timing runs alone on one CPU, but this process may use {}: run it under taskset -c CPU",
+                cpus.len()
+            ));
+        }
         let mut prepare = Some(prepare);
         retry_contaminated(seed, |seed| {
             benchmark_once(

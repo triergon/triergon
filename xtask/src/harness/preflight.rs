@@ -6,9 +6,10 @@
 //! identity; that every case of the selected features names a reference the
 //! identity holds and has its input, ordered entities and companions on disk
 //! with their pinned hashes; that the ISO BMFF suite's and the codec workloads'
-//! inputs match their pins; that the RSS module source has a review for this
-//! kernel; and that the RSS module is unloaded, as timing needs it, or, with
-//! `--kernel`, loaded under a current proof, as kernel-bound memory needs it.
+//! inputs match their pins, and those of the external vector and capture; that
+//! the RSS module source has a review for this kernel; and that the RSS module
+//! is unloaded, as timing needs it, or, with `--kernel`, loaded under a current
+//! proof, as kernel-bound memory needs it. Anything it cannot establish fails.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -19,16 +20,21 @@ use crate::json::Value;
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
-       [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--review FILE] [--kernel]
+       [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--external-vector]
+       [--capture CASES] (--review FILE | --standard-memory) [--kernel]
 
 Check, before a gate run measures anything, that the build identity's workers and
 references are current and the gate build; that each --feature's cases name known
 references and have every input with its pinned hash (in --corpus, else the
 manifest's recorded directory, else .research/fixtures; --manifest replaces the
-contract's corpus.json); with --isobmff the ISO BMFF suite's inputs and with
---codecs each workload list's inputs; with --review that the review covers this RSS
-module source and kernel; and that the RSS module is unloaded, or with --kernel
-loaded under a current proof. Prints every check and exits 1 if any fails.";
+contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with --codecs
+each workload list's inputs, with --external-vector the mandatory external vector
+and with --capture the capture cases, their input generator and its numpy Python;
+that the RSS module review covers this module source and kernel (--review), unless
+the run's memory uses the standard bounds (--standard-memory); and that the RSS
+module is unloaded, or with --kernel loaded under a current proof. A feature
+without cases or a workload list without workloads fails. Prints every check and
+exits 1 if any fails.";
 
 type R<T> = Result<T, String>;
 
@@ -39,7 +45,10 @@ struct Options {
     manifests: BTreeMap<String, PathBuf>,
     isobmff: bool,
     codecs: Vec<PathBuf>,
+    external_vector: bool,
+    capture: Option<PathBuf>,
     review: Option<PathBuf>,
+    standard_memory: bool,
     kernel: bool,
 }
 
@@ -69,10 +78,16 @@ impl Options {
                 "--manifest" => pair(&mut options.manifests, value()?)?,
                 "--isobmff" => options.isobmff = true,
                 "--codecs" => options.codecs.push(root.join(value()?)),
+                "--external-vector" => options.external_vector = true,
+                "--capture" => options.capture = Some(root.join(value()?)),
                 "--review" => options.review = Some(root.join(value()?)),
+                "--standard-memory" => options.standard_memory = true,
                 "--kernel" => options.kernel = true,
                 _ => return Err(USAGE.to_owned()),
             }
+        }
+        if options.review.is_some() == options.standard_memory {
+            return Err("give the RSS module review with --review, or --standard-memory for a run without the kernel bound".into());
         }
         for id in options.corpora.keys().chain(options.manifests.keys()) {
             if !options.features.contains(id) {
@@ -141,6 +156,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             codec_inputs(root, workloads),
         );
     }
+    if options.external_vector {
+        checks.check("external vector", external_vector(root));
+    }
+    if let Some(cases) = &options.capture {
+        checks.check("capture inputs", capture_inputs(root, cases));
+    }
     if let Some(review) = &options.review {
         checks.check("RSS module review", module_review(root, review));
     }
@@ -208,7 +229,9 @@ fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<Stri
             Err(error) => problems.push(format!("{name}: {error}")),
         }
     }
-    if problems.is_empty() {
+    if cases.is_empty() {
+        Err(format!("{} lists no cases", manifest_path.display()))
+    } else if problems.is_empty() {
         Ok(format!("{} cases in {}", cases.len(), corpus.display()))
     } else {
         let shown = problems.len().min(5);
@@ -248,11 +271,65 @@ fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
             Err(error) => problems.push(format!("{id}: {path}: {error}")),
         }
     }
-    if problems.is_empty() {
+    if entries.is_empty() {
+        Err("lists no workloads".into())
+    } else if problems.is_empty() {
         Ok(format!("{} inputs", entries.len()))
     } else {
         Err(problems.join("; "))
     }
+}
+
+/// The mandatory external vector is in the sample cache with its pinned hash.
+fn external_vector(root: &Path) -> R<String> {
+    let contract =
+        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
+    let specs = contract
+        .get("required_additional_vectors")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    if specs.is_empty() {
+        return Err("the contract names no external vector".into());
+    }
+    for spec in specs {
+        let file = spec
+            .get("file")
+            .and_then(Value::as_str)
+            .ok_or("vector without a file")?;
+        let pin = spec
+            .get("sha256")
+            .and_then(Value::as_str)
+            .ok_or("vector without a hash")?;
+        let path = root.join(".research/fate-samples").join(file);
+        if sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))? != pin {
+            return Err(format!("{} differs from its pin", path.display()));
+        }
+    }
+    Ok(format!("{} vectors", specs.len()))
+}
+
+/// The capture cases exist, and the Python that generates their inputs has numpy.
+fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
+    let listed = read_json(cases)?;
+    let count = listed
+        .get("cases")
+        .and_then(Value::as_array)
+        .map_or(0, <[Value]>::len);
+    if count == 0 {
+        return Err(format!("{} lists no cases", cases.display()));
+    }
+    let generator = root.join("harness/capture/generate_inputs.py");
+    if !generator.is_file() {
+        return Err(format!("{} missing", generator.display()));
+    }
+    let python = super::reuse::python()?;
+    let identity = python.as_str().unwrap_or_default();
+    if identity.ends_with(" None") {
+        return Err(format!(
+            "the input generator's Python has no numpy ({identity})"
+        ));
+    }
+    Ok(format!("{count} cases, Python and numpy {identity}"))
 }
 
 /// The review names this module source and kernel release as a reviewed upper bound.
@@ -317,23 +394,33 @@ mod tests {
     #[test]
     fn corpora_and_manifests_name_selected_features() {
         let root = Path::new("/repo");
-        let options = Options::parse(
-            root,
-            &args(&[
-                "--feature",
-                "hls-segments",
-                "--corpus",
-                "hls-segments=harness/fixtures/hls",
-            ]),
-        )
+        let parse = |values: &[&str]| {
+            let mut all = args(values);
+            all.push("--standard-memory".into());
+            Options::parse(root, &all)
+        };
+        let options = parse(&[
+            "--feature",
+            "hls-segments",
+            "--corpus",
+            "hls-segments=harness/fixtures/hls",
+        ])
         .unwrap();
         assert_eq!(
             options.corpora.get("hls-segments"),
             Some(&root.join("harness/fixtures/hls"))
         );
-        assert!(Options::parse(root, &args(&["--corpus", "hls-segments=x"])).is_err());
-        assert!(Options::parse(root, &args(&["--feature", "a", "--corpus", "a"])).is_err());
-        assert!(Options::parse(root, &args(&["--frobnicate"])).is_err());
+        assert!(parse(&["--corpus", "hls-segments=x"]).is_err());
+        assert!(parse(&["--feature", "a", "--corpus", "a"]).is_err());
+        assert!(parse(&["--frobnicate"]).is_err());
+    }
+
+    #[test]
+    fn a_run_names_its_rss_review_or_its_standard_bounds() {
+        let root = Path::new("/repo");
+        assert!(Options::parse(root, &args(&["--feature", "a"])).is_err());
+        assert!(Options::parse(root, &args(&["--review", "r.json"])).is_ok());
+        assert!(Options::parse(root, &args(&["--review", "r.json", "--standard-memory"])).is_err());
     }
 
     #[test]

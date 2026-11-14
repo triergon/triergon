@@ -504,8 +504,9 @@ may override that count for diagnostic comparisons.
   one run of `--iterations` complete sessions, each opened afresh, and the run fails if
   any session's stream differs. Work counts are totals over the iterations.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
-  run may use and those online. Neither instance size nor pinning is required, but a
-  bound measured pinned to one CPU is not comparable with one measured unpinned.
+  run may use and those online. On Linux a timing session refuses to start unless the
+  process may use exactly one CPU (`taskset -c CPU`), so every Linux bound is measured
+  pinned and alone on its CPU.
 - Time optimised builds doing equivalent work. For demuxing, the timed operation is
   open, probe, the required reads and packet production for the same selection, with
   process startup and serialisation outside the timing.
@@ -558,11 +559,14 @@ may override that count for diagnostic comparisons.
 
 1. Build the workers, then run `cargo xtask preflight` with every feature the run will
    measure (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
-   takes them), `--isobmff`, `--codecs` for each workload list and `--review` for the
-   RSS module review. It checks that the gate build's workers and references match the
-   build identity, that every case names a reference the identity holds and has each
-   input it reads with its pinned hash, that the review covers this module source and
-   kernel, and that the module is unloaded, and prints every failure at once. Run
+   takes them), `--isobmff`, `--codecs` for each workload list, `--external-vector`,
+   `--capture` for the capture cases, and `--review` for the RSS module review (or
+   `--standard-memory` for a run without the kernel bound). It checks that the gate
+   build's workers and references match the build identity, that every case names a
+   reference the identity holds and has each input it reads with its pinned hash, that
+   the capture input generator's Python has numpy, that the review covers this module
+   source and kernel, and that the module is unloaded. A feature without cases or a
+   workload list without workloads fails, and every failure is printed at once. Run
    `prove.sh` once into a scratch directory and unload the module again, so a module
    that will not build, load or prove itself stops the run here.
 2. Time every feature, alone on one CPU with the RSS module unloaded (`taskset -c 1`).
@@ -575,14 +579,15 @@ Never time while memory, a build or anything else runs on the host.
 
 #### Memory in parallel
 
-Memory collections run side by side, one per CPU the process may use (at most 32, the
-sessions the kernel RSS bound admits). Each slot measures one case at a time from its
-own copies of the workers, under the same eviction before every run, so evicting one
-slot's executables never touches a file another slot runs. Cases that read a common
-file (the input, an ordered entity or a companion) run in the same slot one after
-another, so no run's eviction or reads change another's page-cache state. Workers
-measured from their own paths are such a file, so their cases run one at a time.
-Pinned to one CPU, collection runs exactly as before.
+Memory collections run side by side, one slot per CPU the process may use (at most
+32, the sessions the kernel RSS bound admits), each slot's thread pinned to its CPU so
+the workers it starts run there alone. Each slot measures one case at a time from its
+own copies of the worker executables, and only those copies are evicted before every
+run, so one slot's eviction never touches an executable another slot runs. Inputs are
+not evicted: they stay in the page cache as in a serial run, and cases that read a
+common file (the input, an ordered entity or a companion) run in the same slot one
+after another. Workers measured from their own paths are such a file, so their cases
+run one at a time. Pinned to one CPU, collection runs exactly as before.
 
 #### Reuse
 
@@ -593,17 +598,23 @@ a key before it measures and writes it, with its exit status, to `gate-result.js
 its output directory. The key covers the command and its settings (pairs, seed,
 iterations, acceptance requirement, the kernel bound), the contract, manifest and other
 documents that define its cases, the bytes of every worker it runs and of every shared
-library their loader resolves, the allocation observer and probe, every file of
-`xtask/src`, the observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml`
-and `harness/policy.json`, the Rust and C compilers' versions, the gate target, and the
-host class (architecture and personality, kernel release, CPU model and features,
-machine type, page size and online CPUs). A `grade` key also binds the keys of the two
-collections it joins. When an [evidence](#evidence) set that the index keeps lists a
+library their loader resolves, the allocation observer and probe, every shared input
+of the build identity (oracles, specification sources, reference headers, generator
+inputs), every file of `xtask/src` and `harness/*.py`, the reviewed input lists, the
+observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml` and
+`harness/policy.json`, the Rust, C and Python versions with numpy's, the gate target,
+and the host class (architecture and personality, kernel release, CPU model and
+features, machine type, page size, the CPUs online and those the process may use). A
+probe that fails is an error. A `grade` key also binds the two collections it joins:
+each one's key and the SHA-256 of its report, so grading reports measured again with
+`--full` is never answered with an earlier grade. When an [evidence](#evidence) set
+that the index keeps lists a
 result with the same key, the command takes that result instead of measuring: it
 prints the set, writes a `gate-result.json` that names it as `reused` with the set's
-source revisions, and exits with the recorded status. `--full` measures anyway.
-Grading a reused collection takes the cited grade; a reused collection beside a
-measured one cannot be graded, so measure both with `--full`.
+source revisions, and exits with the recorded status. `--full` measures (or, for
+`grade`, grades) anyway. Grading two reused collections takes the cited grade; a
+reused collection beside a measured one cannot be graded, so measure both with
+`--full`.
 
 ### 32-bit ARMv7
 

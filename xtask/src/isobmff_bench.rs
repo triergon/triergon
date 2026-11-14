@@ -1374,6 +1374,7 @@ fn compare(root: &Path, options: &Options, suite: &Suite, build: &Build, policy:
                     let (root, build, options) = (&root, &build, &options);
                     let contract = &suite.contract;
                     memory::Job::new(&workers, [case.path(root)], move |slot| {
+                        verify_input(root, case)?;
                         measure_memory(slot, root, build, case, options, contract, &row)
                     })
                 })

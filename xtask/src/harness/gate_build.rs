@@ -388,11 +388,47 @@ pub fn cpus() -> Value {
     Value::object([("allowed", allowed), ("online", online)])
 }
 
+/// The CPUs this process may use, as Linux lists them in `Cpus_allowed_list`;
+/// `None` where the system does not say.
+pub fn allowed_cpu_list() -> Option<Vec<usize>> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    parse_cpu_list(allowed_cpus(&status)?)
+}
+
+/// A Linux CPU list such as `1-3,7` as CPU numbers.
+fn parse_cpu_list(list: &str) -> Option<Vec<usize>> {
+    let mut cpus = Vec::new();
+    for part in list.split(',').filter(|part| !part.is_empty()) {
+        let (first, last) = part.split_once('-').unwrap_or((part, part));
+        let first: usize = first.trim().parse().ok()?;
+        let last: usize = last.trim().parse().ok()?;
+        if first > last {
+            return None;
+        }
+        cpus.extend(first..=last);
+    }
+    Some(cpus)
+}
+
 fn allowed_cpus(status: &str) -> Option<&str> {
     status
         .lines()
         .find_map(|line| line.strip_prefix("Cpus_allowed_list:"))
         .map(str::trim)
+}
+
+#[cfg(test)]
+mod cpu_list_tests {
+    use super::parse_cpu_list;
+
+    #[test]
+    fn cpu_lists_expand_ranges() {
+        assert_eq!(parse_cpu_list("1"), Some(vec![1]));
+        assert_eq!(parse_cpu_list("0-2,7"), Some(vec![0, 1, 2, 7]));
+        assert_eq!(parse_cpu_list("1-15").map(|c| c.len()), Some(15));
+        assert_eq!(parse_cpu_list("3-1"), None);
+        assert_eq!(parse_cpu_list("a"), None);
+    }
 }
 
 #[cfg(test)]
