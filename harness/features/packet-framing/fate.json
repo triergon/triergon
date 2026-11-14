@@ -1,0 +1,48 @@
+{
+ "revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+ "rights": "fetched-not-redistributed",
+ "cases": [
+  {
+   "id": "fate-h264-bsf-mp4toannexb",
+   "sample": "h264/interlaced_crop.mp4",
+   "projection": "avc",
+   "annex_b_md5": "ff2551123909f54c382294baa1bb4364"
+  },
+  {
+   "id": "fate-h264-bsf-mp4toannexb-2",
+   "sample": "h264/ps_prefix_first_idr.mp4",
+   "projection": "avc",
+   "annex_b_md5": "cffcfa6a2d0b58c9de1f5785f099f41d"
+  },
+  {
+   "id": "fate-h264-bsf-mp4toannexb-new-extradata",
+   "sample": "h264/extradata-reload-multi-stsd.mov",
+   "projection": "avc-metadata",
+   "annex_b_md5": "a48f175bf3458410d1dd1907682b92d3"
+  },
+  {
+   "id": "fate-h264_mp4toannexb_ticket2991",
+   "sample": "h264/wwwq_cut.mp4",
+   "projection": "avc-explicit",
+   "annex_b_md5": "b6ff5910928ad0b2a7eec481dcc41594"
+  },
+  {
+   "id": "fate-h264_mp4toannexb_ticket5927",
+   "sample": "h264/thezerotheorem-cut.mp4",
+   "projection": "avc-explicit",
+   "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f"
+  },
+  {
+   "id": "fate-h264_mp4toannexb_ticket5927_2",
+   "sample": "h264/thezerotheorem-cut.mp4",
+   "projection": "avc",
+   "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f"
+  },
+  {
+   "id": "fate-hevc-bsf-mp4toannexb",
+   "sample": "hevc-conformance/WPP_A_ericsson_MAIN10_2.bit",
+   "projection": "hevc",
+   "annex_b_md5": "73019329ed7f81c24f9af67c34c640c0"
+  }
+ ]
+}

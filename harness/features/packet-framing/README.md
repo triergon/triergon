@@ -34,3 +34,22 @@ framing crate's `reference-trace` feature for comparison-only error codes.
 source hashes. The historical measurements used compiler overrides and are not
 current gate results. Qualification requires the pinned stable build and all
 131 cases on native AArch64 Linux.
+
+[`fate.json`](fate.json) lists the Annex B byte projections of the upstream
+AVC and HEVC framing cases. Build the ISO BMFF example and use an FFmpeg
+binary with MOV demuxing and muxing, the AVC and HEVC Annex B filters, and
+the H.264 metadata filter enabled.
+
+```sh
+CARGO_INCREMENTAL=0 cargo build --locked --release -p triergon-isobmff --example packet_annex_b
+CARGO_INCREMENTAL=0 cargo xtask framing fate --ffmpeg /path/to/ffmpeg \
+  --candidate target/release/examples/packet_annex_b \
+  --output .research/framing-fate
+```
+
+The runner checks the input SHA-256 and upstream output MD5, then compares
+the candidate and reference Annex B streams by SHA-256. It records every
+case and returns failure if any case cannot be projected or differs. The
+binary hashes and reference version are recorded in `report.json`. These
+are byte projections of the framing operation. The upstream cases can also
+check decoded frames or a second remux.

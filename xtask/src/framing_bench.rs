@@ -8,6 +8,8 @@ use crate::harness::report::{self, Options, PrefixFeature};
 use crate::{checks, corpus, json, sha256};
 use json::Value;
 
+#[path = "framing_bench/fate.rs"]
+mod fate;
 #[path = "../../harness/features/packet-framing/fixtures.rs"]
 mod fixtures;
 
@@ -15,6 +17,7 @@ pub const USAGE: &str = "usage: cargo xtask framing [fixtures] [--output DIR]
        [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
        [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance] [--full]
        cargo xtask framing manifest --record
+       cargo xtask framing fate --ffmpeg FILE --candidate FILE --output DIR
 
 All 131 cases are required. `fixtures` writes their hash-checked bytes.
 The default operation uses the shared report, timing, memory and build-identity
@@ -160,6 +163,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
     if args == ["manifest", "--record"] {
         record_extensions(root)?;
         return Ok(0);
+    }
+    if args.first().is_some_and(|s| s == "fate") {
+        return fate::compare(root, &args[1..]);
     }
     if args.first().is_some_and(|s| s == "fixtures") {
         let output = match &args[1..] {

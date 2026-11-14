@@ -3,6 +3,36 @@
   "note": "Upstream regression samples, and local remuxes of them, that subtitle corpora measure: fetched into the ignored corpus cache by these hashes and compared locally, never redistributed. Their redistribution rights are unreviewed.",
   "samples": [
     {
+      "path": "h264/interlaced_crop.mp4",
+      "sha256": "49559668e71f3a9ef5f1dbe092980e58262857d625a26bfc3016336d1aaf6c11",
+      "source": "https://fate-suite.ffmpeg.org/h264/interlaced_crop.mp4"
+    },
+    {
+      "path": "h264/ps_prefix_first_idr.mp4",
+      "sha256": "54506c08e0bc89b477ddd892b6a6255561ef23d0d346fc106bbcf2a43488218a",
+      "source": "https://fate-suite.ffmpeg.org/h264/ps_prefix_first_idr.mp4"
+    },
+    {
+      "path": "h264/extradata-reload-multi-stsd.mov",
+      "sha256": "b5bcbd4edc1ce3ead58e868367e7ea72a0945d2b988d00ff2e22ddbe139d94e7",
+      "source": "https://fate-suite.ffmpeg.org/h264/extradata-reload-multi-stsd.mov"
+    },
+    {
+      "path": "h264/wwwq_cut.mp4",
+      "sha256": "194c5d9b85d92be175b81ca0786493e16371dc14e0af2048b285500fb0f7e48f",
+      "source": "https://fate-suite.ffmpeg.org/h264/wwwq_cut.mp4"
+    },
+    {
+      "path": "h264/thezerotheorem-cut.mp4",
+      "sha256": "ecb73a6375311b3038ce0c1d233746bfec3ef63382ec48fd5c609202f6f34afd",
+      "source": "https://fate-suite.ffmpeg.org/h264/thezerotheorem-cut.mp4"
+    },
+    {
+      "path": "hevc-conformance/WPP_A_ericsson_MAIN10_2.bit",
+      "sha256": "3b0d7323bf81d64d3c1443c9cebb8df6a42e0719ed422e64125e03971999b956",
+      "source": "https://fate-suite.ffmpeg.org/hevc-conformance/WPP_A_ericsson_MAIN10_2.bit"
+    },
+    {
       "path": "fate/filter/242_4.mkv",
       "sha256": "b5e175e331d02f7479771eb890e32fce7dbdae55ac48ab6e00c69e8459567253",
       "source": "rsync://fate-suite.ffmpeg.org/fate-suite/filter/242_4.mkv"
