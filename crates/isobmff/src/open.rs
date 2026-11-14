@@ -105,6 +105,7 @@ struct Walk {
     frames: BudgetVec<Option<Frame>>,
     depth: usize,
     quicktime: bool,
+    recover_legacy_data_handler: bool,
     parts: BudgetVec<Parts>,
     movie: Option<MovieHeader>,
     trex: BudgetVec<Trex>,
@@ -117,6 +118,7 @@ impl Walk {
         b: &Budget,
         l: OpenLimits,
         major_brand: Option<[u8; 4]>,
+        recover_legacy_data_handler: bool,
     ) -> Result<Self> {
         let mut frames = BudgetVec::new(b);
         frames.try_reserve_exact(l.depth)?;
@@ -133,6 +135,7 @@ impl Walk {
             frames,
             depth: 1,
             quicktime: major_brand == Some(*b"qt  "),
+            recover_legacy_data_handler,
             parts: BudgetVec::new(b),
             movie: None,
             trex: BudgetVec::new(b),
@@ -233,28 +236,40 @@ impl Walk {
                 b"tkhd" => unique(&mut p.tkhd, raw)?,
                 b"mdhd" => unique(&mut p.mdhd, raw)?,
                 b"hdlr" if parent.kind == *b"mdia" => unique(&mut p.hdlr, raw)?,
-                b"hdlr"
-                    if self.quicktime
-                        && matches!(
+                b"hdlr" => {
+                    let legacy = self.recover_legacy_data_handler
+                        && raw.payload().get(..12) == Some(b"\0\0\0\0dhlrcios");
+                    if !(self.quicktime || legacy)
+                        || !matches!(
                             frames,
                             [_, Some(trak), Some(mdia), Some(minf)]
                                 if [trak.kind, mdia.kind, minf.kind] == [*b"trak", *b"mdia", *b"minf"]
-                        ) =>
-                {
+                        )
+                    {
+                        return Err(Error::Invalid("unexpected track handler box"));
+                    }
                     if p.data_handler_seen {
                         return Err(Error::Invalid("duplicate QuickTime data handler"));
                     }
-                    if parent.data_info_seen
+                    if (!legacy && parent.data_info_seen)
                         || p.hdlr
                             .as_ref()
                             .is_none_or(|handler| handler.payload().get(4..8) != Some(b"mhlr"))
                     {
                         return Err(Error::Invalid("QuickTime data handler placement"));
                     }
-                    validate_quicktime_data_handler(&raw)?;
+                    if legacy {
+                        // Data source selection still uses the checked data references.
+                        let name = raw.payload().get(24..).ok_or(Error::Truncated)?;
+                        let (&length, name) = name.split_first().ok_or(Error::Truncated)?;
+                        if name.len() != usize::from(length) {
+                            return Err(Error::Invalid("legacy QuickTime data handler"));
+                        }
+                    } else {
+                        validate_quicktime_data_handler(&raw)?;
+                    }
                     p.data_handler_seen = true;
                 }
-                b"hdlr" => return Err(Error::Invalid("unexpected track handler box")),
                 b"stbl" => unique(&mut p.stbl, raw)?,
                 b"elst" => unique(&mut p.elst, raw)?,
                 b"dref" => unique(&mut p.dref, raw)?,
@@ -528,8 +543,8 @@ impl MovieOpen {
         Self::new_inner(input, limits, false, true)
     }
 
-    /// Admit terminal media declarations for the explicit pinned native
-    /// recovery view. SourcePhysical uses the strict opener.
+    /// Preserve terminal media declarations and admit the supported legacy
+    /// QuickTime metadata in the recovery view.
     pub fn new_recovery(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
         Self::new_inner(input, limits, true, false)
     }
@@ -642,6 +657,7 @@ impl MovieOpen {
                         &self.pool,
                         self.limits,
                         self.brand,
+                        self.native_recovery,
                     )?;
                     self.walk = Some(walk);
                     self.scan_done = true;
@@ -708,12 +724,15 @@ impl MovieOpen {
                 return Ok(OpenStep::Yield);
             }
             let raw = required(p.stbl.clone(), "missing sample table")?;
-            let builder = SampleTableBuilder::with_timing_policy(
+            let mut builder = SampleTableBuilder::with_timing_policy(
                 raw,
                 self.pool.clone(),
                 self.limits.format,
                 self.timing_policy,
             )?;
+            if self.native_recovery {
+                builder.allow_legacy_dependency_flags();
+            }
             let dref = p
                 .dref
                 .as_ref()
@@ -934,6 +953,7 @@ impl MovieOpen {
                     &self.pool,
                     self.limits,
                     self.brand,
+                    self.native_recovery,
                 )?)
             } else {
                 None
