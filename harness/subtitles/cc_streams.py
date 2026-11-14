@@ -966,11 +966,12 @@ def remux(source, path, raw_format=None):
          "-f", container, path])
 
 
-def ts_rewrite_video(ts, transform):
+def ts_rewrite_video(ts, transform, pts=None):
     """`ts` with each video PES payload n replaced by transform(n, payload), or
     dropped when it returns None; the PES headers (PTS, DTS) and the other
-    packets stay. The rewritten PES has
-    PES_packet_length 0 and is cut into packets, the last stuffed."""
+    packets stay, but for the PTS of a PES without DTS, which pts(n) gives
+    when passed. The rewritten PES has PES_packet_length 0 and is cut into
+    packets, the last stuffed."""
     packets = [ts[i:i + 188] for i in range(0, len(ts), 188)]
     video = None
     for p in packets:
@@ -990,6 +991,11 @@ def ts_rewrite_video(ts, transform):
         header = bytearray(data[:header_length])
         header[4:6] = b"\x00\x00"
         payload = transform(flush.count, bytes(data[header_length:]))
+        if payload is not None and pts is not None:
+            assert header[7] >> 6 == 2, "a PES with a DTS"
+            t = pts(flush.count) % (1 << 33)
+            header[9:14] = bytes([0x21 | (t >> 29) & 0x0E, (t >> 22) & 0xFF, 0x01 | (t >> 14) & 0xFE,
+                                  (t >> 7) & 0xFF, 0x01 | (t << 1) & 0xFE])
         flush.count += 1
         pes.clear()
         if payload is None:
@@ -1542,7 +1548,7 @@ def picture_output_cases(tmp_dir):
     # of its decode index.
     carrier32 = base("h264", "h264-carrier32", params="bframes=0")
 
-    def written(name, pictures, restriction=None, size=(2, 2), level=30):
+    def written(name, pictures, restriction=None, size=(2, 2), level=30, pts=None):
         def au(n, payload):
             if n >= len(pictures):
                 return None
@@ -1552,7 +1558,7 @@ def picture_output_cases(tmp_dir):
             sei = sei_nal(sei_messages_t35(data[n % len(data)]), False)
             slice_nal = frame_slice(kind, idr, ref, fn, poc, size[0] * size[1])
             return units + sei + b"\x00\x00\x00\x01" + slice_nal
-        out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au)), ["cc"]))
+        out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au, pts)), ["cc"]))
 
     # The start hold and depth growth without a bitstream restriction: a B
     # picture below 5 P frames at decode index 6 is kept (nothing leaves
@@ -1591,8 +1597,47 @@ def picture_output_cases(tmp_dir):
         return units + sei + b"\x00\x00\x00\x01" + fields[n][0]
     out.append(("h264-fields-ts", write("h264-fields.ts", ts_rewrite_video(carrier, field_au)), ["cc"]))
     out += hold_and_field_cases(written, carrier, fields, data)
+    rate_cases(written)
     shutil.rmtree(tmp_dir)
     return out
+
+
+def rate_cases(written):
+    """The duration estimate without VUI timing: 300 P frames (one jump where
+    named) whose PTS follow the probes' patterns (probes p79-p83)."""
+    def at_rate(p, q, jitter=True):
+        # Frames at p/q per second, a tick added on odd frames so that the
+        # steps share no divisor.
+        return lambda n: 90000 + (2 * n * 90000 * q + p) // (2 * p) + (n % 2 if jitter else 0)
+
+    plain = frame_pictures(300)
+    # One of each kind of candidate rate: twelfths (29 + 11/12 fps), whole
+    # (45), fast (240) and NTSC (24000/1001).
+    written("h264-rate-twelfths", plain, pts=at_rate(359, 12))
+    written("h264-rate-whole", plain, pts=at_rate(45, 1))
+    written("h264-rate-fast", plain, pts=at_rate(240, 1))
+    written("h264-rate-ntsc", plain, pts=at_rate(24000, 1001))
+    # 11/12 fps is no candidate: its double, 22/12, fits as well (49090);
+    # 70 fps fits none, nor a multiple: one tick.
+    written("h264-rate-multiple", plain, pts=at_rate(11, 12))
+    written("h264-rate-fallback", plain, pts=at_rate(70, 1))
+    # Steps of 3100 share a divisor above 1/500 s: 3100, though 29 fps fits.
+    written("h264-rate-divisor", plain, pts=lambda n: 90000 + 3100 * n)
+    # 12.5 fps with five steps of one tick among the first 20: the mean step
+    # is too short for 12.5 fps (below 0.8 of its rate), so 25 (3600).
+    short = {0, 5, 9, 13, 17}
+    times = [90000]
+    for k in range(300):
+        times.append(times[-1] + (1 if k in short else 7200 + (1 if k % 2 else -1)))
+    written("h264-rate-skip", plain, pts=lambda n: times[n])
+    # Every other frame 719 ticks late at 25 fps scores just under the
+    # threshold (3600); 721 just over (one tick).
+    written("h264-rate-close", plain, pts=lambda n: 90000 + 3600 * n + 719 * (n % 2))
+    written("h264-rate-far", plain, pts=lambda n: 90000 + 3600 * n + 721 * (n % 2))
+    # An order count jump at frame 1 leaves frames 2-6 out of the estimate:
+    # frame 2 moved 1501 later does not count (3003, not 1501).
+    jump = frame_pictures(300, jumps={1})
+    written("h264-rate-jump", jump, pts=lambda n: at_rate(30000, 1001)(n) + (1501 if n == 2 else 0))
 
 
 def hold_and_field_cases(written, carrier, fields, data):

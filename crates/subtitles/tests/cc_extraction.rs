@@ -401,9 +401,8 @@ fn h264_frame_durations_come_from_the_vui_or_the_first_decode_steps() {
     };
     let frames = extract(coding, ts_packets(&stream(&fast)));
     assert!(frames.iter().all(|f| f.1 == Some(0)));
-    // Case h264-estimate-ts: without VUI timing, the greatest
-    // common divisor of the decode time steps between packets 1 and 20;
-    // the first step does not count.
+    // Case h264-estimate-ts: without VUI timing, a common divisor of the
+    // decode time steps from packet 3 to 20 longer than 1/500 s.
     let untimed = AvcSps {
         poc_type: 2,
         timing: None,
@@ -432,6 +431,78 @@ fn h264_frame_durations_come_from_the_vui_or_the_first_decode_steps() {
     let frames = extract(coding, packets);
     assert_eq!(frames.len(), 30);
     assert!(frames.iter().all(|f| f.1 == Some(6006)));
+}
+
+/// The durations of 40 H.264 P frames without VUI timing or bitstream
+/// restriction, order counts 2 apart (4 from the IDR picture with `jump`),
+/// at the (PTS, DTS) `times` gives.
+fn estimated(jump: bool, times: impl Fn(i64) -> (i64, Option<i64>)) -> Vec<Option<i64>> {
+    let sps = AvcSps {
+        reorder: None,
+        timing: None,
+        ..AvcSps::default()
+    };
+    let pictures: Vec<_> = (0..40u32)
+        .map(|n| match n {
+            0 => (2, true, 0, 0),
+            _ => (0, true, (2 * n + u32::from(jump) * 2) % 256, n % 16),
+        })
+        .collect();
+    let units = avc_stream(&sps, &pictures, &[0]);
+    let packets = units.iter().enumerate().map(|(n, (data, _))| {
+        let (pts, dts) = times(n as i64);
+        VideoPacket {
+            data,
+            pts: Some(pts),
+            dts,
+            duration: None,
+        }
+    });
+    let frames = extract(VideoCoding::Nal(Codec::H264, Framing::StartCodes), packets);
+    assert_eq!(frames.len(), 40);
+    frames.iter().map(|f| f.1).collect()
+}
+
+#[test]
+fn h264_durations_without_vui_timing_fit_a_frame_rate() {
+    // Cases h264-rate-twelfths-ts and h264-rate-multiple-ts: one tick added
+    // on odd frames, so that the steps share no divisor.
+    let at =
+        |p: i64, q: i64| move |n: i64| (90_000 + (2 * n * 90_000 * q + p) / (2 * p) + n % 2, None);
+    assert!(
+        estimated(false, at(359, 12))
+            .iter()
+            .all(|&d| d == Some(3008))
+    );
+    assert!(
+        estimated(false, at(11, 12))
+            .iter()
+            .all(|&d| d == Some(49_090))
+    );
+    // Case h264-rate-jump-ts: after the order count jump at frame 1, frames
+    // 2-6 give no time, so frame 2 moved 1501 later does not count; with
+    // DTS other than the PTS it does (probe p84).
+    let moved = |n: i64| 90_000 + 3003 * n + n % 2 + if n == 2 { 1501 } else { 0 };
+    assert!(
+        estimated(true, |n| (moved(n), None))
+            .iter()
+            .all(|&d| d == Some(3003))
+    );
+    assert!(
+        estimated(true, |n| (moved(n), Some(moved(n))))
+            .iter()
+            .all(|&d| d == Some(3003))
+    );
+    assert!(
+        estimated(false, |n| (moved(n), None))
+            .iter()
+            .all(|&d| d == Some(1501))
+    );
+    assert!(
+        estimated(true, |n| (moved(n) + 6006, Some(moved(n))))
+            .iter()
+            .all(|&d| d == Some(1501))
+    );
 }
 
 #[test]

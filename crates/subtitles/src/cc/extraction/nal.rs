@@ -99,10 +99,17 @@
 //! when the container gives one above 0; otherwise the frame period of its
 //! SPS's VUI timing (H.264 frames: two ticks; H.264 fields and HEVC: one tick),
 //! truncated to the time base, or 0 when that period is 1/1000 s or less
-//! (`h264-vui-fast-ts`); without VUI timing, the greatest common divisor of the
-//! steps between the decode times of packets 1 to 20, the first step not
-//! counting (`h264-estimate-ts`). Frames that need that value wait, with those
-//! after them, until the twenty-first packet or the end.
+//! (`h264-vui-fast-ts`); without VUI timing, the duration estimated from the
+//! times of the first 21 packets ([`RateEstimate`]: a common divisor of their
+//! steps, else the frame rate whose grid they fit best; `h264-estimate-ts`,
+//! `h264-rate-*-ts`). A packet's time is its DTS, else its PTS; in H.264
+//! without a bitstream restriction, when a picture up to the sixth raises the
+//! depth from 0 by its order count step before any B picture, the packets
+//! after it up to the seventh whose DTS is absent or equals their PTS give the
+//! estimate no time, up to the first B picture (probes p81, p82, p84;
+//! `h264-rate-jump-ts`). Frames
+//! that need the estimate wait, with those after them, until it has its 21
+//! times or the stream ends.
 //!
 //! A picture whose parameter sets are missing or invalid is not decoded.
 //!
@@ -113,6 +120,7 @@
 
 use super::captions::Gathered;
 use super::queue::FrameQueue;
+use super::rate::RateEstimate;
 use crate::cc::video::avc;
 use crate::cc::video::hevc::{self, Reference};
 use crate::cc::video::nal::{
@@ -155,8 +163,11 @@ const FAR_BACK: usize = 15;
 /// before it raises a depth of 0 to 1 (probes p31, p32, p64, p66, p74).
 const NEXT_STEP: i32 = 2;
 
-/// The packets whose decode times the duration estimate takes.
-const ESTIMATE_PACKETS: u32 = 21;
+/// H.264 without a bitstream restriction: after a picture up to this index
+/// that raises the depth from 0 by its order count step, the packets up to
+/// this index whose DTS is absent or equals their PTS give the duration
+/// estimate no time (probes p81, p82, p84).
+const UNTIMED_THROUGH: u32 = 6;
 
 /// A picture waiting in the buffer: its times and its caption bytes in the
 /// gathered bytes.
@@ -337,43 +348,11 @@ struct Progress {
     /// Bytes of pictures not decoded, for the next picture decoded (HEVC):
     /// they run from here to the end of the gathered bytes.
     pending: Option<usize>,
-    timing: StepTiming,
+    timing: RateEstimate,
+    /// The duration estimate, once settled.
+    estimate: Option<i64>,
     /// Frames wait in `unsettled` until the duration estimate is settled.
     holding: bool,
-}
-
-/// The frame duration estimated from the packets' decode times: the greatest
-/// common divisor of the steps between packets 1 and 20 (the second to the
-/// twenty-first packet).
-#[derive(Clone, Copy, Debug, Default)]
-struct StepTiming {
-    packets: u32,
-    last: Option<i64>,
-    divisor: Option<i64>,
-}
-
-impl StepTiming {
-    fn packet(&mut self, time: Option<i64>) {
-        if let (Some(time), Some(last)) = (time, self.last)
-            && (2..ESTIMATE_PACKETS).contains(&self.packets)
-            && let Some(step) = time.checked_sub(last).filter(|&step| step > 0)
-        {
-            self.divisor = Some(self.divisor.map_or(step, |divisor| gcd(divisor, step)));
-        }
-        self.last = time.or(self.last);
-        self.packets = self.packets.saturating_add(1);
-    }
-
-    fn settled(&self) -> bool {
-        self.packets >= ESTIMATE_PACKETS
-    }
-}
-
-fn gcd(mut a: i64, mut b: i64) -> i64 {
-    while b != 0 {
-        (a, b) = (b, a % b);
-    }
-    a
 }
 
 /// The parameter sets of either codec.
@@ -632,7 +611,13 @@ impl NalDecode {
                 _ => {}
             }
         }
-        self.progress.timing.packet(dts.or(pts));
+        let b_picture = match &picture {
+            Picture::Avc(slice) => slice.header.slice_type % 5 == 1,
+            _ => false,
+        };
+        self.progress
+            .timing
+            .packet(dts.or(pts), dts.is_some_and(|d| Some(d) != pts), b_picture);
         let held = |decode: &Self, timing: Option<Timing>, ticks: u32| Held {
             pts,
             duration: duration
@@ -916,6 +901,9 @@ impl NalDecode {
                         .is_some_and(|p| order > p.saturating_add(NEXT_STEP))
                 {
                     state.depth = 1;
+                    if !state.b_seen {
+                        self.progress.timing.untime_through(UNTIMED_THROUGH);
+                    }
                 }
             } else if displaced > 0 && header.slice_type % 5 == 1 && state.decoded <= START_WINDOW {
                 // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
@@ -1233,7 +1221,8 @@ impl NalDecode {
             progress.holding = true;
             return self.unsettled.push(held.pts, held.duration, bytes);
         }
-        out.push(held.pts, held.duration.or(progress.timing.divisor), bytes)
+        let duration = held.duration.or_else(|| estimate(progress, self.time_base));
+        out.push(held.pts, duration, bytes)
     }
 
     /// Releases the frames kept for the duration estimate once it is
@@ -1242,7 +1231,7 @@ impl NalDecode {
         if !self.progress.holding || !(finishing || self.progress.timing.settled()) {
             return Ok(());
         }
-        let estimate = self.progress.timing.divisor;
+        let estimate = estimate(&mut self.progress, self.time_base);
         for entry in self.unsettled.entries() {
             out.push(
                 entry.pts,
@@ -1325,6 +1314,14 @@ fn keep<T>(list: &mut BudgetVec<T>, item: T) {
     debug_assert!(list.len() < list.capacity());
     // Within the reserved capacity, the push neither allocates nor fails.
     let _ = list.try_push(item);
+}
+
+/// The settled duration estimate, worked out once.
+fn estimate(progress: &mut Progress, time_base: (u32, u32)) -> Option<i64> {
+    if progress.estimate.is_none() {
+        progress.estimate = progress.timing.duration(time_base);
+    }
+    progress.estimate
 }
 
 #[cfg(test)]

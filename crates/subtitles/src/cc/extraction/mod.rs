@@ -45,9 +45,9 @@
 //!   pictures that are not decoded (before the first IRAP picture, RASL
 //!   pictures of a new sequence) pass theirs to the next picture decoded. A
 //!   frame keeps its packet's PTS and lasts the packet's duration, the VUI's
-//!   frame period, or the step FFmpeg's demuxer estimates from the first
-//!   decode times. The rules and FFmpeg's departures from the specifications
-//!   are described in `nal.rs`.
+//!   frame period, or the duration the reference estimates from the first
+//!   packets' times (`rate.rs`). The rules and FFmpeg's departures from the
+//!   specifications are described in `nal.rs`.
 //!
 //! Frames without caption bytes are left out.
 
@@ -55,6 +55,7 @@ mod captions;
 mod mpeg2;
 mod nal;
 mod queue;
+mod rate;
 
 use super::charge;
 use super::video::nal::{Codec, Framing};
