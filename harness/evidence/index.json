@@ -20354,6 +20354,15 @@
      "status": 0
     }
    ]
+  },
+  {
+   "name": "quicktime-open-index-interrupted-f5b1559d",
+   "path": "quicktime-open-index-interrupted-f5b1559d",
+   "retention": "retained",
+   "reason": "ISO BMFF open and index parity and the timing samples saved before the first run was interrupted.",
+   "key": "evidence/quicktime-open-index-interrupted-f5b1559d/0eaf28776e7a5c7ffceb98d8937064707e9a2b04f6c19d21ee1aabb64c170023.tar.gz",
+   "sha256": "0eaf28776e7a5c7ffceb98d8937064707e9a2b04f6c19d21ee1aabb64c170023",
+   "bytes": 487223620
   }
  ]
 }
