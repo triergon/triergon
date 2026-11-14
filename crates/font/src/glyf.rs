@@ -7,7 +7,7 @@ use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::work::charge;
 use crate::{Bounds, GlyphId, Limits};
-use triergon_core::{BudgetVec, Error, Result, WorkBudget};
+use triergon_core::{Error, Result, WorkBudget};
 
 /// Simple-glyph point flags.
 const ON_CURVE: u8 = 0x01;
@@ -86,11 +86,16 @@ pub(crate) fn translate(points: &mut [OutlinePoint], (dx, dy): (i64, i64)) -> Re
     Ok(())
 }
 
-/// Runs each glyph's program as a hinted load builds the outline.
+/// Runs each glyph's program as a hinted load builds the outline. The
+/// loader is generic over it, so an unhinted load ([`Unhinted`]) compiles to
+/// the plain loader.
 pub(crate) trait Hint {
-    /// The font-unit positions of the outline's points so far, which simple
-    /// glyphs append to as they load.
-    fn units(&mut self) -> &mut BudgetVec<Point>;
+    /// Whether the load hints at all.
+    const ACTIVE: bool;
+
+    /// Records the font-unit position of the point a simple glyph just
+    /// appended to the outline.
+    fn unit(&mut self, unit: Point) -> Result<()>;
 
     /// Whether the programs fit glyphs to the grid at this size; the
     /// control value program may turn that off.
@@ -103,6 +108,25 @@ pub(crate) trait Hint {
         outline: &mut Outline,
         work: &mut WorkBudget,
     ) -> Result<()>;
+}
+
+/// The load without hinting.
+pub(crate) struct Unhinted;
+
+impl Hint for Unhinted {
+    const ACTIVE: bool = false;
+
+    fn unit(&mut self, _: Point) -> Result<()> {
+        Ok(())
+    }
+
+    fn grid_fitting(&self) -> bool {
+        false
+    }
+
+    fn glyph(&mut self, _: Loaded<'_>, _: &mut Outline, _: &mut WorkBudget) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// A glyph just loaded, as [`Hint::glyph`] takes it.
@@ -314,27 +338,27 @@ impl Glyf {
 
     /// Loads `glyph` into `outline` and reports whose metrics apply; with
     /// `hint`, running each glyph's program on its points as it loads.
-    pub(crate) fn outline(
+    pub(crate) fn outline<H: Hint>(
         &self,
         cx: &Context<'_>,
         glyph: GlyphId,
         scale: Scale,
         outline: &mut Outline,
         work: &mut WorkBudget,
-        hint: Option<&mut dyn Hint>,
+        hint: &mut H,
     ) -> Result<Metrics> {
         self.load(cx, glyph.0, scale, outline, work, hint, 0)
     }
 
     #[allow(clippy::too_many_arguments, reason = "the recursion carries the load")]
-    fn load(
+    fn load<H: Hint>(
         &self,
         cx: &Context<'_>,
         glyph: u16,
         scale: Scale,
         outline: &mut Outline,
         work: &mut WorkBudget,
-        mut hint: Option<&mut dyn Hint>,
+        hint: &mut H,
         depth: u32,
     ) -> Result<Metrics> {
         if glyph >= cx.glyph_count {
@@ -348,10 +372,8 @@ impl Glyf {
         let mut metrics = Metrics::of(glyph, header);
         if contours > 0 {
             let (base, ends) = (outline.len(), outline.contour_ends().len());
-            let units = hint.as_mut().map(|h| h.units());
-            let instructions =
-                simple(&mut r, contours.unsigned_abs(), scale, outline, work, units)?;
-            if let Some(h) = hint {
+            let instructions = simple(&mut r, contours.unsigned_abs(), scale, outline, work, hint)?;
+            if H::ACTIVE {
                 let loaded = Loaded {
                     metrics,
                     composite: false,
@@ -359,7 +381,7 @@ impl Glyf {
                     ends,
                     instructions,
                 };
-                h.glyph(loaded, outline, work)?;
+                hint.glyph(loaded, outline, work)?;
             }
         } else {
             // FreeType reads every negative count as a composite.
@@ -370,13 +392,12 @@ impl Glyf {
                 return Err(Error::Policy("glyph nesting depth"));
             }
             let (base, ends) = (outline.len(), outline.contour_ends().len());
-            let reborrowed = hint.as_mut().map(|h| &mut **h as &mut dyn Hint);
             let (own, instructed) =
-                self.composite(cx, &mut r, scale, outline, work, reborrowed, depth)?;
+                self.composite(cx, &mut r, scale, outline, work, hint, depth)?;
             if let Some(own) = own {
                 metrics = own;
             }
-            if let Some(h) = hint {
+            if H::ACTIVE {
                 let instructions = if instructed {
                     let len = usize::from(r.u16()?);
                     r.take(len)?
@@ -390,7 +411,7 @@ impl Glyf {
                     ends,
                     instructions,
                 };
-                h.glyph(loaded, outline, work)?;
+                hint.glyph(loaded, outline, work)?;
             }
         }
         Ok(metrics)
@@ -399,14 +420,14 @@ impl Glyf {
     /// Appends the components; returns the metrics of the last `USE_MY_METRICS`
     /// component, and whether instructions follow the components.
     #[allow(clippy::too_many_arguments, reason = "the recursion carries the load")]
-    fn composite(
+    fn composite<H: Hint>(
         &self,
         cx: &Context<'_>,
         r: &mut Reader<'_>,
         scale: Scale,
         outline: &mut Outline,
         work: &mut WorkBudget,
-        mut hint: Option<&mut dyn Hint>,
+        hint: &mut H,
         depth: u32,
     ) -> Result<(Option<Metrics>, bool)> {
         let mut metrics = None;
@@ -415,14 +436,13 @@ impl Glyf {
             charge(work, 1)?;
             let c = component(r)?;
             let base = outline.len();
-            let reborrowed = hint.as_mut().map(|h| &mut **h as &mut dyn Hint);
-            let component = self.load(cx, c.glyph, scale, outline, work, reborrowed, depth + 1)?;
+            let component = self.load(cx, c.glyph, scale, outline, work, hint, depth + 1)?;
             if c.flags & USE_MY_METRICS != 0 {
                 metrics = Some(component);
             }
             // FreeType places only components that add points.
             if outline.len() > base {
-                let fitted = hint.as_ref().is_some_and(|h| h.grid_fitting());
+                let fitted = H::ACTIVE && hint.grid_fitting();
                 place(&c, scale, outline, first, base, fitted)?;
             }
             if c.flags & MORE_COMPONENTS == 0 {
@@ -516,15 +536,15 @@ fn component(r: &mut Reader<'_>) -> Result<Component> {
     })
 }
 
-/// Appends a simple glyph's contours, and their font-unit points to `units`;
-/// returns the glyph's instructions.
-fn simple<'d>(
+/// Appends a simple glyph's contours, recording their font-unit points with
+/// `hint`; returns the glyph's instructions.
+fn simple<'d, H: Hint>(
     r: &mut Reader<'d>,
     contours: u16,
     scale: Scale,
     outline: &mut Outline,
     work: &mut WorkBudget,
-    mut units: Option<&mut BudgetVec<Point>>,
+    hint: &mut H,
 ) -> Result<&'d [u8]> {
     let ends = r.take(2 * usize::from(contours))?;
     let mut count = 0_usize;
@@ -562,9 +582,8 @@ fn simple<'d>(
             PointKind::Quadratic
         };
         outline.push_point(point(scale, x, y)?, kind)?;
-        if let Some(units) = units.as_mut() {
-            let unit = Point::new(narrow(x)?, narrow(y)?);
-            units.try_push(unit).map_err(|e| e.error)?;
+        if H::ACTIVE {
+            hint.unit(Point::new(narrow(x)?, narrow(y)?))?;
         }
     }
     let ends = ends

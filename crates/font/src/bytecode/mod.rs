@@ -234,6 +234,10 @@ impl Hinter {
         if self.failed {
             return Err(Error::Invalid("TrueType font or control value program"));
         }
+        // Without a program to run the points stay as they are.
+        if !self.grid_fitting() || instructions.is_empty() {
+            return Ok(());
+        }
         let GlyphPoints {
             outline,
             base,
@@ -254,42 +258,40 @@ impl Hinter {
             zone.push(p, if units.is_some() { u } else { p }, true)?;
         }
         zone.ends.try_extend_from_slice(ends)?;
-        if self.grid_fitting() && !instructions.is_empty() {
-            self.glyph_cvt.clear();
-            self.glyph_cvt.try_extend_from_slice(self.cvt.as_slice())?;
-            self.glyph_storage.clear();
-            self.glyph_storage
-                .try_extend_from_slice(self.storage.as_slice())?;
-            let state = if self.instruct_control & IGNORE_CONTROL_STATE != 0 {
-                GraphicsState::default()
-            } else {
-                GraphicsState::for_glyph(&self.state)
-            };
-            let mut machine = Machine {
-                code: [programs.font, programs.control, instructions],
-                stack: &mut self.stack,
-                stack_limit: self.stack_limit,
-                cvt: self.glyph_cvt.as_mut_slice(),
-                storage: self.glyph_storage.as_mut_slice(),
-                functions: &mut self.functions,
-                instructions: &mut self.instructions,
-                twilight: &mut self.twilight,
-                glyph: &mut self.glyph,
-                state,
-                size: Size {
-                    ppem: self.ppem,
-                    scale: self.scale,
-                    symmetric: self.symmetric,
-                },
-                work,
-                program: Program::Glyph,
-                instruct_control: self.instruct_control,
-                interpolated: [false; 2],
-            };
-            let result = machine.run(Program::Glyph);
-            self.stack.clear();
-            result?;
-        }
+        self.glyph_cvt.clear();
+        self.glyph_cvt.try_extend_from_slice(self.cvt.as_slice())?;
+        self.glyph_storage.clear();
+        self.glyph_storage
+            .try_extend_from_slice(self.storage.as_slice())?;
+        let state = if self.instruct_control & IGNORE_CONTROL_STATE != 0 {
+            GraphicsState::default()
+        } else {
+            GraphicsState::for_glyph(&self.state)
+        };
+        let mut machine = Machine {
+            code: [programs.font, programs.control, instructions],
+            stack: &mut self.stack,
+            stack_limit: self.stack_limit,
+            cvt: self.glyph_cvt.as_mut_slice(),
+            storage: self.glyph_storage.as_mut_slice(),
+            functions: &mut self.functions,
+            instructions: &mut self.instructions,
+            twilight: &mut self.twilight,
+            glyph: &mut self.glyph,
+            state,
+            size: Size {
+                ppem: self.ppem,
+                scale: self.scale,
+                symmetric: self.symmetric,
+            },
+            work,
+            program: Program::Glyph,
+            instruct_control: self.instruct_control,
+            interpolated: [false; 2],
+        };
+        let result = machine.run(Program::Glyph);
+        self.stack.clear();
+        result?;
         // The phantom points move nothing: the advances stay unhinted.
         let zone = &self.glyph;
         let flags = zone.flags.as_slice();
@@ -316,18 +318,18 @@ pub(crate) struct GlyphPoints<'o> {
     pub(crate) phantoms: ([Point; 4], [Point; 4]),
 }
 
-/// A face's interpreter, made for the size it is used at.
+/// A face's interpreter, made on the first hinted load and kept for the size
+/// it was last made at.
 #[derive(Debug)]
 pub(crate) struct Bytecode {
     budget: Budget,
-    state: Mutex<State>,
+    state: Mutex<Option<Box<State>>>,
 }
 
 /// What a face's interpreter keeps between loads.
 #[derive(Debug)]
 pub(crate) struct State {
-    /// The hinter, for whichever size it was last made.
-    pub(crate) hinter: Option<Hinter>,
+    pub(crate) hinter: Hinter,
     /// Scratch for one load: the font-unit positions of its points and one
     /// glyph's contour ends.
     pub(crate) units: BudgetVec<Point>,
@@ -336,24 +338,34 @@ pub(crate) struct State {
 
 impl Bytecode {
     pub(crate) fn new(budget: Budget) -> Self {
-        let state = State {
-            hinter: None,
-            units: BudgetVec::new(&budget),
-            ends: BudgetVec::new(&budget),
-        };
         Self {
             budget,
-            state: Mutex::new(state),
+            state: Mutex::new(None),
         }
     }
 
-    pub(crate) const fn budget(&self) -> &Budget {
-        &self.budget
-    }
-
-    /// The interpreter's state, held for one load.
-    pub(crate) fn lock(&self) -> MutexGuard<'_, State> {
-        self.state.lock().unwrap_or_else(PoisonError::into_inner)
+    /// The interpreter at `ppem` and the 16.16 `scale`, made from `tables`
+    /// (the face's) unless it already is, held for one load.
+    pub(crate) fn at_size<'t>(
+        &self,
+        tables: impl FnOnce() -> Tables<'t>,
+        ppem: u16,
+        scale: i64,
+        work: u64,
+    ) -> Result<MutexGuard<'_, Option<Box<State>>>> {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        if !state.as_ref().is_some_and(|s| s.hinter.is_for(ppem, scale)) {
+            // The old size's state goes before the new one is made.
+            *state = None;
+            let mut setup = WorkBudget::new(work);
+            let hinter = Hinter::new(tables(), ppem, scale, &self.budget, &mut setup)?;
+            *state = Some(Box::new(State {
+                hinter,
+                units: BudgetVec::new(&self.budget),
+                ends: BudgetVec::new(&self.budget),
+            }));
+        }
+        Ok(state)
     }
 }
 

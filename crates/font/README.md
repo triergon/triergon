@@ -427,12 +427,14 @@ Private DICT per CFF FDArray entry, variation region scalars and kern subtable
 records. A face FreeType auto-hints also keeps, once a default load needs
 them, the auto-hinter's style of each glyph, its reverse charmap of accented
 characters and each latin or CJK style's metrics, charged to that budget, as is the
-scratch storage of an auto-hinted load. A face with TrueType programs keeps, for
-the size it last loaded hinted at, the interpreter's function and instruction
+scratch storage of an auto-hinted load. A face with TrueType programs makes, on
+its first hinted load, and keeps for the size it last loaded hinted at, the
+interpreter's function and instruction
 definitions, control values, storage, twilight zone, stack and the zone one
 glyph is hinted in, charged to that budget and sized by `maxp` as FreeType
 sizes them (the stack 128 values deeper and the twilight zone four points
-larger, at least 64 function definitions); a hinted load holds it locked. An
+larger, at least 64 function definitions); a hinted load holds it locked, and a
+glyph without a program leaves it untouched. An
 `Outline` charges its points and contour ends to its own budget and keeps its
 capacity across glyphs; a `SizedFont` is a small copyable view that allocates
 nothing.

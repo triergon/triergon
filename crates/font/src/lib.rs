@@ -792,7 +792,14 @@ impl Font {
         let advances = match &self.outlines {
             Outlines::Glyf(table) => {
                 outline.begin(self.limits.points);
-                let m = table.outline(&self.glyf_context(), glyph, scale, outline, work, None)?;
+                let m = table.outline(
+                    &self.glyf_context(),
+                    glyph,
+                    scale,
+                    outline,
+                    work,
+                    &mut glyf::Unhinted,
+                )?;
                 let (origin, advances) = self.glyf_advances(m, scale);
                 if origin != 0 {
                     glyf::translate(outline.points_mut(), (-origin, 0))?;

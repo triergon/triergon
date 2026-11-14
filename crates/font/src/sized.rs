@@ -475,33 +475,23 @@ impl<'f> SizedFont<'f> {
         let (ppem, scale) = (self.metrics.y_ppem, self.hinted_scale);
         // The interpreter runs the font and control value programs once per
         // size, and keeps the state they leave for the size's glyphs.
-        let mut state = bytecode.lock();
-        let state = &mut *state;
-        if !state
-            .hinter
-            .as_ref()
-            .is_some_and(|h| h.is_for(ppem, scale.y))
-        {
-            state.hinter = None;
+        let tables = || {
             let table = |tag| font.table(tag).unwrap_or_default();
-            let tables = Tables {
+            Tables {
                 programs,
                 cvt: table(*b"cvt "),
                 maxp: table(*b"maxp"),
                 gasp: table(*b"gasp"),
-            };
-            let mut setup = WorkBudget::new(font.limits.work);
-            let made = Hinter::new(tables, ppem, scale.y, bytecode.budget(), &mut setup);
-            state.hinter = Some(made?);
-        }
-        let hinter = state
-            .hinter
-            .as_mut()
+            }
+        };
+        let mut state = bytecode.at_size(tables, ppem, scale.y, font.limits.work)?;
+        let state = state
+            .as_deref_mut()
             .ok_or(Error::Invalid("TrueType interpreter"))?;
         state.units.clear();
         let mut hinting = GlyfHinting {
             font,
-            hinter,
+            hinter: &mut state.hinter,
             programs,
             units: &mut state.units,
             ends: &mut state.ends,
@@ -513,7 +503,7 @@ impl<'f> SizedFont<'f> {
             scale,
             outline,
             work,
-            Some(&mut hinting),
+            &mut hinting,
         )?;
         let (origin, advances) = font.glyf_advances(m, scale);
         if origin != 0 {
@@ -706,8 +696,10 @@ struct GlyfHinting<'h> {
 }
 
 impl glyf::Hint for GlyfHinting<'_> {
-    fn units(&mut self) -> &mut BudgetVec<Point> {
-        self.units
+    const ACTIVE: bool = true;
+
+    fn unit(&mut self, unit: Point) -> Result<()> {
+        self.units.try_push(unit).map_err(|e| e.error)
     }
 
     fn grid_fitting(&self) -> bool {
