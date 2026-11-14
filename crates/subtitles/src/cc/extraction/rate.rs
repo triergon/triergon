@@ -58,6 +58,8 @@ pub(super) struct RateEstimate {
     /// Packets up to this index go without a time unless their DTS differs
     /// from their PTS.
     untimed_through: Option<u32>,
+    /// The stream has ended.
+    ended: bool,
 }
 
 impl RateEstimate {
@@ -90,9 +92,15 @@ impl RateEstimate {
         }
     }
 
-    /// Whether every time the estimate takes has been seen.
+    /// The stream ends: the estimate takes the times it has.
+    pub(super) fn end(&mut self) {
+        self.ended = true;
+    }
+
+    /// Whether the estimate has every time it takes: all of them, or those
+    /// of a stream that ended.
     pub(super) fn settled(&self) -> bool {
-        self.taken >= TAKEN
+        self.taken >= TAKEN || self.ended
     }
 
     /// The estimated duration in ticks of `time_base`, or `None` without a
@@ -225,6 +233,18 @@ mod tests {
         let late = |a: i64| (0..TAKEN as i64).map(move |n| 90_000 + 3600 * n + a * (n % 2));
         assert_eq!(estimate(late(719)), Some(3600));
         assert_eq!(estimate(late(721)), Some(1));
+    }
+
+    #[test]
+    fn the_end_of_the_stream_settles_the_estimate() {
+        let mut e = RateEstimate::default();
+        for t in [90_000, 93_003] {
+            e.packet(Some(t), true, false);
+        }
+        assert!(!e.settled());
+        e.end();
+        assert!(e.settled());
+        assert_eq!(e.duration(TB), Some(1));
     }
 
     #[test]

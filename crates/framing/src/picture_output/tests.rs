@@ -544,6 +544,26 @@ fn a_store_the_pool_refuses_gives_the_picture_back() {
 }
 
 #[test]
+fn pictures_stored_in_room_reserved_take_no_more_memory() {
+    let pool = pool();
+    let mut dpb = DecodedPictures::new(&pool);
+    let new = |poc| NewPicture {
+        poc,
+        output: true,
+        marking: Marking::Unused,
+        field: None,
+        hold: false,
+    };
+    dpb.try_reserve(2).expect("room");
+    let used = pool.used();
+    for poc in [0, 2] {
+        dpb.store(new(poc), [0u8; 64]).expect("stored");
+    }
+    assert_eq!(pool.used(), used);
+    assert_eq!(dpb.payloads().count(), 2);
+}
+
+#[test]
 fn take_removes_a_picture_without_output() {
     let mut dpb = DecodedPictures::new(&pool());
     let new = |poc| NewPicture {

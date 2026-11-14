@@ -31,7 +31,9 @@
 //! leaves is reported to a sink as a [`Leave`]: output (the "bumping" process,
 //! H.264 C.4.5.3, H.265 C.5.2.4), then removed, or removed without output.
 //! [`DecodedPictures::store`] stores a picture without any process, for a
-//! caller that drives output itself.
+//! caller that drives output itself. Storing is the only step that takes
+//! memory; [`DecodedPictures::try_reserve`] takes it ahead, for a caller whose
+//! step must not fail once it has changed the buffer.
 //!
 //! The processes follow the specifications. FFmpeg's decoders were observed
 //! to output in other ways (see the caption extraction of `triergon-subtitles`
@@ -338,6 +340,21 @@ impl<P> DecodedPictures<P> {
         self.stored.iter_mut().map(Entry)
     }
 
+    /// The payloads of the stored pictures, in storage order.
+    pub fn payloads(&self) -> impl Iterator<Item = &P> {
+        self.stored.iter().map(|p| &p.picture)
+    }
+
+    /// Makes room for `additional` more pictures: storing them then neither
+    /// allocates nor fails, whatever leaves the buffer in between.
+    ///
+    /// # Errors
+    ///
+    /// When the pool refuses the memory; the buffer is left as it was.
+    pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
+        self.stored.try_reserve(additional)
+    }
+
     /// The stored picture `id`.
     pub fn entry(&mut self, id: PictureId) -> Option<Entry<'_, P>> {
         self.stored.iter_mut().find(|p| p.id == id).map(Entry)
@@ -459,7 +476,11 @@ impl<P> DecodedPictures<P> {
         pictures: usize,
         mut leave: impl FnMut(Leave<'_, P>),
     ) {
-        while self.waiting() > pictures && self.bump(&mut leave) {}
+        // Each bump outputs one of the pictures needed for output.
+        let mut waiting = self.waiting();
+        while waiting > pictures && self.bump(&mut leave) {
+            waiting -= 1;
+        }
     }
 
     /// Bumps while the buffer holds at least `pictures` pictures and one of
@@ -703,25 +724,6 @@ impl<P> DecodedPictures<P> {
                 output: p.output,
             });
         }
-    }
-}
-
-impl<P: Copy> DecodedPictures<P> {
-    /// Makes this buffer a copy of `other`, reusing its allocation where it
-    /// is large enough. A refused allocation leaves it as it was.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory.
-    pub fn copy_from(&mut self, other: &Self) -> Result<()> {
-        if self.stored.capacity() < other.stored.len() {
-            self.stored
-                .try_reserve(other.stored.len() - self.stored.len())?;
-        }
-        self.stored.clear();
-        self.stored.try_extend_from_slice(other.stored.as_slice())?;
-        self.next_id = other.next_id;
-        Ok(())
     }
 }
 

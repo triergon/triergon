@@ -1,5 +1,6 @@
 //! A queue of caption frames: entries over one byte arena that is compacted as
-//! frames leave. A change that fails leaves the frames as they were.
+//! frames leave. A change that fails leaves the frames as they were, and room
+//! reserved ahead lets frames be queued without any failing.
 
 use super::CaptionFrame;
 use crate::cc::text::Text;
@@ -41,6 +42,11 @@ impl FrameQueue {
         self.entries.len() - self.head
     }
 
+    /// The caption bytes of the live frames.
+    pub(super) fn bytes_len(&self) -> usize {
+        self.live
+    }
+
     /// Queues a frame; a frame without caption bytes is left out.
     pub(super) fn push(
         &mut self,
@@ -51,22 +57,43 @@ impl FrameQueue {
         if bytes.is_empty() {
             return Ok(());
         }
-        self.compact()?;
-        if self.entries.len() == self.entries.capacity() {
-            self.entries.try_reserve_exact(self.entries.len().max(16))?;
-        }
-        let start = self.data.len();
-        self.data.put(bytes)?;
-        self.entries
-            .try_push(Entry {
-                pts,
-                duration,
-                start,
-                end: self.data.len(),
-            })
-            .map_err(|rejected| rejected.error)?;
-        self.live += bytes.len();
+        self.reserve(1, bytes.len())?;
+        self.push_reserved(pts, duration, bytes);
         Ok(())
+    }
+
+    /// Makes room for `frames` more frames with `bytes` caption bytes in all:
+    /// [`push_reserved`](Self::push_reserved) then takes them without
+    /// allocating, until a pop.
+    #[inline]
+    pub(super) fn reserve(&mut self, frames: usize, bytes: usize) -> Result<()> {
+        self.compact()?;
+        let spare = self.entries.capacity() - self.entries.len();
+        if spare < frames {
+            self.entries
+                .try_reserve_exact(frames.max(self.entries.len()).max(16))?;
+        }
+        self.data.reserve(bytes)
+    }
+
+    /// Queues a frame in the room [`reserve`](Self::reserve) made; a frame
+    /// without caption bytes is left out.
+    #[inline]
+    pub(super) fn push_reserved(&mut self, pts: Option<i64>, duration: Option<i64>, bytes: &[u8]) {
+        if bytes.is_empty() {
+            return;
+        }
+        debug_assert!(self.entries.len() < self.entries.capacity());
+        let start = self.data.len();
+        // Within the room reserved, neither push allocates nor fails.
+        let _ = self.data.put(bytes);
+        let _ = self.entries.try_push(Entry {
+            pts,
+            duration,
+            start,
+            end: self.data.len(),
+        });
+        self.live += bytes.len();
     }
 
     /// The live entries, front first.
@@ -185,5 +212,21 @@ mod tests {
         }
         while queue.pop_front().expect("pop").is_some() {}
         assert_eq!(queue.live, 0);
+    }
+
+    #[test]
+    fn frames_queued_in_room_reserved_take_no_more_memory() {
+        let pool = Budget::new(1 << 24).expect("pool");
+        let mut queue = FrameQueue::new(&pool);
+        queue.push(Some(0), None, &[1; 5000]).expect("push");
+        queue.pop_front().expect("pop");
+        queue.reserve(20, 20 * 7).expect("room");
+        let used = pool.used();
+        for n in 0..20u8 {
+            queue.push_reserved(Some(n.into()), None, &[n; 7]);
+        }
+        assert_eq!(pool.used(), used);
+        assert_eq!((queue.len(), queue.bytes_len()), (20, 140));
+        assert_eq!(queue.bytes_len(), live(&queue));
     }
 }

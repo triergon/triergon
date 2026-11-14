@@ -131,9 +131,11 @@
 //! A picture whose parameter sets are missing or invalid is not decoded.
 //!
 //! A push or the finish either succeeds or leaves the decoder and its output as
-//! they were: the picture buffer is copied before a step and put back when it
-//! fails, buffers are appended to and cut back, and the parameter sets a step
-//! replaces are kept until it succeeds.
+//! they were. A step first reads its access unit, which only adds caption bytes
+//! and parameter sets (cut back and put back when the step fails), then
+//! reserves all the memory the rest of it can need: room for its pictures, for
+//! every picture to leave, and for their frames. Only then does it change the
+//! picture buffer and the output, and from there on nothing can fail.
 
 use super::captions::Gathered;
 use super::queue::FrameQueue;
@@ -329,8 +331,20 @@ impl Recent {
         (0..count).map(move |back| self.pocs[(self.next + RECENT - 1 - back) % RECENT])
     }
 
+    /// How many of the order counts are above `poc`: the pictures it is
+    /// displaced by.
+    fn above(&self, poc: i32) -> u32 {
+        // Until they wrap, the order counts fill the array from the start.
+        let mut above = 0;
+        for &q in &self.pocs[..self.len] {
+            above += u32::from(q > poc);
+        }
+        above
+    }
+
     fn clear(&mut self) {
         self.len = 0;
+        self.next = 0;
     }
 }
 
@@ -459,8 +473,6 @@ pub(super) struct NalDecode {
     time_base: (u32, u32),
     tables: Tables,
     pictures: DecodedPictures<Held>,
-    /// The buffer before the step, to go back to.
-    saved: DecodedPictures<Held>,
     captions: Gathered,
     progress: Progress,
     replaced: BudgetVec<Replaced>,
@@ -475,12 +487,32 @@ pub(super) struct NalDecode {
 #[derive(Clone, Copy, Debug)]
 enum Picture {
     None,
-    Avc(avc::Slice),
+    Avc {
+        slice: avc::Slice,
+        /// The other field of the frame, in the same packet.
+        second: Option<avc::Slice>,
+        /// A recovery point SEI's `recovery_frame_cnt`.
+        recovery: Option<u32>,
+    },
     Hevc {
         slice: hevc::Slice,
-        /// An end of sequence or end of bitstream NAL unit came before it.
-        after_end: bool,
+        /// An end of sequence or end of bitstream NAL unit follows it.
+        end_after: bool,
     },
+}
+
+/// An access unit as read, before it changes the decoder.
+#[derive(Clone, Copy, Debug)]
+struct Unit {
+    picture: Picture,
+    /// Where its caption bytes start in the gathered bytes (HEVC: with those
+    /// of the pictures not decoded before it).
+    start: usize,
+    /// HEVC: an end of sequence or end of bitstream NAL unit came after the
+    /// last picture decoded and before this one's, and the ids of the SPSs
+    /// whose content the unit changed.
+    after_end: bool,
+    changed_sps: u16,
 }
 
 impl NalDecode {
@@ -501,7 +533,6 @@ impl NalDecode {
                 Codec::Hevc => Tables::Hevc(hevc::Tables::new(pool)),
             },
             pictures: DecodedPictures::new(pool),
-            saved: DecodedPictures::new(pool),
             captions: Gathered::new(pool),
             progress,
             replaced: BudgetVec::new(pool),
@@ -520,14 +551,19 @@ impl NalDecode {
         duration: Option<i64>,
         out: &mut FrameQueue,
     ) -> Result<()> {
-        self.step(out, |decode, out| {
-            decode.access_unit(data, pts, dts, duration, out)?;
-            decode.settle(false, out)
+        self.step(|decode| {
+            let unit = decode.read(data)?;
+            let bytes = decode.captions.bytes.len() - unit.start;
+            decode.reserve(bytes, out)?;
+            decode.access_unit(unit, pts, dts, duration, out);
+            decode.settle(out);
+            Ok(())
         })
     }
 
     pub(super) fn finish(&mut self, out: &mut FrameQueue) -> Result<()> {
-        self.step(out, |decode, out| {
+        self.step(|decode| {
+            decode.reserve(0, out)?;
             if decode.progress.avc.deferred {
                 decode.resolve_recovery();
             }
@@ -535,53 +571,68 @@ impl NalDecode {
                 decode.progress.avc.b_window = BWindow::Closed;
                 decode.choose_start();
             }
-            decode.leaving.try_reserve(decode.pictures.len())?;
-            let leaving = &mut decode.leaving;
-            decode.pictures.flush(|leave| {
-                if let Leave::Output { poc, picture } = leave {
-                    collect(leaving, poc, picture);
-                }
-            });
+            // The estimate has all the times it gets: the frames kept leave,
+            // and those still waiting follow them.
+            decode.progress.timing.end();
+            decode.settle(out);
+            decode.pictures.flush(collect(&mut decode.leaving));
             match decode.codec {
-                Codec::H264 => decode.emit_avc(out)?,
-                Codec::Hevc => decode.emit(out)?,
+                Codec::H264 => decode.emit_avc(out),
+                Codec::Hevc => decode.emit(out),
             }
-            decode.settle(true, out)?;
             decode.progress.pending = None;
             decode.progress.avc.first_field = None;
             Ok(())
         })
     }
 
-    /// Runs `step`; when it fails, puts the decoder and `out` back as they
-    /// were.
-    fn step(
-        &mut self,
-        out: &mut FrameQueue,
-        step: impl FnOnce(&mut Self, &mut FrameQueue) -> Result<()>,
-    ) -> Result<()> {
-        self.saved.copy_from(&self.pictures)?;
-        let progress = self.progress;
+    /// Runs `step`, which fails only before it changes anything but the
+    /// caption bytes and the parameter sets; those are put back when it does.
+    fn step(&mut self, step: impl FnOnce(&mut Self) -> Result<()>) -> Result<()> {
         let captions = self.captions.mark();
-        let frames = out.len();
-        let unsettled = self.unsettled.len();
-        self.replaced.clear();
-        let result = step(self, out);
+        let result = step(self);
         if result.is_err() {
-            std::mem::swap(&mut self.pictures, &mut self.saved);
-            self.progress = progress;
             self.captions.rollback(captions);
-            out.truncate(frames);
-            if self.unsettled.len() >= unsettled {
-                self.unsettled.truncate(unsettled);
-            }
             self.restore();
         } else {
             self.compact();
         }
         self.replaced.clear();
-        self.leaving.clear();
         result
+    }
+
+    /// Reserves all the memory the rest of a step can need, `bytes` being the
+    /// caption bytes of its access unit: room for two more pictures (the
+    /// fields of a frame) and for every picture to leave, and for the frames
+    /// they make, in `unsettled` when it may keep them and in `out` with those
+    /// it keeps already.
+    fn reserve(&mut self, bytes: usize, out: &mut FrameQueue) -> Result<()> {
+        let frames = self.pictures.len() + 2;
+        let bytes = bytes
+            + self
+                .pictures
+                .payloads()
+                .map(|held| held.end - held.start)
+                .sum::<usize>();
+        self.pictures.try_reserve(2)?;
+        self.leaving.try_reserve(frames)?;
+        if self.may_keep() {
+            self.unsettled.reserve(frames, bytes)?;
+        }
+        out.reserve(
+            frames + self.unsettled.len(),
+            bytes + self.unsettled.bytes_len(),
+        )
+    }
+
+    /// Whether this step may keep frames in `unsettled`: some are kept, the
+    /// duration estimate is not settled, or the H.264 start choice may still
+    /// be made.
+    fn may_keep(&self) -> bool {
+        let progress = &self.progress;
+        progress.holding
+            || !progress.timing.settled()
+            || self.codec == Codec::H264 && progress.avc.b_window == BWindow::Open
     }
 
     /// Puts back the parameter sets of a failed step, last replaced first.
@@ -601,20 +652,16 @@ impl NalDecode {
         }
     }
 
-    fn access_unit(
-        &mut self,
-        data: &[u8],
-        pts: Option<i64>,
-        dts: Option<i64>,
-        duration: Option<i64>,
-        out: &mut FrameQueue,
-    ) -> Result<()> {
-        let start = self.progress.pending.unwrap_or(self.captions.bytes.len());
-        let mut picture = Picture::None;
-        // H.264: the other field of the frame, in the same packet.
-        let mut second = None;
+    /// Reads an access unit: its parameter sets (kept in the tables), its
+    /// caption bytes (gathered) and its picture's first slice.
+    fn read(&mut self, data: &[u8]) -> Result<Unit> {
+        let mut unit = Unit {
+            picture: Picture::None,
+            start: self.progress.pending.unwrap_or(self.captions.bytes.len()),
+            after_end: self.progress.hevc.after_end,
+            changed_sps: 0,
+        };
         let mut recovery = None;
-        let mut end_after = false;
         for nal in nal_units(data, self.framing) {
             let Some(kind) = self.codec.nal_type(nal) else {
                 continue;
@@ -651,14 +698,22 @@ impl NalDecode {
                 (
                     Tables::Avc(tables),
                     triergon_framing::avc::SLICE | triergon_framing::avc::IDR,
-                ) => match picture {
+                ) => match &mut unit.picture {
                     Picture::None => {
                         if let Some(slice) = tables.slice(nal) {
-                            picture = Picture::Avc(slice);
+                            unit.picture = Picture::Avc {
+                                slice,
+                                second: None,
+                                recovery: None,
+                            };
                         }
                     }
-                    Picture::Avc(first) if second.is_none() => {
-                        second = tables.slice(nal).filter(|slice| {
+                    Picture::Avc {
+                        slice: first,
+                        second: second @ None,
+                        ..
+                    } => {
+                        *second = tables.slice(nal).filter(|slice| {
                             slice.header.bottom_field.is_some()
                                 && slice.header.bottom_field != first.header.bottom_field
                         });
@@ -668,7 +723,7 @@ impl NalDecode {
                 (Tables::Hevc(tables), kinds::SPS) => {
                     if let Some((id, old)) = tables.put_sps(payload)? {
                         if old.is_some() {
-                            self.progress.hevc.changed_sps |= 1 << id;
+                            unit.changed_sps |= 1 << id;
                         }
                         keep(&mut self.replaced, Replaced::HevcSps(id, old));
                     }
@@ -678,28 +733,44 @@ impl NalDecode {
                         keep(&mut self.replaced, Replaced::HevcPps(id, old));
                     }
                 }
-                (Tables::Hevc(_), kinds::EOS | kinds::EOB) => {
-                    if matches!(picture, Picture::None) {
-                        self.progress.hevc.after_end = true;
-                    } else {
-                        end_after = true;
-                    }
-                }
+                (Tables::Hevc(_), kinds::EOS | kinds::EOB) => match &mut unit.picture {
+                    Picture::Hevc { end_after, .. } => *end_after = true,
+                    _ => unit.after_end = true,
+                },
                 (Tables::Hevc(tables), kind)
-                    if kinds::is_slice(kind) && matches!(picture, Picture::None) =>
+                    if kinds::is_slice(kind) && matches!(unit.picture, Picture::None) =>
                 {
                     if let Some(slice) = tables.slice(nal, &mut self.references)? {
-                        picture = Picture::Hevc {
+                        unit.picture = Picture::Hevc {
                             slice,
-                            after_end: self.progress.hevc.after_end,
+                            end_after: false,
                         };
                     }
                 }
                 _ => {}
             }
         }
-        let b_picture = match &picture {
-            Picture::Avc(slice) => slice.header.slice_type % 5 == 1,
+        if let Picture::Avc { recovery: read, .. } = &mut unit.picture {
+            *read = recovery;
+        }
+        Ok(unit)
+    }
+
+    /// Decodes an access unit read by [`read`](Self::read), with its
+    /// packet's times.
+    fn access_unit(
+        &mut self,
+        unit: Unit,
+        pts: Option<i64>,
+        dts: Option<i64>,
+        duration: Option<i64>,
+        out: &mut FrameQueue,
+    ) {
+        let hevc = &mut self.progress.hevc;
+        hevc.after_end = unit.after_end;
+        hevc.changed_sps |= unit.changed_sps;
+        let b_picture = match &unit.picture {
+            Picture::Avc { slice, .. } => slice.header.slice_type % 5 == 1,
             _ => false,
         };
         self.progress
@@ -710,28 +781,31 @@ impl NalDecode {
             duration: duration
                 .filter(|&d| d > 0)
                 .or_else(|| timing.map(|t| decode.frame_period(t, ticks))),
-            start,
+            start: unit.start,
             end: decode.captions.bytes.len(),
             recovered: false,
             key: false,
             above: 0,
             first_key: false,
         };
-        match picture {
+        match unit.picture {
             Picture::None => {
                 if self.codec == Codec::Hevc {
-                    self.progress.pending = Some(start);
+                    self.progress.pending = Some(unit.start);
                 } else {
-                    self.captions.bytes.truncate(start);
+                    self.captions.bytes.truncate(unit.start);
                 }
-                Ok(())
             }
-            Picture::Avc(slice) => {
+            Picture::Avc {
+                slice,
+                second,
+                recovery,
+            } => {
                 let Tables::Avc(tables) = &self.tables else {
-                    return Ok(());
+                    return;
                 };
                 let Some(sps) = tables.sps(slice.sps_id) else {
-                    return Ok(());
+                    return;
                 };
                 let ticks = if slice.header.bottom_field.is_some() {
                     1
@@ -739,40 +813,32 @@ impl NalDecode {
                     2
                 };
                 let held = held(self, sps.timing(), ticks);
-                self.avc_picture(slice, recovery, held, out)?;
+                self.avc_picture(slice, recovery, held, out);
                 // The second field, without caption bytes of its own: the
                 // packet's go to the first.
-                match second {
-                    Some(slice) => {
-                        let end = self.captions.bytes.len();
-                        self.avc_picture(
-                            slice,
-                            None,
-                            Held {
-                                start: end,
-                                end,
-                                ..held
-                            },
-                            out,
-                        )
-                    }
-                    None => Ok(()),
+                if let Some(slice) = second {
+                    let end = self.captions.bytes.len();
+                    let held = Held {
+                        start: end,
+                        end,
+                        ..held
+                    };
+                    self.avc_picture(slice, None, held, out);
                 }
             }
-            Picture::Hevc { slice, after_end } => {
+            Picture::Hevc { slice, end_after } => {
                 let Tables::Hevc(tables) = &self.tables else {
-                    return Ok(());
+                    return;
                 };
                 let Some(sps) = tables.sps(slice.sps_id) else {
-                    return Ok(());
+                    return;
                 };
                 let fields = sps.fields;
                 let held = held(self, fields.timing, 1);
-                self.hevc_picture(slice, fields, after_end, held, out)?;
+                self.hevc_picture(slice, fields, unit.after_end, held, out);
                 if end_after {
                     self.progress.hevc.after_end = true;
                 }
-                Ok(())
             }
         }
     }
@@ -824,12 +890,12 @@ impl NalDecode {
         recovery: Option<u32>,
         mut held: Held,
         out: &mut FrameQueue,
-    ) -> Result<()> {
+    ) {
         let Tables::Avc(tables) = &self.tables else {
-            return Ok(());
+            return;
         };
         let Some(sps) = tables.sps(slice.sps_id) else {
-            return Ok(());
+            return;
         };
         let fields = sps.fields;
         let header = slice.header;
@@ -888,17 +954,11 @@ impl NalDecode {
                     field: Some(parity),
                     hold: false,
                 };
-                self.leaving.try_reserve(1)?;
-                let leaving = &mut self.leaving;
                 let joined = self.pictures.avc_store_second_field(
                     first.id,
                     store,
                     held,
-                    |leave| {
-                        if let Leave::Output { poc, picture } = leave {
-                            collect(leaving, poc, picture);
-                        }
-                    },
+                    collect(&mut self.leaving),
                     |frame, second| {
                         if frame.end == second.start {
                             frame.end = second.end;
@@ -906,8 +966,9 @@ impl NalDecode {
                     },
                 );
                 if joined.is_ok() {
-                    self.emit_avc(out)?;
-                    return self.bump_avc(out);
+                    self.emit_avc(out);
+                    self.bump_avc(out);
+                    return;
                 }
             } else if let Some(lone) = self.pictures.take(first.id) {
                 // An unpaired field is not output: its caption bytes go to
@@ -940,14 +1001,8 @@ impl NalDecode {
         .unwrap_or(16);
         state.holds = !state.stated && state.dpb_frames >= 2;
         if slice.idr || header.mmco5 {
-            self.leaving.try_reserve(self.pictures.len())?;
-            let leaving = &mut self.leaving;
-            while self.pictures.bump(|leave| {
-                if let Leave::Output { poc, picture } = leave {
-                    collect(leaving, poc, picture);
-                }
-            }) {}
-            self.emit_avc(out)?;
+            while self.pictures.bump(collect(&mut self.leaving)) {}
+            self.emit_avc(out);
             let state = &mut self.progress.avc;
             state.late.restart();
             state.floor = None;
@@ -966,67 +1021,50 @@ impl NalDecode {
         }
         let state = &mut self.progress.avc;
         let order = poc.stored_poc;
+        let displaced = state.recent.above(order);
         // Far below the last pictures decoded: the pictures waiting leave
         // first, it does not raise the depth, and no floor drops it (probe
         // p89e N19-N22 with the B picture below the intra picture).
         let far = state.recent.len >= FAR_BACK && state.recent.last(FAR_BACK).all(|q| order < q);
         if far {
-            self.leaving.try_reserve(self.pictures.len())?;
-            let leaving = &mut self.leaving;
-            while self.pictures.bump(|leave| {
-                if let Leave::Output { poc, picture } = leave {
-                    collect(leaving, poc, picture);
-                }
-            }) {}
-            self.emit_avc(out)?;
+            while self.pictures.bump(collect(&mut self.leaving)) {}
+            self.emit_avc(out);
             self.progress.avc.late.restart();
             self.progress.avc.floor = None;
-        } else {
-            let displaced = state.recent.last(RECENT).filter(|&q| q > order).count();
-            if !state.stated {
-                state.depth = state
-                    .depth
-                    .max(u32::try_from(displaced).unwrap_or(u32::MAX));
-                if header.slice_type % 5 == 1 {
-                    // After a B picture at least one picture waits (probe
-                    // p50 k0: a B picture in order at index 1).
-                    state.b_seen = true;
-                }
-                // At depth 0, a picture more than NEXT_STEP above the one
-                // before it raises the depth to 1, unless a gap in
-                // `frame_num` comes before it (probe p74).
-                if state.depth == 0
-                    && (!gap || fields.gaps_in_frame_num_allowed)
-                    && state
-                        .previous
-                        .is_some_and(|p| order > p.saturating_add(NEXT_STEP))
-                {
-                    state.depth = 1;
-                    if !state.b_seen {
-                        self.progress.timing.untime_through(UNTIMED_THROUGH);
-                    }
-                }
-            } else if displaced > 0
-                && header.slice_type % 5 == 1
-                && state.decoded <= START_WINDOW + 1
-            {
-                // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
-                // p3-h264-pyr-r0).
-                state.depth = state.depth.max(1);
+        } else if !state.stated {
+            state.depth = state.depth.max(displaced);
+            if header.slice_type % 5 == 1 {
+                // After a B picture at least one picture waits (probe
+                // p50 k0: a B picture in order at index 1).
+                state.b_seen = true;
             }
+            // At depth 0, a picture more than NEXT_STEP above the one
+            // before it raises the depth to 1, unless a gap in
+            // `frame_num` comes before it (probe p74).
+            if state.depth == 0
+                && (!gap || fields.gaps_in_frame_num_allowed)
+                && state
+                    .previous
+                    .is_some_and(|p| order > p.saturating_add(NEXT_STEP))
+            {
+                state.depth = 1;
+                if !state.b_seen {
+                    self.progress.timing.untime_through(UNTIMED_THROUGH);
+                }
+            }
+        } else if displaced > 0 && header.slice_type % 5 == 1 && state.decoded <= START_WINDOW + 1 {
+            // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
+            // p3-h264-pyr-r0).
+            state.depth = state.depth.max(1);
         }
         let state = &mut self.progress.avc;
         if state.decoded == 1 {
             state.early.uncounted_first = !slice.idr && header.intra() && header.frame_num == 0;
         }
         if !state.early.ended {
-            let displaced = state.recent.last(RECENT).filter(|&q| q > order).count();
-            state.early.picture(
-                order,
-                u32::try_from(displaced).unwrap_or(u32::MAX),
-                header.slice_type % 5 == 1,
-                gap,
-            );
+            state
+                .early
+                .picture(order, displaced, header.slice_type % 5 == 1, gap);
             let index = state.decoded.saturating_sub(1);
             state.early.ended = state.early.ends(index, state.dpb_frames);
         }
@@ -1127,14 +1165,9 @@ impl NalDecode {
         let state = &self.progress.avc;
         if !far && state.stated && slice.reference && state.decoded <= START_WINDOW + 1 {
             let depth = state.depth as usize;
-            self.leaving.try_reserve(self.pictures.len())?;
-            let leaving = &mut self.leaving;
-            self.pictures.bump_while_waiting_more_than(depth, |leave| {
-                if let Leave::Output { poc, picture } = leave {
-                    collect(leaving, poc, picture);
-                }
-            });
-            self.emit_avc(out)?;
+            self.pictures
+                .bump_while_waiting_more_than(depth, collect(&mut self.leaving));
+            self.emit_avc(out);
         }
         let state = &self.progress.avc;
         held.recovered = state.recovered && !unrecovered
@@ -1150,10 +1183,10 @@ impl NalDecode {
             field: parity,
             hold: parity.is_some(),
         };
-        let id = self
-            .pictures
-            .store(new, held)
-            .map_err(|refused| refused.error)?;
+        // Within the room reserved, the store neither allocates nor fails.
+        let Ok(id) = self.pictures.store(new, held) else {
+            return;
+        };
         if first_key {
             self.progress.avc.key_id = Some(id);
         }
@@ -1164,7 +1197,7 @@ impl NalDecode {
                 parity,
             });
         }
-        self.bump_avc(out)
+        self.bump_avc(out);
     }
 
     /// Decides the recovery of the pictures above the first intra picture
@@ -1259,40 +1292,26 @@ impl NalDecode {
     /// while the start is held or a first field waits for its second, and at
     /// least one waits in the start window and, without a bitstream
     /// restriction, after a B picture.
-    fn bump_avc(&mut self, out: &mut FrameQueue) -> Result<()> {
+    fn bump_avc(&mut self, out: &mut FrameQueue) {
         let state = &self.progress.avc;
         // Pictures leave by frames: none while a first field waits for its
         // second (package case0060, case0749).
-        if state.first_field.is_some() {
-            return Ok(());
+        if state.first_field.is_some() || state.holds && !state.early.ended {
+            return;
         }
         let index = state.decoded.saturating_sub(1);
-        if state.holds && !state.early.ended {
-            return Ok(());
+        let mut depth = state.depth as usize;
+        if index < START_WINDOW || state.b_seen && !state.stated {
+            depth = depth.max(1);
         }
-        loop {
-            let state = &self.progress.avc;
-            let mut depth = state.depth as usize;
-            if index < START_WINDOW || (state.b_seen && !state.stated) {
-                depth = depth.max(1);
-            }
-            if self.pictures.waiting() <= depth {
-                return Ok(());
-            }
-            self.leaving.try_reserve(1)?;
-            let leaving = &mut self.leaving;
-            self.pictures.bump(|leave| {
-                if let Leave::Output { poc, picture } = leave {
-                    collect(leaving, poc, picture);
-                }
-            });
-            self.emit_avc(out)?;
-        }
+        self.pictures
+            .bump_while_waiting_more_than(depth, collect(&mut self.leaving));
+        self.emit_avc(out);
     }
 
     /// Outputs the H.264 pictures that left, dropping those not recovered,
     /// below the floor or late.
-    fn emit_avc(&mut self, out: &mut FrameQueue) -> Result<()> {
+    fn emit_avc(&mut self, out: &mut FrameQueue) {
         let mut at = 0;
         while at < self.leaving.len() {
             let (poc, held) = self.leaving[at];
@@ -1311,10 +1330,9 @@ impl NalDecode {
             if held.key {
                 state.recovered = true;
             }
-            self.output(held, out)?;
+            self.output(held, out);
         }
         self.leaving.clear();
-        Ok(())
     }
 
     fn hevc_picture(
@@ -1324,7 +1342,7 @@ impl NalDecode {
         after_end: bool,
         held: Held,
         out: &mut FrameQueue,
-    ) -> Result<()> {
+    ) {
         let state = &mut self.progress.hevc;
         let kind = slice.nal_type;
         let irap = kinds::is_irap(kind);
@@ -1345,7 +1363,7 @@ impl NalDecode {
         if !state.started && !irap || kinds::is_rasl(kind) && state.no_rasl_output {
             // Not decoded: its bytes go to the next picture decoded.
             self.progress.pending = Some(held.start);
-            return Ok(());
+            return;
         }
         self.progress.pending = None;
         let first = !state.started;
@@ -1368,15 +1386,9 @@ impl NalDecode {
             ..sps.limits
         };
         let holding = sps.max_dec_pic_buffering as usize + 1;
-        self.leaving.try_reserve(2 * (self.pictures.len() + 1))?;
-        let leaving = &mut self.leaving;
-        let mut collect = |leave: Leave<'_, Held>| {
-            if let Leave::Output { poc, picture } = leave {
-                collect(leaving, poc, picture);
-            }
-        };
         // Observed: room is made before the reference picture set applies.
-        self.pictures.bump_while_holding(holding, &mut collect);
+        self.pictures
+            .bump_while_holding(holding, collect(&mut self.leaving));
         if no_rasl_output {
             self.pictures.mark_unused();
         } else {
@@ -1393,7 +1405,7 @@ impl NalDecode {
             });
         }
         if after_end && !irap || new_sps {
-            while self.pictures.bump(&mut collect) {}
+            while self.pictures.bump(collect(&mut self.leaving)) {}
         }
         self.pictures.hevc_remove(
             HevcPicture {
@@ -1403,27 +1415,31 @@ impl NalDecode {
                 no_output_of_prior_pics: slice.no_output_of_prior_pics,
             },
             limits,
-            &mut collect,
+            collect(&mut self.leaving),
         );
-        self.pictures
-            .hevc_store(poc, slice.pic_output, held, limits, &mut collect)
-            .map_err(|refused| refused.error)?;
-        self.emit(out)
+        // Within the room reserved, the store neither allocates nor fails.
+        let _ = self.pictures.hevc_store(
+            poc,
+            slice.pic_output,
+            held,
+            limits,
+            collect(&mut self.leaving),
+        );
+        self.emit(out);
     }
 
     /// Outputs the pictures that left.
-    fn emit(&mut self, out: &mut FrameQueue) -> Result<()> {
+    fn emit(&mut self, out: &mut FrameQueue) {
         for at in 0..self.leaving.len() {
             let (_, held) = self.leaving[at];
-            self.output(held, out)?;
+            self.output(held, out);
         }
         self.leaving.clear();
-        Ok(())
     }
 
     /// Outputs a frame, or keeps it (and those after it) until the duration
     /// estimate it may need is settled.
-    fn output(&mut self, held: Held, out: &mut FrameQueue) -> Result<()> {
+    fn output(&mut self, held: Held, out: &mut FrameQueue) {
         let bytes = &self.captions.bytes.as_bytes()[held.start..held.end];
         let progress = &mut self.progress;
         let needs_estimate = held.duration.is_none() && !progress.timing.settled();
@@ -1440,22 +1456,22 @@ impl NalDecode {
                     choice.above = at;
                 }
             }
-            return self.unsettled.push(held.pts, held.duration, bytes);
+            self.unsettled.push_reserved(held.pts, held.duration, bytes);
+            return;
         }
         let duration = held.duration.or_else(|| estimate(progress, self.time_base));
-        out.push(held.pts, duration, bytes)
+        out.push_reserved(held.pts, duration, bytes);
     }
 
-    /// Releases the frames kept for the duration estimate once it is
-    /// settled, or at the end of the stream.
-    fn settle(&mut self, finishing: bool, out: &mut FrameQueue) -> Result<()> {
+    /// Releases the frames kept once the duration estimate they need is
+    /// settled and the start choice made.
+    fn settle(&mut self, out: &mut FrameQueue) {
         let progress = &self.progress;
         if !progress.holding
-            || !finishing
-                && (progress.avc.choice.is_some()
-                    || progress.needs_estimate && !progress.timing.settled())
+            || progress.avc.choice.is_some()
+            || progress.needs_estimate && !progress.timing.settled()
         {
-            return Ok(());
+            return;
         }
         let estimate = if self.progress.needs_estimate {
             estimate(&mut self.progress, self.time_base)
@@ -1465,32 +1481,34 @@ impl NalDecode {
         let skip = self.progress.skip;
         for (at, entry) in self.unsettled.entries().iter().enumerate() {
             if skip != Some(at) {
-                out.push(
+                out.push_reserved(
                     entry.pts,
                     entry.duration.or(estimate),
                     self.unsettled.bytes(entry),
-                )?;
+                );
             }
         }
         self.unsettled.clear();
         self.progress.holding = false;
         self.progress.needs_estimate = false;
         self.progress.skip = None;
-        Ok(())
     }
 
     /// Drops the bytes of pictures that have left once they outweigh the
     /// rest: the bytes still needed move to the front, in order.
     fn compact(&mut self) {
         let total = self.captions.bytes.len();
+        if total < 4096 {
+            return;
+        }
         let pending = self.progress.pending.map_or(0, |start| total - start);
         let live: usize = pending
             + self
                 .pictures
-                .entries_mut()
-                .map(|entry| entry.picture().end - entry.picture().start)
+                .payloads()
+                .map(|held| held.end - held.start)
                 .sum::<usize>();
-        if total < 4096 || total < 2 * live {
+        if total < 2 * live {
             return;
         }
         let mut cursor = 0;
@@ -1499,8 +1517,7 @@ impl NalDecode {
             // The next range still needed, by start.
             let next = self
                 .pictures
-                .entries_mut()
-                .map(|entry| *entry.picture())
+                .payloads()
                 .filter(|held| held.start >= from && held.end > held.start)
                 .map(|held| held.start)
                 .min();
@@ -1537,11 +1554,17 @@ impl NalDecode {
     }
 }
 
-/// Adds a left picture to `list`, whose capacity the caller reserved.
-fn collect(list: &mut BudgetVec<(i32, Held)>, poc: i32, picture: &Held) {
-    debug_assert!(list.len() < list.capacity());
-    // Within the reserved capacity, the push neither allocates nor fails.
-    let _ = list.try_push((poc, *picture));
+/// A sink that adds the pictures output to `list`, whose capacity the step
+/// reserved.
+fn collect(list: &mut BudgetVec<(i32, Held)>) -> impl FnMut(Leave<'_, Held>) + '_ {
+    |leave| {
+        if let Leave::Output { poc, picture } = leave {
+            debug_assert!(list.len() < list.capacity());
+            // Within the reserved capacity, the push neither allocates nor
+            // fails.
+            let _ = list.try_push((poc, *picture));
+        }
+    }
 }
 
 /// Adds `item` to `list`, whose capacity the caller reserved.

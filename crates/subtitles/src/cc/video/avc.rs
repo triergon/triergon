@@ -51,8 +51,14 @@ pub(crate) struct Tables {
     last_pps: LastPayload,
 }
 
-const SPS_IDS: usize = 32;
-const PPS_IDS: usize = 256;
+/// The slot of set `id` in `table`, grown to it.
+fn slot<T>(table: &mut BudgetVec<Option<T>>, id: u8) -> Result<&mut Option<T>> {
+    let at = usize::from(id);
+    if table.len() <= at {
+        table.try_extend_with(at + 1 - table.len(), |_| None)?;
+    }
+    Ok(&mut table[at])
+}
 
 impl Tables {
     pub(crate) fn new(pool: &Budget) -> Self {
@@ -74,9 +80,6 @@ impl Tables {
     /// nothing. An SPS cut short, out of range or not taken by the reference
     /// is ignored.
     pub(crate) fn put_sps(&mut self, payload: &[u8]) -> Result<Option<(u8, Option<Sps>)>> {
-        if self.sps.is_empty() {
-            self.sps.try_extend_with(SPS_IDS, |_| None)?;
-        }
         if self.last_sps.repeats(payload) {
             return Ok(None);
         }
@@ -100,16 +103,13 @@ impl Tables {
         };
         let mut cycle = BudgetVec::new(&self.pool);
         cycle.try_extend_from_slice(&offsets[..len])?;
-        let old = self.sps[usize::from(fields.id)].replace(Sps { fields, cycle });
-        Ok(Some((fields.id, old)))
+        let slot = slot(&mut self.sps, fields.id)?;
+        Ok(Some((fields.id, slot.replace(Sps { fields, cycle }))))
     }
 
     /// Reads a PPS NAL unit payload and stores it, returning its id and the
     /// set it replaces.
     pub(crate) fn put_pps(&mut self, payload: &[u8]) -> Result<Option<(u8, Option<AvcPps>)>> {
-        if self.pps.is_empty() {
-            self.pps.try_resize(PPS_IDS, None)?;
-        }
         if self.last_pps.repeats(payload) {
             return Ok(None);
         }
@@ -117,7 +117,7 @@ impl Tables {
         let Ok(pps) = read_avc_pps(payload, AvcReading::Lenient) else {
             return Ok(None);
         };
-        Ok(Some((pps.id, self.pps[usize::from(pps.id)].replace(pps))))
+        Ok(Some((pps.id, slot(&mut self.pps, pps.id)?.replace(pps))))
     }
 
     /// Forgets the last sets read, after a failed step puts sets back.

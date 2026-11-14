@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use triergon_core::{Budget, WorkBudget};
 use triergon_harness_protocol::unhex;
 use triergon_subtitles::cc::video::nal::{Codec, Framing};
-use triergon_subtitles::compat::cc::{CaptionExtractor, VideoCoding, VideoPacket};
+use triergon_subtitles::compat::cc::{CaptionExtractor, CaptionFrame, VideoCoding, VideoPacket};
 
 /// One output frame: pts, duration and caption bytes.
 type Frame = (Option<i64>, Option<i64>, Vec<u8>);
@@ -1277,5 +1277,122 @@ fn h264_a_stated_depth_of_0_is_raised_by_a_b_picture_up_to_index_20() {
         }
         let frames = extract(coding, ts_packets(&avc_stream(&sps, &pictures, &[0])));
         assert_eq!(tags(&frames).iter().any(|t| t == &[41]), kept, "B at {at}");
+    }
+}
+
+/// The frames of `packets` (decode order) with every push and the finish
+/// first refused: each is tried with the pool holding back all but a few
+/// bytes, a few more on every try, until it succeeds. Also gives the number of
+/// calls refused.
+fn extract_starved(coding: VideoCoding, packets: &[VideoPacket<'_>]) -> (Vec<Frame>, usize) {
+    let pool = Budget::new(1 << 24).expect("pool");
+    let mut work = WorkBudget::new(1 << 24);
+    let mut extractor = CaptionExtractor::new(&pool, coding, (1, 90_000));
+    let owned = |f: CaptionFrame<'_>| (f.pts, f.duration, f.data.to_vec());
+    let mut frames = Vec::new();
+    let mut refused = 0;
+    for at in 0..=packets.len() {
+        for spare in (0..).step_by(8) {
+            let front = extractor.peek().map(owned);
+            let held = pool.reserve(pool.available() - spare).expect("hold");
+            let result = match packets.get(at) {
+                Some(&packet) => extractor.push(packet, &mut work),
+                None => extractor.finish(),
+            };
+            drop(held);
+            if result.is_ok() {
+                break;
+            }
+            refused += 1;
+            assert_eq!(extractor.peek().map(owned), front, "packet {at}");
+        }
+        while let Some(f) = extractor.pop().expect("pop") {
+            frames.push(owned(f));
+        }
+    }
+    (frames, refused)
+}
+
+#[test]
+fn a_refused_push_or_finish_leaves_the_extractor_as_it_was() {
+    // Whatever the pool refuses, the frames are those of an extraction it
+    // never starves: B pictures, field pairs in one packet and in two,
+    // durations estimated from the decode times, a start without an IDR
+    // picture with a B picture among the first 21, and HEVC pictures not
+    // decoded and discarded after an end of sequence.
+    let h264 = VideoCoding::Nal(Codec::H264, Framing::StartCodes);
+    let hevc = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
+    let mut pictures = avc_gop(0);
+    pictures.extend(
+        avc_gop(0)
+            .into_iter()
+            .map(|(t, r, lsb, f)| (t, r, lsb + 14, f)),
+    );
+    let gop = avc_stream(&AvcSps::default(), &pictures, &[0, 7]);
+    let untimed = AvcSps {
+        reorder: None,
+        timing: None,
+        ..AvcSps::default()
+    };
+    let estimated = avc_stream(&untimed, &pictures.repeat(2), &[0, 7, 14, 21]);
+    let mut kinds = vec![0; 15];
+    kinds[0] = 2;
+    kinds[14] = 1;
+    let start = avc_start(
+        &untimed,
+        &start_pictures(&kinds, &[(14, 255), (15, 3)], 40),
+        None,
+    );
+    let fields = AvcSps {
+        frame_mbs_only: false,
+        reorder: Some(2),
+        max_ref_frames: 4,
+        ..AvcSps::default()
+    };
+    let field = |k: u32, bottom: bool| {
+        let (slice_type, reference, display) =
+            [(2, true, 0), (0, true, 3), (1, false, 1)][k as usize];
+        let slice = AvcSlice {
+            idr: k == 0 && !bottom,
+            reference,
+            slice_type,
+            frame_num: k.min(2),
+            poc_lsb: 4 * display + u32::from(bottom),
+            field: Some(bottom),
+            ..AvcSlice::default()
+        };
+        let sps = (k == 0 && !bottom).then_some(&fields);
+        avc_nals(sps, (2 * k + u32::from(bottom)) as u8, &slice, 0)
+    };
+    let paired: Vec<_> = (0..3)
+        .map(|k| {
+            (
+                annex_b(&[field(k, false), field(k, true)].concat()),
+                90_000 + i64::from(k) * 3003,
+            )
+        })
+        .collect();
+    let separate: Vec<_> = (0..6)
+        .map(|n| {
+            (
+                annex_b(&field(n / 2, n % 2 == 1)),
+                90_000 + i64::from(n) * 1501,
+            )
+        })
+        .collect();
+    let mut open = hevc_stream(&hevc_open_gop());
+    open[7].0 = with_end_of_sequence(&open[7].0);
+    for (coding, units) in [
+        (h264, gop),
+        (h264, estimated),
+        (h264, start),
+        (h264, paired),
+        (h264, separate),
+        (hevc, open),
+    ] {
+        let packets: Vec<_> = ts_packets(&units).collect();
+        let (frames, refused) = extract_starved(coding, &packets);
+        assert!(refused > units.len(), "{refused} refused");
+        assert_eq!(frames, extract(coding, packets));
     }
 }
