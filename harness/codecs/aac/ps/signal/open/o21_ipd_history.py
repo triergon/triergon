@@ -8,8 +8,8 @@ Crafted streams, one envelope per frame, IPD/OPD in every frame:
   corner34_20 / corner20_34
                         a change registered while off (error frame, header-less frame),
                         ICC index 0 so that the decorrelator does not enter
-Each stream is decoded by the reference and by the builds given (rust_variant.py's
-scratch copy, switched by PSV); per-frame residuals are printed.
+Each stream is decoded by the reference and by each decoder build given; per-frame
+residuals are printed.
 
 usage: o21_ipd_history.py OUTDIR binary [binary ...]"""
 import o20_ipd_change as O20
