@@ -38,7 +38,8 @@ the whole set once.
 Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
 qualification, keep the RSS kernel module unloaded and
-TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.";
+TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.
+For kernel-bound memory, collect the phases separately and use cargo xtask grade.";
 
 pub const CANDIDATE: &str = "isobmff-worker";
 pub const REFERENCE: &str = "ffmpeg-isobmff-native";
@@ -537,6 +538,16 @@ impl Suite {
             .filter(|&i| kept.contains(&self.cases[i].alias.unwrap_or(i)))
             .collect()
     }
+}
+
+/// Resolve a gate part against the full registered ISO BMFF suite.
+pub(crate) fn full_part_selection(root: &Path, part: (usize, usize)) -> R<Vec<usize>> {
+    let suite = Suite::load(root)?;
+    let selection = suite.part(&suite.selection(false), part);
+    if selection.is_empty() {
+        return Err("ISO BMFF part has no physical operations".into());
+    }
+    Ok(selection)
 }
 
 /// ISO BMFF harness inputs to include in the shared build's source bindings.
@@ -1139,11 +1150,12 @@ fn summary(rows: &[Value], selection: &[usize], options: &Options, unchanged: bo
         ),
         (
             "selected_physical_operations",
-            Value::int(if options.subset {
-                52
-            } else {
-                PHYSICAL_OPERATIONS as i128
-            }),
+            Value::int(
+                selection
+                    .iter()
+                    .filter(|&&index| rows[index].get("alias_of") == Some(&Value::Null))
+                    .count() as i128,
+            ),
         ),
         ("timing_passes", Value::int(time as i128)),
         ("memory_passes", Value::int(memory as i128)),
@@ -1909,16 +1921,27 @@ mod tests {
         let rows: Vec<_> = suite
             .cases
             .iter()
-            .map(|_| {
-                Value::object([
-                    ("match", Value::Bool(true)),
-                    ("timing", Value::object([("pass", Value::Bool(true))])),
-                    ("memory", Value::object([("pass", Value::Bool(true))])),
-                ])
+            .map(|case| {
+                let mut row = case.description();
+                field(&mut row, "match", Value::Bool(true));
+                for mode in ["timing", "memory"] {
+                    field(&mut row, mode, Value::object([("pass", Value::Bool(true))]));
+                }
+                row
             })
             .collect();
         let result = summary(&rows, &suite.selection(true), &options, true);
         assert_eq!(result.get("parity_matches"), Some(&Value::int(1020)));
+        assert_eq!(
+            result.get("selected_physical_operations"),
+            Some(&Value::int(52))
+        );
+        let part = suite.part(&suite.selection(false), (0, 3));
+        let part_result = summary(&rows, &part, &options, true);
+        assert_eq!(
+            part_result.get("selected_physical_operations"),
+            Some(&Value::int(319))
+        );
         assert!(result.get("qualified").is_none());
         let mut failed = rows;
         field(&mut failed[100], "match", Value::Bool(false));
