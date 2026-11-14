@@ -6,6 +6,7 @@ use super::{
     NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase, PacketPlan,
     PacketSegmentStorage, PacketState, PlanPhase,
 };
+use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -348,23 +349,22 @@ impl PacketPlan {
             });
         }
         let codec = state.codec;
+        let header = source.bytes[self.offset];
         let kind = if codec == Codec::Hevc {
             // Width-framed HEVC reaches Scan only after Lookahead
             // accepted every header or retained the first observed
             // refusal. The exclusively borrowed source is immutable.
-            (source.bytes[self.offset] >> 1) & 63
+            (header >> 1) & 63
         } else {
-            match NalHeader::parse_compact(codec, &source.bytes[self.offset..end]) {
-                Ok(header) => header.nal_unit_type(),
-                Err(e) if state.observed_packet => {
-                    state.packet_source_refusal.get_or_insert(e);
-                    match codec {
-                        Codec::Avc => source.bytes[self.offset] & 31,
-                        Codec::Hevc => (source.bytes[self.offset] >> 1) & 63,
-                    }
+            // The length check above already admitted the one-byte AVC header.
+            if header & 0x80 != 0 {
+                let refusal = NalHeaderError::ForbiddenZeroBit;
+                if !state.observed_packet {
+                    return Err(refusal.error());
                 }
-                Err(e) => return Err(e.error()),
+                state.packet_source_refusal.get_or_insert(refusal);
             }
+            header & 31
         };
         let mut inject = None;
         if codec == Codec::Hevc {
@@ -457,13 +457,13 @@ impl PacketPlan {
         } else if codec == Codec::Avc
             && end == source.bytes.len()
             && inject.is_some()
-            && !matches!(state.segments, Some(PacketSegmentStorage::Heap(_)))
+            && !matches!(state.segments, PacketSegmentStorage::Heap(_))
         {
             // The final source NAL and its inserted configuration may cross
             // the inline boundary together. Size the first allocation for
             // both. The count bounds an AVC injection that selects only SPS,
             // PPS or non-extension NALs.
-            let preceding = state.segments.as_ref().map_or(0, PacketSegmentStorage::len);
+            let preceding = state.segments.len();
             self.segment_hint = Some(preceding + 1 + state.config().config_nal_count());
         }
         if let Some(i) = inject {
@@ -747,10 +747,7 @@ impl PacketEmission {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step> {
-        let parts = state
-            .segments
-            .as_ref()
-            .map_or(&[][..], PacketSegmentStorage::as_slice);
+        let parts = state.segments.as_slice();
         while let Some(part) = parts.get(self.copy_segment) {
             let prefix = usize::from(part.prefix_bytes());
             let end = prefix.checked_add(part.len()).ok_or(Error::Overflow)?;
@@ -883,10 +880,7 @@ impl PacketEmission {
             has_configuration_identity: configuration_identity.is_some(),
             configuration_source_refusal,
             packet_source_refusal: state.packet_source_refusal,
-            segments: state
-                .segments
-                .take()
-                .unwrap_or_else(PacketSegmentStorage::new),
+            segments: std::mem::replace(&mut state.segments, PacketSegmentStorage::new()),
             receiver_epoch: state.epoch,
             forward_new_extradata,
         });

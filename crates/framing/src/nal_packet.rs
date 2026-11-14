@@ -467,7 +467,7 @@ impl NalPacketSession {
                 avc,
                 epoch,
                 update_verified: false,
-                segments: None,
+                segments: PacketSegmentStorage::new(),
                 total: 0,
                 failure: None,
                 receiver_failure: None,
@@ -874,7 +874,7 @@ struct PacketState<'a, M> {
     avc: AvcState,
     epoch: u64,
     update_verified: bool,
-    segments: Option<PacketSegmentStorage>,
+    segments: PacketSegmentStorage,
     total: usize,
     failure: Option<Error>,
     receiver_failure: Option<NalPacketReceiverErrorKind>,
@@ -1084,7 +1084,7 @@ impl PacketPlan {
         state: &mut PacketState<'_, M>,
         segment: NalPacketSegment,
     ) -> Result<()> {
-        let parts = state.segments.as_ref().map_or(0, PacketSegmentStorage::len);
+        let parts = state.segments.len();
         if parts == state.session.limits.maximum_segments {
             return Err(Error::Limit {
                 requested: parts.saturating_add(1),
@@ -1106,8 +1106,9 @@ impl PacketPlan {
         if self.live_base != Self::LIMITS_FIT {
             self.check_storage_bound(state, count, total)?;
         }
-        let parts = state.segments.get_or_insert_with(PacketSegmentStorage::new);
-        parts.try_push(&state.session.pool, self.segment_hint, segment)?;
+        state
+            .segments
+            .try_push(&state.session.pool, self.segment_hint, segment)?;
         state.total = total;
         Ok(())
     }
@@ -1179,7 +1180,7 @@ impl<M> NalPacketJob<'_, M> {
         if let PacketPhase::Emit(emission) = &mut self.phase {
             emission.output = None;
         }
-        self.state.segments = None;
+        self.state.segments = PacketSegmentStorage::new();
     }
 }
 
