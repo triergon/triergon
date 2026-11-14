@@ -9,6 +9,7 @@ use std::path::{Component, Path, PathBuf};
 use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
+use super::reuse;
 use super::timing::{self, GATE_PAIRS};
 use super::validation::{
     self, array, external_contract, field, hash, members, put, require_same, selected_operation,
@@ -311,15 +312,11 @@ impl Binding<'_> {
             "input_path",
             "origin",
             "redistribution_qualified",
-            "cpus",
         ] {
             same_field(timed, memory, key)?;
         }
-        same_field(
-            timed.get("environment").unwrap_or(&Value::Null),
-            memory.get("environment").unwrap_or(&Value::Null),
-            "cpus",
-        )?;
+        // Each report keeps its own CPU record: timing runs alone on one CPU,
+        // memory side by side on several, which changes no observation.
         identities(field(timed, "identity")?, field(memory, "identity")?)?;
         Ok(kind)
     }
@@ -770,6 +767,37 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
     let options = Options::parse(root, args)?;
     super::report::create_output(&options.output)?;
+    // A grade binds the gate results recorded beside the reports it joins.
+    let collections = [&options.timing, &options.memory]
+        .map(|report| report.parent().unwrap_or(Path::new(".")).to_path_buf());
+    let key = if collections.iter().all(|d| reuse::read(d).is_ok()) {
+        let mut files = vec![options.contract.as_path(), options.manifest.as_path()];
+        files.extend(options.additional.iter().map(PathBuf::as_path));
+        let settings = Value::object([(
+            "requirement",
+            options.requirement.map_or(Value::Null, Value::str),
+        )]);
+        let inputs = collections.each_ref().map(PathBuf::as_path);
+        Some(reuse::Key::new(root, "grade", settings, &files, &[])?.with_inputs(&inputs)?)
+    } else {
+        None
+    };
+    let join = || {
+        if collections.iter().any(|d| reuse::was_reused(d)) {
+            return Err(
+                "a reused collection has no report to grade: measure both with --full".into(),
+            );
+        }
+        grade(root, &options)
+    };
+    match key {
+        Some(key) => reuse::step(root, &options.output, &key, false, join),
+        None => join(),
+    }
+}
+
+/// Join and grade the two reports.
+fn grade(root: &Path, options: &Options) -> R<i32> {
     let (timed, timing_sha) = document(&options.timing)?;
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
@@ -2370,9 +2398,11 @@ mod tests {
                     Some(key) => put(&mut changed, key, record).unwrap(),
                     None => changed = record,
                 }
-                assert!(binding.headers(base, &changed).is_err());
                 if missing {
+                    assert!(binding.headers(base, &changed).is_err());
                     assert!(binding.headers(&changed, &changed).is_err());
+                } else {
+                    assert!(binding.headers(base, &changed).is_ok());
                 }
             }
         }

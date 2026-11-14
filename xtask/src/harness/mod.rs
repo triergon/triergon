@@ -19,6 +19,7 @@ pub mod parity;
 pub mod policy;
 pub mod provenance;
 pub mod report;
+pub mod reuse;
 pub mod screen;
 #[cfg(test)]
 mod tests;

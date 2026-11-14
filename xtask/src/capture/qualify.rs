@@ -65,6 +65,41 @@ pub struct Options {
     pub seed: u64,
 }
 
+/// The key of a qualification run as a gate step: its settings, the cases and
+/// their input generator, the workers and the oracle decoders.
+pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, String> {
+    let settings = Value::object([
+        ("only", Value::strings(a.only.clone())),
+        ("pairs", Value::int(a.pairs as i64)),
+        ("iterations", Value::int(a.iterations as i64)),
+        ("memory_pairs", Value::int(a.memory_pairs as i64)),
+        ("seed", Value::int(a.seed)),
+        (
+            "kernel_bound",
+            std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+        ),
+    ]);
+    let generator = root.join("harness/capture/generate_inputs.py");
+    let oracle = Path::new(&a.oracle_bin);
+    let (ffmpeg, ffprobe) = (oracle.join("ffmpeg"), oracle.join("ffprobe"));
+    let mut workers = vec![
+        ("candidate", Path::new(&a.candidate)),
+        ("reference", Path::new(&a.reference)),
+        ("ffmpeg", ffmpeg.as_path()),
+        ("ffprobe", ffprobe.as_path()),
+    ];
+    if let Some(small) = &a.reference_small {
+        workers.push(("reference-small", Path::new(small)));
+    }
+    crate::harness::reuse::Key::new(
+        root,
+        "capture qualify",
+        settings,
+        &[&a.cases, &generator, Path::new(&a.observer)],
+        &workers,
+    )
+}
+
 /// Source files whose digest identifies a qualification run.
 const SOURCE_TREES: [&str; 5] = [
     "crates/capture",
@@ -438,16 +473,25 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             let mut args = vec!["memory".to_owned()];
             args.extend(case_args(case, &SESSION));
             args.push(path_text);
-            memory::collect_command(
-                root,
-                Path::new(&a.candidate),
-                Path::new(&a.reference),
-                &path,
-                a.memory_pairs,
-                a.seed + MEMORY_SEED,
-                &args,
-                outputs,
-            )?
+            let (candidate, reference) = (Path::new(&a.candidate), Path::new(&a.reference));
+            let workers = memory::WorkerPaths {
+                candidate,
+                reference,
+                registered: false,
+            };
+            memory::collect_one(memory::Job::new(&workers, [path.clone()], |slot| {
+                memory::collect_command(
+                    slot,
+                    root,
+                    candidate,
+                    reference,
+                    &path,
+                    a.memory_pairs,
+                    a.seed + MEMORY_SEED,
+                    &args,
+                    outputs,
+                )
+            }))?
         } else {
             Value::object([("status", Value::str("missing-correctness-output"))])
         };

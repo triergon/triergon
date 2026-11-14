@@ -15,6 +15,7 @@ use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
 use super::provenance::source_identity_error;
+use super::reuse;
 use super::timing::{Operation, Work, benchmark};
 use super::validation::{self, selected_operation};
 use super::worker;
@@ -43,6 +44,8 @@ pub struct Options {
     /// Time and measure the candidate against this worker of another build instead
     /// of the reference. Correctness is still compared with the reference.
     pub baseline_worker: Option<PathBuf>,
+    /// Measure even when a cited evidence set holds this collection's result.
+    pub full: bool,
 }
 
 impl Options {
@@ -63,7 +66,20 @@ impl Options {
             memory_pairs: None,
             iterations: None,
             seed: 280,
+            full: false,
         }
+    }
+
+    /// Timed iterations per pair member: the override, else the contract's.
+    fn iterations(&self, contract: &Value) -> u32 {
+        self.iterations
+            .or_else(|| {
+                contract
+                    .get("iterations")
+                    .and_then(Value::as_f64)
+                    .map(|n| n as u32)
+            })
+            .unwrap_or(200)
     }
 }
 
@@ -645,6 +661,54 @@ impl PrefixFeature {
     }
 }
 
+/// A checkpoint of the rows collected so far; never an acceptance.
+fn partial(base: &[(&str, Value)], rows: &[Value]) -> Value {
+    let mut partial = base.to_vec();
+    partial.extend([
+        ("collection_status", Value::str("partial")),
+        ("cases", Value::Array(rows.to_vec())),
+        (
+            "acceptance",
+            Value::object([
+                ("accepted", Value::Bool(false)),
+                ("slice_accepted", Value::Bool(false)),
+                ("slice_reasons", Value::strings(["collection incomplete"])),
+                ("reasons", Value::strings(["collection incomplete"])),
+            ]),
+        ),
+    ]);
+    object(partial)
+}
+
+/// Why a measured case's inputs no longer match their pins, if they do not.
+fn input_failure(
+    corpus: &Path,
+    case: &Value,
+    input: &Path,
+    sha: &str,
+    prefix: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    if digest(input)? != sha {
+        return Ok(Some("input-hash-mismatch"));
+    }
+    let failure = additional_input_failure(corpus, case, prefix)?;
+    if failure.is_none() && prefix.is_some() {
+        resolved_case_arguments(corpus, case, case_arguments(case))?;
+    }
+    Ok(failure)
+}
+
+/// Every corpus file a case reads: its input, ordered entities and companions.
+fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
+    let mut files = vec![corpus.join(s(case, "file").ok_or("case without input path")?)];
+    for key in ["entities", "companions"] {
+        for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {
+            files.push(corpus.join(s(input, "file").ok_or("input without a path")?));
+        }
+    }
+    Ok(files)
+}
+
 fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -812,7 +876,98 @@ fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
 /// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     create_output(&options.output)?;
-    collect(root, options, None)
+    match gate_key(root, options, &[])? {
+        Some(key) => reuse::step(root, &options.output, &key, options.full, || {
+            collect(root, options, None)
+        }),
+        None => collect(root, options, None),
+    }
+}
+
+/// The key of a gate collection: timing or memory against the reference, not a
+/// comparison with another build. It binds every worker the run uses, and any
+/// `documents` beyond the contract and manifest that define its cases.
+pub(crate) fn gate_key(
+    root: &Path,
+    options: &Options,
+    documents: &[PathBuf],
+) -> Result<Option<reuse::Key>, String> {
+    let mode = match (options.benchmark, options.memory) {
+        _ if options.baseline_worker.is_some() => return Ok(None),
+        (false, false) => return Ok(None),
+        (true, false) => "report --benchmark",
+        (false, true) => "report --memory",
+        (true, true) => "report --benchmark --memory",
+    };
+    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let contract = read_json(&options.contract)?;
+    let (manifest, _) = super::manifest::read(root, &options.manifest)?;
+    let (media, native) = validation::current_workers(root, &identity)?;
+    let candidate = match s(&contract, "candidate").unwrap_or("media-worker") {
+        "media-worker" => media.clone(),
+        name => validation::candidate_worker(root, &identity, name)?,
+    };
+    let mut workers = vec![
+        ("candidate".to_owned(), candidate),
+        ("media-worker".to_owned(), media),
+        ("ffmpeg-worker".to_owned(), native),
+    ];
+    for case in manifest
+        .get("cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let selected = selected_operation(case, &contract, &identity)?;
+        for record in [&selected.reference, &selected.measured] {
+            let path = root.join(s(record, "path").unwrap_or_default());
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if !workers.iter().any(|(known, _)| *known == name) {
+                workers.push((name, path));
+            }
+        }
+    }
+    let settings = Value::object([
+        ("pairs", Value::int(options.pairs as i64)),
+        (
+            "memory_pairs",
+            Value::int(options.memory_pairs.unwrap_or(options.pairs) as i64),
+        ),
+        ("iterations", Value::int(options.iterations(&contract))),
+        ("seed", Value::int(options.seed)),
+        (
+            "require_acceptance",
+            Value::Bool(options.require_acceptance),
+        ),
+        (
+            "require_slice_acceptance",
+            Value::Bool(options.require_slice_acceptance),
+        ),
+        ("fate_cache", Value::Bool(options.fate_cache.is_some())),
+        (
+            "kernel_bound",
+            std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+        ),
+    ]);
+    let shared = [
+        "harness/fate/index.json",
+        "harness/fate/map.json",
+        "harness/module-gates.json",
+        "harness/comparison-rules.json",
+    ]
+    .map(|path| root.join(path));
+    let files: Vec<&Path> = [options.contract.as_path(), options.manifest.as_path()]
+        .into_iter()
+        .chain(shared.iter().chain(documents).map(PathBuf::as_path))
+        .chain(options.additional_reports.iter().map(PathBuf::as_path))
+        .collect();
+    let workers: Vec<(&str, &Path)> = workers
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_path()))
+        .collect();
+    reuse::Key::new(root, mode, settings, &files, &workers).map(Some)
 }
 
 /// Collect inside the directory reserved by the report command.
@@ -848,15 +1003,7 @@ pub(crate) fn collect(
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.
     let worker_operation = s(&contract, "worker_operation").map(str::to_owned);
-    let iterations = options
-        .iterations
-        .or_else(|| {
-            contract
-                .get("iterations")
-                .and_then(Value::as_f64)
-                .map(|n| n as u32)
-        })
-        .unwrap_or(200);
+    let iterations = options.iterations(&contract);
     if (options.require_acceptance || options.require_slice_acceptance)
         && !validation::iterations_valid(&contract, &Value::int(iterations))
     {
@@ -945,6 +1092,7 @@ pub(crate) fn collect(
         .unwrap_or_default();
     reserve_case_outputs(&options.output, cases)?;
     let mut rows: Vec<Value> = Vec::new();
+    let mut memory_jobs = Vec::new();
     for case in cases {
         let id = s(case, "id").unwrap_or_default().to_owned();
         let mut timed: Option<(PathBuf, PathBuf, Operation)> = None;
@@ -1109,70 +1257,72 @@ pub(crate) fn collect(
         row.push(("parity", parity));
         if let (true, Some((measured, input, operation))) = (passed, timed) {
             let reference = options.baseline_worker.clone().unwrap_or(measured);
-            let check_inputs = || {
-                if digest(&input)? != sha {
-                    return Ok(Some("input-hash-mismatch"));
-                }
-                let failure = additional_input_failure(&corpus, case, worker_operation.as_deref())?;
-                if failure.is_none() && worker_operation.is_some() {
-                    resolved_case_arguments(&corpus, case, case_arguments(case))?;
-                }
-                Ok(failure)
-            };
+            let prefix = worker_operation.as_deref();
             if options.benchmark {
-                let timing = measure_pinned(check_inputs, || {
-                    benchmark(
-                        &candidate,
-                        &reference,
-                        &input,
-                        options.pairs,
-                        iterations,
-                        options.seed,
-                        &operation,
-                    )
-                })?;
+                let timing = measure_pinned(
+                    || input_failure(&corpus, case, &input, sha, prefix),
+                    || {
+                        benchmark(
+                            &candidate,
+                            &reference,
+                            &input,
+                            options.pairs,
+                            iterations,
+                            options.seed,
+                            &operation,
+                        )
+                    },
+                )?;
                 row.push((
                     "timing",
                     store_measurement(&options.output, rows.len(), "timing", &timing)?,
                 ));
             }
             if options.memory {
-                let memory = measure_pinned(check_inputs, || {
-                    super::memory::collect(
-                        root,
-                        super::memory::WorkerPaths {
-                            candidate: &candidate,
-                            reference: &reference,
-                            registered: options.baseline_worker.is_none(),
+                let index = rows.len();
+                let registered = options.baseline_worker.is_none();
+                let workers = super::memory::WorkerPaths {
+                    candidate: &candidate,
+                    reference: &reference,
+                    registered,
+                };
+                let files = case_files(&corpus, case)?;
+                let (corpus, candidate, reference) =
+                    (corpus.clone(), candidate.clone(), reference.clone());
+                let job = super::memory::Job::new(&workers, files, move |slot| {
+                    let memory = measure_pinned(
+                        || input_failure(&corpus, case, &input, sha, prefix),
+                        || {
+                            super::memory::collect(
+                                slot,
+                                root,
+                                super::memory::WorkerPaths {
+                                    candidate: &candidate,
+                                    reference: &reference,
+                                    registered,
+                                },
+                                &input,
+                                options.memory_pairs.unwrap_or(options.pairs),
+                                options.seed,
+                                &operation,
+                            )
                         },
-                        &input,
-                        options.memory_pairs.unwrap_or(options.pairs),
-                        options.seed,
-                        &operation,
-                    )
-                })?;
-                row.push((
-                    "memory",
-                    store_measurement(&options.output, rows.len(), "memory", &memory)?,
-                ));
+                    )?;
+                    store_measurement(&options.output, index, "memory", &memory)
+                });
+                memory_jobs.push((index, job));
             }
         }
         rows.push(object(row));
-        let mut partial = base.clone();
-        partial.extend([
-            ("collection_status", Value::str("partial")),
-            ("cases", Value::Array(rows.clone())),
-            (
-                "acceptance",
-                Value::object([
-                    ("accepted", Value::Bool(false)),
-                    ("slice_accepted", Value::Bool(false)),
-                    ("slice_reasons", Value::strings(["collection incomplete"])),
-                    ("reasons", Value::strings(["collection incomplete"])),
-                ]),
-            ),
-        ]);
-        save_checkpoint(&options.output.join("partial.json"), &object(partial))?;
+        save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
+    }
+    // Every case is timed before any memory runs; memory then fills the CPUs.
+    let (indices, jobs): (Vec<usize>, Vec<_>) = memory_jobs.into_iter().unzip();
+    for (index, memory) in indices.into_iter().zip(super::memory::collect_all(jobs)?) {
+        validation::put(&mut rows[index], "memory", memory?)?;
+    }
+    if options.memory {
+        save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
     }
     let mut unavailable = None;
     let load_case = |row: &Value| {
