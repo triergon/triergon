@@ -824,6 +824,85 @@ def field_slice(kind, idr, ref, frame_num, bottom, lsb):
     return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
 
 
+def frame_sps(restriction=None):
+    """An SPS of 32x32 frames: frame_num 4 bits, POC type 0 with 8-bit LSBs,
+    2 reference frames, level 3.0; with `restriction` (reorder, buffering) a
+    VUI bitstream restriction, else no VUI."""
+    b = BitWriter()
+    for v, n in ((77, 8), (0, 8), (30, 8)):
+        b.u(v, n)
+    for v in (0, 0, 0, 4, 2):
+        b.ue(v)
+    b.u(0, 1)
+    b.ue(1)
+    b.ue(1)  # 32x32
+    for v in (1, 1, 0):
+        b.u(v, 1)  # frames, direct 8x8, no crop
+    b.u(1 if restriction else 0, 1)
+    if restriction:
+        b.u(0, 4)
+        b.u(0, 1)  # no timing
+        b.u(0, 3)
+        b.u(1, 1)
+        b.u(1, 1)
+        for v in (0, 0, 16, 16) + tuple(restriction):
+            b.ue(v)
+    b.u(1, 1)
+    return b"\x67" + escape(b.rbsp())
+
+
+def frame_slice(kind, idr, ref, frame_num, lsb):
+    """A slice of a 32x32 frame (field_pps): I_PCM or skipped macroblocks."""
+    b = BitWriter()
+    b.ue(0)
+    b.ue({"P": 5, "B": 6, "I": 7}[kind])
+    b.ue(0)
+    b.u(frame_num % 16, 4)
+    if idr:
+        b.ue(0)
+    b.u(lsb % 256, 8)
+    if kind == "B":
+        b.u(1, 1)
+    if kind != "I":
+        b.u(0, 2 if kind == "P" else 3)
+    if ref:
+        b.u(0, 2 if idr else 1)
+    b.se(0)
+    if kind == "I":
+        for _ in range(4):
+            b.ue(25)  # I_PCM
+            b.u(0, -len(b.bits) % 8)
+            for _ in range(384):
+                b.u(0x80, 8)
+    else:
+        b.ue(4)  # mb_skip_run
+    b.u(1, 1)
+    return bytes([0x65 if idr else 0x41 if ref else 0x01]) + escape(b.rbsp())
+
+
+def frame_pictures(count, bs=(), start=None, ifr=None):
+    """(kind, idr, ref, frame_num, order count) of P frames with order counts
+    2 apart from an IDR picture; `bs` maps a decode index to (P frames above
+    it, ...) for a non-reference B picture; `start` (index of a non-IDR I
+    frame) begins without an IDR picture."""
+    out, fn, pk = [], 0, 0
+    pocs = []
+    base, offset = (0, 0) if start is None else (40, 2)
+    for n in range(count):
+        if n in bs:
+            above = bs[n]
+            out.append(("B", False, False, fn + 1, pocs[-above] - 1))
+            continue
+        if n == 0 and start is None:
+            out.append(("I", True, True, 0, 0)); pocs.append(0); continue
+        fn += 1
+        pk += 1
+        kind = "I" if start is not None and n == start else "P"
+        poc = base + 2 * pk
+        out.append((kind, False, True, fn + offset, poc)); pocs.append(poc)
+    return out
+
+
 def field_pictures(count):
     """(slice NAL, display index) of each field, in decode order."""
     frames = [("I", 0, 0)]
@@ -1450,6 +1529,39 @@ def picture_output_cases(tmp_dir):
     h264_nob = base("h264", "h264-nob", params="bframes=0")
     captioned("h264-estimate", h264_nob, False,
               lambda n, au: strip_vui_timing(au) if n in sparse or n > at else None)
+
+    # Directly written 32x32 frames (P frames with order counts 2 apart and
+    # non-reference B pictures `above` P frames below the last), carried in
+    # the PES packets of a libx264 encode; each picture gets the caption data
+    # of its decode index.
+    carrier32 = base("h264", "h264-carrier32", params="bframes=0")
+
+    def written(name, pictures, restriction=None):
+        def au(n, payload):
+            if n >= len(pictures):
+                return None
+            kind, idr, ref, fn, poc = pictures[n]
+            nals = [b"\x09\xf0"] + ([frame_sps(restriction), field_pps()] if n == 0 else [])
+            units = b"".join(b"\x00\x00\x00\x01" + nal for nal in nals)
+            sei = sei_nal(sei_messages_t35(data[n % len(data)]), False)
+            return units + sei + b"\x00\x00\x00\x01" + frame_slice(kind, idr, ref, fn, poc)
+        out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier32, au)), ["cc"]))
+
+    # The start hold and depth growth without a bitstream restriction: a B
+    # picture below 5 P frames at decode index 6 is kept (nothing leaves
+    # before the seventh picture) and makes the depth 5; later B pictures 5
+    # and 6 below are kept and dropped; one 20 below leaves at once.
+    written("h264-start-hold", frame_pictures(300, bs={6: 5, 40: 5, 60: 6, 90: 20}))
+    # Depth growth after the start: a B picture 3 below at index 30 is late
+    # and dropped, the depth becomes 3; at 60 one 3 below is kept, at 80 one
+    # 4 below dropped.
+    written("h264-depth-grow", frame_pictures(300, bs={30: 3, 60: 3, 80: 4}))
+    # Starts without IDR picture or recovery point: P frames, then a non-IDR
+    # I frame at index 2; with reorder depth 2 the I frame is kept and the 2
+    # frames after it dropped; without a restriction (depth 0) the I frame
+    # is dropped and those after it kept.
+    written("h264-start-intra-r2", frame_pictures(300, start=2), restriction=(2, 3))
+    written("h264-start-intra", frame_pictures(300, start=2))
 
     # Field pairs in separate packets (the carrier's PES headers keep their
     # times; each field gets the caption data of its frame's display index

@@ -4400,6 +4400,274 @@
       }
     },
     {
+      "id": "h264-start-hold-ts",
+      "profile": "h264-start-hold-ts",
+      "file": "cc/h264-start-hold.ts",
+      "sha256": "15ac1f8a09ad667e53a9e6bbd5ef2a97c9855d20afa16d75c4d0fa4641738d9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1079,
+        "digest": 12769550437059306111
+      }
+    },
+    {
+      "id": "h264-start-hold-ts-realtime",
+      "profile": "h264-start-hold-ts",
+      "file": "cc/h264-start-hold.ts",
+      "sha256": "15ac1f8a09ad667e53a9e6bbd5ef2a97c9855d20afa16d75c4d0fa4641738d9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1314,
+        "digest": 16697466578348345947
+      }
+    },
+    {
+      "id": "h264-start-hold-ts-first",
+      "profile": "h264-start-hold-ts",
+      "file": "cc/h264-start-hold.ts",
+      "sha256": "15ac1f8a09ad667e53a9e6bbd5ef2a97c9855d20afa16d75c4d0fa4641738d9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1079,
+        "digest": 12769550437059306111
+      }
+    },
+    {
+      "id": "h264-start-hold-ts-second",
+      "profile": "h264-start-hold-ts",
+      "file": "cc/h264-start-hold.ts",
+      "sha256": "15ac1f8a09ad667e53a9e6bbd5ef2a97c9855d20afa16d75c4d0fa4641738d9d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1498,
+        "digest": 6392895810933638540
+      }
+    },
+    {
+      "id": "h264-depth-grow-ts",
+      "profile": "h264-depth-grow-ts",
+      "file": "cc/h264-depth-grow.ts",
+      "sha256": "2d68b921859dcc565f0aad50c15373c3967f16184c1f93b3182be7d5b4a43336",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 11969478481770265863
+      }
+    },
+    {
+      "id": "h264-depth-grow-ts-realtime",
+      "profile": "h264-depth-grow-ts",
+      "file": "cc/h264-depth-grow.ts",
+      "sha256": "2d68b921859dcc565f0aad50c15373c3967f16184c1f93b3182be7d5b4a43336",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1318,
+        "digest": 13851597603635471870
+      }
+    },
+    {
+      "id": "h264-depth-grow-ts-first",
+      "profile": "h264-depth-grow-ts",
+      "file": "cc/h264-depth-grow.ts",
+      "sha256": "2d68b921859dcc565f0aad50c15373c3967f16184c1f93b3182be7d5b4a43336",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 1057,
+        "digest": 11969478481770265863
+      }
+    },
+    {
+      "id": "h264-depth-grow-ts-second",
+      "profile": "h264-depth-grow-ts",
+      "file": "cc/h264-depth-grow.ts",
+      "sha256": "2d68b921859dcc565f0aad50c15373c3967f16184c1f93b3182be7d5b4a43336",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1477,
+        "digest": 10381110806871080035
+      }
+    },
+    {
+      "id": "h264-start-intra-r2-ts",
+      "profile": "h264-start-intra-r2-ts",
+      "file": "cc/h264-start-intra-r2.ts",
+      "sha256": "832e02d5e997828aafbeef0944d1a04ffed6b748b4ec7e1e148ccd9e76e68429",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 994,
+        "digest": 2548305526351433793
+      }
+    },
+    {
+      "id": "h264-start-intra-r2-ts-realtime",
+      "profile": "h264-start-intra-r2-ts",
+      "file": "cc/h264-start-intra-r2.ts",
+      "sha256": "832e02d5e997828aafbeef0944d1a04ffed6b748b4ec7e1e148ccd9e76e68429",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 1744,
+        "digest": 13865795248715069477
+      }
+    },
+    {
+      "id": "h264-start-intra-r2-ts-first",
+      "profile": "h264-start-intra-r2-ts",
+      "file": "cc/h264-start-intra-r2.ts",
+      "sha256": "832e02d5e997828aafbeef0944d1a04ffed6b748b4ec7e1e148ccd9e76e68429",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 994,
+        "digest": 2548305526351433793
+      }
+    },
+    {
+      "id": "h264-start-intra-r2-ts-second",
+      "profile": "h264-start-intra-r2-ts",
+      "file": "cc/h264-start-intra-r2.ts",
+      "sha256": "832e02d5e997828aafbeef0944d1a04ffed6b748b4ec7e1e148ccd9e76e68429",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1413,
+        "digest": 16754265891593940827
+      }
+    },
+    {
+      "id": "h264-start-intra-ts",
+      "profile": "h264-start-intra-ts",
+      "file": "cc/h264-start-intra.ts",
+      "sha256": "ad02897998a121594c5b8c3d8b0fb4268ffbdbd4d2d1a1b38cb14970c28045f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 994,
+        "digest": 16626039241181362657
+      }
+    },
+    {
+      "id": "h264-start-intra-ts-realtime",
+      "profile": "h264-start-intra-ts",
+      "file": "cc/h264-start-intra.ts",
+      "sha256": "ad02897998a121594c5b8c3d8b0fb4268ffbdbd4d2d1a1b38cb14970c28045f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 1744,
+        "digest": 2028735862605483936
+      }
+    },
+    {
+      "id": "h264-start-intra-ts-first",
+      "profile": "h264-start-intra-ts",
+      "file": "cc/h264-start-intra.ts",
+      "sha256": "ad02897998a121594c5b8c3d8b0fb4268ffbdbd4d2d1a1b38cb14970c28045f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 994,
+        "digest": 16626039241181362657
+      }
+    },
+    {
+      "id": "h264-start-intra-ts-second",
+      "profile": "h264-start-intra-ts",
+      "file": "cc/h264-start-intra.ts",
+      "sha256": "ad02897998a121594c5b8c3d8b0fb4268ffbdbd4d2d1a1b38cb14970c28045f0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1417,
+        "digest": 8371860521605306364
+      }
+    },
+    {
       "id": "h264-fields-ts",
       "profile": "h264-fields-ts",
       "file": "cc/h264-fields.ts",

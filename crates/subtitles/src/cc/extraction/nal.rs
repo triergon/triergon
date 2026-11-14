@@ -46,12 +46,20 @@
 //! A stream that does not start at an IDR picture outputs nothing until it
 //! recovers (`h264-recovery-*`): at an IDR picture; at the reference picture
 //! whose `frame_num` a recovery point SEI names (`recovery_frame_cnt` after
-//! the SEI's picture), which also recovers the pictures waiting; or when an
-//! intra picture decoded before that leaves, such pictures being output.
-//! Pictures decoded before recovery, and pictures with a lower order count
-//! than the first of those intra pictures or the recovery point (as stored,
-//! so 0 after operation 5: `h264-mmco5-start-ts`), are dropped with their
-//! captions.
+//! the SEI's picture), which also recovers the pictures waiting; or, without
+//! a recovery point, once as many pictures above the first intra picture as
+//! the reorder depth have followed it, the last of them still not recovered
+//! (`h264-start-intra-r2-ts`; probe p59). At depth 0 it recovers at that
+//! intra picture, which is itself dropped unless it is the stream's first
+//! picture with a `frame_num` other than 0 (`h264-start-intra-ts`; probes
+//! p59, p60, p61). Intra pictures decoded before recovery are output; or
+//! recovery comes when one of them leaves. With pictures below the intra
+//! picture decoded first, the reference drops the first picture above it
+//! too (probes p6-h264-b2-norec-norestr, p6-h264-b2-norec-r0d1): not
+//! followed. Pictures decoded before recovery, and pictures with a lower
+//! order count than the first of those intra pictures or the recovery point
+//! (as stored, so 0 after operation 5: `h264-mmco5-start-ts`), are dropped
+//! with their captions.
 //!
 //! **HEVC.** Order counts follow 8.3.1 and the reference picture sets 8.3.2.
 //! A picture is decoded from the first IRAP picture on; RASL pictures of an
@@ -206,8 +214,11 @@ struct AvcState {
     recovered: bool,
     /// The `frame_num` a recovery point SEI names.
     target: Option<u32>,
-    /// An intra picture has been decoded before recovery.
+    /// An intra picture has been decoded before recovery, its order count
+    /// and the pictures above it decoded since.
     keyed: bool,
+    key_poc: Option<i32>,
+    above_key: u32,
     /// Pictures with a lower order count than this are dropped.
     floor: Option<i32>,
     late: LateOutput,
@@ -797,12 +808,41 @@ impl NalDecode {
             let max_frame_num = 1u32 << fields.frame_num_bits.min(16);
             state.target = Some(u32::from(header.frame_num).wrapping_add(count) % max_frame_num);
         }
+        // Before recovery: the stream recovers once `depth` pictures above
+        // the first intra picture follow it (that one still not recovered);
+        // at depth 0 it recovers at the intra picture, which itself is kept
+        // only as the stream's first picture with `frame_num` other than 0
+        // (probes p59, p60, p61).
+        let first_key = !state.recovered && header.intra() && !state.keyed;
+        let mut unrecovered = false;
+        if !state.recovered && !first_key && state.target.is_none() {
+            if let Some(key) = state.key_poc
+                && poc.stored_poc > key
+            {
+                state.above_key = state.above_key.saturating_add(1);
+                if state.above_key >= state.depth {
+                    state.recovered = true;
+                    state.key_poc = None;
+                    unrecovered = true;
+                }
+            }
+        } else if first_key && state.target.is_none() && state.depth == 0 {
+            state.recovered = true;
+            held.key = state.decoded == 1 && header.frame_num != 0;
+            unrecovered = true;
+        }
+        let state = &mut self.progress.avc;
         if !state.recovered && header.intra() {
             held.key = true;
             if !state.keyed {
                 state.keyed = true;
                 state.floor = Some(poc.stored_poc);
+                state.key_poc = (state.depth > 0).then_some(poc.stored_poc);
+                state.above_key = 0;
             }
+        } else if first_key {
+            state.keyed = true;
+            state.floor = Some(poc.stored_poc);
         }
         if !state.recovered && slice.reference && state.target == Some(u32::from(header.frame_num))
         {
@@ -815,7 +855,7 @@ impl NalDecode {
                 entry.picture_mut().recovered = true;
             }
         }
-        held.recovered = self.progress.avc.recovered;
+        held.recovered = self.progress.avc.recovered && !unrecovered;
         // Stored without the processes of C.4.5: pictures leave by the
         // reorder depth instead. A first field waits for its second.
         let new = NewPicture {
