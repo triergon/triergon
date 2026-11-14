@@ -16490,6 +16490,15 @@
    "bytes": 161683579
   },
   {
+   "name": "gate-media-inputs",
+   "path": "gate-media-inputs",
+   "retention": "retained",
+   "reason": "The media inputs the full gate reads that the repository does not generate, unpacked at the repository root of a gate host: the FATE samples, the codec workload inputs and the subtitle corpus (.research/fate-samples, .research/codec-inputs, .research/subtitle-corpus); the gate images are built with it",
+   "key": "evidence/gate-media-inputs/cb5e7a87f37115db65d7615d609424511bf10dd169938276e7053a3572e50527.tar.gz",
+   "sha256": "cb5e7a87f37115db65d7615d609424511bf10dd169938276e7053a3572e50527",
+   "bytes": 302529082
+  },
+  {
    "name": "framing-codecs-checks-linux-armv7",
    "path": "framing-codecs-checks-linux-armv7",
    "retention": "retained",

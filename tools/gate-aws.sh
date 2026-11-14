@@ -203,7 +203,7 @@ image() {
     say "prepare"
     detached 1 PREPARED prepare
     upload_packs 1 "$inside" "$repository"
-    on 1 "rm -rf $repository/.research/reference-cache ~/*.tar.gz ~/gate-host.out; sudo apt-get clean"
+    on 1 "rm -rf $repository/.research/reference-cache ~/*.tar.gz ~/gate-host.out; mv ~/gate-host.log ~/image.log; sudo apt-get clean"
     local name="triergon-gate-$target"
     say "image $name-$stamp"
     local ami
@@ -266,17 +266,18 @@ run() {
     local repository inside run=".research/gate/$revision"
     repository=$(repository_path "$target"); inside=$(inside_command "$target")
     for i in $(seq 1 "$count"); do
+        mkdir -p "$out/shard-$i"
+        on "$i" "cat ~/gate-host.log" > "$out/shard-$i/gate-host.log" || true
+        if ! on "$i" "test -f $repository/$run/shard.json"; then say "host $i: no output"; continue; fi
         on "$i" "cd $repository/$run && tar -cf - . | zstd -q -T0" \
             | aws s3 cp --only-show-errors - "$ARCHIVE/qualification/gate-runs/$revision-$target-$stamp/shard-$i.tar.zst"
-        mkdir -p "$out/shard-$i"
         on "$i" "cd $repository/$run && tar -cf - shard.json identity-*.json run.log steps logs" | tar -xf - -C "$out/shard-$i"
-        on "$i" "cat ~/gate-host.log" > "$out/shard-$i/gate-host.log"
         upload_packs "$i" "$inside" "$repository"
     done
     for i in $(seq 2 "$count"); do
         tar -cf - -C "$out" "shard-$i" | on 1 "mkdir -p $repository/.research/gate/shards && tar -xf - -C $repository/.research/gate/shards"
     done
-    on 1 "mkdir -p $repository/.research/gate/shards && cp -r $repository/$run $repository/.research/gate/shards/shard-1"
+    on 1 "mkdir -p $repository/.research/gate/shards/shard-1 && cd $repository/$run && cp -r shard.json identity-*.json run.log steps $repository/.research/gate/shards/shard-1/"
     local shards; shards=$(for i in $(seq 1 "$count"); do printf '.research/gate/shards/shard-%s ' "$i"; done)
     on 1 "$inside 'cd ~/triergon && . ~/.cargo/env && cargo xtask gate summary --output .research/gate/summary.json $shards'" > "$out/summary.txt" || true
     on 1 "cat $repository/.research/gate/summary.json" > "$out/summary.json"
