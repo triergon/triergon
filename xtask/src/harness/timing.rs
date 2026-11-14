@@ -1441,14 +1441,16 @@ mod tests {
         let cpu = original[0];
         let observed = on_cpu(Some(cpu), || {
             assert_eq!(allowed_cpu_list(), Some(vec![cpu]));
-            let worker = Command::new("taskset")
-                .args(["-p", "-c", "0"])
+            let worker = Command::new("cat")
+                .arg("/proc/self/status")
                 .output()
                 .unwrap();
             assert!(worker.status.success());
-            let affinity = String::from_utf8(worker.stdout).unwrap();
+            let status = String::from_utf8(worker.stdout).unwrap();
             assert_eq!(
-                affinity.split_whitespace().last(),
+                status
+                    .lines()
+                    .find_map(|line| line.strip_prefix("Cpus_allowed_list:").map(str::trim)),
                 Some(cpu.to_string().as_str())
             );
             Ok(std::thread::current().id())
