@@ -79,6 +79,12 @@ fn row(r: &Value) -> Result<String, String> {
         .filter(|x| x.truthy());
     let truthy = |value: &Value, key: &str| value.get(key).is_some_and(Value::truthy);
     let pass = |value: &Value, key: &str| if truthy(value, key) { "pass" } else { "FAIL" };
+    let verdict = get(r, "verdict")?;
+    // A failure listed in the contract's open_cases for this target says so.
+    let conversion = match pass(c, "conversion") {
+        "FAIL" if truthy(verdict, "open_on_target") => "FAIL, open on this target",
+        other => other,
+    };
     let exact = match c.get("conversion_exact") {
         Some(x) => float(x)?,
         None => 0.0,
@@ -109,7 +115,6 @@ fn row(r: &Value) -> Result<String, String> {
                 .unwrap_or("unmeasured"),
         ),
     };
-    let verdict = get(r, "verdict")?;
     let memory = if truthy(verdict, "heap_gate") && truthy(verdict, "rss_gate") {
         "pass"
     } else {
@@ -122,7 +127,7 @@ fn row(r: &Value) -> Result<String, String> {
     Ok(format!(
         "| {} | {} (±{}, {}% exact) | {} | {} ({}, {}×, {}/{} dB) | {runtime} | {} | {} | {} | {} | {} |",
         python::str(get(get(r, "case")?, "id")?),
-        pass(c, "conversion"),
+        conversion,
         python::str(optional(c, "conversion_max_abs")),
         fixed(100.0 * exact, 2),
         pass(c, "mux"),
