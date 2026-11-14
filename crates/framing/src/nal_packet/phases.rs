@@ -8,7 +8,8 @@ use super::{
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
-use std::ops::ControlFlow;
+use std::num::NonZeroU32;
+use std::ops::{ControlFlow, Range};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
@@ -21,12 +22,24 @@ const YIELD: Step = Step::Break(NalPacketProgress::Yield);
 
 pub(super) struct AvcBufferingLookahead {
     offset: usize,
-    length: usize,
-    prefix_read: usize,
     remaining_nals: usize,
-    sps: Option<std::ops::Range<usize>>,
-    pps: Option<std::ops::Range<usize>>,
     insertion_index: usize,
+    sps: ParameterSetSpan,
+    pps: ParameterSetSpan,
+    length: u32,
+    prefix_read: u8,
+}
+
+#[derive(Default)]
+struct ParameterSetSpan {
+    start: usize,
+    length: Option<NonZeroU32>,
+}
+impl ParameterSetSpan {
+    fn range(&self) -> Option<Range<usize>> {
+        self.length
+            .map(|length| self.start..self.start + length.get() as usize)
+    }
 }
 
 #[inline]
@@ -391,8 +404,8 @@ impl PacketPlan {
                         length: 0,
                         prefix_read: 0,
                         remaining_nals: state.session.limits.maximum_nals - self.nals - 1,
-                        sps: None,
-                        pps: None,
+                        sps: ParameterSetSpan::default(),
+                        pps: ParameterSetSpan::default(),
                         insertion_index: 0,
                     });
                     self.nal = Some(kind);
@@ -503,7 +516,7 @@ impl PacketPlan {
                 break;
             }
             let available = source.bytes.len() - valid.offset;
-            let missing = width - valid.prefix_read;
+            let missing = width - usize::from(valid.prefix_read);
             if available < missing {
                 break;
             }
@@ -512,17 +525,18 @@ impl PacketPlan {
                 if count == 0 {
                     return Ok(YIELD);
                 }
+                // The declared width caps the complete prefix at four bytes.
                 valid.length = extend_length(
-                    valid.length,
+                    valid.length as usize,
                     &source.bytes[valid.offset..valid.offset + count],
-                );
+                ) as u32;
                 work.take(count as u64);
                 valid.offset += count;
-                valid.prefix_read += count;
+                valid.prefix_read += count as u8;
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
                 }
-                if valid.prefix_read < width {
+                if usize::from(valid.prefix_read) < width {
                     return Ok(YIELD);
                 }
             }
@@ -531,20 +545,24 @@ impl PacketPlan {
             }
             let Some(end) = valid
                 .offset
-                .checked_add(valid.length)
+                .checked_add(valid.length as usize)
                 .filter(|&end| end <= source.bytes.len())
             else {
                 break;
             };
-            if valid.length > 0 {
+            if let Some(length) = NonZeroU32::new(valid.length) {
                 valid.remaining_nals -= 1;
                 let kind = source.bytes[valid.offset] & 31;
                 if matches!(kind, avc::IDR | avc::SLICE) {
                     break;
                 }
+                let span = ParameterSetSpan {
+                    start: valid.offset,
+                    length: Some(length),
+                };
                 match kind {
-                    avc::SPS => valid.sps = Some(valid.offset..end),
-                    avc::PPS => valid.pps = Some(valid.offset..end),
+                    avc::SPS => valid.sps = span,
+                    avc::PPS => valid.pps = span,
                     _ => {}
                 }
             }
@@ -619,22 +637,22 @@ impl PacketPlan {
         // Insert the sequence set before the picture set. An in-band copy
         // uses the packet range; it never changes the configuration record.
         let (config_index, packet_range) = if index == 0 {
-            (None, lookahead.sps.as_ref())
+            (None, lookahead.sps.range())
         } else if index == count + 1 {
-            (None, lookahead.pps.as_ref())
+            (None, lookahead.pps.range())
         } else {
             (Some(index - 1), None)
         };
         let segment = if let Some(range) = packet_range {
-            Some(NalPacketSegment::packet(range.clone(), 4, state.total))
+            Some(NalPacketSegment::packet(range, 4, state.total))
         } else if let Some(index) = config_index {
             let n = state
                 .config()
                 .config_nal(index)
                 .ok_or(Error::Invalid("missing AVC parameter set"))?;
             let include = match n.kind {
-                Some(AvcConfigArrayKind::Sequence) => lookahead.sps.is_none(),
-                Some(AvcConfigArrayKind::Picture) => lookahead.pps.is_none(),
+                Some(AvcConfigArrayKind::Sequence) => lookahead.sps.length.is_none(),
+                Some(AvcConfigArrayKind::Picture) => lookahead.pps.length.is_none(),
                 _ => false,
             };
             include.then(|| NalPacketSegment::configuration(index, n.range, state.total))
