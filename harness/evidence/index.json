@@ -19750,6 +19750,51 @@
    "source_revision": "230d1314464d34a04f5f2614298e5b7009292f0c"
   },
   {
+   "name": "code-size-4dbbd545-aarch64",
+   "path": "code-size-4dbbd545-aarch64",
+   "retention": "retained",
+   "reason": "Code-size change at 4dbbd545 on AArch64 (c8g.2xlarge): the playback, transport, media, subtitle-cc, ISO BMFF and framing gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the worker SHA-256 and .text sizes. The ISO BMFF and framing rows cite it: their workers are byte-identical at 4fc96a49.",
+   "key": "evidence/code-size-4dbbd545-aarch64/da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f.tar.zst",
+   "sha256": "da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f",
+   "bytes": 65174745
+  },
+  {
+   "name": "code-size-4fc96a49-aarch64",
+   "path": "code-size-4fc96a49-aarch64",
+   "retention": "retained",
+   "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.2xlarge): the playback, transport, media and subtitle-cc gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the release tests, worker-tests, the worker SHA-256 and .text sizes.",
+   "key": "evidence/code-size-4fc96a49-aarch64/78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29.tar.zst",
+   "sha256": "78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29",
+   "bytes": 37021601
+  },
+  {
+   "name": "code-size-4fc96a49-aarch64-recollect",
+   "path": "code-size-4fc96a49-aarch64-recollect",
+   "retention": "retained",
+   "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.2xlarge), companion to code-size-4fc96a49-aarch64: kernel-bound memory of tags-binary, track-disabled and fate-witch-realtime collected again (30 pairs, the same worker and reference SHA-256), user-mode instruction counts of the Matroska worker at main f426ea65, ce6b5f71, 4fc96a49 and a variant with one demux loop per scan_prefix, Callgrind per-function tables of three cases, and the scripts that ran them.",
+   "key": "evidence/code-size-4fc96a49-aarch64-recollect/606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192.tar.zst",
+   "sha256": "606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192",
+   "bytes": 1173263
+  },
+  {
+   "name": "code-size-placement-probe-aarch64",
+   "path": "code-size-placement-probe-aarch64",
+   "retention": "retained",
+   "reason": "Matroska audio clock total RSS on AArch64: alternating audio-clocks runs of main at f426ea65 against b438e75a and 4fc96a49, the per-commit bisect, the split of the first commit, resident pages and faults per 64 KiB fault-around window, every variant tried, subtitle-cc at b438e75a, and the scripts that ran them.",
+   "key": "evidence/code-size-placement-probe-aarch64/9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72.tar.zst",
+   "sha256": "9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72",
+   "bytes": 20056214
+  },
+  {
+   "name": "code-size-4fc96a49-armv7",
+   "path": "code-size-4fc96a49-armv7",
+   "retention": "retained",
+   "reason": "Code-size change at 4fc96a49 on 32-bit ARMv7 (Thumb-2 with NEON, c6g.4xlarge): the playback, transport, media and subtitle-cc gates, the external vector, ISO BMFF and framing (30 pairs; kernel-bound memory graded with the module loaded), total RSS of long-movie-mkv and charset-cp950-nomapping-a240, the release tests, worker-tests, the worker SHA-256 and .text sizes, user-mode instruction counts of main at f426ea65 against 4fc96a49, and the scripts that ran them.",
+   "key": "evidence/code-size-4fc96a49-armv7/9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda.tar.zst",
+   "sha256": "9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda",
+   "bytes": 62855498
+  },
+  {
    "name": "codec-aac-parametric-stereo-560f2225",
    "path": "codec-aac-parametric-stereo-560f2225",
    "retention": "retained",
@@ -20004,6 +20049,19 @@
    "bytes": 334587340,
    "source_revisions": {
     "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   }
+  },
+  {
+   "name": "gate-parallel-memory-matroska-head",
+   "path": "gate-parallel-memory-matroska-head",
+   "retention": "retained",
+   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15 with each slot pinned to its CPU, at the branch head on Linux AArch64 (8607afdd, the worker link policy of main) and at 247e8560 on the ARMv7 gate target in the armhf user space (main's link policy did not build there), each on a second c6g.4xlarge: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the preflights, the timing collection both grades join, the comparisons, the RSS module review and proofs for the current module source, the measured workers and observers, and the scripts",
+   "key": "evidence/gate-parallel-memory-matroska-head/4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233.tar.gz",
+   "sha256": "4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233",
+   "bytes": 332932426,
+   "source_revisions": {
+    "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
+    "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
    }
   }
  ]
