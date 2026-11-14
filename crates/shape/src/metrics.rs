@@ -1,14 +1,15 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
 
+use crate::cff;
 use crate::cmap::{Cmap, Subtable};
 use crate::rotations::{Decide, FaceRotations};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, Platform,
-    SizedFont, TextLookup, Variant, VariationSequences,
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, OutlineFormat,
+    Platform, SizedFont, TextLookup, Variant, VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -126,8 +127,8 @@ fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
 /// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the `cmap`
 /// subtable HarfBuzz prefers among the table's raw encoding records, read as
 /// HarfBuzz reads it, its variation sequences, `hmtx`
-/// advances, and extents from the `glyf` header box or the charstring's
-/// control box.
+/// advances, and extents from the `glyf` header box or, for CFF and CFF2, as
+/// HarfBuzz's own charstring reading gives them.
 #[derive(Debug)]
 pub struct OtMetrics<'a> {
     font: &'a Font,
@@ -162,17 +163,19 @@ impl<'a> OtMetrics<'a> {
 
     /// The unscaled ink box (x min, y max, width, height ≤ 0) as hb-ot reads it:
     /// for TrueType the `glyf` header box moved to the `hmtx` side bearing, for
-    /// CFF the charstring's control box, each side rounded as `roundf` rounds it
-    /// after HarfBuzz narrows its double to a float.
+    /// CFF and CFF2 the box HarfBuzz's own charstring reading gives
+    /// ([`cff::extents`]).
     fn unscaled_extents(&self, glyph: GlyphId) -> Result<Option<[i32; 4]>> {
         // HarfBuzz's own functions have no budget beyond the face's limits.
         let mut work = WorkBudget::new(self.font.limits().work);
+        if self.font.outline_format() != OutlineFormat::TrueType {
+            return cff::extents(self.font, glyph, &mut work);
+        }
         let control = self.font.control_box(glyph, &mut work).map(Some);
         let Some(control) = unless_unloadable(control, None)? else {
             return Ok(None);
         };
         Ok(Some(match control {
-            ControlBox::Empty => [0; 4],
             ControlBox::Glyf(b) => {
                 let [x_min, y_min, x_max, y_max] =
                     [b.x_min, b.y_min, b.x_max, b.y_max].map(i32::from);
@@ -183,19 +186,8 @@ impl<'a> OtMetrics<'a> {
                     -(y_max - y_min).abs(),
                 ]
             }
-            ControlBox::Charstring(b) => {
-                let round = |v: i32| ((f64::from(v) / 65536.0) as f32).round() as i32;
-                let [mut x, mut y, mut w, mut h] = [0; 4];
-                if b.x_min < b.x_max {
-                    x = round(b.x_min);
-                    w = round(b.x_max) - x;
-                }
-                if b.y_min < b.y_max {
-                    y = round(b.y_max);
-                    h = round(b.y_min) - y;
-                }
-                [x, y, w, h]
-            }
+            // A TrueType face has no charstrings.
+            ControlBox::Empty | ControlBox::Charstring(_) => [0; 4],
         }))
     }
 }

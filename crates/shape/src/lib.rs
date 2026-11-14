@@ -12,10 +12,6 @@
 
 pub mod bidi;
 mod buffer;
-#[allow(
-    dead_code,
-    reason = "the CFF arm of OtMetrics::unscaled_extents is to call it"
-)]
 mod cff;
 mod cmap;
 mod face;
