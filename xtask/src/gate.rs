@@ -1596,7 +1596,7 @@ fn run_step(
 const SELF_CHECKING: [&str; 2] = ["codecs", "capture"];
 
 /// What a timing or memory step did not measure: the cases of its report
-/// (`--output DIR`/report.json) whose timing is not `measured` or whose memory
+/// in `--output DIR` whose timing is not `measured` or whose memory
 /// collection is not `qualified`, or the report itself when it is missing, does
 /// not read or says its collection is incomplete. A command in [`SELF_CHECKING`]
 /// checks itself.
@@ -1621,7 +1621,18 @@ fn unmeasured_cases(step: &Step) -> Vec<String> {
     else {
         return vec!["the step names no --output".into()];
     };
-    let path = output.join("report.json");
+    // ISO BMFF writes statuses and hashes separately from its raw observations.
+    // The grade step checks those observations one case at a time.
+    let filename = if step
+        .command
+        .get(1)
+        .is_some_and(|cmd| cmd == "isobmff-bench")
+    {
+        "collection.json"
+    } else {
+        "report.json"
+    };
+    let path = output.join(filename);
     match crate::checks::read_json(&path) {
         Ok(report) => unmeasured_in(&report, key, measured),
         Err(error) => vec![format!("no report: {error}")],
@@ -2459,6 +2470,26 @@ mod tests {
         assert!(unmeasured_cases(&timed)[0].starts_with("no report: "));
         timed.command = xtask(&["codecs", "time", "--out", "/nonexistent-gate-output"]);
         assert!(unmeasured_cases(&timed).is_empty());
+    }
+
+    #[test]
+    fn isobmff_step_checks_the_compact_collection() {
+        let output = crate::walk::scratch("gate-isobmff-completion");
+        fs::create_dir_all(&output).unwrap();
+        fs::write(output.join("report.json"), b"{").unwrap();
+        fs::write(
+            output.join("collection.json"),
+            br#"{"collection_status":"complete","cases":[{"id":"a","timing":{"status":"measured"}}]}"#,
+        )
+        .unwrap();
+        let timed = step(
+            "benchmark-isobmff",
+            Stage::Timing,
+            Placement::Timed,
+            xtask(&["isobmff-bench", "--output", output.to_str().unwrap()]),
+        );
+        assert!(unmeasured_cases(&timed).is_empty());
+        fs::remove_dir_all(output).unwrap();
     }
 
     #[test]
