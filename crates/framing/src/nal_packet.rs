@@ -7,8 +7,31 @@ use phases::AvcBufferingLookahead;
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, AvcConfiguration, BuildStep, Codec, HvcConfiguration, LengthSize};
 use std::ops::Range;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, WorkBudget};
+
+/// Copy one piece within the same work and cancellation checkpoints used for
+/// both packet and configuration output.
+#[inline(never)]
+pub(crate) fn copy_annex_b_piece(
+    remaining: &[u8],
+    output: &mut BudgetVec<u8>,
+    copied: &mut usize,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> Result<bool> {
+    let count = (work.remaining().min(4096) as usize).min(remaining.len());
+    if count == 0 {
+        return Ok(false);
+    }
+    output.try_extend_from_slice(&remaining[..count])?;
+    work.take(count as u64);
+    *copied += count;
+    if cancel.load(Ordering::Relaxed) {
+        return Err(Error::Cancelled);
+    }
+    Ok(true)
+}
 
 /// Literal caller fields. A numeric value here is not a known-source-clock proof.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

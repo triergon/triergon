@@ -4,7 +4,7 @@
 use super::{
     AvcState, EmissionPhase, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
     NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketPhase, PacketPlan,
-    PacketSegmentStorage, PacketState, PlanPhase, packet_pool,
+    PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_piece, packet_pool,
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
@@ -763,21 +763,9 @@ impl PacketEmission {
             // Charge and check cancellation at the prefix, payload chunks
             // and segment boundary, including when resuming a partial copy.
             if self.copied < prefix {
-                let left = prefix - self.copied;
-                let count = (work.remaining().min(left as u64)) as usize;
-                if count == 0 {
-                    return Ok(YIELD);
-                }
                 let start = 4 - prefix + self.copied;
-                buffer.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
-                work.take(count as u64);
-                self.copied += count;
-                if cancel.load(Ordering::Relaxed) {
-                    return Err(Error::Cancelled);
-                }
-                // A partial prefix used all remaining work: prefixes are at
-                // most four bytes and always fit within a copy chunk.
-                if count < left {
+                copy_annex_b_piece(&[0, 0, 0, 1][start..], buffer, &mut self.copied, work, cancel)?;
+                if self.copied < prefix {
                     return Ok(YIELD);
                 }
             }
@@ -794,16 +782,14 @@ impl PacketEmission {
                     .get(part.source_range())
                     .ok_or(Error::Invalid("packet segment range"))?;
                 while self.copied < end {
-                    let count = work_count(work).min(end - self.copied);
-                    if count == 0 {
+                    if !copy_annex_b_piece(
+                        &payload[self.copied - prefix..],
+                        buffer,
+                        &mut self.copied,
+                        work,
+                        cancel,
+                    )? {
                         return Ok(YIELD);
-                    }
-                    let start = self.copied - prefix;
-                    buffer.try_extend_from_slice(&payload[start..start + count])?;
-                    work.take(count as u64);
-                    self.copied += count;
-                    if cancel.load(Ordering::Relaxed) {
-                        return Err(Error::Cancelled);
                     }
                 }
             }
