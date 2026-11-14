@@ -258,7 +258,9 @@ them when the scale is undefined. A `SizedFont` then gives:
   Other TrueType glyphs go through the TrueType interpreter, as below.
 - The TrueType interpreter (`bytecode`) runs a face's programs as FreeType
   2.15's default load runs them in backward compatibility mode. At each size
-  the face is loaded hinted at, the font program defines its functions
+  the face is loaded hinted at (open: the specifications run the font program
+  once per face, and which of the two FreeType does is not probed), the font
+  program defines its functions
   and instructions and the control value program adjusts the scaled control
   values, fills the storage area and the twilight zone and sets the graphics
   state glyphs inherit; each glyph then loads at the hinted scale and its
