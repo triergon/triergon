@@ -786,16 +786,7 @@ impl Options {
                 "--full" => options.full = true,
                 "--part" => {
                     let value = args.next().ok_or("--part needs I/N")?;
-                    options.part = Some(
-                        value
-                            .split_once('/')
-                            .and_then(|(i, n)| Some((i.parse::<usize>().ok()?, n.parse().ok()?)))
-                            .filter(|&(i, n)| (1..=n).contains(&i))
-                            .map(|(i, n)| (i - 1, n))
-                            .ok_or_else(|| {
-                                format!("--part {value}: expected I/N with 1 <= I <= N")
-                            })?,
-                    );
+                    options.part = Some(crate::gate::parse_part(value)?);
                 }
                 "--no-early-stop" => options.early_stop = false,
                 "--output" => {

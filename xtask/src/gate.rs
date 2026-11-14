@@ -48,7 +48,6 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
 
 /// The shard file each run writes in its output directory.
 const SHARD: &str = "shard.json";
-const PAIRS: &str = "30";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Stage {
@@ -101,8 +100,11 @@ pub struct Item {
 /// The features the gate measures through `report`, with their corpus
 /// directory and planning weight: the minutes their timing, memory and grade took
 /// with early stop on a 32-bit ARMv7 c6g.4xlarge.
-const FEATURES: [(&str, Option<&str>, u32); 23] = [
+const FEATURES: [(&str, Option<&str>, u32); 26] = [
     ("mp4-forward", None, 2),
+    ("mp4-range", None, 3),
+    ("mpegts-access-units", None, 3),
+    ("subtitle-pgs-capsules", None, 5),
     ("ts-program", None, 2),
     ("matroska-audio-clocks", None, 1),
     ("raw-annex-b", None, 1),
@@ -139,6 +141,91 @@ const FEATURES: [(&str, Option<&str>, u32); 23] = [
     ("subtitle-teletext", Some(SUBTITLE_CORPUS), 5),
 ];
 const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
+
+/// How the gate covers every other registered feature (`harness/features/ID`):
+/// through the command that measures or compares it, or why it is not gated.
+/// `gate plan` and `gate summary` fail on a registered feature that is neither here
+/// nor in [`FEATURES`].
+const COVERED: [(&str, Coverage); 22] = [
+    (
+        "isobmff-open-index",
+        Coverage::Item("isobmff-bench, in parts"),
+    ),
+    ("packet-framing", Coverage::Item("framing")),
+    ("progressive-ts188", Coverage::Item("progressive")),
+    ("font-outlines", Coverage::Item("fonts compare")),
+    ("font-hinting-none", Coverage::Item("fonts compare")),
+    ("font-hinting-default", Coverage::Item("fonts compare")),
+    ("shape-libass", Coverage::Item("shape compare")),
+    ("shape-text", Coverage::Item("shape compare")),
+    ("shape-bidi", Coverage::Item("shape compare")),
+    ("shape-simple", Coverage::Item("shape compare")),
+    ("shape-unicode", Coverage::Item("shape compare")),
+    ("raster-glyphs", Coverage::Item("raster compare --all")),
+    ("raster-outlines", Coverage::Item("raster compare --all")),
+    ("raster-bitmaps", Coverage::Item("raster compare --all")),
+    ("raster-sweep", Coverage::Item("raster compare --all")),
+    ("ass-parse-scripts", Coverage::Item("ass compare")),
+    ("ass-parse-chunks", Coverage::Item("ass compare")),
+    ("ass-parse-events", Coverage::Item("ass compare")),
+    ("ass-parse-host", Coverage::Item("ass compare")),
+    (
+        "font-hinting-modes",
+        Coverage::Excluded("on demand: measured, not gated (fonts compare --all)"),
+    ),
+    (
+        "shape-text-all",
+        Coverage::Excluded("on demand: coverage at units per em (shape compare --all)"),
+    ),
+    (
+        "raster-simd",
+        Coverage::Excluded("diagnostic: the host's SIMD engine, not a reference build"),
+    ),
+];
+
+/// How a registered feature that [`FEATURES`] does not measure is covered.
+#[derive(Clone, Copy, Debug)]
+enum Coverage {
+    /// By the gate step that runs this command.
+    Item(&'static str),
+    /// Not by the gate, for this reason.
+    Excluded(&'static str),
+}
+
+/// Registered features with neither a plan nor a stated exclusion, and listed
+/// features that are not registered.
+fn coverage_problems(root: &Path) -> R<Vec<String>> {
+    let directory = root.join("harness/features");
+    let mut registered: Vec<String> = fs::read_dir(&directory)
+        .map_err(|e| format!("{}: {e}", directory.display()))?
+        .flatten()
+        .filter(|entry| entry.path().join("contract.json").is_file())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    registered.sort();
+    let listed: Vec<&str> = FEATURES
+        .iter()
+        .map(|(id, _, _)| *id)
+        .chain(COVERED.iter().map(|(id, _)| *id))
+        .collect();
+    let mut problems: Vec<String> = registered
+        .iter()
+        .filter(|id| !listed.contains(&id.as_str()))
+        .map(|id| format!("{id}: registered, but neither planned nor excluded"))
+        .collect();
+    problems.extend(
+        listed
+            .iter()
+            .filter(|id| !registered.iter().any(|r| r == *id))
+            .map(|id| format!("{id}: planned, but not registered")),
+    );
+    for (i, id) in listed.iter().enumerate() {
+        if listed[..i].contains(id) {
+            problems.push(format!("{id}: listed twice"));
+        }
+    }
+    Ok(problems)
+}
 /// How many parts the ISO BMFF suite's measurements are split into.
 const ISOBMFF_PARTS: usize = 3;
 /// The capture cases, which the capture items split between them.
@@ -223,6 +310,7 @@ fn grade(name: &str, contract: &str, manifest: &str, out: &str, full: bool) -> S
 /// commands that reuse a kept result. `target` is the gate target, `release`
 /// the workers' directory and `capture` the capture case ids.
 fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String]) -> Vec<Item> {
+    let pairs = crate::harness::timing::GATE_PAIRS.to_string();
     let with_full = |mut args: Vec<String>| {
         if full {
             args.push("--full".into());
@@ -246,7 +334,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             args.extend(owned(&[
                 &format!("--{mode}"),
                 "--pairs",
-                PAIRS,
+                &pairs,
                 "--output",
                 &format!("{out}/{mode}/{feature}"),
             ]));
@@ -277,7 +365,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             "external-vector",
             &format!("--{mode}"),
             "--pairs",
-            PAIRS,
+            &pairs,
             "--output",
             &format!("{out}/{mode}/external-vector"),
         ]))
@@ -303,12 +391,12 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     for part in 1..=ISOBMFF_PARTS {
         let name = format!("isobmff-{part}");
         let part = format!("{part}/{ISOBMFF_PARTS}");
-        let bench = |mode: &str, pairs: &str| {
+        let bench = |mode: &str, flag: &str| {
             with_full(xtask(&[
                 "isobmff-bench",
                 &format!("--{mode}"),
-                pairs,
-                PAIRS,
+                flag,
+                &pairs,
                 "--part",
                 &part,
                 "--output",
@@ -333,7 +421,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             "framing",
             &format!("--{mode}"),
             "--pairs",
-            PAIRS,
+            &pairs,
             "--output",
             &format!("{out}/{mode}/framing"),
         ]))
@@ -357,6 +445,28 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             "--corpus",
             "packet-framing=.research/fixtures-packet-framing",
         ]),
+    });
+
+    let progressive = |mode: &str| {
+        with_full(xtask(&[
+            "progressive",
+            &format!("--{mode}"),
+            "--pairs",
+            &pairs,
+            "--output",
+            &format!("{out}/{mode}/progressive"),
+        ]))
+    };
+    items.push(Item {
+        name: "progressive".into(),
+        weight: 3,
+        steps: collections(
+            "progressive",
+            progressive("benchmark"),
+            progressive("memory"),
+        )
+        .into(),
+        preflight: owned(&["--feature", "progressive-ts188"]),
     });
 
     let target_args = |mut args: Vec<String>| {
@@ -423,34 +533,48 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         steps: codecs,
         preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
     });
-    items.push(Item {
-        name: "codecs-time".into(),
-        weight: 19,
-        steps: vec![step(
-            "benchmark-codecs",
-            Stage::Timing,
-            Placement::Timed,
-            with_full(xtask(&[
+    for (name, workloads, weight) in [
+        ("codec-workloads", "harness/codecs/workloads.json", 19),
+        (
+            "codec-file-workloads",
+            "harness/codecs/file-workloads.json",
+            10,
+        ),
+    ] {
+        let codecs = |mode: &str| {
+            let mut args = xtask(&[
                 "codecs",
-                "time",
+                mode,
                 "--candidate",
                 &codec_worker,
                 "--reference",
                 "target/harness/ffmpeg-decode-worker",
                 "--workloads",
-                "harness/codecs/workloads.json",
+                workloads,
                 "--root",
                 ".",
-                "--ledger",
-                &format!("{out}/codecs-ledger.jsonl"),
                 "--out",
-                &format!("{out}/benchmark/codecs"),
-                "--label",
-                target,
-            ])),
-        )],
-        preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
-    });
+            ]);
+            if mode == "time" {
+                args.push(format!("{out}/benchmark/{name}"));
+                args.extend(owned(&[
+                    "--ledger",
+                    &format!("{out}/{name}-ledger.jsonl"),
+                    "--label",
+                    target,
+                ]));
+            } else {
+                args.push(format!("{out}/memory/{name}"));
+            }
+            with_full(args)
+        };
+        items.push(Item {
+            name: name.into(),
+            weight,
+            steps: collections(name, codecs("time"), codecs("memory")).into(),
+            preflight: owned(&["--codecs", workloads]),
+        });
+    }
 
     // Each capture case on its own: one is up to a quarter of an hour on ARMv7.
     for id in capture {
@@ -598,13 +722,13 @@ fn capture_cases(root: &Path) -> R<Vec<String>> {
         .collect())
 }
 
-/// `I/N`, counted from 1.
-fn parse_shard(value: &str) -> R<(usize, usize)> {
+/// `I/N` with 1 <= I <= N, as a shard or a part: (I - 1, N).
+pub fn parse_part(value: &str) -> R<(usize, usize)> {
     let (index, count) = value
         .split_once('/')
         .and_then(|(i, n)| Some((i.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
         .filter(|&(i, n)| (1..=n).contains(&i))
-        .ok_or_else(|| format!("--shard {value}: expected I/N with 1 <= I <= N"))?;
+        .ok_or_else(|| format!("{value}: expected I/N with 1 <= I <= N"))?;
     Ok((index - 1, count))
 }
 
@@ -641,7 +765,7 @@ impl Options {
                     .ok_or_else(|| format!("{arg} needs a value"))
             };
             match arg.as_str() {
-                "--shard" => options.shard = parse_shard(&value()?)?,
+                "--shard" => options.shard = parse_part(&value()?)?,
                 "--shards" => {
                     options.shards = value()?
                         .parse()
@@ -699,7 +823,17 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                     names.join(" ")
                 );
             }
-            Ok(0)
+            for (id, coverage) in COVERED {
+                match coverage {
+                    Coverage::Item(command) => println!("{id}: in {command}"),
+                    Coverage::Excluded(reason) => println!("{id}: not gated, {reason}"),
+                }
+            }
+            let problems = coverage_problems(root)?;
+            for problem in &problems {
+                println!("FAIL {problem}");
+            }
+            Ok(i32::from(!problems.is_empty()))
         }
         "preflight" => {
             let mut args = vec!["preflight".to_owned()];
@@ -727,7 +861,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         }
         "summary" => {
             let output = options.output.ok_or("gate summary needs --output FILE")?;
-            summary(&output, &options.directories)
+            summary(root, &output, &options.directories)
         }
         "test" => {
             let output = options.output.ok_or("gate test needs --output DIR")?;
@@ -785,6 +919,18 @@ fn run(root: &Path, output: &Path, stage: Stage, shard: (usize, usize), full: bo
         .map_err(|e| format!("{}: {e}", output.display()))?;
     let out = output.display().to_string();
     let items = shard_items(root, &out, full, shard)?;
+    // A stage's records describe this run of it alone: the timing stage starts a
+    // run afresh, and the memory stage replaces only its own steps' records.
+    let records = output.join("steps");
+    if stage == Stage::Timing {
+        let _ = fs::remove_dir_all(&records);
+    } else {
+        for step in items.iter().flat_map(|item| &item.steps) {
+            if step.stage == stage {
+                let _ = fs::remove_file(records.join(format!("{}.json", step.name)));
+            }
+        }
+    }
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let log = output.join("run.log");
     let revision = git(root, &["rev-parse", "HEAD"])?;
@@ -1103,8 +1249,8 @@ fn only_open_cases(record: &Value) -> bool {
 
 /// Joins the shards' outputs into one result at `file`; 0 when every planned
 /// step ran once and passed on one source and one set of workers.
-fn summary(file: &Path, directories: &[PathBuf]) -> R<i32> {
-    let mut problems = Vec::new();
+fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
+    let mut problems = coverage_problems(root)?;
     let mut shards = Vec::new();
     let mut steps = Vec::new();
     let mut identities: Vec<(String, String)> = Vec::new();
@@ -1189,7 +1335,37 @@ fn summary(file: &Path, directories: &[PathBuf]) -> R<i32> {
         })
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect();
-    let planned = items("OUT", false, "TARGET", "target/release", &[]);
+    let capture = capture_cases(root)?;
+    let planned = items("OUT", false, "TARGET", "target/release", &capture);
+    // Each shard ran the items the plan gives it.
+    let count = count.unwrap_or(0.0) as usize;
+    if count > 0 {
+        let names =
+            |items: Vec<Item>| -> Vec<String> { items.into_iter().map(|i| i.name).collect() };
+        let plan: Vec<Vec<String>> = self::shards(
+            items("OUT", false, "TARGET", "target/release", &capture),
+            count,
+        )
+        .into_iter()
+        .map(names)
+        .collect();
+        for shard in &shards {
+            let index = field(shard, "index")
+                .and_then(|i| i.as_f64())
+                .unwrap_or(0.0) as usize;
+            let ran: Vec<String> = field(shard, "items")
+                .and_then(|i| i.as_array().map(<[Value]>::to_vec))
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect();
+            if index == 0 || index > count || ran != plan[index - 1] {
+                problems.push(format!(
+                    "shard {index} of {count} did not run its planned items"
+                ));
+            }
+        }
+    }
     for item in &planned {
         let times = ran_items.iter().filter(|name| **name == item.name).count();
         if times != 1 {
@@ -1311,11 +1487,11 @@ mod tests {
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
         assert!(names.contains(&"capture-c04"));
-        assert!(names.contains(&"benchmark-codecs") && names.contains(&"test-release"));
+        assert!(names.contains(&"memory-codec-file-workloads") && names.contains(&"test-release"));
     }
 
     #[test]
-    fn capture_cases_split_into_two_halves_that_cover_them_once() {
+    fn every_capture_case_is_an_item_of_its_own() {
         let plan = plan();
         let ids: Vec<String> = plan
             .iter()
@@ -1411,10 +1587,16 @@ mod tests {
     }
 
     #[test]
+    fn every_registered_feature_is_planned_or_excluded() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        assert_eq!(coverage_problems(root).unwrap(), Vec::<String>::new());
+    }
+
+    #[test]
     fn shard_arguments_count_from_one() {
-        assert_eq!(parse_shard("1/4").unwrap(), (0, 4));
-        assert_eq!(parse_shard("4/4").unwrap(), (3, 4));
-        assert!(parse_shard("0/4").is_err());
-        assert!(parse_shard("5/4").is_err());
+        assert_eq!(parse_part("1/4").unwrap(), (0, 4));
+        assert_eq!(parse_part("4/4").unwrap(), (3, 4));
+        assert!(parse_part("0/4").is_err());
+        assert!(parse_part("5/4").is_err());
     }
 }
