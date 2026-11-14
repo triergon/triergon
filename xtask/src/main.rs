@@ -17,6 +17,7 @@ mod fetch;
 mod fonts;
 mod framing_bench;
 mod fuzz;
+mod gate;
 mod generators;
 mod harness;
 mod isobmff_bench;
@@ -103,6 +104,9 @@ commands:
                  [--kernel]
                  before a gate run measures: workers, references, inputs, RSS module review
                  and state; see `cargo xtask preflight --help`
+  gate           plan|preflight|run|summary   the full gate as one plan of steps, split
+                 into shards that run on separate hosts, and their joined result (see
+                 `cargo xtask gate --help`)
   build-workers  [--comparison-build] [--only WORKER]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
@@ -222,6 +226,7 @@ fn main() -> ExitCode {
             playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
         }
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("gate") => return failing(gate::main(&root, &args[1..]), gate::USAGE),
         Some("preflight") => {
             return failing(
                 harness::preflight::main(&root, &args[1..]),
@@ -920,7 +925,7 @@ fn run(command: &mut Command) -> Task {
 
 /// The nightly toolchain of the opt-in HEVC `std::simd` path, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
-const NIGHTLY: &str = "nightly-2026-10-17";
+pub(crate) const NIGHTLY: &str = "nightly-2026-10-17";
 
 /// Everything `check` needs once: each step runs as its own `cargo xtask`
 /// command with the pinned reference first on `PATH`, so the worker build
