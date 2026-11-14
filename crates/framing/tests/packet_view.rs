@@ -5,7 +5,7 @@
 //! an unsupported HEVC decoder array is an initialization rejection; teardown
 //! releases every pool charge. Each scenario's complete event stream (every step
 //! with its remaining work and pool charge, every published or refused fact) is
-//! pinned per quantum to a digest recorded before the forms were merged.
+//! pinned per quantum to a digest.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::compat::nal::*;
@@ -42,10 +42,13 @@ impl Run {
     /// FNV-1a over the events with their charges, one per line. Charges include
     /// storage headers, which depend on the pointer width.
     fn digest(&self) -> u64 {
-        fnv(self.events.iter().map(|(e, charge)| match charge {
+        fnv(self.charged_lines())
+    }
+    fn charged_lines(&self) -> impl Iterator<Item = String> + '_ {
+        self.events.iter().map(|(e, charge)| match charge {
             Some(charge) => format!("{e} {charge}"),
             None => e.clone(),
-        }))
+        })
     }
     /// FNV-1a over the events without the charges, the same on every target.
     fn portable_digest(&self) -> u64 {
@@ -371,28 +374,28 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
 }
 
 const QUANTA: [u64; 7] = [1, 2, 3, 5, 7, 16, 4096];
-/// Recorded at QUANTA from the compact receiver on `main` at `0f154393`.
+/// Complete event digests at QUANTA, including charged segment and descriptor storage.
 #[rustfmt::skip]
 const DIGESTS: &[(&str, [u64; 7])] = &[
-    ("avc w1 ppsfalse", [1947442219789186057, 1185511715728659596, 8307867964941644497, 16897372378937639698, 17866696144606131561, 5629152097004961167, 18136709142933314019]),
-    ("avc w1 ppstrue", [13884842486497754742, 7760196371067881174, 8533287113242588717, 3299030819101980589, 28164783380591304, 15532338594060495250, 2993719951551840672]),
-    ("avc w2 ppsfalse", [18239225528200379728, 13696431517684817629, 1177911623385127194, 14722527547198414937, 9852954414541737502, 8247547752360730507, 5065442223320622584]),
-    ("avc w2 ppstrue", [3186796332870143657, 9787146178842508965, 6758172136960999258, 2013678162438990773, 7693912216902509816, 16660758004324448607, 875409473685783686]),
-    ("avc w3", [16842999140837986091, 13141484540749877097, 13752474366022095176, 11986371681674494830, 1314298917957113964, 10689175764475304426, 12754415927343330207]),
-    ("avc w4 ppsfalse", [6881063878196693147, 16788212410440608559, 8861556221903114139, 14865897147439908912, 14004740400971062279, 418115431769904358, 17699106426060566749]),
-    ("avc w4 ppstrue", [13984787769768039516, 4966072882948194836, 12326267232434518053, 1703232038220652748, 131814776833187396, 3399827663089223451, 13214804148910948561]),
-    ("hevc duplicate w1", [3124786859819776625, 1630484269661242907, 10996132396304132206, 3848208352051949208, 8615005597859952558, 9479307566767738734, 1429814736607856650]),
-    ("hevc duplicate w2", [7620262315426779902, 9082895688902331519, 2414145230931230328, 14051324404230534766, 6556259138145128636, 12964702671778931216, 12653359729152742345]),
-    ("hevc duplicate w4", [12166421534325376975, 14338866888887521327, 3786663991869377886, 1887436272715170888, 14218994063198536257, 10316036579912284558, 5144817311338313907]),
-    ("hevc empty-arrays w1", [4472031776549822959, 389195086017800842, 512248974393640783, 5196724354034341913, 7642291549320038400, 5678538463194126218, 4270409721997365512]),
-    ("hevc empty-arrays w2", [12093839843655496258, 14297394989122481366, 7641131992357581990, 5921002143566267030, 10139872864010920011, 15879448962327190946, 16856545013193957969]),
-    ("hevc empty-arrays w4", [4544666759356073468, 16069129778441921885, 1445292836986433385, 9501364019316999730, 10720420832453371739, 5133658117174576628, 3768710688477938181]),
-    ("hevc plain w1", [1151220572727913936, 17146245933546370549, 5503377946578327264, 2327234607465535447, 9713478295318565475, 3763506753170346512, 12884181674464957107]),
-    ("hevc plain w2", [18347078724543440790, 10955919909891640212, 11516865353179713685, 11464422390447011651, 3832210858104039010, 11884959605875041875, 13851452055297469670]),
-    ("hevc plain w4", [4918472576543061793, 11332669951336139187, 40232216270817173, 15544172345539372930, 733418252062103648, 14728754430991790955, 247588522761713046]),
-    ("hevc unsupported-array w1", [13228462911118913844, 5816232290387083747, 12526470776149356078, 3858220857909355972, 439654780368376682, 16238039268892528066, 2153331595941929985]),
-    ("hevc unsupported-array w2", [5103550455282199555, 12793933050465456660, 15257397603592746829, 1252985044042593747, 1305757942712506281, 4252329059126782593, 14139041805707675458]),
-    ("hevc unsupported-array w4", [9276415840149683133, 6722290642593121470, 10083458655981451603, 6426923991653888973, 15108859086384853719, 16137964412663070607, 17233005384820849888]),
+    ("avc w1 ppsfalse", [905064756224523096, 7151783689517260397, 13150647336558554542, 435637639704801594, 11749272069224479263, 12792634921093526631, 12707667297594190573]),
+    ("avc w1 ppstrue", [6109730803531287305, 17997121586550986303, 12109541400898794574, 1843295475818028168, 11279553021772091214, 17234858506052855126, 9159041993561305053]),
+    ("avc w2 ppsfalse", [4354351364886564551, 15994936447631003580, 9651395599742152992, 14369298239189725981, 10629051199830008027, 4321172009484281103, 15388159959071678041]),
+    ("avc w2 ppstrue", [2883418830152518142, 18424811499865266063, 514190343724989599, 10277839915955915526, 13724550944526444799, 12827487318682191504, 12813742230815263134]),
+    ("avc w3", [2270234120079389569, 6905801116545198317, 1486163853372943960, 13365912284903168394, 11269832817307313595, 12421906341972072934, 3812459991134978430]),
+    ("avc w4 ppsfalse", [6068485879170345954, 6081884611385515645, 11811571435467656028, 4892112785325294935, 3861056660484678093, 6181407664285790435, 2305606340294160549]),
+    ("avc w4 ppstrue", [14350100067509348088, 14858318294801832599, 418094416328063176, 17715679983769462053, 824339617190092778, 821047106420001604, 18366516228307050883]),
+    ("hevc duplicate w1", [17217223722441469118, 17808715117623123167, 17791480868392898300, 12574183637329099971, 2545131625520549189, 17166073514181678016, 17618075856014778381]),
+    ("hevc duplicate w2", [5809727229330668701, 386371075108266438, 17726386513524887668, 1411409155552140423, 7314057185719534042, 4885840607894944375, 4015945133816519762]),
+    ("hevc duplicate w4", [15789834674696324342, 15046700934327650348, 3970209607903503184, 6782120356783477237, 5232997590457421771, 16242965851958269467, 2673450737920712147]),
+    ("hevc empty-arrays w1", [14462187495883043233, 11790353043237025258, 6201632495744888822, 3409716912808089351, 9576027947134224536, 13999316447947301990, 12174180436113173246]),
+    ("hevc empty-arrays w2", [8882430916472964279, 2308313333460562115, 14871784045200525355, 138933959563676263, 9998976378867400962, 12797459644369840253, 3597747990813164361]),
+    ("hevc empty-arrays w4", [10823684903402338566, 12477925237855661820, 14965016194135242005, 9186840991212185442, 9244232414203035970, 14555238688340035910, 15576334647452414745]),
+    ("hevc plain w1", [1103097628201207235, 9087721649785947946, 17682419764125701992, 4385260624464364618, 11149299066110466787, 17310124928597772561, 15954507405314900246]),
+    ("hevc plain w2", [7982415255355087194, 13092488028379191715, 583573442717337160, 15481442150416136582, 2920015728587742443, 961396160318518948, 1156820082482988567]),
+    ("hevc plain w4", [15299808682842970593, 2866216108024682259, 1963294947853540437, 15773285260572867465, 16051651964005962081, 17670892069740087857, 10981958022236071389]),
+    ("hevc unsupported-array w1", [9760657034952486696, 1909685243231031197, 6530699571153027736, 2672250236220841708, 7444361582556524331, 1565554288769659725, 9838977261231973581]),
+    ("hevc unsupported-array w2", [9980674468244188663, 12510024032811284670, 4615778744638086439, 17921271603648022459, 17645955684425257500, 17281371535035820590, 7108050433788582830]),
+    ("hevc unsupported-array w4", [9139310300119093833, 134922366974068244, 18047749306727472057, 12161628579397686997, 4717624351277987974, 17443595228734678340, 7270274127487440580]),
 ];
 
 /// The same runs without the pool charges, which are the same on every target.
@@ -419,9 +422,8 @@ const PORTABLE_DIGESTS: &[(&str, [u64; 7])] = &[
     ("hevc unsupported-array w4", [4444520668675455896, 13959612938313425998, 14786629297830374284, 1951013741772967682, 10683691208253335742, 16285626213819425795, 4351122034030628480]),
 ];
 
-/// Each scenario's event stream at every quantum, as recorded from the receiver
-/// before its configuration forms were merged.
-fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str) {
+/// Check each scenario's facts, work and charged storage at every quantum.
+fn check_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str) -> Vec<String> {
     let find = |table: &[(&str, [u64; 7])]| {
         let Some(&(_, digests)) = table.iter().find(|(l, _)| *l == label) else {
             panic!("no digests for {label}");
@@ -429,6 +431,7 @@ fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str)
         digests
     };
     let (expected, portable) = (find(DIGESTS), find(PORTABLE_DIGESTS));
+    let mut charge_failures = Vec::new();
     for ((q, expected), portable) in QUANTA.into_iter().zip(expected).zip(portable) {
         let run = receive(codec, record, packets, q);
         // Every scenario reaches the packet engine or the decoder-array refusal.
@@ -437,12 +440,32 @@ fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str)
                 || (run.count("out ") >= 8 && run.count("rejection Some") >= 1),
             "{label} quantum {q}"
         );
+        if let Ok(directory) = std::env::var("TRIERGON_PACKET_EVENTS") {
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            std::fs::write(
+                directory.join(format!("{label}-{q}.trace")),
+                run.charged_lines().collect::<Vec<_>>().join("\n") + "\n",
+            )
+            .unwrap();
+            std::fs::write(
+                directory.join(format!("{label}-{q}.digest")),
+                run.digest().to_string(),
+            )
+            .unwrap();
+        }
         assert_eq!(run.portable_digest(), portable, "{label} quantum {q}");
         // The charges were recorded on a 64-bit target.
-        if cfg!(target_pointer_width = "64") {
-            assert_eq!(run.digest(), expected, "{label} quantum {q}");
+        if cfg!(target_pointer_width = "64") && run.digest() != expected {
+            // Collect every trace before failing, so storage changes can be
+            // reviewed against the complete event set before updating pins.
+            charge_failures.push(format!(
+                "{label} quantum {q}: charge digest {} != {expected}",
+                run.digest()
+            ));
         }
     }
+    charge_failures
 }
 
 fn avc_packets(width: usize, record: &[u8]) -> Vec<Packet> {
@@ -493,25 +516,33 @@ fn avc_packets(width: usize, record: &[u8]) -> Vec<Packet> {
 
 #[test]
 fn avc_receiver_publishes_and_rejects_at_every_width_and_quantum() {
+    let mut charge_failures = Vec::new();
     for width in [1u8, 2, 4] {
         for extra_pps in [false, true] {
             let record = avc_record(width, extra_pps);
             let packets = avc_packets(usize::from(width), &record);
-            assert_receives(
+            charge_failures.extend(check_receives(
                 Codec::Avc,
                 &record,
                 &packets,
                 &format!("avc w{width} pps{extra_pps}"),
-            );
+            ));
         }
     }
     // Observed three-byte width keeps its source refusal on every output.
     let record = avc_record(3, true);
-    assert_receives(Codec::Avc, &record, &avc_packets(3, &record), "avc w3");
+    charge_failures.extend(check_receives(
+        Codec::Avc,
+        &record,
+        &avc_packets(3, &record),
+        "avc w3",
+    ));
+    assert!(charge_failures.is_empty(), "{charge_failures:#?}");
 }
 
 #[test]
 fn hevc_receiver_publishes_and_rejects_for_every_array_shape_and_quantum() {
+    let mut charge_failures = Vec::new();
     let irap = hvc_nal(19, 1);
     let trail = hvc_nal(1, 2);
     let prefix_sei = hvc_nal(39, 3);
@@ -580,12 +611,13 @@ fn hevc_receiver_publishes_and_rejects_for_every_array_shape_and_quantum() {
                 ),
             ),
         ] {
-            assert_receives(
+            charge_failures.extend(check_receives(
                 Codec::Hevc,
                 &record,
                 &packets,
                 &format!("hevc {name} w{width}"),
-            );
+            ));
         }
     }
+    assert!(charge_failures.is_empty(), "{charge_failures:#?}");
 }

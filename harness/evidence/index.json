@@ -20354,6 +20354,428 @@
      "status": 0
     }
    ]
+  },
+  {
+   "name": "packet-framing-exact-reservation",
+   "retention": "retained",
+   "key": "evidence/packet-framing-exact-reservation/b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc.tar.gz",
+   "sha256": "b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc",
+   "bytes": 64994162
+  },
+  {
+   "name": "packet-framing-cycle-profiles",
+   "retention": "retained",
+   "key": "evidence/packet-framing-cycle-profiles/7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e.tar.gz",
+   "sha256": "7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e"
+  },
+  {
+   "name": "packet-framing-inline-segment-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-inline-segment-comparison/297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600.tar.gz",
+   "sha256": "297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600",
+   "reason": "Packet framing AArch64 status row: all 125 AVC/HEVC comparisons, paired runtime, heap and total RSS, with the exact source, workers and resource traces",
+   "bytes": 65546655,
+   "source_revision": "fc64e27d2fc6c4a1f6eed253d2e9f00c2ce1c4a4"
+  },
+  {
+   "name": "packet-framing-avc-update-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-avc-update-comparison/e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18.tar.gz",
+   "sha256": "e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18"
+  },
+  {
+   "name": "packet-framing-job-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-job-comparison/a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb.tar.gz",
+   "sha256": "a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb"
+  },
+  {
+   "name": "packet-framing-resident-diagnostics",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-resident-diagnostics/2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5.tar.gz",
+   "sha256": "2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5"
+  },
+  {
+   "name": "packet-framing-profiles",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-profiles/a72d9872b39c6c01ca8e1f22ba36b33b8f57a1073dea735e2f20634667e7b77f.tar.gz",
+   "sha256": "a72d9872b39c6c01ca8e1f22ba36b33b8f57a1073dea735e2f20634667e7b77f"
+  },
+  {
+   "name": "packet-framing-budget-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-budget-count/7034e01ee5d0cf4d9c3a2ec41358e105498e519cd7c15e333055b649b3c4da61.tar.gz",
+   "sha256": "7034e01ee5d0cf4d9c3a2ec41358e105498e519cd7c15e333055b649b3c4da61"
+  },
+  {
+   "name": "packet-framing-layout-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-layout-count/669f4acdba1f03cbc7765ebe0e8e790a8672c255707cad7bd0a680ec58b6a66a.tar.gz",
+   "sha256": "669f4acdba1f03cbc7765ebe0e8e790a8672c255707cad7bd0a680ec58b6a66a"
+  },
+  {
+   "name": "packet-framing-layout-screen",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-layout-screen/18cde9b75c7343f91064856d7f667a88474041381edc3a7bf48d0c20da30449a.tar.gz",
+   "sha256": "18cde9b75c7343f91064856d7f667a88474041381edc3a7bf48d0c20da30449a"
+  },
+  {
+   "name": "packet-framing-refinement-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-refinement-count/8ec70d2d2a8656fa50719104ed3f70b0eb189ea0b48436eead96c55aa67c5c0f.tar.gz",
+   "sha256": "8ec70d2d2a8656fa50719104ed3f70b0eb189ea0b48436eead96c55aa67c5c0f"
+  },
+  {
+   "name": "packet-framing-state-count",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-state-count/8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d.tar.gz",
+   "sha256": "8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d"
+  },
+  {
+   "name": "packet-framing-publication-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-publication-count/6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc.tar.gz",
+   "sha256": "6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc"
+  },
+  {
+   "name": "packet-framing-hevc-resource-traces",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-hevc-resource-traces/d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884.tar.gz",
+   "sha256": "d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884"
+  },
+  {
+   "name": "packet-framing-inline-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-inline-comparison/00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff.tar.gz",
+   "sha256": "00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff"
+  },
+  {
+   "name": "packet-framing-inline-gate-build",
+   "retention": "retained",
+   "key": "evidence/packet-framing-inline-gate-build/f4e2a24b9da316d42c9e5edaf56388e239bf692b2e382e36c6125c2e0460a0a5.tar.gz",
+   "sha256": "f4e2a24b9da316d42c9e5edaf56388e239bf692b2e382e36c6125c2e0460a0a5"
+  },
+  {
+   "name": "packet-framing-segment-resource-traces",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-segment-resource-traces/1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4.tar.gz",
+   "sha256": "1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4"
+  },
+  {
+   "name": "packet-framing-segment-gate-build",
+   "retention": "retained",
+   "key": "evidence/packet-framing-segment-gate-build/8c3eb3b37920b7b3308c0600cd3d6b68b9ce694f831d4f952fb49007a09f6628.tar.gz",
+   "sha256": "8c3eb3b37920b7b3308c0600cd3d6b68b9ce694f831d4f952fb49007a09f6628"
+  },
+  {
+   "name": "packet-framing-configuration-lookup",
+   "path": "packet-framing-configuration-lookup",
+   "retention": "retained",
+   "reason": "packet-framing configuration lookup and paired build comparisons cited by docs/status.md",
+   "key": "evidence/packet-framing-configuration-lookup/f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f.tar.gz",
+   "sha256": "f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f",
+   "bytes": 104415028
+  },
+  {
+   "name": "packet-framing-compact-state",
+   "retention": "retained",
+   "key": "evidence/packet-framing-compact-state/7b09d5ecab0b8752146e7e548668145cb9ba488bcfd55dc18eb70a8d8f035d84.tar.gz",
+   "sha256": "7b09d5ecab0b8752146e7e548668145cb9ba488bcfd55dc18eb70a8d8f035d84"
+  },
+  {
+   "name": "packet-framing-bounded-insert",
+   "retention": "retained",
+   "key": "evidence/packet-framing-bounded-insert/8ef50e430c7377e613aaa960bacb794e4de540cec032412c77cff77ed2a0ebaa.tar.gz",
+   "sha256": "8ef50e430c7377e613aaa960bacb794e4de540cec032412c77cff77ed2a0ebaa"
+  },
+  {
+   "name": "packet-framing-hevc-inline",
+   "retention": "retained",
+   "key": "evidence/packet-framing-hevc-inline/f0adf4775628265e8b3ad509c64b15961075d9f6b2613b0f7e70b26b988af228.tar.gz",
+   "sha256": "f0adf4775628265e8b3ad509c64b15961075d9f6b2613b0f7e70b26b988af228"
+  },
+  {
+   "name": "packet-framing-avc-scan",
+   "retention": "retained",
+   "key": "evidence/packet-framing-avc-scan/920a7967407aa6a8b5bd2becbdabb7d40442ed4a29018df88acabae65775e5c7.tar.gz",
+   "sha256": "920a7967407aa6a8b5bd2becbdabb7d40442ed4a29018df88acabae65775e5c7"
+  },
+  {
+   "name": "packet-framing-inline-storage-1cea5f7b-aarch64",
+   "path": "packet-framing-inline-storage-1cea5f7b-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison with five inline segment descriptors, short AVC extensions and static runtime support. Includes the exact source, workers, observer proof, all 131 timings and memory samples, and the failed runtime grade.",
+   "key": "evidence/packet-framing-inline-storage-1cea5f7b-aarch64/f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5.tar.zst",
+   "sha256": "f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5",
+   "bytes": 41030376
+  },
+  {
+   "name": "packet-framing-link-policy-cbc8aca8-aarch64",
+   "path": "packet-framing-link-policy-cbc8aca8-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison under the shared GNU/Linux link policy. Includes 131 parity, timing and memory results, the exact workers and source, and the four cases above the runtime ceiling.",
+   "key": "evidence/packet-framing-link-policy-cbc8aca8-aarch64/26194f9c7a22339279995164e09e2afedc1d597e6c7f0a46fb3856bb1505d8ae.tar.zst",
+   "sha256": "26194f9c7a22339279995164e09e2afedc1d597e6c7f0a46fb3856bb1505d8ae",
+   "bytes": 57395736
+  },
+  {
+   "name": "packet-framing-combined-40e2ab49-aarch64",
+   "path": "packet-framing-combined-40e2ab49-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with six inline segment descriptors and bounded descriptor storage. Includes all 131 parity, timing and memory results and the work-budget differential traces.",
+   "key": "evidence/packet-framing-combined-40e2ab49-aarch64/1af7451dbad47826469d5133ff4d09cc658cf942eaab7f84fd9b7631ba848881.tar.zst",
+   "sha256": "1af7451dbad47826469d5133ff4d09cc658cf942eaab7f84fd9b7631ba848881",
+   "bytes": 60161485
+  },
+  {
+   "name": "packet-framing-parallel-bb57273d-aarch64",
+   "path": "packet-framing-parallel-bb57273d-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with shared libm and parallel memory collection. Includes source, workers, the reviewed observer and all 131 cases with the two runtime misses.",
+   "key": "evidence/packet-framing-parallel-bb57273d-aarch64/7d7f2805ee7835963e2d68d771cd5bda5a61f59a077bfee84a80dee6552aa53b.tar.zst",
+   "sha256": "7d7f2805ee7835963e2d68d771cd5bda5a61f59a077bfee84a80dee6552aa53b",
+   "bytes": 55066769
+  },
+  {
+   "name": "packet-framing-bounded-prefix-768b50ab-aarch64",
+   "path": "packet-framing-bounded-prefix-768b50ab-aarch64",
+   "retention": "retained",
+   "reason": "Paired AArch64 comparison of complete NAL prefix reads and descriptor checks. Includes both workers, all 131 reference folds and paired timing results, and unchanged work-budget traces.",
+   "key": "evidence/packet-framing-bounded-prefix-768b50ab-aarch64/f07378d8a1452f9d4bd268a3f185ceae311ed886915056af8e4894b577a2e6fb.tar.zst",
+   "sha256": "f07378d8a1452f9d4bd268a3f185ceae311ed886915056af8e4894b577a2e6fb",
+   "bytes": 42930285
+  },
+  {
+   "name": "packet-framing-gate-768b50ab-aarch64",
+   "path": "packet-framing-gate-768b50ab-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison using the merged link policy, including the remaining runtime failure, all paired samples, both workers and the kernel RSS proof.",
+   "key": "evidence/packet-framing-gate-768b50ab-aarch64/808f84fc8925b5ae201603c9ecf5a35a954554566c1135c3a48052026cceaaca.tar.zst",
+   "sha256": "808f84fc8925b5ae201603c9ecf5a35a954554566c1135c3a48052026cceaaca",
+   "bytes": 681644343
+  },
+  {
+   "name": "framing-comparison-7a80e17e",
+   "path": "framing-comparison-7a80e17e",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/framing-comparison-7a80e17e/c6bb06161ca73a9b262d809c86e2a9fe38b1558b9f6f89e82d42e93328eb32c3.tar.gz",
+   "sha256": "c6bb06161ca73a9b262d809c86e2a9fe38b1558b9f6f89e82d42e93328eb32c3",
+   "bytes": 287766997,
+   "results": [
+    {
+     "path": "results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "3f814e8af169e23bf1a0e2452e73a438cc3fbf423352e2d4a4edf5e8745fe992",
+     "status": 0,
+     "report_sha256": "369c7e50e22d9c7b7aad76d47e9c2bafbd3b78acb3b2a92b2b67db87f4a1e25f"
+    }
+   ]
+  },
+  {
+   "name": "packet-framing-native-checks-7a80e17e",
+   "path": "packet-framing-native-checks-7a80e17e",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/packet-framing-native-checks-7a80e17e/21709e0ea4aa18e59d8cfa2b06d63285cb8f9b986611dc092e963dbc39efae2d.tar.gz",
+   "sha256": "21709e0ea4aa18e59d8cfa2b06d63285cb8f9b986611dc092e963dbc39efae2d",
+   "bytes": 50153224
+  },
+  {
+   "name": "framing-fate-trace-7a80e17e",
+   "path": "framing-fate-trace-7a80e17e",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/framing-fate-trace-7a80e17e/c04b4812020f57a3ca506417e3bd47842528f69e936a739c162cc70cf9aa1493.tar.gz",
+   "sha256": "c04b4812020f57a3ca506417e3bd47842528f69e936a739c162cc70cf9aa1493",
+   "bytes": 92700
+  },
+  {
+   "name": "framing-validated-copy-ea310015",
+   "path": "framing-validated-copy-ea310015",
+   "retention": "retained",
+   "reason": "",
+   "key": "evidence/framing-validated-copy-ea310015/ae28a2ec6c9e6750607a25a4f1238eb96c21777a9611622741922bed18ad315f.tar.gz",
+   "sha256": "ae28a2ec6c9e6750607a25a4f1238eb96c21777a9611622741922bed18ad315f",
+   "bytes": 289412690,
+   "results": [
+    {
+     "path": "results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "37649c6cb5529c18c5411c701ab1f800658864da18ca05d07b3038af927fd321",
+     "status": 0,
+     "report_sha256": "adb47621c52b182d6ae631e40fcdf042d934d97a945533851eb66367d54b1c38"
+    }
+   ]
+  },
+  {
+   "name": "framing-reserved-output-ccc8fcc2-aarch64",
+   "path": "framing-reserved-output-ccc8fcc2-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 paired timing against FFmpeg and the previous Rust worker for reserved Annex B output.",
+   "key": "evidence/framing-reserved-output-ccc8fcc2-aarch64/7b823cb4436f3d577f60dc84e74b15e296471f4909cf86fd258bbb73c900bcc0.tar.gz",
+   "sha256": "7b823cb4436f3d577f60dc84e74b15e296471f4909cf86fd258bbb73c900bcc0",
+   "bytes": 304639711,
+   "results": [
+    {
+     "path": "results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "7ba23c8e1947af5a4e5e8f6429cb5e6afb5939dfeee9b98ab2519cbfc9d6ca7f",
+     "status": 0,
+     "report_sha256": "c04c94e1825235765ea802d7ebd2edfc2bd819972c0bb52364b6170aeee2cd09"
+    }
+   ]
+  },
+  {
+   "name": "framing-length-and-output",
+   "path": "framing-length-and-output",
+   "retention": "retained",
+   "reason": "Paired AArch64 timing for shared length parsing and Thumb-2 executable page observations for reserved Annex B output.",
+   "key": "evidence/framing-length-and-output/094273a46706e775d756f3006962017d94011857ac6e564ac82922bcf5f95575.tar.gz",
+   "sha256": "094273a46706e775d756f3006962017d94011857ac6e564ac82922bcf5f95575",
+   "bytes": 312545591,
+   "results": [
+    {
+     "path": "length-aarch64/run/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "26644b65f7170ccc77b6566802d795dc2d86bf4dc2f9074c3f9e6dfc11e11d69",
+     "status": 0,
+     "report_sha256": "f151f21cb8455c90b9a39e2103103c9ed81f136da3faca6eac17ae9d6082acf1"
+    }
+   ]
+  },
+  {
+   "name": "framing-borrowed-pool-e791da7c",
+   "path": "framing-borrowed-pool-e791da7c",
+   "retention": "retained",
+   "reason": "The AArch64 borrow-and-reserve timing comparison and the Thumb-2 executable-page observations.",
+   "key": "evidence/framing-borrowed-pool-e791da7c/9fc3ad5489bf07c756f54380b84cd6a3588f616968c46ba736f8343b2d21d5c4.tar.gz",
+   "sha256": "9fc3ad5489bf07c756f54380b84cd6a3588f616968c46ba736f8343b2d21d5c4",
+   "bytes": 331301069,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "02d3e58a4fbfdb7a48c6f55f8b2bee4a41c89912a88c244bce9faa5041febb6f",
+     "status": 0,
+     "report_sha256": "d5ea6ae60c237a9075446dd643ca1051c75db869f6a768d2f67ca617c15cd212"
+    }
+   ]
+  },
+  {
+   "name": "framing-parameter-set-cursor-cc56c7d0",
+   "path": "framing-parameter-set-cursor-cc56c7d0",
+   "retention": "retained",
+   "reason": "Full AArch64 timing of local parameter-set insertion and a clean-cache run of the upstream framing vectors.",
+   "key": "evidence/framing-parameter-set-cursor-cc56c7d0/4bce8281a0b8202d58dd07e09b247e99a5fbd0600ad287074fc9c1885004c766.tar.gz",
+   "sha256": "4bce8281a0b8202d58dd07e09b247e99a5fbd0600ad287074fc9c1885004c766",
+   "bytes": 322285088,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "029cf4ea517c66c53a3fd2796ae264ad4253a23bface0affb04c94abe32ff565",
+     "status": 0,
+     "report_sha256": "01ecc08e2a0a8313c52f153322b191f503934741d74a533f5c62d32ee873c4c7"
+    }
+   ]
+  },
+  {
+   "name": "framing-annex-b-slices-6ac355f7",
+   "path": "framing-annex-b-slices-6ac355f7",
+   "retention": "retained",
+   "reason": "Native AArch64 paired timing of Annex B source slice reuse across all packet-framing workloads.",
+   "key": "evidence/framing-annex-b-slices-6ac355f7/cc9d7301f72be437757153b02ba65af9c01ff0baa463715a36f344425d7ff853.tar.gz",
+   "sha256": "cc9d7301f72be437757153b02ba65af9c01ff0baa463715a36f344425d7ff853",
+   "bytes": 307907033,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "1596e0b29f8c20d79b7e7619518881ade8116ae80b767887539b082853bfde21",
+     "status": 0,
+     "report_sha256": "3530659a7c211d244834092d6e577f1f7ec8009aa4473424002f17545369271b"
+    }
+   ]
+  },
+  {
+   "name": "framing-metadata-fold-1fb7e8e2",
+   "path": "framing-metadata-fold-1fb7e8e2",
+   "retention": "retained",
+   "reason": "Native AArch64 timing and Thumb-2 link diagnostics for the shared packet metadata fold.",
+   "key": "evidence/framing-metadata-fold-1fb7e8e2/ba6879bc75d9b7e2a1c74a5dd4c9035b63695cc150444111667ec2cfb5929281.tar.gz",
+   "sha256": "ba6879bc75d9b7e2a1c74a5dd4c9035b63695cc150444111667ec2cfb5929281",
+   "bytes": 304984312,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "75ee22cd210e21a386a5b8a75838081322e143a0a77ee2f23fea93b01af27d64",
+     "status": 0,
+     "report_sha256": "ac99201fe52266d501afdb9330cb71c03667af24295e6cd80e9a8f3531db409b"
+    }
+   ]
+  },
+  {
+   "name": "framing-descriptor-extents-49e04e0f",
+   "path": "framing-descriptor-extents-49e04e0f",
+   "retention": "90 days",
+   "reason": "AArch64 comparison of checked descriptor extents",
+   "key": "qualification/framing-descriptor-extents-49e04e0f/01f0a922f7f5aaf9d210ad49d33a85db5444db3100ab17f5c5a33678e2d5e704.tar.gz",
+   "sha256": "01f0a922f7f5aaf9d210ad49d33a85db5444db3100ab17f5c5a33678e2d5e704",
+   "bytes": 308599819
+  },
+  {
+   "name": "framing-packed-avc-401fbcca",
+   "path": "framing-packed-avc-401fbcca",
+   "retention": "90 days",
+   "reason": "AArch64 comparison of packed AVC state",
+   "key": "qualification/framing-packed-avc-401fbcca/9b42701fd46439e7a405f89afb354af16595d73a6e869802db6fefb1166cfc9d.tar.gz",
+   "sha256": "9b42701fd46439e7a405f89afb354af16595d73a6e869802db6fefb1166cfc9d",
+   "bytes": 307481526
+  },
+  {
+   "name": "framing-full-0ce0e738-aarch64",
+   "path": "framing-full-0ce0e738-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing timing and kernel-bound memory on all 131 cases",
+   "key": "evidence/framing-full-0ce0e738-aarch64/d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a.tar.zst",
+   "sha256": "d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a",
+   "bytes": 26848727,
+   "results": [
+    {
+     "path": "results/grade/gate-result.json",
+     "command": "grade",
+     "key": "808f560e1359d7345c2e0bb86e5d15061363615b636349f0f2fb74c4684e6bd6",
+     "status": 0,
+     "report_sha256": "dfa1f59d5e25b1bba740f1a3db60285b8e7559fac6c31bcc276408ec446cbf1c"
+    },
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "report --memory",
+     "key": "81c47e37837dfd0f2b672a477b4c56ddb1faa2ffe528deaeb376ccc89d55519b",
+     "status": 0,
+     "report_sha256": "ee94dde4c214c8d790dae4c89bbebe53ebd7b00069333acdf1f1184671216a42"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9af5da359f5be4a0cfebf34ff74165cf23edbe48919c6f4e572e5e6a14869bb9",
+     "status": 0,
+     "report_sha256": "aa98233a721b5db3d5a08eb7d19b47c59f51ac220e55f5a94348584fa96996b2"
+    }
+   ],
+   "source_revision": "0ce0e7389c4f7232701558b7fdf614e69b393a3f"
+  },
+  {
+   "name": "framing-upstream-0ce0e738",
+   "path": "framing-upstream-0ce0e738",
+   "retention": "retained",
+   "reason": "Seven upstream Annex B replays and four frame or remux comparisons",
+   "key": "evidence/framing-upstream-0ce0e738/0f1dfb80affe8acc1f56b16175e318031a5e71d9f8631410cea06180889b277d.tar.zst",
+   "sha256": "0f1dfb80affe8acc1f56b16175e318031a5e71d9f8631410cea06180889b277d",
+   "bytes": 26759317,
+   "source_revision": "0ce0e7389c4f7232701558b7fdf614e69b393a3f"
   }
  ]
 }
