@@ -20226,6 +20226,15 @@
     "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
     "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
    }
+  },
+  {
+   "name": "packet-framing-combined-40e2ab49-aarch64",
+   "path": "packet-framing-combined-40e2ab49-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with six inline segment descriptors and bounded descriptor storage. Includes all 131 parity, timing and memory results and the work-budget differential traces.",
+   "key": "evidence/packet-framing-combined-40e2ab49-aarch64/1af7451dbad47826469d5133ff4d09cc658cf942eaab7f84fd9b7631ba848881.tar.zst",
+   "sha256": "1af7451dbad47826469d5133ff4d09cc658cf942eaab7f84fd9b7631ba848881",
+   "bytes": 60161485
   }
  ]
 }
