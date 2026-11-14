@@ -36,6 +36,23 @@ resource limit becomes an explicit, reviewed rule for that case.
   refused. With `TRIERGON_DOWNLOAD_CACHE` set, verified downloads are also kept in that
   directory under their hash and reused before any network access. CI keeps this
   cache between runs.
+- **Reference builds.** Each prepare command (`prepare-ffmpeg`, `fonts prepare`,
+  `shape prepare`, `raster prepare`, `ass prepare`) keys its build by the SHA-256 of
+  what the build depends on besides its own directory: the xtask code that defines it
+  (with its pinned source hashes, configure flags and link steps) and the worker link
+  policy's, its directory (the configure prefix), the keys of the builds it links, the
+  C and C++ compilers and their target, the installed package list (FFmpeg's default
+  configuration detects optional system libraries) and the compiler and `pkg-config`
+  environment variables. The key is recorded in `reference-key.json` beside
+  `build.json`. A prepare whose directory holds its key does nothing; one whose key is
+  packed in `.research/reference-cache/NAME/KEY.tar.zst` unpacks the pack, which
+  restores the directory as the packed build left it, so `build-workers` links the same
+  libraries and records the same identity; only a miss builds. `cargo xtask references
+  keys` lists each build's key and whether it is current, cached or missing, `pack`
+  packs current builds, and with `TRIERGON_EVIDENCE_ARCHIVE` set `fetch` and `upload`
+  move packs to and from `qualification/reference-builds/NAME/KEY.tar.zst`. A pack is
+  not evidence: it expires 90 days after its upload, and the next prepare that misses
+  it builds and uploads it again.
 - **FFmpeg pins.** `cargo xtask prepare-ffmpeg --profile P` builds FFmpeg from a pinned,
   hash-checked source with recorded configure flags, compiler and binary hashes, and
   `cargo xtask build-workers` builds the reference worker of every prepared profile
@@ -556,22 +573,37 @@ may override that count for diagnostic comparisons.
 
 ### Running the gates
 
-1. Build the workers, then run `cargo xtask preflight` with every feature the run will
-   measure (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
-   takes them), `--isobmff`, `--codecs` for each workload list and `--review` for the
-   RSS module review. It checks that the gate build's workers and references match the
-   build identity, that every case names a reference the identity holds and has each
-   input it reads with its pinned hash, that the review covers this module source and
-   kernel, and that the module is unloaded, and prints every failure at once. Run
-   `prove.sh` once into a scratch directory and unload the module again, so a module
-   that will not build, load or prove itself stops the run here.
-2. Time every feature, alone on one CPU with the RSS module unloaded (`taskset -c 1`).
-3. [Prove](../harness/rss-bound/README.md) the kernel bound, rebuild the workers with
-   the proof, check it with `cargo xtask preflight --kernel`, and collect memory on the
-   remaining CPUs (`taskset -c 1-15` on a 16-CPU host).
-4. Grade with the module loaded.
+`cargo xtask gate` holds the full gate as one plan. Its items are the work for one
+measured thing: a feature's timing, memory and grade, the ISO BMFF and packet-framing
+suites, the codecs, each half of the capture cases, the tests, and the font, shaping,
+rasterising and ASS comparisons. `cargo xtask gate plan --shards N` splits them into N
+shards of about equal planning weight, each for its own host. On one host, a shard's
+run is:
 
-Never time while memory, a build or anything else runs on the host.
+1. `tools/gate-host.sh ready I/N REVIEW`: the prepare commands, the workers, and `cargo
+   xtask gate preflight`, which runs `cargo xtask preflight` with everything the shard
+   measures (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
+   takes them, `--isobmff`, `--codecs` for each workload list) and `--review` for the
+   RSS module review. Preflight checks that the gate build's workers and references
+   match the build identity, that every case names a reference the identity holds and
+   has each input it reads with its pinned hash, that the review covers this module
+   source and kernel, and that the module is unloaded, and prints every failure at
+   once. Then `prove.sh` runs once into a scratch directory and the module is unloaded
+   again, so a module that will not build, load or prove itself stops the run here.
+2. `tools/gate-host.sh run I/N REVIEW OUT` times the shard alone on one CPU with the RSS
+   module unloaded (`taskset -c 1`, `cargo xtask gate run --stage timing`), after its
+   parity steps.
+3. It [proves](../harness/rss-bound/README.md) the kernel bound, rebuilds the workers
+   with the proof, checks them with `cargo xtask gate preflight --kernel`, and collects
+   memory on the remaining CPUs (`taskset -c 1-15` on a 16-CPU host, `cargo xtask gate
+   run --stage memory`).
+4. It grades with the module loaded. Grades measure nothing, so several run at once.
+
+Never time while memory, a build or anything else runs on the host. Each step's log,
+and a record of its command, status and time, go under OUT. `cargo xtask gate summary
+--output FILE DIR...` joins the shards' outputs into one result; it fails when a
+planned step did not run exactly once, a step failed, or the shards measured different
+source revisions or timing builds.
 
 #### Memory in parallel
 
@@ -649,6 +681,9 @@ and user-space package list with the results. The `subtitles` reference builds l
 from its source archive, which needs `apt-get install autoconf automake libtool autopoint
 gettext` in the user space first.
 
+`tools/gate-host.sh setup armv7` does all of this on a gate host, and mounts the user
+space at every boot.
+
 The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
 entry point. The module belongs to the host's kernel, so build and load it on the host,
 which needs the kernel's headers, and bind debugfs into the user space before entering
@@ -665,6 +700,32 @@ harness/rss-bound/prove.sh .research/rss-bound/RSS-REVIEW.json .research/rss-bou
 Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
 `TRIERGON_RSS_KERNEL_BOUND=1` inside the user space, as the
 [kernel proof workflow](../harness/rss-bound/README.md) describes.
+
+### Gate hosts
+
+`tools/gate-aws.sh` runs gate hosts on AWS from a workstation with the `aws` CLI; the
+hosts hold no AWS credentials. `tools/gate-aws.sh image aarch64|armv7 REVISION
+INPUT...` builds a target's gate image on a Graviton2 c6g.4xlarge: Ubuntu 24.04 with
+the build packages, the kernel headers and Rust, the kernel held at the release the
+RSS module review names, unattended upgrades off; for ARMv7 the armhf user space with
+its own Rust and the gate target; the repository at REVISION with every reference
+build (restored from the archive's packs where it holds their keys, the packs of the
+others uploaded), the generated fixtures, vectors, font corpus and manifests, and the
+workers; and each INPUT, an archive of media inputs the repository does not generate,
+with repository-relative paths: evidence set `gate-media-inputs` holds the FATE
+samples, the codec workload inputs and the subtitle corpus the gate reads
+(`s3:evidence/gate-media-inputs/SHA.tar.gz`, its key in the
+[index](../harness/evidence/index.json)). The image is tagged
+`Name=triergon-gate-TARGET`, and the earlier images of the target and their snapshots
+are removed. Run it again when the reference builds' keys or the media inputs change,
+or to take a new base image.
+
+`tools/gate-aws.sh run TARGET N REVISION REVIEW OUT` launches N hosts from the image,
+checks out REVISION on each, restores reference builds whose keys changed from the
+archive's packs (building and uploading the others), gets each host ready and runs
+shard I of N on host I. The shards' outputs are archived under
+`qualification/gate-runs/`, where they expire after 90 days unless promoted, and the
+logs, step records and the summary are copied to OUT.
 
 ## Robustness
 
