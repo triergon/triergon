@@ -604,6 +604,15 @@ may override that count for diagnostic comparisons.
   and instruction counts is placement. A screen never replaces a recorded result.
 - Qualification runs natively: on AArch64 Linux, and on 32-bit ARMv7 Linux in an armhf
   user space (below). Results on one platform do not establish another.
+- The gates qualify on one host class for both targets: the AWS c6g.4xlarge
+  (Graviton2, 16 vCPUs, 32 GiB), which runs 32-bit user spaces and has the memory
+  kernel-bound memory needs. Runtime from another class is not comparable, because
+  another core moves the candidate/reference ratio of the same instructions: on 13
+  Linux AArch64 rows measured first on c8g (Graviton4) and again on a c6g.4xlarge at
+  `79e0ae13`, each candidate's user-mode instruction count stayed within -0.4% to +0.3%
+  of the earlier build's (one row's code got 9% cheaper) while the runtime upper bounds
+  moved by -0.31 to +0.18 (`cargo xtask count`, below). Every row of
+  [status](status.md) names the class it was measured on.
 
 ### Running the gates
 

@@ -28,8 +28,9 @@
 # start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to;
 # TRIERGON_EVIDENCE_ARCHIVE, the s3:// evidence archive; optionally
 # TRIERGON_BASE_IMAGE (default: the current Ubuntu 24.04 arm64 image) and
-# TRIERGON_VOLUME_GB (default 200). Hosts are c6g.4xlarge: Graviton2, which runs
-# 32-bit user spaces, with the 32 GiB kernel-bound memory is qualified on. Every
+# TRIERGON_VOLUME_GB (default 200). Hosts are c6g.4xlarge, the class the gates
+# qualify on for both targets: Graviton2, which runs 32-bit user spaces, with the
+# 32 GiB kernel-bound memory needs. Every
 # resource is tagged Project=triergon; hosts terminate when they shut down, and a
 # timer on disk shuts each down 72 hours after it boots, whatever happens. Each
 # command removes its hosts, security group and key pair when it ends, and exits
