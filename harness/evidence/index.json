@@ -16490,6 +16490,15 @@
    "bytes": 161683579
   },
   {
+   "name": "gate-run-armv7-a49421ad",
+   "path": "gate-run-armv7-a49421ad",
+   "retention": "retained",
+   "reason": "A full 32-bit ARMv7 gate run at a49421ad sharded over four hosts from the gate image, cited for its wall times and shard balance: each shard's whole output, the hosts' logs and the per-feature bounds; it is not the measurement of any status row",
+   "key": "evidence/gate-run-armv7-a49421ad/2e538e81b985394b1052e5bbc75904046e9305ed51ab401c60e685317f31ebff.tar.zst",
+   "sha256": "2e538e81b985394b1052e5bbc75904046e9305ed51ab401c60e685317f31ebff",
+   "bytes": 2022209497
+  },
+  {
    "name": "gate-media-inputs",
    "path": "gate-media-inputs",
    "retention": "retained",
