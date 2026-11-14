@@ -38,7 +38,7 @@ is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`)
 | AC-3, E-AC-3 | `frmsiz`; an access unit adds the dependent and further substreams after substream 0 | appended to the packet before | none | `ac-3`, `ec-3` |
 
 A frame cut short by the end of the input is delivered with `Packet::is_complete`
-false, and so are MPEG audio bytes after the last frame, as FFmpeg 9.0 delivers them.
+false, and so are MPEG audio bytes after the last frame, as FFmpeg 9.0.2 delivers them.
 
 FLAC metadata blocks are kept up to the retention limit (PADDING by length only), and
 SEEKTABLE and STREAMINFO are read; a stream whose first block is not STREAMINFO is
@@ -48,7 +48,7 @@ before it; its track comes from that header and its configuration is empty.
 Fixed-blocking frame numbers count the first frame's block size, or each frame's own
 when STREAMINFO declares a range of sizes, as FFmpeg counts them.
 
-MPEG audio follows FFmpeg 9.0 where the specification leaves room: a first Layer III
+MPEG audio follows FFmpeg 9.0.2 where the specification leaves room: a first Layer III
 frame with a Xing, Info or VBRI description is not delivered; a LAME tag written by
 LAME or FFmpeg trims `delay + 529` samples from the first packet and `padding - 529`
 from frame `frames - 1`, unless the source holds more than a sixteenth more bytes than

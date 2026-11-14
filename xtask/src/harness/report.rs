@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use super::acceptance::acceptance;
+use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
@@ -249,8 +249,8 @@ const QUALIFIED_TARGETS: [&str; 4] = [
 /// reports `aarch64` or `armv8l` from `uname -m`, so the machine name cannot tell
 /// it apart from a 64-bit one. Any other target, such as ARMv6 or A32, is reported
 /// as unqualified.
-pub fn gate_target() -> String {
-    qualified(gate_build::worker_target())
+pub fn gate_target() -> Result<String, String> {
+    gate_build::worker_target().map(qualified)
 }
 
 fn qualified(target: &str) -> String {
@@ -645,30 +645,22 @@ impl PrefixFeature {
     }
 }
 
-fn save_json(path: &Path, value: &Value) -> Result<(), String> {
+fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Stream canonical report JSON, retaining at most one case from the iterator.
-/// Publish a complete report without replacing an existing destination.
-pub(crate) fn write_case_report(
-    output: &Path,
-    header: &Value,
-    rows: impl Iterator<Item = Result<Value, String>>,
+/// Publish a complete JSON document without replacing another result.
+pub(crate) fn publish_json(path: &Path, text: &str) -> Result<(), String> {
+    publish(path, |writer| writer.write_all(text.as_bytes()))
+}
+
+fn publish(
+    destination: &Path,
+    write: impl FnOnce(&mut BufWriter<fs::File>) -> std::io::Result<()>,
 ) -> Result<(), String> {
-    let Value::Object(fields) = header else {
-        return Err("report header must be an object".into());
-    };
-    let mut fields: BTreeMap<_, _> = fields
-        .iter()
-        .map(|(key, value)| (key.as_str(), value))
-        .collect();
-    let placeholder = Value::Null;
-    fields.insert("cases", &placeholder);
-    let temporary = output.join("report.json.tmp");
-    let destination = output.join("report.json");
+    let temporary = destination.with_extension("json.tmp");
     let file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -676,39 +668,159 @@ pub(crate) fn write_case_report(
         .map_err(|error| format!("{}: {error}", temporary.display()))?;
     let result = (|| -> std::io::Result<()> {
         let mut writer = BufWriter::new(file);
+        write(&mut writer)?;
+        writer.flush()?;
+        drop(writer);
+        fs::hard_link(&temporary, destination)
+    })();
+    let _ = fs::remove_file(&temporary);
+    result.map_err(|error| format!("{}: {error}", destination.display()))
+}
+
+fn store_measurement(
+    output: &Path,
+    case: usize,
+    kind: &str,
+    measurement: &Value,
+) -> Result<Value, String> {
+    let name = format!("measurements/{case:04}-{kind}.json");
+    let path = output.join(&name);
+    let data = json::observations(measurement) + "\n";
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .and_then(|mut file| file.write_all(data.as_bytes()))
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Value::object([
+        ("raw", Value::str(name)),
+        ("raw_sha256", Value::str(sha256::hex(data.as_bytes()))),
+    ]))
+}
+
+/// Stream canonical report JSON for callers with a canonical output format.
+pub(crate) fn write_case_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+) -> Result<(), String> {
+    stream_report(output, header, rows, true)
+}
+
+/// Stream the cases in their recorded order, including each observer's run order.
+pub(crate) fn write_observed_case_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+) -> Result<(), String> {
+    stream_report(output, header, rows, false)
+}
+
+/// Retain at most one case and publish without replacing an existing report.
+fn stream_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+    canonical: bool,
+) -> Result<(), String> {
+    let Value::Object(fields) = header else {
+        return Err("report header must be an object".into());
+    };
+    let mut fields: Vec<_> = fields
+        .iter()
+        .filter(|(key, _)| key != "cases")
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
+    fields.push(("cases", &Value::Null));
+    let serialize = if canonical {
+        json::canonical
+    } else {
+        json::observations
+    };
+    if canonical {
+        fields.sort_unstable_by_key(|(key, _)| *key);
+    }
+    publish(&output.join("report.json"), |writer| {
         let mut rows = rows;
         write!(writer, "{{")?;
-        for (index, (key, value)) in fields.iter().enumerate() {
+        for (index, (key, value)) in fields.into_iter().enumerate() {
             let separator = if index == 0 { "" } else { "," };
-            write!(writer, "{separator}{}:", json::canonical(&Value::str(*key)))?;
-            if *key == "cases" {
+            write!(writer, "{separator}{}:", json::canonical(&Value::str(key)))?;
+            if key == "cases" {
                 write!(writer, "[")?;
                 for (index, row) in rows.by_ref().enumerate() {
                     let row = row.map_err(std::io::Error::other)?;
                     let separator = if index == 0 { "" } else { "," };
-                    write!(writer, "{separator}{}", json::canonical(&row))?;
+                    write!(writer, "{separator}{}", serialize(&row))?;
                 }
                 write!(writer, "]")?;
             } else {
-                write!(writer, "{}", json::canonical(value))?;
+                write!(writer, "{}", serialize(value))?;
             }
         }
-        writeln!(writer, "}}")?;
-        writer.flush()?;
-        drop(writer);
-        fs::hard_link(&temporary, &destination)
-    })();
-    let _ = fs::remove_file(&temporary);
-    result.map_err(|error| format!("{}: {error}", destination.display()))
+        writeln!(writer, "}}")
+    })
 }
 
 fn object(pairs: Vec<(&str, Value)>) -> Value {
     Value::Object(pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect())
 }
 
-/// Run the report; returns the process exit code (0 all cases pass, 1 a case
-/// failed, 2 a required acceptance was not reached).
+fn reject_controls(proof: &mut Value, error: &str) -> Result<(), String> {
+    validation::put(proof, "passed", Value::Bool(false))?;
+    validation::put(proof, "error", Value::str(error))
+}
+
+/// Reserve a new directory before emitting any report, traces or observations.
+pub(crate) fn create_output(path: &Path) -> Result<(), String> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::create_dir(path)
+        .map_err(|error| format!("{}: {error}; use a new output directory", path.display()))
+}
+
+fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
+    let mut directories = Vec::with_capacity(cases.len());
+    for case in cases {
+        let id = s(case, "id").unwrap_or_default();
+        let relative = Path::new(id);
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err(format!(
+                "case id {id:?} does not name a relative output directory"
+            ));
+        }
+        directories.push(relative);
+    }
+    // A case may name another case's parent directory. Reserve the parent
+    // first without changing the order of the report rows.
+    directories.sort_unstable_by_key(|&path| (path.components().count(), path));
+    for relative in directories {
+        create_output(&output.join(relative))?;
+    }
+    Ok(())
+}
+
+/// Run the report; returns 0 for matching parity, 1 for a failed case and 2
+/// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
+    create_output(&options.output)?;
+    collect(root, options, None)
+}
+
+/// Collect inside the directory reserved by the report command.
+pub(crate) fn collect(
+    root: &Path,
+    options: &Options,
+    controls: Option<&Value>,
+) -> Result<i32, String> {
     if options.baseline_worker.is_some()
         && (options.require_acceptance || options.require_slice_acceptance)
     {
@@ -752,7 +864,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest, &gate_target())?;
+    let open = open_cases(&contract, &manifest, &gate_target()?)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -766,15 +878,19 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         }
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
-    fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
-    let target = gate_target();
+    let measures = options.benchmark || options.memory;
+    if measures {
+        let samples = options.output.join("measurements");
+        fs::create_dir(&samples).map_err(|e| format!("{}: {e}", samples.display()))?;
+    }
+    let target = gate_target()?;
     let coverage = fate_coverage(
         root,
         &read_json(&root.join("harness/fate/index.json"))?,
         &read_json(&root.join("harness/fate/map.json"))?,
         options.fate_cache.as_deref(),
     )?;
-    let base = vec![
+    let mut base = vec![
         ("schema", Value::int(1)),
         ("target", Value::str(&target)),
         ("identity", identity.clone()),
@@ -795,17 +911,41 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         ("fate_coverage", Value::Array(coverage.clone())),
         ("additional_cases", Value::Array(additional.clone())),
     ];
+    if measures {
+        base.push(("case_storage", Value::str("sha256-files")));
+    }
+    if let Some(proof) = controls {
+        base.push(("functional_controls", proof.clone()));
+    }
+    let validate_controls = |header: &Value| {
+        if contract.get("functional_controls").is_some() {
+            crate::progressive_bench::validate_report_controls(
+                root,
+                &options.output.join("report.json"),
+                header,
+                &contract,
+                &manifest,
+            )
+        } else {
+            Ok(())
+        }
+    };
+    let header = object(base.clone());
+    if measures || controls.is_some() {
+        validate_controls(&header)?;
+    }
     let corpus = options
         .corpus
         .canonicalize()
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
     let reviewed = reviewed_inputs(root)?;
-    let mut rows: Vec<Value> = Vec::new();
-    for case in manifest
+    let cases = manifest
         .get("cases")
         .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
+        .unwrap_or_default();
+    reserve_case_outputs(&options.output, cases)?;
+    let mut rows: Vec<Value> = Vec::new();
+    for case in cases {
         let id = s(case, "id").unwrap_or_default().to_owned();
         let mut timed: Option<(PathBuf, PathBuf, Operation)> = None;
         let mut row = vec![
@@ -991,7 +1131,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                         &operation,
                     )
                 })?;
-                row.push(("timing", timing));
+                row.push((
+                    "timing",
+                    store_measurement(&options.output, rows.len(), "timing", &timing)?,
+                ));
             }
             if options.memory {
                 let memory = measure_pinned(check_inputs, || {
@@ -1008,7 +1151,10 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                         &operation,
                     )
                 })?;
-                row.push(("memory", memory));
+                row.push((
+                    "memory",
+                    store_measurement(&options.output, rows.len(), "memory", &memory)?,
+                ));
             }
         }
         rows.push(object(row));
@@ -1026,21 +1172,53 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 ]),
             ),
         ]);
-        save_json(&options.output.join("partial.json"), &object(partial))?;
+        save_checkpoint(&options.output.join("partial.json"), &object(partial))?;
     }
-    let mut verdict = acceptance(
+    let mut unavailable = None;
+    let load_case = |row: &Value| {
+        if measures {
+            validation::expand_measurements(&options.output, row)
+        } else {
+            Ok(row.clone())
+        }
+    };
+    let mut verdict = acceptance_iter(
         root,
         &contract,
-        &rows,
+        rows.iter()
+            .map(|row| load_case(row).inspect_err(|error| unavailable = Some(error.clone()))),
         &identity,
         &target,
         &coverage,
         &additional,
     );
-    if let Some(error) = source_identity_error(root, &identity)
-        && let Value::Object(fields) = &mut verdict
+    if let Some(error) = unavailable {
+        return Err(error);
+    }
+    let control_error = validate_controls(&header).err();
+    let controls_valid = controls.is_none() || control_error.is_none();
+    if let Some(error) = &control_error
+        && let Some((_, proof)) = base
+            .iter_mut()
+            .find(|(key, _)| *key == "functional_controls")
     {
-        for (key, value) in fields.iter_mut() {
+        reject_controls(proof, error)?;
+    }
+    let identity_error = source_identity_error(root, &identity)
+        .or_else(|| validation::current_workers(root, &identity).err())
+        .or_else(|| {
+            if candidate_name == "media-worker" {
+                None
+            } else {
+                validation::candidate_worker(root, &identity, &candidate_name).err()
+            }
+        });
+    let identity_valid = identity_error.is_none();
+    for error in [identity_error, control_error].into_iter().flatten() {
+        let Value::Object(fields) = &mut verdict else {
+            return Err("acceptance verdict must be an object".into());
+        };
+        for (key, value) in fields {
             match (key.as_str(), value) {
                 ("accepted" | "slice_accepted", v) => *v = Value::Bool(false),
                 ("reasons" | "slice_reasons", Value::Array(list)) => list.push(Value::str(&error)),
@@ -1051,10 +1229,24 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let mut report = base;
     report.extend([
         ("collection_status", Value::str("complete")),
-        ("cases", Value::Array(rows.clone())),
+        (
+            "summary",
+            Value::object([(
+                "source_and_workers_unchanged",
+                Value::Bool(identity_valid && controls_valid),
+            )]),
+        ),
         ("acceptance", verdict.clone()),
     ]);
-    save_json(&options.output.join("report.json"), &object(report))?;
+    if measures {
+        publish_measurements(&options.output, object(report), &rows, load_case)?;
+    } else {
+        report.push(("cases", Value::Array(rows.clone())));
+        publish_json(
+            &options.output.join("report.json"),
+            &(json::to_python(&object(report), Some(2)) + "\n"),
+        )?;
+    }
     let reasons = |key: &str| {
         verdict
             .get(key)
@@ -1087,7 +1279,26 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    Ok(i32::from(!ratchet(&label, &rows, &open)))
+    let parity_matches = ratchet(&label, &rows, &open);
+    Ok(i32::from(
+        !parity_matches || !controls_valid || !identity_valid,
+    ))
+}
+
+fn publish_measurements(
+    output: &Path,
+    mut header: Value,
+    rows: &[Value],
+    load_case: impl FnMut(&Value) -> Result<Value, String>,
+) -> Result<(), String> {
+    validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
+    validation::put(&mut header, "cases", Value::Array(rows.to_vec()))?;
+    publish_json(
+        &output.join("collection.json"),
+        &(json::to_python(&header, Some(2)) + "\n"),
+    )?;
+    validation::put(&mut header, "case_storage", Value::str("inline"))?;
+    write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
 
 /// A contract's `open_cases` on `target`: case ids that fail today, each tied to
@@ -1539,7 +1750,7 @@ mod tests {
         ] {
             assert_eq!(qualified(other), format!("unqualified-{other}"));
         }
-        let host = gate_target();
+        let host = gate_target().unwrap();
         assert!(
             QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
             "{host}"
@@ -1568,6 +1779,69 @@ mod tests {
     }
 
     #[test]
+    fn measured_checkpoint_keeps_samples_separate_and_checks_their_digest() {
+        let output = Output::new();
+        fs::create_dir(output.0.join("measurements")).unwrap();
+        let timing = json::parse_strict(
+            r#"{"ratio":{"upper_95":1.01234567890123456789},"samples":[18446744073709551615]}"#,
+        )
+        .unwrap();
+        let memory = json::parse_observations(
+            r#"{"status":"invalid-memory-work","samples":[{"reference_rss":9007199254740993,"candidate_heap":NaN}]}"#,
+        )
+        .unwrap();
+        let row = Value::object([
+            ("id", Value::str("sample")),
+            (
+                "timing",
+                store_measurement(&output.0, 0, "timing", &timing).unwrap(),
+            ),
+            (
+                "memory",
+                store_measurement(&output.0, 0, "memory", &memory).unwrap(),
+            ),
+        ]);
+        let checkpoint = Value::object([
+            ("collection_status", Value::str("partial")),
+            ("case_storage", Value::str("sha256-files")),
+            ("cases", Value::Array(vec![row.clone()])),
+        ]);
+        let path = output.0.join("partial.json");
+        save_checkpoint(&path, &checkpoint).unwrap();
+        let text = fs::read_to_string(path).unwrap();
+        assert!(!text.contains("samples"));
+        assert!(!output.0.join("report.json").exists());
+        let expanded = validation::expand_measurements(&output.0, &row).unwrap();
+        assert_eq!(
+            json::canonical(expanded.get("timing").unwrap()),
+            json::canonical(&timing)
+        );
+        let memory = json::observations(&memory);
+        assert_eq!(json::observations(expanded.get("memory").unwrap()), memory);
+        let inline = output.0.join("inline");
+        create_output(&inline).unwrap();
+        stream_report(
+            &inline,
+            &Value::Object(Vec::new()),
+            [Ok(expanded)].into_iter(),
+            false,
+        )
+        .unwrap();
+        assert!(
+            fs::read_to_string(inline.join("report.json"))
+                .unwrap()
+                .contains(&memory)
+        );
+        assert!(store_measurement(&output.0, 0, "memory", &timing).is_err());
+        fs::write(output.0.join("measurements/0000-memory.json"), b"{}\n").unwrap();
+        assert!(
+            validation::expand_measurements(&output.0, &row)
+                .unwrap_err()
+                .contains("raw measurement changed")
+        );
+    }
+
+    #[test]
     fn case_report_preserves_raw_rows_and_number_precision() {
         let output = Output::new();
         let header = Value::object([
@@ -1591,6 +1865,7 @@ mod tests {
         .unwrap();
         let expected = Value::object([
             ("z", header.get("z").unwrap().clone()),
+            ("a", Value::str("complete")),
             (
                 "cases",
                 Value::Array(
@@ -1599,7 +1874,6 @@ mod tests {
                         .collect(),
                 ),
             ),
-            ("a", Value::str("complete")),
         ]);
         let text = fs::read_to_string(output.0.join("report.json")).unwrap();
         assert_eq!(text, format!("{}\n", json::canonical(&expected)));
@@ -1629,6 +1903,25 @@ mod tests {
     }
 
     #[test]
+    fn parity_only_cannot_overwrite_a_measured_report() {
+        let parent = Output::new();
+        let output = parent.0.join("run");
+        create_output(&output).unwrap();
+        let path = output.join("partial.json");
+        fs::write(&path, "measurement checkpoint").unwrap();
+        let options = Options {
+            output,
+            ..Options::defaults(&parent.0)
+        };
+        assert!(
+            run(&parent.0, &options)
+                .unwrap_err()
+                .contains("use a new output directory")
+        );
+        assert_eq!(fs::read_to_string(path).unwrap(), "measurement checkpoint");
+    }
+
+    #[test]
     fn case_report_keeps_existing_destination() {
         let output = Output::new();
         let destination = output.0.join("report.json");
@@ -1646,6 +1939,42 @@ mod tests {
     }
 
     #[test]
+    fn complete_json_keeps_existing_destination() {
+        let output = Output::new();
+        let destination = output.0.join("report.json");
+        fs::write(&destination, b"existing grade\n").unwrap();
+        assert!(publish_json(&destination, "{}\n").is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"existing grade\n");
+        assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn case_output_keeps_existing_nested_traces() {
+        let output = Output::new();
+        let nested = output.0.join("nested/case");
+        create_output(&nested).unwrap();
+        let trace = nested.join("progressive-fold.json");
+        fs::write(&trace, b"existing trace\n").unwrap();
+        for id in ["nested/case", "../outside"] {
+            let case = Value::object([("id", Value::str(id))]);
+            assert!(reserve_case_outputs(&output.0, &[case]).is_err());
+        }
+        assert_eq!(fs::read(&trace).unwrap(), b"existing trace\n");
+    }
+
+    #[test]
+    fn case_outputs_reserve_nested_cases_in_either_order() {
+        for child in ["nested/child", "Nested/child"] {
+            for ids in [[child, "nested"], ["nested", child]] {
+                let output = Output::new();
+                let cases = ids.map(|id| Value::object([("id", Value::str(id))]));
+                reserve_case_outputs(&output.0, &cases).unwrap();
+                assert!(output.0.join(child).is_dir());
+            }
+        }
+    }
+
+    #[test]
     fn case_report_keeps_existing_temporary_file() {
         let output = Output::new();
         let temporary = output.0.join("report.json.tmp");
@@ -1660,5 +1989,38 @@ mod tests {
         );
         assert_eq!(fs::read(&temporary).unwrap(), b"in progress\n");
         assert!(!output.0.join("report.json").exists());
+    }
+
+    #[test]
+    fn final_validation_failures_are_written_in_both_report_forms() {
+        let output = Output::new();
+        let mut proof = Value::object([
+            ("passed", Value::Bool(true)),
+            ("path", Value::str("controls/report.json")),
+        ]);
+        reject_controls(&mut proof, "functional control proof hash mismatch").unwrap();
+        let header = Value::object([
+            ("functional_controls", proof),
+            (
+                "summary",
+                Value::object([("source_and_workers_unchanged", Value::Bool(false))]),
+            ),
+        ]);
+        publish_measurements(&output.0, header, &[Value::int(1)], |case| Ok(case.clone())).unwrap();
+        for name in ["collection.json", "report.json"] {
+            let report = read_json(&output.0.join(name)).unwrap();
+            assert_eq!(
+                report
+                    .get("summary")
+                    .and_then(|summary| summary.get("source_and_workers_unchanged")),
+                Some(&Value::Bool(false))
+            );
+            let proof = report.get("functional_controls").unwrap();
+            assert_eq!(proof.get("passed"), Some(&Value::Bool(false)));
+            assert_eq!(
+                s(proof, "error"),
+                Some("functional control proof hash mismatch")
+            );
+        }
     }
 }

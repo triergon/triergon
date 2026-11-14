@@ -423,7 +423,7 @@ pub(crate) fn candidate_worker(root: &Path, identity: &Value, name: &str) -> R<P
         .get("additional_candidates")
         .and_then(|workers| workers.get(name))
         .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
-    let path = root.join(gate_build::release_dir()).join(name);
+    let path = root.join(gate_build::release_dir()?).join(name);
     if record.get("sha256").and_then(Value::as_str) != Some(sha(&path)?.as_str()) {
         return Err(format!("{name} changed since build identity; rebuild"));
     }
@@ -459,7 +459,7 @@ fn additional_candidates(
     for spec in selected {
         let mut command: Vec<String> = [
             "cargo",
-            "build",
+            "rustc",
             "-p",
             spec.package,
             "--release",
@@ -471,13 +471,16 @@ fn additional_candidates(
             "--target-dir".into(),
             root.join("target").display().to_string(),
         ]);
-        command.extend(gate_build::target_args());
-        if let Some(example) = spec.example {
-            command.extend(["--example".into(), example.into()]);
+        command.extend(gate_build::target_args()?);
+        match spec.example {
+            Some(example) => command.extend(["--example".into(), example.into()]),
+            None => command.extend(["--bin".into(), spec.name.into()]),
         }
         if !spec.features.is_empty() {
             command.extend(["--features".into(), spec.features.join(",")]);
         }
+        command.push("--".into());
+        command.extend(gate_build::worker_link_arguments()?);
         let status = Command::new("cargo")
             .args(&command[1..])
             .env("CARGO_INCREMENTAL", "0")
@@ -489,10 +492,10 @@ fn additional_candidates(
         }
         if let Some(example) = spec.example {
             fs::copy(
-                root.join(gate_build::release_dir())
+                root.join(gate_build::release_dir()?)
                     .join("examples")
                     .join(example),
-                root.join(gate_build::release_dir()).join(spec.name),
+                root.join(gate_build::release_dir()?).join(spec.name),
             )
             .map_err(|error| format!("{}: {error}", spec.name))?;
         }
@@ -504,7 +507,7 @@ fn additional_candidates(
 fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
     let mut candidates = Vec::new();
     for (name, command) in built {
-        let path = format!("{}/{name}", gate_build::release_dir());
+        let path = format!("{}/{name}", gate_build::release_dir()?);
         candidates.push((
             *name,
             Value::object([
@@ -835,7 +838,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
     let linux = cfg!(target_os = "linux");
     let mut candidate_command: Vec<String> = [
         "cargo",
-        "build",
+        "rustc",
         "-p",
         "media-worker",
         "--release",
@@ -847,7 +850,9 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         "--target-dir".into(),
         root.join("target").display().to_string(),
     ]);
-    candidate_command.extend(gate_build::target_args());
+    candidate_command.extend(gate_build::target_args()?);
+    candidate_command.extend(["--bin".into(), "media-worker".into(), "--".into()]);
+    candidate_command.extend(gate_build::worker_link_arguments()?);
     let status = Command::new("cargo")
         .args(&candidate_command[1..])
         .env("CARGO_INCREMENTAL", "0")
@@ -893,7 +898,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         "-Werror".into(),
         root.join("harness/reference.c").display().to_string(),
     ];
-    command.extend(shell_words(&flags)?);
+    command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
     command.extend(["-o".into(), worker.display().to_string()]);
     run(&command)?;
     let mut combined_command = vec![command[0].clone(), "-DTRIERGON_COMBINED_REFERENCE=1".into()];
@@ -949,7 +954,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
             command.push(generate(root)?.display().to_string());
         }
         command.push(root.join(reference.source).display().to_string());
-        command.extend(shell_words(&flags)?);
+        command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
         command.extend(["-o".into(), path.display().to_string()]);
         run(&command)?;
         profile_workers.push((reference, path, build, command));
@@ -968,7 +973,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         ("observer_sha256".to_owned(), Value::str(sha(&observer)?)),
         ("probe_sha256".to_owned(), Value::str(sha(&probe)?)),
     ];
-    let candidate = root.join(gate_build::release_dir()).join("media-worker");
+    let candidate = root.join(gate_build::release_dir()?).join("media-worker");
     let mut libraries: Vec<(String, Value)> = Vec::new();
     if linux {
         for (name, path) in [
@@ -1502,7 +1507,7 @@ mod tests {
     fn primary_only_identity_does_not_adopt_stale_additional_binaries() {
         let root = std::env::temp_dir().join(format!("worker-build-stale-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
-        let release = root.join(gate_build::release_dir());
+        let release = root.join(gate_build::release_dir().unwrap());
         fs::create_dir_all(&release).unwrap();
         for spec in &ADDITIONAL_CANDIDATES {
             fs::write(release.join(spec.name), b"stale").unwrap();

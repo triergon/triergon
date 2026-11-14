@@ -5,7 +5,7 @@
 use crate::{
     ClockOrigin, CursorStatus, FragmentIndex, MediaClock, OwnedFragmentCursor, PacketOccurrence,
     PacketProjector, PredecessorClock, Sample, SampleStep, SchedulingClock,
-    mov_cursor::PreviousClock,
+    mov_cursor::{FragmentEdit, PreviousClock},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, TimeBase, WorkBudget};
@@ -166,7 +166,7 @@ pub struct FrontTrack {
     previous: Option<PreviousClock>,
     minimum: i64,
     regular_samples: u64,
-    edited: bool,
+    edit: Option<FragmentEdit>,
     run: Option<(u64, u32)>,
     discard_boundary: i64,
 }
@@ -178,7 +178,7 @@ impl FrontTrack {
         previous: Option<PreviousClock>,
         minimum: i64,
         regular_samples: u64,
-        edited: bool,
+        edit: Option<FragmentEdit>,
     ) -> Self {
         Self {
             track,
@@ -187,7 +187,7 @@ impl FrontTrack {
             previous,
             minimum,
             regular_samples,
-            edited,
+            edit,
             run: None,
             discard_boundary: i64::MIN,
         }
@@ -204,11 +204,13 @@ impl FrontTrack {
         if head.track != self.track {
             return Err(Error::Invalid("native continuation track mismatch"));
         }
-        if self.edited || self.regular_samples != 0 {
+        if self.regular_samples != 0 {
             return Err(Error::Unsupported(
                 "native edited/mixed regular fragment continuation",
             ));
         }
+        let edit = self.edit;
+        let offset = i128::from(edit.map_or(0, |edit| edit.packet_offset));
         let sample = &head.sample;
         if sample.dts_ticks.is_some() != sample.cts_ticks.is_some() {
             return Err(Error::Invalid("inconsistent source clock knownness"));
@@ -229,10 +231,13 @@ impl FrontTrack {
                 ticks,
                 ClockOrigin::PredecessorEnd(PredecessorClock {
                     predecessor_sample: previous.sample,
-                    predecessor_demux_dts_ticks: previous.dts,
+                    predecessor_demux_dts_ticks: previous
+                        .dts
+                        .checked_sub(offset)
+                        .ok_or(Error::Overflow)?,
                     predecessor_duration_ticks: previous.duration,
                     predecessor_source_dts_known: previous.source_known,
-                    derived_dts_ticks: ticks,
+                    derived_dts_ticks: ticks.checked_sub(offset).ok_or(Error::Overflow)?,
                 }),
             )
         } else {
@@ -240,8 +245,12 @@ impl FrontTrack {
         };
         let mut next = *self;
         next.minimum = next.minimum.min(head.minimum);
-        let mut demux =
-            PacketProjector::new(self.base, None).project_fragment(sample, dts, next.minimum)?;
+        let presentation_dts = dts.checked_sub(offset).ok_or(Error::Overflow)?;
+        let mut demux = PacketProjector::new(self.base, None).project_fragment(
+            sample,
+            presentation_dts,
+            next.minimum,
+        )?;
         let run_key = (head.run.fragment_first_ordinal, head.run.index);
         if next.run != Some(run_key) {
             next.discard_boundary = next.previous.map_or(i64::MIN, |p| p.signed_dts);
@@ -263,7 +272,7 @@ impl FrontTrack {
                 track_id: self.track,
                 source: sample.clone(),
                 demux,
-                edit: None,
+                edit: edit.map(|edit| edit.identity(sample.ordinal)),
                 clock_origin: origin,
                 media_clock: self.clock,
                 scheduling_clock: SchedulingClock::NonseekableSourcePosition(sample.range.start),

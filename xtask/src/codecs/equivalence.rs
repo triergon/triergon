@@ -89,14 +89,17 @@ fn decoder_entry(job: &Job) -> Value {
     ])
 }
 
-/// `cargo build --release --locked ARGS...` for the worker target in `root`; `quiet`
+/// `cargo rustc --release --locked ARGS...` for the worker target in `root`, linked
+/// under the gate build's link policy; ARGS select one binary or example; `quiet`
 /// captures its output.
 pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String> {
     let mut command = Command::new("cargo");
     command
-        .args(["build", "--release", "--locked"])
-        .args(crate::harness::gate_build::target_args())
+        .args(["rustc", "--release", "--locked"])
+        .args(crate::harness::gate_build::target_args()?)
         .args(args)
+        .arg("--")
+        .args(crate::harness::gate_build::worker_link_arguments()?)
         .env("CARGO_INCREMENTAL", "0")
         .current_dir(root);
     let status = if quiet {
@@ -108,7 +111,7 @@ pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String
     if status.success() {
         Ok(())
     } else {
-        Err(format!("cargo build {}: {status}", args.join(" ")))
+        Err(format!("cargo rustc {}: {status}", args.join(" ")))
     }
 }
 
@@ -192,7 +195,7 @@ pub fn run(
     cargo_build(root, &["-p", "codec-worker"], false)?;
     let suite = root.join(".research/fate-samples");
     let examples = root
-        .join(crate::harness::gate_build::release_dir())
+        .join(crate::harness::gate_build::release_dir()?)
         .join("examples");
     let scratch = TempDir::new(None)?;
     let mut jobs = Vec::new();
@@ -245,7 +248,7 @@ pub fn run(
             argv: vec![
                 python::path(
                     &root
-                        .join(crate::harness::gate_build::release_dir())
+                        .join(crate::harness::gate_build::release_dir()?)
                         .join("codec-worker"),
                 ),
                 format!("{}-raw", field("operation")?),

@@ -159,8 +159,9 @@ the bitmap unblurred, as libass does. Outline coordinates stay within
 input panics, including arithmetic overflow in debug builds. Where libass's
 result depends on the target for values far out of range (conversions of
 doubles beyond the `long` range, shifts by 32 or more), the crate follows
-libass on 32-bit ARM hard-float with GCC on every target: conversions saturate, NaN converts to 0 and such shifts give 0, so a
-coordinate rounds out of range as libass does there.
+libass on 32-bit ARM hard-float with GCC on every target: conversions
+saturate, NaN converts to 0 and such shifts give 0, so a coordinate rounds
+out of range as libass does there.
 
 Not covered: glyph loading, hinting, synthetic styles and decoration lines
 (`triergon-font` and the renderer); drawing parsing and the image list,
@@ -183,3 +184,10 @@ from a build of the same libass without its zeroed locals, whose code layout
 alone slows small glyphs by up to 40%, and its timed region holds only the work
 the candidate's does, without libass's per-run cache reset; see the libass pin
 in [docs/quality.md](../../docs/quality.md#reference-and-corpus).
+
+## Licence
+
+MIT or Apache-2.0, at your option, with libass 0.17.5's ISC licence: the outline,
+stroking, rasterising, blur, composition and clipping stages are translated from
+libass. `LICENSE` holds the notice, and
+[docs/provenance.md](../../docs/provenance.md#triergon-raster) lists the modules.

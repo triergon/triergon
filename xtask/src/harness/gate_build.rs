@@ -1,5 +1,5 @@
 //! The gate build: workers compiled by the toolchain in `rust-toolchain.toml` with no
-//! extra compiler configuration.
+//! extra compiler configuration, workers and references linked under [`LINK_POLICY`].
 //!
 //! Compiler version and flags move a runtime bound by more than a gate's margin, so a
 //! gate result only means something for one build. `build-workers` refuses any other
@@ -41,8 +41,19 @@ pub fn compiler(root: &Path, search_path: Option<&OsStr>) -> Result<String, Stri
     String::from_utf8(output.stdout).map_err(|e| format!("rustc -vV: {e}"))
 }
 
+/// One `key: value` field of `rustc -vV`.
+fn field<'a>(compiler: &'a str, key: &str) -> Option<&'a str> {
+    compiler
+        .lines()
+        .find_map(|line| line.strip_prefix(key)?.strip_prefix(": "))
+}
+
 fn release(compiler: &str) -> Option<&str> {
-    compiler.lines().find_map(|l| l.strip_prefix("release: "))
+    field(compiler, "release")
+}
+
+fn host_of(compiler: &str) -> Result<&str, String> {
+    field(compiler, "host").ok_or_else(|| "rustc reports no host".to_owned())
 }
 
 /// The gate target on 32-bit ARM: Thumb-2, assuming NEON. The armhf compilers that
@@ -55,27 +66,19 @@ pub const ARM32_TARGET: &str = "thumbv7neon-unknown-linux-gnueabihf";
 const ARM32_HOST: &str = "armv7-unknown-linux-gnueabihf";
 
 /// The host triple of the toolchain cargo resolves in the current directory.
-pub fn host() -> &'static str {
-    static HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+pub fn host() -> Result<&'static str, String> {
+    static HOST: std::sync::OnceLock<Result<String, String>> = std::sync::OnceLock::new();
     HOST.get_or_init(|| {
-        Command::new("rustc")
-            .arg("-vV")
-            .output()
-            .ok()
-            .and_then(|output| String::from_utf8(output.stdout).ok())
-            .and_then(|version| {
-                version
-                    .lines()
-                    .find_map(|line| line.strip_prefix("host: "))
-                    .map(str::to_owned)
-            })
-            .unwrap_or_else(|| "unknown".to_owned())
+        let compiler = compiler(Path::new("."), None)?;
+        host_of(&compiler).map(str::to_owned)
     })
+    .as_deref()
+    .map_err(Clone::clone)
 }
 
 /// The target the workers and the tests are compiled for.
-pub fn worker_target() -> &'static str {
-    target_for(host())
+pub fn worker_target() -> Result<&'static str, String> {
+    host().map(target_for)
 }
 
 fn target_for(host: &str) -> &str {
@@ -88,8 +91,8 @@ fn target_for(host: &str) -> &str {
 
 /// The `--target` arguments cargo needs to compile for [`worker_target`]; none where
 /// it is the host's, so those builds stay as they are.
-pub fn target_args() -> Vec<String> {
-    target_arguments(host())
+pub fn target_args() -> Result<Vec<String>, String> {
+    host().map(target_arguments)
 }
 
 fn target_arguments(host: &str) -> Vec<String> {
@@ -103,20 +106,90 @@ fn target_arguments(host: &str) -> Vec<String> {
 
 /// Where cargo puts release binaries for [`worker_target`], relative to its target
 /// directory.
-pub fn release_subdir() -> String {
-    release_path(host())
+pub fn release_subdir() -> Result<String, String> {
+    host().map(release_path)
 }
 
 fn release_path(host: &str) -> String {
-    match target_arguments(host).last() {
-        Some(target) => format!("{target}/release"),
-        None => "release".to_owned(),
+    let target = target_for(host);
+    if target == host {
+        "release".to_owned()
+    } else {
+        format!("{target}/release")
     }
 }
 
 /// Where the workers are, relative to the repository root.
-pub fn release_dir() -> String {
-    format!("target/{}", release_subdir())
+pub fn release_dir() -> Result<String, String> {
+    Ok(format!("target/{}", release_subdir()?))
+}
+
+/// How workers and references link the support libraries of their language runtimes. On a
+/// GNU/Linux target both sides take every runtime support library from its static archive:
+/// the Rust workers libgcc's unwinder (`libgcc_eh`) and libm, the C and C++ references
+/// libm, libstdc++, libgcc and libatomic. A process then maps only the support code its own
+/// libraries use. libc and third-party libraries stay shared on both sides, and so does
+/// libm on x86, where glibc's `libm.a` selects its implementations through the static libc
+/// and links only into a static program. Elsewhere both sides link as their toolchains do.
+pub const LINK_POLICY: &str = "static-runtime-support-v1";
+
+/// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
+fn static_runtime(target: &str) -> bool {
+    target.contains("-linux-gnu")
+}
+
+/// Whether glibc's `libm.a` links into a program that uses the shared libc on `target`.
+fn static_libm(target: &str) -> bool {
+    static_runtime(target)
+        && !["x86_64-", "i586-", "i686-"]
+            .iter()
+            .any(|x86| target.starts_with(x86))
+}
+
+/// The arguments `cargo rustc` passes to a worker's own compile, after `--`, to link
+/// it under [`LINK_POLICY`]. Placed with the worker's native libraries, ahead of the
+/// standard library's `-lgcc_s` and `-lm`, the static archives resolve every unwinder
+/// and libm import, and the linker leaves the unneeded shared libraries out.
+pub fn worker_link_arguments() -> Result<Vec<String>, String> {
+    worker_target().map(worker_link_flags)
+}
+
+fn worker_link_flags(target: &str) -> Vec<String> {
+    let mut libraries = Vec::new();
+    if static_runtime(target) {
+        libraries.push("gcc_eh");
+    }
+    if static_libm(target) {
+        libraries.push("m");
+    }
+    libraries
+        .into_iter()
+        .flat_map(|library| ["-l".to_owned(), format!("static:-bundle={library}")])
+        .collect()
+}
+
+/// A reference's link flags under [`LINK_POLICY`]: libm, libstdc++ and libatomic from
+/// their static archives, and libgcc from its own with `-static-libgcc`.
+pub fn reference_link_flags(flags: Vec<String>) -> Result<Vec<String>, String> {
+    Ok(reference_flags(worker_target()?, flags))
+}
+
+fn reference_flags(target: &str, flags: Vec<String>) -> Vec<String> {
+    if !static_runtime(target) {
+        return flags;
+    }
+    let libm = static_libm(target);
+    let mut linked: Vec<String> = flags
+        .into_iter()
+        .map(|flag| match flag.as_str() {
+            "-lm" if libm => "-l:libm.a".to_owned(),
+            "-lstdc++" => "-l:libstdc++.a".to_owned(),
+            "-latomic" => "-l:libatomic.a".to_owned(),
+            _ => flag,
+        })
+        .collect();
+    linked.push("-static-libgcc".to_owned());
+    linked
 }
 
 /// Whether an environment variable changes how cargo compiles a worker.
@@ -233,6 +306,7 @@ pub fn current(root: &Path) -> Result<Vec<(String, Value)>, String> {
             "cargo_configuration".to_owned(),
             Value::strings(configuration(root, cargo_home().as_deref())),
         ),
+        ("link_policy".to_owned(), Value::str(LINK_POLICY)),
     ])
 }
 
@@ -267,6 +341,11 @@ pub fn refusals(identity: &Value, pinned: &str) -> Vec<String> {
             reasons.push(format!("Cargo configuration: {}", keys.join(", ")));
         }
         None => reasons.push("records no Cargo configuration".to_owned()),
+    }
+    match identity.get("link_policy").and_then(Value::as_str) {
+        Some(LINK_POLICY) => {}
+        Some(found) => reasons.push(format!("link policy {found}, not {LINK_POLICY}")),
+        None => reasons.push("records no link policy".to_owned()),
     }
     reasons
 }
@@ -400,6 +479,18 @@ mod tests {
     const PIN: &str = "1.99.1";
 
     #[test]
+    fn the_host_is_read_from_rustc_or_refused() {
+        let version = "rustc 1.99.1\nbinary: rustc\nhost: aarch64-apple-darwin\nrelease: 1.99.1\n";
+        assert_eq!(host_of(version), Ok("aarch64-apple-darwin"));
+        assert_eq!(release(version), Some("1.99.1"));
+        assert_eq!(
+            host_of("rustc 1.99.1\nrelease: 1.99.1\n"),
+            Err("rustc reports no host".to_owned())
+        );
+        assert_eq!(field("hostname: x\n", "host"), None);
+    }
+
+    #[test]
     fn workers_compile_for_thumb2_on_32_bit_arm_and_for_the_host_elsewhere() {
         assert_eq!(target_for(ARM32_HOST), ARM32_TARGET);
         assert_eq!(
@@ -427,6 +518,7 @@ mod tests {
             ("rustc", Value::str(format!("rustc\nrelease: {PIN}\n"))),
             ("build_environment", Value::Object(Vec::new())),
             ("cargo_configuration", Value::Array(Vec::new())),
+            ("link_policy", Value::str(LINK_POLICY)),
         ];
         Value::Object(
             base.into_iter()
@@ -499,8 +591,63 @@ mod tests {
             ("rustc", "records no compiler"),
             ("build_environment", "records no build environment"),
             ("cargo_configuration", "records no Cargo configuration"),
+            ("link_policy", "records no link policy"),
         ] {
             assert_eq!(refusals(&record(key, None), PIN), [reason]);
+        }
+    }
+
+    #[test]
+    fn a_build_linked_under_another_policy_is_refused() {
+        let earlier = record("link_policy", Some(Value::str("toolchain-default")));
+        assert_eq!(
+            refusals(&earlier, PIN),
+            ["link policy toolchain-default, not static-runtime-support-v1"]
+        );
+    }
+
+    #[test]
+    fn gnu_linux_workers_and_references_take_runtime_support_from_static_archives() {
+        let flags = ["-L/p", "-lharfbuzz", "-lstdc++", "-lm", "-lz", "-latomic"];
+        let flags = || flags.map(String::from).to_vec();
+        for target in [ARM32_TARGET, "aarch64-unknown-linux-gnu"] {
+            assert_eq!(
+                worker_link_flags(target),
+                ["-l", "static:-bundle=gcc_eh", "-l", "static:-bundle=m"]
+            );
+            assert_eq!(
+                reference_flags(target, flags()),
+                [
+                    "-L/p",
+                    "-lharfbuzz",
+                    "-l:libstdc++.a",
+                    "-l:libm.a",
+                    "-lz",
+                    "-l:libatomic.a",
+                    "-static-libgcc"
+                ]
+            );
+        }
+        // glibc's libm.a on x86 links only into a static program: libm stays shared.
+        assert_eq!(
+            worker_link_flags("x86_64-unknown-linux-gnu"),
+            ["-l", "static:-bundle=gcc_eh"]
+        );
+        assert_eq!(
+            reference_flags("x86_64-unknown-linux-gnu", flags()),
+            [
+                "-L/p",
+                "-lharfbuzz",
+                "-l:libstdc++.a",
+                "-lm",
+                "-lz",
+                "-l:libatomic.a",
+                "-static-libgcc"
+            ]
+        );
+        for target in ["aarch64-apple-darwin", "aarch64-unknown-linux-musl"] {
+            assert!(worker_link_flags(target).is_empty());
+            assert_eq!(reference_flags(target, flags()), flags());
         }
     }
 

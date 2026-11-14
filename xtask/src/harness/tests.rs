@@ -130,6 +130,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
         ("rustc", Value::str(compiler)),
         ("build_environment", Value::Object(Vec::new())),
         ("cargo_configuration", Value::Array(Vec::new())),
+        ("link_policy", Value::str(gate_build::LINK_POLICY)),
         (
             "instrumentation",
             v(r#"{"probe_sha256": "probe-hash", "observer_sha256": "observer-hash"}"#),
@@ -999,7 +1000,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 1024);
+    assert_eq!(checked, 1044);
     let mut contract = load("harness/features/matroska-zlib/contract.json");
     put(&mut contract, &[], "reference", Value::str("not-built"));
     assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());

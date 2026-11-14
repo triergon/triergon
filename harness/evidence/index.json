@@ -19775,6 +19775,251 @@
    "key": "evidence/code-size-placement-probe-aarch64/9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72.tar.zst",
    "sha256": "9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72",
    "bytes": 20056214
+  },
+  {
+   "name": "codec-aac-parametric-stereo-560f2225",
+   "path": "codec-aac-parametric-stereo-560f2225",
+   "retention": "retained",
+   "reason": "AAC Parametric Stereo from open publications and probes: the recovery of the PS syntax, Huffman books, SBR_F_ENVBAL30 and every signal table and rule by scripted probes of FFmpeg 9.0.2, with the notes and probes of both passes and the source texts; the table generator's write and --check runs from empty work directories; the aac lane's gates for 560f2225 and 339ec261 on AArch64 and in the ARMv7 user space (crate tests, fate_vectors with AAC_REF_DIR, per-vector numbers, conformance s16, codecs grade), the equivalence records and the three open cases on both builds and targets; instruction counts of the PS, HE-AAC and frozen AAC-LC workloads against 339ec261 on both targets; the scripts that ran them. Raw PCM outputs are left out.",
+   "key": "evidence/codec-aac-parametric-stereo-560f2225/b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708.tar.gz",
+   "sha256": "b3e04129ab40a86bea032839869680e53907db23ff44aabade68373929d9c708",
+   "bytes": 64872808,
+   "source_revisions": {
+    "candidate": "560f222594f3b8767d7454ee1fa5752573020112",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "codec-aac-parametric-stereo-81cb8bf9",
+   "path": "codec-aac-parametric-stereo-81cb8bf9",
+   "retention": "retained",
+   "reason": "Review of AAC Parametric Stereo at 81cb8bf9 (the review commits with main merged at f426ea65): the transient ducking's re-derivation from probes alone (its brief, probe kit, probes p01-p13 with their logs and streams, notes and report, every rejected candidate); on AArch64 against main's build at 339ec261, whose AAC code f426ea65 keeps, the crate and xtask tests, fate_vectors with AAC_REF_DIR, the byte comparison of all 36 decoder outputs with the 560f2225 build, conformance s16, codecs grade, the open-case summaries, the equivalence record, the table generator's --check from an empty and from a seeded work directory and after the ducking precision change, and instruction counts of the PS, HE-AAC and frozen AAC-LC workloads; in the ARMv7 user space against main at f426ea65, both built for thumbv7neon-unknown-linux-gnueabihf, the same parity checks and counts; the two fuzz campaigns' reports, manifests and identities without case inputs; the scripts that ran them. Raw PCM outputs are left out.",
+   "key": "evidence/codec-aac-parametric-stereo-81cb8bf9/25cd8fa2e8d359ae096328c21d46ab0322654a7d93016b17f822134db25d8560.tar.gz",
+   "sha256": "25cd8fa2e8d359ae096328c21d46ab0322654a7d93016b17f822134db25d8560",
+   "bytes": 3971907,
+   "source_revisions": {
+    "candidate": "81cb8bf9ac9499fe036d2f186a8fdca365e13820",
+    "baseline": "f426ea659a9e34882a102262aa1ab99aa881969b"
+   }
+  },
+  {
+   "name": "subtitles-small-spots-c79ae2da",
+   "path": "subtitles-small-spots-c79ae2da",
+   "retention": "retained",
+   "reason": "Subtitle, framing and transport pieces written anew from their specifications and observation: parity and instruction counts against main on Linux AArch64 and ARMv7, runtime and memory of the 8 crafted cases on Linux AArch64, and the probes they were derived from",
+   "key": "evidence/subtitles-small-spots-c79ae2da/a5afebfe3a1c86829b0768823e7aa6518d008fd450104a72ca95b812113019a9.tar.zst",
+   "sha256": "a5afebfe3a1c86829b0768823e7aa6518d008fd450104a72ca95b812113019a9",
+   "bytes": 27668526,
+   "source_revisions": {
+    "candidate": "c79ae2da8b8a0d004d37936100eedd7b46e0a589",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-small-spots-traces-92d1a1c5",
+   "path": "subtitles-small-spots-traces-92d1a1c5",
+   "retention": "retained",
+   "reason": "Subtitle worker traces of the DVD, PGS and teletext cases against main on Linux AArch64 and of six DVD calls on ARMv7, for the crafted size, fragment and trimming cases",
+   "key": "evidence/subtitles-small-spots-traces-92d1a1c5/425c08ba299c60e13c0690b16ef7599bf4fdaade2cfb8ce32b75c547edc7767b.tar.zst",
+   "sha256": "425c08ba299c60e13c0690b16ef7599bf4fdaade2cfb8ce32b75c547edc7767b",
+   "bytes": 21144587,
+   "source_revisions": {
+    "candidate": "92d1a1c5c83b8b39b12ae1ed11b999badbeddc23",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-small-spots-82190095",
+   "path": "subtitles-small-spots-82190095",
+   "retention": "retained",
+   "reason": "The review commit of the small subtitle and framing pieces re-checked against main: subtitle gates, worker traces and instruction counts on Linux AArch64, parity and instruction counts on ARMv7",
+   "key": "evidence/subtitles-small-spots-82190095/6fc99861c2fc41d8b1fe161148c3c916f84425142d437c0eb09ed5b1b3936731.tar.zst",
+   "sha256": "6fc99861c2fc41d8b1fe161148c3c916f84425142d437c0eb09ed5b1b3936731",
+   "bytes": 1283903,
+   "source_revisions": {
+    "candidate": "821900952ba46678d07300ea7e4bb04ec517f324",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-small-spots-da654563-armv7",
+   "path": "subtitles-small-spots-da654563-armv7",
+   "retention": "retained",
+   "reason": "Subtitles, small spots at da654563 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: slices of subtitle-dvd (the four vobsub-idx-size cases), subtitle-pgs (rx-canvas-bounds-ts, rx-ods-first-fragment-ts) and subtitle-teletext (teletext-chop-text, teletext-chop-ass) with parity, 30 timing pairs and 30 kernel-bound memory pairs, the kernel RSS proof made in that checkout, and the CPU, kernel and user-space package list",
+   "key": "evidence/subtitles-small-spots-da654563-armv7/2445c829a23ebd335a86ad4f3d946ed78053617d40f25db1c680612ed8eec145.tar.gz",
+   "sha256": "2445c829a23ebd335a86ad4f3d946ed78053617d40f25db1c680612ed8eec145",
+   "bytes": 91281223,
+   "source_revisions": {
+    "candidate": "da6545639aa4cb878ca62bfb384ea3aeff7f8309"
+   }
+  },
+  {
+   "name": "subtitles-mov-text-tags-30fe564a",
+   "path": "subtitles-mov-text-tags-30fe564a",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at 30fe564a, natively on Linux AArch64 and in the ARMv7 user space; the subtitle-text and subtitle-text-host gates against 339ec261's on both targets, the crate and worker tests, a fuzz campaign of subtitle-text; instruction counts of every subtitle-text and subtitle-text-host case against 339ec261 on both targets, with the 13 mov-text-tags sessions split per sample on AArch64; the probes the tag rules were derived from with the reference's output, the clean-room brief, rules and notes, the scripts that ran them and a bundle of the measured commits.",
+   "key": "evidence/subtitles-mov-text-tags-30fe564a/1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc.tar.gz",
+   "sha256": "1b73087069b838cfd16bc22c5f8d29dcafbe9c5674c3c775d53519f02fcf08bc",
+   "bytes": 31099225,
+   "source_revisions": {
+    "candidate": "30fe564a562f0ed73de7c076fe7f4eb0b12f21d6",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-mov-text-tags-96f660ba",
+   "path": "subtitles-mov-text-tags-96f660ba",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at 96f660ba, with a style's font table entries found by binary search; the 13 mov-text-tags cases timed and memory-measured on a c8g.xlarge pinned to CPU 1, with 30 timing pairs and 30 kernel-bound memory pairs, the RSS proof and the parity run, reported per run because cargo xtask grade does not join a slice of the feature; on Linux AArch64, the subtitle-text and subtitle-text-host gates, the crate and worker tests, the 137 probes, instruction counts of every subtitle-text and subtitle-text-host case against 339ec261 with the 13 sessions split per sample, reruns and diagnostic builds; in the ARMv7 user space, the two gates and instruction counts of every case against 339ec261; the scripts that ran them and a bundle of the measured commits.",
+   "key": "evidence/subtitles-mov-text-tags-96f660ba/03a2ee2f02daf3c5371c5c44e183c45b4bc655c30714bc12594fc58c72a56311.tar.gz",
+   "sha256": "03a2ee2f02daf3c5371c5c44e183c45b4bc655c30714bc12594fc58c72a56311",
+   "bytes": 77641015,
+   "source_revisions": {
+    "candidate": "96f660ba99fa33fbc1a2019cda9e73bec6de287d",
+    "base": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-mov-text-tags-dd395b41-armv7",
+   "path": "subtitles-mov-text-tags-dd395b41-armv7",
+   "retention": "retained",
+   "reason": "Subtitles, text: the mov_text override tags at dd395b41 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: the subtitle-text slice of the 13 mov-text-tags cases with parity, 30 timing pairs and 30 kernel-bound memory pairs, the kernel RSS proof made in that checkout, and the CPU, kernel and user-space package list",
+   "key": "evidence/subtitles-mov-text-tags-dd395b41-armv7/f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713.tar.gz",
+   "sha256": "f3a4c240aa2177b1af1ec6557318208bd417fc983adde2e742de5d54bf0a5713",
+   "bytes": 82035334,
+   "source_revisions": {
+    "candidate": "dd395b41add1b51859be0104ad865de111d7b401"
+   }
+  },
+  {
+   "name": "subtitles-dvb-palettes-aebbe582",
+   "path": "subtitles-dvb-palettes-aebbe582",
+   "retention": "retained",
+   "reason": "DVB palettes: the default CLUTs, the CLUT entry conversion and the automatic palette at aebbe582 against main at 339ec261; the subtitle-dvb gate on Linux AArch64 and in the armv7-userland user space, the instruction counts of every case on both targets, the runtime and kernel-bound memory of the 10 new cases on a c8g.xlarge (at edd4e8c8 and aebbe582), both derivations' notes and probes, the scripts that ran them and a bundle of the branch.",
+   "key": "evidence/subtitles-dvb-palettes-aebbe582/d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3.tar.gz",
+   "sha256": "d856570b6485dc339bc9fdcb2dbf76824ffd9e2e760b8d3efab36ca7ef291dc3",
+   "bytes": 186258324,
+   "source_revisions": {
+    "candidate": "aebbe5827b1b2ae8f1dcf53a1be67053c850a279",
+    "baseline": "339ec261952c7f5bab69ffa48946fd2e7d0413a2"
+   }
+  },
+  {
+   "name": "subtitles-dvb-palettes-74155089-armv7",
+   "path": "subtitles-dvb-palettes-74155089-armv7",
+   "retention": "retained",
+   "reason": "Subtitles, DVB palettes at 74155089 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: a subtitle-dvb slice of the 12 crafted cases and the three sequence cases with parity, 30 timing pairs and 30 kernel-bound memory pairs, the kernel RSS proof made in that checkout, and the CPU, kernel and user-space package list",
+   "key": "evidence/subtitles-dvb-palettes-74155089-armv7/63453697efcbf39e4af583c5f546d1f366e2e49c4b6a9c97df3e867ca1293646.tar.gz",
+   "sha256": "63453697efcbf39e4af583c5f546d1f366e2e49c4b6a9c97df3e867ca1293646",
+   "bytes": 92315031,
+   "source_revisions": {
+    "candidate": "74155089881341aa7aae67e5f754b35a86e4898b"
+   }
+  },
+  {
+   "name": "mp4-forward-edits-f5453ef9-aarch64",
+   "path": "mp4-forward-edits-f5453ef9-aarch64",
+   "retention": "retained",
+   "reason": "MP4 forward and range playback with checked AAC edits and bounded seek restarts",
+   "key": "evidence/mp4-forward-edits-f5453ef9-aarch64/bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223.tar.zst",
+   "sha256": "bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223",
+   "bytes": 67830097,
+   "source_revision": "f5453ef9d88712777aa5b6383250875456e9f334"
+  },
+  {
+   "name": "adts-priming-96232af7-aarch64",
+   "path": "adts-priming-96232af7-aarch64",
+   "retention": "retained",
+   "reason": "ADTS AAC priming policy and both AAC-LC decoder workloads",
+   "key": "evidence/adts-priming-96232af7-aarch64/a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe.tar.zst",
+   "sha256": "a905aaa8c0e099f85218d2a7f097ed1aa3a3627a5adaf77c10dbdfdab063fdfe",
+   "bytes": 38661043,
+   "source_revision": "96232af7d9431c2285c6b6d248aa38a133b85fe3"
+  },
+  {
+   "name": "codec-he-aac-workloads-700c2134",
+   "path": "codec-he-aac-workloads-700c2134",
+   "retention": "retained",
+   "reason": "Codecs: the HE-AAC v1 and v2 timing workloads (aac-he-stereo, aac-he-5.1, aac-hev2-stereo) on one c6g.4xlarge, Linux AArch64 and ARMv7 (thumbv7neon-unknown-linux-gnueabihf) pinned to CPU 1: their inputs; the heap failure at 5c4fe252 and the heap profiles that located it; at 700c2134 against 5c4fe252 the crate and FATE tests, worker outputs on 68 AAC inputs on both targets, instruction counts, 30-pair AArch64 timing and memory (HE and LC) and 30-pair ARMv7 timing and memory (HE)",
+   "key": "evidence/codec-he-aac-workloads-700c2134/838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239.tar.gz",
+   "sha256": "838ee260edf0c87fa7f1feb154d9ae83529c2a817b9d92c7c6b9ba72fae2d239",
+   "bytes": 37234479,
+   "source_revisions": {
+    "candidate": "700c2134a123d8c9566c1cdccdeb3a0b3b0399c0",
+    "baseline": "5c4fe25232e54ea1280b258c7f99a04fa3f4bf93"
+   }
+  },
+  {
+   "name": "progressive-report-stream-855bfea3-aarch64",
+   "path": "progressive-report-stream-855bfea3-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with identical grades from compact and self-contained reports",
+   "key": "evidence/progressive-report-stream-855bfea3-aarch64/d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a.tar.gz",
+   "sha256": "d144f900ef1598b8300ddc7966349268fbea62c4a726fccf4291c766273e2e6a",
+   "bytes": 34538077,
+   "source_revision": "855bfea306ee7c2f7a933505cb18cde287f91a7c"
+  },
+  {
+   "name": "progressive-report-stream-ec6afe86-aarch64",
+   "path": "progressive-report-stream-ec6afe86-aarch64",
+   "retention": "retained",
+   "reason": "Progressive playback with matching compact and self-contained grades and preserved case outputs",
+   "key": "evidence/progressive-report-stream-ec6afe86-aarch64/f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f.tar.gz",
+   "sha256": "f35c3d9e3abba7519187a6f7821b47362f5f58869637738a7490e9329d10067f",
+   "bytes": 34423896,
+   "source_revision": "ec6afe8635509d7e9007fd3d3c20ce2bf1c25835"
+  },
+  {
+   "name": "aac-s16-floor-ddb02a59-armv7",
+   "path": "aac-s16-floor-ddb02a59-armv7",
+   "retention": "retained",
+   "reason": "Audio codec timing and the s16 conversion without floorf at ddb02a59 against main at f3d4935b on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of every audio workload for both against the decode reference, instruction counts on the gate target and on A32 with NEON, the aac-lc-stereo profiles, the decoder-output equivalence records, the conversion checked against the floor over every f32, the four conversions compared and their disassembly, the workers, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-ddb02a59-armv7/52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977.tar.gz",
+   "sha256": "52e5576be35489a871fea3b89cdb13389cb5da8dc3ef465d23315556d41e8977",
+   "bytes": 72342434,
+   "source_revisions": {
+    "candidate": "ddb02a59a7ac8bf1974c14439194430e2b245504",
+    "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+   }
+  },
+  {
+   "name": "aac-s16-floor-he-0b3c2db5-armv7",
+   "path": "aac-s16-floor-he-0b3c2db5-armv7",
+   "retention": "retained",
+   "reason": "AAC-LC and HE-AAC v1 and v2 codec timing with the s16 conversion without floorf at 0b3c2db5 (the change merged with main) against main at b89e5844 on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf, in the armv7-userland user space on a c6g.4xlarge pinned to CPU 1: 30 timing pairs of the five AAC workloads for both against the decode reference, instruction counts of every audio workload on the gate target and on A32 with NEON, the aac-he-stereo and aac-lc-stereo profiles, the decoder-output equivalence records, the session tests, the workers, the scripts, and the CPU, kernel and user-space package list",
+   "key": "evidence/aac-s16-floor-he-0b3c2db5-armv7/bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a.tar.gz",
+   "sha256": "bf142970609ef8d465066f57c2010f8e876524b0b7e334628390d59bfc5fb43a",
+   "bytes": 62225056,
+   "source_revisions": {
+    "candidate": "0b3c2db5239da81ab38d7a33f73b70a9f77df464",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
+  },
+  {
+   "name": "aac-s16-floor-f0744418-aarch64",
+   "path": "aac-s16-floor-f0744418-aarch64",
+   "retention": "retained",
+   "reason": "The s16 conversion without floorf on Linux AArch64, the codec gate target, at f0744418 against main at b89e5844 on a c6g.4xlarge: instruction counts of every audio workload in three rounds and of main against itself, the decoder-output equivalence records, the session tests, the conversion checked against the floor over every f32, the downmix disassembly, the aac-lc-stereo profiles, the workers, the scripts, and the CPU, kernel and package list",
+   "key": "evidence/aac-s16-floor-f0744418-aarch64/ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6.tar.gz",
+   "sha256": "ad8eb8a8a898a065df3e43fd62c74f9d988977bfe88515aab1c3447e0ec7d1a6",
+   "bytes": 9623793,
+   "source_revisions": {
+    "candidate": "f0744418776dd2e01795c24d06716f54a0aefc2e",
+    "baseline": "b89e58442a0fb928514a44ca4b8a9425c5ff51fc"
+   }
+  },
+  {
+   "name": "fonts-cjk-autohinter-204d2122",
+   "path": "fonts-cjk-autohinter-204d2122",
+   "retention": "retained",
+   "reason": "FreeType's CJK writing system in triergon-font at 204d2122 against main at b78dd86f on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets (fonts, shape and ass compare --all), the per-feature parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the build identities and logs, the scripts, and the kernel, CPU and compilers",
+   "key": "evidence/fonts-cjk-autohinter-204d2122/6aa341a5864a8f4b535d2d9383ebcd7a4726f5889f1258f91a9c17d4c7136973.tar.gz",
+   "sha256": "6aa341a5864a8f4b535d2d9383ebcd7a4726f5889f1258f91a9c17d4c7136973",
+   "bytes": 53632017,
+   "source_revisions": {
+    "candidate": "204d212285ace2400a36774544188b687b06eff6",
+    "baseline": "b78dd86f2eebb7417c758b0a5757500039d718bf"
+   }
   }
  ]
 }

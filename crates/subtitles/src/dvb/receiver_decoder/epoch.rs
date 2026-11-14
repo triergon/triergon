@@ -24,9 +24,8 @@ pub(super) struct Region {
     drawn: bool,
     objects: BudgetVec<ObjectPlacement>,
     pixels: BudgetVec<u8>,
-    /// The automatic palette as last computed. The receiver recomputes it only
-    /// after an object is drawn into the region, and a recomputation rewrites
-    /// only the colours it ranks; the rest keep earlier values.
+    /// The automatic palette as last computed, and whether it still holds:
+    /// a drawing makes it stale, unless the epoch keeps the first one.
     automatic: [u32; 256],
     automatic_current: bool,
     /// Every pixel value is below this: the widest depth composed since the
@@ -165,15 +164,22 @@ pub(super) struct Epoch {
     cluts: BudgetVec<Clut>,
     /// Objects a region composition has referenced.
     objects: ObjectSet,
+    /// Keep each region's first automatic palette while the region lasts
+    /// ([`WithoutClutOnce`](super::AutomaticPalette::WithoutClutOnce)): no
+    /// drawing makes it stale.
+    keep_automatic: bool,
     budget: Budget,
 }
 
 impl Epoch {
-    pub(super) fn new(budget: &Budget) -> Self {
+    /// With `keep_automatic`, a region's automatic palette is computed once
+    /// and kept while the region lasts.
+    pub(super) fn new(budget: &Budget, keep_automatic: bool) -> Self {
         Self {
             regions: BudgetVec::new(budget),
             cluts: BudgetVec::new(budget),
             objects: ObjectSet::new(budget),
+            keep_automatic,
             budget: budget.clone(),
         }
     }
@@ -232,8 +238,9 @@ impl Epoch {
         &self.regions.as_slice()[index]
     }
 
-    /// Region `index`'s automatic palette, recomputed when an object was
-    /// drawn into the region since the last computation.
+    /// Region `index`'s automatic palette, recomputed when it no longer holds:
+    /// an object was drawn into the region since the last computation, and
+    /// the epoch does not keep the first one.
     pub(super) fn automatic_palette(
         &mut self,
         index: usize,
@@ -355,10 +362,7 @@ impl Epoch {
         };
         let clut = &mut self.cluts.as_mut_slice()[index];
         clut.version = definition.version;
-        for entry in definition.entries() {
-            let word = palette::ycrcbt(entry.y, entry.cr, entry.cb, entry.t);
-            clut.tables.set(entry.id, entry.depths, word);
-        }
+        store_entries(&mut clut.tables, definition);
         Ok(())
     }
 
@@ -408,6 +412,7 @@ impl Epoch {
             return Ok(Flow::Stop);
         };
         let bottom = if bottom.is_empty() { top } else { bottom };
+        let keep_automatic = self.keep_automatic;
         for region in self.regions.as_mut_slice() {
             let width = usize::from(region.width);
             let height = usize::from(region.height);
@@ -434,7 +439,7 @@ impl Epoch {
                         non_modifying: object.non_modifying,
                     };
                     // A field the receiver abandons leaves the palette as computed.
-                    if pixels::draw_field(&mut canvas, field, pen) {
+                    if pixels::draw_field(&mut canvas, field, pen) && !keep_automatic {
                         region.automatic_current = false;
                     }
                 }
@@ -442,5 +447,18 @@ impl Epoch {
             }
         }
         Ok(Flow::Continue)
+    }
+}
+
+/// Convert the entries of `definition` and store them in `tables`. A CLUT
+/// definition is rare next to the pixels a packet draws: out of line and cold,
+/// the entry loop keeps its values in registers, and the packet loop that
+/// inlines [`Epoch::define_clut`] keeps its registers and block layout.
+#[cold]
+#[inline(never)]
+fn store_entries(tables: &mut Tables, definition: &ClutDefinition<'_>) {
+    for entry in definition.entries() {
+        let word = palette::entry_word(entry.y, entry.cr, entry.cb, entry.t);
+        tables.set(entry.id, entry.depths, word);
     }
 }
