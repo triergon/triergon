@@ -8,21 +8,21 @@ from olib import *
 
 out = sys.argv[1]
 os.makedirs(out, exist_ok=True)
-OPEN = os.path.join(ROOT, 'harness', 'codecs', 'aac', 'ps', 'open')
+VECTORS = os.path.join(ROOT, 'harness', 'codecs', 'aac', 'ps', 'vectors')
 
 
 def sha(p):
     return hashlib.sha256(open(p, 'rb').read()).hexdigest()
 
 
-for name, label, seed, psw, sc, nosbr in (('ps-open-change-while-off.adts', 'T2', 9412, 0.15, 34, False),
-                                         ('ps-open-no-sbr-element.adts', 'TS', 9203, 0.15, 20, True)):
+for name, label, seed, psw, sc, nosbr in (('ps-change-while-off.adts', 'T2', 9412, 0.15, 34, False),
+                                         ('ps-no-sbr-element.adts', 'TS', 9203, 0.15, 20, True)):
     VC.NOSBR = nosbr
     rng = np.random.default_rng(seed)
     spec, model = VC.make_stream(rng, p_switch=psw, start_cfg=sc, allow_change=True)
     p = os.path.join(out, '%s_%d.aac' % (label, seed))
     build2(p, spec, seed=seed)
-    print('==', name, 'rebuilt identical:', sha(p) == sha(os.path.join(OPEN, name)))
+    print('==', name, 'rebuilt identical:', sha(p) == sha(os.path.join(VECTORS, name)))
     y, msgs, _ = decode_log(p)
     z = rust(p)
     X, _ = dump(p)

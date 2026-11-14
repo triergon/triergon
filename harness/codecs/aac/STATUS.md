@@ -34,15 +34,14 @@ binary.
   signal table and rule (hybrid prototypes and band maps, decorrelator and ducking, both
   mixing procedures, IPD/OPD, behaviour over frames, 20/34-band changes) are recovered by
   scripted probes of the FFmpeg binary ([ps/README.md](ps/README.md)). The decorrelator's
-  lead delay and coefficient taper, the transient ducking, the IPD/OPD smoothing and the
-  behaviour over frames are observed behaviour: no available text gives them, and the
-  code names the probes of each.
+  lead delay and coefficient taper, the decorrelator state kept over the stream, the
+  transient ducking, the IPD/OPD smoothing and the behaviour over frames are observed
+  behaviour: no available text gives them, and the code names the probes of each.
   `cargo xtask codecs aac-ps-tables` reruns the recovery and writes
   `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`;
-  `--check` compares them. Not recovered: the three open cases of
-  [ps-open-manifest.json](ps-open-manifest.json), graded with `codecs grade` like the
-  other manifests and listed in its `open_cases`, so `codecs summarize` fails once one
-  of them matches (see the crate's known differences).
+  `--check` compares them. Three crafted streams of paths no FATE vector takes (a 20/34
+  change registered while PS is off, IPD/OPD across a 34 -> 20 change, a PS frame without
+  its SBR element) are vectors of the aac lane, in [ps/vectors](ps/vectors).
 
 Confirmed black-box: PNS noise LCG (1664525, 1013904223, seed `0x1f2e3d4c`), PCE speaker
 mapping (`tools/probe_layout.py`), the libfaac fill-element skip, the implicit PS stereo

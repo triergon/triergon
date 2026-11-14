@@ -115,20 +115,6 @@ caller's reserved PCM planes and reuses them on the next access unit.
   transcribed from a document. They are validated by the conformance vectors only;
   codewords no vector reaches are unverified. Provenance:
   [harness/codecs/aac/STATUS.md](../../harness/codecs/aac/STATUS.md).
-- Parametric Stereo: three crafted streams of
-  [harness/codecs/aac/ps-open-manifest.json](../../harness/codecs/aac/ps-open-manifest.json)
-  are open cases, outside the numeric rules (worst channel RMS / max against FFmpeg):
-  - a change between 20 and 34 bands registered while PS is off after an error, followed
-    by a frame that runs (`ps-open-change-while-off`): 1.4e-3 / 4.7e-2. FFmpeg differs in
-    the next frames; this decoder converts the start matrices and restarts the
-    decorrelator only when a frame's configuration differs from that of the frame read
-    before it;
-  - a PS frame without its SBR element (`ps-open-no-sbr-element`): 1.7e-5 / 5.2e-4, in
-    that frame only, where the difference from FFmpeg's output lies in QMF bands 31..35.
-    An HE-AAC v1 stream with the same frame matches FFmpeg;
-  - IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands
-    (`ps-open-ipd-after-iid34`): 3.4e-3 / 3.9e-2, in the change frame and the three after
-    it; later frames match.
 
 ## Conformance
 
@@ -141,11 +127,15 @@ caller's reserved PCM planes and reuses them on the next access unit.
   FFmpeg's output by scripted probes
   ([harness/codecs/aac/ps](../../harness/codecs/aac/ps/README.md)), regenerated and checked
   by `cargo xtask codecs aac-ps-tables [--check]`. Observed behaviour, given by no
-  available text: the decorrelator's lead delay and coefficient taper, the transient
-  ducking (Purnhagen names transient reduction but gives no form), the IPD/OPD smoothing
-  and the behaviour over frames; the code names the probes of each.
+  available text: the decorrelator's lead delay and coefficient taper, the decorrelator
+  state kept over the stream, the transient ducking (Purnhagen names transient reduction
+  but gives no form), the IPD/OPD smoothing and the behaviour over frames, including a
+  frame without its SBR element; the code names the probes of each.
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
-  remuxed to ADTS). Every sample of every channel is compared with no delay search or gain
+  remuxed to ADTS) and three crafted HE-AAC v2 streams
+  ([harness/codecs/aac/ps/vectors](../../harness/codecs/aac/ps/vectors)): a 20/34-band
+  change registered while PS is off, IPD/OPD across a 34 -> 20 change, and a PS frame
+  without its SBR element. Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
