@@ -20049,6 +20049,66 @@
    }
   },
   {
+   "name": "gate-parallel-memory-matroska",
+   "path": "gate-parallel-memory-matroska",
+   "retention": "retained",
+   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on Linux AArch64 and on the ARMv7 gate target in the armhf user space, each on a c6g.4xlarge, at a92f2d0a: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the timing collection both grades join, the comparisons, the RSS module review for the concurrent-session module source, the proofs, the measured workers and observers, and the scripts",
+   "key": "evidence/gate-parallel-memory-matroska/68e8dd83e9051e2927195cac4ac4c97102d56a61152355c3da3180176365469d.tar.gz",
+   "sha256": "68e8dd83e9051e2927195cac4ac4c97102d56a61152355c3da3180176365469d",
+   "bytes": 334587340,
+   "source_revisions": {
+    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   }
+  },
+  {
+   "name": "gate-parallel-memory-matroska-head",
+   "path": "gate-parallel-memory-matroska-head",
+   "retention": "retained",
+   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15 with each slot pinned to its CPU, at the branch head on Linux AArch64 (8607afdd, the worker link policy of main) and at 247e8560 on the ARMv7 gate target in the armhf user space (main's link policy did not build there), each on a second c6g.4xlarge: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the preflights, the timing collection both grades join, the comparisons, the RSS module review and proofs for the current module source, the measured workers and observers, and the scripts",
+   "key": "evidence/gate-parallel-memory-matroska-head/4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233.tar.gz",
+   "sha256": "4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233",
+   "bytes": 332932426,
+   "source_revisions": {
+    "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
+    "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
+   }
+  },
+  {
+   "name": "framing-armv7-static-toolchain-4a932ef9",
+   "path": "framing-armv7-static-toolchain-4a932ef9",
+   "retention": "retained",
+   "reason": "Packet framing on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf at 4a932ef9, the link policy static-toolchain-runtime-v1, in the armhf user space on a c6g.4xlarge: every profile reference built (build-workers --all-references), preflight, 30 timing pairs on CPU 1 with the RSS module unloaded, the kernel proof, 30 kernel-bound memory pairs in parallel on CPUs 1-15, grading with the module loaded; parity 125/125, runtime <=1.110566929819581, heap <=0.7652811735941321, total RSS <=1.010086455331412 with 73/125 lower. With the first attempt, which stopped before measuring, the RSS module review and proof, 40 resident-page snapshots per worker of bad-packet-good-update by mapping and libc load address, the scripts and a bundle of the source",
+   "key": "evidence/framing-armv7-static-toolchain-4a932ef9/e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1.tar.gz",
+   "sha256": "e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1",
+   "bytes": 754032839,
+   "source_revisions": {
+    "candidate": "4a932ef908ca783976c56e187c0563ce955f15b5"
+   },
+   "results": [
+    {
+     "path": "gate/out/gate/graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "ddcc0c83262d486675bda4777432bb3ec52420f01fc11d909cdc79af30aba764",
+     "status": 0,
+     "report_sha256": "cc0437186d3fad00573fc21b319a7954e3f1b84251fef25e9da7ae53698af5ef"
+    },
+    {
+     "path": "gate/out/gate/memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "2a5f9f1bc82358472d38bbc7c50e2df78076fe2d37c2a7923ce9f6f64ba66c03",
+     "status": 0,
+     "report_sha256": "137276ea6b87b1ce63a8947ec029db4ecfc33606b7ff0c68ec414bc13720048a"
+    },
+    {
+     "path": "gate/out/gate/timing/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "312fa83087df3570a09899b6a71a16346c5eff9f7d2c0ec756455df9e854edbc",
+     "status": 0,
+     "report_sha256": "d0df228620ab6739967a8f47e8ee9a5557f4a733b85f057bd9feb0077e178be1"
+    }
+   ]
+  },
+  {
    "name": "packet-framing-exact-reservation",
    "retention": "retained",
    "key": "evidence/packet-framing-exact-reservation/b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc.tar.gz",
@@ -20210,31 +20270,6 @@
    "key": "evidence/packet-framing-link-policy-cbc8aca8-aarch64/26194f9c7a22339279995164e09e2afedc1d597e6c7f0a46fb3856bb1505d8ae.tar.zst",
    "sha256": "26194f9c7a22339279995164e09e2afedc1d597e6c7f0a46fb3856bb1505d8ae",
    "bytes": 57395736
-  },
-  {
-   "name": "gate-parallel-memory-matroska",
-   "path": "gate-parallel-memory-matroska",
-   "retention": "retained",
-   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on Linux AArch64 and on the ARMv7 gate target in the armhf user space, each on a c6g.4xlarge, at a92f2d0a: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the timing collection both grades join, the comparisons, the RSS module review for the concurrent-session module source, the proofs, the measured workers and observers, and the scripts",
-   "key": "evidence/gate-parallel-memory-matroska/68e8dd83e9051e2927195cac4ac4c97102d56a61152355c3da3180176365469d.tar.gz",
-   "sha256": "68e8dd83e9051e2927195cac4ac4c97102d56a61152355c3da3180176365469d",
-   "bytes": 334587340,
-   "source_revisions": {
-    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
-   }
-  },
-  {
-   "name": "gate-parallel-memory-matroska-head",
-   "path": "gate-parallel-memory-matroska-head",
-   "retention": "retained",
-   "reason": "Memory of matroska-demux with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15 with each slot pinned to its CPU, at the branch head on Linux AArch64 (8607afdd, the worker link policy of main) and at 247e8560 on the ARMv7 gate target in the armhf user space (main's link policy did not build there), each on a second c6g.4xlarge: every case's peak heap identical sample for sample, total RSS medians within the serial spread, the same graded verdicts; with the preflights, the timing collection both grades join, the comparisons, the RSS module review and proofs for the current module source, the measured workers and observers, and the scripts",
-   "key": "evidence/gate-parallel-memory-matroska-head/4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233.tar.gz",
-   "sha256": "4d0ef995a9349d4e0fe380a607e38696833411000fb332145a42249b6eba3233",
-   "bytes": 332932426,
-   "source_revisions": {
-    "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
-    "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
-   }
   },
   {
    "name": "packet-framing-combined-40e2ab49-aarch64",
