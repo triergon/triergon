@@ -600,6 +600,11 @@ impl NalPacketSegment {
             self.payload_length as usize
         }
     }
+    fn framed_len(&self) -> usize {
+        // The length is bounded by a byte slice, at most isize::MAX. The
+        // inserted prefix is at most four bytes and zero for passthrough.
+        self.len() + usize::from(self.prefix_bytes())
+    }
     fn source_range(&self) -> Range<usize> {
         self.source_start..self.source_start + self.len()
     }
@@ -1099,17 +1104,17 @@ impl PacketPlan {
         segment: NalPacketSegment,
     ) -> Result<()> {
         let parts = state.segments.len();
-        if parts == state.session.limits.maximum_segments {
+        let maximum_parts = state.session.limits.maximum_segments;
+        if parts >= maximum_parts {
             return Err(Error::Limit {
                 requested: parts.saturating_add(1),
-                maximum: state.session.limits.maximum_segments,
+                maximum: maximum_parts,
             });
         }
-        let count = parts.checked_add(1).ok_or(Error::Overflow)?;
+        let count = parts + 1;
         let total = state
             .total
-            .checked_add(usize::from(segment.prefix_bytes()))
-            .and_then(|v| v.checked_add(segment.len()))
+            .checked_add(segment.framed_len())
             .ok_or(Error::Overflow)?;
         if total > state.session.limits.maximum_output_bytes {
             return Err(Error::Limit {

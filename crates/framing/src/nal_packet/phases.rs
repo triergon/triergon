@@ -757,8 +757,7 @@ impl PacketEmission {
             .ok_or(Error::Invalid("missing packet buffer"))?;
         while let Some(part) = parts.get(self.copy_segment) {
             let prefix = usize::from(part.prefix_bytes());
-            // Planning checked the complete output extent, including every prefix.
-            let end = prefix + part.len();
+            let end = part.framed_len();
             // Charge and check cancellation at the prefix, payload chunks
             // and segment boundary, including when resuming a partial copy.
             if self.copied < prefix {
