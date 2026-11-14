@@ -20138,6 +20138,15 @@
    "retention": "retained",
    "key": "evidence/packet-framing-avc-scan/920a7967407aa6a8b5bd2becbdabb7d40442ed4a29018df88acabae65775e5c7.tar.gz",
    "sha256": "920a7967407aa6a8b5bd2becbdabb7d40442ed4a29018df88acabae65775e5c7"
+  },
+  {
+   "name": "packet-framing-inline-storage-1cea5f7b-aarch64",
+   "path": "packet-framing-inline-storage-1cea5f7b-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison with five inline segment descriptors, short AVC extensions and static runtime support. Includes the exact source, workers, observer proof, all 131 timings and memory samples, and the failed runtime grade.",
+   "key": "evidence/packet-framing-inline-storage-1cea5f7b-aarch64/f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5.tar.zst",
+   "sha256": "f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5",
+   "bytes": 41030376
   }
  ]
 }
