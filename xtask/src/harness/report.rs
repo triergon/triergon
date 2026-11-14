@@ -14,9 +14,10 @@ use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
+use super::policy::Runtime;
 use super::provenance::source_identity_error;
 use super::reuse;
-use super::timing::{Operation, Work, benchmark};
+use super::timing::{Operation, Pairs, Work, benchmark};
 use super::validation::{self, selected_operation};
 use super::worker;
 use crate::checks::read_json;
@@ -46,6 +47,8 @@ pub struct Options {
     pub baseline_worker: Option<PathBuf>,
     /// Measure even when a cited evidence set holds this collection's result.
     pub full: bool,
+    /// Let a gate session stop at an early look; `--no-early-stop` runs every pair.
+    pub early_stop: bool,
 }
 
 impl Options {
@@ -67,6 +70,7 @@ impl Options {
             iterations: None,
             seed: 280,
             full: false,
+            early_stop: true,
         }
     }
 
@@ -973,6 +977,7 @@ pub(crate) fn gate_key(
             Value::Bool(options.require_slice_acceptance),
         ),
         ("fate_cache", Value::Bool(options.fate_cache.is_some())),
+        ("early_stop", Value::Bool(options.early_stop)),
         (
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
@@ -1120,6 +1125,16 @@ pub(crate) fn collect(
     reserve_case_outputs(&options.output, cases)?;
     let mut rows: Vec<Value> = Vec::new();
     let mut memory_jobs = Vec::new();
+    // A gate comparison stops early once its bound is settled below the ceiling;
+    // a comparison with another build runs every pair.
+    let planned_memory = options.memory_pairs.unwrap_or(options.pairs);
+    let (timing_pairs, memory_pairs) = match options.baseline_worker {
+        None => (
+            Pairs::gate(options.pairs, Runtime::load(root)?.ceiling).early_stop(options.early_stop),
+            Pairs::gate(planned_memory, super::memory::CEILING).early_stop(options.early_stop),
+        ),
+        Some(_) => (Pairs::fixed(options.pairs), Pairs::fixed(planned_memory)),
+    };
     for case in cases {
         let id = s(case, "id").unwrap_or_default().to_owned();
         let mut timed: Option<(PathBuf, PathBuf, Operation)> = None;
@@ -1293,7 +1308,7 @@ pub(crate) fn collect(
                             &candidate,
                             &reference,
                             &input,
-                            options.pairs,
+                            timing_pairs,
                             iterations,
                             options.seed,
                             &operation,
@@ -1329,7 +1344,7 @@ pub(crate) fn collect(
                                     registered,
                                 },
                                 &input,
-                                options.memory_pairs.unwrap_or(options.pairs),
+                                memory_pairs,
                                 options.seed,
                                 &operation,
                             )
