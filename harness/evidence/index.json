@@ -20542,6 +20542,42 @@
      "report_sha256": "adb47621c52b182d6ae631e40fcdf042d934d97a945533851eb66367d54b1c38"
     }
    ]
+  },
+  {
+   "name": "framing-reserved-output-ccc8fcc2-aarch64",
+   "path": "framing-reserved-output-ccc8fcc2-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 paired timing against FFmpeg and the previous Rust worker for reserved Annex B output.",
+   "key": "evidence/framing-reserved-output-ccc8fcc2-aarch64/7b823cb4436f3d577f60dc84e74b15e296471f4909cf86fd258bbb73c900bcc0.tar.gz",
+   "sha256": "7b823cb4436f3d577f60dc84e74b15e296471f4909cf86fd258bbb73c900bcc0",
+   "bytes": 304639711,
+   "results": [
+    {
+     "path": "results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "7ba23c8e1947af5a4e5e8f6429cb5e6afb5939dfeee9b98ab2519cbfc9d6ca7f",
+     "status": 0,
+     "report_sha256": "c04c94e1825235765ea802d7ebd2edfc2bd819972c0bb52364b6170aeee2cd09"
+    }
+   ]
+  },
+  {
+   "name": "framing-length-and-output",
+   "path": "framing-length-and-output",
+   "retention": "retained",
+   "reason": "Paired AArch64 timing for shared length parsing and Thumb-2 executable page observations for reserved Annex B output.",
+   "key": "evidence/framing-length-and-output/094273a46706e775d756f3006962017d94011857ac6e564ac82922bcf5f95575.tar.gz",
+   "sha256": "094273a46706e775d756f3006962017d94011857ac6e564ac82922bcf5f95575",
+   "bytes": 312545591,
+   "results": [
+    {
+     "path": "length-aarch64/run/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "26644b65f7170ccc77b6566802d795dc2d86bf4dc2f9074c3f9e6dfc11e11d69",
+     "status": 0,
+     "report_sha256": "f151f21cb8455c90b9a39e2103103c9ed81f136da3faca6eac17ae9d6082acf1"
+    }
+   ]
   }
  ]
 }
