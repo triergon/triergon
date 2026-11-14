@@ -683,8 +683,10 @@ commands do unless they compare with another build. `capture qualify --stage tim
 runs correctness and timing alone, on one CPU, and `--stage memory --timing DIR` then
 collects every case's memory in one collection from the records the timing run wrote,
 refusing them if the sources, workers, cases or host differ; without `--stage` one run
-does both, its memory after all its timing. Pinned to one CPU, collection runs exactly
-as before. The reference's memory is measured afresh in every pair, not reused from
+does both, its memory after all its timing. Collecting side by side, it gives each
+case its own copy of its generated input, checked against the hash its timing recorded
+and removed when the run ends, so cases of one input no longer share a file; on one CPU
+they read the input itself. Pinned to one CPU, collection runs exactly as before. The reference's memory is measured afresh in every pair, not reused from
 earlier runs: on a second host
 of the same class it gives the same heaps and resident peaks within their spread
 (evidence set `gate-reference-memory-cross-host`), but caching it would save a few

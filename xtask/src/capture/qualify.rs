@@ -352,12 +352,28 @@ impl MeasuredCase {
             .unwrap_or(&Value::Null)
     }
 
-    /// The observed worker arguments of the case's memory runs.
-    fn memory_arguments(&self) -> Vec<String> {
+    /// The observed worker arguments of the case's memory runs, reading `input`.
+    fn memory_arguments(&self, input: &Path) -> Vec<String> {
         let mut arguments = vec!["memory".to_owned()];
         arguments.extend(case_args(self.field("case"), &SESSION));
-        arguments.push(python::path(&self.input));
+        arguments.push(python::path(input));
         arguments
+    }
+
+    /// A copy of the case's input at `directory`, with the hash its timing recorded.
+    fn copy_input(&self, directory: &Path) -> Result<PathBuf, String> {
+        let name = self
+            .input
+            .file_name()
+            .ok_or("an input without a file name")?;
+        let copy = directory.join(&self.id).join(name);
+        fs::create_dir_all(copy.parent().expect("under the directory"))
+            .map_err(|e| format!("{}: {e}", directory.display()))?;
+        fs::copy(&self.input, &copy).map_err(|e| format!("{}: {e}", copy.display()))?;
+        if file_sha(&copy).ok().as_deref() != self.field("input_sha256").as_str() {
+            return Err(format!("{}: differs from the timed input", copy.display()));
+        }
+        Ok(copy)
     }
 
     /// The case `--stage timing` recorded in `timing/ID/timing.json`.
@@ -390,6 +406,16 @@ impl MeasuredCase {
 
 /// Each case's record after `--stage timing`.
 const TIMING_RECORD: &str = "timing.json";
+
+/// The per-case input copies of a collection that runs cases side by side, under
+/// the run's inputs directory; removed with this value.
+struct InputCopies(PathBuf);
+
+impl Drop for InputCopies {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
 
 /// Generate the case's input if needed, compare both workers' outputs and time
 /// them.
@@ -602,17 +628,38 @@ fn memory_stage(
         registered: refusals.is_empty(),
     };
     let pairs = Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop);
+    // Cases of one generated input would share its file and so run one after
+    // another; side by side, each measures its own copy, of the same bytes.
+    let side_by_side = gate_build::allowed_cpu_list().is_none_or(|cpus| cpus.len() > 1);
+    let copies = side_by_side.then(|| {
+        InputCopies(
+            a.inputs
+                .join(format!(".memory-copies-{}", std::process::id())),
+        )
+    });
+    let mut inputs = Vec::new();
+    for measured in &measured_cases {
+        inputs.push(match (&copies, measured.correctness().get("outputs")) {
+            (Some(copies), Some(_)) => measured.copy_input(&copies.0)?,
+            _ => measured.input.clone(),
+        });
+    }
     let arguments: Vec<Vec<String>> = measured_cases
         .iter()
-        .map(MeasuredCase::memory_arguments)
+        .zip(&inputs)
+        .map(|(measured, input)| measured.memory_arguments(input))
         .collect();
     let mut jobs = Vec::new();
     let mut collected = Vec::new();
-    for (index, (measured, args)) in measured_cases.iter().zip(&arguments).enumerate() {
+    for (index, ((measured, args), path)) in measured_cases
+        .iter()
+        .zip(&arguments)
+        .zip(&inputs)
+        .enumerate()
+    {
         let Some(outputs) = measured.correctness().get("outputs") else {
             continue;
         };
-        let path = &measured.input;
         jobs.push(memory::Job::new(&workers, [path.clone()], move |slot| {
             memory::collect_command(
                 slot,
@@ -631,6 +678,7 @@ fn memory_stage(
     for (index, memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
         memories[index] = Some(memory?);
     }
+    drop(copies);
     measured_cases
         .into_iter()
         .zip(memories)
@@ -810,7 +858,19 @@ mod tests {
         .unwrap();
         let read = MeasuredCase::read(&dir.join("timing"), &case).unwrap();
         assert_eq!(read.input, input);
-        assert_eq!(read.memory_arguments().last(), Some(&python::path(&input)));
+        assert_eq!(
+            read.memory_arguments(&input).last(),
+            Some(&python::path(&input))
+        );
+        let copies = InputCopies(dir.join("copies"));
+        let copy = read.copy_input(&copies.0).unwrap();
+        assert_eq!(fs::read(&copy).unwrap(), b"pixels");
+        assert_eq!(copy, dir.join("copies/noise/noise-64x48-2.rgba"));
+        drop(copies);
+        assert!(
+            !dir.join("copies").exists(),
+            "copies are removed with the run"
+        );
         let other = json::parse(r#"{"id": "noise", "content": "bars"}"#).unwrap();
         assert!(MeasuredCase::read(&dir.join("timing"), &other).is_err());
         fs::write(&input, b"changed").unwrap();
