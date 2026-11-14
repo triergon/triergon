@@ -24,6 +24,10 @@ One operation parses every face of the file from memory and reads, per face:
 | `font-sized` | `vertical`, 26.6 pixels | every glyph's `linearVertAdvance` and `metrics.vertAdvance` of the unhinted load, then `metrics.vertAdvance` of the default load |
 | `font-sized` | `default`, 26.6 pixels | every glyph's default load (`FT_LOAD_DEFAULT`): `metrics.horiAdvance`, `vertAdvance`, `horiBearingX`, `horiBearingY`, `width` and `height`, then its hinted outline |
 
+HEIGHT may list up to 64 heights separated by commas (`1000,640,1000`): each face
+is then requested at each in turn, on the same face as libass resizes one, and each
+height's values follow a `request HEIGHT` record.
+
 A face, size or glyph the reader rejects is recorded as such and reading goes on.
 A default-load value the crate declares `Unsupported` is not a value: the
 `advances`, `vertical` and `default` modes then exit with an error naming the

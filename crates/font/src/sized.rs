@@ -136,7 +136,12 @@ impl Font {
     ///
     /// A size of zero pixels per em, such as height 0, keeps its scales and
     /// metrics, but FreeType then loads glyphs unscaled, in font units, and
-    /// unhinted (`FT_Load_Glyph`: "undefined scale means no scale").
+    /// unhinted (`FT_Load_Glyph`: "undefined scale means no scale"), by the
+    /// default load as by the unhinted one, with the linear vertical advance
+    /// scaled by the size's scale. Observed: FreeType's request of such a size
+    /// fails for a TrueType face and succeeds for a CFF one, and glyphs load
+    /// so either way (probes `zero-ppem`, `zero-ppem-control-program`,
+    /// `zero-ppem-uninstructed`).
     ///
     /// # Errors
     ///
@@ -476,8 +481,9 @@ impl<'f> SizedFont<'f> {
             control: bytes(font.tables.prep),
         };
         let (ppem, scale) = (self.metrics.y_ppem, self.hinted_scale);
-        // The interpreter runs the font and control value programs once per
-        // size, and keeps the state they leave for the size's glyphs.
+        // The interpreter runs the font program once for the face and the
+        // control value program once per size, and keeps the state they
+        // leave for the size's glyphs.
         let tables = || {
             let table = |tag| font.table(tag).unwrap_or_default();
             Tables {

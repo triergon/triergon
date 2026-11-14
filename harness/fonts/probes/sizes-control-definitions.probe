@@ -1,0 +1,28 @@
+# Function definitions the control value program makes, when one face is
+# requested at several sizes in turn: below 12 ppem it defines function 3 to
+# push 333 and function 4 to push 444, from 12 ppem only function 4, to push
+# 555. The glyph writes what functions 4 and 3 push into the y of points 0
+# and 1 (a call of an undefined function ends the program).
+sequence 640 1000 640
+sequence 1000 640 1000
+heights 1000 640
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  MPPEM; PUSH 12; LT
+  IF
+    PUSH 3; FDEF; PUSH 333; ENDF
+    PUSH 4; FDEF; PUSH 444; ENDF
+  ELSE
+    PUSH 4; FDEF; PUSH 555; ENDF
+  EIF
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]
+    PUSH 0 4; CALL; SCFS
+    PUSH 1 3; CALL; SCFS
+  end
+end

@@ -1,0 +1,19 @@
+# As zero-ppem, for a face with only a control value program (longer than 7
+# bytes, so not auto-hinted).
+heights 0 20 40
+modes default outlines advances vertical
+prep
+  PUSH 0; POP; PUSH 0; POP; PUSH 0; POP
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 700 lsb 10
+  component 0 offset 31 -17 round
+  component 0 offset 300 0 scale 0.5
+end
+glyph advance 300
+end
