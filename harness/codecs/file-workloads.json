@@ -9,6 +9,10 @@
   "MEM heap and attributable RSS upper95 < 1"
  ],
  "note": "FLAC, MPEG audio, Vorbis and Opus files: the measured operation reads the file through its container reader, decodes it with its trims and mixes it to stereo s16, as the reference reads, decodes and converts it through its demuxer. Conformance vectors are graded for correctness separately.",
+ "memory_timeout_seconds": {
+  "aarch64-unknown-linux-gnu": 600,
+  "thumbv7neon-unknown-linux-gnueabihf": 600
+ },
  "workloads": [
   {
    "id": "flac-16-44k-stereo",

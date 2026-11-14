@@ -490,6 +490,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     a.seed + MEMORY_SEED,
                     &args,
                     outputs,
+                    crate::harness::worker::DEFAULT_TIMEOUT,
                 )
             }))?
         } else {

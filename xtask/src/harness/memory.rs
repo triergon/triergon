@@ -406,6 +406,7 @@ fn observe(
         argv.push(input.map_or_else(OsString::new, |p| p.as_os_str().to_owned()));
     }
     argv.extend(arguments.iter().map(OsString::from));
+    let started = std::time::Instant::now();
     let result = (|| -> Result<Value, String> {
         let Some(Finished {
             code,
@@ -497,13 +498,22 @@ fn observe(
             ("instrument_sha256", Value::str(sha)),
         ]))
     })();
+    let elapsed = started.elapsed();
     let _ = fs::remove_dir_all(&directory);
-    result.unwrap_or_else(|error| {
+    let mut observation = result.unwrap_or_else(|error| {
         obj(vec![
             ("status", Value::str("observer-failed")),
             ("error", Value::str(error)),
         ])
-    })
+    });
+    // How long the observer run took, against its limit.
+    if let Value::Object(fields) = &mut observation {
+        fields.push((
+            "process_elapsed_ns".into(),
+            Value::int(elapsed.as_nanos() as i128),
+        ));
+    }
+    observation
 }
 
 fn file_sha(path: &Path) -> R<String> {
@@ -1855,6 +1865,7 @@ pub(crate) fn collect_command(
     seed: u64,
     arguments: &[String],
     expected_outputs: &Value,
+    timeout: Duration,
 ) -> R<Value> {
     collect_invocation(
         slot,
@@ -1873,7 +1884,7 @@ pub(crate) fn collect_command(
             candidate_arguments: None,
             expected_outputs: Some(expected_outputs),
             work_fields: None,
-            timeout: worker::DEFAULT_TIMEOUT,
+            timeout,
         },
     )
 }
