@@ -44,7 +44,7 @@ const RULES: &str = "harness/codecs/reader-rules.json";
 const DIFFERENCES: &str = "harness/codecs/reader-differences.json";
 pub const DIFFERENCES_SCHEMA: &str = "triergon.codecs.reader-differences.v1";
 /// The columns of one recorded difference.
-const COLUMNS: [&str; 7] = [
+pub(super) const COLUMNS: [&str; 7] = [
     "stream",
     "candidate_packet",
     "reference_packet",
@@ -314,7 +314,7 @@ fn scope(value: &Value, id: &str) -> Result<Scope, String> {
 }
 
 /// The canonical text a difference list is hashed by: its rows without dispositions.
-fn list_sha256(rows: &[Value]) -> String {
+pub(super) fn list_sha256(rows: &[Value]) -> String {
     sha256::hex(json::canonical(&Value::Array(rows.to_vec())).as_bytes())
 }
 
@@ -783,14 +783,14 @@ fn project(packets: &mut [Fields], from: Ratio, to: Ratio) {
 }
 
 /// Packets as the alignment sees them: the aligned field and the size.
-type Key = [Option<i128>; 2];
+pub(super) type Key = [Option<i128>; 2];
 /// One alignment step: a reader packet, a reference packet, or both paired.
-type Pair = (Option<usize>, Option<usize>);
+pub(super) type Pair = (Option<usize>, Option<usize>);
 
 /// The in-order alignment of two packet sequences at the least cost: a pair costs the
 /// number of its keys that differ, an unpaired packet 1, and of equal costs a pair is
 /// preferred, then an unpaired reader packet.
-fn align(a: &[Key], b: &[Key]) -> Vec<Pair> {
+pub(super) fn align(a: &[Key], b: &[Key]) -> Vec<Pair> {
     let (n, m) = (a.len(), b.len());
     if n == m && a == b || (n + 1) * (m + 1) > ALIGN_CELLS {
         let mut pairs: Vec<_> = (0..n.min(m)).map(|i| (Some(i), Some(i))).collect();
