@@ -127,18 +127,31 @@
 //! SPS's VUI timing (H.264 frames: two ticks; H.264 fields and HEVC: one tick),
 //! truncated to the time base, or 0 when that period is 1/1000 s or less
 //! (`h264-vui-fast-ts`); without VUI timing, the duration estimated from the
-//! times of the first 21 packets ([`RateEstimate`]: a common divisor of their
-//! steps, else the frame rate whose grid they fit best, one tick with fewer
-//! than three; `h264-estimate-ts`, `h264-rate-*-ts`). A packet's time is its DTS, else its PTS; in H.264
-//! without a bitstream restriction, when a picture up to the sixth raises the
-//! depth from 0 by its order count step before any B picture, the packets
-//! after it up to the seventh whose DTS is absent or equals their PTS give the
-//! estimate no time, up to the first B picture (probes p81, p82, p84;
-//! `h264-rate-jump-ts`). Frames
-//! that need the estimate wait, with those after them, until it has its 21
-//! times, 4096 packets have passed or the stream ends; without any time it is
-//! one tick (probe p93; `h264-untimed-ts`). The reference looks further for
-//! times (probe p93b; `h264-untimed-far-ts`, open).
+//! times of the first packets ([`RateEstimate`]: 21 times, or 41 in a time
+//! base coarser than 1/2000 s; a common divisor of their steps, else the frame
+//! rate whose grid they fit best, one tick with fewer than three;
+//! `h264-estimate-ts`, `h264-rate-*-ts`). A packet's time is its DTS, else its
+//! PTS. In H.264 without a bitstream restriction, once the start hold's depth
+//! rises from 0 to 1 (by an order count step or a B picture in order or one
+//! below), the packets after it until the hold ends give the estimate no time
+//! when their DTS is absent or equals their PTS, but for those of B pictures;
+//! a rise above 1 ends the run (probes p71p, p81, p82, p84, p99;
+//! `h264-rate-jump-ts`, `h264-rate-pts-b-ts`, `h264-rate-pts-run-ts`). Frames
+//! that need the estimate wait, with those after them, until it has its
+//! times, 5,000,000 bytes of packets have been read or the stream ends;
+//! without any time it is one tick (probes p93, p93b, p100;
+//! `h264-untimed-ts`, `h264-untimed-far-ts`, `h264-untimed-bytes-ts`).
+//!
+//! H.264 in length-prefixed framing without packet durations or VUI timing
+//! (Matroska) takes the presentation times of the packets after the first
+//! picture output, in presentation order ([`Shown`]); until that estimate is
+//! settled each frame lasts 0, or one tick in a time base coarser than
+//! 1/1000 s, and at least one picture waits in the buffer (probes p85, p86,
+//! p96-p98; `h264-nodur-mkv`, `h264-nodur-fine-mkv`, `h264-nodur-coarse-mkv`).
+//! Not reproduced: start holds displaced by three or more pictures settle 1 to
+//! 5 packets later in the reference, a second B picture dropped as late adds a
+//! packet, and at ticks between 1 and 2 ms the reference picks a multiple of a
+//! 10 fps rate (probes p96-p98).
 //!
 //! A picture whose parameter sets are missing or invalid is not decoded.
 //!
@@ -151,7 +164,7 @@
 
 use super::captions::Gathered;
 use super::queue::FrameQueue;
-use super::rate::RateEstimate;
+use super::rate::{RateEstimate, Shown};
 use crate::cc::video::avc;
 use crate::cc::video::hevc::{self, Reference};
 use crate::cc::video::nal::{
@@ -207,12 +220,6 @@ const FAR_BACK: usize = 16;
 /// H.264: a picture whose order count is more than this above the picture
 /// before it raises a depth of 0 to 1 (probes p31, p32, p64, p66, p74).
 const NEXT_STEP: i32 = 2;
-
-/// H.264 without a bitstream restriction: after a picture up to this index
-/// that raises the depth from 0 by its order count step, the packets up to
-/// this index whose DTS is absent or equals their PTS give the duration
-/// estimate no time (probes p81, p82, p84).
-const UNTIMED_THROUGH: u32 = 6;
 
 /// A picture waiting in the buffer: its times and its caption bytes in the
 /// gathered bytes.
@@ -423,6 +430,9 @@ struct AvcState {
     floor: Option<i32>,
     late: LateOutput,
     first_field: Option<FirstField>,
+    /// Packets give the duration estimate no time: the start hold's depth
+    /// rose from 0 to 1 and the hold has not ended (probe p99).
+    untimed_run: bool,
 }
 
 impl AvcState {
@@ -461,7 +471,7 @@ struct HevcState {
 }
 
 /// The decoder's state between steps, besides its buffers.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 struct Progress {
     avc: AvcState,
     hevc: HevcState,
@@ -469,6 +479,9 @@ struct Progress {
     /// they run from here to the end of the gathered bytes.
     pending: Option<usize>,
     timing: RateEstimate,
+    /// H.264 in length-prefixed framing with presentation times only: the
+    /// estimate from those (decided at the first picture).
+    shown: Option<Shown>,
     /// The duration estimate, once settled.
     estimate: Option<i64>,
     /// Frames are kept in the output until the duration estimate is settled
@@ -477,6 +490,31 @@ struct Progress {
     needs_estimate: bool,
     /// The frame kept that the start choice dropped, by its place among them.
     skip: Option<usize>,
+}
+
+impl Progress {
+    fn new(time_base: (u32, u32)) -> Self {
+        Self {
+            avc: AvcState {
+                order: AvcOrder::new(AfterMmco5::CodedLsb, AfterGap::OffsetKept),
+                ..AvcState::default()
+            },
+            hevc: HevcState::default(),
+            pending: None,
+            timing: RateEstimate::new(time_base),
+            shown: None,
+            estimate: None,
+            holding: false,
+            needs_estimate: false,
+            skip: None,
+        }
+    }
+
+    /// Whether the duration estimate has every time it takes.
+    fn settled(&self) -> bool {
+        self.shown
+            .map_or_else(|| self.timing.settled(), |shown| shown.duration().is_some())
+    }
 }
 
 /// The parameter sets of either codec.
@@ -550,8 +588,7 @@ impl NalDecode {
         framing: Framing,
         time_base: (u32, u32),
     ) -> Self {
-        let mut progress = Progress::default();
-        progress.avc.order = AvcOrder::new(AfterMmco5::CodedLsb, AfterGap::OffsetKept);
+        let progress = Progress::new(time_base);
         Self {
             codec,
             framing,
@@ -582,7 +619,7 @@ impl NalDecode {
             let unit = decode.read(data)?;
             let bytes = decode.captions.bytes.len() - unit.start;
             decode.reserve(bytes, out)?;
-            decode.access_unit(unit, pts, dts, duration, out);
+            decode.access_unit(unit, data.len(), pts, dts, duration, out);
             decode.settle(out);
             Ok(())
         })
@@ -771,6 +808,7 @@ impl NalDecode {
     fn access_unit(
         &mut self,
         unit: Unit,
+        bytes: usize,
         pts: Option<i64>,
         dts: Option<i64>,
         duration: Option<i64>,
@@ -779,13 +817,10 @@ impl NalDecode {
         let hevc = &mut self.progress.hevc;
         hevc.after_end = unit.after_end;
         hevc.changed_sps |= unit.changed_sps;
-        let b_picture = match &unit.picture {
-            Picture::Avc { slice, .. } => slice.header.bipredictive(),
-            _ => false,
-        };
-        self.progress
-            .timing
-            .packet(dts.or(pts), dts.is_some_and(|d| Some(d) != pts), b_picture);
+        // A packet's time is its DTS, else its PTS; one whose DTS is absent or
+        // equals its PTS gives none in an untimed run (probe p84).
+        let time = dts.or(pts);
+        let distinct_dts = dts.is_some_and(|d| Some(d) != pts);
         let held = |decode: &Self, timing: Option<Timing>, ticks: u32| Held {
             pts,
             duration: duration
@@ -798,6 +833,7 @@ impl NalDecode {
             above: 0,
             first_key: false,
         };
+        let mut untimed = false;
         match unit.picture {
             Picture::None => {
                 if self.codec == Codec::Hevc {
@@ -822,8 +858,20 @@ impl NalDecode {
                 } else {
                     2
                 };
-                let held = held(self, sps.timing(), ticks);
-                self.avc_picture(slice, recovery, held, out);
+                let mut held = held(self, sps.timing(), ticks);
+                if self.progress.avc.decoded == 0
+                    && held.duration.is_none()
+                    && matches!(self.framing, Framing::Lengths(_))
+                {
+                    self.progress.shown = Some(Shown::new(self.time_base));
+                }
+                if let Some(shown) = &self.progress.shown {
+                    held.duration = held.duration.or(shown.early());
+                }
+                untimed = self.avc_picture(slice, recovery, held, out);
+                if let Some(shown) = &mut self.progress.shown {
+                    shown.settle(self.time_base);
+                }
                 // The second field, without caption bytes of its own: the
                 // packet's go to the first.
                 if let Some(slice) = second {
@@ -851,6 +899,9 @@ impl NalDecode {
                 }
             }
         }
+        self.progress
+            .timing
+            .packet(bytes, time.filter(|_| distinct_dts || !untimed));
     }
 
     /// Gathers an SEI NAL unit's caption bytes; returns a recovery point's
@@ -894,18 +945,20 @@ impl NalDecode {
         i64::try_from(ticks).unwrap_or(i64::MAX)
     }
 
+    /// Decodes an H.264 picture; returns whether its packet is in an untimed
+    /// run.
     fn avc_picture(
         &mut self,
         slice: avc::Slice,
         recovery: Option<u32>,
         mut held: Held,
         out: &mut FrameQueue,
-    ) {
+    ) -> bool {
         let Tables::Avc(tables) = &self.tables else {
-            return;
+            return false;
         };
         let Some(sps) = tables.sps(slice.sps_id) else {
-            return;
+            return false;
         };
         let fields = sps.fields;
         let header = slice.header;
@@ -978,7 +1031,7 @@ impl NalDecode {
                 if joined.is_ok() {
                     self.emit_avc(out);
                     self.bump_avc(out);
-                    return;
+                    return false;
                 }
             } else if let Some(lone) = self.pictures.take(first.id) {
                 // An unpaired field is not output: its caption bytes go to
@@ -1058,20 +1111,22 @@ impl NalDecode {
                     .is_some_and(|p| order > p.saturating_add(NEXT_STEP))
             {
                 state.depth = 1;
-                if !state.b_seen {
-                    self.progress.timing.untime_through(UNTIMED_THROUGH);
-                }
             }
         } else if displaced > 0 && header.bipredictive() && state.decoded <= START_WINDOW + 1 {
             // A stated depth of 0 becomes 1 (probes p3-h264-closed-r0,
             // p3-h264-pyr-r0).
             state.depth = state.depth.max(1);
         }
+        if let Some(shown) = &mut self.progress.shown {
+            shown.picture(held.pts, header.bipredictive().then_some(displaced > 0));
+        }
         let state = &mut self.progress.avc;
         if state.decoded == 1 {
             state.early.uncounted_first = !slice.idr && header.intra() && header.frame_num == 0;
         }
+        let mut untimed = false;
         if !state.early.ended {
+            let before = state.early.depth;
             state
                 .early
                 .picture(order, displaced, header.bipredictive(), gap);
@@ -1079,6 +1134,18 @@ impl NalDecode {
             state.early.ended = state
                 .early
                 .ends(index, state.dpb_frames, self.pictures.len());
+            // Without a bitstream restriction, once the hold's depth rises
+            // from 0 to 1 the packets until the hold ends give no time, but
+            // for those of B pictures; a rise above 1 ends the run (probes
+            // p71p, p81, p82, p99).
+            let after = state.early.depth;
+            if after > 1 || state.early.ended {
+                state.untimed_run = false;
+            }
+            untimed = state.untimed_run && !header.bipredictive();
+            if !state.stated && before == 0 && after == 1 && !state.early.ended {
+                state.untimed_run = true;
+            }
         }
         state.recent.push(order);
         state.previous = Some(order);
@@ -1197,7 +1264,7 @@ impl NalDecode {
         };
         // Within the room reserved, the store neither allocates nor fails.
         let Ok(id) = self.pictures.store(new, held) else {
-            return;
+            return untimed;
         };
         if first_key {
             self.progress.avc.key_id = Some(id);
@@ -1210,6 +1277,7 @@ impl NalDecode {
             });
         }
         self.bump_avc(out);
+        untimed
     }
 
     /// Decides the recovery of the pictures above the first intra picture
@@ -1313,7 +1381,8 @@ impl NalDecode {
         }
         let index = state.decoded.saturating_sub(1);
         let mut depth = state.depth as usize;
-        if index < START_WINDOW || state.b_seen && !state.stated {
+        let analysing = self.progress.shown.is_some_and(|shown| shown.waits());
+        if index < START_WINDOW || state.b_seen && !state.stated || analysing {
             depth = depth.max(1);
         }
         self.pictures
@@ -1341,6 +1410,9 @@ impl NalDecode {
             state.late.admit(poc);
             if held.key {
                 state.recovered = true;
+            }
+            if let Some(shown) = &mut self.progress.shown {
+                shown.output();
             }
             self.output(held, out);
         }
@@ -1458,7 +1530,7 @@ impl NalDecode {
     fn output(&mut self, held: Held, out: &mut FrameQueue) {
         let bytes = &self.captions.bytes.as_bytes()[held.start..held.end];
         let progress = &mut self.progress;
-        let needs_estimate = held.duration.is_none() && !progress.timing.settled();
+        let needs_estimate = held.duration.is_none() && !progress.settled();
         if progress.holding || needs_estimate || progress.avc.choice.is_some() {
             progress.holding = true;
             progress.needs_estimate |= held.duration.is_none();
@@ -1487,7 +1559,7 @@ impl NalDecode {
         let progress = &self.progress;
         if !progress.holding
             || progress.avc.choice.is_some()
-            || progress.needs_estimate && !progress.timing.settled()
+            || progress.needs_estimate && !progress.settled()
         {
             return;
         }
@@ -1583,9 +1655,10 @@ fn keep<T>(list: &mut BudgetVec<T>, item: T) {
 
 /// The settled duration estimate, worked out once.
 fn estimate(progress: &mut Progress, time_base: (u32, u32)) -> i64 {
+    let shown = progress.shown.and_then(|shown| shown.duration());
     *progress
         .estimate
-        .get_or_insert_with(|| progress.timing.duration(time_base))
+        .get_or_insert_with(|| shown.unwrap_or_else(|| progress.timing.duration(time_base)))
 }
 
 #[cfg(test)]

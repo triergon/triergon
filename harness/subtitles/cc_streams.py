@@ -1665,10 +1665,12 @@ def picture_output_cases(tmp_dir):
     carrier32 = base("h264", "h264-carrier32", params="bframes=0")
 
     def written(name, pictures, restriction=None, size=(2, 2), level=30, pts=None, gaps=False,
-                recovery=None, mkv_ns=None, carrier=carrier32):
+                recovery=None, mkv_ns=None, mkv_scale=1_000_000, carrier=carrier32, pad=0):
         """A case of `pictures` in the carrier's packets (or, with mkv_ns(n)
-        times in nanoseconds, in a Matroska file without durations), with a
-        recovery point of recovery_frame_cnt `recovery` on the first."""
+        times in nanoseconds, in a Matroska file without durations whose
+        TimestampScale is `mkv_scale`), with a recovery point of
+        recovery_frame_cnt `recovery` on the first; with `pad`, each access
+        unit is filled to that many bytes with filler data."""
         def au(n, payload):
             if n >= len(pictures):
                 return None
@@ -1679,10 +1681,14 @@ def picture_output_cases(tmp_dir):
                 units += recovery_point_sei(recovery)
             sei = sei_nal(sei_messages_t35(data[n % len(data)]), False)
             slice_nal = frame_slice(kind, idr, ref, fn, poc, size[0] * size[1])
-            return units + sei + b"\x00\x00\x00\x01" + slice_nal
+            unit = units + sei + b"\x00\x00\x00\x01" + slice_nal
+            if pad > len(unit) + 6:
+                filler = b"\x00\x00\x00\x01\x0c" + b"\xff" * (pad - len(unit) - 6) + b"\x80"
+                unit = units + sei + filler + b"\x00\x00\x00\x01" + slice_nal
+            return unit
         if mkv_ns is not None:
             units = [(mkv_ns(n), au(n, b"")) for n in range(len(pictures))]
-            out.append((name + "-mkv", write(name + ".mkv", matroska(units)), ["cc"]))
+            out.append((name + "-mkv", write(name + ".mkv", matroska(units, mkv_scale)), ["cc"]))
         else:
             out.append((name + "-ts", write(name + ".ts", ts_rewrite_video(carrier, au, pts)), ["cc"]))
 
@@ -1725,14 +1731,17 @@ def picture_output_cases(tmp_dir):
     out += hold_and_field_cases(written, carrier, fields, data)
     rate_cases(written)
     output_rule_cases(written)
-    # Packets without a time (probes p93, p93b): none at all, where every
-    # frame lasts one tick; and none for the first 4300, where the estimate
-    # settles after 4096 packets with no time (one tick) and the reference
-    # takes the times after them (3003; open).
+    # Packets without a time (probes p93, p93b, p100): none at all, where
+    # every frame lasts one tick; none for the first 4300 small ones, whose
+    # times the estimate still takes (3003); and none for the first 2510 of
+    # 2000 bytes each, past 5,000,000 bytes, after which it takes none (one
+    # tick).
     written("h264-untimed", frame_pictures(300), pts=lambda n: None)
     long_carrier = base("h264", "h264-carrier-long", frames=4400, params="bframes=0")
     written("h264-untimed-far", frame_pictures(4400), carrier=long_carrier,
             pts=lambda n: None if n < 4300 else 90000 + 3003 * n)
+    written("h264-untimed-bytes", frame_pictures(2600), carrier=long_carrier, pad=2000,
+            pts=lambda n: None if n < 2510 else 90000 + 3003 * n)
     shutil.rmtree(tmp_dir)
     return out
 
@@ -1782,8 +1791,9 @@ def output_rule_cases(written):
     jumps in the start hold, a B picture among the first 21 pictures, an
     intra picture with frame_num 0, a non-reference intra picture, a
     recovery point above the intra picture), the start hold's step, the depth
-    growth, a stated depth against a jump, and the duration estimate of two
-    packets; and two open behaviours of the prepared packets' durations."""
+    growth, a stated depth against a jump, the duration estimate of two
+    packets, of PTS-only packets after the start hold's depth rises, and of
+    Matroska packets without durations."""
     def shifted(pictures, by, start=1):
         return [(k, i, r, f, q + by if n >= start else q) for n, (k, i, r, f, q) in enumerate(pictures)]
 
@@ -1836,14 +1846,37 @@ def output_rule_cases(written):
     written("h264-depth-two", frame_pictures(300, bs={25: 2, 40: 2, 50: 3}))
     # Two packets: the estimate is one tick (probe p42).
     written("h264-rate-two", frame_pictures(2))
-    # Open: PTS-only with a B picture at index 2, the second packet after it
-    # moved half a frame. The reference's estimate leaves out a run of packets
-    # after the B picture (its window starts at packet 8; probe p71p h8).
+    # PTS-only with a B picture one below at index 2, which raises the start
+    # hold's depth to 1: the packets after it until the hold ends (3 to 7)
+    # give the estimate no time, so the fourth packet moved half a frame
+    # leaves it at 3003 (probes p71p h8, p99 b2k1).
     written("h264-rate-pts-b", frame_pictures(300, bs={2: 1}),
             pts=lambda n: 90000 + (2 * n * 90000 * 1001 + 30000) // 60000 + n % 2 + (1501 if n == 4 else 0))
-    # Open: Matroska without block durations, DefaultDuration or VUI timing.
-    # The reference gives the first frames a duration of 0 (probes p85, p86).
-    written("h264-nodur", frame_pictures(300), mkv_ns=lambda n: 10**9 + n * 40_000_000)
+    # A step of 4 at index 1 starts the run (2 to 6); a B picture at 4 gives
+    # its own time but does not end the run, so packet 6 moved half a frame
+    # leaves the estimate at 3003 (probe p99 j1b4k1).
+    written("h264-rate-pts-run", frame_pictures(300, bs={4: 1}, jumps={1}),
+            pts=lambda n: 90000 + (2 * n * 90000 * 1001 + 30000) // 60000 + n % 2 + (1501 if n == 6 else 0))
+
+    def shown_ns(pictures, period_ns):
+        # Presentation times by display rank, as a muxer writes them.
+        rank = {poc: r for r, poc in enumerate(sorted(p[4] for p in pictures))}
+        return lambda n: 10**9 + rank[pictures[n][4]] * period_ns
+
+    # Matroska without block durations, DefaultDuration or VUI timing
+    # (probes p85, p86, p96-p98). At 1 ms per tick the frames up to the 48th
+    # (the first output at index 6, then 41 times) last 0.
+    plain = frame_pictures(300)
+    written("h264-nodur", plain, mkv_ns=lambda n: 10**9 + n * 40_000_000)
+    # At 0.1 ms, 21 times: a first B picture displaced at index 10 adds two
+    # packets (30 frames of 0), and a B picture one below at 24, while the
+    # estimate is not settled, is kept.
+    fine = frame_pictures(300, bs={10: 1, 24: 1})
+    written("h264-nodur-fine", fine, mkv_ns=shown_ns(fine, 40_000_000), mkv_scale=100_000)
+    # At 2 ms per tick, 41 times, the frames before the estimate last one
+    # tick; a first B picture in order at index 30 adds one packet.
+    coarse = frame_pictures(300, bs={30: 0})
+    written("h264-nodur-coarse", coarse, mkv_ns=shown_ns(coarse, 40_000_000), mkv_scale=2_000_000)
 
 
 def hold_and_field_cases(written, carrier, fields, data):

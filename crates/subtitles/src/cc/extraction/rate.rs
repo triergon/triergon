@@ -1,30 +1,48 @@
 //! The frame duration of a stream whose packets and SPS give none, estimated
 //! from the times of its first packets as the reference does (probes p58,
-//! p71-p73, p77-p83).
+//! p71-p73, p77-p83, p96-p100).
 //!
-//! The estimate takes the times of the first [`TAKEN`] packets that carry
-//! one. When the steps from the fourth to the twenty-first of them share a
-//! divisor longer than 1/500 s, that divisor is the duration. Otherwise each
-//! candidate frame rate is scored by how far the times of the second to the
-//! twenty-first packets lie from its frame grid, and the duration is one frame
-//! at the best rate, rounded down to the time base; with no candidate close
-//! enough, or fewer than three times, it is one tick of the time base.
+//! The estimate takes the times of the first packets that carry one: 21 of
+//! them when the time base is 1/2000 s or finer, 41 when it is coarser. When
+//! the steps from the fourth time on share a divisor longer than 1/500 s,
+//! that divisor is the duration. Otherwise each candidate frame rate is scored
+//! by how far the times from the second on lie from its frame grid, and the
+//! duration is one frame at the best rate, rounded down to the time base; with
+//! no candidate close enough, or fewer than three times, it is one tick of the
+//! time base.
 //!
-//! The estimate settles once it has its times, at the end of the stream, or
-//! after [`LOOK_AHEAD`] packets, so that the frames waiting for it stay
-//! bounded. The reference looks further when packets go without a time
-//! (probe p93b: times after 60000 untimed packets of 40 bytes count, after
-//! 4000 of 1.6 kB they do not); an estimate that settles at the bound with
-//! fewer times than the reference finds differs from it.
+//! The times come from the packets read while fewer than 5,000,000 bytes of
+//! packets came before them (probes p93b, p100): the estimate settles once it
+//! has its times, once that much has been read, or at the end of the stream.
+//! Frames waiting for it hold only their caption bytes, so they take a small
+//! part of the packet data the reference keeps until then.
+//!
+//! Packets of a length-prefixed (Matroska) stream that carry only
+//! presentation times are taken in [`Shown`] order instead.
 
-/// The packets whose times the estimate takes (probes p71, p77).
-pub(super) const TAKEN: usize = 21;
+/// The most times the estimate takes: those of a time base coarser than
+/// 1/2000 s (probes p96, p98).
+const TAKEN_MAX: usize = 41;
 
-/// The estimate settles after this many packets at the latest. MPEG-TS
-/// codes a PTS at least every 0.7 s (ISO/IEC 13818-1, 2.7.4), so a
-/// conforming stream gives its times within 4096 packets up to 280 frames per
-/// second.
-pub(super) const LOOK_AHEAD: u32 = 4096;
+/// The times the estimate takes in a time base of 1/2000 s or finer (probes
+/// p71, p77; p96, p98: TimestampScale 500000 ns takes 21, 500001 ns 41).
+const TAKEN_FINE: usize = 21;
+
+/// The estimate takes times from the packets read before this many bytes of
+/// packets (probes p93b, p100: untimed access units of 1000, 2000 and 4000
+/// bytes up to 4,980,000 bytes in all leave room for the times after them,
+/// 5,000,000 do not; p100c, p100d: a packet that starts below 5,000,000 bytes
+/// counts, also when it ends above, one that starts at it does not).
+const LOOK_BYTES: u64 = 5_000_000;
+
+/// The times the estimate takes in `time_base`.
+fn taken(time_base: (u32, u32)) -> usize {
+    if u64::from(time_base.0) * 2000 <= u64::from(time_base.1) {
+        TAKEN_FINE
+    } else {
+        TAKEN_MAX
+    }
+}
 
 /// The divisor takes the steps from the fourth packet taken (probe p77:
 /// moving the second or third packet leaves the divisor).
@@ -61,48 +79,42 @@ fn candidates() -> impl Iterator<Item = (u32, u32)> {
     twelfths.chain(whole).chain(ntsc)
 }
 
-/// The times of the first packets, and the packets going without one.
-#[derive(Clone, Copy, Debug, Default)]
+/// The times of the first packets.
+#[derive(Clone, Copy, Debug)]
 pub(super) struct RateEstimate {
-    times: [i64; TAKEN],
+    times: [i64; TAKEN_MAX],
     taken: usize,
-    /// Packets seen.
-    seen: u32,
-    /// Packets up to this index go without a time unless their DTS differs
-    /// from their PTS.
-    untimed_through: Option<u32>,
+    /// The times the estimate takes.
+    wanted: usize,
+    /// Bytes of the packets seen.
+    bytes: u64,
     /// The stream has ended.
     ended: bool,
 }
 
 impl RateEstimate {
-    /// Takes the next packet's time. `distinct_dts` says whether the packet
-    /// has a DTS other than its PTS (probe p84: a DTS equal to the PTS, or
-    /// none, alike), `b_picture` whether it holds a B picture, which ends a
-    /// run of packets going without a time.
-    pub(super) fn packet(&mut self, time: Option<i64>, distinct_dts: bool, b_picture: bool) {
-        let index = self.seen;
-        self.seen = self.seen.saturating_add(1);
-        if b_picture {
-            self.untimed_through = None;
+    /// An estimate of packet times in `time_base`.
+    pub(super) fn new(time_base: (u32, u32)) -> Self {
+        Self {
+            times: [0; TAKEN_MAX],
+            taken: 0,
+            wanted: taken(time_base),
+            bytes: 0,
+            ended: false,
         }
-        if !distinct_dts && self.untimed_through.is_some_and(|last| index <= last) {
-            return;
-        }
+    }
+
+    /// Takes the next packet: its size in bytes and its time, `None` for a
+    /// packet that gives the estimate none.
+    pub(super) fn packet(&mut self, bytes: usize, time: Option<i64>) {
         if let Some(time) = time
-            && self.taken < TAKEN
+            && self.bytes < LOOK_BYTES
+            && self.taken < self.wanted
         {
             self.times[self.taken] = time;
             self.taken += 1;
         }
-    }
-
-    /// The packets after those seen, up to index `last`, go without a time
-    /// unless their DTS differs from their PTS.
-    pub(super) fn untime_through(&mut self, last: u32) {
-        if self.seen <= last {
-            self.untimed_through = Some(last);
-        }
+        self.bytes = self.bytes.saturating_add(bytes as u64);
     }
 
     /// The stream ends: the estimate takes the times it has.
@@ -111,61 +123,190 @@ impl RateEstimate {
     }
 
     /// Whether the estimate has every time it takes: all of them, those of
-    /// a stream that ended, or those of the first [`LOOK_AHEAD`] packets.
+    /// a stream that ended, or those of the packets before [`LOOK_BYTES`].
     pub(super) fn settled(&self) -> bool {
-        self.taken >= TAKEN || self.ended || self.seen >= LOOK_AHEAD
+        self.taken >= self.wanted || self.ended || self.bytes >= LOOK_BYTES
     }
 
     /// The estimated duration in ticks of `time_base`: one tick with fewer
     /// than three times (probe p42: one or two packets last 1, three 3003;
     /// probe p93: packets without any time last 1).
     pub(super) fn duration(&self, time_base: (u32, u32)) -> i64 {
-        let times = &self.times[..self.taken];
-        let [first, .., last] = *times else {
-            return 1;
-        };
-        if times.len() < 3 {
-            return 1;
+        estimate(&self.times[..self.taken], time_base)
+    }
+}
+
+/// The duration estimated from `times`.
+fn estimate(times: &[i64], time_base: (u32, u32)) -> i64 {
+    let [first, .., last] = *times else {
+        return 1;
+    };
+    if times.len() < 3 {
+        return 1;
+    }
+    let (num, den) = (u64::from(time_base.0.max(1)), u64::from(time_base.1.max(1)));
+    let divisor = times
+        .windows(2)
+        .skip(DIVISOR_FROM)
+        .filter_map(|w| u64::try_from(w[1].checked_sub(w[0])?).ok())
+        .filter(|&step| step > 0)
+        .fold(0, gcd);
+    if u128::from(divisor) * u128::from(num) * DIVISOR_ABOVE.1 > u128::from(den) * DIVISOR_ABOVE.0 {
+        return i64::try_from(divisor).unwrap_or(i64::MAX);
+    }
+    let tick = num as f64 / den as f64;
+    // Times too far apart for a step leave no candidate out.
+    let mean_rate = last
+        .checked_sub(first)
+        .map_or(0.0, |span| (times.len() - 1) as f64 / (span as f64 * tick));
+    // The fitted times in seconds, as each candidate scales them.
+    let mut seconds = [0.0; TAKEN_MAX];
+    for (s, &t) in seconds.iter_mut().zip(&times[FIT_FROM..]) {
+        *s = t as f64 * tick;
+    }
+    let seconds = &seconds[..times.len() - FIT_FROM];
+    let mut best: Option<(f64, (u32, u32))> = None;
+    for (p, q) in candidates() {
+        let rate = f64::from(p) / f64::from(q);
+        if rate < SLOWEST * mean_rate {
+            continue;
         }
-        let (num, den) = (u64::from(time_base.0.max(1)), u64::from(time_base.1.max(1)));
-        let divisor = times
-            .windows(2)
-            .skip(DIVISOR_FROM)
-            .filter_map(|w| u64::try_from(w[1].checked_sub(w[0])?).ok())
-            .filter(|&step| step > 0)
-            .fold(0, gcd);
-        if u128::from(divisor) * u128::from(num) * DIVISOR_ABOVE.1
-            > u128::from(den) * DIVISOR_ABOVE.0
+        let score = score(seconds, rate);
+        if score < best.map_or(CLOSE, |(least, _)| least) {
+            best = Some((score, (p, q)));
+        }
+    }
+    best.map_or(1, |(_, (p, q))| {
+        // One frame rounded down: q / (p * tick) = den * q / (num * p).
+        let ticks = u128::from(den) * u128::from(q) / (u128::from(num) * u128::from(p));
+        i64::try_from(ticks).unwrap_or(i64::MAX)
+    })
+}
+
+/// The packets [`Shown`] keeps the presentation times of: those of a start
+/// hold, its times and the packets a B picture adds, with room to spare.
+const SHOWN_CAP: usize = 128;
+
+/// The estimate of an H.264 stream in length-prefixed (Matroska) framing
+/// whose packets carry presentation times only, without durations or VUI
+/// timing (probes p86, p96-p98; `h264-nodur-mkv`).
+///
+/// The packets up to the first picture output give no time. From the next
+/// packet on, the estimate takes the presentation times of 21 or 41 packets
+/// ([`taken`]), in presentation order among the packets read by then. A first
+/// B picture among those packets makes the estimate wait one packet more when
+/// it is in order and two when it is displaced; a first B picture before them
+/// (in the start hold) adds none, and later B pictures add none (probes p97,
+/// p98: B pictures at index 8 to 47, one or two at once). Until the estimate
+/// is settled each frame lasts 0 when a tick of the time base is 1/1000 s or
+/// shorter and one tick otherwise (probe p96: TimestampScale 1000000 ns gives
+/// 0, 1000001 ns 1), and at least one picture waits in the buffer (probes p96,
+/// p97: a B picture one below the last at index 21 to 27, or 47 at the coarser
+/// time base, is kept).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Shown {
+    pts: [i64; SHOWN_CAP],
+    len: usize,
+    /// Pictures seen.
+    seen: u32,
+    /// The first packet whose time counts: the one after the first picture
+    /// output.
+    start: Option<u32>,
+    /// The packets the first B picture adds, once it has come.
+    lag: Option<u32>,
+    wanted: u32,
+    /// The duration of a frame before the estimate is settled.
+    early: i64,
+    /// The estimate, once settled.
+    settled: Option<i64>,
+}
+
+impl Shown {
+    pub(super) fn new(time_base: (u32, u32)) -> Self {
+        let fine = u64::from(time_base.0) * 1000 <= u64::from(time_base.1);
+        Self {
+            pts: [0; SHOWN_CAP],
+            len: 0,
+            seen: 0,
+            start: None,
+            lag: None,
+            wanted: taken(time_base) as u32,
+            early: i64::from(!fine),
+            settled: None,
+        }
+    }
+
+    /// The duration of the next picture's frame while the estimate is not
+    /// settled.
+    pub(super) fn early(&self) -> Option<i64> {
+        self.settled.is_none().then_some(self.early)
+    }
+
+    /// Takes the next picture: its presentation time, and for a B picture
+    /// whether it is displaced (below a recent picture).
+    pub(super) fn picture(&mut self, pts: Option<i64>, b_displaced: Option<bool>) {
+        let index = self.seen;
+        self.seen = self.seen.saturating_add(1);
+        if self.settled.is_some() {
+            return;
+        }
+        if let Some(pts) = pts
+            && self.len < SHOWN_CAP
         {
-            return i64::try_from(divisor).unwrap_or(i64::MAX);
+            self.pts[self.len] = pts;
+            self.len += 1;
         }
-        let tick = num as f64 / den as f64;
-        // Times too far apart for a step leave no candidate out.
-        let mean_rate = last
-            .checked_sub(first)
-            .map_or(0.0, |span| (times.len() - 1) as f64 / (span as f64 * tick));
-        // The fitted times in seconds, as each candidate scales them.
-        let mut seconds = [0.0; TAKEN];
-        for (s, &t) in seconds.iter_mut().zip(&times[FIT_FROM..]) {
-            *s = t as f64 * tick;
+        if let Some(displaced) = b_displaced
+            && self.lag.is_none()
+        {
+            self.lag = Some(match self.start {
+                Some(start) if index >= start => 1 + u32::from(displaced),
+                _ => 0,
+            });
         }
-        let seconds = &seconds[..times.len() - FIT_FROM];
-        let mut best: Option<(f64, (u32, u32))> = None;
-        for (p, q) in candidates() {
-            let rate = f64::from(p) / f64::from(q);
-            if rate < SLOWEST * mean_rate {
-                continue;
-            }
-            let score = score(seconds, rate);
-            if score < best.map_or(CLOSE, |(least, _)| least) {
-                best = Some((score, (p, q)));
-            }
+    }
+
+    /// A picture was output: the first starts the times.
+    pub(super) fn output(&mut self) {
+        if self.start.is_none() {
+            self.start = Some(self.seen);
         }
-        best.map_or(1, |(_, (p, q))| {
-            // One frame rounded down: q / (p * tick) = den * q / (num * p).
-            let ticks = u128::from(den) * u128::from(q) / (u128::from(num) * u128::from(p));
-            i64::try_from(ticks).unwrap_or(i64::MAX)
-        })
+    }
+
+    /// Whether the estimate settles at the picture last taken.
+    fn settles(&self) -> bool {
+        let Some(start) = self.start else {
+            return self.len == SHOWN_CAP;
+        };
+        let last = start
+            .saturating_add(self.wanted - 1)
+            .saturating_add(self.lag.unwrap_or(0));
+        self.seen > last || self.len == SHOWN_CAP
+    }
+
+    /// Whether a picture still has to wait in the buffer: the estimate is
+    /// not settled by the picture last taken.
+    pub(super) fn waits(&self) -> bool {
+        self.settled.is_none() && !self.settles()
+    }
+
+    /// Settles the estimate when the picture last taken completes it.
+    pub(super) fn settle(&mut self, time_base: (u32, u32)) {
+        if self.settled.is_some() || !self.settles() {
+            return;
+        }
+        let times = &mut self.pts[..self.len];
+        times.sort_unstable();
+        let from = self
+            .start
+            .map_or(times.len(), |s| (s as usize).min(times.len()));
+        let to = (from + self.wanted as usize).min(times.len());
+        self.settled = Some(estimate(&times[from..to], time_base));
+    }
+
+    /// The estimate, once settled.
+    pub(super) fn duration(&self) -> Option<i64> {
+        self.settled
     }
 }
 
@@ -218,14 +359,14 @@ fn gcd(mut a: u64, mut b: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{RateEstimate, TAKEN};
+    use super::{LOOK_BYTES, RateEstimate, Shown, TAKEN_FINE as TAKEN};
 
     const TB: (u32, u32) = (1, 90_000);
 
     fn estimate(times: impl IntoIterator<Item = i64>) -> i64 {
-        let mut e = RateEstimate::default();
+        let mut e = RateEstimate::new(TB);
         for t in times {
-            e.packet(Some(t), true, false);
+            e.packet(100, Some(t));
         }
         e.duration(TB)
     }
@@ -306,9 +447,9 @@ mod tests {
 
     #[test]
     fn the_end_of_the_stream_settles_the_estimate() {
-        let mut e = RateEstimate::default();
+        let mut e = RateEstimate::new(TB);
         for t in [90_000, 93_003] {
-            e.packet(Some(t), true, false);
+            e.packet(100, Some(t));
         }
         assert!(!e.settled());
         e.end();
@@ -317,39 +458,121 @@ mod tests {
     }
 
     #[test]
-    fn the_estimate_settles_after_its_look_ahead() {
-        // Probe p93b: the reference also finds times after 4096 untimed
-        // packets; the estimate stops looking there, with what it has.
-        let mut e = RateEstimate::default();
-        for _ in 1..super::LOOK_AHEAD {
-            e.packet(None, false, false);
+    fn times_count_from_packets_starting_below_five_million_bytes() {
+        // Probes p100c, p100d: after 4,996 untimed units of 1000 bytes and
+        // one of 2999 (4,997,999 bytes), the third timed unit starts at
+        // 4,999,999 and counts; after 4,998,000 bytes it starts at 5,000,000
+        // and does not, which leaves two times: one tick.
+        for (untimed, expected) in [(4_997_999u64, 3003), (4_998_000, 1)] {
+            let mut e = RateEstimate::new(TB);
+            e.packet(usize::try_from(untimed).unwrap(), None);
+            for n in 0..60 {
+                e.packet(1000, Some(90_000 + 3003 * n));
+            }
+            assert!(e.settled());
+            assert_eq!(e.duration(TB), expected, "{untimed}");
         }
+        let mut e = RateEstimate::new(TB);
+        e.packet(usize::try_from(LOOK_BYTES - 1).unwrap(), None);
         assert!(!e.settled());
-        e.packet(None, false, false);
+        e.packet(1, None);
         assert!(e.settled());
-        assert_eq!(e.duration(TB), 1);
     }
 
     #[test]
-    fn packets_without_a_time_are_passed_over() {
-        // Probes p81, p84: packets 2 to 6 go without a time after an order
-        // count jump at packet 1; a DTS other than the PTS keeps them.
-        let mut e = RateEstimate::default();
-        for n in 0..30 {
-            e.packet(Some(n), false, false);
-            if n == 1 {
-                e.untime_through(6);
-            }
+    fn a_time_base_coarser_than_a_two_thousandth_takes_41_times() {
+        // Probes p96, p98: TimestampScale 500000 ns takes 21 times, 500001 ns
+        // 41; at 1 ms, 41 steps of 40 with one of 20 at the 30th.
+        let times = |n: i64| 1000 + 40 * n - if n >= 30 { 20 } else { 0 };
+        let mut e = RateEstimate::new((1, 1000));
+        let mut fine = RateEstimate::new((1, 2000));
+        for n in 0..60 {
+            e.packet(100, Some(times(n)));
+            fine.packet(100, Some(times(n)));
         }
-        assert!(e.settled());
-        assert_eq!(&e.times[..4], &[0, 1, 7, 8]);
-        let mut e = RateEstimate::default();
-        for n in 0..30 {
-            e.packet(Some(n), true, false);
-            if n == 1 {
-                e.untime_through(6);
+        assert_eq!(e.duration((1, 1000)), 20);
+        assert_eq!(fine.duration((1, 2000)), 40);
+    }
+
+    /// The durations the [`Shown`] estimate gives pictures with the given
+    /// presentation times, the first output at `first_output`, and B
+    /// pictures (index, displaced).
+    fn shown(
+        time_base: (u32, u32),
+        pts: &[i64],
+        first_output: u32,
+        bs: &[(u32, bool)],
+    ) -> Vec<i64> {
+        let mut s = Shown::new(time_base);
+        let mut out = Vec::new();
+        for (n, &t) in (0u32..).zip(pts) {
+            let early = s.early();
+            let b = bs.iter().find(|&&(at, _)| at == n).map(|&(_, d)| d);
+            s.picture(Some(t), b);
+            if n >= first_output {
+                s.output();
             }
+            s.settle(time_base);
+            out.push(early.or(s.duration()).unwrap());
         }
-        assert_eq!(&e.times[..4], &[0, 1, 2, 3]);
+        out
+    }
+
+    #[test]
+    fn presentation_times_count_from_the_first_output_on() {
+        // Probes p96, p98 (25 fps, first output at index 6): 28 frames of 0
+        // at 0.1 ms, 48 at 1 ms; one tick of 1.000001 ms or more lasts 1
+        // until then.
+        let pts = |tick_ns: i64| {
+            (0..90)
+                .map(move |n| (1_000_000_000 + n * 40_000_000) / tick_ns)
+                .collect::<Vec<_>>()
+        };
+        let lead = |d: &[i64]| d.iter().take_while(|&&x| x == d[0]).count();
+        let fine = shown((1, 10_000), &pts(100_000), 6, &[]);
+        assert_eq!((lead(&fine), fine[0], fine[89]), (28, 0, 400));
+        let coarse = shown((1, 1000), &pts(1_000_000), 6, &[]);
+        assert_eq!((lead(&coarse), coarse[0], coarse[89]), (48, 0, 40));
+        let one = shown((1, 500), &pts(2_000_000), 6, &[]);
+        assert_eq!((lead(&one), one[0], one[89]), (48, 1, 20));
+        // Probe p97: a first B picture at 10 adds one packet in order, two
+        // displaced; probe p98: a second adds none.
+        assert_eq!(
+            lead(&shown((1, 10_000), &pts(100_000), 6, &[(10, false)])),
+            29
+        );
+        assert_eq!(
+            lead(&shown((1, 10_000), &pts(100_000), 6, &[(10, true)])),
+            30
+        );
+        assert_eq!(
+            lead(&shown(
+                (1, 10_000),
+                &pts(100_000),
+                6,
+                &[(10, false), (15, true)]
+            )),
+            29
+        );
+        // Probe p98: a B picture in the start hold adds none (first output at
+        // 8 after a B picture at 2: 30 frames).
+        assert_eq!(
+            lead(&shown((1, 10_000), &pts(100_000), 8, &[(2, true)])),
+            30
+        );
+    }
+
+    #[test]
+    fn presentation_times_are_taken_in_presentation_order() {
+        // Probe p97 (half): a B picture in order at 10 half a frame off enters
+        // the divisor (200); displaced one below at 10 it sorts before the
+        // fourth time and does not (400).
+        let mut pts: Vec<i64> = (0..90).map(|n| 10_000 + 400 * n).collect();
+        pts[10] = pts[9] + 200;
+        let lead = shown((1, 10_000), &pts, 6, &[(10, false)]);
+        assert_eq!(lead[89], 200);
+        let mut pts: Vec<i64> = (0..90).map(|n| 10_000 + 400 * n).collect();
+        pts[10] = pts[9] - 200;
+        assert_eq!(shown((1, 10_000), &pts, 6, &[(10, true)])[89], 400);
     }
 }

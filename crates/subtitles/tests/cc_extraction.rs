@@ -606,6 +606,112 @@ fn h264_durations_without_vui_timing_fit_a_frame_rate() {
     );
 }
 
+/// The durations of 300 H.264 pictures without VUI timing or bitstream
+/// restriction: P frames with order counts 2 apart (4 from the frame before
+/// at the indices in `jumps`), and at the indices in `bs` a non-reference B
+/// picture that many P frames below the last; `framing` and `time` (the
+/// PTS of a decode index and order count) as given.
+fn durations(
+    bs: &[(u32, u32)],
+    jumps: &[u32],
+    framing: Framing,
+    time: impl Fn(i64, u32) -> i64,
+) -> Vec<Option<i64>> {
+    let sps = AvcSps {
+        reorder: None,
+        timing: None,
+        ..AvcSps::default()
+    };
+    let (mut pocs, mut frame_num, mut units) = (vec![0u32], 0u32, Vec::new());
+    for n in 0..300u32 {
+        let slice = if n == 0 {
+            AvcSlice {
+                idr: true,
+                reference: true,
+                slice_type: 2,
+                ..AvcSlice::default()
+            }
+        } else if let Some(&(_, below)) = bs.iter().find(|&&(at, _)| at == n) {
+            let last = pocs[pocs.len() - below as usize];
+            AvcSlice {
+                slice_type: 1,
+                frame_num: (frame_num + 1) % 16,
+                poc_lsb: if below == 0 { last + 1 } else { last - 1 } % 256,
+                ..AvcSlice::default()
+            }
+        } else {
+            frame_num += 1;
+            let poc = pocs[pocs.len() - 1] + if jumps.contains(&n) { 4 } else { 2 };
+            pocs.push(poc);
+            AvcSlice {
+                reference: true,
+                frame_num: frame_num % 16,
+                poc_lsb: poc % 256,
+                ..AvcSlice::default()
+            }
+        };
+        let nals = avc_nals((n == 0).then_some(&sps), n as u8, &slice, 0);
+        let data = match framing {
+            Framing::StartCodes => nals
+                .iter()
+                .flat_map(|nal| [&[0, 0, 0, 1][..], nal].concat())
+                .collect(),
+            Framing::Lengths(_) => length_prefixed(&nals),
+        };
+        units.push((data, time(i64::from(n), slice.poc_lsb)));
+    }
+    let packets = units.iter().map(|(data, pts)| VideoPacket {
+        data,
+        pts: Some(*pts),
+        dts: None,
+        duration: None,
+    });
+    let frames = extract(VideoCoding::Nal(Codec::H264, framing), packets);
+    frames.iter().map(|f| f.1).collect()
+}
+
+#[test]
+fn h264_pts_only_packets_give_no_time_while_the_start_hold_waits() {
+    // Cases h264-rate-pts-b-ts and h264-rate-pts-run-ts (probe p99): 29.97
+    // fps, a tick added on odd packets, one packet moved half a frame. A B
+    // picture one below at 2 raises the hold's depth to 1: packets 3 to 7
+    // give no time, so packet 4 moved leaves the estimate at 3003, packet 8
+    // moved does not. After a step at 1, packets 2 to 6 give none but for the
+    // B picture at 4, which gives its own time.
+    let at = |moved: i64| {
+        move |n: i64, _| {
+            90_000
+                + (2 * n * 90_000 * 1001 + 30_000) / 60_000
+                + n % 2
+                + if n == moved { 1501 } else { 0 }
+        }
+    };
+    let all = |d: Vec<Option<i64>>, want: i64| d.iter().all(|&x| x == Some(want));
+    let start = Framing::StartCodes;
+    assert!(all(durations(&[(2, 1)], &[], start, at(4)), 3003));
+    assert!(!all(durations(&[(2, 1)], &[], start, at(8)), 3003));
+    assert!(all(durations(&[(4, 1)], &[1], start, at(6)), 3003));
+    assert!(!all(durations(&[(4, 1)], &[1], start, at(4)), 3003));
+}
+
+#[test]
+fn h264_matroska_frames_last_0_until_the_presentation_times_settle() {
+    // Cases h264-nodur-mkv and h264-nodur-fine-mkv (probes p96, p97):
+    // length-prefixed packets with presentation times only. The first
+    // picture leaves at index 6; at 0.1 ms per tick the estimate takes the
+    // 21 times after it, a first B picture displaced at 10 waits two packets
+    // more: 30 frames last 0, the rest one frame of 25 fps (the B picture,
+    // half a frame off, sorts before the fourth time and leaves the divisor).
+    let shown = |_, poc: u32| 10_000 + i64::from(poc) * 200;
+    let d = durations(&[(10, 1)], &[], Framing::Lengths(4), shown);
+    let lead = d.iter().take_while(|&&x| x == Some(0)).count();
+    assert_eq!((lead, d[lead]), (30, Some(400)));
+    // Without B pictures, 28 frames last 0.
+    let plain = durations(&[], &[], Framing::Lengths(4), shown);
+    assert_eq!(plain.iter().take_while(|&&x| x == Some(0)).count(), 28);
+    assert!(plain[28..].iter().all(|&x| x == Some(400)));
+}
+
 #[test]
 fn h264_sequences_reordering_more_than_16_frames_are_not_taken() {
     // The reference takes a bitstream restriction's max_num_reorder_frames
