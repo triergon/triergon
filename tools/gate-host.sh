@@ -106,7 +106,7 @@ prepare() {
     done
     for command in "fonts prepare --jobs 8" "shape prepare --jobs 8" "ass prepare --jobs 8" \
         fixtures fetch-vectors "fonts fetch" "fonts manifest" "shape manifest" "raster manifest" \
-        "ass manifest" "framing fixtures" build-workers; do
+        "ass manifest" "framing fixtures" "build-workers --all-references"; do
         step "$command" inside "cargo xtask $command"
     done
     log PREPARED
@@ -148,7 +148,7 @@ run() {
     [ ! -e /sys/module/triergon_rss_bound ] || sudo rmmod triergon_rss_bound
     step "timing $shard" inside "cargo xtask gate run --stage timing --shard $shard --output $out $full" || true
     step prove prove "$review" "$proof"
-    step build-workers-kernel inside "TRIERGON_RSS_KERNEL_PROOF=$proof/RSS-PROOF.json cargo xtask build-workers"
+    step build-workers-kernel inside "TRIERGON_RSS_KERNEL_PROOF=$proof/RSS-PROOF.json cargo xtask build-workers --all-references"
     step preflight-kernel inside "cargo xtask gate preflight --shard $shard --review $review --kernel"
     step "memory $shard" inside "cargo xtask gate run --stage memory --shard $shard --output $out $full" || true
     sudo rmmod triergon_rss_bound
