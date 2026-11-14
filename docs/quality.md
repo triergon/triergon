@@ -615,7 +615,11 @@ Collected serially and in parallel under the kernel bound with 30 pairs at `a92f
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
 no case's median total RSS by more than one page on AArch64 or ten pages on ARMv7,
-both inside the serial collection's own spread, and grades every case the same.
+both inside the serial collection's own spread, and grades every case the same. With
+each slot pinned to its CPU, at `8607afdd` on AArch64 and `247e8560` on ARMv7 (evidence
+set `gate-parallel-memory-matroska-head`), the same comparison gives the same result:
+heaps identical, medians within one page on AArch64 and twelve on ARMv7, verdicts
+unchanged.
 
 #### Reuse
 
