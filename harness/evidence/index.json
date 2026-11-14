@@ -20372,6 +20372,18 @@
      "status": 0
     }
    ]
+  },
+  {
+   "name": "gate-run-validation-74f466ae",
+   "path": "gate-run-validation-74f466ae",
+   "retention": "retained",
+   "reason": "Sharded gate runs at 74f466ae from the images built at 98369886 on c6g.4xlarge hosts, ARMv7 on 10 hosts and Linux AArch64 on 6: each shard's run log, host log, plan, build identities, step records and step logs, the ARMv7 run summary, and the wall time of every shard; for the gate tooling's wall times and shard balance only",
+   "key": "evidence/gate-run-validation-74f466ae/9d27775a1bceddc4f15f74ccff79d2bd01462646c1883f92f5a92030c8561493.tar.zst",
+   "sha256": "9d27775a1bceddc4f15f74ccff79d2bd01462646c1883f92f5a92030c8561493",
+   "bytes": 633551,
+   "source_revisions": {
+    "candidate": "74f466ae08398d329a9a9484c1d220499c738245"
+   }
   }
  ]
 }
