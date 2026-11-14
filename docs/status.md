@@ -13,6 +13,11 @@ terminal-media matrix against the FFmpeg 9.0.2 release; fonts against FreeType 2
 shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17;
 rasterising, ASS parsing and ASS rendering against libass 0.17.5
 ([reference pins](quality.md#reference-and-corpus)).
+Every runtime and memory figure below was measured with workers and references linked as
+their toolchains link them, before the [link policy](quality.md#measuring-performance)
+that links the runtime support libraries of both sides from their static archives. The policy
+changes every worker and reference binary, so each row cites its earlier measurement
+until it is measured again under the policy.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -523,7 +528,7 @@ Qualification runs on native AArch64 Linux and, where the next section says so, 
 ### 32-bit ARMv7
 
 The gate build for `thumbv7neon-unknown-linux-gnueabihf` (Rust 1.99.1, default flags:
-Thumb-2, assuming NEON) at `3df7ae6d`, with every FFmpeg, FreeType, HarfBuzz, FriBidi and
+Thumb-2, assuming NEON; linked before the link policy) at `3df7ae6d`, with every FFmpeg, FreeType, HarfBuzz, FriBidi and
 libass reference built from the same pins in the same user space (Thumb-2, the armhf
 compiler's default; FFmpeg selects NEON at run time). The Ubuntu 24.04 armhf user space
 archived as `armv7-userland` ([how to repeat it](quality.md#32-bit-armv7)), with the 15

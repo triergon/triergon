@@ -482,3 +482,17 @@ composites) are
 The comparison establishes agreement with FreeType on that corpus, not conformance
 with the OpenType specification. Face matching is checked by unit tests and
 through the renderer's comparison with libass (`ass-render`).
+
+## Licence
+
+MIT or Apache-2.0, at your option, with FreeType 2.15.0's FreeType License,
+HarfBuzz 14.6.0's "Old MIT" licence and libass 0.17.5's ISC licence for the modules
+derived from them: most of the CFF hinter and the auto-hinter, the fixed-point
+arithmetic, synthetic styles and glyph-name tables are translated from or generated
+from FreeType, and face matching and the text charmap follow libass. `LICENSE`
+holds all the notices, and [docs/provenance.md](../../docs/provenance.md#triergon-font)
+lists the modules. Software that includes this crate credits FreeType in its
+documentation:
+
+> Portions of this software are copyright © 2026 The FreeType Project
+> (<https://freetype.org>). All rights reserved.
