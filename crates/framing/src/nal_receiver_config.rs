@@ -4,8 +4,8 @@ use crate::avc_config::profile_extension_required;
 use crate::nal_packet::NalConfigurationRefusal;
 use crate::{
     AvcConfigArray, AvcConfigFields, AvcConfigLimits, AvcConfigNal, AvcConfigParser,
-    AvcConfigSource, AvcConfiguration, BuildStep, HvcConfigArray, HvcConfigFields, HvcConfigLimits,
-    HvcConfigNal, HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
+    AvcConfigSource, AvcConfiguration, BuildStep, ConfigProgress, HvcConfigArray, HvcConfigFields,
+    HvcConfigLimits, HvcConfigNal, HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
@@ -217,22 +217,39 @@ impl ReceiverAvcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
-        let result = self.inner.step(work, cancel);
-        match result {
-            Ok(BuildStep::Ready(inner)) => {
-                let config = ReceiverAvcConfiguration::from_record(inner);
-                self.refusal = config.refusal();
-                Ok(BuildStep::Ready(config))
-            }
-            Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
-            Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
-            Err(error) => {
-                if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                    self.failure = Some(error);
-                }
-                Err(error)
-            }
+        let mut ready = None;
+        match self.step_into(work, cancel, &mut ready)? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(
+                ready.ok_or(Error::Invalid("missing published configuration"))?,
+            )),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
         }
+    }
+
+    /// Publishes into an empty caller-provided slot. Occupied slots are rejected
+    /// before any state, work or retained storage changes, including update rejections.
+    /// Yield, completion and errors leave an initially empty slot empty.
+    pub fn step_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<ReceiverAvcConfiguration>,
+    ) -> Result<ConfigProgress> {
+        if ready.is_some() {
+            return Err(Error::Invalid("configuration output sink occupied"));
+        }
+        let result = self.inner.step_into_with(work, cancel, ready, |inner| {
+            let record = ReceiverAvcConfiguration::from_record(inner);
+            self.refusal = record.refusal();
+            record
+        });
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(error);
+        }
+        result
     }
     pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
         // A complete AVC record requires the six-byte prefix and a PPS count.
@@ -274,10 +291,28 @@ impl ReceiverHevcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverHevcConfiguration>> {
-        match self.inner.step(work, cancel)? {
-            BuildStep::Ready(inner) => Ok(BuildStep::Ready(ReceiverHevcConfiguration { inner })),
-            BuildStep::Yield => Ok(BuildStep::Yield),
-            BuildStep::Complete => Ok(BuildStep::Complete),
+        let mut ready = None;
+        match self.step_into(work, cancel, &mut ready)? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(
+                ready.ok_or(Error::Invalid("missing published configuration"))?,
+            )),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
         }
+    }
+
+    /// Publishes into an empty caller-provided slot. Occupied slots are rejected
+    /// before any state, work or retained storage changes. Yield, completion and errors
+    /// leave an initially empty slot empty.
+    pub fn step_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<ReceiverHevcConfiguration>,
+    ) -> Result<ConfigProgress> {
+        self.inner
+            .step_into_with(work, cancel, ready, |inner| ReceiverHevcConfiguration {
+                inner,
+            })
     }
 }
