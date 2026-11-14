@@ -634,42 +634,65 @@ fn mp4_range_expected((packets, bytes, digest): (u32, u32, u64)) -> Value {
     ])
 }
 
-fn mp4_range_fate_cases(root: &Path) -> Result<[Value; 2], String> {
-    const FILE: &str = "mov/mp4-init-nonkeyframe.mp4";
+fn mp4_range_fate_cases(root: &Path) -> Result<Vec<Value>, String> {
     let registry = crate::checks::read_json(&root.join("harness/fate/samples.json"))?;
-    let path = format!("fate/{FILE}");
-    let sha256 = registry
+    let samples = registry
         .get("samples")
         .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .find(|sample| sample.get("path").and_then(Value::as_str) == Some(&path))
-        .and_then(|sample| sample.get("sha256").and_then(Value::as_str))
-        .ok_or("missing FATE non-sync prefix input hash")?;
-    let case = |id, target, expected| {
-        Value::object([
-            ("id", Value::str(id)),
-            ("profile", Value::str(id)),
-            ("file", Value::str(FILE)),
-            ("sha256", Value::str(sha256)),
-            ("rights", Value::str("fetched-not-redistributed")),
-            ("source", Value::str(format!("fate-suite/{FILE}"))),
-            ("arguments", Value::strings(target)),
-            ("expected", mp4_range_expected(expected)),
-        ])
-    };
-    Ok([
-        case(
-            "fate-non-sync-prefix-open",
-            None,
-            (293, 1158487, 4548821196215711946),
+        .ok_or("missing FATE sample registry")?;
+    let mut cases = Vec::new();
+    for (file, operations) in [
+        (
+            "mov/mp4-init-nonkeyframe.mp4",
+            [
+                (
+                    "fate-non-sync-prefix-open",
+                    None,
+                    (293, 1_158_487, 4_548_821_196_215_711_946),
+                ),
+                (
+                    "fate-non-sync-prefix-seek",
+                    Some("91091"),
+                    (72, 317_984, 3_463_143_097_373_344_921),
+                ),
+            ],
         ),
-        case(
-            "fate-non-sync-prefix-seek",
-            Some("91091"),
-            (72, 317984, 3463143097373344921),
+        (
+            "mov/mov_stream_shorter_than_movie.mov",
+            [
+                (
+                    "fate-shorter-track-open",
+                    None,
+                    (97, 74_078, 17_037_965_405_558_180_766),
+                ),
+                (
+                    "fate-shorter-track-seek",
+                    Some("9216"),
+                    (97, 74_078, 17_037_965_405_558_180_766),
+                ),
+            ],
         ),
-    ])
+    ] {
+        let path = format!("fate/{file}");
+        let sha256 = samples
+            .iter()
+            .find(|sample| sample.get("path").and_then(Value::as_str) == Some(&path))
+            .and_then(|sample| sample.get("sha256").and_then(Value::as_str))
+            .ok_or_else(|| format!("missing FATE sample hash for {file}"))?;
+        for (id, target, expected) in operations {
+            cases.push(Value::object([
+                ("id", Value::str(id)),
+                ("profile", Value::str(id)),
+                ("file", Value::str(file)),
+                ("sha256", Value::str(sha256)),
+                ("rights", Value::str("fetched-not-redistributed")),
+                ("source", Value::str(format!("fate-suite/{file}"))),
+                ("arguments", Value::strings(target)),
+                ("expected", mp4_range_expected(expected)),
+            ]));
+        }
+    }
+    Ok(cases)
 }
 
 fn mp4_range_entries(paths: &Paths, output: &Path) -> Result<Vec<Value>, String> {

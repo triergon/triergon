@@ -21,6 +21,7 @@
     "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
     "compare startup and backward seek at the first sync sample in a regular AVC/AAC file with an initial non-sync sequence and reordered packets outside its presentation edit",
     "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame",
+    "compare startup and backward seek at three quarters of a second on the upstream QuickTime sample with a track shorter than the movie",
     "compare open-ended fragment edits, startup trim with unequal media and sample clocks, and backward seeks on both sides of a sync boundary",
     "compare fragmented AVC/AAC with timed text and DVD subpictures through EOF, including non-sync text samples at fragment boundaries and a leading empty subpicture edit",
     "compare the full suffix of the subtitle files after video seeks at the start, during a cue and after it ends",
@@ -80,7 +81,9 @@
     "fragmented-subtitle-edit-seek-during-cue",
     "fragmented-subtitle-edit-seek-after-cue",
     "fate-non-sync-prefix-open",
-    "fate-non-sync-prefix-seek"
+    "fate-non-sync-prefix-seek",
+    "fate-shorter-track-open",
+    "fate-shorter-track-seek"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

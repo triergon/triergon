@@ -731,6 +731,36 @@
         "bytes": 317984,
         "digest": 3463143097373344921
       }
+    },
+    {
+      "id": "fate-shorter-track-open",
+      "profile": "fate-shorter-track-open",
+      "file": "mov/mov_stream_shorter_than_movie.mov",
+      "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/mov/mov_stream_shorter_than_movie.mov",
+      "arguments": [],
+      "expected": {
+        "packets": 97,
+        "bytes": 74078,
+        "digest": 17037965405558180766
+      }
+    },
+    {
+      "id": "fate-shorter-track-seek",
+      "profile": "fate-shorter-track-seek",
+      "file": "mov/mov_stream_shorter_than_movie.mov",
+      "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/mov/mov_stream_shorter_than_movie.mov",
+      "arguments": [
+        "9216"
+      ],
+      "expected": {
+        "packets": 97,
+        "bytes": 74078,
+        "digest": 17037965405558180766
+      }
     }
   ]
 }
