@@ -11,9 +11,7 @@ use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
-};
+use triergon_core::{BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
 
 /// Outcome of one phase step.
 type Step = ControlFlow<NalPacketProgress>;

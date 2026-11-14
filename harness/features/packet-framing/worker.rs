@@ -1,6 +1,4 @@
 //! Packet-framing worker entry point. Enable the framing `reference-trace` feature.
-//!
-//! A binary calls `main` with its arguments excluding the executable name.
 #![forbid(unsafe_code)]
 
 #[path = "worker_model.rs"]
@@ -9,6 +7,8 @@ mod model;
 mod operation;
 
 use model::{Case, Outcome};
+use std::env::ArgsOs;
+use std::ffi::OsStr;
 use std::io::{self, Read, Write};
 use std::time::Instant;
 
@@ -31,43 +31,63 @@ fn execute(case: &Case, iterations: u32) -> triergon_core::Result<Outcome> {
 }
 
 /// `nal-fold FILE`, `nal-bench FILE ITERATIONS`, `nal-memory FILE`, or `identity -`.
-pub fn main(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
-    if matches!(args, [mode] | [mode, _] if mode == "identity") {
-        println!("{{\"operation\":\"NalPacketWholeFoldV1\",\"implementation\":\"safe-rust\"}}");
+pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
+    args.next();
+    let mode = args.next();
+    let mode = mode
+        .as_deref()
+        .and_then(OsStr::to_str)
+        .ok_or("mode required")?;
+    let mut output = io::stdout().lock();
+    if mode == "identity" && args.len() <= 1 {
+        output.write_all(
+            b"{\"operation\":\"NalPacketWholeFoldV1\",\"implementation\":\"safe-rust\"}\n",
+        )?;
         return Ok(());
     }
-    let mode = args.first().ok_or("mode required")?;
     let timing = mode == "nal-bench";
     let memory = mode == "nal-memory";
     if (!timing && !memory && mode != "nal-fold" && mode != "nal-check")
-        || args.len() != if timing { 3 } else { 2 }
+        || args.len() != if timing { 2 } else { 1 }
     {
         return Err("expected nal-fold FILE, nal-bench FILE ITERATIONS, or nal-memory FILE".into());
     }
-    let iterations = if timing { args[2].parse::<u32>()? } else { 1 };
+    let path = args.next().ok_or("file required")?;
+    let iterations = if timing {
+        let count = args.next().ok_or("iteration count required")?;
+        count
+            .to_str()
+            .ok_or("invalid iteration count")?
+            .parse::<u32>()?
+    } else {
+        1
+    };
     if !(1..=1_000_000).contains(&iterations) {
         return Err("iterations must be 1..1000000".into());
     }
-    let mut data = Vec::new();
-    std::fs::File::open(&args[1])?
-        .take(16 * 1024 * 1024 + 1)
-        .read_to_end(&mut data)?;
-    let case = Case::parse(&data)?;
+    let case = {
+        let mut data = Vec::new();
+        std::fs::File::open(path)?
+            .take(16 * 1024 * 1024 + 1)
+            .read_to_end(&mut data)?;
+        Case::parse(&data)?
+    };
     if memory {
-        println!("TRIERGON_BEGIN_V1");
-        io::stdout().flush()?;
+        output.write_all(b"TRIERGON_BEGIN_V1\n")?;
+        output.flush()?;
     }
     let start = timing.then(Instant::now);
     let total = execute(&case, iterations)?;
     let elapsed = start.map_or(0, |start| start.elapsed().as_nanos());
     if memory {
-        println!("TRIERGON_END_V1");
-        io::stdout().flush()?;
+        output.write_all(b"TRIERGON_END_V1\n")?;
+        output.flush()?;
     }
-    println!(
+    writeln!(
+        output,
         "{{\"schema\":1,\"operation\":\"NalPacketWholeFoldV1\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"digest_b\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
         total.packets, total.bytes, total.digest.0, total.digest.1
-    );
+    )?;
     Ok(())
 }
 
