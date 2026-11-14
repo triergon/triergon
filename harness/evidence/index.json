@@ -20596,6 +20596,24 @@
      "report_sha256": "d5ea6ae60c237a9075446dd643ca1051c75db869f6a768d2f67ca617c15cd212"
     }
    ]
+  },
+  {
+   "name": "framing-parameter-set-cursor-cc56c7d0",
+   "path": "framing-parameter-set-cursor-cc56c7d0",
+   "retention": "retained",
+   "reason": "Full AArch64 timing of local parameter-set insertion and a clean-cache run of the upstream framing vectors.",
+   "key": "evidence/framing-parameter-set-cursor-cc56c7d0/4bce8281a0b8202d58dd07e09b247e99a5fbd0600ad287074fc9c1885004c766.tar.gz",
+   "sha256": "4bce8281a0b8202d58dd07e09b247e99a5fbd0600ad287074fc9c1885004c766",
+   "bytes": 322285088,
+   "results": [
+    {
+     "path": "aarch64/results/candidate/reference-screen/packet-framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "029cf4ea517c66c53a3fd2796ae264ad4253a23bface0affb04c94abe32ff565",
+     "status": 0,
+     "report_sha256": "01ecc08e2a0a8313c52f153322b191f503934741d74a533f5c62d32ee873c4c7"
+    }
+   ]
   }
  ]
 }
