@@ -1384,9 +1384,41 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
 const MAX_SLOTS: usize = 32;
 
 /// One of the CPUs this process may use. A slot measures one case at a time,
-/// from its own copies of the workers; only [`collect_all`] makes one.
+/// from its own copies of the workers, on its own CPU; only [`collect_all`]
+/// makes one.
 pub(crate) struct Slot {
     index: usize,
+    /// The CPU the slot's thread, and so every worker it starts, is pinned to,
+    /// where the system lists the CPUs this process may use.
+    cpu: Option<usize>,
+}
+
+impl Slot {
+    /// Pin the calling thread to the slot's CPU, so the workers it starts inherit
+    /// that CPU alone (`taskset -p` on the thread's own id).
+    fn pin(&self) -> R<()> {
+        let Some(cpu) = self.cpu else {
+            return Ok(());
+        };
+        let link =
+            fs::read_link("/proc/thread-self").map_err(|e| format!("/proc/thread-self: {e}"))?;
+        let thread = link
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or("unreadable thread id")?;
+        let status = std::process::Command::new("taskset")
+            .args(["-p", "-c", &cpu.to_string(), thread])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .map_err(|e| format!("taskset: {e}"))?;
+        if !status.success() {
+            return Err(format!(
+                "could not pin memory slot {} to CPU {cpu}: {status}",
+                self.index
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A collection, run in whichever slot is free.
@@ -1429,8 +1461,13 @@ pub(crate) fn collect_all(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
 
 fn run_in_slots(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
     let groups = shared_file_groups(&jobs);
-    let slots = std::thread::available_parallelism()
-        .map_or(1, std::num::NonZero::get)
+    let cpus = super::gate_build::allowed_cpu_list();
+    let slots = cpus
+        .as_ref()
+        .map_or_else(
+            || std::thread::available_parallelism().map_or(1, std::num::NonZero::get),
+            Vec::len,
+        )
         .min(MAX_SLOTS)
         .min(groups.len())
         .max(1);
@@ -1457,15 +1494,22 @@ fn run_in_slots(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
     let results: Mutex<Vec<Option<R<Value>>>> = Mutex::new((0..count).map(|_| None).collect());
     std::thread::scope(|scope| {
         for index in 0..slots {
-            let (queue, results) = (&queue, &results);
+            let (queue, results, cpus) = (&queue, &results, &cpus);
             scope.spawn(move || {
-                let slot = Slot { index };
-                while let Some(group) = queue.lock().ok().and_then(|mut q| q.pop_front()) {
+                let slot = Slot {
+                    index,
+                    cpu: cpus.as_ref().map(|cpus| cpus[index]),
+                };
+                let pinned = slot.pin();
+                loop {
+                    let next = queue.lock().expect("no memory slot panics").pop_front();
+                    let Some(group) = next else { break };
                     for (job, Job { collect, .. }) in group {
-                        let result = collect(&slot);
-                        if let Ok(mut results) = results.lock() {
-                            results[job] = Some(result);
-                        }
+                        let result = match &pinned {
+                            Ok(()) => collect(&slot),
+                            Err(error) => Err(error.clone()),
+                        };
+                        results.lock().expect("no memory slot panics")[job] = Some(result);
                     }
                 }
             });
@@ -1473,7 +1517,7 @@ fn run_in_slots(jobs: Vec<Job<'_>>) -> R<Vec<R<Value>>> {
     });
     results
         .into_inner()
-        .map_err(|_| "a memory slot panicked".to_owned())?
+        .expect("no memory slot panics")
         .into_iter()
         .map(|result| result.ok_or_else(|| "a memory collection did not run".to_owned()))
         .collect()
@@ -1935,7 +1979,10 @@ mod command_tests {
         let reference = root.join("longer-reference-name");
         fs::write(&candidate, b"candidate").unwrap();
         fs::write(&reference, b"reference").unwrap();
-        let slot = Slot { index: 0 };
+        let slot = Slot {
+            index: 0,
+            cpu: None,
+        };
         let paths = prepare_workers(&slot, &root, &candidate, &reference).unwrap();
         let first = paths.each_ref().map(|path| fs::File::open(path).unwrap());
         assert_eq!(paths[0].as_os_str().len(), paths[1].as_os_str().len());
@@ -1943,7 +1990,16 @@ mod command_tests {
             paths,
             prepare_workers(&slot, &root, &candidate, &reference).unwrap()
         );
-        let other = prepare_workers(&Slot { index: 11 }, &root, &candidate, &reference).unwrap();
+        let other = prepare_workers(
+            &Slot {
+                index: 11,
+                cpu: None,
+            },
+            &root,
+            &candidate,
+            &reference,
+        )
+        .unwrap();
         for (path, own) in other.iter().zip(&paths) {
             assert_ne!(path, own);
             assert_eq!(path.as_os_str().len(), own.as_os_str().len());
@@ -2010,6 +2066,15 @@ mod command_tests {
         let mut heavy = heaps.clone();
         heavy[0] = (4096.0, 4096.0);
         assert!(settled(&heavy[..10], &totals[..10], gate).is_none());
+    }
+
+    #[test]
+    fn slots_never_outnumber_the_kernel_sessions() {
+        let module = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../harness/rss-bound/triergon_rss_bound.c"),
+        )
+        .unwrap();
+        assert!(module.contains(&format!("#define MAX_SESSIONS {MAX_SLOTS}\n")));
     }
 
     #[test]

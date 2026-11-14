@@ -136,7 +136,7 @@ fn stem_width(
         } else if dist < 56 {
             dist = 56;
         }
-        if let Some(standard) = axis.widths().first() {
+        if let Some(standard) = axis.stems.widths().first() {
             if abs(dist - standard.cur) < 40 {
                 dist = standard.cur.max(48);
             } else if dist < 3 * 64 {
@@ -486,12 +486,12 @@ mod tests {
     fn axis(standard: Option<i64>, extra_light: bool) -> Axis {
         let mut axis = Axis::EMPTY;
         if let Some(cur) = standard {
-            axis.widths[0] = Width {
+            axis.stems.widths[0] = Width {
                 org: 0,
                 cur,
                 fit: cur,
             };
-            axis.width_count = 1;
+            axis.stems.count = 1;
         }
         axis.extra_light = extra_light;
         axis

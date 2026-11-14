@@ -92,7 +92,7 @@ commands:
   isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
   framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
-                 [--additional-report F] [--require-slice-acceptance|--require-acceptance]
+                 [--additional-report F] [--require-slice-acceptance|--require-acceptance] [--full]
                  join complete reports, recompute runtime and memory bounds, then apply gates
   preflight      [--feature ID]... [--corpus ID=DIR]... [--isobmff] [--codecs F]... [--review F]
                  [--kernel]
@@ -132,9 +132,10 @@ commands:
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
-  fonts          prepare|fetch|manifest|compare   the pinned FreeType reference, the font
-                 corpus and the font features' manifests; compare reports the required
-                 font features, --all every one (see `cargo xtask fonts --help`)
+  fonts          prepare|fetch|manifest|compare|assemble|probe   the pinned FreeType
+                 reference, the font corpus and the font features' manifests; compare
+                 reports the required font features, --all every one; probe compares
+                 assembled TrueType probe faces (see `cargo xtask fonts --help`)
   shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
                  HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
   raster         prepare|manifest|compare   triergon-raster against the pinned libass
