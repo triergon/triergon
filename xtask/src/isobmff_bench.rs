@@ -578,6 +578,20 @@ pub fn verify_inputs(root: &Path) -> R<String> {
     Ok(format!("{} cases", suite.cases.len()))
 }
 
+/// The suite's inputs as `verify_inputs` checks them: each path with its pinned
+/// SHA-256, once.
+pub fn inputs(root: &Path) -> R<Vec<(PathBuf, String)>> {
+    let suite = Suite::load(root)?;
+    let mut inputs: Vec<(PathBuf, String)> = suite
+        .cases
+        .iter()
+        .map(|case| (case.path(root), case.input_sha.clone()))
+        .collect();
+    inputs.sort();
+    inputs.dedup();
+    Ok(inputs)
+}
+
 fn verify_input(root: &Path, case: &Case) -> R<()> {
     let (_, actual) = provenance::file_identity(root, &case.path(root))?;
     let length = fs::metadata(case.path(root))

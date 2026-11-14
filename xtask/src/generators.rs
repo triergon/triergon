@@ -73,6 +73,20 @@ pub fn for_contract(contract: &Value) -> Option<&'static Generator> {
         .find(|generator| generator.candidate == candidate)
 }
 
+/// The manifest `COMMAND manifest` writes at `path` (its manifest directory's
+/// `<id>/corpus.json`), built as it builds it; none when no generator writes there.
+pub fn written(root: &Path, path: &Path) -> Option<R<Value>> {
+    GENERATORS.into_iter().find_map(|generator| {
+        let rest = path
+            .strip_prefix(root.join(generator.manifest_directory))
+            .ok()?;
+        let mut parts = rest.iter();
+        let id = parts.next()?.to_str()?;
+        (parts.next()? == "corpus.json" && parts.next().is_none())
+            .then(|| generator.manifest(root, id))
+    })
+}
+
 /// The generator for a `cargo xtask` command.
 pub fn named(command: &str) -> Option<&'static Generator> {
     GENERATORS

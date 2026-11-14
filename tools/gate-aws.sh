@@ -18,7 +18,9 @@
 #       shards' outputs are archived under qualification/gate-runs/, their logs
 #       and records copied to OUT, and joined by `cargo xtask gate summary`
 #       into OUT/summary.json. Each host is terminated as soon as its shard's
-#       outputs are archived and checked. The RSS module review is the one REVISION commits
+#       outputs are archived and checked. It launches nothing unless this
+#       checkout is REVISION, unchanged, and `cargo xtask gate check --shards
+#       SHARDS` passes in it. The RSS module review is the one REVISION commits
 #       for its module source and the image's kernel
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
@@ -385,7 +387,17 @@ summarise() {
 
 run() {
     local target=$1 count=$2 revision=$3 out=$4 full=${5:-}
-    local name="triergon-gate-$target" ami stamp
+    local name="triergon-gate-$target" ami stamp checkout
+    # Before any host: every input each shard's preflight reads is one a prepared
+    # host has. The check reads this checkout, so it must be REVISION, unchanged.
+    checkout=$(cd "$HERE/.." && pwd)
+    if [ "$(git -C "$checkout" rev-parse "$revision^{commit}")" != "$(git -C "$checkout" rev-parse HEAD)" ] ||
+        ! git -C "$checkout" diff --quiet HEAD; then
+        echo "check out $revision here, unchanged: the gate check reads this checkout" >&2
+        return 2
+    fi
+    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask gate check --shards "$count") ||
+        { echo "the gate check fails: no host launched" >&2; return 1; }
     stamp=$(date -u +%Y%m%d-%H%M%S)
     ami=$(aws ec2 describe-images --owners self \
         --filters "Name=tag:Name,Values=$name" "Name=tag:Project,Values=triergon" \

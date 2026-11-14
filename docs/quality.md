@@ -605,12 +605,25 @@ may override that count for diagnostic comparisons.
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
 measurements, the packet-framing and progressive TS suites, the codecs' parity, a codec
-workload list's timing and memory, a capture case, the debug or the release tests, and
+workload list's timing and memory, a capture case, the checked or the release tests, and
 the font, shaping, rasterising and ASS comparisons. Every registered feature is either
 one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated (an
 on-demand or diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on
 any other. `cargo xtask gate plan --shards N` splits the items into N shards of about
-equal planning weight, each for its own host. On one host, a shard's run is:
+equal planning weight, each for its own host.
+
+`cargo xtask gate check --shards N` runs on any machine in a second, before a host
+exists: it resolves the preflight of every shard as the shard resolves it, and fails,
+naming the item and the path, on any input a prepared host would not have. A host has
+the committed tree; the fixtures `fixtures` and `framing fixtures` generate from it,
+which the check generates under `target/gate-check`; the manifests the `fonts`,
+`shape`, `raster` and `ass` generators write; the vectors `fetch-vectors` fetches, by
+their pins; and the files of the kept evidence sets unpacked at the repository root
+(`"unpacked_at": "repository"` in the [index](../harness/evidence/index.json)), by
+the set's listing, without fetching any. Where preflight pins an input's hash, its
+source's must match. `tools/gate-aws.sh run` runs it before it launches anything.
+
+On one host, a shard's run is:
 
 1. `tools/gate-host.sh ready I/N`: the prepare commands, the workers with
    `cargo xtask build-workers --all-references`, so that every profile reference is
@@ -907,7 +920,9 @@ is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
 
-`tools/gate-aws.sh run TARGET N REVISION OUT` launches N hosts from the image,
+`tools/gate-aws.sh run TARGET N REVISION OUT`, in a checkout at REVISION without
+changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
+start when it fails. Then it launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
 archive's packs (building and uploading the others), gets each host ready and runs
 shard I of N on host I. When a shard ends, finished or not, its host's outputs are

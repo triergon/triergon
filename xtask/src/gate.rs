@@ -13,6 +13,7 @@
 //! shard ran the items the plan gives it, every step of the plan once, on the same
 //! source and workers.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -24,6 +25,7 @@ use crate::sha256;
 type R<T> = Result<T, String>;
 
 pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
+       cargo xtask gate check [--shards N]
        cargo xtask gate preflight [--shard I/N] [--review FILE] [--kernel]
        cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full]
        cargo xtask gate summary --output FILE DIR...
@@ -31,6 +33,11 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
 
   plan       print the gate's items and their planning weights (minutes on a
              32-bit ARMv7 c6g.4xlarge), split into N shards (default 1)
+  check      on any machine, before a host is launched: every file the preflight
+             of each of N shards reads, resolved as the shard resolves it, is
+             committed, generated from committed sources by a host's prepare,
+             fetched by it with a pin, or listed in a kept evidence set unpacked
+             at the repository root, with any hash preflight pins it to
   preflight  `cargo xtask preflight` over everything shard I of N measures, with
              the committed RSS module review or --review FILE; --kernel after the
              kernel proof
@@ -816,6 +823,260 @@ fn shard_items(root: &Path, out: &str, full: bool, (index, count): (usize, usize
     Ok(shards(all, count).swap_remove(index))
 }
 
+/// Where a host gets an input from.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Source {
+    Committed,
+    Generated,
+    Fetched,
+    Kept,
+}
+
+/// What a gate host holds once it is prepared, known without a host: the
+/// committed tree, what `fixtures` and `framing fixtures` generate from it, the
+/// generated manifests, the vectors `fetch-vectors` fetches with their pins, and
+/// the files of the kept evidence sets unpacked at the repository root.
+struct Tree {
+    root: PathBuf,
+    committed: BTreeSet<String>,
+    /// The generated fixtures, under their repository-relative paths.
+    generated: Option<PathBuf>,
+    fetched: BTreeMap<String, String>,
+    /// Path to SHA-256.
+    kept: BTreeMap<String, String>,
+    hashes: BTreeMap<PathBuf, String>,
+}
+
+/// Where `check` generates the fixtures.
+const CHECK_DIRECTORY: &str = "target/gate-check";
+
+impl Tree {
+    fn load(root: &Path) -> R<Self> {
+        let generated = root.join(CHECK_DIRECTORY);
+        if generated.exists() {
+            fs::remove_dir_all(&generated).map_err(|e| format!("{}: {e}", generated.display()))?;
+        }
+        let paths = crate::corpus::Paths {
+            root: root.to_path_buf(),
+            out: generated.clone(),
+        };
+        crate::corpus::generate_all(&paths)?;
+        crate::framing_bench::generate(&generated.join(".research/fixtures-packet-framing"))?;
+        let mut tree = Self::committed(root)?;
+        tree.generated = Some(generated);
+        for pin in crate::fetch::pins(root)? {
+            tree.fetched
+                .insert(format!("{}/{}", pin.directory, pin.file), pin.sha256);
+        }
+        tree.kept = kept_files(root)?;
+        Ok(tree)
+    }
+
+    /// The committed tree alone.
+    fn committed(root: &Path) -> R<Self> {
+        let output = Command::new("git")
+            .args(["ls-files", "-z"])
+            .current_dir(root)
+            .output()
+            .map_err(|e| format!("git ls-files: {e}"))?;
+        if !output.status.success() {
+            return Err("git ls-files failed".into());
+        }
+        Ok(Self {
+            root: root.to_path_buf(),
+            committed: output
+                .stdout
+                .split(|&b| b == 0)
+                .filter(|path| !path.is_empty())
+                .map(|path| String::from_utf8_lossy(path).into_owned())
+                .collect(),
+            generated: None,
+            fetched: BTreeMap::new(),
+            kept: BTreeMap::new(),
+            hashes: BTreeMap::new(),
+        })
+    }
+
+    /// The manifest a host reads at `path`: the committed file, or the one a
+    /// host's prepare generates there.
+    fn manifest(&self, path: &Path) -> R<Value> {
+        let relative = self.relative(path)?;
+        if self.committed.contains(&relative) {
+            return crate::checks::read_json(path);
+        }
+        generated_manifest(&self.root, path)
+            .unwrap_or_else(|| Err(format!("{relative}: no committed or generated manifest")))
+    }
+
+    fn relative(&self, path: &Path) -> R<String> {
+        let inside = path
+            .strip_prefix(&self.root)
+            .map_err(|_| format!("{}: outside the repository", path.display()))?;
+        let mut parts = Vec::new();
+        for part in inside.components() {
+            match part {
+                std::path::Component::Normal(part) => parts.push(part.to_string_lossy()),
+                std::path::Component::CurDir => {}
+                _ => return Err(format!("{}: escapes the repository", path.display())),
+            }
+        }
+        Ok(parts.join("/"))
+    }
+
+    fn hash(&mut self, path: PathBuf) -> R<String> {
+        if let Some(hash) = self.hashes.get(&path) {
+            return Ok(hash.clone());
+        }
+        let hash = sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        self.hashes.insert(path, hash.clone());
+        Ok(hash)
+    }
+
+    /// Where a host gets `input` from, or why it has no such file.
+    fn source(&mut self, input: &crate::harness::preflight::Input) -> R<Source> {
+        let relative = self.relative(&input.path)?;
+        let generated = self
+            .generated
+            .as_ref()
+            .map(|directory| directory.join(&relative))
+            .filter(|path| path.is_file());
+        let (source, hash) = if self.committed.contains(&relative) {
+            (Source::Committed, self.hash(self.root.join(&relative))?)
+        } else if let Some(path) = generated {
+            (Source::Generated, self.hash(path)?)
+        } else if let Some(pin) = self.fetched.get(&relative) {
+            (Source::Fetched, pin.clone())
+        } else if let Some(hash) = self.kept.get(&relative) {
+            (Source::Kept, hash.clone())
+        } else if generated_manifest(&self.root, &input.path).is_some() {
+            return Ok(Source::Generated);
+        } else {
+            return Err(format!(
+                "{relative}: not committed, not generated or fetched by a host's prepare, \
+                 and in no kept evidence set"
+            ));
+        };
+        match &input.sha256 {
+            Some(pin) if *pin != hash => Err(format!(
+                "{relative}: pinned as {} but {source:?} as {}",
+                &pin[..pin.len().min(12)],
+                &hash[..hash.len().min(12)]
+            )),
+            _ => Ok(source),
+        }
+    }
+
+    /// The problems of preflight ARGS: inputs a host would not have.
+    fn problems(&mut self, args: &[String]) -> (Vec<Source>, Vec<String>) {
+        let root = self.root.clone();
+        let inputs = {
+            let tree = &*self;
+            crate::harness::preflight::inputs(&root, args, &|path| tree.manifest(path))
+        };
+        let mut sources = Vec::new();
+        let mut problems = Vec::new();
+        match inputs {
+            Ok(inputs) => {
+                for input in &inputs {
+                    match self.source(input) {
+                        Ok(source) => sources.push(source),
+                        Err(problem) => problems.push(problem),
+                    }
+                }
+            }
+            Err(error) => problems.push(error),
+        }
+        (sources, problems)
+    }
+}
+
+/// The manifest a host's prepare generates at `path`: beside a generated
+/// feature's contract, or where `COMMAND manifest` writes it.
+fn generated_manifest(root: &Path, path: &Path) -> Option<R<Value>> {
+    crate::harness::manifest::generated(root, path)
+        .or_else(|| crate::generators::written(root, path))
+}
+
+/// The files of the kept evidence sets that unpack at the repository root, by
+/// their listing in the evidence index.
+fn kept_files(root: &Path) -> R<BTreeMap<String, String>> {
+    let index = crate::checks::read_json(&root.join("harness/evidence/index.json"))?;
+    let mut files = BTreeMap::new();
+    for set in index
+        .get("sets")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let text = |key| set.get(key).and_then(Value::as_str);
+        if text("retention") != Some("retained") || text("unpacked_at") != Some("repository") {
+            continue;
+        }
+        for file in set
+            .get("files")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            let field = |key| file.get(key).and_then(Value::as_str);
+            if let (Some(path), Some(hash)) = (field("path"), field("sha256")) {
+                files.insert(path.to_owned(), hash.to_owned());
+            }
+        }
+    }
+    Ok(files)
+}
+
+/// `gate check`: every shard's preflight reads only what a prepared host has.
+fn check(root: &Path, count: usize) -> R<i32> {
+    let all = items(
+        "OUT",
+        false,
+        "TARGET",
+        "target/release",
+        &capture_cases(root)?,
+    );
+    let mut tree = Tree::load(root)?;
+    let mut failed = 0;
+    for (index, shard) in shards(all, count).iter().enumerate() {
+        let label = format!("shard {}/{count}", index + 1);
+        let mut sources = Vec::new();
+        let mut problems = Vec::new();
+        for item in shard {
+            let (found, missing) = tree.problems(&item.preflight);
+            sources.extend(found);
+            problems.extend(missing.into_iter().map(|p| format!("{}: {p}", item.name)));
+        }
+        // The shard's arguments together, as `gate preflight --shard` passes them.
+        let combined: Vec<String> = shard.iter().flat_map(|i| i.preflight.clone()).collect();
+        if let Err(error) = crate::harness::preflight::inputs(root, &combined, &|_| Ok(Value::Null))
+        {
+            problems.push(format!("the shard's preflight arguments: {error}"));
+        }
+        if problems.is_empty() {
+            let of = |source| sources.iter().filter(|&&s| s == source).count();
+            println!(
+                "ok   {label}: {} inputs: {} committed, {} generated, {} fetched, {} kept",
+                sources.len(),
+                of(Source::Committed),
+                of(Source::Generated),
+                of(Source::Fetched),
+                of(Source::Kept)
+            );
+        } else {
+            failed += problems.len();
+            for problem in &problems {
+                println!("FAIL {label}: {problem}");
+            }
+        }
+    }
+    if failed == 0 {
+        println!("gate check passed: {count} shards");
+        Ok(0)
+    } else {
+        println!("gate check failed: {failed} problems");
+        Ok(1)
+    }
+}
+
 pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let (command, rest) = args.split_first().ok_or(USAGE)?;
     let options = Options::parse(rest)?;
@@ -850,6 +1111,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             }
             Ok(i32::from(!problems.is_empty()))
         }
+        "check" => check(root, options.shards),
         "preflight" => {
             let mut args = vec!["preflight".to_owned()];
             for item in shard_items(root, "OUT", false, options.shard)? {
@@ -1638,6 +1900,49 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn preflight_of(name: &str) -> Vec<String> {
+        plan()
+            .into_iter()
+            .find(|item| item.name == name)
+            .unwrap()
+            .preflight
+    }
+
+    #[test]
+    fn a_feature_whose_inputs_are_neither_committed_nor_kept_is_refused() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let mut tree = Tree::committed(root).unwrap();
+        tree.kept = kept_files(root).unwrap();
+        // The progressive item as an earlier plan had it: the feature alone, so its
+        // cases resolve to .research/fixtures, where no host has them.
+        let (_, problems) = tree.problems(&owned(&["--feature", "progressive-ts188"]));
+        assert_eq!(problems.len(), 3, "{problems:?}");
+        assert!(problems.iter().all(
+            |p| p.starts_with(".research/fixtures/") && p.ends_with("in no kept evidence set")
+        ));
+        let (sources, problems) = tree.problems(&preflight_of("progressive"));
+        assert_eq!(problems, Vec::<String>::new());
+        assert!(sources.iter().all(|&source| source == Source::Committed));
+    }
+
+    #[test]
+    fn inputs_in_a_kept_set_count_by_its_listing_and_pins() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let args = preflight_of("codec-file-workloads");
+        let mut tree = Tree::committed(root).unwrap();
+        let (_, problems) = tree.problems(&args);
+        assert_eq!(problems.len(), 10, "{problems:?}");
+        tree.kept = kept_files(root).unwrap();
+        let (sources, problems) = tree.problems(&args);
+        assert_eq!(problems, Vec::<String>::new());
+        assert_eq!(sources.iter().filter(|&&s| s == Source::Kept).count(), 10);
+        let listed = ".research/codec-inputs/flac-16-44k-stereo.flac";
+        *tree.kept.get_mut(listed).unwrap() = "0".repeat(64);
+        let (_, problems) = tree.problems(&args);
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].starts_with(&format!("{listed}: pinned as")));
     }
 
     #[test]

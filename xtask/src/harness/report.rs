@@ -730,7 +730,7 @@ pub(super) fn input_problem(
 }
 
 /// Every corpus file a case reads: its input, ordered entities and companions.
-fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
     let mut files = vec![corpus.join(s(case, "file").ok_or("case without input path")?)];
     for key in ["entities", "companions"] {
         for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {

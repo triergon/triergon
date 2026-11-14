@@ -228,6 +228,25 @@ fn qualified_memory(meminfo: &str) -> R<String> {
 }
 
 impl Options {
+    /// The manifest feature `id`'s cases come from: --manifest, else the
+    /// contract's corpus.json.
+    fn manifest(&self, root: &Path, id: &str) -> PathBuf {
+        self.manifests
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| root.join("harness/features").join(id).join("corpus.json"))
+    }
+
+    /// The directory feature `id`'s case files are in: --corpus, else the
+    /// manifest's recorded directory, else .research/fixtures.
+    fn corpus(&self, root: &Path, id: &str, manifest: &Value) -> PathBuf {
+        match self.corpora.get(id) {
+            Some(corpus) => corpus.clone(),
+            None => super::report::recorded_corpus(root, manifest)
+                .unwrap_or_else(|| root.join(".research/fixtures")),
+        }
+    }
+
     /// The references the selected runs other than features measure against,
     /// which name them by path rather than through a contract.
     fn measured_references(&self) -> Vec<String> {
@@ -288,19 +307,10 @@ fn workers(root: &Path, identity: &Value) -> R<String> {
 /// Every case of a feature names references the identity holds and has every
 /// input it reads with its pinned hash.
 fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<String> {
-    let directory = root.join("harness/features").join(id);
-    let contract = read_json(&directory.join("contract.json"))?;
-    let manifest_path = options
-        .manifests
-        .get(id)
-        .cloned()
-        .unwrap_or_else(|| directory.join("corpus.json"));
+    let contract = read_json(&root.join("harness/features").join(id).join("contract.json"))?;
+    let manifest_path = options.manifest(root, id);
     let (manifest, _) = super::manifest::read(root, &manifest_path)?;
-    let corpus = match options.corpora.get(id) {
-        Some(corpus) => corpus.clone(),
-        None => super::report::recorded_corpus(root, &manifest)
-            .unwrap_or_else(|| root.join(".research/fixtures")),
-    };
+    let corpus = options.corpus(root, id, &manifest);
     let prefix = contract.get("worker_operation").and_then(Value::as_str);
     let cases = manifest
         .get("cases")
@@ -335,28 +345,35 @@ fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<Stri
     }
 }
 
+/// Each workload of a list: its id, and its input's repository-relative path and
+/// pinned hash, or none when it lacks either.
+fn workloads(list: &Value) -> Vec<(&str, Option<(&str, &str)>)> {
+    list.get("workloads")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .map(|workload| {
+            let text = |key| workload.get(key).and_then(Value::as_str);
+            (
+                text("id").unwrap_or_default(),
+                text("path").zip(text("sha256")),
+            )
+        })
+        .collect()
+}
+
 /// Every workload's input exists with its pinned hash.
 fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
     let list = read_json(workloads)?;
-    let entries = list
-        .get("workloads")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
+    let entries = self::workloads(&list);
     let mut problems = Vec::new();
-    for workload in entries {
-        let id = workload
-            .get("id")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let (Some(path), Some(pin)) = (
-            workload.get("path").and_then(Value::as_str),
-            workload.get("sha256").and_then(Value::as_str),
-        ) else {
+    for (id, input) in &entries {
+        let Some((path, pin)) = input else {
             problems.push(format!("{id}: no path or hash"));
             continue;
         };
         match sha256::file_hex(&root.join(path)) {
-            Ok(actual) if actual == pin => {}
+            Ok(actual) if actual == *pin => {}
             Ok(_) => problems.push(format!("{id}: {path} differs from its pin")),
             Err(error) => problems.push(format!("{id}: {path}: {error}")),
         }
@@ -370,10 +387,12 @@ fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
     }
 }
 
-/// The mandatory external vector is in the sample cache with its pinned hash.
-fn external_vector(root: &Path) -> R<String> {
-    let contract =
-        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
+/// The contract that names the mandatory external vectors.
+const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
+
+/// The mandatory external vectors: each path in the sample cache with its pin.
+fn external_vectors(root: &Path) -> R<Vec<(PathBuf, String)>> {
+    let contract = read_json(&root.join(VECTOR_CONTRACT))?;
     let specs = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -381,22 +400,107 @@ fn external_vector(root: &Path) -> R<String> {
     if specs.is_empty() {
         return Err("the contract names no external vector".into());
     }
-    for spec in specs {
-        let file = spec
-            .get("file")
-            .and_then(Value::as_str)
-            .ok_or("vector without a file")?;
-        let pin = spec
-            .get("sha256")
-            .and_then(Value::as_str)
-            .ok_or("vector without a hash")?;
-        let path = root.join(".research/fate-samples").join(file);
-        if sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))? != pin {
+    specs
+        .iter()
+        .map(|spec| {
+            let text = |key| spec.get(key).and_then(Value::as_str);
+            let file = text("file").ok_or("vector without a file")?;
+            let pin = text("sha256").ok_or("vector without a hash")?;
+            Ok((
+                root.join(".research/fate-samples").join(file),
+                pin.to_owned(),
+            ))
+        })
+        .collect()
+}
+
+/// The mandatory external vector is in the sample cache with its pinned hash.
+fn external_vector(root: &Path) -> R<String> {
+    let vectors = external_vectors(root)?;
+    for (path, pin) in &vectors {
+        if sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))? != *pin {
             return Err(format!("{} differs from its pin", path.display()));
         }
     }
-    Ok(format!("{} vectors", specs.len()))
+    Ok(format!("{} vectors", vectors.len()))
 }
+
+/// A file a preflight check reads, with the SHA-256 the check pins it to, if any.
+#[derive(Debug)]
+pub struct Input {
+    pub path: PathBuf,
+    pub sha256: Option<String>,
+}
+
+/// Every file the checks of `preflight ARGS` read, resolved as those checks
+/// resolve them, with `manifest` reading a feature's manifest. The build identity,
+/// the references and the RSS module review are the host's and are left out.
+pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>) -> R<Vec<Input>> {
+    let options = Options::parse(root, args)?;
+    let mut inputs = Vec::new();
+    let mut add = |path: PathBuf, sha256: Option<&str>| {
+        inputs.push(Input {
+            path,
+            sha256: sha256.map(str::to_owned),
+        });
+    };
+    for id in &options.features {
+        add(
+            root.join("harness/features").join(id).join("contract.json"),
+            None,
+        );
+        let path = options.manifest(root, id);
+        let document = manifest(&path).map_err(|e| format!("feature {id}: {e}"))?;
+        let corpus = options.corpus(root, id, &document);
+        add(path, None);
+        for case in document
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            // The pins in the order `case_files` lists the files: the input, then
+            // its ordered entities, then its companions.
+            let mut pins = vec![case.get("sha256").and_then(Value::as_str)];
+            for key in ["entities", "companions"] {
+                for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {
+                    pins.push(input.get("sha256").and_then(Value::as_str));
+                }
+            }
+            let files = super::report::case_files(&corpus, case)
+                .map_err(|e| format!("feature {id}: {e}"))?;
+            for (file, pin) in files.into_iter().zip(pins) {
+                add(file, pin);
+            }
+        }
+    }
+    if options.isobmff {
+        for (path, pin) in crate::isobmff_bench::inputs(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    for list in &options.codecs {
+        add(list.clone(), None);
+        for (id, input) in workloads(&read_json(list)?) {
+            let (path, pin) =
+                input.ok_or_else(|| format!("{}: {id}: no path or hash", list.display()))?;
+            add(root.join(path), Some(pin));
+        }
+    }
+    if options.external_vector {
+        add(root.join(VECTOR_CONTRACT), None);
+        for (path, pin) in external_vectors(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    if let Some(cases) = &options.capture {
+        add(cases.clone(), None);
+        add(root.join(CAPTURE_GENERATOR), None);
+    }
+    Ok(inputs)
+}
+
+/// The capture inputs' generator.
+const CAPTURE_GENERATOR: &str = "harness/capture/generate_inputs.py";
 
 /// The capture cases exist, and the Python that generates their inputs has numpy.
 fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
@@ -408,7 +512,7 @@ fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
     if count == 0 {
         return Err(format!("{} lists no cases", cases.display()));
     }
-    let generator = root.join("harness/capture/generate_inputs.py");
+    let generator = root.join(CAPTURE_GENERATOR);
     if !generator.is_file() {
         return Err(format!("{} missing", generator.display()));
     }
