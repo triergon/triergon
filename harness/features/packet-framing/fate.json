@@ -24,18 +24,21 @@
    "id": "fate-h264_mp4toannexb_ticket2991",
    "sample": "h264/wwwq_cut.mp4",
    "projection": "avc-explicit",
+   "candidate_reader": "avc-recovery",
    "annex_b_md5": "b6ff5910928ad0b2a7eec481dcc41594"
   },
   {
    "id": "fate-h264_mp4toannexb_ticket5927",
    "sample": "h264/thezerotheorem-cut.mp4",
    "projection": "avc-explicit",
+   "candidate_reader": "avc-recovery",
    "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f"
   },
   {
    "id": "fate-h264_mp4toannexb_ticket5927_2",
    "sample": "h264/thezerotheorem-cut.mp4",
    "projection": "avc",
+   "candidate_reader": "avc-recovery",
    "annex_b_md5": "edddeef7901b2bd8d55625b8105b579f"
   },
   {

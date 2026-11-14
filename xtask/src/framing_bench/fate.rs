@@ -98,6 +98,7 @@ struct Case<'a> {
     sha256: &'a str,
     expected: &'a str,
     projection: Projection,
+    recover_avc: bool,
 }
 
 impl<'a> Case<'a> {
@@ -126,6 +127,11 @@ impl<'a> Case<'a> {
             sha256: field(pin, "sha256")?,
             expected: field(row, "annex_b_md5")?,
             projection: Projection::parse(field(row, "projection")?)?,
+            recover_avc: match row.get("candidate_reader").and_then(Value::as_str) {
+                Some("avc-recovery") => true,
+                None => false,
+                Some(name) => return Err(format!("unknown Annex B candidate reader {name}")),
+            },
         })
     }
 
@@ -172,11 +178,15 @@ impl<'a> Case<'a> {
             ));
         }
         let candidate = directory.join("candidate.annexb");
-        command_output(&[
+        let mut command = vec![
             options.candidate.clone().into_os_string(),
             input.into_os_string(),
             candidate.clone().into_os_string(),
-        ])?;
+        ];
+        if self.recover_avc {
+            command.push(arg("--recover-avc"));
+        }
+        command_output(&command)?;
         let expected = sha256::file_hex(&reference).map_err(|e| e.to_string())?;
         let actual = sha256::file_hex(&candidate).map_err(|e| e.to_string())?;
         if expected != actual {
