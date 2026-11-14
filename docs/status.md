@@ -174,6 +174,10 @@ memory comparisons await gate-build measurement with repository runners.
 ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 `--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
 
+The ISO BMFF recovery opener handles legacy QuickTime data-handler metadata in
+ISO-branded files with self-contained data references. It also accepts flag 1
+in a version-0 sample dependency table and checks every declared sample row.
+
 The ISO BMFF row uses the gate build at `f99d893196908d562c897bccb20c6a972cd25d11`
 on a c8g.large pinned to CPU 1, 30 pairs. Runtime comes from the timing collection and
 memory from a separate collection under the kernel RSS bound; both are in the raw
