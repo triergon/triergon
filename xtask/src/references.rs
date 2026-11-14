@@ -39,8 +39,12 @@ pub const USAGE: &str = "usage: cargo xtask references keys
   pack    pack each current build (all by default) into
           .research/reference-cache/NAME/KEY.tar.zst
   fetch   download the archived pack of each build that is neither current nor
-          cached, where the archive holds one (TRIERGON_EVIDENCE_ARCHIVE)
-  upload  upload the pack of each current build that the archive lacks
+          cached, where the archive holds one (TRIERGON_EVIDENCE_ARCHIVE, through
+          the aws CLI and its credentials)
+  upload  upload the pack of each current build that the archive lacks, the same way
+
+A gate host holds no credentials: tools/gate-aws.sh fetches its packs through
+presigned addresses and uploads them through the workstation, by `keys` and `pack`.
 
 The prepare commands restore a build from its pack in the cache instead of
 building it, and record the key of what they build.";

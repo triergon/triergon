@@ -604,9 +604,12 @@ may override that count for diagnostic comparisons.
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the packet-framing suite, the codecs' parity or their timing, a capture
-case, the debug or the release tests, and the font, shaping, rasterising and ASS
-comparisons. `cargo xtask gate plan --shards N` splits them into N shards of about
+measurements, the packet-framing and progressive TS suites, the codecs' parity, a codec
+workload list's timing and memory, a capture case, the debug or the release tests, and
+the font, shaping, rasterising and ASS comparisons. Every registered feature is either
+one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated (an
+on-demand or diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on
+any other. `cargo xtask gate plan --shards N` splits the items into N shards of about
 equal planning weight, each for its own host. On one host, a shard's run is:
 
 1. `tools/gate-host.sh ready I/N`: the prepare commands, the workers with
