@@ -256,7 +256,7 @@ impl EncodedEditPlan {
         let discard = if audio {
             source_end <= i128::from(self.entry.media_time)
         } else {
-            cts < self.anchor || cts >= self.presentation_end
+            cts < i128::from(self.entry.media_time) || cts >= self.presentation_end
         };
         let packet = PacketView {
             source_ordinal: source.ordinal,
@@ -389,6 +389,7 @@ pub struct EncodedEditJob<'a> {
     end: i128,
     anchor: Option<i128>,
     maximum_cts: Option<i128>,
+    leading_video_ticks: i64,
     source_end: i128,
     count: u64,
     frame: u32,
@@ -419,7 +420,7 @@ impl<'a> EncodedEditJob<'a> {
         _profile: EncodedEditProfile,
     ) -> Result<Self> {
         context.stream.kind().require_regular_codec()?;
-        Self::new_description_bound(context, input, limits, 1, false)
+        Self::new_description_bound(context, input, limits, 1, false, false)
     }
     pub fn new_with_configs(
         context: EncodedEditContext<'a>,
@@ -430,7 +431,7 @@ impl<'a> EncodedEditJob<'a> {
     ) -> Result<Self> {
         crate::encoded_configs::validate_configs(context.table, configs, input.budget())?;
         let count = u32::try_from(configs.len()).map_err(|_| Error::Overflow)?;
-        Self::new_description_bound(context, input, limits, count, false)
+        Self::new_description_bound(context, input, limits, count, false, false)
     }
     /// Separate source-preserving SDTP/public-disposable observation. Effective
     /// recovery memberships and unproven group namespaces remain unsupported.
@@ -447,7 +448,7 @@ impl<'a> EncodedEditJob<'a> {
         // already established edit/roll observation, with its raw groups
         // retained unchanged; no new recovery capability is inferred here.
         let dependency_table = context.table.has_dependency_table();
-        Self::new_description_bound(context, input, limits, count, dependency_table)
+        Self::new_description_bound(context, input, limits, count, dependency_table, false)
     }
     /// Bounded regular open/index receiver observation. All actual roll/prol
     /// source records are validated and retained; this is not decoder preroll.
@@ -463,7 +464,8 @@ impl<'a> EncodedEditJob<'a> {
         let dependency = context.table.has_dependency_table();
         let recovery =
             crate::encoded_recovery::RecoveryWalk::new(context.table, limits.max_samples)?;
-        let mut job = Self::new_description_bound(context, input, limits, count, dependency)?;
+        let mut job =
+            Self::new_description_bound(context, input, limits, count, dependency, false)?;
         job.empty_recovery = None;
         job.dependency_recovery = true;
         job.recovery_walk = Some(recovery);
@@ -477,13 +479,14 @@ impl<'a> EncodedEditJob<'a> {
         _profile: crate::EncodedContextProfile,
     ) -> Result<Self> {
         crate::encoded_configs::validate_configs(context.table, configs, input.budget())?;
-        Self::new_recovery_bound(context, input, limits, configs.len())
+        Self::new_recovery_bound(context, input, limits, configs.len(), false)
     }
     fn new_recovery_bound(
         context: EncodedEditContext<'a>,
         input: &InputCursor,
         limits: EncodedEditLimits,
         descriptions: usize,
+        range_playback: bool,
     ) -> Result<Self> {
         let count = u32::try_from(descriptions).map_err(|_| Error::Overflow)?;
         let dependency = context.table.has_dependency_table();
@@ -491,7 +494,8 @@ impl<'a> EncodedEditJob<'a> {
             context.table,
             limits.max_samples,
         )?;
-        let mut out = Self::new_description_bound(context, input, limits, count, dependency)?;
+        let mut out =
+            Self::new_description_bound(context, input, limits, count, dependency, range_playback)?;
         out.empty_recovery = None;
         out.recovery_walk = None;
         out.dependency_recovery = true;
@@ -499,7 +503,7 @@ impl<'a> EncodedEditJob<'a> {
         Ok(out)
     }
     /// Range playback admits leading encoder-delay edits for AC-3, E-AC-3
-    /// and DTS. DTS also supports a leading empty edit before the media edit.
+    /// and DTS. AVC and DTS also support a leading empty edit before the media edit.
     /// AAC uses the sample durations in `stts` and the coded frame length for trim.
     /// Opus uses the edit list for priming and keeps each source duration.
     /// A regular video edit can begin on the presentation tick of a non-sync sample at decode origin.
@@ -510,8 +514,7 @@ impl<'a> EncodedEditJob<'a> {
         limits: EncodedEditLimits,
     ) -> Result<Self> {
         crate::encoded_configs::validate_range_configs(context.table, configs, input.budget())?;
-        let mut job = Self::new_recovery_bound(context, input, limits, configs.len())?;
-        job.range_playback = true;
+        let mut job = Self::new_recovery_bound(context, input, limits, configs.len(), true)?;
         let stream = job.context.stream;
         let kind = match stream.kind() {
             EncodedEntryKind::Aac => {
@@ -568,6 +571,7 @@ impl<'a> EncodedEditJob<'a> {
         limits: EncodedEditLimits,
         descriptions: u32,
         dependency_table: bool,
+        range_playback: bool,
     ) -> Result<Self> {
         if !context.table.raw().bytes().belongs_to(input.budget())
             || !context.edits.raw().bytes().belongs_to(input.budget())
@@ -580,26 +584,28 @@ impl<'a> EncodedEditJob<'a> {
             return Err(Error::ForeignPool);
         }
         let dts = context.stream.dts;
+        let delayed_video = range_playback && context.stream.kind() == EncodedEntryKind::Avc;
         let (edit_ordinal, leading_ticks) = match context.edits.len() {
             1 => (0, 0),
-            2 if dts.is_some() => {
+            2 if dts.is_some() || delayed_video => {
                 let leading = context.edits.entry(0)?;
                 if !leading.is_empty()
                     || leading.segment_duration == 0
                     || leading.rate_integer != 1
                     || leading.rate_fraction != 0
                 {
-                    return Err(Error::Unsupported(
-                        "DTS leading empty rate-one edit required",
-                    ));
+                    let reason = if delayed_video {
+                        "AVC leading empty rate-one edit required"
+                    } else {
+                        "DTS leading empty rate-one edit required"
+                    };
+                    return Err(Error::Unsupported(reason));
                 }
                 (
                     1,
-                    i128::from(
-                        leading
-                            .duration(context.movie_base)?
-                            .to_i64_ticks(context.media_base, Rounding::NearestAway)?,
-                    ),
+                    leading
+                        .duration(context.movie_base)?
+                        .to_i64_ticks(context.media_base, Rounding::NearestAway)?,
                 )
             }
             _ => {
@@ -645,7 +651,7 @@ impl<'a> EncodedEditJob<'a> {
                 return Err(Error::Unsupported("DTS edit needs a coded frame clock"));
             }
             let anchor = i128::from(entry.media_time)
-                .checked_sub(leading_ticks)
+                .checked_sub(i128::from(leading_ticks))
                 .ok_or(Error::Overflow)?;
             (Some(scale), frame.unwrap_or(0), Some(anchor))
         } else {
@@ -678,6 +684,7 @@ impl<'a> EncodedEditJob<'a> {
             end: 0,
             anchor,
             maximum_cts: None,
+            leading_video_ticks: if delayed_video { leading_ticks } else { 0 },
             source_end: 0,
             count: 0,
             frame,
@@ -685,7 +692,7 @@ impl<'a> EncodedEditJob<'a> {
             opus_first: 1,
             opus_first_tick: 0,
             opus_durations: BudgetVec::new(input.budget()),
-            range_playback: false,
+            range_playback,
             non_sync_prefix: false,
             sync_after_edit: false,
             aac_program: None,
@@ -1017,7 +1024,10 @@ impl<'a> EncodedEditJob<'a> {
                     edit_ordinal: self.edit_ordinal,
                     media_base: self.context.media_base,
                     movie_base: self.context.movie_base,
-                    anchor,
+                    // The gap affects movie clocks, while selection still uses source clocks.
+                    anchor: anchor
+                        .checked_sub(i128::from(self.leading_video_ticks))
+                        .ok_or(Error::Overflow)?,
                     end: self.end,
                     source_end: self.source_end,
                     presentation_end,

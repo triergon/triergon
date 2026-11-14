@@ -56,6 +56,8 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+Regular AVC with a leading empty edit keeps its video start delay in range and
+forward playback. An empty edit does not produce a packet.
 QuickTime range playback reads AAC configuration from version 1 and version 2
 sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison

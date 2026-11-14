@@ -566,6 +566,25 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             ));
         }
     }
+    let leading_video_file = "avc-leading-edit.mp4";
+    let leading_video = leading_video_edit_fixture(&control);
+    write(&output.join(leading_video_file), &leading_video)?;
+    cases.extend([
+        mp4_range_case(
+            "leading-video-edit-open",
+            leading_video_file,
+            &leading_video,
+            [],
+            (237, 81_478, 9_596_315_584_292_083_372),
+        ),
+        mp4_range_case(
+            "leading-video-edit-seek",
+            leading_video_file,
+            &leading_video,
+            ["28000"],
+            (181, 62_042, 5_378_275_097_212_072_522),
+        ),
+    ]);
     cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
     paths.manifest(
@@ -577,6 +596,23 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         ]),
     )?;
     Ok(format!("MP4 range corpus: {count} playback comparisons"))
+}
+
+// The pinned seed's media precedes the movie box, so chunk offsets stay put.
+fn leading_video_edit_fixture(seed: &[u8]) -> Vec<u8> {
+    let leading = [96, u32::MAX, 1 << 16].map(u32::to_be_bytes).concat();
+    let mut data = seed.to_vec();
+    for at in [81_526, 81_642, 81_742, 81_750] {
+        let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
+        data[at..at + 4].copy_from_slice(&(size + leading.len() as u32).to_be_bytes());
+    }
+    // Extend the movie and video track durations to include the delay.
+    for at in [81_558, 81_678] {
+        data[at..at + 4].copy_from_slice(&4096_u32.to_be_bytes());
+    }
+    data[81_762..81_766].copy_from_slice(&2_u32.to_be_bytes());
+    data.splice(81_766..81_766, leading);
+    data
 }
 
 fn mp4_opus_composition_fixture(seed: &[u8]) -> Vec<u8> {

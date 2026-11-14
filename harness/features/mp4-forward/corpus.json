@@ -691,6 +691,21 @@
         "bytes": 2716,
         "digest": 1403301861570612487
       }
+    },
+    {
+      "id": "progressive-leading-video-edit",
+      "profile": "progressive-leading-video-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 7900241654160636937
+      }
     }
   ]
 }
