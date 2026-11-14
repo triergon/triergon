@@ -126,8 +126,8 @@ pub fn release_dir() -> Result<String, String> {
 
 /// How workers and references link the support libraries of their language runtimes.
 /// On a GNU/Linux target both sides take every runtime support library from its static
-/// archive: the Rust workers libgcc's unwinder (`libgcc_eh`), the C and C++ references
-/// libm, libstdc++ and libgcc. A process then maps only the support code its own
+/// archive: the Rust workers libgcc's unwinder (`libgcc_eh`) and libm, the C and C++
+/// references libm, libstdc++ and libgcc. A process then maps only the support code its own
 /// libraries use. libc and third-party libraries stay shared on both sides. Elsewhere
 /// both link as their toolchains do.
 pub const LINK_POLICY: &str = "static-runtime-support-v1";
@@ -139,15 +139,18 @@ fn static_runtime(target: &str) -> bool {
 
 /// The arguments `cargo rustc` passes to a worker's own compile, after `--`, to link
 /// it under [`LINK_POLICY`]. Placed with the worker's native libraries, ahead of the
-/// standard library's `-lgcc_s`, libgcc's static unwinder resolves every unwinder
-/// import, and the linker leaves the unneeded `libgcc_s` out.
+/// standard library's `-lgcc_s` and `-lm`, the static archives resolve every unwinder
+/// and libm import, and the linker leaves the unneeded shared libraries out.
 pub fn worker_link_arguments() -> Result<Vec<String>, String> {
     worker_target().map(worker_link_flags)
 }
 
 fn worker_link_flags(target: &str) -> Vec<String> {
     if static_runtime(target) {
-        vec!["-l".to_owned(), "static:-bundle=gcc_eh".to_owned()]
+        ["gcc_eh", "m"]
+            .into_iter()
+            .flat_map(|library| ["-l".to_owned(), format!("static:-bundle={library}")])
+            .collect()
     } else {
         Vec::new()
     }
@@ -596,7 +599,10 @@ mod tests {
             "aarch64-unknown-linux-gnu",
             "x86_64-unknown-linux-gnu",
         ] {
-            assert_eq!(worker_link_flags(target), ["-l", "static:-bundle=gcc_eh"]);
+            assert_eq!(
+                worker_link_flags(target),
+                ["-l", "static:-bundle=gcc_eh", "-l", "static:-bundle=m"]
+            );
             let flags = ["-L/p", "-lharfbuzz", "-lstdc++", "-lm", "-lz", "-latomic"];
             assert_eq!(
                 reference_flags(target, flags.map(String::from).to_vec()),

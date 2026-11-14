@@ -482,8 +482,8 @@ may override that count for diagnostic comparisons.
 - Workers and references follow one link policy, `static-runtime-support-v1`: on
   GNU/Linux each side links the support libraries of its language runtime from their
   static archives, and libc and third-party libraries, such as zlib, stay shared on
-  both. Today that is libgcc's unwinder (`libgcc_eh`) for the Rust workers, and libm,
-  libstdc++ and libgcc for the C and C++ references. Total RSS then compares the code
+  both. Today that is libgcc's unwinder (`libgcc_eh`) and libm for the Rust workers, and
+  libm, libstdc++ and libgcc for the C and C++ references. Total RSS then compares the code
   and data each process's libraries use: a shared runtime support library is mapped
   whether or not that code calls it, and the two toolchains load different ones. The
   Rust standard library loads `libgcc_s` and runs its initialisation in every program,
