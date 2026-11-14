@@ -499,6 +499,11 @@ may override that count for diagnostic comparisons.
   as their toolchains do. `build-workers` records the policy in `identity.json`, and
   `report` and `grade` refuse a build that records another policy or none, so results
   from differently linked builds are never compared or reused together.
+- A gate run builds with `cargo xtask build-workers --all-references`, which fails when
+  any profile reference's FFmpeg, FreeType, HarfBuzz or libass profile is not prepared.
+  Without the flag, `build-workers` builds the references whose profiles are prepared
+  and prints each one it skipped; `comparison_references` in `identity.json` lists
+  exactly those it built.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
   with the same two settings in its own release profile. On ARMv7, building the

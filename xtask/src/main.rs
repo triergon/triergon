@@ -94,10 +94,12 @@ commands:
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance]
                  join complete reports, recompute runtime and memory bounds, then apply gates
-  build-workers  [--comparison-build] [--only WORKER]
+  build-workers  [--comparison-build] [--only WORKER] [--all-references]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
-                 gate build is refused unless it is for paired comparisons only
+                 gate build is refused unless it is for paired comparisons only; a profile
+                 reference whose profile is not prepared is skipped and printed, and with
+                 --all-references it fails the build
   memory-admission CANDIDATE REFERENCE
                  check the native Linux memory observer (AArch64 or 32-bit ARMv7)
                  for two built workers and print the certificate
