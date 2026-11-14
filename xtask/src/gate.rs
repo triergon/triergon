@@ -157,11 +157,12 @@ const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor in [`FEATURES`].
-const COVERED: [(&str, Coverage); 23] = [
+const COVERED: [(&str, Coverage); 24] = [
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
     ),
+    ("isobmff-reader", Coverage::Item("codecs isobmff-reader")),
     ("packet-framing", Coverage::Item("framing")),
     ("progressive-ts188", Coverage::Item("progressive")),
     ("font-outlines", Coverage::Item("fonts compare")),
@@ -276,6 +277,8 @@ const ISOBMFF_PARTS: usize = 3;
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
 const FFMPEG_BIN: &str = ".research/reference-decode/install/bin";
+/// The formats reference's `ffprobe`, which the neutral ISO BMFF reader is compared with.
+const FORMATS_FFPROBE: &str = ".research/reference-formats/install/bin/ffprobe";
 
 fn xtask(args: &[&str]) -> Vec<String> {
     std::iter::once("xtask")
@@ -519,6 +522,28 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 crate::progressive_bench::FEATURE
             ),
         ]),
+    });
+
+    // The neutral ISO BMFF reader against the formats reference's MOV demuxer.
+    items.push(Item {
+        name: "isobmff-reader".into(),
+        weight: 3,
+        steps: vec![step(
+            "isobmff-reader-compare",
+            Stage::Timing,
+            Placement::Free,
+            xtask(&[
+                "codecs",
+                "isobmff-reader",
+                "--ffprobe",
+                FORMATS_FFPROBE,
+                "--codec-worker",
+                &format!("{release}/codec-worker"),
+                "--out",
+                &format!("{out}/parity/isobmff-reader.jsonl"),
+            ]),
+        )],
+        preflight: owned(&["--reference", "ffmpeg-formats-native"]),
     });
 
     let target_args = |mut args: Vec<String>| {
@@ -2054,6 +2079,7 @@ mod tests {
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
         assert!(names.contains(&"capture-c04"));
+        assert!(names.contains(&"isobmff-reader-compare"));
         assert!(
             names.contains(&"memory-codec-file-workloads-3") && names.contains(&"test-release")
         );

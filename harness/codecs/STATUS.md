@@ -131,6 +131,18 @@ relation) of exactly one disposition the case lists. Each view of each input is 
 unexplained differences, attributed where a scope matches, to `OUT.differences.json`
 for review.
 
+`cargo xtask codecs isobmff-reader` applies the same alignment and the same reviewed,
+frozen difference lists to the neutral ISO BMFF reader, against the formats profile's
+`ffprobe` with the MOV demuxer, and is a gate item (`isobmff-reader`). Its contract,
+corpus of 648 read and seek cases, rules and differences are in
+[harness/features/isobmff-reader](../features/isobmff-reader); it fails when a case
+fails:
+
+```sh
+cargo xtask codecs isobmff-reader --ffprobe .research/reference-formats/install/bin/ffprobe \
+  --codec-worker target/release/codec-worker --out isobmff-reader.jsonl
+```
+
 ## Timing and memory
 
 `cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282;

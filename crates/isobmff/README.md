@@ -217,6 +217,40 @@ What the reader does not do:
 - **A QuickTime `mp4a` entry** whose sound description or `wave` layout cannot be walked
   stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
+### Comparison with FFmpeg
+
+`cargo xtask codecs isobmff-reader` compares every packet `Reader` delivers with the
+formats reference's `ffprobe -show_packets`, read with `-f mov -fflags
++noparse+nofillin -ignore_editlist 1` so that FFmpeg, like the reader, fills nothing in
+and reports media times. Tracks pair with FFmpeg's streams by `track_ID`; per track,
+each packet's size, position, payload MD5, sync flag, pts, dts and duration are
+compared, and so are the order across tracks, the set of tracks and how reading ended.
+Seek cases call `request_seek` and read FFmpeg from the same time with
+`-read_intervals`. The contract, corpus, rules, reviewed dispositions and frozen
+difference lists are in
+[harness/features/isobmff-reader](../../harness/features/isobmff-reader).
+
+The 648 cases are 522 distinct inputs read through (the 251 authored open-index
+inputs, the committed ISO BMFF, playback and AAC fixtures, the MP4 range fixtures with
+FATE's `mp4-init-nonkeyframe.mp4`, and the subtitle corpus's MP4 files) and 126 seeks
+on 42 of them. 333 match exactly, 3 are refused by both, and 312 differ only by
+reviewed FFmpeg behaviour (4 reads by two kinds):
+
+- **Refusals** (131 reads). The reader refuses media outside every `mdat`,
+  inconsistent sample tables, truncated files, a zero timescale and times beyond `i64`,
+  where FFmpeg reads what it can; FFmpeg fails to open 13 inputs the reader reads.
+- **Clock conventions** (58). FFmpeg moves decode times earlier by the most negative
+  `ctts` offset, and in fragments presentation times later; it reads version 0 offsets
+  of 2^31 or more as negative; it times fragments without `tfdt`, which the reader
+  leaves unknown; it reports no duration for a stated decode delta of 0; it marks the
+  first sample of an empty `stss` a keyframe.
+- **Packetisation and order** (55). FFmpeg delivers QuickTime PCM a chunk at a time and
+  interleaves tracks by time where the reader keeps byte order.
+- **Seeks** (72 seek cases). Both land the seek track on the same sync sample, except where a
+  reordered sync sample is decoded but not presented by the target: FFmpeg lands on it,
+  the reader on the one before. FFmpeg resumes the other tracks at their last sample at
+  or before the landing decode time, the reader at the first at or after the landing.
+
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
 comparison runs and needs the `reference-trace` feature.
 
