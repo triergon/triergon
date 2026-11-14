@@ -1615,3 +1615,111 @@ fn the_built_observer_counts_every_hook_and_operator_new_form() {
     assert_eq!(data.get("status"), Some(&Value::str("invalid")));
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// A pair of valid observations, as `memory::measure` records it.
+fn observed_pair() -> Value {
+    let sample = |observer: Value| {
+        Value::object([
+            ("status", Value::str("measured")),
+            ("instrument_sha256", Value::str("observer-hash")),
+            ("observer", observer),
+        ])
+    };
+    Value::object([
+        ("candidate_heap", sample(receipt("heap"))),
+        ("candidate_rss", sample(kernel_receipt())),
+        ("reference_heap", sample(receipt("heap"))),
+        ("reference_rss", sample(kernel_receipt())),
+    ])
+}
+
+/// The observation the observer records when the module saw another task
+/// update the worker's resident counters.
+fn foreign_update(row: &mut Value, key: &str) {
+    for (field, value) in [
+        ("status", Value::str("invalid")),
+        ("error_bits", Value::int(512)),
+        ("kernel_rss_errors", Value::int(1)),
+    ] {
+        set(row, &[key, "observer"], field, value);
+    }
+}
+
+#[test]
+fn only_a_pair_the_kernel_bound_alone_voided_is_measured_again() {
+    let sha = Value::str("observer-hash");
+    let voided = |row: &Value| super::memory::voided_by_foreign_update(row, Some(&sha));
+    let clean = observed_pair();
+    assert!(linux::valid_receipt(&kernel_receipt(), "rss"));
+    assert!(!voided(&clean), "a valid pair is never discarded");
+    let mut row = clean.clone();
+    foreign_update(&mut row, "reference_rss");
+    assert!(voided(&row));
+    let mut both = row.clone();
+    foreign_update(&mut both, "candidate_rss");
+    assert!(voided(&both));
+    // Any other fault of the pair, or another module error, still fails it.
+    let observer = |key| [key, "observer"];
+    let refused = [
+        (
+            observer("reference_rss"),
+            "kernel_rss_errors",
+            Value::int(4),
+        ),
+        (
+            observer("reference_rss"),
+            "kernel_rss_missed",
+            Value::int(1),
+        ),
+        (
+            observer("reference_rss"),
+            "error_bits",
+            Value::int(512 | 128),
+        ),
+        (
+            observer("reference_rss"),
+            "kernel_rss_requested",
+            Value::int(0),
+        ),
+        (observer("candidate_heap"), "error_bits", Value::int(64)),
+    ];
+    for (path, field, value) in refused {
+        let mut changed = row.clone();
+        set(&mut changed, &path, field, value);
+        assert!(!voided(&changed), "{path:?} {field} was retried");
+    }
+    for (key, field, value) in [
+        ("reference_rss", "status", Value::str("observer-failed")),
+        ("candidate_rss", "instrument_sha256", Value::str("other")),
+    ] {
+        let mut changed = row.clone();
+        set(&mut changed, &[key], field, value);
+        assert!(!voided(&changed), "{key} {field} was retried");
+    }
+    let mut heap = row.clone();
+    foreign_update(&mut heap, "reference_heap");
+    assert!(!voided(&heap), "a heap run carries no kernel bound");
+}
+
+#[test]
+fn recorded_retries_must_be_voided_pairs_within_the_cap() {
+    let sha = Value::str("observer-hash");
+    let mut row = observed_pair();
+    foreign_update(&mut row, "reference_rss");
+    let retry = |pair: i128, sample: &Value| {
+        Value::object([("pair", Value::int(pair)), ("sample", sample.clone())])
+    };
+    let valid =
+        |list: Vec<Value>| super::memory::retries_valid(Some(&Value::Array(list)), 30, Some(&sha));
+    assert!(super::memory::retries_valid(None, 30, Some(&sha)));
+    assert!(valid(vec![retry(3, &row), retry(3, &row)]));
+    assert!(!valid(vec![retry(3, &row); super::memory::MAX_RETRIES + 1]));
+    assert!(
+        !valid(vec![retry(30, &row)]),
+        "a pair the collection never measured"
+    );
+    assert!(
+        !valid(vec![retry(3, &observed_pair())]),
+        "a valid pair was discarded"
+    );
+}
