@@ -20056,6 +20056,160 @@
    "key": "qualification/packet-framing-cycles-ee052323-aarch64/646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e.tar.zst",
    "sha256": "646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e",
    "bytes": 366419
+  },
+  {
+   "name": "packet-framing-exact-reservation",
+   "retention": "retained",
+   "key": "evidence/packet-framing-exact-reservation/b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc.tar.gz",
+   "sha256": "b058a0c47cc2e8e93e7b04f57b17a3a45cd0203aeb7ed6f81bdd614feded30dc",
+   "bytes": 64994162
+  },
+  {
+   "name": "packet-framing-cycle-profiles",
+   "retention": "retained",
+   "key": "evidence/packet-framing-cycle-profiles/7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e.tar.gz",
+   "sha256": "7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e"
+  },
+  {
+   "name": "packet-framing-inline-segment-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-inline-segment-comparison/297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600.tar.gz",
+   "sha256": "297e955badff27602675483a13ecadfa3377521411ebd7017c9b279a6a1c1600",
+   "reason": "Packet framing AArch64 status row: all 125 AVC/HEVC comparisons, paired runtime, heap and total RSS, with the exact source, workers and resource traces",
+   "bytes": 65546655,
+   "source_revision": "fc64e27d2fc6c4a1f6eed253d2e9f00c2ce1c4a4"
+  },
+  {
+   "name": "packet-framing-avc-update-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-avc-update-comparison/e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18.tar.gz",
+   "sha256": "e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18"
+  },
+  {
+   "name": "packet-framing-job-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-job-comparison/a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb.tar.gz",
+   "sha256": "a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb"
+  },
+  {
+   "name": "packet-framing-resident-diagnostics",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-resident-diagnostics/2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5.tar.gz",
+   "sha256": "2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5"
+  },
+  {
+   "name": "packet-framing-profiles",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-profiles/a72d9872b39c6c01ca8e1f22ba36b33b8f57a1073dea735e2f20634667e7b77f.tar.gz",
+   "sha256": "a72d9872b39c6c01ca8e1f22ba36b33b8f57a1073dea735e2f20634667e7b77f"
+  },
+  {
+   "name": "packet-framing-budget-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-budget-count/7034e01ee5d0cf4d9c3a2ec41358e105498e519cd7c15e333055b649b3c4da61.tar.gz",
+   "sha256": "7034e01ee5d0cf4d9c3a2ec41358e105498e519cd7c15e333055b649b3c4da61"
+  },
+  {
+   "name": "packet-framing-layout-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-layout-count/669f4acdba1f03cbc7765ebe0e8e790a8672c255707cad7bd0a680ec58b6a66a.tar.gz",
+   "sha256": "669f4acdba1f03cbc7765ebe0e8e790a8672c255707cad7bd0a680ec58b6a66a"
+  },
+  {
+   "name": "packet-framing-layout-screen",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-layout-screen/18cde9b75c7343f91064856d7f667a88474041381edc3a7bf48d0c20da30449a.tar.gz",
+   "sha256": "18cde9b75c7343f91064856d7f667a88474041381edc3a7bf48d0c20da30449a"
+  },
+  {
+   "name": "packet-framing-refinement-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-refinement-count/8ec70d2d2a8656fa50719104ed3f70b0eb189ea0b48436eead96c55aa67c5c0f.tar.gz",
+   "sha256": "8ec70d2d2a8656fa50719104ed3f70b0eb189ea0b48436eead96c55aa67c5c0f"
+  },
+  {
+   "name": "packet-framing-state-count",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-state-count/8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d.tar.gz",
+   "sha256": "8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d"
+  },
+  {
+   "name": "packet-framing-publication-count",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-publication-count/6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc.tar.gz",
+   "sha256": "6a865704505d5a75568599906e16b88f35729ff7ded2832541f8d56a5bc86ddc"
+  },
+  {
+   "name": "packet-framing-hevc-resource-traces",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-hevc-resource-traces/d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884.tar.gz",
+   "sha256": "d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884"
+  },
+  {
+   "name": "packet-framing-inline-comparison",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-inline-comparison/00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff.tar.gz",
+   "sha256": "00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff"
+  },
+  {
+   "name": "packet-framing-inline-gate-build",
+   "retention": "retained",
+   "key": "evidence/packet-framing-inline-gate-build/f4e2a24b9da316d42c9e5edaf56388e239bf692b2e382e36c6125c2e0460a0a5.tar.gz",
+   "sha256": "f4e2a24b9da316d42c9e5edaf56388e239bf692b2e382e36c6125c2e0460a0a5"
+  },
+  {
+   "name": "packet-framing-segment-resource-traces",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-segment-resource-traces/1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4.tar.gz",
+   "sha256": "1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4"
+  },
+  {
+   "name": "packet-framing-segment-gate-build",
+   "retention": "retained",
+   "key": "evidence/packet-framing-segment-gate-build/8c3eb3b37920b7b3308c0600cd3d6b68b9ce694f831d4f952fb49007a09f6628.tar.gz",
+   "sha256": "8c3eb3b37920b7b3308c0600cd3d6b68b9ce694f831d4f952fb49007a09f6628"
+  },
+  {
+   "name": "packet-framing-configuration-lookup",
+   "path": "packet-framing-configuration-lookup",
+   "retention": "retained",
+   "reason": "packet-framing configuration lookup and paired build comparisons cited by docs/status.md",
+   "key": "evidence/packet-framing-configuration-lookup/f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f.tar.gz",
+   "sha256": "f3c88cd969c581ebd803e860a0c52f5ee00285a99f85d563aa949862140cf33f",
+   "bytes": 104415028
+  },
+  {
+   "name": "packet-framing-compact-state",
+   "retention": "retained",
+   "key": "evidence/packet-framing-compact-state/7b09d5ecab0b8752146e7e548668145cb9ba488bcfd55dc18eb70a8d8f035d84.tar.gz",
+   "sha256": "7b09d5ecab0b8752146e7e548668145cb9ba488bcfd55dc18eb70a8d8f035d84"
+  },
+  {
+   "name": "packet-framing-bounded-insert",
+   "retention": "retained",
+   "key": "evidence/packet-framing-bounded-insert/8ef50e430c7377e613aaa960bacb794e4de540cec032412c77cff77ed2a0ebaa.tar.gz",
+   "sha256": "8ef50e430c7377e613aaa960bacb794e4de540cec032412c77cff77ed2a0ebaa"
+  },
+  {
+   "name": "packet-framing-hevc-inline",
+   "retention": "retained",
+   "key": "evidence/packet-framing-hevc-inline/f0adf4775628265e8b3ad509c64b15961075d9f6b2613b0f7e70b26b988af228.tar.gz",
+   "sha256": "f0adf4775628265e8b3ad509c64b15961075d9f6b2613b0f7e70b26b988af228"
+  },
+  {
+   "name": "packet-framing-avc-scan",
+   "retention": "retained",
+   "key": "evidence/packet-framing-avc-scan/920a7967407aa6a8b5bd2becbdabb7d40442ed4a29018df88acabae65775e5c7.tar.gz",
+   "sha256": "920a7967407aa6a8b5bd2becbdabb7d40442ed4a29018df88acabae65775e5c7"
+  },
+  {
+   "name": "packet-framing-inline-storage-1cea5f7b-aarch64",
+   "path": "packet-framing-inline-storage-1cea5f7b-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison with five inline segment descriptors, short AVC extensions and static runtime support. Includes the exact source, workers, observer proof, all 131 timings and memory samples, and the failed runtime grade.",
+   "key": "evidence/packet-framing-inline-storage-1cea5f7b-aarch64/f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5.tar.zst",
+   "sha256": "f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5",
+   "bytes": 41030376
   }
  ]
 }

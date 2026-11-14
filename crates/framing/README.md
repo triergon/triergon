@@ -14,6 +14,11 @@ is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
 Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
 and are fed with `provide` and closed with `finish` or `fail`.
 
+AVC and HEVC record parsers, including their compatibility wrappers, also offer
+`step_into` with an empty output slot and `ConfigProgress`. This publishes the
+configuration directly into caller storage. Occupied slots are rejected without
+advancing the parser; `step` retains the same progress and error behaviour.
+
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
@@ -118,17 +123,35 @@ size/type header); sample jobs take one complete container sample.
 generation. Raw and reserved fields stay readable; local violations are reported
 through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
 fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
-retained view keeps the whole backing allocation charged. Small AVC records can
-reuse the checked offsets from the validation pass when the remaining work
-budget covers publishing the descriptors.
+retained view keeps the whole backing allocation charged. An AVC configuration
+keeps up to four NAL descriptors inline; larger records use charged heap storage.
+Small records reuse the checked offsets from the validation pass when the
+remaining work budget covers publishing the descriptors. Each scan step keeps
+its cursor local and saves it at a return to the caller. Array counts and the
+validated end offset are derived from the descriptors and the extension fields.
+HEVC configurations independently keep up to four array descriptors and four NAL
+descriptors inline. The validation pass fills both tables when they fit inline.
+When either exceeds its inline capacity, a second pass fills the tables with
+exact-capacity charged storage for the larger tables. Both paths keep the same
+work checkpoints and retain the original record.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs allocate segment storage as needed and share the original
-payload for passthrough packets.
+Stateful packet jobs keep up to five segment descriptors inline, then spill the
+complete table into charged heap storage. The spill can use the exact segment
+count from HEVC lookahead or an upper bound from the AVC configuration. A
+refused hint falls back to ordinary growth. A refused spill keeps the inline
+descriptors intact for retry. Retaining complete outputs in a `BudgetVec`
+charges their full element size, including inline descriptors. Passthrough packets
+share the original payload. Segment descriptors store the wire-bounded NAL
+length once, with full-width source and output offsets. Whole-packet passthrough
+lengths remain full width as well.
+Contiguous copying selects the packet buffer directly for packet segments and
+looks up the active configuration only for configuration segments. Both paths
+retain their checked payload ranges.
 
 **Codec-specific limits.**
 
@@ -200,6 +223,10 @@ complete packet fields and side data, malformed input, flush and drain actions,
 and retained packet access after close. Add `--benchmark --memory` to collect
 paired runtime and memory measurements through the shared harness; qualification
 requires the pinned gate build on native AArch64 Linux.
+
+Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
+`cargo test -p triergon-framing --features reference-trace --test packet_view`
+to export every complete event trace and digest with all digest assertions active.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in

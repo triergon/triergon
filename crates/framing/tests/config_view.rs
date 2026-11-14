@@ -20,6 +20,12 @@ trait Drive {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Outcome<BuildStep<Self::Out>>;
+    fn drive_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<Self::Out>,
+    ) -> Outcome<ConfigProgress>;
 }
 macro_rules! drive {
     ($($parser:ty => $out:ty),* $(,)?) => {$(
@@ -32,6 +38,14 @@ macro_rules! drive {
             ) -> Outcome<BuildStep<$out>> {
                 self.step(work, cancel)
             }
+            fn drive_into(
+                &mut self,
+                work: &mut WorkBudget,
+                cancel: &AtomicBool,
+                ready: &mut Option<$out>,
+            ) -> Outcome<ConfigProgress> {
+                self.step_into(work, cancel, ready)
+            }
         }
     )*};
 }
@@ -41,6 +55,37 @@ drive!(
     ReceiverAvcConfigParser => ReceiverAvcConfiguration,
     ReceiverHevcConfigParser => ReceiverHevcConfiguration,
 );
+
+struct Slots<P>(P);
+impl<P: Drive> Drive for Slots<P> {
+    type Out = P::Out;
+
+    fn drive(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Outcome<BuildStep<Self::Out>> {
+        let mut ready = None;
+        let progress = self.0.drive_into(work, cancel, &mut ready);
+        if progress != Ok(ConfigProgress::Ready) {
+            assert!(ready.is_none());
+        }
+        match progress? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(ready.unwrap())),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
+        }
+    }
+
+    fn drive_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<Self::Out>,
+    ) -> Outcome<ConfigProgress> {
+        self.0.drive_into(work, cancel, ready)
+    }
+}
 
 static NO: AtomicBool = AtomicBool::new(false);
 const QUANTA: [u64; 7] = [1, 2, 3, 5, 7, 16, 4096];
@@ -640,7 +685,7 @@ fn single_exports_outlive_parser_and_configuration_with_one_full_owner() {
     let config = run(&mut parser, 4096).1.unwrap();
     drop(parser);
     let table = config.descriptor_storage_bytes().unwrap();
-    assert!(table > 0);
+    assert_eq!(table, 0);
     assert_eq!(config.retained_storage_bytes().unwrap(), raw_charge + table);
     assert_eq!(pool.used(), baseline + raw_charge + table);
     let suffix = config.retain_opaque_suffix().unwrap();
@@ -916,6 +961,55 @@ fn avc_cached_fill_boundary_matches_fallback_output_and_work() {
 }
 
 #[test]
+fn hevc_late_nal_spill_preserves_the_array_prefix_after_backpressure() {
+    let vps = hvc_nal(32, 9);
+    let sps = hvc_nal(33, 7);
+    let record = hvc_record(
+        4,
+        &[(32, vec![vps.clone(); 4]), (33, vec![sps.clone()])],
+        &[0xe7],
+    );
+    let pool = Budget::new(4096).unwrap();
+    let baseline = pool.used();
+    let mut parser =
+        HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, &record), hvc_limits()).unwrap();
+    let blocker = bytes(
+        &pool,
+        &vec![0; pool.available() - Bytes::owner_overhead_bytes()],
+    );
+    assert_eq!(pool.available(), 0);
+
+    // Prefix, two array starts and ends, five NALs, record end, array reservation.
+    let mut work = WorkBudget::new(12);
+    assert!(matches!(parser.step(&mut work, &NO), Ok(BuildStep::Yield)));
+    assert_eq!(work.remaining(), 0);
+    let mut work = WorkBudget::new(1);
+    assert!(matches!(
+        parser.step(&mut work, &NO),
+        Err(Error::Backpressure { available: 0, .. })
+    ));
+    assert_eq!(work.remaining(), 0);
+    drop(blocker);
+
+    let (trace, result) = run(&mut parser, 11);
+    assert_eq!(trace, [("ready", 0)]);
+    let config = result.unwrap();
+    assert_eq!(config.array_count(), 2);
+    assert_eq!(config.array(0).unwrap().nal_indices(), 0..4);
+    assert_eq!(config.array(1).unwrap().nal_indices(), 4..5);
+    assert_eq!(config.nal_count(), 5);
+    assert!(config.nals().take(4).all(|n| n.source_bytes() == vps));
+    assert_eq!(config.nal(4).unwrap().source_bytes(), sps);
+    assert_eq!(config.opaque_suffix(), [0xe7]);
+    assert_eq!(
+        pool.used(),
+        baseline + config.retained_storage_bytes().unwrap()
+    );
+    drop(config);
+    assert_eq!(pool.used(), baseline);
+}
+
+#[test]
 fn permanent_failures_and_limits_latch_and_release() {
     let rich = avc_rich();
     // Late physical truncation, zero NAL length and a bad fixed NAL header.
@@ -1069,7 +1163,8 @@ fn actual_capacity_minimum_budget_and_resumable_pressure() {
         };
         // The configuration held only its record charge plus its actual
         // table capacity.
-        assert!(table > 0 && charge > 0);
+        assert!(charge > 0);
+        assert_eq!(table == 0, codec == "hevc");
         assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
@@ -1105,18 +1200,228 @@ fn actual_capacity_minimum_budget_and_resumable_pressure() {
         bytes(pool, &vec![0; size])
     };
     let expected = avc_check(&rich, avc_limits(), 1).1.unwrap();
-    let pool = Budget::new(1 << 16).unwrap();
-    let raw = bytes(&pool, &rich);
-    let parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
-    let blocker = block(&pool);
-    assert_eq!(avc_facts(&pressured(parser, blocker)), expected);
+    for slots in [false, true] {
+        let pool = Budget::new(1 << 16).unwrap();
+        let raw = bytes(&pool, &rich);
+        let parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
+        let blocker = block(&pool);
+        let output = if slots {
+            pressured(Slots(parser), blocker)
+        } else {
+            pressured(parser, blocker)
+        };
+        assert_eq!(avc_facts(&output), expected);
+    }
 
     let expected = hvc_check(&hvc, hvc_limits(), 1).1.unwrap();
-    let pool = Budget::new(1 << 16).unwrap();
-    let raw = bytes(&pool, &hvc);
-    let parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
-    let blocker = block(&pool);
-    assert_eq!(hvc_facts(&pressured(parser, blocker)), expected);
+    for slots in [false, true] {
+        let pool = Budget::new(1 << 16).unwrap();
+        let raw = bytes(&pool, &hvc);
+        let mut parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+        let blocker = block(&pool);
+        let output = if slots {
+            run(&mut Slots(parser), 1).1.unwrap()
+        } else {
+            run(&mut parser, 1).1.unwrap()
+        };
+        assert_eq!(hvc_facts(&output), expected);
+        assert_eq!(output.descriptor_storage_bytes().unwrap(), 0);
+        drop(blocker);
+    }
+    let hvc = hvc_record(
+        4,
+        &[
+            (33, vec![hvc_nal(33, 9); 5]),
+            (55, vec![]),
+            (33, vec![]),
+            (32, vec![]),
+            (39, vec![]),
+        ],
+        &[],
+    );
+    let expected = hvc_check(&hvc, hvc_limits(), 1).1.unwrap();
+    for slots in [false, true] {
+        let pool = Budget::new(1 << 16).unwrap();
+        let raw = bytes(&pool, &hvc);
+        let parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+        let blocker = block(&pool);
+        let output = if slots {
+            pressured(Slots(parser), blocker)
+        } else {
+            pressured(parser, blocker)
+        };
+        assert_eq!(hvc_facts(&output), expected);
+    }
+}
+
+#[test]
+fn configuration_slots_preserve_traces_and_facts() {
+    fn compare<P: Drive, F: std::fmt::Debug + PartialEq>(
+        make: impl Fn() -> P,
+        facts: impl Fn(&P::Out) -> F,
+        quantum: u64,
+    ) {
+        let (before, expected) = run(&mut make(), quantum);
+        let (after, actual) = run(&mut Slots(make()), quantum);
+        assert_eq!(after, before);
+        assert_eq!(actual.map(|v| facts(&v)), expected.map(|v| facts(&v)));
+    }
+
+    let pool = Budget::new(1 << 20).unwrap();
+    let baseline = pool.used();
+    let plain = avc_fixture_records()
+        .into_iter()
+        .find(|(label, _)| label == "plain-control")
+        .unwrap()
+        .1;
+    for record in [plain, avc_rich(), avc_rich()[..6].to_vec()] {
+        for quantum in QUANTA {
+            compare(
+                || {
+                    AvcConfigParser::new(&pool, avc_source(), bytes(&pool, &record), avc_limits())
+                        .unwrap()
+                },
+                avc_facts,
+                quantum,
+            );
+            compare(
+                || {
+                    ReceiverAvcConfigParser::new_update(
+                        &pool,
+                        avc_source(),
+                        bytes(&pool, &record),
+                        avc_limits(),
+                    )
+                    .unwrap()
+                },
+                |v| {
+                    (
+                        v.source_bytes().to_vec(),
+                        v.fields(),
+                        v.strict_source_refusal(),
+                        v.nals()
+                            .map(|n| (n.source_range(), n.header(), n.source_bytes().to_vec()))
+                            .collect::<Vec<_>>(),
+                    )
+                },
+                quantum,
+            );
+        }
+        assert_eq!(pool.used(), baseline);
+    }
+    for record in [
+        hvc_prefix(4, 0),
+        hvc_example(&[0xe7]),
+        hvc_example(&[])[..22].to_vec(),
+    ] {
+        for quantum in QUANTA {
+            compare(
+                || {
+                    HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, &record), hvc_limits())
+                        .unwrap()
+                },
+                hvc_facts,
+                quantum,
+            );
+            compare(
+                || {
+                    ReceiverHevcConfigParser::new(
+                        &pool,
+                        hvc_source(),
+                        bytes(&pool, &record),
+                        hvc_limits(),
+                    )
+                    .unwrap()
+                },
+                |v| {
+                    (
+                        v.source_bytes().to_vec(),
+                        v.fields(),
+                        v.strict_source_refusal(),
+                        v.syntax_issues(),
+                        v.nal_count(),
+                        v.opaque_suffix().to_vec(),
+                    )
+                },
+                quantum,
+            );
+        }
+        assert_eq!(pool.used(), baseline);
+    }
+}
+
+#[test]
+fn occupied_configuration_slots_are_inert_and_cancellation_stays_sticky() {
+    fn check<P: Drive>(pool: &Budget, make: impl Fn() -> P) {
+        let mut ready = Some(run(&mut make(), 4096).1.unwrap());
+        let mut parser = make();
+        let used = pool.used();
+        let mut work = WorkBudget::new(19);
+        assert_eq!(
+            parser.drive_into(&mut work, &AtomicBool::new(true), &mut ready),
+            Err(Error::Invalid("configuration output sink occupied"))
+        );
+        assert_eq!(work.remaining(), 19);
+        assert_eq!(pool.used(), used);
+        let retained = ready.take().unwrap();
+        assert_eq!(
+            parser.drive_into(&mut WorkBudget::new(0), &NO, &mut ready),
+            Ok(ConfigProgress::Yield)
+        );
+        let value = run(&mut Slots(parser), 1).1.unwrap();
+        drop(value);
+        drop(retained);
+
+        let mut parser = make();
+        assert_eq!(
+            parser.drive_into(&mut WorkBudget::new(0), &AtomicBool::new(true), &mut ready),
+            Err(Error::Cancelled)
+        );
+        assert!(ready.is_none());
+        let used = pool.used();
+        let mut work = WorkBudget::new(23);
+        assert_eq!(
+            parser.drive_into(&mut work, &NO, &mut ready),
+            Err(Error::Cancelled)
+        );
+        assert!(ready.is_none());
+        assert_eq!(work.remaining(), 23);
+        assert_eq!(pool.used(), used);
+    }
+
+    let pool = Budget::new(1 << 20).unwrap();
+    let baseline = pool.used();
+    check(&pool, || {
+        AvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc_rich()), avc_limits()).unwrap()
+    });
+    check(&pool, || {
+        HvcConfigParser::new(
+            &pool,
+            hvc_source(),
+            bytes(&pool, &hvc_example(&[])),
+            hvc_limits(),
+        )
+        .unwrap()
+    });
+    check(&pool, || {
+        ReceiverAvcConfigParser::new_update(
+            &pool,
+            avc_source(),
+            bytes(&pool, &avc_rich()),
+            avc_limits(),
+        )
+        .unwrap()
+    });
+    check(&pool, || {
+        ReceiverHevcConfigParser::new(
+            &pool,
+            hvc_source(),
+            bytes(&pool, &hvc_example(&[])),
+            hvc_limits(),
+        )
+        .unwrap()
+    });
+    assert_eq!(pool.used(), baseline);
 }
 
 #[test]

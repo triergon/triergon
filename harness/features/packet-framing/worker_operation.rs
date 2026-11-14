@@ -10,12 +10,14 @@ use triergon_framing::*;
 const QUANTUM: u64 = 4096;
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
-fn avc(
+#[inline(never)]
+fn avc_into(
     pool: &Budget,
     raw: Bytes,
     offset: u64,
     update: bool,
-) -> std::result::Result<ReceiverAvcConfiguration, (Error, Option<i32>)> {
+    ready: &mut Option<ReceiverAvcConfiguration>,
+) -> std::result::Result<(), (Error, Option<i32>)> {
     let source = AvcConfigSource {
         source: SourceId(1),
         generation: 1,
@@ -33,10 +35,12 @@ fn avc(
     }
     .map_err(|e| (e, None))?;
     loop {
-        match parser.step(&mut WorkBudget::new(QUANTUM), &CANCEL) {
-            Ok(BuildStep::Ready(v)) => return Ok(v),
-            Ok(BuildStep::Yield) => (),
-            Ok(BuildStep::Complete) => return Err((Error::Invalid("configuration missing"), None)),
+        match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, ready) {
+            Ok(ConfigProgress::Ready) => return Ok(()),
+            Ok(ConfigProgress::Yield) => (),
+            Ok(ConfigProgress::Complete) => {
+                return Err((Error::Invalid("configuration missing"), None));
+            }
             Err(e) => {
                 return Err((
                     e,
@@ -49,18 +53,32 @@ fn avc(
     }
 }
 
-fn configuration(case: &Case) -> Result<NalPacketConfiguration> {
+#[inline(never)]
+fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -> Result<()> {
     let raw = &case.configuration;
     if raw.len() < 4 || raw.starts_with(&[0, 0, 1]) || raw.starts_with(&[0, 0, 0, 1]) {
-        return Ok(NalPacketConfiguration::Passthrough {
+        *ready = Some(NalPacketConfiguration::Passthrough {
             codec: case.codec,
             raw: raw.clone(),
         });
+        return Ok(());
     }
     match case.codec {
-        Codec::Avc => avc(&case.pool, raw.clone(), case.config_offset, false)
-            .map(NalPacketConfiguration::ReceiverAvc)
-            .map_err(|(e, _)| e),
+        Codec::Avc => {
+            let mut record = None;
+            avc_into(
+                &case.pool,
+                raw.clone(),
+                case.config_offset,
+                false,
+                &mut record,
+            )
+            .map_err(|(e, _)| e)?;
+            *ready = Some(NalPacketConfiguration::ReceiverAvc(
+                record.ok_or(Error::Invalid("configuration missing"))?,
+            ));
+            Ok(())
+        }
         Codec::Hevc => {
             let mut parser = ReceiverHevcConfigParser::new(
                 &case.pool,
@@ -77,11 +95,19 @@ fn configuration(case: &Case) -> Result<NalPacketConfiguration> {
                     maximum_nal_bytes: 65535,
                 },
             )?;
+            let mut record = None;
             loop {
-                match parser.step(&mut WorkBudget::new(QUANTUM), &CANCEL)? {
-                    BuildStep::Ready(v) => return Ok(NalPacketConfiguration::ReceiverHevc(v)),
-                    BuildStep::Yield => (),
-                    BuildStep::Complete => return Err(Error::Invalid("configuration missing")),
+                match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, &mut record)? {
+                    ConfigProgress::Ready => {
+                        *ready = Some(NalPacketConfiguration::ReceiverHevc(
+                            record.ok_or(Error::Invalid("configuration missing"))?,
+                        ));
+                        return Ok(());
+                    }
+                    ConfigProgress::Yield => (),
+                    ConfigProgress::Complete => {
+                        return Err(Error::Invalid("configuration missing"));
+                    }
                 }
             }
         }
@@ -147,7 +173,11 @@ fn retain_output<T>(kept: &mut BudgetVec<T>, value: T, following: &[Event]) -> R
 
 fn operation(case: &Case) -> Result<Outcome> {
     let mut outcome = Outcome::default();
-    let config = configuration(case)?;
+    let config = {
+        let mut ready = None;
+        configuration_into(case, &mut ready)?;
+        ready.ok_or(Error::Invalid("configuration missing"))?
+    };
     let mut session = NalPacketSession::new(
         &case.pool,
         config,
@@ -211,22 +241,19 @@ fn operation(case: &Case) -> Result<Outcome> {
             }
             continue;
         };
-        let update = if case.codec == Codec::Avc {
-            if let Some(raw) = extra.as_ref().filter(|b| !b.is_empty()) {
-                match avc(&case.pool, raw.clone(), *extra_offset, true) {
-                    Ok(v) => Some(v),
-                    Err((_, Some(code))) => {
-                        receive_failure(&mut outcome.digest, index, code);
-                        continue;
-                    }
-                    Err((error, None)) => return Err(error),
+        let mut update = None;
+        if case.codec == Codec::Avc
+            && let Some(raw) = extra.as_ref().filter(|b| !b.is_empty())
+        {
+            match avc_into(&case.pool, raw.clone(), *extra_offset, true, &mut update) {
+                Ok(()) => (),
+                Err((_, Some(code))) => {
+                    receive_failure(&mut outcome.digest, index, code);
+                    continue;
                 }
-            } else {
-                None
+                Err((error, None)) => return Err(error),
             }
-        } else {
-            None
-        };
+        }
         let packet = NalPacket {
             bytes: bytes.clone(),
             fields: *fields,
