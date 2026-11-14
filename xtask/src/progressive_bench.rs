@@ -19,7 +19,8 @@ All five functional inputs (ten literal worker outcomes) must pass first.
 The three original comparable cases are required for correctness, runtime and memory.
 Timing uses 50 complete sessions per sample and at least 30 paired samples.";
 
-const FEATURE: &str = "harness/features/progressive-ts188";
+/// The feature's directory; its inputs are under `inputs`.
+pub const FEATURE: &str = "harness/features/progressive-ts188";
 const OPERATION: &str = "ProgressiveAvcAacTsOwnedFeedV1";
 const TIMED: [&str; 3] = ["continuous-44100", "reordered-48000", "later-entry-48000"];
 const CONTROLS: [&str; 5] = [

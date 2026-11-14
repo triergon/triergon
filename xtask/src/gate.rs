@@ -473,7 +473,15 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             progressive("memory"),
         )
         .into(),
-        preflight: owned(&["--feature", "progressive-ts188"]),
+        preflight: owned(&[
+            "--feature",
+            "progressive-ts188",
+            "--corpus",
+            &format!(
+                "progressive-ts188={}/inputs",
+                crate::progressive_bench::FEATURE
+            ),
+        ]),
     });
 
     let target_args = |mut args: Vec<String>| {
@@ -1605,6 +1613,31 @@ mod tests {
     fn every_registered_feature_is_planned_or_excluded() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
         assert_eq!(coverage_problems(root).unwrap(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn features_with_committed_inputs_are_preflighted_against_them() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        for item in plan() {
+            let args = &item.preflight;
+            for (index, arg) in args.iter().enumerate() {
+                if arg != "--feature" {
+                    continue;
+                }
+                let id = &args[index + 1];
+                let inputs = format!("harness/features/{id}/inputs");
+                if !root.join(&inputs).is_dir() {
+                    continue;
+                }
+                let corpus = format!("{id}={inputs}");
+                assert!(
+                    args.windows(2)
+                        .any(|pair| pair[0] == "--corpus" && pair[1] == corpus),
+                    "{}: preflight of {id} without --corpus {corpus}",
+                    item.name
+                );
+            }
+        }
     }
 
     #[test]
