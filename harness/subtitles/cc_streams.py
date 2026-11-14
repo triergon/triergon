@@ -891,7 +891,7 @@ def frame_pictures(count, bs=(), start=None, ifr=None):
     for n in range(count):
         if n in bs:
             above = bs[n]
-            out.append(("B", False, False, fn + 1, pocs[-above] - 1))
+            out.append(("B", False, False, fn + 1, pocs[-above] - 1 if above else pocs[-1] + 1))
             continue
         if n == 0 and start is None:
             out.append(("I", True, True, 0, 0)); pocs.append(0); continue
@@ -1556,6 +1556,12 @@ def picture_output_cases(tmp_dir):
     # and dropped, the depth becomes 3; at 60 one 3 below is kept, at 80 one
     # 4 below dropped.
     written("h264-depth-grow", frame_pictures(300, bs={30: 3, 60: 3, 80: 4}))
+    # The longer start hold: a depth of 1 by the seventh picture holds the
+    # pictures until index 8 (a B picture 5 below at 8 is kept and makes the
+    # depth 5); a B picture in order (at index 1) makes one picture wait (one
+    # 1 below at 30 is kept).
+    written("h264-hold-depth1", frame_pictures(300, bs={2: 1, 8: 5, 12: 2}))
+    written("h264-b-in-order", frame_pictures(300, bs={1: 0, 30: 1}))
     # Starts without IDR picture or recovery point: P frames, then a non-IDR
     # I frame at index 2; with reorder depth 2 the I frame is kept and the 2
     # frames after it dropped; without a restriction (depth 0) the I frame
