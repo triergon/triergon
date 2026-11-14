@@ -9,8 +9,9 @@ use super::zone::{ON_CURVE, TOUCHED_X, TOUCHED_Y, Zone};
 use crate::outline::Point;
 use triergon_core::{BudgetVec, Error, Result, WorkBudget};
 
-/// The deepest nesting of function calls.
-const MAX_CALL_DEPTH: usize = 64;
+/// The deepest nesting of function calls. Observed: 32 calls may be in
+/// progress, and a 33rd ends the program (`call-depth`).
+const MAX_CALL_DEPTH: usize = 32;
 
 /// Where code lives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,72 +32,118 @@ pub(super) struct Code {
     pub(super) end: u32,
 }
 
-/// Function definitions by number. Observed: any number may be defined, up
-/// to `maxp`'s function count or 64 distinct numbers, whichever is more
-/// (`limits`, `limits-twilight`, `limits-stack`, `limits-functions-64`,
-/// `limits-functions-65`).
+/// Function definitions by number: any number may be defined, up to a
+/// capacity of distinct numbers, which `maxp` sets (see `Profile::read`).
 #[derive(Debug)]
 pub(super) struct Functions {
     /// Numbers below the capacity, by number.
     numbered: BudgetVec<Option<Code>>,
-    /// Larger numbers.
+    /// Larger numbers, in order.
     others: BudgetVec<(u32, Code)>,
     defined: usize,
+    capacity: usize,
 }
 
 impl Functions {
-    pub(super) fn new(budget: &triergon_core::Budget, maxp: u16) -> Result<Self> {
-        let capacity = usize::from(maxp).max(64);
+    pub(super) fn new(budget: &triergon_core::Budget, capacity: usize) -> Result<Self> {
         Ok(Self {
             numbered: BudgetVec::try_filled(budget, None, capacity)?,
             others: BudgetVec::new(budget),
             defined: 0,
+            capacity,
         })
     }
 
     fn get(&self, number: i32) -> Option<Code> {
         let number = number as u32;
-        match self.numbered.as_slice().get(number as usize) {
-            Some(code) => *code,
-            None => self
-                .others
-                .as_slice()
-                .iter()
-                .find(|(n, _)| *n == number)
-                .map(|&(_, code)| code),
+        if let Some(code) = self.numbered.as_slice().get(number as usize) {
+            return *code;
         }
+        let others = self.others.as_slice();
+        others
+            .binary_search_by_key(&number, |&(n, _)| n)
+            .ok()
+            .map(|i| others[i].1)
     }
 
-    /// Defines function `number`; `false` when that would define more
-    /// numbers than the capacity.
-    fn define(&mut self, number: i32, code: Code) -> Result<bool> {
+    /// Defines function `number`; `None` when that would define more
+    /// numbers than the capacity, else how many definitions it moved.
+    fn define(&mut self, number: i32, code: Code) -> Result<Option<usize>> {
         let number = number as u32;
-        let capacity = self.numbered.len();
         if let Some(slot) = self.numbered.as_mut_slice().get_mut(number as usize) {
             if slot.is_none() {
-                if self.defined == capacity {
-                    return Ok(false);
+                if self.defined == self.capacity {
+                    return Ok(None);
                 }
                 self.defined += 1;
             }
             *slot = Some(code);
-            return Ok(true);
+            return Ok(Some(0));
         }
-        if let Some(entry) = self
+        let at = match self
             .others
-            .as_mut_slice()
-            .iter_mut()
-            .find(|(n, _)| *n == number)
+            .as_slice()
+            .binary_search_by_key(&number, |&(n, _)| n)
         {
-            entry.1 = code;
-            return Ok(true);
-        }
-        if self.defined == capacity {
-            return Ok(false);
+            Ok(i) => {
+                self.others.as_mut_slice()[i].1 = code;
+                return Ok(Some(0));
+            }
+            Err(at) => at,
+        };
+        if self.defined == self.capacity {
+            return Ok(None);
         }
         self.defined += 1;
         self.others.try_push((number, code)).map_err(|e| e.error)?;
-        Ok(true)
+        self.others.as_mut_slice()[at..].rotate_right(1);
+        Ok(Some(self.others.len() - at))
+    }
+}
+
+/// Instruction definitions by opcode. Observed: as many distinct opcodes may
+/// be defined as `maxp` allows, a definition of an opcode already defined
+/// replaces it, and a definition past the limit or of a number outside a
+/// byte is an error (`idef-opcode`, `idef-opcode-none-allowed`,
+/// `idef-opcode-wide`, `idef-opcode-negative`, `idef-limit-two`,
+/// `idef-limit-same`).
+#[derive(Debug)]
+pub(super) struct Instructions {
+    by_opcode: BudgetVec<Option<Code>>,
+    defined: usize,
+    capacity: usize,
+}
+
+impl Instructions {
+    pub(super) fn new(budget: &triergon_core::Budget, capacity: u16) -> Result<Self> {
+        Ok(Self {
+            by_opcode: BudgetVec::try_filled(budget, None, 256)?,
+            defined: 0,
+            capacity: usize::from(capacity),
+        })
+    }
+
+    fn get(&self, op: u8) -> Option<Code> {
+        self.by_opcode.as_slice()[usize::from(op)]
+    }
+
+    /// Defines `number`'s instruction; `false` for a number outside a byte
+    /// or past the capacity.
+    fn define(&mut self, number: i32, code: Code) -> bool {
+        let Some(slot) = u8::try_from(number)
+            .ok()
+            .map(|op| &mut self.by_opcode.as_mut_slice()[usize::from(op)])
+        else {
+            return false;
+        };
+        if slot.is_none() {
+            if self.defined == self.capacity {
+                return false;
+            }
+            self.defined += 1;
+        }
+        *slot = Some(code);
+        true
     }
 }
 
@@ -206,7 +253,7 @@ pub(super) struct Machine<'a> {
     pub(super) cvt: &'a mut [i32],
     pub(super) storage: &'a mut [i32],
     pub(super) functions: &'a mut Functions,
-    pub(super) instructions: &'a mut BudgetVec<(u8, Code)>,
+    pub(super) instructions: &'a mut Instructions,
     pub(super) twilight: &'a mut Zone,
     pub(super) glyph: &'a mut Zone,
     pub(super) state: GraphicsState,
@@ -247,9 +294,7 @@ impl Machine<'_> {
                 // A function without ENDF ends with its program.
                 return Err(Stop::Program);
             }
-            if !self.work.try_charge(1) {
-                return Err(Stop::Limit(Error::Policy("TrueType instructions")));
-            }
+            self.charge(1)?;
             let code = self.code[program as usize];
             let op = code[ip];
             let mut next = ip + 1;
@@ -264,7 +309,7 @@ impl Machine<'_> {
             }
             match op {
                 0x40 | 0x41 | 0xB0..=0xBF => next = self.push(code, ip)?,
-                0x1B => next = skip(code, next, end, Skip::Eif).ok_or(Stop::Program)?,
+                0x1B => next = self.skip(code, next, end, Skip::Eif)?,
                 0x1C | 0x78 | 0x79 => {
                     let (offset, jump) = if op == 0x1C {
                         (self.pop(), true)
@@ -282,7 +327,7 @@ impl Machine<'_> {
                 }
                 0x58 => {
                     if self.pop() == 0 {
-                        next = skip(code, next, end, Skip::ElseOrEif).ok_or(Stop::Program)?;
+                        next = self.skip(code, next, end, Skip::ElseOrEif)?;
                     }
                 }
                 0x59 => {}
@@ -348,17 +393,33 @@ impl Machine<'_> {
         }
     }
 
+    /// Charges `units` against the work budget: one for each instruction,
+    /// and one for each value, point, flag or byte of code an instruction
+    /// goes through.
+    fn charge(&mut self, units: usize) -> Run {
+        if self.work.try_charge(units as u64) {
+            Ok(())
+        } else {
+            Err(Stop::Limit(Error::Policy("TrueType instructions")))
+        }
+    }
+
+    /// The position after the end of the skipped run at `ip` that `target`
+    /// names, charging a unit per byte skipped; an error if the code ends
+    /// first.
+    fn skip(&mut self, code: &[u8], ip: usize, end: usize, target: Skip) -> Run<usize> {
+        let next = skip(code, ip, end, target);
+        self.charge(next.unwrap_or(end).saturating_sub(ip))?;
+        next.ok_or(Stop::Program)
+    }
+
     /// The instruction definition for `op`, where the instruction set leaves
     /// it undefined.
     fn defined_instruction(&self, op: u8) -> Option<Code> {
         if !is_undefined(op) {
             return None;
         }
-        self.instructions
-            .as_slice()
-            .iter()
-            .find(|(o, _)| *o == op)
-            .map(|&(_, code)| code)
+        self.instructions.get(op)
     }
 
     /// FDEF or IDEF at `ip`: records the body up to its ENDF and returns the
@@ -375,26 +436,17 @@ impl Machine<'_> {
             return Err(Stop::Program);
         }
         let id = self.pop();
-        let close = skip(code, ip, end, Skip::Endf).ok_or(Stop::Program)?;
+        let close = self.skip(code, ip, end, Skip::Endf)?;
         let body = Code {
             program,
             start: ip as u32,
             end: close as u32,
         };
         if op == 0x2C {
-            if !self.functions.define(id, body)? {
-                return Err(Stop::Program);
-            }
-        } else {
-            let op = id as u8;
-            let list = self.instructions.as_mut_slice();
-            if let Some(entry) = list.iter_mut().find(|(o, _)| *o == op) {
-                entry.1 = body;
-            } else {
-                self.instructions
-                    .try_push((op, body))
-                    .map_err(|e| Stop::Limit(e.error))?;
-            }
+            let moved = self.functions.define(id, body)?.ok_or(Stop::Program)?;
+            self.charge(moved)?;
+        } else if !self.instructions.define(id, body) {
+            return Err(Stop::Program);
         }
         Ok(close)
     }
@@ -410,6 +462,7 @@ impl Machine<'_> {
             0xB0..=0xB7 => (usize::from(op - 0xAF), false, ip + 1),
             _ => (usize::from(op - 0xB7), true, ip + 1),
         };
+        self.charge(count)?;
         let size = if words { 2 } else { 1 };
         let bytes = code.get(data..data + count * size).ok_or(Stop::Program)?;
         for chunk in bytes.chunks_exact(size) {
@@ -503,48 +556,58 @@ impl Machine<'_> {
     /// Moves point `p` of the zone `zone` points to along the freedom vector
     /// until its projection has changed by `distance`, and touches it.
     fn move_point(&mut self, zone: usize, p: usize, distance: i32, touch: bool) {
+        if let Some((_, dy)) = self.displacement(distance) {
+            self.shift_point(zone, p, dy, touch);
+        }
+    }
+
+    /// The move along the freedom vector that changes a projection by
+    /// `distance`; `None` where the vectors are perpendicular.
+    fn displacement(&self, distance: i32) -> Option<(i32, i32)> {
         let (f, pv) = (self.state.freedom, self.state.projection);
-        let (dx, dy) = if f == pv && (f == Vector::X || f == Vector::Y) {
-            (
+        if f == pv && (f == Vector::X || f == Vector::Y) {
+            return Some((
                 if f == Vector::X { distance } else { 0 },
                 if f == Vector::Y { distance } else { 0 },
-            )
-        } else {
-            let dot = f.dot(pv);
-            if dot == 0 {
-                return;
-            }
+            ));
+        }
+        let dot = f.dot(pv);
+        (dot != 0).then(|| {
             (
                 math::mul_div(distance, f.x, dot),
                 math::mul_div(distance, f.y, dot),
             )
-        };
-        self.shift_point(zone, p, dx, dy, touch);
+        })
     }
 
-    /// Moves point `p` by `(dx, dy)`. Observed in backward compatibility
-    /// mode: glyph points never move in x, and no glyph point moves once IUP
-    /// has run in both directions (`backward-compatibility`).
-    fn shift_point(&mut self, zone: usize, p: usize, dx: i32, dy: i32, touch: bool) {
+    /// Moves point `p` by `dy` in y, touching it in the directions the
+    /// freedom vector has. Observed in backward compatibility mode: no point
+    /// moves in x, in the glyph zone or the twilight zone, and no glyph point
+    /// moves once IUP has run in both directions (`backward-compatibility`,
+    /// `twilight-moves`, `twilight-moves-more`); the instructions that place
+    /// twilight points set their x.
+    fn shift_point(&mut self, zone: usize, p: usize, dy: i32, touch: bool) {
         let glyph = self.state.zp[zone] != 0;
-        let (fx, fy) = (self.state.freedom.x != 0, self.state.freedom.y != 0);
         let frozen = glyph && self.interpolated == [true; 2];
         let z = self.zone_mut(zone);
         let point = &mut z.current.as_mut_slice()[p];
         if !frozen {
-            if !glyph {
-                point.x = point.x.wrapping_add(dx);
-            }
             point.y = point.y.wrapping_add(dy);
         }
         if touch {
-            let flags = &mut z.flags.as_mut_slice()[p];
-            if fx {
-                *flags |= TOUCHED_X;
-            }
-            if fy {
-                *flags |= TOUCHED_Y;
-            }
+            self.touch(zone, p);
+        }
+    }
+
+    /// Touches point `p` in the directions the freedom vector has.
+    fn touch(&mut self, zone: usize, p: usize) {
+        let (fx, fy) = (self.state.freedom.x != 0, self.state.freedom.y != 0);
+        let flags = &mut self.zone_mut(zone).flags.as_mut_slice()[p];
+        if fx {
+            *flags |= TOUCHED_X;
+        }
+        if fy {
+            *flags |= TOUCHED_Y;
         }
     }
 
@@ -640,7 +703,7 @@ impl Machine<'_> {
         }
         let steps = (arg & 15) - 8;
         let steps = if steps >= 0 { steps + 1 } else { steps };
-        Some(steps.wrapping_mul(64) >> self.state.delta_shift.clamp(0, 31))
+        Some((steps * 64) >> self.state.delta_shift)
     }
 
     fn instruction(&mut self, op: u8) -> Run {
@@ -743,10 +806,8 @@ impl Machine<'_> {
                     .map(|k| len - k);
                 match (index, op) {
                     (Some(index), 0x26) => {
-                        let v = self.stack.as_slice()[index];
+                        self.charge(len - index)?;
                         self.stack.as_mut_slice()[index..].rotate_left(1);
-                        self.stack.pop();
-                        self.push_value(v)?;
                     }
                     (Some(index), _) => {
                         let v = self.stack.as_slice()[index];
@@ -790,23 +851,30 @@ impl Machine<'_> {
                     self.state.rp[1] = p;
                 }
             }
-            0x30 | 0x31 => self.interpolate_untouched(op == 0x31),
+            0x30 | 0x31 => self.interpolate_untouched(op == 0x31)?,
             0x32..=0x37 => self.shift(op)?,
-            0x38 => self.shift_by_pixels(),
-            0x39 => self.interpolate(),
+            0x38 => self.shift_by_pixels()?,
+            0x39 => self.interpolate()?,
             0x3A | 0x3B => {
                 let d = self.pop();
                 if let Some(p) = self.pop_point(1) {
                     let r = self.state.rp[0];
                     if r < self.zone(0).len() {
                         if self.state.zp[1] == 0 {
-                            let o = self.original(0, r);
+                            // Observed: MSIRP places a twilight point at rp0
+                            // moved by the distance along the freedom vector,
+                            // x included, and its original position with it
+                            // (`twilight-relative`, `twilight-moves`).
                             let c = self.current(0, r);
+                            let (dx, dy) = self.displacement(d).unwrap_or_default();
+                            let at = Point::new(c.x.wrapping_add(dx), c.y.wrapping_add(dy));
                             let z = self.zone_mut(1);
-                            z.original.as_mut_slice()[p] = o;
-                            z.current.as_mut_slice()[p] = c;
+                            z.original.as_mut_slice()[p] = at;
+                            z.current.as_mut_slice()[p] = at;
+                            self.touch(1, p);
+                        } else {
+                            self.move_to_distance(1, p, 0, r, d);
                         }
-                        self.move_to_distance(1, p, 0, r, d);
                         self.state.rp[1] = r;
                         self.state.rp[2] = p;
                         if op == 0x3B {
@@ -815,7 +883,7 @@ impl Machine<'_> {
                     }
                 }
             }
-            0x3C => self.align_to_reference(),
+            0x3C => self.align_to_reference()?,
             0x3D => self.state.round = Round::DoubleGrid,
             0x3E | 0x3F => self.move_indirect_absolute(op == 0x3F),
             0x42 => {
@@ -872,6 +940,12 @@ impl Machine<'_> {
                 if let Some(p) = self.pop_point(2) {
                     let current = self.coordinate(2, p);
                     self.move_point(2, p, c.wrapping_sub(current), true);
+                    // Observed: in the twilight zone SCFS moves the original
+                    // position too (`twilight-moves`).
+                    if self.state.zp[2] == 0 {
+                        let z = self.zone_mut(2);
+                        z.original.as_mut_slice()[p] = z.current.as_slice()[p];
+                    }
                 }
             }
             0x49 | 0x4A => {
@@ -917,13 +991,20 @@ impl Machine<'_> {
                     if let (Some(amount), Some(slot)) = (amount, slot) {
                         *slot = slot.wrapping_add(amount);
                     }
-                    if !self.work.try_charge(1) {
-                        return Err(Stop::Limit(Error::Policy("TrueType instructions")));
-                    }
+                    self.charge(1)?;
                 }
             }
-            0x5E => self.state.delta_base = self.pop(),
-            0x5F => self.state.delta_shift = self.pop(),
+            // Observed: the delta base keeps the low 16 bits of SDB's value,
+            // and an SDS outside 0 to 6 is an error (`delta-base-extremes`,
+            // `delta-base-wide`, `delta-shift`).
+            0x5E => self.state.delta_base = i32::from(self.pop() as u16),
+            0x5F => {
+                let shift = self.pop();
+                if !(0..=6).contains(&shift) {
+                    return Err(Stop::Program);
+                }
+                self.state.delta_shift = shift;
+            }
             0x64 => {
                 let v = self.pop();
                 self.push_value(v.wrapping_abs())?;
@@ -953,7 +1034,7 @@ impl Machine<'_> {
             0x7C => self.state.round = Round::UpToGrid,
             0x7D => self.state.round = Round::DownToGrid,
             0x80 => {
-                let count = self.looped(0).unwrap_or(0);
+                let count = self.looped(0)?.unwrap_or(0);
                 for _ in 0..count {
                     if let Some(p) = self.pop_point(0) {
                         self.zone_mut(0).flags.as_mut_slice()[p] ^= ON_CURVE;
@@ -968,6 +1049,7 @@ impl Machine<'_> {
                     return Ok(());
                 };
                 if low <= high && high < len {
+                    self.charge(high - low + 1)?;
                     for f in &mut self.zone_mut(0).flags.as_mut_slice()[low..=high] {
                         if op == 0x81 {
                             *f |= ON_CURVE;
@@ -1010,9 +1092,13 @@ impl Machine<'_> {
     /// The loop variable, reset to one for the next instruction, if the
     /// stack holds that many values and `extra` more; observed, a looped
     /// instruction short of them is skipped (`stack-underflow`).
-    fn looped(&mut self, extra: usize) -> Option<usize> {
+    fn looped(&mut self, extra: usize) -> Run<Option<usize>> {
         let count = std::mem::replace(&mut self.state.loop_count, 1).max(0) as usize;
-        (self.stack.len() >= count + extra).then_some(count)
+        if self.stack.len() < count + extra {
+            return Ok(None);
+        }
+        self.charge(count)?;
+        Ok(Some(count))
     }
 
     fn intersect(&mut self) {
@@ -1045,10 +1131,10 @@ impl Machine<'_> {
         }
     }
 
-    fn align_to_reference(&mut self) {
+    fn align_to_reference(&mut self) -> Run {
         let r = self.state.rp[0];
-        let Some(count) = self.looped(0) else {
-            return;
+        let Some(count) = self.looped(0)? else {
+            return Ok(());
         };
         let valid = r < self.zone(0).len();
         for _ in 0..count {
@@ -1057,6 +1143,7 @@ impl Machine<'_> {
                 self.move_point(1, p, d.wrapping_neg(), true);
             }
         }
+        Ok(())
     }
 
     fn move_indirect_absolute(&mut self, round: bool) {
@@ -1098,6 +1185,11 @@ impl Machine<'_> {
             return;
         }
         let mut d = self.original_distance(1, p, 0, r);
+        // Observed: the cut-in compares the signed distance with the single
+        // width as set, and a distance within it becomes the single width,
+        // negated for a negative distance: a negative distance snaps only to
+        // a negative single width, and then turns positive
+        // (`single-width-signed`).
         let (sw, swci) = (self.state.single_width, self.state.single_width_cut_in);
         if (d.wrapping_sub(sw)).wrapping_abs() < swci {
             d = if d >= 0 { sw } else { sw.wrapping_neg() };
@@ -1117,13 +1209,16 @@ impl Machine<'_> {
             return;
         }
         let mut cvt = self.control_value(n);
+        // Observed: as in MDRP, the signed control value, before the auto
+        // flip (`single-width-signed`).
         let (sw, swci) = (self.state.single_width, self.state.single_width_cut_in);
         if (cvt.wrapping_sub(sw)).wrapping_abs() < swci {
             cvt = if cvt >= 0 { sw } else { sw.wrapping_neg() };
         }
         if self.state.zp[1] == 0 {
-            // A twilight point starts at the reference point plus the control
-            // value along the freedom vector.
+            // Observed: a twilight point starts at rp0's original position
+            // plus the control value along the freedom vector, x included,
+            // then moves in y only (`twilight-relative`, `twilight-moves`).
             let o = self.original(0, r);
             let f = self.state.freedom;
             let at = Point::new(
@@ -1202,7 +1297,7 @@ impl Machine<'_> {
     fn shift(&mut self, op: u8) -> Run {
         match op {
             0x32 | 0x33 => {
-                let Some(count) = self.looped(0) else {
+                let Some(count) = self.looped(0)? else {
                     return Ok(());
                 };
                 let reference = self.reference_shift(op);
@@ -1225,9 +1320,12 @@ impl Machine<'_> {
                     let start = if c == 0 { 0 } else { ends[c - 1] as usize };
                     Some(start..end)
                 });
+                // Observed: SHC on a contour the glyph does not have does
+                // nothing (`shifts-invalid-contour`).
                 let Some(range) = range else {
-                    return Err(Stop::Program);
+                    return Ok(());
                 };
+                self.charge(range.len())?;
                 // Observed: SHC touches the points it moves, SHZ does not
                 // (`shifts`).
                 let same = self.state.zp[zone] == self.state.zp[2];
@@ -1248,6 +1346,7 @@ impl Machine<'_> {
                 self.state.zp[2] = e;
                 let same = self.state.zp[zone] == e;
                 let len = self.zone(2).len();
+                self.charge(len)?;
                 for p in 0..len {
                     if !(same && p == r) {
                         self.move_point(2, p, d, false);
@@ -1259,16 +1358,12 @@ impl Machine<'_> {
         Ok(())
     }
 
-    fn shift_by_pixels(&mut self) {
-        let Some(count) = self.looped(1) else {
-            return;
+    fn shift_by_pixels(&mut self) -> Run {
+        let Some(count) = self.looped(1)? else {
+            return Ok(());
         };
         let amount = self.pop();
-        let f = self.state.freedom;
-        let (dx, dy) = (
-            math::mul_div(amount, f.x, 0x4000),
-            math::mul_div(amount, f.y, 0x4000),
-        );
+        let dy = math::mul_div(amount, self.state.freedom.y, 0x4000);
         for _ in 0..count {
             if let Some(p) = self.pop_point(2) {
                 // Observed: in a simple glyph's zone SHPIX moves only points
@@ -1277,9 +1372,10 @@ impl Machine<'_> {
                 if self.untouched_simple(2, p) {
                     continue;
                 }
-                self.shift_point(2, p, dx, dy, true);
+                self.shift_point(2, p, dy, true);
             }
         }
+        Ok(())
     }
 
     fn delta_points(&mut self, range: i32) -> Run {
@@ -1292,9 +1388,7 @@ impl Machine<'_> {
             }
             let p = self.pop_point(0);
             let arg = self.pop();
-            if !self.work.try_charge(1) {
-                return Err(Stop::Limit(Error::Policy("TrueType instructions")));
-            }
+            self.charge(1)?;
             let (Some(p), Some(amount)) = (p, self.delta(arg, range)) else {
                 continue;
             };
@@ -1306,21 +1400,22 @@ impl Machine<'_> {
         Ok(())
     }
 
-    /// IP. Observed: between glyph points the original distances are
-    /// measured in font units and left unscaled, so a point whose reference
-    /// points share an original position moves to its font-unit distance
-    /// from rp1 (`interpolation`).
     /// Whether point `p` of the zone `zone` points to is a point of a simple
-    /// glyph not yet touched in y, which SHPIX and DELTAP leave alone.
+    /// glyph not yet touched in y, which SHPIX and DELTAP leave alone
+    /// (observed, `backward-compatibility`, `moves-delta`).
     fn untouched_simple(&self, zone: usize, p: usize) -> bool {
         self.state.zp[zone] != 0
             && self.glyph.font_units
             && self.glyph.flags.as_slice()[p] & TOUCHED_Y == 0
     }
 
-    fn interpolate(&mut self) {
-        let Some(count) = self.looped(0) else {
-            return;
+    /// IP. Observed: between glyph points the original distances are
+    /// measured in font units and left unscaled, so a point whose reference
+    /// points share an original position moves to its font-unit distance
+    /// from rp1 (`interpolation`, `interpolation-ip`).
+    fn interpolate(&mut self) -> Run {
+        let Some(count) = self.looped(0)? else {
+            return Ok(());
         };
         let (r1, r2) = (self.state.rp[1], self.state.rp[2]);
         let valid = r1 < self.zone(0).len() && r2 < self.zone(1).len();
@@ -1353,18 +1448,20 @@ impl Machine<'_> {
             };
             self.move_point(2, p, target.wrapping_sub(current), true);
         }
+        Ok(())
     }
 
     /// IUP: interpolates the untouched points of each glyph contour between
     /// the touched ones, in x or y. Observed in backward compatibility mode:
     /// once IUP has run in both directions, glyph points no longer move
     /// (`backward-compatibility`).
-    fn interpolate_untouched(&mut self, x: bool) {
+    fn interpolate_untouched(&mut self, x: bool) -> Run {
         let frozen = self.interpolated == [true; 2];
         self.interpolated[usize::from(!x)] = true;
         if frozen || self.state.zp[2] == 0 {
-            return;
+            return Ok(());
         }
+        self.charge(self.glyph.len())?;
         let touched = if x { TOUCHED_X } else { TOUCHED_Y };
         let z = &mut *self.glyph;
         let mut start = 0;
@@ -1393,6 +1490,7 @@ impl Machine<'_> {
             }
             interpolate_run(z, x, previous, first, range);
         }
+        Ok(())
     }
 }
 

@@ -137,9 +137,17 @@ pub(super) fn mul_div(a: i32, b: i32, c: i32) -> i32 {
     div_round(i64::from(a) * i64::from(b), i64::from(c)) as i32
 }
 
-/// A font-unit value at a 16.16 scale, in 26.6.
+/// A font-unit value at a 16.16 scale, in 26.6, rounded half away from zero
+/// and wrapped to 32 bits.
 pub(super) fn scale(units: i32, scale: i64) -> i32 {
-    round_shift(i64::from(units) * scale, 16) as i32
+    let product = i128::from(units) * i128::from(scale);
+    let half = 1 << 15;
+    let scaled = if product < 0 {
+        -((half - product) >> 16)
+    } else {
+        (product + half) >> 16
+    };
+    scaled as i32
 }
 
 /// A round state: the predefined ones, or SROUND's and S45ROUND's period,
@@ -156,6 +164,8 @@ pub(super) enum Round {
         period: i32,
         phase: i32,
         threshold: i32,
+        /// S45ROUND's, whose periods are not powers of two.
+        diagonal: bool,
     },
 }
 
@@ -165,10 +175,12 @@ impl Round {
     pub(super) fn custom(n: i32, diagonal: bool) -> Self {
         // One grid period in 26.6: a pixel, or the half diagonal of one.
         let grid = if diagonal { 45 } else { 64 };
+        // Observed: the period the specifications reserve (3) is one grid
+        // period (`round-extremes`).
         let period = match (n >> 6) & 3 {
             0 => grid / 2,
-            1 => grid,
-            _ => grid * 2,
+            2 => grid * 2,
+            _ => grid,
         };
         let phase = match (n >> 4) & 3 {
             0 => 0,
@@ -184,34 +196,47 @@ impl Round {
             period,
             phase,
             threshold,
+            diagonal,
         }
     }
 
-    /// Rounds a distance, symmetrically about zero.
+    /// Rounds a distance, symmetrically about zero: a negative one as the
+    /// negation of its magnitude's rounding. Observed: the arithmetic wraps
+    /// in 32 bits, and a result whose sign differs from the distance's is
+    /// replaced by the state's smallest result of that sign, 0 or the phase;
+    /// SROUND takes the value down to a multiple of the period,
+    /// S45ROUND towards zero (`round-extremes`).
     pub(super) fn apply(self, d: i32) -> i32 {
-        let positive = d >= 0;
-        let magnitude = d.wrapping_abs();
-        let rounded = match self {
-            Self::Grid => magnitude.wrapping_add(32) & !63,
-            Self::HalfGrid => (magnitude & !63) + 32,
-            Self::DoubleGrid => magnitude.wrapping_add(16) & !31,
-            Self::DownToGrid => magnitude & !63,
-            Self::UpToGrid => magnitude.wrapping_add(63) & !63,
-            Self::Off => magnitude,
+        // The smallest result of the state, and the rounding of `m`.
+        let rounded = |m: i32| match self {
+            Self::Grid => (0, m.wrapping_add(32) & !63),
+            Self::HalfGrid => (32, (m & !63).wrapping_add(32)),
+            Self::DoubleGrid => (0, m.wrapping_add(16) & !31),
+            Self::DownToGrid => (0, m & !63),
+            Self::UpToGrid => (0, m.wrapping_add(63) & !63),
+            Self::Off => (0, m),
             Self::Super {
                 period,
                 phase,
                 threshold,
+                diagonal,
             } => {
-                let v = magnitude.wrapping_sub(phase).wrapping_add(threshold);
-                let v = v - v.rem_euclid(period) + phase;
-                if v < 0 { phase } else { v }
+                let v = m.wrapping_sub(phase).wrapping_add(threshold);
+                let v = if diagonal {
+                    v.wrapping_sub(v % period)
+                } else {
+                    v & -period
+                };
+                (phase, v.wrapping_add(phase))
             }
         };
-        if positive {
-            rounded
+        if d >= 0 {
+            let (least, r) = rounded(d);
+            if r < 0 { least } else { r }
         } else {
-            rounded.wrapping_neg()
+            let (least, r) = rounded(d.wrapping_neg());
+            let r = r.wrapping_neg();
+            if r > 0 { -least } else { r }
         }
     }
 }
@@ -268,6 +293,32 @@ mod tests {
         assert_eq!(all(Round::custom(0x48, false)), all(Round::Grid));
         // SROUND 01:01:1000 rounds to quarter past each pixel.
         assert_eq!(Round::custom(0x58, false).apply(70), 80);
+    }
+
+    #[test]
+    fn rounding_wraps_at_the_ends_of_32_bits() {
+        // Values the reference gives on 32-bit ARMv7 (probe `round-extremes`).
+        const MAX: i32 = i32::MAX;
+        const MIN: i32 = i32::MIN;
+        let grid = |v| Round::Grid.apply(v);
+        assert_eq!([MAX, MAX - 20, MAX - 63].map(grid), [0, 0, MAX - 63]);
+        assert_eq!([MIN, MIN + 1, MIN + 63].map(grid), [MIN, MIN, MIN + 64]);
+        let half = |v| Round::HalfGrid.apply(v);
+        assert_eq!([MAX, MIN, MIN + 1].map(half), [MAX - 31, -32, MIN + 32]);
+        assert_eq!(Round::UpToGrid.apply(MIN + 63), MIN);
+        assert_eq!(Round::custom(0x48, false).apply(MIN + 1), MIN);
+        assert_eq!(Round::custom(0xC8, false).apply(MIN), MIN);
+        assert_eq!(Round::custom(0xB0, false).apply(MAX), 96);
+        assert_eq!(Round::custom(0xF8, false).apply(MAX), MAX - 15);
+        assert_eq!(Round::custom(0xF8, false).apply(MIN), MIN + 16);
+        let s45 = |n, v| Round::custom(n, true).apply(v);
+        assert_eq!(
+            [s45(0xB0, MAX), s45(0xB0, MIN), s45(0xB0, MIN + 63)],
+            [67, -67, MIN + 61]
+        );
+        assert_eq!([s45(0xB8, MAX), s45(0xB8, MAX - 20)], [67, MAX - 60]);
+        assert_eq!([s45(0x40, MAX - 20), s45(0x40, MIN + 20)], [0, 0]);
+        assert_eq!(s45(0x40, MAX - 63), MAX - 37);
     }
 
     #[test]

@@ -257,8 +257,8 @@ them when the scale is undefined. A `SizedFont` then gives:
   a `prep` of at most 7 bytes) goes through FreeType's auto-hinter, as below.
   Other TrueType glyphs go through the TrueType interpreter, as below.
 - The TrueType interpreter (`bytecode`) runs a face's programs as FreeType
-  2.15's default load runs them in backward compatibility mode. At the size
-  the face is first loaded hinted at, the font program defines its functions
+  2.15's default load runs them in backward compatibility mode. At each size
+  the face is loaded hinted at, the font program defines its functions
   and instructions and the control value program adjusts the scaled control
   values, fills the storage area and the twilight zone and sets the graphics
   state glyphs inherit; each glyph then loads at the hinted scale and its
@@ -266,9 +266,11 @@ them when the scale is undefined. A `SizedFont` then gives:
   components', with the control values and storage the control value program
   left. Every instruction is implemented from the TrueType instruction set;
   what the specifications leave open (backward compatibility, which keeps
-  glyph points from moving horizontally and stops all moves once IUP has run
-  in both directions; rounding and arithmetic; errors; composites and phantom
-  points) is reproduced as probes of FreeType establish it
+  points from moving horizontally, outside the instructions that place
+  twilight points, and stops all moves of glyph points once IUP has run in
+  both directions; rounding and arithmetic, wrapping in 32 bits; errors;
+  limits; composites and phantom points) is reproduced as probes of FreeType
+  establish it
   (`harness/fonts/probes`). The advances are the unhinted ones, rounded; the
   box is fitted outwards to pixels.
 - The auto-hinter (`autofit`), as FreeType 2.15 builds it without HarfBuzz and
@@ -433,19 +435,22 @@ interpreter's function and instruction
 definitions, control values, storage, twilight zone, stack and the zone one
 glyph is hinted in, charged to that budget and sized by `maxp` as FreeType
 sizes them (the stack 128 values deeper and the twilight zone four points
-larger, at least 64 function definitions); a hinted load holds it locked, and a
-glyph without a program leaves it untouched. An
+larger, at least 64 function definitions with a version 1.0 `maxp` and none
+with another); a hinted load holds it locked, and a glyph without a program
+leaves it untouched. A size whose font or control value program fails, or
+runs out of its work, keeps that error for the loads that follow. An
 `Outline` charges its points and contour ends to its own budget and keeps its
 capacity across glyphs; a `SizedFont` is a small copyable view that allocates
 nothing.
 
 `Limits` bounds the work of one parse and of one outline (`work`, which a
-hinted load's instructions also count against, as the font and control value
-programs count against a budget of their own), nested
+hinted load's instructions also count against, a unit for each instruction
+and for each value, point, flag or byte of code it goes through, as the font
+and control value programs count against a budget of their own), nested
 composites and subroutine calls (`depth`) and the points of one outline
 (`points`); exceeding one is `Error::Policy`. Format ceilings (48 or 513 operands,
 96 stems, 32 transient slots, 16 nested subroutine calls in CFF, 64 nested
-composites) are
+composites, 32 nested calls of TrueType functions, which end the program) are
 `Error::Invalid`, as is malformed data. Unsupported files and features are
 `Error::Unsupported`. No input panics.
 

@@ -13,10 +13,10 @@ mod exec;
 mod math;
 mod zone;
 
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Mutex, PoisonError};
 
 use crate::outline::{Outline, Point, PointKind};
-use exec::{Code, Functions, GraphicsState, Machine, Program, Size};
+use exec::{Functions, GraphicsState, Instructions, Machine, Program, Size};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use zone::{ON_CURVE, Zone};
 
@@ -53,17 +53,26 @@ fn symmetric_rendering(gasp: &[u8], ppem: u16) -> bool {
         .is_some_and(|(_, behaviour)| behaviour & 8 != 0)
 }
 
-/// The `maxp` limits the programs run within.
-#[derive(Clone, Copy, Debug, Default)]
+/// The limits the programs run within.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct Profile {
+    /// `maxp`'s twilight points, storage locations, instruction definitions
+    /// and stack values.
     twilight_points: u16,
     storage: u16,
-    functions: u16,
+    instruction_defs: u16,
     stack: u16,
+    /// How many distinct function numbers may be defined.
+    functions: usize,
 }
 
 impl Profile {
-    /// The limits of a version 1.0 `maxp` table; none for any other.
+    /// The limits a `maxp` table sets. Observed: up to `maxp`'s count of
+    /// function definitions or 64, whichever is more, and none at all with a
+    /// `maxp` other than version 1.0, which leaves every other limit at zero
+    /// (`limits-functions-64`, `limits-functions-65`,
+    /// `limits-functions-maxp-0`, `limits-functions-maxp-1`,
+    /// `limits-maxp-0.5`, `limits-maxp-0.5-functions-64`).
     fn read(maxp: &[u8]) -> Self {
         let field = |at: usize| {
             maxp.get(at..at + 2)
@@ -75,8 +84,9 @@ impl Profile {
         Self {
             twilight_points: field(16),
             storage: field(18),
-            functions: field(20),
+            instruction_defs: field(22),
             stack: field(24),
+            functions: usize::from(field(20)).max(64),
         }
     }
 }
@@ -96,7 +106,7 @@ pub(crate) struct Hinter {
     state: GraphicsState,
     instruct_control: u8,
     functions: Functions,
-    instructions: BudgetVec<(u8, Code)>,
+    instructions: Instructions,
     /// The twilight zone, which keeps what each glyph program leaves in it
     /// (observed, `twilight`).
     twilight: Zone,
@@ -135,6 +145,14 @@ impl Hinter {
         } = tables;
         let profile = Profile::read(maxp);
         let symmetric = symmetric_rendering(gasp, ppem);
+        // A unit of work for each value the setup fills.
+        let filled = cvt.len() / 2
+            + usize::from(profile.storage)
+            + usize::from(profile.twilight_points)
+            + profile.functions;
+        if !work.try_charge(filled as u64) {
+            return Err(Error::Policy("TrueType instructions"));
+        }
         let mut values = BudgetVec::new(budget);
         values.try_reserve_exact(cvt.len() / 2)?;
         for unit in cvt.chunks_exact(2) {
@@ -157,7 +175,7 @@ impl Hinter {
             state: GraphicsState::default(),
             instruct_control: 0,
             functions: Functions::new(budget, profile.functions)?,
-            instructions: BudgetVec::new(budget),
+            instructions: Instructions::new(budget, profile.instruction_defs)?,
             twilight,
             stack_limit: usize::from(profile.stack) + 128,
             failed: false,
@@ -167,6 +185,11 @@ impl Hinter {
             glyph: Zone::new(budget),
         };
         hinter.stack.try_reserve_exact(hinter.stack_limit)?;
+        // The font program runs at each size, where the specifications run
+        // it once per face. Open: the probes load one size per process and
+        // cannot tell the two apart; they differ only for a font program
+        // that reads the size or leaves values the control value program
+        // reads.
         for program in [Program::Font, Program::Control] {
             let mut machine = Machine {
                 code: [programs.font, programs.control, &[]],
@@ -245,9 +268,15 @@ impl Hinter {
             units,
             phantoms,
         } = glyph;
+        // A unit of work for each point, control value and storage location
+        // the glyph starts from.
+        let points = &outline.points()[base..];
+        let copied = points.len() + self.cvt.len() + self.storage.len();
+        if !work.try_charge(copied as u64) {
+            return Err(Error::Policy("TrueType instructions"));
+        }
         let zone = &mut self.glyph;
         zone.clear();
-        let points = &outline.points()[base..];
         // A composite's points start where its components left them.
         zone.font_units = units.is_some();
         for (i, p) in points.iter().enumerate() {
@@ -319,11 +348,30 @@ pub(crate) struct GlyphPoints<'o> {
 }
 
 /// A face's interpreter, made on the first hinted load and kept for the size
-/// it was last made at.
+/// it was last made at; a size whose font or control value program could not
+/// run within the face's limits keeps that error.
 #[derive(Debug)]
 pub(crate) struct Bytecode {
     budget: Budget,
-    state: Mutex<Option<Box<State>>>,
+    setup: Mutex<Option<Setup>>,
+}
+
+/// The interpreter at one size, or why it could not be made.
+#[derive(Debug)]
+enum Setup {
+    Ready(Box<State>),
+    Failed { ppem: u16, scale: i64, error: Error },
+}
+
+impl Setup {
+    fn is_for(&self, ppem: u16, scale: i64) -> bool {
+        match self {
+            Self::Ready(state) => state.hinter.is_for(ppem, scale),
+            Self::Failed {
+                ppem: p, scale: s, ..
+            } => (*p, *s) == (ppem, scale),
+        }
+    }
 }
 
 /// What a face's interpreter keeps between loads.
@@ -340,39 +388,52 @@ impl Bytecode {
     pub(crate) fn new(budget: Budget) -> Self {
         Self {
             budget,
-            state: Mutex::new(None),
+            setup: Mutex::new(None),
         }
     }
 
-    /// The interpreter at `ppem` and the 16.16 `scale`, made from `tables`
-    /// (the face's) unless it already is, held for one load.
-    pub(crate) fn at_size<'t>(
+    /// Runs `load` with the interpreter at `ppem` and the 16.16 `scale`,
+    /// made from `tables` (the face's) within `work` units unless it already
+    /// is, or made and failed. A failure for want of memory the budget may
+    /// later have (`Backpressure`) is not kept.
+    pub(crate) fn with_size<'t, R>(
         &self,
         tables: impl FnOnce() -> Tables<'t>,
         ppem: u16,
         scale: i64,
         work: u64,
-    ) -> Result<MutexGuard<'_, Option<Box<State>>>> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        if !state.as_ref().is_some_and(|s| s.hinter.is_for(ppem, scale)) {
-            // The old size's state goes before the new one is made.
-            *state = None;
-            let mut setup = WorkBudget::new(work);
-            let hinter = Hinter::new(tables(), ppem, scale, &self.budget, &mut setup)?;
-            *state = Some(Box::new(State {
-                hinter,
-                units: BudgetVec::new(&self.budget),
-                ends: BudgetVec::new(&self.budget),
-            }));
+        load: impl FnOnce(&mut State) -> Result<R>,
+    ) -> Result<R> {
+        let mut guard = self.setup.lock().unwrap_or_else(PoisonError::into_inner);
+        // The old size's state goes before the new one is made.
+        let kept = guard.take().filter(|s| s.is_for(ppem, scale));
+        let setup = if let Some(setup) = kept {
+            guard.insert(setup)
+        } else {
+            let mut budget = WorkBudget::new(work);
+            let setup = match Hinter::new(tables(), ppem, scale, &self.budget, &mut budget) {
+                Ok(hinter) => Setup::Ready(Box::new(State {
+                    hinter,
+                    units: BudgetVec::new(&self.budget),
+                    ends: BudgetVec::new(&self.budget),
+                })),
+                Err(e @ Error::Backpressure { .. }) => return Err(e),
+                Err(error) => Setup::Failed { ppem, scale, error },
+            };
+            guard.insert(setup)
+        };
+        match setup {
+            Setup::Ready(state) => load(state),
+            Setup::Failed { error, .. } => Err(*error),
         }
-        Ok(state)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{GlyphPoints, Hinter, Programs, Tables};
+    use super::{Bytecode, GlyphPoints, Hinter, Programs, Tables};
     use crate::outline::{Outline, Point, PointKind};
+    use std::cell::Cell;
     use triergon_core::{Budget, Error, WorkBudget};
 
     /// A version 1.0 `maxp`: 4 twilight points, 8 storage locations, 8
@@ -382,22 +443,43 @@ mod tests {
         0, 0,
     ];
 
+    /// `MAXP` with as many twilight points as a `maxp` can ask for.
+    fn wide_twilight() -> [u8; 32] {
+        let mut maxp = MAXP;
+        maxp[16..18].copy_from_slice(&[0xFF, 0xFF]);
+        maxp
+    }
+
+    /// The tables of a face with `maxp`, `fpgm` and `prep`, and one control
+    /// value.
+    fn tables<'a>(maxp: &'a [u8], fpgm: &'a [u8], prep: &'a [u8]) -> Tables<'a> {
+        Tables {
+            programs: Programs {
+                font: fpgm,
+                control: prep,
+            },
+            cvt: &[0, 100],
+            maxp,
+            gasp: &[],
+        }
+    }
+
     /// Runs `program` at 16 pixels per em (font units halved) on a square
     /// glyph whose points are in font units, and returns its points.
     fn hint(fpgm: &[u8], prep: &[u8], program: &[u8], work: u64) -> Result<Vec<Point>, Error> {
-        let budget = Budget::new(1 << 20)?;
-        let programs = Programs {
-            font: fpgm,
-            control: prep,
-        };
-        let mut setup = WorkBudget::new(1 << 16);
-        let cvt = [0, 100];
-        let tables = Tables {
-            programs,
-            cvt: &cvt,
-            maxp: &MAXP,
-            gasp: &[],
-        };
+        hint_in(tables(&MAXP, fpgm, prep), 1 << 16, program, work)
+    }
+
+    /// As [`hint`] for the face `tables`, its setup within `setup` units.
+    fn hint_in(
+        tables: Tables<'_>,
+        setup: u64,
+        program: &[u8],
+        work: u64,
+    ) -> Result<Vec<Point>, Error> {
+        let budget = Budget::new(1 << 24)?;
+        let programs = tables.programs;
+        let mut setup = WorkBudget::new(setup);
         let mut hinter = Hinter::new(tables, 16, 0x8000, &budget, &mut setup)?;
         let units = [(100, 3), (100, 703), (501, 703), (501, 3)].map(|(x, y)| Point::new(x, y));
         let mut outline = Outline::new(&budget);
@@ -459,6 +541,109 @@ mod tests {
         let fpgm = [0xB0, 0, 0x2C, 0xB0, 0, 0x2B, 0x2D];
         let points = hint(&fpgm, &[], &[0xB0, 0, 0x2B], 1000).unwrap();
         assert_eq!(ys(&points), [1, 351, 351, 1]);
+    }
+
+    #[test]
+    fn instructions_are_charged_for_each_point_and_value_they_go_through() {
+        // PUSHB 0; SHZ[0]; PUSHW -6; JMPR: shifts the 65,539 twilight points
+        // over and over.
+        let shifting = [0xB0, 0, 0x36, 0xB8, 0xFF, 0xFA, 0x1C];
+        let maxp = wide_twilight();
+        let started = std::time::Instant::now();
+        assert_eq!(
+            hint_in(tables(&maxp, &[], &[]), 1 << 24, &shifting, 1 << 24),
+            Err(Error::Policy("TrueType instructions"))
+        );
+        // The same in the control value program fails the setup.
+        assert_eq!(
+            hint_in(tables(&maxp, &[], &shifting), 1 << 24, &[], 1 << 24),
+            Err(Error::Policy("TrueType instructions"))
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(10));
+        // NPUSHB of 255 values costs 256 units.
+        let mut npush = vec![0x40, 255];
+        npush.extend([0; 255]);
+        assert!(hint(&[], &[], &npush, 300).is_ok());
+        assert_eq!(
+            hint(&[], &[], &npush, 200),
+            Err(Error::Policy("TrueType instructions"))
+        );
+        // A skipped IF body costs a unit a byte: PUSHB 0; IF; 250 x
+        // (PUSHB 0); EIF.
+        let mut skipped = vec![0xB0, 0, 0x58];
+        skipped.extend([0xB0, 0].repeat(125));
+        skipped.push(0x59);
+        assert_eq!(
+            hint(&[], &[], &skipped, 200),
+            Err(Error::Policy("TrueType instructions"))
+        );
+    }
+
+    #[test]
+    fn calls_nest_32_deep() {
+        // fpgm: function 0 calls itself while storage 0 counts down, then
+        // rounds point 1: PUSHB 0; FDEF; PUSHB 0; RS; IF; PUSHB 0 0; RS;
+        // PUSHB 1; SUB; WS; PUSHB 0; CALL; ELSE; SVTCA[0]; PUSHB 1; MDAP[1];
+        // EIF; ENDF.
+        let fpgm = [
+            0xB0, 0, 0x2C, 0xB0, 0, 0x43, 0x58, 0xB1, 0, 0, 0x43, 0xB0, 1, 0x61, 0x42, 0xB0, 0,
+            0x2B, 0x1B, 0x00, 0xB0, 1, 0x2F, 0x59, 0x2D,
+        ];
+        // PUSHB 0 n-1; WS; PUSHB 0; CALL: n calls in progress at the deepest.
+        let calls = |n: u8| hint(&fpgm, &[], &[0xB1, 0, n - 1, 0x42, 0xB0, 0, 0x2B], 10_000);
+        assert_eq!(ys(&calls(32).unwrap()), [1, 320, 351, 1]);
+        assert_eq!(ys(&calls(33).unwrap()), [1, 351, 351, 1]);
+    }
+
+    #[test]
+    fn delta_bases_keep_16_bits() {
+        // 2^31 - 1 from words: PUSHW 32767 16384; MUL; PUSHW 16384; MUL;
+        // PUSHW 32767; ADD; PUSHW 32767; ADD; PUSHB 1; ADD.
+        let max = [
+            0xB9, 0x7F, 0xFF, 0x40, 0x00, 0x63, 0xB8, 0x40, 0x00, 0x63, 0xB8, 0x7F, 0xFF, 0x60,
+            0xB8, 0x7F, 0xFF, 0x60, 0xB0, 1, 0x60,
+        ];
+        // Then SDB; SVTCA[0]; PUSHB 1; MDAP[0]; PUSHB 0x6F 1 1; DELTAP1:
+        // no ppem matches, and nothing overflows.
+        let mut program = max.to_vec();
+        program.extend([0x5E, 0x00, 0xB0, 1, 0x2E, 0xB2, 0x6F, 1, 1, 0x5D]);
+        assert_eq!(
+            ys(&hint(&[], &[], &program, 1000).unwrap()),
+            [1, 351, 351, 1]
+        );
+        // 65536 + 10 acts as 10 (ppem 16 = 10 + 6): PUSHW 16384 256; MUL;
+        // PUSHB 10; ADD; SDB; ...
+        let mut program = vec![0xB9, 0x40, 0x00, 0x01, 0x00, 0x63, 0xB0, 10, 0x60];
+        program.extend([0x5E, 0x00, 0xB0, 1, 0x2E, 0xB2, 0x6F, 1, 1, 0x5D]);
+        assert_eq!(
+            ys(&hint(&[], &[], &program, 1000).unwrap()),
+            [1, 415, 351, 1]
+        );
+    }
+
+    #[test]
+    fn a_failed_setup_is_kept_for_its_size() {
+        // prep: PUSHW -3; JMPR, without end.
+        let looping = [0xB8, 0xFF, 0xFD, 0x1C];
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        let made = Cell::new(0);
+        let at = |ppem| {
+            bytecode.with_size(
+                || {
+                    made.set(made.get() + 1);
+                    tables(&MAXP, &[], &looping)
+                },
+                ppem,
+                i64::from(ppem) << 11,
+                1000,
+                |_| Ok(()),
+            )
+        };
+        assert_eq!(at(16), Err(Error::Policy("TrueType instructions")));
+        assert_eq!(at(16), Err(Error::Policy("TrueType instructions")));
+        assert_eq!(made.get(), 1);
+        assert_eq!(at(17), Err(Error::Policy("TrueType instructions")));
+        assert_eq!(made.get(), 2);
     }
 
     #[test]

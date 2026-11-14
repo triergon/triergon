@@ -1,0 +1,57 @@
+# At 16 pixels per em (height 1024): DELTAP1 for ppem base + 6 after SDB 10
+# and 65536 + 10; DELTAP2 for base + 16 + 6 after SDB 65530 (-6 in 16
+# bits); then after SDB 10, DELTAP1 with SDS 65539, 6, 40 and -1.
+# Observed: 65536 + 10 acts as 10, and 65530 is not -6.
+heights 1024
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 16384 256; MUL; PUSH 10; ADD; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 16384 256; MUL; PUSH 6; SUB; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP2
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 16384 256; MUL; PUSH 3; ADD; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 6; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 40; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH -1; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1
+  end
+end

@@ -1,0 +1,53 @@
+# DELTAP1 on point 1 and DELTAC1 on control value 0 (read back to point 2),
+# arguments for ppem base + 6, after SDB with 250 (256 - 6, the ppem at
+# 16384), 65536 + 250, 250 - 65536, 2^31 - 1, 2^31 - 11 and -2^31.
+# Observed: SDB keeps the low 16 bits of its value; the largest and smallest
+# values match no size.
+heights 16384
+wraps-at-32-bits
+cvt 100
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 250; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; PUSH 0x6F 0 1; DELTAC1; PUSH 2 0; RCVT; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 16384 256; MUL; PUSH 250; ADD; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; PUSH 0x6F 0 1; DELTAC1; PUSH 2 0; RCVT; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 16384 256; MUL; NEG; PUSH 250; ADD; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; PUSH 0x6F 0 1; DELTAC1; PUSH 2 0; RCVT; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 32767 16384; MUL; PUSH 16384; MUL; PUSH 32767; ADD; PUSH 32767; ADD; PUSH 1; ADD; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; PUSH 0x6F 0 1; DELTAC1; PUSH 2 0; RCVT; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 32767 16384; MUL; PUSH 16384; MUL; PUSH 32767; ADD; PUSH 32767; ADD; PUSH 1; ADD; PUSH 10; SUB; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; PUSH 0x6F 0 1; DELTAC1; PUSH 2 0; RCVT; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 32767 16384; MUL; PUSH 16384; MUL; PUSH 32767; ADD; PUSH 32767; ADD; PUSH 1; ADD; PUSH 1; ADD; SDB; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; PUSH 0x6F 0 1; DELTAC1; PUSH 2 0; RCVT; SVTCA[0]; SCFS
+  end
+end

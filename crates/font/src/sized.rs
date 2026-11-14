@@ -487,27 +487,25 @@ impl<'f> SizedFont<'f> {
                 gasp: table(*b"gasp"),
             }
         };
-        let mut state = bytecode.at_size(tables, ppem, scale.y, font.limits.work)?;
-        let state = state
-            .as_deref_mut()
-            .ok_or(Error::Invalid("TrueType interpreter"))?;
-        state.units.clear();
-        let mut hinting = GlyfHinting {
-            font,
-            hinter: &mut state.hinter,
-            programs,
-            units: &mut state.units,
-            ends: &mut state.ends,
-        };
-        outline.begin(font.limits.points);
-        let m = table.outline(
-            &font.glyf_context(),
-            glyph,
-            scale,
-            outline,
-            work,
-            &mut hinting,
-        )?;
+        let m = bytecode.with_size(tables, ppem, scale.y, font.limits.work, |state| {
+            state.units.clear();
+            let mut hinting = GlyfHinting {
+                font,
+                hinter: &mut state.hinter,
+                programs,
+                units: &mut state.units,
+                ends: &mut state.ends,
+            };
+            outline.begin(font.limits.points);
+            table.outline(
+                &font.glyf_context(),
+                glyph,
+                scale,
+                outline,
+                work,
+                &mut hinting,
+            )
+        })?;
         let (origin, advances) = font.glyf_advances(m, scale);
         if origin != 0 {
             glyf::translate(outline.points_mut(), (-origin, 0))?;
@@ -687,6 +685,28 @@ impl<'f> SizedFont<'f> {
     }
 }
 
+/// The phantom points `units` (font units) as the programs see them at the
+/// 16.16 `scale`. Observed: the horizontal ones' x and the vertical ones' y
+/// on the pixel grid, the vertical ones at half the advance
+/// (`phantom-points`). `Overflow` for a point outside 32 bits.
+fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<[Point; 4]> {
+    let scaled = |u: i32| i32::try_from(mul_fix(i64::from(u), scale)).map_err(|_| Error::Overflow);
+    let fitted = |u: i32| {
+        scaled(u)?
+            .checked_add(32)
+            .map(|v| v & !63)
+            .ok_or(Error::Overflow)
+    };
+    let [pp1, pp2, pp3, pp4] = units;
+    let middle = scaled(((i64::from(pp2.x) - i64::from(pp1.x)) / 2) as i32)?;
+    Ok([
+        Point::new(fitted(pp1.x)?, 0),
+        Point::new(fitted(pp2.x)?, 0),
+        Point::new(middle, fitted(pp3.y)?),
+        Point::new(middle, fitted(pp4.y)?),
+    ])
+}
+
 /// Runs each glyph's program as a hinted TrueType load builds its outline.
 struct GlyfHinting<'h> {
     font: &'h Font,
@@ -725,23 +745,11 @@ impl glyf::Hint for GlyfHinting<'_> {
         let first = u32::try_from(base).map_err(|_| Error::Overflow)?;
         self.ends.clear();
         for &end in &outline.contour_ends()[ends..] {
-            self.ends.try_push(end - first).map_err(|e| e.error)?;
+            let end = end.checked_sub(first).ok_or(Error::Overflow)?;
+            self.ends.try_push(end).map_err(|e| e.error)?;
         }
         let units = self.font.phantom_points(metrics);
-        let scale = self.hinter.scale();
-        let scaled = |u: i32| mul_fix(i64::from(u), scale) as i32;
-        let fitted = |u: i32| (scaled(u) + 32) & !63;
-        // Observed: the programs see the horizontal phantom points' x and
-        // the vertical ones' y on the pixel grid, the vertical ones at half
-        // the advance (`phantom-points`).
-        let [pp1, pp2, pp3, pp4] = units;
-        let middle = scaled((pp2.x - pp1.x) / 2);
-        let scaled = [
-            Point::new(fitted(pp1.x), 0),
-            Point::new(fitted(pp2.x), 0),
-            Point::new(middle, fitted(pp3.y)),
-            Point::new(middle, fitted(pp4.y)),
-        ];
+        let scaled = scaled_phantom_points(units, self.hinter.scale())?;
         let points = GlyphPoints {
             outline,
             base,
@@ -755,7 +763,24 @@ impl glyf::Hint for GlyfHinting<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::keeps_compatibility;
+    use super::{keeps_compatibility, scaled_phantom_points};
+    use crate::outline::Point;
+    use triergon_core::Error;
+
+    #[test]
+    fn phantom_points_outside_32_bits_are_an_overflow() {
+        let units = [(0, 0), (1000, 0), (0, 800), (0, -200)].map(|(x, y)| Point::new(x, y));
+        // Height 1000 at 2048 units per em.
+        assert_eq!(
+            scaled_phantom_points(units, 32000),
+            Ok([(0, 0), (512, 0), (244, 384), (244, -128)].map(|(x, y)| Point::new(x, y)))
+        );
+        let wide = [(0, 0), (32767, 0), (0, 0), (0, 0)].map(|(x, y)| Point::new(x, y));
+        assert_eq!(scaled_phantom_points(wide, 1 << 33), Err(Error::Overflow));
+        // A scaled value just under 2^31 that rounding would carry over.
+        let edge = 0x7FFF_FFF0_i64 * 65536 / 32767;
+        assert_eq!(scaled_phantom_points(wide, edge + 1), Err(Error::Overflow));
+    }
 
     #[test]
     fn instruction_control_needs_a_constant_harmless_selector() {
