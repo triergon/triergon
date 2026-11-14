@@ -1,0 +1,32 @@
+# A CID-keyed CFF table with three Font DICTs, each with its own local
+# subroutine 0, selected by FDSelect: glyphs draw through local index -107.
+# Font DICT 0 draws `10 0 rlineto`, 1 `0 20 rlineto`, 2 has no local
+# subroutines.
+cid
+font-dict end
+local
+  10 0 rlineto return
+end
+font-dict end
+local
+  0 20 rlineto return
+end
+font-dict end
+glyph
+  endchar
+end
+glyph fd 0
+  100 100 rmoveto -107 callsubr endchar
+end
+glyph fd 1
+  100 100 rmoveto -107 callsubr endchar
+end
+glyph fd 2
+  100 100 rmoveto -107 callsubr 5 5 rlineto endchar
+end
+glyph fd 1 # 4: the accented form in a CID-keyed font
+  50 20 65 194 endchar
+end
+glyph fd 0 # 5: a plain line
+  100 100 rmoveto 1 2 rlineto endchar
+end
