@@ -28,7 +28,7 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts tables [--check]
        cargo xtask fonts manifest [--record] [--output DIR]
        cargo xtask fonts compare [--all] [REPORT OPTION]...
-       cargo xtask fonts assemble DESCRIPTION OUTPUT
+       cargo xtask fonts assemble [--embed NAME] DESCRIPTION OUTPUT
        cargo xtask fonts probe --reference WORKER [--candidate WORKER] [--record]
                                [--output DIR] PROBE...
 
@@ -50,7 +50,8 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
             font-hinting-modes; further report options pass through, and each
             report goes to OUTPUT/<feature> (OUTPUT: --output, default
             .research/font-report)
-  assemble  write the TrueType font a probe description describes
+  assemble  write the TrueType font a probe description describes, or with
+            --embed the [Fonts] lines that embed it in a script
   probe     load assembled probe faces (harness/fonts/probes) with the
             reference and candidate font workers and compare their default
             loads with the recorded reference dumps and with each other";

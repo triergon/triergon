@@ -2,7 +2,9 @@
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
-use triergon_font::{Band, Charmap, GlyphMetrics, Outline, PointKind, SizeMetrics, SizedFont};
+use triergon_font::{
+    Band, Charmap, GlyphMetrics, Orientation, Outline, PointKind, SizeMetrics, SizedFont,
+};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 
 /// What one size reports besides its glyphs.
@@ -111,13 +113,15 @@ pub enum Record<'a> {
     Size(&'a Size),
     /// A size the face cannot be loaded at.
     SizeError(i32),
+    /// An unhinted glyph, recorded with its outline's orientation.
     ScaledGlyph {
         index: u16,
         /// The unhinted advance in 26.6.
         advance: i32,
         outline: &'a Outline,
     },
-    /// A synthetic style of the last scaled glyph; `None` when it cannot be applied.
+    /// A synthetic style of the last scaled glyph, recorded with its outline's
+    /// orientation; `None` when it cannot be applied.
     Styled {
         style: Style,
         index: u16,
@@ -181,6 +185,16 @@ const fn point_tag(kind: PointKind) -> u8 {
     }
 }
 
+/// An orientation's folded value and dump word, as the reference maps
+/// `FT_Outline_Get_Orientation`'s result.
+fn orientation(outline: &Outline) -> (u64, &'static str) {
+    match outline.orientation() {
+        Orientation::TrueType => (0, "truetype"),
+        Orientation::PostScript => (1, "postscript"),
+        Orientation::None => (2, "none"),
+    }
+}
+
 /// The work of one or more operations: glyph outlines (or advances), their
 /// points and the digest.
 #[derive(Default)]
@@ -241,6 +255,12 @@ impl Work {
         }
         self.packets += 1;
         self.bytes += points.len() as u64;
+    }
+
+    /// The outline's orientation, then the outline.
+    fn oriented(&mut self, outline: &Outline) {
+        fold(&mut self.digest, orientation(outline).0);
+        self.outline(outline);
     }
 
     /// Adds the work of one operation, its digest folded as one value.
@@ -346,7 +366,7 @@ impl Sink for Work {
                 outline,
             } => {
                 self.words(&[SCALED_GLYPH, index.into(), signed(advance.into())]);
-                self.outline(outline);
+                self.oriented(outline);
             }
             Record::Styled {
                 style,
@@ -355,7 +375,7 @@ impl Sink for Work {
             } => {
                 self.words(&[STYLED, style as u64, index.into()]);
                 match outline {
-                    Some(outline) => self.outline(outline),
+                    Some(outline) => self.oriented(outline),
                     None => fold(&mut self.digest, ABSENT),
                 }
             }
@@ -418,6 +438,12 @@ impl<W: Write> Dump<W> {
             write!(out, " {x} {y} {tag}")?;
         }
         writeln!(out)
+    }
+
+    /// The outline's orientation, then the outline.
+    fn oriented(&mut self, outline: &Outline) -> io::Result<()> {
+        write!(self.0, "{} ", orientation(outline).1)?;
+        self.outline(outline)
     }
 
     fn band(&mut self, key: &str, band: Option<Band>) -> io::Result<()> {
@@ -525,7 +551,7 @@ impl<W: Write> Sink for Dump<W> {
                 outline,
             } => {
                 write!(self.0, "glyph {index} {advance} ")?;
-                self.outline(outline)
+                self.oriented(outline)
             }
             Record::Styled {
                 style,
@@ -534,7 +560,7 @@ impl<W: Write> Sink for Dump<W> {
             } => match outline {
                 Some(outline) => {
                     write!(self.0, "{} {index} ", style.name())?;
-                    self.outline(outline)
+                    self.oriented(outline)
                 }
                 None => writeln!(self.0, "{} {index} error", style.name()),
             },

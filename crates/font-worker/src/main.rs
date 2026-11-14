@@ -28,7 +28,8 @@ enum Operation {
     /// Face data and unscaled outlines.
     Faces,
     /// What libass obtains at a size with hinting off: size metrics, kerning, and
-    /// every glyph's unhinted outline and advance with its synthetic styles.
+    /// every glyph's unhinted outline and advance with its synthetic styles, each
+    /// outline with its orientation.
     Scaled(i32),
     /// The default-load (hinted) advance of every glyph at a size.
     Hinted(i32),
