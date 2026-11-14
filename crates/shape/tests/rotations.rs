@@ -5,7 +5,7 @@
 mod support;
 
 use std::cell::RefCell;
-use triergon_core::{Budget, Bytes, Error, WorkBudget};
+use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::{Font, GlyphId, Limits};
 use triergon_shape::{Extents, FaceRotations, GlyphRotations, Metrics, SizedMetrics};
 
@@ -63,17 +63,14 @@ fn a_glyph_first_found_through_a_rotating_code_point_advances_vertically() {
 }
 
 #[test]
-fn glyphs_without_points_have_empty_extents_and_others_need_hinting() {
+fn glyphs_without_points_have_empty_extents_and_no_contour_points() {
     let (_budget, font) = vertical_font();
     let sized = font.at_size(16384).expect("size");
     let mut work = WorkBudget::new(1 << 20);
     let metrics = SizedMetrics::new(sized, &mut work).expect("metrics");
     // Every glyph of the test font is empty; a glyph outside the face has no
-    // extents.
+    // extents, and an empty glyph has no contour points.
     assert_eq!(metrics.extents(GlyphId(3)), Ok(Some(Extents::default())));
     assert_eq!(metrics.extents(GlyphId(30)), Ok(None));
-    assert!(matches!(
-        metrics.contour_point(GlyphId(3), 0),
-        Err(Error::Unsupported(_))
-    ));
+    assert_eq!(metrics.contour_point(GlyphId(3), 0), Ok(None));
 }

@@ -20409,6 +20409,32 @@
    }
   },
   {
+   "name": "fonts-truetype-interpreter-e110f29c",
+   "path": "fonts-truetype-interpreter-e110f29c",
+   "retention": "retained",
+   "reason": "The TrueType bytecode interpreter in triergon-font at e110f29c against main at 4a932ef9 on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the ass-render timing (30 pairs, CPU 1), kernel-bound memory (30 pairs) and grades with their proofs and module review, the build identities, logs, scripts, and the kernel, CPU, compilers and ARMv7 package list",
+   "key": "evidence/fonts-truetype-interpreter-e110f29c/aa45ccdbeecec1d775a19639afae3d4559dd2cdbd91570a6bb07af9d84155033.tar.gz",
+   "sha256": "aa45ccdbeecec1d775a19639afae3d4559dd2cdbd91570a6bb07af9d84155033",
+   "bytes": 966990401,
+   "source_revisions": {
+    "candidate": "e110f29cb904c0a4f3925fc90a2d1a10a67aeff4",
+    "baseline": "4a932ef908ca783976c56e187c0563ce955f15b5"
+   }
+  },
+  {
+   "name": "fonts-truetype-interpreter-218065d6",
+   "path": "fonts-truetype-interpreter-218065d6",
+   "retention": "retained",
+   "reason": "The TrueType interpreter after review, at 218065d6, against main at 2886a3fd (its merge base) on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and against e110f29c, each with the reference against itself, the build logs, the scripts, and the kernel, CPU and compiler",
+   "key": "evidence/fonts-truetype-interpreter-218065d6/e017f46cf9d4ff61e7b0615a16ee1d39eac92d92c8bafc43141a255e6ccec818.tar.gz",
+   "sha256": "e017f46cf9d4ff61e7b0615a16ee1d39eac92d92c8bafc43141a255e6ccec818",
+   "bytes": 53818400,
+   "source_revisions": {
+    "candidate": "218065d60fb7520fc5e636c8451b46a4d6bda61f",
+    "baseline": "2886a3fd7b84392b75a98369e8426e0dd6f9edda"
+   }
+  },
+  {
    "name": "gate-run-armv7-a49421ad",
    "path": "gate-run-armv7-a49421ad",
    "retention": "retained",

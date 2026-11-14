@@ -1,0 +1,33 @@
+# The control value program sets ssw; the glyph reads the graphics
+# state. Observed: glyphs inherit the control program's minimum distance,
+# control value cut-in, single width and its cut-in, delta base and shift and
+# auto flip, and start from the defaults for the rest; INSTCTRL flag 1 turns
+# glyph programs off, flag 2 has glyphs start from the defaults.
+# Each glyph's program computes values and writes value i into the y of
+# point i of a 32-point contour (SCFS along y), so the dump shows them.
+heights 16384 1000
+cvt 30 -501 0 0 0 7
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  PUSH 30; SSW; PUSH 1000; SSWCI
+end
+glyph advance 400
+  contour 0 0, 10 0, 20 0, 30 0, 40 0, 50 0, 60 0, 70 0, 80 0, 90 0, 100 0, 110 0, 120 0, 130 0, 140 0, 150 0, 160 0, 170 0, 180 0, 190 0, 200 0, 210 0, 220 0, 230 0, 240 0, 250 0, 260 0, 270 0, 280 0, 290 0, 300 0, 310 0
+  contour 0 0, 300 100, 100 700, -200 50, 1000 999, 3 7, 1500 -1300, 77 1
+  contour 0 0, 10 0, 20 0, 30 0, 40 0, 50 0, 60 0, 70 500
+  program
+    PUSH 0; GPV; POP; SVTCA[0]; SCFS
+    PUSH 1; GPV; SWAP; POP; SVTCA[0]; SCFS
+    PUSH 2; GFV; POP; SVTCA[0]; SCFS
+    PUSH 3; GFV; SWAP; POP; SVTCA[0]; SCFS
+    PUSH 4; SVTCA[0]; PUSH 100; ROUND[00]; SVTCA[0]; SCFS
+    PUSH 5; SVTCA[0]; PUSH 40; SRP0; PUSH 41; MDRP[01000]; PUSH 41; GC[0]; SVTCA[0]; SCFS
+    PUSH 6; SVTCA[0]; PUSH 40; SRP0; PUSH 42 0; MIRP[00100]; PUSH 42; GC[0]; SVTCA[0]; SCFS
+    PUSH 7; SVTCA[0]; PUSH 40; SRP0; PUSH 43; MDRP[00000]; PUSH 43; GC[0]; SVTCA[0]; SCFS
+    PUSH 8; SVTCA[0]; PUSH 40; SRP0; PUSH 47 1; MIRP[00100]; PUSH 47; GC[0]; SVTCA[0]; SCFS
+    PUSH 9; PUSH 0x18 5 1; DELTAC1; PUSH 5; RCVT; SVTCA[0]; SCFS
+    PUSH 10; SVTCA[0]; PUSH 44; MDAP[1]; PUSH 44; GC[0]; SVTCA[0]; SCFS
+  end
+end

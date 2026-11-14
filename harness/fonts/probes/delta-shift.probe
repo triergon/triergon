@@ -1,0 +1,71 @@
+# At 16 pixels per em: DELTAP1 for ppem 16 by 8 steps after SDB 10 and SDS
+# 6, 7, 31, 32, 40, -1 and 65536 + 3, then a move of point 2; then SDS 7
+# and -1 followed directly by the move.
+# Observed: SDS outside 0 to 6 is an error, ending the program.
+heights 1024
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 6; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 7; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 31; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 32; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 40; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH -1; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 16384 256; MUL; PUSH 3; ADD; SDS; SVTCA[0]; PUSH 1; MDAP[0]; PUSH 0x6F 1 1; DELTAP1; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH 7; SDS; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 10; SDB; PUSH -1; SDS; SVTCA[0]; PUSH 2 64; SCFS
+  end
+end

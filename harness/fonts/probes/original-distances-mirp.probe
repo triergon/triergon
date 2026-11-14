@@ -1,0 +1,28 @@
+# Original distances with integer pixels per em, where scaling the font-unit
+# distance and the difference of the scaled points disagree (point 1 at 1386
+# and point 2 at 1493 units). Observed: MIRP measures between the scaled
+# original positions, MDRP in font units scaled.
+head-flags 8
+heights 16384 1000 700 1500
+cvt 5000
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 113 0, 303 1386, 113 1493, 506 870
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]; PUSH 1 0; MIRP[01100]
+  end
+end
+glyph advance 600
+  contour 113 0, 303 1386, 113 1493, 506 870
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]; PUSH 1; MDRP[01100]
+  end
+end
+glyph advance 600
+  contour 113 0, 303 1386, 113 1493, 506 870
+  program
+    SVTCA[0]; PUSH 2; MDAP[1]; PUSH 1; MDRP[01000]; PUSH 3; MDRP[00000]
+  end
+end
