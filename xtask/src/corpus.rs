@@ -584,7 +584,52 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             ["28000"],
             (181, 62_042, 5_378_275_097_212_072_522),
         ),
+        mp4_range_case(
+            "leading-video-edit-seek-before-sync",
+            leading_video_file,
+            &leading_video,
+            ["17535"],
+            (237, 81_478, 9_596_315_584_292_083_372),
+        ),
+        mp4_range_case(
+            "leading-video-edit-seek-at-sync",
+            leading_video_file,
+            &leading_video,
+            ["17536"],
+            (181, 62_042, 5_378_275_097_212_072_522),
+        ),
     ]);
+    let trimmed_file = "avc-leading-edit-trimmed.mp4";
+    let mut trimmed = leading_video.clone();
+    // Start the media edit exactly on the second sync sample's source CTS.
+    trimmed[81_782..81_786].copy_from_slice(&18_672_u32.to_be_bytes());
+    write(&output.join(trimmed_file), &trimmed)?;
+    cases.extend([
+        mp4_range_case(
+            "leading-video-edit-trimmed-open",
+            trimmed_file,
+            &trimmed,
+            [],
+            (225, 69_726, 580_711_317_104_354_027),
+        ),
+        mp4_range_case(
+            "leading-video-edit-trimmed-seek",
+            trimmed_file,
+            &trimmed,
+            ["17536"],
+            (169, 50_686, 5_242_818_698_675_809_095),
+        ),
+    ]);
+    let unrepresentable_file = "avc-unrepresentable-edit.mp4";
+    let unrepresentable = unrepresentable_video_edit_fixture(&leading_video);
+    write(&output.join(unrepresentable_file), &unrepresentable)?;
+    cases.push(mp4_range_case(
+        "unrepresentable-video-edit-audio-only",
+        unrepresentable_file,
+        &unrepresentable,
+        [],
+        (189, 32_517, 3_117_005_324_307_362_295),
+    ));
     cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
     paths.manifest(
@@ -612,6 +657,25 @@ fn leading_video_edit_fixture(seed: &[u8]) -> Vec<u8> {
     }
     data[81_762..81_766].copy_from_slice(&2_u32.to_be_bytes());
     data.splice(81_766..81_766, leading);
+    data
+}
+
+fn unrepresentable_video_edit_fixture(seed: &[u8]) -> Vec<u8> {
+    let mut data = seed.to_vec();
+    for at in [81_526, 81_642, 81_742, 81_750] {
+        let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
+        data[at..at + 4].copy_from_slice(&(size + 16).to_be_bytes());
+    }
+    data[81_758] = 1;
+    // The empty duration fits the track clock, but the sum with the
+    // following edit would exceed the signed packet clock range.
+    let mut edits = Vec::new();
+    for (duration, media_start) in [((1_u64 << 59) - 64, -1_i64), (4_000, 2_672)] {
+        edits.extend(duration.to_be_bytes());
+        edits.extend(media_start.to_be_bytes());
+        edits.extend((1_u32 << 16).to_be_bytes());
+    }
+    data.splice(81_766..81_790, edits);
     data
 }
 

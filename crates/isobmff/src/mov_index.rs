@@ -529,8 +529,8 @@ impl<'a> SeekJob<'a> {
                         return Err(Error::Unsupported("native seek null index clock"));
                     }
                     if self.scanned == 0 {
-                        // A fragment seek subtracts the media start from its
-                        // query. A leading empty edit delays index timestamps.
+                        // Convert the query to the packet index clock before
+                        // searching. Packet and presentation clocks can differ.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
                         // A secondary track can replay its non-sync prefix.
                         // The primary needs a preceding key.

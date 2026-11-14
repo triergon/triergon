@@ -731,6 +731,77 @@
       }
     },
     {
+      "id": "leading-video-edit-seek-before-sync",
+      "profile": "leading-video-edit-seek-before-sync",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "17535"
+      ],
+      "expected": {
+        "packets": 237,
+        "bytes": 81478,
+        "digest": 9596315584292083372
+      }
+    },
+    {
+      "id": "leading-video-edit-seek-at-sync",
+      "profile": "leading-video-edit-seek-at-sync",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "17536"
+      ],
+      "expected": {
+        "packets": 181,
+        "bytes": 62042,
+        "digest": 5378275097212072522
+      }
+    },
+    {
+      "id": "leading-video-edit-trimmed-open",
+      "profile": "leading-video-edit-trimmed-open",
+      "file": "avc-leading-edit-trimmed.mp4",
+      "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 225,
+        "bytes": 69726,
+        "digest": 580711317104354027
+      }
+    },
+    {
+      "id": "leading-video-edit-trimmed-seek",
+      "profile": "leading-video-edit-trimmed-seek",
+      "file": "avc-leading-edit-trimmed.mp4",
+      "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "17536"
+      ],
+      "expected": {
+        "packets": 169,
+        "bytes": 50686,
+        "digest": 5242818698675809095
+      }
+    },
+    {
+      "id": "unrepresentable-video-edit-audio-only",
+      "profile": "unrepresentable-video-edit-audio-only",
+      "file": "avc-unrepresentable-edit.mp4",
+      "sha256": "36116695ac130b276e7f44bc0f49c58f6c38713c582075add21f1b35ae481d3f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 189,
+        "bytes": 32517,
+        "digest": 3117005324307362295
+      }
+    },
+    {
       "id": "fate-non-sync-prefix-open",
       "profile": "fate-non-sync-prefix-open",
       "file": "mov/mp4-init-nonkeyframe.mp4",

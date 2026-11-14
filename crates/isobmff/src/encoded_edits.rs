@@ -95,6 +95,8 @@ pub struct EncodedEditPlan {
     presentation_end: i128,
     count: u64,
     timing: EditTiming,
+    video_prefix: u64,
+    video_seek_offset: i64,
     opus_timing: Option<Arc<OpusTiming>>,
     dts_scale: Option<u32>,
     dependency_table: bool,
@@ -127,6 +129,9 @@ impl EncodedEditPlan {
     }
     pub(crate) fn edit_ordinal(&self) -> u32 {
         self.edit_ordinal
+    }
+    pub(crate) fn seek_offset(&self) -> i64 {
+        self.video_seek_offset
     }
     pub fn anchor_ticks(&self) -> i128 {
         self.anchor
@@ -244,7 +249,15 @@ impl EncodedEditPlan {
                 };
                 (opus.duration(occurrence)?, occurrence + 1)
             }
-            _ => (source.duration_ticks, source.ordinal),
+            _ => {
+                let Some(sequence) = source.ordinal.checked_sub(self.video_prefix) else {
+                    return Ok(None);
+                };
+                if sequence == 0 {
+                    return Ok(None);
+                }
+                (source.duration_ticks, sequence)
+            }
         };
         let dts_field =
             ClockField::from_exact_ticks(dts.checked_sub(self.anchor).ok_or(Error::Overflow)?)?;
@@ -389,7 +402,7 @@ pub struct EncodedEditJob<'a> {
     end: i128,
     anchor: Option<i128>,
     maximum_cts: Option<i128>,
-    leading_video_ticks: i64,
+    leading_video: Option<LeadingVideoEdit>,
     source_end: i128,
     count: u64,
     frame: u32,
@@ -412,6 +425,16 @@ pub struct EncodedEditJob<'a> {
     recovery_facts: Option<crate::RecoveryFacts>,
     recovery_observation: Option<crate::RecoveryObservation>,
 }
+
+#[derive(Clone, Copy)]
+struct LeadingVideoEdit {
+    gap: i64,
+    prefix: u64,
+    first_decode: i128,
+    first_visible_decode: Option<i128>,
+    last_cts: i128,
+}
+
 impl<'a> EncodedEditJob<'a> {
     pub fn new(
         context: EncodedEditContext<'a>,
@@ -684,7 +707,13 @@ impl<'a> EncodedEditJob<'a> {
             end: 0,
             anchor,
             maximum_cts: None,
-            leading_video_ticks: if delayed_video { leading_ticks } else { 0 },
+            leading_video: (delayed_video && edit_ordinal != 0).then_some(LeadingVideoEdit {
+                gap: leading_ticks,
+                prefix: 0,
+                first_decode: 0,
+                first_visible_decode: None,
+                last_cts: 0,
+            }),
             source_end: 0,
             count: 0,
             frame,
@@ -1016,6 +1045,47 @@ impl<'a> EncodedEditJob<'a> {
                 } else {
                     None
                 };
+                let (anchor, video_prefix, video_seek_offset) = match self.leading_video {
+                    Some(video) => {
+                        let gap = i128::from(video.gap);
+                        let origin = anchor.checked_sub(gap).ok_or(Error::Overflow)?;
+                        let first = video
+                            .first_decode
+                            .checked_sub(origin)
+                            .ok_or(Error::Overflow)?;
+                        let last = self
+                            .source_end
+                            .max(video.last_cts)
+                            .checked_sub(origin)
+                            .ok_or(Error::Overflow)?;
+                        let end = presentation_end
+                            .checked_sub(i128::from(self.entry.media_time))
+                            .and_then(|duration| duration.checked_add(gap))
+                            .ok_or(Error::Overflow)?;
+                        if first <= i128::from(i64::MIN)
+                            || last > i128::from(i64::MAX)
+                            || end > i128::from(i64::MAX)
+                        {
+                            // An unrepresentable edited track has no usable
+                            // packets. Other tracks keep their own edits.
+                            (origin, self.count, 0)
+                        } else {
+                            // MOV seeks from the decode time of the first displayed
+                            // sample, while packet DTS retains the composition lead.
+                            let first_visible = video
+                                .first_visible_decode
+                                .ok_or(Error::Invalid("missing video presentation start"))?;
+                            let seek_offset =
+                                anchor.checked_sub(first_visible).ok_or(Error::Overflow)?;
+                            (
+                                origin,
+                                video.prefix,
+                                i64::try_from(seek_offset).map_err(|_| Error::Overflow)?,
+                            )
+                        }
+                    }
+                    None => (anchor, 0, 0),
+                };
                 self.result = Some(EncodedEditPlan {
                     source_table: self.context.table.raw().clone(),
                     source_edit: self.context.edits.raw().clone(),
@@ -1024,15 +1094,14 @@ impl<'a> EncodedEditJob<'a> {
                     edit_ordinal: self.edit_ordinal,
                     media_base: self.context.media_base,
                     movie_base: self.context.movie_base,
-                    // The gap affects movie clocks, while selection still uses source clocks.
-                    anchor: anchor
-                        .checked_sub(i128::from(self.leading_video_ticks))
-                        .ok_or(Error::Overflow)?,
+                    anchor,
                     end: self.end,
                     source_end: self.source_end,
                     presentation_end,
                     count: self.count,
                     timing,
+                    video_prefix,
+                    video_seek_offset,
                     opus_timing,
                     dts_scale: self.dts_scale,
                     dependency_table: self.dependency_table,
@@ -1134,6 +1203,23 @@ impl<'a> EncodedEditJob<'a> {
                     // the prefix even when decoded after its first sample.
                     if self.non_sync_prefix && c <= media_start && s.is_container_sync() {
                         return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
+                    if let Some(video) = &mut self.leading_video {
+                        // Keep the decode dependencies from the last sync
+                        // sample at or before the media edit's start.
+                        if c <= media_start && s.is_container_sync() {
+                            video.prefix = s.ordinal - 1;
+                            video.first_decode = d;
+                            video.first_visible_decode = None;
+                            video.last_cts = c;
+                            self.anchor = None;
+                            self.maximum_cts = None;
+                            self.sync_after_edit = false;
+                        }
+                        if c >= media_start && video.first_visible_decode.is_none() {
+                            video.first_visible_decode = Some(d);
+                        }
+                        video.last_cts = video.last_cts.max(c);
                     }
                     if c >= media_start && self.anchor.is_none_or(|prior| c < prior) {
                         self.anchor = Some(c);
