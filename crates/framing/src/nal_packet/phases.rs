@@ -531,73 +531,77 @@ impl PacketEmission {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step> {
-        // One unit per pass exactly as the outer loop runs it: the
-        // cancellation check precedes every unit after the first, and
-        // every yield, charge and error is unchanged. Only the phase
-        // dispatch between units is skipped.
         let parts = state
             .segments
             .as_ref()
             .map_or(&[][..], PacketSegmentStorage::as_slice);
-        let mut first = true;
-        loop {
-            if !first && cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            first = false;
-            let Some(p) = parts.get(self.copy_segment) else {
-                self.phase = EmissionPhase::Freeze;
-                break;
-            };
-            let prefix = usize::from(p.prefix_bytes());
-            let n = prefix.checked_add(p.len()).ok_or(Error::Overflow)?;
-            if self.copied == n {
-                if !work.try_charge(1) {
-                    return Ok(YIELD);
-                }
-                self.copy_segment += 1;
-                self.copied = 0;
-                continue;
-            }
-            let count = if self.copied < prefix {
-                prefix - self.copied
-            } else {
-                (n - self.copied).min(4096)
-            }
-            .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
-            if count == 0 {
-                return Ok(YIELD);
-            }
-            let b = self
+        while let Some(part) = parts.get(self.copy_segment) {
+            let prefix = usize::from(part.prefix_bytes());
+            let end = prefix.checked_add(part.len()).ok_or(Error::Overflow)?;
+            let buffer = self
                 .output
                 .as_mut()
                 .ok_or(Error::Invalid("missing packet buffer"))?;
-            if self.copied < prefix {
+            // Charge and check cancellation at the prefix, payload chunks
+            // and segment boundary, including when resuming a partial copy.
+            while self.copied < prefix {
+                let count = work_count(work).min(prefix - self.copied);
+                if count == 0 {
+                    return Ok(YIELD);
+                }
                 let start = 4 - prefix + self.copied;
-                b.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
-            } else {
-                let start = self.copied - prefix;
+                buffer.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
+                work.take(count as u64);
+                self.copied += count;
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+            }
+            if self.copied < end {
+                if work.remaining() == 0 {
+                    return Ok(YIELD);
+                }
                 let source = &state
                     .source
                     .as_ref()
                     .ok_or(Error::Invalid("missing packet source"))?
                     .bytes;
-                let configuration =
-                    if (p.nal_and_prefix >> 24) as u8 & NalPacketSegment::CONFIGURATION_SOURCE == 0
-                    {
-                        source
-                    } else {
-                        state.update.as_ref().map_or_else(
-                            || state.session.configuration.bytes(),
-                            super::AvcUpdate::bytes,
-                        )
-                    };
-                let payload = p.payload(source, configuration)?;
-                b.try_extend_from_slice(&payload[start..start + count])?;
+                let configuration = if (part.nal_and_prefix >> 24) as u8
+                    & NalPacketSegment::CONFIGURATION_SOURCE
+                    == 0
+                {
+                    source
+                } else {
+                    state.update.as_ref().map_or_else(
+                        || state.session.configuration.bytes(),
+                        super::AvcUpdate::bytes,
+                    )
+                };
+                let payload = part.payload(source, configuration)?;
+                while self.copied < end {
+                    let count = work_count(work).min(end - self.copied);
+                    if count == 0 {
+                        return Ok(YIELD);
+                    }
+                    let start = self.copied - prefix;
+                    buffer.try_extend_from_slice(&payload[start..start + count])?;
+                    work.take(count as u64);
+                    self.copied += count;
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                }
             }
-            work.take(count as u64);
-            self.copied += count;
+            if !work.try_charge(1) {
+                return Ok(YIELD);
+            }
+            self.copy_segment += 1;
+            self.copied = 0;
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
         }
+        self.phase = EmissionPhase::Freeze;
         Ok(NEXT)
     }
 
@@ -672,4 +676,8 @@ impl PacketEmission {
         });
         Ok(Step::Break(NalPacketProgress::Ready))
     }
+}
+
+fn work_count(work: &WorkBudget) -> usize {
+    work.remaining().min(4096) as usize
 }
