@@ -1516,19 +1516,19 @@ fn run_step(
     };
     let code = if unmeasured.is_empty() { code } else { 1 };
     append(log, &format!("{} EXIT={code}", step.name))?;
-    // A grade's verdict lines, which tell listed open cases from other failures.
-    let mut outcome: Vec<String> = if step.placement == Placement::Grade {
-        fs::read_to_string(logs.join(format!("{}.log", step.name)))
-            .unwrap_or_default()
-            .lines()
-            .filter(|line| {
-                line.contains(" cases pass") || line.contains(" open failures, as listed")
-            })
-            .map(str::to_owned)
-            .collect()
-    } else {
-        Vec::new()
-    };
+    // The verdict lines of a grade or a codec collection, which tell listed open
+    // cases from other failures.
+    let mut outcome: Vec<String> = fs::read_to_string(logs.join(format!("{}.log", step.name)))
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| {
+            line.contains(" cases pass")
+                || line.contains(" open failures, as listed")
+                || line.contains(": failing: ")
+                || line.contains("diagnostic on this target")
+        })
+        .map(str::to_owned)
+        .collect();
     if !unmeasured.is_empty() {
         outcome.push(format!(
             "{} of its cases not measured: {}",
@@ -2098,6 +2098,15 @@ mod tests {
             "subtitle-cc: 201 of 205 cases pass"
         ])));
         assert!(!only_open_cases(&record(&[])));
+        // A codec collection's verdict lines read the same way.
+        assert!(only_open_cases(&record(&[
+            "workloads timing: 19 of 20 cases pass",
+            "workloads timing: 1 open failures, as listed: hevc-main10-2160p",
+        ])));
+        assert!(!only_open_cases(&record(&[
+            "workloads timing: 19 of 20 cases pass",
+            "workloads timing: failing: hevc-main10-2160p",
+        ])));
     }
 
     #[test]

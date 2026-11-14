@@ -69,7 +69,7 @@ fn work(worker: &Path, operation: &str, input: &Path) -> Result<Value, String> {
 }
 
 /// Whether the platform can produce a memory gate result.
-fn gate_platform() -> bool {
+pub fn gate_platform() -> bool {
     cfg!(all(
         target_os = "linux",
         target_arch = "aarch64",
@@ -195,6 +195,7 @@ pub fn run(options: &Options) -> Result<(), String> {
     write(&options.out.join("identity.json"), &identity)?;
     let mut summary = Vec::new();
     let mut unmeasured = Vec::new();
+    let mut bounds = Vec::new();
     for (index, w) in workloads.iter().enumerate() {
         let id = text(w, "id")?;
         if only.as_ref().is_some_and(|o| !o.contains(&id)) || !in_part(index, options.part) {
@@ -279,6 +280,10 @@ pub fn run(options: &Options) -> Result<(), String> {
             gate_platform(),
             refusals.is_empty() && parity_matches,
         );
+        if measured.get("status").and_then(Value::as_str) == Some("qualified") {
+            let held = verdict.get("memory_gate").is_some_and(Value::truthy);
+            bounds.push((id.to_owned(), held));
+        }
         let bound = |key: &str| measured.get(key).cloned().unwrap_or(Value::Null);
         let mut line = vec![("id".to_owned(), Value::str(id))];
         line.extend(match &verdict {
@@ -305,8 +310,25 @@ pub fn run(options: &Options) -> Result<(), String> {
         summary.push(line);
     }
     write(&options.out.join("summary.json"), &Value::Array(summary))?;
+    let name = list_name(&options.workloads);
+    let (lines, failed) = super::bounds(&manifest, &name, "memory", &bounds, gate_platform());
+    for line in &lines {
+        println!("{line}");
+    }
     println!("DONE");
-    measured_all("memory", &unmeasured)
+    measured_all("memory", &unmeasured)?;
+    if failed {
+        return Err(format!("{name} memory: a gated bound failed"));
+    }
+    Ok(())
+}
+
+/// A workload list's name, from its file: `workloads` or `file-workloads`.
+pub fn list_name(workloads: &Path) -> String {
+    workloads.file_stem().map_or_else(
+        || "workloads".into(),
+        |stem| stem.to_string_lossy().into_owned(),
+    )
 }
 
 /// Whether the workload at `index` is in `part` (zero-based I of N): every Nth
@@ -353,6 +375,45 @@ mod tests {
             .collect();
         assert_eq!(taken, vec![vec![0, 3, 6], vec![1, 4, 7], vec![2, 5]]);
         assert!((0..8).all(|w| in_part(w, None)));
+    }
+
+    #[test]
+    fn a_failed_bound_fails_where_gated_and_open_failures_read_as_listed() {
+        let results = |held: &[(&str, bool)]| -> Vec<(String, bool)> {
+            held.iter().map(|(id, h)| ((*id).to_owned(), *h)).collect()
+        };
+        let list =
+            json::parse(r#"{"open_workloads": ["hevc-main10-2160p"], "workloads": []}"#).unwrap();
+        let all = results(&[("aac-lc-stereo", true), ("hevc-main10-2160p", true)]);
+        assert_eq!(
+            super::super::bounds(&list, "workloads", "timing", &all, true),
+            (
+                vec!["workloads timing: 2 of 2 cases pass".to_owned()],
+                false
+            )
+        );
+        let open = results(&[("aac-lc-stereo", true), ("hevc-main10-2160p", false)]);
+        assert_eq!(
+            super::super::bounds(&list, "workloads", "timing", &open, true),
+            (
+                vec![
+                    "workloads timing: 1 of 2 cases pass".to_owned(),
+                    "workloads timing: 1 open failures, as listed: hevc-main10-2160p".to_owned(),
+                ],
+                true
+            )
+        );
+        let other = results(&[("aac-lc-stereo", false), ("hevc-main10-2160p", true)]);
+        let (lines, failed) = super::super::bounds(&list, "workloads", "memory", &other, true);
+        assert!(failed);
+        assert_eq!(lines[1], "workloads memory: failing: aac-lc-stereo");
+        // A target the gate does not apply to reports its bounds and fails nothing.
+        let (lines, failed) = super::super::bounds(&list, "workloads", "memory", &other, false);
+        assert!(!failed);
+        assert_eq!(
+            lines,
+            vec!["workloads memory: diagnostic on this target, not gated: 1 of 2 within the bound"]
+        );
     }
 
     #[test]

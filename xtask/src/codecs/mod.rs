@@ -100,6 +100,56 @@ impl Gate<'_> {
     }
 }
 
+/// The verdict of a codec collection's bounds, `results` each workload's id and whether
+/// its bound held. Where the gate applies (`gated`: native Linux AArch64, the gate
+/// build) a failed bound fails the collection, as a failed case fails a grade, and its
+/// lines tell failures that are only the list's `open_workloads` from others, as a
+/// grade's do; elsewhere the bounds are diagnostics and fail nothing. Returns the lines
+/// to print and whether the collection fails.
+pub fn bounds(
+    list: &Value,
+    name: &str,
+    what: &str,
+    results: &[(String, bool)],
+    gated: bool,
+) -> (Vec<String>, bool) {
+    let passed = results.iter().filter(|(_, held)| *held).count();
+    let total = results.len();
+    if !gated {
+        return (
+            vec![format!(
+                "{name} {what}: diagnostic on this target, not gated: {passed} of {total} within the bound"
+            )],
+            false,
+        );
+    }
+    let open: Vec<&str> = list
+        .get("open_workloads")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let failed: Vec<&str> = results
+        .iter()
+        .filter(|(_, held)| !held)
+        .map(|(id, _)| id.as_str())
+        .collect();
+    let (listed, other): (Vec<&str>, Vec<&str>) = failed.iter().partition(|id| open.contains(id));
+    let mut lines = vec![format!("{name} {what}: {passed} of {total} cases pass")];
+    if !listed.is_empty() {
+        lines.push(format!(
+            "{name} {what}: {} open failures, as listed: {}",
+            listed.len(),
+            listed.join(", ")
+        ));
+    }
+    if !other.is_empty() {
+        lines.push(format!("{name} {what}: failing: {}", other.join(", ")));
+    }
+    (lines, !failed.is_empty())
+}
+
 /// `--name value` and `--name=value` options and positional arguments, as
 /// `argparse` accepts them; `switches` take no value.
 pub struct Args {

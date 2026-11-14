@@ -636,7 +636,11 @@ summary` checks them against the same narrowed plan.
 A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
 timing step whose report holds a case not `measured`, or a memory step one not
 `qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
-they did not measure, after writing every record. So no feature measures nothing in
+they did not measure, after writing every record. Where the codec gates apply (native
+Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
+does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
+are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
+diagnostics, which they print as such and fail nothing. So no feature measures nothing in
 silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
 run limit per target triple (30 s when absent), and every memory observation records how
 long its run took (`process_elapsed_ns`). Each list sets four times its slowest observed
