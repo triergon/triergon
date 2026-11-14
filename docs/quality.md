@@ -824,7 +824,9 @@ Where a set lives decides how long it is kept: sets under `qualification/` expir
 days after upload, and sets under `evidence/` are kept. With `TRIERGON_EVIDENCE_ARCHIVE`
 set to the archive location:
 
-1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run.
+1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run. An
+   `OUT` ending in `.tar.gz` stores the tar uncompressed in gzip blocks; one ending in
+   `.tar.zst` compresses it with the system `zstd`, which suits large sets of reports.
 2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
    prints its index entry, which lists the fresh [gate results](#reuse) the set holds.
    Every new set starts there.
