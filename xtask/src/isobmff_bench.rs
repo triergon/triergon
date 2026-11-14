@@ -36,7 +36,8 @@ Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
 qualification, keep the RSS kernel module unloaded and
 TRIERGON_RSS_KERNEL_BOUND unset or 0, using the conservative RSS observer.
-On Linux, --timing-cpu pins timing alone and leaves the caller's CPUs for memory.";
+For combined Linux diagnostics, --timing-cpu pins timing alone and leaves the
+caller's CPUs for standard-memory collection. Use separate commands for the gate.";
 
 pub const CANDIDATE: &str = "isobmff-worker";
 pub const REFERENCE: &str = "ffmpeg-isobmff-native";
@@ -810,8 +811,12 @@ impl Options {
         if options.require_acceptance && (options.subset || !options.benchmark || !options.memory) {
             return Err("acceptance requires the full runtime and memory sets".into());
         }
-        if options.timing_cpu.is_some() && !options.benchmark {
-            return Err("--timing-cpu requires --benchmark".into());
+        if options.timing_cpu.is_some()
+            && (!options.benchmark || !options.memory || options.require_acceptance)
+        {
+            return Err(
+                "--timing-cpu requires combined timing and standard-memory diagnostics".into(),
+            );
         }
         Ok(options)
     }
@@ -1206,6 +1211,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let options = Options::parse(&root, args)?;
     if let Some(cpu) = options.timing_cpu {
+        if std::env::var("TRIERGON_RSS_KERNEL_BOUND").is_ok_and(|value| value != "0")
+            || std::env::var_os("TRIERGON_RSS_KERNEL_PROOF").is_some()
+            || Path::new("/sys/module/triergon_rss_bound").exists()
+        {
+            return Err("--timing-cpu requires the standard memory observer".into());
+        }
         let allowed = gate_build::allowed_cpu_list()
             .ok_or("--timing-cpu requires a Linux CPU affinity list")?;
         if !allowed.contains(&cpu) {
@@ -1906,9 +1917,21 @@ mod tests {
     }
 
     #[test]
-    fn timing_cpu_requires_benchmarking() {
-        let args = ["--timing-cpu", "2"].map(str::to_owned);
-        assert!(Options::parse(&root(), &args).is_err());
+    fn timing_cpu_requires_combined_diagnostics() {
+        for flags in [
+            &[][..],
+            &["--benchmark"][..],
+            &["--memory"][..],
+            &["--benchmark", "--memory", "--require-acceptance"][..],
+        ] {
+            let args = flags
+                .iter()
+                .copied()
+                .chain(["--timing-cpu", "2"])
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            assert!(Options::parse(&root(), &args).is_err());
+        }
         let args = ["--benchmark", "--memory", "--timing-cpu", "2"].map(str::to_owned);
         assert_eq!(Options::parse(&root(), &args).unwrap().timing_cpu, Some(2));
         let args = ["--benchmark", "--timing-cpu"].map(str::to_owned);
