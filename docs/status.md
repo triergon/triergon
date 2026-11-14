@@ -13,12 +13,14 @@ terminal-media matrix against the FFmpeg 9.0.2 release; fonts against FreeType 2
 shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17;
 rasterising, ASS parsing and ASS rendering against libass 0.17.5
 ([reference pins](quality.md#reference-and-corpus)).
-Every runtime and memory figure below but capture on Linux AArch64 was measured with
-workers and references linked as their toolchains link them, before the [link policy](quality.md#measuring-performance) that
+Every runtime and memory figure below but capture on Linux AArch64 and packet framing on
+ARMv7 was measured with workers and references linked as their toolchains link them, before
+the [link policy](quality.md#measuring-performance) that
 links both sides' toolchain runtime support libraries from their static archives. The policy
 changes every Rust worker and the HarfBuzz and libass references; the FFmpeg and FreeType
 references link as before. Each row cites its earlier measurement until it is measured again
-under the policy; capture on Linux AArch64 is measured under it at `5aa55488`.
+under the policy; capture on Linux AArch64 is measured under it at `5aa55488`, and packet
+framing on ARMv7 at `4a932ef9`.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -36,7 +38,7 @@ under the policy; capture on Linux AArch64 is measured under it at `5aa55488`.
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 1.0267 (35/35 pass) | heap ≤0.087743, total RSS ≤0.867077 (35/35 lower) | additional program and carriage profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.1256 (3/3 pass) | heap ≤0.015079, total RSS ≤0.724510 (3/3 lower) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.0336 (71/71 pass) | heap ≤0.020733, total RSS ≤0.808122 (71/71 lower) | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 125 of 125 cases | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 52 of 125 cases | runtime and RSS optimization; full AVC/HEVC/ADTS grammar; on ARMv7, the Rust runtime's main-thread stack-guard lookup reads `/proc/self/maps` through glibc's scanf, so 15–16 more libc pages are resident than for the reference, up to 32 depending on where libc is loaded, and the worker's own binary is only 15 pages smaller |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 0.8573 (354/354 pass; worst `tx3g-known_box_trailing_bytes_and_short_bodies_are_errors`, median of the cases 0.383); the 13 `mov-text-tags` cases at `96f660ba`: 0.9860 (13/13 pass; worst `mov-text-tags-ranges`, median of the cases 0.797); instructions at `96f660ba` against main at `339ec261`: 0.916 of main's in sum, `subtitle-text-host` 1.000, no case above main beyond the run spread but `mov-text-tags-nul-transitions` (1.031), whose output is longer | heap ≤0.336, total RSS ≤0.911 (354/354 lower); the 13 `mov-text-tags` cases at `96f660ba`: heap ≤0.336, total RSS ≤0.860 (13/13 lower, kernel-bound); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 1 of 377 cases | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), the 2 cases added at `c79ae2da` on A32 there | 0.8780 (317/317 pass); the 2 cases `rx-canvas-bounds-ts` and `rx-ods-first-fragment-ts` at `c79ae2da`: 0.4199 (2/2 pass; worst `rx-canvas-bounds-ts`); instructions at `c79ae2da` against main at `339ec261`: 0.99983 of main's in sum, `subtitle-pgs-capsules` 0.99987, no case above main beyond the run spread | heap ≤0.966 (317/317 lower), total RSS ≤0.984 (317/317 lower); the 2 cases at `c79ae2da`: heap ≤0.108, total RSS ≤0.672 (2/2 lower, kernel-bound); on [32-bit ARMv7](#32-bit-armv7) the total RSS gate fails, above the reference in 1 of 317 cases | FATE coverage |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` (−2 keeps a region's first automatic palette until a new epoch) | 241/241 cases (`subtitle-dvb`: TS and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8593 (229/229 pass); the 10 cases `automatic-*` and `clut-conversion-grid-ts`, `clut-flags-ranges-ts` at `aebbe582`: 0.7077 (10/10 pass; worst `clut-conversion-grid-ts`); the 2 `automatic-once` cases added at `86e5bbe8` are not timed; instructions at `74155089` against main at `2de40661`: 0.7523 of main's in sum, median of the cases 0.9990, no case above main beyond the run spread | heap ≤0.991, total RSS ≤0.811 (229/229 lower); the 10 cases at `aebbe582`: heap ≤0.459, total RSS ≤0.661 (10/10 lower, kernel-bound) | FATE coverage |
@@ -522,7 +524,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Linux AArch64: the container, playback, MPEG-TS, HLS and closed caption rows, checked again with the code-size change | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29` |
 | Linux AArch64: the memory of `tags-binary`, `track-disabled` and `fate-witch-realtime`, collected again with the code-size change | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192` |
 | Linux AArch64: ISO BMFF with the code-size change | `4dbbd545d2d452220cd0e35ff11807f6c2fd2703` | `da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f` |
-| ARMv7: the Matroska, startup and seek, HLS, ISO BMFF, packet framing, audio clock, MPEG-TS, playback and closed caption rows of the ARMv7 table, the third collection of `charset-cp950-nomapping-a240` and `long-movie-mkv` | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda` |
+| ARMv7: the packet framing row under the link policy, and the resident pages of both framing workers by libc's load address | `4a932ef908ca783976c56e187c0563ce955f15b5` | `e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1` |
+| ARMv7: the Matroska, startup and seek, HLS, ISO BMFF, audio clock, MPEG-TS, playback and closed caption rows of the ARMv7 table, the earlier packet framing bounds, the third collection of `charset-cp950-nomapping-a240` and `long-movie-mkv` | `4fc96a499ecc1c1a8a6a23d11485123cc4e817a7` | `9328926f64b4a90ef5d4d8161059c5dae72105aa02856bb5f74c221ad9b64bda` |
 | ARMv7: every other row of the ARMv7 table and the earlier bounds of the rows above, the video codec timings | `3df7ae6d504d67e054ffe9a54901620c134ba2c6` | `65707cc2d5ece5ed7d907509b9f2cd4f438ad380be3109be368244b04d3f12fd` |
 | Earlier ARMv7, before the page-cache eviction: the container, playback, ASS rendering and capture rows; the A32 and NEON codec comparisons | `22ed8232b28a285f1439772b91713df3aa64ea91` | `abb62b29518be601df25d36c54235cbd4c9f36f7255470a1f89f02eadaeeed1e` |
 | Earlier ARMv7, A32: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
@@ -585,9 +588,13 @@ depend on), on two AWS c6g.4xlarge hosts (Graviton2, Neoverse N1 r3p1), kernel
 Each feature's runs come from one host, pinned to CPU 1: the tests, codecs, container,
 playback, ISO BMFF and framing rows from one, and the fonts, shaping, rasterising, ASS,
 capture and subtitle rows from the other. The Matroska, startup and seek, HLS, ISO BMFF,
-packet framing, audio clock, MPEG-TS, playback and closed caption rows are at `4fc96a49`
-instead, also linked before the link policy, run on a third c6g.4xlarge with the same user
-space and kernel, with the references built there from the same pins. Every case has 30
+audio clock, MPEG-TS, playback and closed caption rows are at `4fc96a49` instead, also
+linked before the link policy, run on a third c6g.4xlarge with the same user space and
+kernel, with the references built there from the same pins. The packet framing row is at
+`4a932ef9`, under the link policy `static-toolchain-runtime-v1`, on a fourth c6g.4xlarge with
+the same user space and kernel and every reference built there
+(`build-workers --all-references`); its memory runs in parallel on CPUs 1–15
+([memory in parallel](quality.md#memory-in-parallel)). Every case has 30
 timing pairs and 30 memory pairs; the contract features are graded by `cargo xtask grade`.
 Memory is kernel-bound in every row but capture: measured under the kernel RSS bound,
 through its 32-bit entry point, with both workers' cached pages dropped before every run
@@ -606,7 +613,7 @@ diagnostics: no codec contract is gated on this target.
 | Matroska startup and seek | 44/44 | 0.8449 (44/44 pass) | heap ≤0.396 (44/44 lower); total RSS fails: ≤1.0342, 17/44 lower |
 | HLS segments | 71/71 | 0.5883 (71/71 pass) | heap ≤0.020, total RSS ≤0.8669 (71/71 lower) |
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 1.0009 (972/972 pass) | heap ≤0.274, total RSS ≤0.8155 (972/972 lower) |
-| Packet framing | 125/125 AVC/HEVC reference comparisons | 1.0706 (125/125 pass) | heap ≤0.766 (125/125 lower); total RSS fails: ≤1.0591, 0/125 lower |
+| Packet framing | 125/125 AVC/HEVC reference comparisons | 1.110566929819581 (125/125 pass) | heap ≤0.7652811735941321 (125/125 lower); total RSS fails: ≤1.010086455331412, 73/125 lower |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 2.0698 (10/20 within the ceiling; AAC at `0b3c2db5`, other audio at `ddb02a59`) | no repository runner for the gate; the three HE-AAC workloads at `700c2134`, not gated: heap ≤0.944, total RSS ≤0.890 (3/3 lower) |
 | Capture | 15/15 at `dcf51398`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1536 at `dcf51398` (15/15 pass; worst `c13-motion-960-6m`, then `c14-motion-960-rate255` 1.1528) | standard bounds at `dcf51398`: heap ≤0.609, total RSS ≤0.982 (14/15 lower); `c05-noise-960` has no memory result: FFmpeg's run under the RSS observer outlasts the 30 s worker limit in all 30 pairs |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7809 (10/10 pass) | heap ≤0.733 (10/10 lower); total RSS fails: ≤1.1913, 0/10 lower |
@@ -683,7 +690,7 @@ xtask grade` does not join a slice, so their bounds come from each run's report.
 
 No gated case is above the ceiling on ARMv7. The closest are capture `c13-motion-960-6m`
 1.1536 and `c14-motion-960-rate255` 1.1528 at `dcf51398`, then `info-date-latest` (Matroska
-segment metadata) 1.1438, `hevc-irap_repeat` (packet framing) 1.0706,
+segment metadata) 1.1438, `hevc-irap_repeat` (packet framing) 1.1106,
 `progressive-ten-sequential-batches` (MP4 forward) 1.0480, `vob-split` (DVD) 1.0389,
 `rle-long-rows-sup` (PGS) 1.0021 and the ISO BMFF output
 `order27-u64-last-scale1000-cat21-native-index-tiny` 1.0009. The raw samples'
@@ -785,12 +792,26 @@ Its heaviest case, `bitmaps-24`, takes about 50 s on each side, within
 The total RSS gate fails on ARMv7 in five container and playback rows: Matroska, startup and seek, packet framing, Matroska audio clocks and MP4 forward.
 It is lower in every ISO BMFF output, MPEG-TS operation, HLS segment, TS program and raw
 Annex B case, in 15 of the 44 startup and seek cases and in 8 of the 116 Matroska cases;
-it is above in every packet framing, MP4 forward and Matroska audio clocks case. Peak heap
+it is above in every MP4 forward and Matroska audio clocks case and in 52 of the 125 packet
+framing cases. Peak heap
 is lower than the reference in every case. The difference is the workers' own code. The playback worker is 2,099,860 bytes with 1,430,354 bytes of `.text`; the
 FFmpeg worker it is compared with, which links 12 demuxers (`ass`, `h264`, `hevc`,
 `matroska`, `mov`, `mpegps`, `mpegts`, `mpegtsraw`, `srt`, `sup`, `vobsub`, `webvtt`), is
 1,248,636 bytes with 781,288 bytes of `.text`. One playback worker holds every runner, and
 `Engine` links every container backend.
+
+Packet framing's worst total RSS bound is 1.010086455331412 (`bad-packet-good-update`), and
+the median of its 125 bounds 0.9971. Both workers' resident pages move in 64 KiB steps, the
+kernel's fault-around window, depending on where libc is loaded. In 40 runs of each worker on
+`bad-packet-good-update`, sorted by libc's load address modulo 64 KiB, the framing worker
+holds 15 to 16 more pages of libc than the reference at the same address, and 31 to 32 more
+at four of the sixteen: before `main`, the Rust runtime's main-thread stack-guard lookup
+reads `/proc/self/maps` through glibc's `pthread_getattr_np` and `sscanf`, which brings in
+libc's printf and scanf code, and the reference never runs that code. The worker's own
+binary is 15 pages smaller (53 resident pages against 68), so the two totals overlap, and a
+case falls below the reference when most of the reference's 30 runs land on an address that
+costs it an extra window. Passing in every case takes about 16 fewer resident pages in the
+framing worker, one 64 KiB window.
 
 These are the first ARMv7 collections with the page-cache eviction. At `22ed8232`, without
 it, how much of each executable was resident at the start of the operation varied between

@@ -20074,6 +20074,288 @@
    }
   },
   {
+   "name": "framing-armv7-static-toolchain-4a932ef9",
+   "path": "framing-armv7-static-toolchain-4a932ef9",
+   "retention": "retained",
+   "reason": "Packet framing on the ARMv7 gate target thumbv7neon-unknown-linux-gnueabihf at 4a932ef9, the link policy static-toolchain-runtime-v1, in the armhf user space on a c6g.4xlarge: every profile reference built (build-workers --all-references), preflight, 30 timing pairs on CPU 1 with the RSS module unloaded, the kernel proof, 30 kernel-bound memory pairs in parallel on CPUs 1-15, grading with the module loaded; parity 125/125, runtime <=1.110566929819581, heap <=0.7652811735941321, total RSS <=1.010086455331412 with 73/125 lower. With the first attempt, which stopped before measuring, the RSS module review and proof, 40 resident-page snapshots per worker of bad-packet-good-update by mapping and libc load address, the scripts and a bundle of the source",
+   "key": "evidence/framing-armv7-static-toolchain-4a932ef9/e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1.tar.gz",
+   "sha256": "e67e0660c55ebde8ec616239c0dcde734eaa59f508160e1554b2a7df5ec32ae1",
+   "bytes": 754032839,
+   "source_revisions": {
+    "candidate": "4a932ef908ca783976c56e187c0563ce955f15b5"
+   },
+   "results": [
+    {
+     "path": "gate/out/gate/graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "ddcc0c83262d486675bda4777432bb3ec52420f01fc11d909cdc79af30aba764",
+     "status": 0,
+     "report_sha256": "cc0437186d3fad00573fc21b319a7954e3f1b84251fef25e9da7ae53698af5ef"
+    },
+    {
+     "path": "gate/out/gate/memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "2a5f9f1bc82358472d38bbc7c50e2df78076fe2d37c2a7923ce9f6f64ba66c03",
+     "status": 0,
+     "report_sha256": "137276ea6b87b1ce63a8947ec029db4ecfc33606b7ff0c68ec414bc13720048a"
+    },
+    {
+     "path": "gate/out/gate/timing/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "312fa83087df3570a09899b6a71a16346c5eff9f7d2c0ec756455df9e854edbc",
+     "status": 0,
+     "report_sha256": "d0df228620ab6739967a8f47e8ee9a5557f4a733b85f057bd9feb0077e178be1"
+    }
+   ]
+  },
+  {
+   "name": "gate-early-stop-two-blocks",
+   "path": "gate-early-stop-two-blocks",
+   "retention": "retained",
+   "reason": "The two-block early stop of timing and memory sessions replayed on every 30-pair session of evidence sets armv7-thumb2-3df7ae6d-linux-armv7, runners-gate-build-linux-arm64, mpegts-pes-gate-build-linux-arm64 and isobmff-armv7-runtime-regate-linux-arm64, and simulated by drawing pairs from the ARMv7 sessions' own ratios with the true median at, beyond and inside each ceiling; the independence of their pairs (lag-1 autocorrelation and first-block shift against each session's shuffled ratios); a simulation of the looks after 10 and 20 pairs and of the two-block rule under autocorrelated and drifting pairs; the per-case comparisons of the real runs in gate-early-stop-runs-aarch64 and gate-early-stop-runs-armv7; and the scripts",
+   "key": "evidence/gate-early-stop-two-blocks/f6daf7ca01d2dbd71b0ac4ee41fd74ab6cf4a75e3e6f41ada937637710a4be67.tar.gz",
+   "sha256": "f6daf7ca01d2dbd71b0ac4ee41fd74ab6cf4a75e3e6f41ada937637710a4be67",
+   "bytes": 6325239,
+   "source_revisions": {
+    "candidate": "ce504ad583c0e96e33fc9b879c32ffce2a5d2f0b"
+   }
+  },
+  {
+   "name": "gate-early-stop-runs-aarch64",
+   "path": "gate-early-stop-runs-aarch64",
+   "retention": "retained",
+   "reason": "matroska-demux and ISO BMFF timing alone on CPU 1, then memory with the kernel RSS bound on CPUs 1-15, and the matroska-demux grade, on Linux AArch64 on a c6g.4xlarge: once at main 4a932ef9 with every session running 30 pairs and once at ce504ad5 with the two-block early stop, on byte-identical workers; every session that stopped kept its 30-pair verdict; with the per-case comparison, the step logs, the preflights, the RSS module proofs, and the source bundle",
+   "key": "evidence/gate-early-stop-runs-aarch64/280c3cc4e953f7e5cf7fd3a1c99869b685d56b223c2e4eec6c73e03120b33527.tar.zst",
+   "sha256": "280c3cc4e953f7e5cf7fd3a1c99869b685d56b223c2e4eec6c73e03120b33527",
+   "bytes": 56315076,
+   "source_revisions": {
+    "baseline": "4a932ef908ca783976c56e187c0563ce955f15b5",
+    "candidate": "ce504ad583c0e96e33fc9b879c32ffce2a5d2f0b"
+   },
+   "results": [
+    {
+     "path": "early/graded/matroska-demux/gate-result.json",
+     "command": "grade",
+     "key": "6775a3e21c4258e729693d11905de8a4d9ec23a5a20da95634c8f5dbe7ff3e48",
+     "status": 0,
+     "report_sha256": "094bcd0984f28452d15b593e4cdcd37c1acf5209c7204775ac59f68ca3ee5bf3"
+    },
+    {
+     "path": "early/memory/isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "791d966f1eb146f5179673d0914e2241e0530a416d5ebd34f7a2610f6e98be97",
+     "status": 0,
+     "report_sha256": "20af66819bb2972ec976086b6ea629a0b6c46258c28c65fdbdc500c60294ade8"
+    },
+    {
+     "path": "early/memory/matroska-demux/gate-result.json",
+     "command": "report --memory",
+     "key": "247a3cb0772f821df08503f3f7de4c51fe18caea69ad28e34895bd03e4420c61",
+     "status": 0,
+     "report_sha256": "828a1f9296f7a903667c4c3573529aa3c4eb005c3469fc1a2d71f948fe20b37c"
+    },
+    {
+     "path": "early/timing/isobmff/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "5d4f239800ab553f2c769dac5aa0425e80eea4113507b2b86e4792e9b7d4f35f",
+     "status": 0,
+     "report_sha256": "58d457fb6564fcbbc463b1b7d8b3dee2f3ceda78903d5a6de47a42de7b6336ef"
+    },
+    {
+     "path": "early/timing/matroska-demux/gate-result.json",
+     "command": "report --benchmark",
+     "key": "30d7f555e322321d08b6b321265f72db8ea16f6e2a34561452272963504d77fd",
+     "status": 0,
+     "report_sha256": "e49284fa9ba9acd8b6785bf29cf3d7f1cb607c3020137b5486b2179f2fc83e05"
+    },
+    {
+     "path": "main/graded/matroska-demux/gate-result.json",
+     "command": "grade",
+     "key": "e1faebc7289a56c052ebb1f1bf14bc92635b14ff997581ca91ae53b39ce6b6ba",
+     "status": 0,
+     "report_sha256": "46aa59408237db3002d3fe63bd6288c6626be67143014a7deed47903fcaa5724"
+    },
+    {
+     "path": "main/memory/isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "58635a620eff8c8e51ec55508048b7652b9ae4669c63738815a42eea9c493d70",
+     "status": 0,
+     "report_sha256": "6a8ba057b66630f8bc5ee58417727aa5e881a0fccbef5f9f5a4726a75dba5766"
+    },
+    {
+     "path": "main/memory/matroska-demux/gate-result.json",
+     "command": "report --memory",
+     "key": "a1d7265499108837e1fc0ab09e3266c493798cf9bd59488ba70c75fe7316aa44",
+     "status": 0,
+     "report_sha256": "38f9395b272f91b6019356734f0461a42d26908deab9681f7fe1d1108b72c0e9"
+    },
+    {
+     "path": "main/timing/isobmff/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "f69278d494dc1e59c678c2850b66247220a6bc0f58f0f6f0795577e744a406ac",
+     "status": 0,
+     "report_sha256": "0fac5439b311bc0a6883814bcf7c844f261322d53a24d54459029216e3e26565"
+    },
+    {
+     "path": "main/timing/matroska-demux/gate-result.json",
+     "command": "report --benchmark",
+     "key": "a9f10a77faf02493bf4df34a072ea6a949f351269fd0a3d8b66c14090f7c9075",
+     "status": 0,
+     "report_sha256": "e8219688aa871d8f0b0b791103fd2b1289373e58e295b5b8d88faef4729c588a"
+    }
+   ]
+  },
+  {
+   "name": "gate-early-stop-runs-armv7",
+   "path": "gate-early-stop-runs-armv7",
+   "retention": "retained",
+   "reason": "matroska-demux and ISO BMFF timing alone on CPU 1, then memory with the kernel RSS bound on CPUs 1-15, and the matroska-demux grade, on the ARMv7 gate target in the armhf user space on a c6g.4xlarge: once at main 4a932ef9 with every session running 30 pairs and once at ce504ad5 with the two-block early stop, on byte-identical workers; every session that stopped kept its 30-pair verdict; with the per-case comparison, the step logs, the preflights, the RSS module proofs, and the source bundle",
+   "key": "evidence/gate-early-stop-runs-armv7/f0787944b7ebd0de1a9c37e2607ccdfe2a069d2e41813f945af49cd0768910cb.tar.zst",
+   "sha256": "f0787944b7ebd0de1a9c37e2607ccdfe2a069d2e41813f945af49cd0768910cb",
+   "bytes": 59661018,
+   "source_revisions": {
+    "baseline": "4a932ef908ca783976c56e187c0563ce955f15b5",
+    "candidate": "ce504ad583c0e96e33fc9b879c32ffce2a5d2f0b"
+   },
+   "results": [
+    {
+     "path": "early/graded/matroska-demux/gate-result.json",
+     "command": "grade",
+     "key": "e6429d08ff98dcf97f17a990efe66f7fd6278d326ec6ad25526efd91d497f6b5",
+     "status": 0,
+     "report_sha256": "3337774dc102bc56199dd331962cdadb3ae1a11c2231ac5d5bf17d0ac0d602af"
+    },
+    {
+     "path": "early/memory/isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "7ab0f7bd2edfd486d37172364434adde718042f3f7a9b31b445bb1358c3628b4",
+     "status": 0,
+     "report_sha256": "ae08562628654e65328b4556cd5c359faa9dba7bb5772c44fc321e974a395ee5"
+    },
+    {
+     "path": "early/memory/matroska-demux/gate-result.json",
+     "command": "report --memory",
+     "key": "4b5603335c2f8aa090abf317b3af078ac574d0a8c702940d7fdfde3ad1049853",
+     "status": 0,
+     "report_sha256": "185d437a8a508d14ec11f49060a2402219d8b5b5b379696885fc092fcd6cadb1"
+    },
+    {
+     "path": "early/timing/isobmff/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "205a7e41e28dddee5a99fcea71cbd37e5fd1a95e4797dcb2e64d4820389a682f",
+     "status": 0,
+     "report_sha256": "5ffef229b0a76929bf57cf2a87e5d76be911df4bbd6938c5e63cfd3ed58de232"
+    },
+    {
+     "path": "early/timing/matroska-demux/gate-result.json",
+     "command": "report --benchmark",
+     "key": "742ebec08dd1aa7e1bb983a8852107f36d3d3e114894a2affa489846cd2f49ee",
+     "status": 0,
+     "report_sha256": "a674cdef256f58c2e5576bfeba54122448820151a3e548c897820572be58d530"
+    },
+    {
+     "path": "main/graded/matroska-demux/gate-result.json",
+     "command": "grade",
+     "key": "f67aa11053ae4808138020916e89cbf5e6716d95f9563e8a44df852875e46a20",
+     "status": 0,
+     "report_sha256": "1cccd8bd9a8c7a41c21ebae6961b9a756bb03b420f8e5b26fa21e3f8558540d3"
+    },
+    {
+     "path": "main/memory/isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "c8d27fd8c65cad17ad4c0e399e27b1f35553c9d49a67e2033bdbfb5633e89f59",
+     "status": 0,
+     "report_sha256": "bdce2da3b9f61fc0bf229dcf08c35ae92827b61ab54682925c136988abdc5952"
+    },
+    {
+     "path": "main/memory/matroska-demux/gate-result.json",
+     "command": "report --memory",
+     "key": "a76a1b456fb8b2e8b247cf49bde22d14c5d60552df31a6956a1b831e23e34c48",
+     "status": 0,
+     "report_sha256": "2ddb1335b1570e173b0378ab0598267f3a6751c66f99eb8b8a4df65f0f7c1374"
+    },
+    {
+     "path": "main/timing/isobmff/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "0aaf931eaafc16af1dee6b64bf2a8cd583ed6955bbae0a1989e5eed2d5577f92",
+     "status": 0,
+     "report_sha256": "3da4535fe124055953b10cb94cf867b2f4a6e884207c23e25c6f8ba6cedba138"
+    },
+    {
+     "path": "main/timing/matroska-demux/gate-result.json",
+     "command": "report --benchmark",
+     "key": "90a4e29b86c76a9373828c2e10d4fdfb9208079e73b4983a0c31656aa27b6387",
+     "status": 0,
+     "report_sha256": "6431c40eb5fa28565f0d14b491f1a29f59093b9713ad870fdc290b650a68d272"
+    }
+   ]
+  },
+  {
+   "name": "gate-reference-memory-cross-host",
+   "path": "gate-reference-memory-cross-host",
+   "retention": "retained",
+   "reason": "Kernel-bound memory of matroska-demux and the 956 ISO BMFF operations on a second c6g.4xlarge per target with the same worker bytes, against the first hosts' collections: on Linux AArch64 and the ARMv7 gate target, every case's candidate and reference peak heap identical sample for sample and every median total resident peak within the first host's spread; the record of why a cached reference memory would be valid, with the per-case series, the comparisons and the scripts",
+   "key": "evidence/gate-reference-memory-cross-host/bbb23e1dcc112bad020072ffc19ed24ae9f7102642a69298221257bc79abada4.tar.gz",
+   "sha256": "bbb23e1dcc112bad020072ffc19ed24ae9f7102642a69298221257bc79abada4",
+   "bytes": 88985752,
+   "source_revisions": {
+    "first": "a92f2d0a938562ac2f2bb3f5106be639015588de",
+    "second": "e1adf7332946f0e430e3deeb1098048684a4072c"
+   }
+  },
+  {
+   "name": "gate-parallel-memory-isobmff-aarch64",
+   "path": "gate-parallel-memory-isobmff-aarch64",
+   "retention": "retained",
+   "reason": "Memory of ISO BMFF with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on Linux AArch64 on a c6g.4xlarge at a92f2d0a: every case's peak heap identical sample for sample, candidate and reference resident medians within the serial spread, every case passing both ways; with the per-case comparison and verdicts, the step logs, the RSS module proof, and the source bundle",
+   "key": "evidence/gate-parallel-memory-isobmff-aarch64/1a07c01b59d24d65b496dc571350fb362505a9b5ef6a1315ccf359cc74fcce07.tar.zst",
+   "sha256": "1a07c01b59d24d65b496dc571350fb362505a9b5ef6a1315ccf359cc74fcce07",
+   "bytes": 38673923,
+   "source_revisions": {
+    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   },
+   "results": [
+    {
+     "path": "memory-parallel-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "b706119e7cd66f71c3f023399c7b74cdcadda36f460af5a3d273040421301f32",
+     "status": 0
+    },
+    {
+     "path": "memory-serial-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "b706119e7cd66f71c3f023399c7b74cdcadda36f460af5a3d273040421301f32",
+     "status": 0
+    }
+   ]
+  },
+  {
+   "name": "gate-parallel-memory-isobmff-armv7",
+   "path": "gate-parallel-memory-isobmff-armv7",
+   "retention": "retained",
+   "reason": "Memory of ISO BMFF with the kernel RSS bound, 30 pairs, once on one CPU and once on CPUs 1-15, on the ARMv7 gate target in the armhf user space on a c6g.4xlarge at a92f2d0a: every case's peak heap identical sample for sample, candidate and reference resident medians within the serial spread, every case passing both ways; with the per-case comparison and verdicts, the step logs, the RSS module proof, and the source bundle",
+   "key": "evidence/gate-parallel-memory-isobmff-armv7/672fd4ba21b3e7de3d062e513c539fd9e111959932e97a4fafb08b07326e84b1.tar.zst",
+   "sha256": "672fd4ba21b3e7de3d062e513c539fd9e111959932e97a4fafb08b07326e84b1",
+   "bytes": 41226788,
+   "source_revisions": {
+    "candidate": "a92f2d0a938562ac2f2bb3f5106be639015588de"
+   },
+   "results": [
+    {
+     "path": "memory-parallel-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "92913f20031f5028fd09ddfc584998cfe75f97605d45d29ba603e1ac377d0db9",
+     "status": 0
+    },
+    {
+     "path": "memory-serial-isobmff/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "92913f20031f5028fd09ddfc584998cfe75f97605d45d29ba603e1ac377d0db9",
+     "status": 0
+    }
+   ]
+  },
+  {
    "name": "capture-armv7-conversion-dcf51398-armv7",
    "path": "capture-armv7-conversion-dcf51398-armv7",
    "retention": "retained",

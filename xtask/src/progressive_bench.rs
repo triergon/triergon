@@ -13,6 +13,7 @@ use crate::sha256;
 pub const USAGE: &str = "usage: cargo xtask progressive [--output DIR]
        [--benchmark] [--memory] [--pairs N] [--iterations 50] [--seed N]
        [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance] [--full]
+       [--no-early-stop]
 
 All five functional inputs (ten literal worker outcomes) must pass first.
 The three original comparable cases are required for correctness, runtime and memory.
@@ -42,6 +43,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
             "--benchmark" => options.benchmark = true,
             "--memory" => options.memory = true,
             "--full" => options.full = true,
+            "--no-early-stop" => options.early_stop = false,
             "--require-acceptance" => options.require_acceptance = true,
             "--require-slice-acceptance" => options.require_slice_acceptance = true,
             "--output" => options.output = PathBuf::from(value()?),
