@@ -338,6 +338,7 @@ pub struct NalPacketSession {
     pool: Budget,
     configuration: NalPacketConfiguration,
     limits: NalPacketLimits,
+    maximum_copy_storage: usize,
     avc: AvcState,
     receiver_epoch: u64,
     drained: bool,
@@ -354,10 +355,16 @@ impl NalPacketSession {
         if limits.maximum_nals == 0 || limits.maximum_segments == 0 {
             return Err(Error::Invalid("zero packet policy"));
         }
+        // When the logical maximum overflows, keep the per-packet proof.
+        // The pool's own charge means its available space is below usize::MAX.
+        let maximum_copy_storage =
+            PacketPlan::added_storage(limits.maximum_segments, limits.maximum_output_bytes, true)
+                .unwrap_or(usize::MAX);
         Ok(Self {
             pool: pool.clone(),
             configuration,
             limits,
+            maximum_copy_storage,
             avc: AvcState::default(),
             receiver_epoch: 0,
             drained: false,
@@ -1027,17 +1034,17 @@ impl PacketPlan {
     }
 
     fn establish_storage_bound<M>(&mut self, state: &PacketState<'_, M>) -> Result<()> {
-        let limits = state.session.limits;
-        let maximum = Self::added_storage(
-            limits.maximum_segments,
-            limits.maximum_output_bytes,
-            state.length_width.is_some(),
-        );
+        let maximum = if state.length_width.is_some() {
+            state.session.maximum_copy_storage
+        } else {
+            PacketSegmentStorage::required_heap_bytes(state.session.limits.maximum_segments)
+                .unwrap_or(usize::MAX)
+        };
         // The job's retained source and configuration remain charged to this
         // pool. Its fixed storage is therefore at most the current live charge.
         // If both logical ceilings fit in the remaining capacity, they bound
         // every future append. Actual reservations still check current pressure.
-        self.live_base = if maximum.is_ok_and(|bytes| bytes <= state.session.pool.available()) {
+        self.live_base = if maximum <= state.session.pool.available() {
             Self::LIMITS_FIT
         } else {
             state.fixed_live_bytes()?
