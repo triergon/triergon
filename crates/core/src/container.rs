@@ -44,6 +44,8 @@ pub enum CodecId<'a> {
     Hevc,
     Av1,
     Vp9,
+    /// Theora (Xiph.Org Theora I).
+    Theora,
     /// Uncompressed video samples.
     RawVideo,
     Aac,
@@ -56,6 +58,8 @@ pub enum CodecId<'a> {
     Vorbis,
     Opus,
     Flac,
+    /// Speex (Xiph.Org Speex).
+    Speex,
     /// MPEG-1, MPEG-2 or MPEG-2.5 audio, Layer I, II or III; each frame header names its
     /// layer.
     MpegAudio,
