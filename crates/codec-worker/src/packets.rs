@@ -7,13 +7,20 @@
 //! reader reports: the track index, `pts`, `dts`, `duration` and `trim_start`/`trim_end`
 //! in the packet's time base, the payload size, the source position (Ogg: the page that
 //! completes the packet; elementary streams: the first byte) and whether the access unit
-//! is complete. Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
+//! is complete; an Ogg packet that ends its page also gives the page's `granule`. Ogg
+//! packets also carry `compat`, the reader's FFmpeg-compatible view
 //! (`triergon_ogg::compat::clock::packet_timing`: `pts`, which is also the decode time,
 //! `duration`, `skip_samples` and `discard_padding`), and the reader's `resync` and
 //! `lost` events are lines of their own (`{"event": ...}`) where they occur. The last
 //! line lists the tracks and how reading ended: `eof`, or `error` with the reader's
 //! message (an error opening the file leaves no tracks). Reader errors are results, so
 //! the process exits 0 whenever it could read the file.
+//!
+//! `seek ogg FILE TRACK SECONDS POLICY` opens the file the same way, seeks track TRACK
+//! (its index once the reader is open) to SECONDS (a decimal number) with POLICY
+//! (`exact`: `SeekPolicy::PreviousRandomAccess`; `preroll`: `SeekPolicy::PlaybackPreroll`),
+//! prints the receipt as a `{"event":"seek",...}` line (its times as `[numerator,
+//! denominator]` seconds) and then every event to the end of the file as `packets` does.
 
 use std::fmt::Write as _;
 use std::fs::File;
@@ -22,7 +29,9 @@ use std::sync::atomic::AtomicBool;
 
 use triergon::elementary::{self, Ac3, Adts, Flac, Format, MpegAudio};
 use triergon::ogg::{self, compat::clock};
-use triergon::{Event, PacketInfo, TimeBase, TrackInfo};
+use triergon::{
+    Event, PacketInfo, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest, Time, TimeBase, TrackInfo,
+};
 
 /// One packet as the reader reports it.
 struct Row {
@@ -36,6 +45,9 @@ struct Row {
     position: u64,
     complete: bool,
     compat: Option<clock::ReferenceTiming>,
+    /// The granule position of the Ogg page the packet ends, when it is the last packet
+    /// completed there.
+    granule: Option<i64>,
 }
 
 impl Row {
@@ -51,6 +63,7 @@ impl Row {
             position,
             complete,
             compat: None,
+            granule: None,
         }
     }
 
@@ -69,6 +82,9 @@ impl Row {
         field(&mut line, "size", &self.size.to_string());
         field(&mut line, "position", &self.position.to_string());
         field(&mut line, "complete", &self.complete.to_string());
+        if let Some(granule) = self.granule {
+            field(&mut line, "granule", &granule.to_string());
+        }
         if let Some(compat) = self.compat {
             let _ = write!(
                 line,
@@ -134,17 +150,86 @@ fn finish(
     writeln!(out, "{{\"tracks\":[{}],{end}}}", tracks.join(","))
 }
 
-fn ogg_packets(file: File, out: &mut impl Write) -> std::io::Result<()> {
+/// A seek of `ogg_packets`: the track index, the target and the policy.
+pub struct Seek {
+    track: usize,
+    target: Time,
+    policy: SeekPolicy,
+}
+
+impl Seek {
+    /// `TRACK SECONDS POLICY` as `seek` takes them.
+    pub fn parse(track: &str, seconds: &str, policy: &str) -> Result<Seek, String> {
+        let track = track.parse().map_err(|_| format!("track {track}"))?;
+        let (whole, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
+        let digits = format!("{whole}{fraction}");
+        let numerator: i128 = digits.parse().map_err(|_| format!("seconds {seconds}"))?;
+        let denominator = 10u128
+            .checked_pow(u32::try_from(fraction.len()).map_err(|_| "seconds")?)
+            .ok_or("seconds")?;
+        let target = Time::new(numerator, denominator).map_err(|e| e.to_string())?;
+        let policy = match policy {
+            "exact" => SeekPolicy::PreviousRandomAccess,
+            "preroll" => SeekPolicy::PlaybackPreroll,
+            other => return Err(format!("policy {other}")),
+        };
+        Ok(Seek {
+            track,
+            target,
+            policy,
+        })
+    }
+}
+
+fn time(value: Time) -> String {
+    format!("[{},{}]", value.numerator(), value.denominator())
+}
+
+fn receipt_line(receipt: &SeekReceipt) -> String {
+    let method = match receipt.method {
+        SeekMethod::Index => "index",
+        SeekMethod::BoundedScan => "bounded-scan",
+        SeekMethod::Restart => "restart",
+    };
+    format!(
+        "{{\"event\":\"seek\",\"requested\":{},\"landing\":{},\"discard_until\":{},\"method\":\"{method}\",\"scanned_bytes\":{}}}",
+        time(receipt.requested),
+        time(receipt.landing),
+        time(receipt.discard_until),
+        receipt.scanned_bytes
+    )
+}
+
+fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io::Result<()> {
     let cancel = AtomicBool::new(false);
     let mut reader = match ogg::BlockingReader::open(BufReader::new(file), ogg::Limits::default()) {
         Ok(reader) => reader,
         Err(error) => return finish(out, &[], Err(error)),
     };
+    let sought = seek.map(|seek| {
+        let track = reader
+            .tracks()
+            .get(seek.track)
+            .map(TrackInfo::id)
+            .ok_or(triergon::Error::Invalid("seek track"))?;
+        let request = SeekRequest {
+            track,
+            target: seek.target,
+            policy: seek.policy,
+        };
+        reader.seek(request, &cancel)
+    });
+    match sought {
+        Some(Ok(receipt)) => writeln!(out, "{}", receipt_line(&receipt))?,
+        Some(Err(error)) => return finish(out, &[], Err(error)),
+        None => {}
+    }
     let end = loop {
         match reader.next_event(&cancel) {
             Ok(Some(Event::Packet(packet))) => {
                 let mut row = Row::of(&packet, packet.track_index(), packet.page_offset(), true);
                 row.compat = Some(clock::packet_timing(&packet));
+                row.granule = packet.granule();
                 row.write(out)?;
             }
             Ok(Some(Event::Other(ogg::ReaderEvent::Resync { offset, bytes }))) => writeln!(
@@ -206,13 +291,16 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
     finish(out, &tracks, end)
 }
 
-/// Print the packets of `path` read as `format`; `Err` for an unknown format or an
-/// unreadable file.
-pub fn run(format: &str, path: &str) -> Result<(), String> {
+/// Print the packets of `path` read as `format`, after `seek` if given (Ogg only);
+/// `Err` for an unknown format or an unreadable file.
+pub fn run(format: &str, path: &str, seek: Option<&Seek>) -> Result<(), String> {
     let file = File::open(path).map_err(|e| format!("{path}: {e}"))?;
     let mut out = BufWriter::new(std::io::stdout().lock());
+    if seek.is_some() && format != "ogg" {
+        return Err(format!("seek: no seeking reader for {format}"));
+    }
     let written = match format {
-        "ogg" => ogg_packets(file, &mut out),
+        "ogg" => ogg_packets(file, seek, &mut out),
         "flac" => elementary_packets::<Flac>(file, &mut out),
         "mp3" => elementary_packets::<MpegAudio>(file, &mut out),
         "aac" => elementary_packets::<Adts>(file, &mut out),

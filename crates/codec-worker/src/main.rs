@@ -272,7 +272,18 @@ fn main() {
     if let [_, command, format, path] = args.as_slice()
         && command == "packets"
     {
-        if let Err(error) = packets::run(format, path) {
+        if let Err(error) = packets::run(format, path, None) {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+        return;
+    }
+    if let [_, command, format, path, track, seconds, policy] = args.as_slice()
+        && command == "seek"
+    {
+        if let Err(error) = packets::Seek::parse(track, seconds, policy)
+            .and_then(|seek| packets::run(format, path, Some(&seek)))
+        {
             eprintln!("{error}");
             std::process::exit(2);
         }
@@ -280,7 +291,7 @@ fn main() {
     }
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE | seek ogg FILE TRACK SECONDS exact|preroll"
         );
         std::process::exit(2);
     };
