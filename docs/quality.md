@@ -437,10 +437,11 @@ complete standard-harness reports and recomputes runtime and memory bounds from
 their raw paired samples before applying the feature gates. Parity and FATE checks
 use the stored outcomes; grading does not rerun workers or oracles. Both collections
 must contain every case in the registered corpus, with identical parity, inputs,
-contract, workers, source graphs, compiler settings, instrumentation and allowed
-CPUs. CPU records are required in both reports. The memory build identity may add
-a kernel RSS proof pin; every other identity field must match. Both input reports
-and their raw samples are hash-linked from the graded report.
+contract, workers, source graphs, compiler settings and instrumentation. Each report
+records the CPUs it ran on, which may differ: timing runs alone on one CPU, memory on
+several. The memory build identity may add a kernel RSS proof pin; every other
+identity field must match. Both input reports and their raw samples are hash-linked
+from the graded report.
 
 `cargo xtask report` writes each case's raw measurements once and records their
 SHA-256 in `partial.json`. After validating the complete collection it publishes
@@ -523,7 +524,8 @@ may override that count for diagnostic comparisons.
 - Prepare both workers with the same sequential write and paths of equal length.
   Linker output and a sequentially written copy can occupy the page cache differently.
   Timing uses freshly written copies. Linux memory collection does the same for workers
-  selected by the report's build registration. It keeps both original paths for explicitly
+  selected by the report's build registration, one pair of copies per
+  [memory slot](#memory-in-parallel). It keeps both original paths for explicitly
   supplied workers and when the loader resolves libraries relative to an executable.
   Keep the measured executables with the raw memory samples. Grading Linux memory
   results rehashes the worker paths in the observer certificate, including any copies
@@ -551,6 +553,57 @@ may override that count for diagnostic comparisons.
   and instruction counts is placement. A screen never replaces a recorded result.
 - Qualification runs natively: on AArch64 Linux, and on 32-bit ARMv7 Linux in an armhf
   user space (below). Results on one platform do not establish another.
+
+### Running the gates
+
+1. Build the workers, then run `cargo xtask preflight` with every feature the run will
+   measure (`--feature ID`, with `--corpus ID=DIR` and `--manifest ID=FILE` as `report`
+   takes them), `--isobmff`, `--codecs` for each workload list and `--review` for the
+   RSS module review. It checks that the gate build's workers and references match the
+   build identity, that every case names a reference the identity holds and has each
+   input it reads with its pinned hash, that the review covers this module source and
+   kernel, and that the module is unloaded, and prints every failure at once. Run
+   `prove.sh` once into a scratch directory and unload the module again, so a module
+   that will not build, load or prove itself stops the run here.
+2. Time every feature, alone on one CPU with the RSS module unloaded (`taskset -c 1`).
+3. [Prove](../harness/rss-bound/README.md) the kernel bound, rebuild the workers with
+   the proof, check it with `cargo xtask preflight --kernel`, and collect memory on the
+   remaining CPUs (`taskset -c 1-15` on a 16-CPU host).
+4. Grade with the module loaded.
+
+Never time while memory, a build or anything else runs on the host.
+
+#### Memory in parallel
+
+Memory collections run side by side, one per CPU the process may use (at most 32, the
+sessions the kernel RSS bound admits). Each slot measures one case at a time from its
+own copies of the workers, under the same eviction before every run, so evicting one
+slot's executables never touches a file another slot runs. Cases that read a common
+file (the input, an ordered entity or a companion) run in the same slot one after
+another, so no run's eviction or reads change another's page-cache state. Workers
+measured from their own paths are such a file, so their cases run one at a time.
+Pinned to one CPU, collection runs exactly as before.
+
+#### Reuse
+
+Every gate command (`report --benchmark`, `report --memory`, `grade`, `isobmff-bench`,
+`framing`, `progressive`, `external-vector`, `codecs time`, `codecs memory`, `capture
+qualify`) derives
+a key before it measures and writes it, with its exit status, to `gate-result.json` in
+its output directory. The key covers the command and its settings (pairs, seed,
+iterations, acceptance requirement, the kernel bound), the contract, manifest and other
+documents that define its cases, the bytes of every worker it runs and of every shared
+library their loader resolves, the allocation observer and probe, every file of
+`xtask/src`, the observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml`
+and `harness/policy.json`, the Rust and C compilers' versions, the gate target, and the
+host class (architecture and personality, kernel release, CPU model and features,
+machine type, page size and online CPUs). A `grade` key also binds the keys of the two
+collections it joins. When an [evidence](#evidence) set that the index keeps lists a
+result with the same key, the command takes that result instead of measuring: it
+prints the set, writes a `gate-result.json` that names it as `reused` with the set's
+source revisions, and exits with the recorded status. `--full` measures anyway.
+Grading a reused collection takes the cited grade; a reused collection beside a
+measured one cannot be graded, so measure both with `--full`.
 
 ### 32-bit ARMv7
 
@@ -642,7 +695,8 @@ set to the archive location:
 
 1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run.
 2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
-   prints its index entry. Every new set starts there.
+   prints its index entry, which lists the fresh [gate results](#reuse) the set holds.
+   Every new set starts there.
 3. `cargo xtask evidence promote SET` moves an indexed set under `evidence/` and
    records it as kept. Promote a set in the pull request that first cites it; an
    uncited upload simply expires.

@@ -52,6 +52,9 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 
 Each row names the source revision a result above was measured on and, where the raw
 samples are archived, their SHA-256. Update the row in the same change as the result.
+A gate run that [reuses](quality.md#reuse) a cited result changes no row: the row keeps
+the revision and set it was measured with, and the run's `gate-result.json` names that
+set as reused.
 
 The DVB rows' 10 cases added at `aebbe582` were measured on a c8g.xlarge pinned to CPU 1, with 30 timing pairs and 30 memory pairs under the kernel RSS proof, run as a slice of `subtitle-dvb`. `cargo xtask grade` does not join a slice with its feature's recorded runs, because the slice's contract differs from the registered feature's, so their per-case results come from each run's report. The instruction counts run both workers from paths of equal length.
 
