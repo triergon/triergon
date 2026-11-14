@@ -261,6 +261,8 @@ impl<'a> Case<'a> {
                 MAXIMUM_BYTES,
                 "triergon-fate",
             )?;
+            let parent = path.parent().ok_or("missing FATE cache directory")?;
+            fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
             fetch::publish(&path, &bytes)?;
         }
         Ok(path)
