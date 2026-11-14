@@ -232,8 +232,10 @@ fn scaled(
                 oblique: !matches!(style, Style::Bold),
                 embolden: !matches!(style, Style::Oblique),
             };
+            // `synthesize` answers `false` where it refuses to embolden, as
+            // FreeType refuses an outline without an orientation.
             let applied = styled.copy_from(&outline).is_ok()
-                && sized.synthesize(&mut styled, synthesis).is_ok();
+                && matches!(sized.synthesize(&mut styled, synthesis), Ok(true));
             sink.record(Record::Styled {
                 style,
                 index: glyph.0,
