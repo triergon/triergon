@@ -547,6 +547,23 @@
       ]
     },
     {
+      "name": "ttf-bitstream-vera-1.10.tar.bz2",
+      "url": "https://download.gnome.org/sources/ttf-bitstream-vera/1.10/ttf-bitstream-vera-1.10.tar.bz2",
+      "licence": "Bitstream Vera (ttf-bitstream-vera-1.10/COPYRIGHT.TXT)",
+      "origin": "Bitstream Vera 1.10",
+      "sha256": "db5b27df7bbb318036ebdb75acd3e98f1bd6eb6608fb70a67d478cd243d178dc",
+      "lanes": [
+        "shape"
+      ],
+      "files": [
+        {
+          "path": "ttf-bitstream-vera-1.10/Vera.ttf",
+          "sha256": "c4c45690b345435b2cba52ecabe275f05e49b389b39fe68ad03afbb551288d3d",
+          "format": "truetype"
+        }
+      ]
+    },
+    {
       "name": "authored",
       "generator": "authored-fonts",
       "licence": "authored for this repository (MIT OR Apache-2.0)",

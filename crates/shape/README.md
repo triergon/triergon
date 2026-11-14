@@ -239,7 +239,7 @@ Paragraphs are limited to 2³² characters.
   [`shape-worker`](../shape-worker/README.md) and the HarfBuzz 14.6.0 and FriBidi
   1.0.17 reference worker (`harness/reference_shape.h`, FriBidi as libass calls
   it), and require both to fold the same output:
-  - `shape-libass`: 201 cases over 26 corpus files and 22 script profiles, 3,105
+  - `shape-libass`: 209 cases over 27 corpus files and 22 script profiles, 3,453
     runs with libass's features and with kerning, ligatures, direction and
     language varied, shaped as libass 0.17.5 shapes them with hinting off; every
     glyph's id, cluster, advances and offsets. The reference opens each face
@@ -252,11 +252,14 @@ Paragraphs are limited to 2³² characters.
     and extents, that load's outline for contour points, and
     `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
     `Font::at_size`. This compares device tables, contour-point anchors and
-    FreeType's advances, and the extents fallback mark positioning reads from
-    glyphs FreeType's auto-hinter gives a CJK style (NotoEmoji).
+    FreeType's advances, the extents fallback mark positioning reads from
+    glyphs FreeType's auto-hinter gives a CJK style (NotoEmoji), and the hinted
+    contour points and extents of instructed TrueType faces (DejaVu Sans `c` with
+    U+0308 on a contour-point anchor, Bitstream Vera `x` with U+0301 placed by
+    fallback positioning).
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
-    script (1,768 cases, 103,031 runs; 1,746 and 101,691 before the charmap face
-    joined them), with HarfBuzz's built-in font functions
+    script (1,790 cases, 104,796 runs; 1,768 and 103,031 before Bitstream Vera
+    and the two mark samples joined them), with HarfBuzz's built-in font functions
     at units per em against `OtMetrics`. They cover the font tables' layout
     without FreeType; each lists one open case, the CFF font whose glyphs use
     operators HarfBuzz's charstring interpreter reads differently (above).
