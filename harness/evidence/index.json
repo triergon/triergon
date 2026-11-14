@@ -26343,9 +26343,9 @@
   {
    "name": "ogg-reader-inputs",
    "path": "ogg-reader-inputs",
-   "retention": "90 days",
+   "retention": "retained",
    "reason": "The inputs of the Ogg reader comparison and its seek cases (harness/codecs/reader-manifest.json lane reader-ogg, harness/codecs/reader-seeks.json): the FATE Vorbis, Theora and chained Ogg samples and the generated Ogg and Speex streams (harness/codecs/ogg/make_vectors.sh, make_speex_vectors.sh), each matching its listed SHA-256, unpacked at the repository root of a gate host; the gate item ogg-readers reads them",
-   "key": "qualification/ogg-reader-inputs/3e0a9f464c4c4efcab8f94f5b91f921daa3efe7f63f4214278a4171dbf6b8f2d.tar.gz",
+   "key": "evidence/ogg-reader-inputs/3e0a9f464c4c4efcab8f94f5b91f921daa3efe7f63f4214278a4171dbf6b8f2d.tar.gz",
    "sha256": "3e0a9f464c4c4efcab8f94f5b91f921daa3efe7f63f4214278a4171dbf6b8f2d",
    "bytes": 2755817,
    "unpacked_at": "repository",
