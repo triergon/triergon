@@ -41,7 +41,7 @@ const CLOSE: f64 = 0.01;
 /// rate; rates below 1, between 30 and 31 off the twelfths, from 61 to 79, 81
 /// to 119, 121 to 239 and above 240, and the NTSC rates of 25, 50, 72, 90,
 /// 96, 100, 120, 144 and 240 are not).
-fn candidates() -> impl Iterator<Item = (u64, u64)> {
+fn candidates() -> impl Iterator<Item = (u32, u32)> {
     let twelfths = (12..=360).map(|k| (k, 12));
     let whole = (31..=60).chain([80, 120, 240]).map(|k| (k, 1));
     let ntsc = [12, 15, 24, 30, 48, 60].map(|k| (k * 1000, 1001));
@@ -126,14 +126,19 @@ impl RateEstimate {
         }
         let tick = num as f64 / den as f64;
         let mean_rate = (times.len() - 1) as f64 / ((last - first) as f64 * tick);
-        let fitted = &times[FIT_FROM..];
-        let mut best: Option<(f64, (u64, u64))> = None;
+        // The fitted times in seconds, as each candidate scales them.
+        let mut seconds = [0.0; TAKEN];
+        for (s, &t) in seconds.iter_mut().zip(&times[FIT_FROM..]) {
+            *s = t as f64 * tick;
+        }
+        let seconds = &seconds[..times.len() - FIT_FROM];
+        let mut best: Option<(f64, (u32, u32))> = None;
         for (p, q) in candidates() {
-            let rate = p as f64 / q as f64;
+            let rate = f64::from(p) / f64::from(q);
             if rate < SLOWEST * mean_rate {
                 continue;
             }
-            let score = score(fitted, tick, rate);
+            let score = score(seconds, rate);
             if score < best.map_or(CLOSE, |(least, _)| least) {
                 best = Some((score, (p, q)));
             }
@@ -146,19 +151,19 @@ impl RateEstimate {
     }
 }
 
-/// How far `times` lie from the frame grid of `rate`: the variance of each
-/// time's distance from its nearest frame boundary, in frames, the lower of
-/// that and the same with the boundaries half a frame on (probes p79, p80: a
-/// stream half a frame off the grid scores as one on it).
-fn score(times: &[i64], tick: f64, rate: f64) -> f64 {
-    let n = times.len() as f64;
+/// How far the times `seconds` lie from the frame grid of `rate`: the
+/// variance of each time's distance from its nearest frame boundary, in
+/// frames, the lower of that and the same with the boundaries half a frame on
+/// (probes p79, p80: a stream half a frame off the grid scores as one on it).
+fn score(seconds: &[f64], rate: f64) -> f64 {
+    let n = seconds.len() as f64;
     [0.0, 0.5]
         .into_iter()
         .map(|offset| {
             let (mut sum, mut squares) = (0.0, 0.0);
-            for &t in times {
-                let x = t as f64 * tick * rate + offset;
-                let e = x - (x + 0.5).floor();
+            for &s in seconds {
+                let x = s * rate + offset;
+                let e = x - floor(x + 0.5);
                 sum += e;
                 squares += e * e;
             }
@@ -166,6 +171,24 @@ fn score(times: &[i64], tick: f64, rate: f64) -> f64 {
             squares / n - mean * mean
         })
         .fold(f64::INFINITY, f64::min)
+}
+
+/// `y.floor()`. 32-bit Arm has no instruction for it, and the library call
+/// it becomes there would dominate the fit; within the range of `i32` the
+/// conversion to it, which truncates, gives the same value.
+#[cfg(target_arch = "arm")]
+fn floor(y: f64) -> f64 {
+    if y.abs() < 2_147_483_648.0 {
+        let t = f64::from(y as i32);
+        (if t > y { t - 1.0 } else { t }).copysign(y)
+    } else {
+        y.floor()
+    }
+}
+
+#[cfg(not(target_arch = "arm"))]
+fn floor(y: f64) -> f64 {
+    y.floor()
 }
 
 fn gcd(mut a: u64, mut b: u64) -> u64 {
@@ -233,6 +256,26 @@ mod tests {
         let late = |a: i64| (0..TAKEN as i64).map(move |n| 90_000 + 3600 * n + a * (n % 2));
         assert_eq!(estimate(late(719)), Some(3600));
         assert_eq!(estimate(late(721)), Some(1));
+    }
+
+    #[test]
+    fn floor_rounds_down_as_f64_floor_does() {
+        let small = [0.0, -0.0, 0.25, -0.25, 1.0, -1.0, 2.5, -2.5];
+        let large = [
+            1e9 + 0.5,
+            -1e9 - 0.5,
+            2_147_483_647.5,
+            -2_147_483_648.5,
+            3e12,
+        ];
+        for y in small
+            .into_iter()
+            .chain(large)
+            .chain([f64::MAX, f64::MIN_POSITIVE])
+        {
+            assert_eq!(super::floor(y).to_bits(), y.floor().to_bits(), "{y}");
+        }
+        assert!(super::floor(f64::NAN).is_nan());
     }
 
     #[test]
