@@ -44,7 +44,7 @@ pub fn generate(root: &Path, kind: Kind) -> Result<Result<Value, String>, String
 }
 
 fn invoke(root: &Path, kind: Kind, file: Option<&Path>) -> Result<Result<Value, String>, String> {
-    let output = Command::new("python3")
+    let output = Command::new(crate::python::interpreter())
         .args(["-m", "harness.oracles", kind.name()])
         .args(file)
         .current_dir(root)

@@ -8,6 +8,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::json::Value;
 
+/// The Python that runs the oracles and the capture input generator:
+/// `TRIERGON_PYTHON`, else `python3` on `PATH`.
+pub fn interpreter() -> String {
+    std::env::var("TRIERGON_PYTHON").unwrap_or_else(|_| "python3".into())
+}
+
 /// `str(pathlib.Path(path))`: `.` components and repeated or trailing
 /// separators removed; `.` for an empty path.
 pub fn path(path: &Path) -> String {

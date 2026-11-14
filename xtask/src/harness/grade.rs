@@ -9,6 +9,7 @@ use std::path::{Component, Path, PathBuf};
 use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
+use super::reuse;
 use super::timing::{self, GATE_PAIRS};
 use super::validation::{
     self, array, external_contract, field, hash, members, put, require_same, selected_operation,
@@ -20,7 +21,8 @@ use crate::sha256;
 
 pub const USAGE: &str =
     "usage: cargo xtask grade TIMING MEMORY --contract PATH --manifest PATH --output DIR
-    [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]";
+    [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]
+    [--full]";
 
 type R<T> = Result<T, String>;
 
@@ -32,6 +34,8 @@ struct Options {
     output: PathBuf,
     additional: Vec<PathBuf>,
     requirement: Option<&'static str>,
+    /// Grade the reports even when a cited set holds this grade.
+    full: bool,
 }
 
 impl Options {
@@ -42,9 +46,11 @@ impl Options {
         let (mut contract, mut manifest, mut output) = (None, None, None);
         let mut additional = Vec::new();
         let mut requirement = None;
+        let mut full = false;
         let mut rest = rest.iter();
         while let Some(flag) = rest.next() {
             match flag.as_str() {
+                "--full" => full = true,
                 "--require-slice-acceptance" | "--require-acceptance" => {
                     let key = if flag == "--require-acceptance" {
                         "accepted"
@@ -85,6 +91,7 @@ impl Options {
             output: output.ok_or("--output is required")?,
             additional,
             requirement,
+            full,
         })
     }
 }
@@ -311,15 +318,11 @@ impl Binding<'_> {
             "input_path",
             "origin",
             "redistribution_qualified",
-            "cpus",
         ] {
             same_field(timed, memory, key)?;
         }
-        same_field(
-            timed.get("environment").unwrap_or(&Value::Null),
-            memory.get("environment").unwrap_or(&Value::Null),
-            "cpus",
-        )?;
+        // Each report keeps its own CPU record: timing runs alone on one CPU,
+        // memory side by side on several, which changes no observation.
         identities(field(timed, "identity")?, field(memory, "identity")?)?;
         Ok(kind)
     }
@@ -770,6 +773,41 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
     let options = Options::parse(root, args)?;
     super::report::create_output(&options.output)?;
+    // A grade binds the gate results recorded beside the reports it joins.
+    let collections = [&options.timing, &options.memory]
+        .map(|report| report.parent().unwrap_or(Path::new(".")).to_path_buf());
+    let key = if collections.iter().all(|d| reuse::read(d).is_ok()) {
+        let reports = [options.timing.as_path(), options.memory.as_path()];
+        let mut files = vec![options.contract.as_path(), options.manifest.as_path()];
+        files.extend(options.additional.iter().map(PathBuf::as_path));
+        let settings = Value::object([(
+            "requirement",
+            options.requirement.map_or(Value::Null, Value::str),
+        )]);
+        Some(
+            reuse::Key::new(root, "grade", settings, &files, &[])?
+                .untimed()
+                .with_inputs(&reports)?,
+        )
+    } else {
+        None
+    };
+    let join = || {
+        if collections.iter().any(|d| reuse::was_reused(d)) {
+            return Err(
+                "a reused collection has no report to grade: measure both with --full".into(),
+            );
+        }
+        grade(root, &options)
+    };
+    match key {
+        Some(key) => reuse::step(root, &options.output, &key, options.full, join),
+        None => join(),
+    }
+}
+
+/// Join and grade the two reports.
+fn grade(root: &Path, options: &Options) -> R<i32> {
     let (timed, timing_sha) = document(&options.timing)?;
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
@@ -2370,9 +2408,11 @@ mod tests {
                     Some(key) => put(&mut changed, key, record).unwrap(),
                     None => changed = record,
                 }
-                assert!(binding.headers(base, &changed).is_err());
                 if missing {
+                    assert!(binding.headers(base, &changed).is_err());
                     assert!(binding.headers(&changed, &changed).is_err());
+                } else {
+                    assert!(binding.headers(base, &changed).is_ok());
                 }
             }
         }

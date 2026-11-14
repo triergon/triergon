@@ -13,7 +13,7 @@ mod fixtures;
 
 pub const USAGE: &str = "usage: cargo xtask framing [fixtures] [--output DIR]
        [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
-       [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance]
+       [--baseline-worker FILE] [--require-acceptance | --require-slice-acceptance] [--full]
        cargo xtask framing manifest --record
 
 All 131 cases are required. `fixtures` writes their hash-checked bytes.
@@ -34,6 +34,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
             "--baseline-worker" => options.baseline_worker = Some(PathBuf::from(value()?)),
             "--benchmark" => options.benchmark = true,
             "--memory" => options.memory = true,
+            "--full" => options.full = true,
             "--require-acceptance" => options.require_acceptance = true,
             "--require-slice-acceptance" => options.require_slice_acceptance = true,
             "--pairs" => {
