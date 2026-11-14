@@ -13,12 +13,10 @@ terminal-media matrix against the FFmpeg 9.0.2 release; fonts against FreeType 2
 shaping against HarfBuzz 14.6.0 and FriBidi 1.0.17;
 rasterising, ASS parsing and ASS rendering against libass 0.17.5
 ([reference pins](quality.md#reference-and-corpus)).
-Every runtime and memory figure below was measured with workers and references linked as
-their toolchains link them, before the [link policy](quality.md#measuring-performance) that
-links both sides' toolchain runtime support libraries from their static archives. The policy
-changes every Rust worker and the HarfBuzz and libass references; the FFmpeg and FreeType
-references link as before. Each row cites its earlier measurement until it is measured again
-under the policy.
+Measurements use the toolchains' default links unless the measurement notes state
+that the workers and references used the [static runtime link policy](quality.md#measuring-performance).
+The policy links toolchain runtime support from static archives for the Rust workers
+and the HarfBuzz and libass references. FFmpeg and FreeType keep their existing links.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -178,8 +176,9 @@ The ISO BMFF recovery opener handles legacy QuickTime data-handler metadata in
 ISO-branded files with self-contained data references. It also accepts flag 1
 in a version-0 sample dependency table and checks every declared sample row.
 
-The AArch64 ISO BMFF row uses a c6g.4xlarge with CPU 1 for timing and CPUs 1–15
-for kernel-bound memory. It measures 956 distinct open and index operations over
+The AArch64 ISO BMFF open and index result uses the `static-toolchain-runtime-v1`
+link policy on a c6g.4xlarge, with CPU 1 for timing and CPUs 1–15 for kernel-bound
+memory. It measures 956 distinct open and index operations over
 30 timing and 30 memory pairs. The 16 aliases keep separate parity traces and
 share their operations' measurements. The shared grader joined both collections
 on the same boot and accepted the open and index slice, including all 48
@@ -424,7 +423,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Matroska startup and seek, preceding comparison | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
-| ISO BMFF open and index runtime and memory | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
+| ISO BMFF open and index runtime and memory | `7b3990083d8305aa46972411f3605a483a2e4b5f` | `371475c620e1da835bba0f3fb12b6227516a5593edfef267a401bf1c3800e6fe` |
+| ISO BMFF open and index, earlier comparison | `f99d893196908d562c897bccb20c6a972cd25d11` | `806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b` |
 | MPEG-TS PES | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
 | MPEG-TS access units | `230d1314464d34a04f5f2614298e5b7009292f0c` | `a86e737ad8081e349a4c3a707b6b29ecfee6ae8bbeaabd9a9edc5f846e2da697` |
 | MPEG-TS program playback | `21c9eef2f08a11bb7bd1c457997095326f2bb42d` | `8ad96ce3a9ca2b5e4b23dfcc53659fb4cc99ae0638d502e114188b3acbdad2f5` |
