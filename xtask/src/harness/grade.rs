@@ -503,7 +503,10 @@ fn samples(measurement: &Value, minimum: i128, failed_memory: bool) -> R<&[Value
     } else {
         integer(measurement, "pairs")?
     };
-    if pairs < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
+    // A collection that stopped early by rule set out to run its planned pairs;
+    // the evaluator replays the rule.
+    let planned = timing::planned_pairs(measurement).unwrap_or(pairs);
+    if planned < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
@@ -561,6 +564,8 @@ fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     Ok(row)
 }
 
+/// `ceiling` is the policy's runtime ceiling, which a timing record that may
+/// stop early must name.
 fn join_case(
     timed: &Value,
     measured: &Value,
@@ -568,6 +573,7 @@ fn join_case(
     contract: &Value,
     identity: &Value,
     target: &str,
+    ceiling: f64,
 ) -> R<Value> {
     require_same(
         &without(timed, &["timing", "memory"])?,
@@ -630,6 +636,7 @@ fn join_case(
             },
             require_linux: linux,
             module_absence: true,
+            ceiling: Some(ceiling),
         },
     )
     .map_err(|error| format!("timing: {error}"))?;
@@ -734,6 +741,7 @@ fn validate_additional(
     binding: &Binding<'_>,
     identity: &Value,
     target: &str,
+    ceiling: f64,
 ) -> R<()> {
     let mut seen = BTreeSet::new();
     for row in rows {
@@ -744,7 +752,15 @@ fn validate_additional(
         let wrapper = Value::object([("case", row.clone())]);
         let expected = binding.expected(&wrapper, Shape::External)?;
         membership(&expected, std::slice::from_ref(row))?;
-        join_case(row, row, &expected[0], binding.contract, identity, target)?;
+        join_case(
+            row,
+            row,
+            &expected[0],
+            binding.contract,
+            identity,
+            target,
+            ceiling,
+        )?;
     }
     Ok(())
 }
@@ -843,6 +859,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     let memory_rows = membership(&expected, rows(&memory, kind)?)?;
     aliases(&expected, &timed_rows)?;
     aliases(&expected, &memory_rows)?;
+    let ceiling = super::policy::Runtime::load(root)?.ceiling;
     let combine = |spec: &Value| -> R<Value> {
         let id = text(spec, "id")?;
         let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
@@ -850,8 +867,10 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         if open.iter().any(|listed| listed == id) {
             return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}"));
         }
-        join_case(&clock, &measured, spec, &contract, identity, target)
-            .map_err(|e| format!("{id}: {e}"))
+        join_case(
+            &clock, &measured, spec, &contract, identity, target, ceiling,
+        )
+        .map_err(|e| format!("{id}: {e}"))
     };
     let mut additional = match memory.get("additional_cases") {
         Some(Value::Array(rows)) => rows.clone(),
@@ -870,7 +889,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     if kind == Shape::External && !additional.is_empty() {
         return Err("an external-vector grade cannot contain additional cases".into());
     }
-    validate_additional(&additional, &binding, identity, target)?;
+    validate_additional(&additional, &binding, identity, target, ceiling)?;
     let derived;
     let selected_contract = if kind == Shape::External {
         derived = external_contract(&contract, text(&expected[0], "id")?)?;
@@ -965,6 +984,33 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
+
+    #[test]
+    fn an_early_stopped_collection_counts_its_planned_pairs() {
+        let record = |pairs: i64, planned: Option<i64>| {
+            let mut fields = vec![
+                ("pairs", Value::int(pairs)),
+                (
+                    "samples",
+                    Value::Array((0..pairs).map(|_| Value::Object(vec![])).collect()),
+                ),
+            ];
+            if let Some(planned) = planned {
+                fields.push((
+                    "early_stop",
+                    Value::object([
+                        ("rule", Value::str(timing::EARLY_STOP_RULE)),
+                        ("planned_pairs", Value::int(planned)),
+                    ]),
+                ));
+            }
+            Value::object(fields)
+        };
+        assert_eq!(samples(&record(20, Some(30)), 30, false).unwrap().len(), 20);
+        assert!(samples(&record(20, Some(20)), 30, false).is_err());
+        assert!(samples(&record(20, None), 30, false).is_err());
+        assert!(samples(&record(30, None), 30, false).is_ok());
+    }
 
     #[test]
     fn grading_cannot_reuse_a_collection_directory() {
@@ -1280,6 +1326,7 @@ mod tests {
                 &self.contract,
                 &self.identity,
                 "unqualified-test",
+                1.2,
             )
         }
 
@@ -2271,7 +2318,7 @@ mod tests {
         let result = super::super::memory::evaluate(
             root,
             array(&memory, "samples").unwrap(),
-            30,
+            timing::Pairs::fixed(30),
             280,
             field(&memory, "certificate").unwrap(),
             None,
