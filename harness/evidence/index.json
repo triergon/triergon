@@ -20147,6 +20147,15 @@
    "key": "evidence/packet-framing-inline-storage-1cea5f7b-aarch64/f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5.tar.zst",
    "sha256": "f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5",
    "bytes": 41030376
+  },
+  {
+   "name": "packet-framing-link-policy-cbc8aca8-aarch64",
+   "path": "packet-framing-link-policy-cbc8aca8-aarch64",
+   "retention": "retained",
+   "reason": "Complete AArch64 packet framing comparison under the shared GNU/Linux link policy. Includes 131 parity, timing and memory results, the exact workers and source, and the four cases above the runtime ceiling.",
+   "key": "evidence/packet-framing-link-policy-cbc8aca8-aarch64/26194f9c7a22339279995164e09e2afedc1d597e6c7f0a46fb3856bb1505d8ae.tar.zst",
+   "sha256": "26194f9c7a22339279995164e09e2afedc1d597e6c7f0a46fb3856bb1505d8ae",
+   "bytes": 57395736
   }
  ]
 }
