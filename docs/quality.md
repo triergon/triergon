@@ -709,25 +709,25 @@ draws: against each session's own shuffled ratios, the share of sessions whose l
 autocorrelation exceeds the shuffled 95th percentile is 4.5% to 5.3% of memory
 collections and 3.0% to 6.0% of timing sessions (5% for independent pairs), and the mean
 of pairs 1 to 10 against pairs 11 to 30 differs by −0.04 to +0.04 standard deviations on
-average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts. Simulated with the true
-median exactly at the ceiling, the rule stops a session early with probability 0.007%
-for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2, 0.27% at 0.5, and
-0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3 standard
-deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
+average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts.
+Simulated with the true median exactly at the ceiling, the rule stops a session early
+with probability 0.007% for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2,
+0.27% at 0.5, and 0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3
+standard deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
 
 Replayed on those sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, the rule
 stops 1,597 of 1,663 AArch64 and 2,980 of 3,037 ARMv7 timing sessions and 1,337 of 1,663
 AArch64 and 2,956 of 3,335 ARMv7 memory collections, and no session it stops failed at
-30 pairs (a collection refused for contamination is refused either way). Drawing pairs
-from the ARMv7 timing sessions' own ratios rescaled to a median exactly at the ceiling,
-0.006% of 128,000 simulated sessions stop early, and the share that passes, 3.22%, is
-the 30-pair bound's; from the ARMv7 memory collections' total resident ratios at a
-median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against fresh
-30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every session
-that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux` memory cases,
-whose total resident bounds lie between 0.978 and 1.011, ran every pair on both sides
-and changed verdict between the two runs, as two 30-pair bounds that close to the
-ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
+30 pairs (a collection refused as an invalid observation is refused either way).
+Drawing pairs from the ARMv7 timing sessions' own ratios rescaled to a median exactly at
+the ceiling, 0.006% of 128,000 simulated sessions stop early, and the share that passes,
+3.22%, is the 30-pair bound's; from the ARMv7 memory collections' total resident ratios
+at a median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against
+fresh 30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every
+session that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux`
+memory cases, whose total resident bounds lie between 0.978 and 1.011, ran every pair on
+both sides and changed verdict between the two runs, as two 30-pair bounds that close to
+the ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
 instead of 19.2 on ARMv7, and its memory 13.5 instead of 19.2 and 10.7 instead of 15.0.
 The replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
 `gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`.
@@ -742,7 +742,11 @@ run, so one slot's eviction never touches an executable another slot runs. Input
 not evicted: they stay in the page cache as in a serial run, and cases that read a
 common file (the input, an ordered entity or a companion) run in the same slot one
 after another. Workers measured from their own paths are such a file, so their cases
-run one at a time. Pinned to one CPU, collection runs exactly as before.
+run one at a time. Pinned to one CPU, collection runs exactly as before. The reference's
+memory is measured afresh in every pair, not reused from earlier runs: on a second host
+of the same class it gives the same heaps and resident peaks within their spread
+(evidence set `gate-reference-memory-cross-host`), but caching it would save a few
+minutes and give up the interleaving of both workers within each pair.
 Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
@@ -752,6 +756,23 @@ each slot pinned to its CPU, at `8607afdd` on AArch64 and `247e8560` on ARMv7 (e
 set `gate-parallel-memory-matroska-head`), the same comparison gives the same result:
 heaps identical, medians within one page on AArch64 and twelve on ARMv7, verdicts
 unchanged.
+ISO BMFF, collected serially and in parallel at `a92f2d0a` (evidence sets
+`gate-parallel-memory-isobmff-aarch64` and `gate-parallel-memory-isobmff-armv7`), gives
+all 956 cases the same peak heap sample for sample, moves no case's median resident peak
+by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread, and
+passes every case either way; the collection took 82 instead of 252 minutes on AArch64
+and 96 instead of 296 on ARMv7.
+
+Each collection records the number of slots (`memory_slots`) and what the host's memory
+did over it (`host_memory`): `MemAvailable` at its start and end and the change of the
+reclaim and compaction counters of `/proc/vmstat`, which count the whole host. Run
+kernel-bound memory gates on a host of the class they are qualified on, a c6g.4xlarge
+with 32 GB, where no archived collection serial or parallel has had a pair voided by
+another task's update of a worker's resident counters; `preflight --kernel` refuses a
+host with less than 30 GiB of `MemTotal`. On smaller hosts such pairs occur, and a
+collection measures them again within the limit the [kernel
+bound](../harness/rss-bound/README.md#what-it-measures) sets; `host_memory` shows
+whether reclaim ran while they were measured.
 
 #### Reuse
 
@@ -907,7 +928,9 @@ Where a set lives decides how long it is kept: sets under `qualification/` expir
 days after upload, and sets under `evidence/` are kept. With `TRIERGON_EVIDENCE_ARCHIVE`
 set to the archive location:
 
-1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run.
+1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run. An
+   `OUT` ending in `.tar.gz` stores the tar uncompressed in gzip blocks; one ending in
+   `.tar.zst` compresses it with the system `zstd`, which suits large sets of reports.
 2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
    prints its index entry, which lists the fresh [gate results](#reuse) the set holds.
    Every new set starts there.

@@ -79,7 +79,7 @@ commands:
                  record the digest of every candidate trace over all recorded cases: the
                  Matroska cases for media-worker, every case of each feature that runs W
                  through a worker operation prefix otherwise
-  evidence pack DIR OUT       deterministic .tar.gz of DIR; prints its SHA-256
+  evidence pack DIR OUT       deterministic .tar.gz or .tar.zst of DIR; prints its SHA-256
   evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
                               (harness/evidence/index.json; TRIERGON_EVIDENCE_ARCHIVE)
   playback-golds DIR [--check]
