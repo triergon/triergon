@@ -20391,6 +20391,32 @@
     }
    ],
    "source_revision": "aed664a1644ca1b7b6623deb03c79e83cc399872"
+  },
+  {
+   "name": "quicktime-kernel-0489d7ae-aarch64",
+   "path": "quicktime-kernel-0489d7ae-aarch64",
+   "retention": "90 days",
+   "reason": "Complete ISO BMFF timing and kernel-bound memory collections with the join diagnostics",
+   "key": "qualification/quicktime-kernel-0489d7ae-aarch64/5132565f340a1360e8a9ebcc3ce0eb3a161b3bd00fc526b50e5f50001d7f257a.tar.zst",
+   "sha256": "5132565f340a1360e8a9ebcc3ce0eb3a161b3bd00fc526b50e5f50001d7f257a",
+   "bytes": 79728044,
+   "results": [
+    {
+     "path": "results/memory/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "62abbb0efa95152ef8a4d7aa5aebfd5250313e1c54f7c5f8c929db68ca2a3c72",
+     "status": 0,
+     "report_sha256": "c59bbdcfc0c40167117edc3eb0db9a29dd3d6e82f67eb18eec41bdab4ad11909"
+    },
+    {
+     "path": "results/timing/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "d27488e366d3beabee97760c1ef8dfc8958fe4d56ba167353241f2a11079efce",
+     "status": 0,
+     "report_sha256": "8593fe980da3ac0c77891b975596400b41058e7cdddd714924c6e211904c64da"
+    }
+   ],
+   "source_revision": "0489d7aebbdb26225c1aac88356fb12d4bd16e80"
   }
  ]
 }
