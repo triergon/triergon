@@ -889,11 +889,16 @@ struct PacketPlan {
     injected_irap: bool,
     has_irap: bool,
     look_nals: usize,
-    live_base: Option<usize>,
+    // No fixed storage can be smaller than the budget control allocation.
+    // The two smaller values represent an unchecked and a proven bound.
+    live_base: usize,
     // A hint sizes a later spill without reserving while descriptors fit inline.
     segment_hint: Option<usize>,
 }
 impl PacketPlan {
+    const UNCHECKED_STORAGE: usize = 0;
+    const LIMITS_FIT: usize = 1;
+
     fn new(phase: PlanPhase) -> Self {
         Self {
             phase,
@@ -906,7 +911,7 @@ impl PacketPlan {
             injected_irap: false,
             has_irap: false,
             look_nals: 0,
-            live_base: None,
+            live_base: Self::UNCHECKED_STORAGE,
             segment_hint: None,
         }
     }
@@ -1001,6 +1006,39 @@ impl<M> PacketState<'_, M> {
 }
 
 impl PacketPlan {
+    fn added_storage(count: usize, bytes: usize, copying: bool) -> Result<usize> {
+        let output = if copying {
+            Bytes::owner_overhead_bytes()
+                .checked_add(bytes)
+                .ok_or(Error::Overflow)?
+        } else {
+            0
+        };
+        PacketSegmentStorage::required_heap_bytes(count)?
+            .checked_add(output)
+            .ok_or(Error::Overflow)
+    }
+
+    #[cold]
+    fn establish_storage_bound<M>(&mut self, state: &PacketState<'_, M>) -> Result<()> {
+        let limits = state.session.limits;
+        let maximum = Self::added_storage(
+            limits.maximum_segments,
+            limits.maximum_output_bytes,
+            state.length_width.is_some(),
+        );
+        // The job's retained source and configuration remain charged to this
+        // pool. Its fixed storage is therefore at most the current live charge.
+        // If both logical ceilings fit in the remaining capacity, they bound
+        // every future append. Actual reservations still check current pressure.
+        self.live_base = if maximum.is_ok_and(|bytes| bytes <= state.session.pool.available()) {
+            Self::LIMITS_FIT
+        } else {
+            state.fixed_live_bytes()?
+        };
+        Ok(())
+    }
+
     // Known storage capacity lower bound, deduplicating raw caller aliases. A
     // larger allocator replacement peak may still require retryable pressure.
     // All terms are non-negative, so summing the job-invariant terms first
@@ -1011,20 +1049,18 @@ impl PacketPlan {
         segments: usize,
         output: usize,
     ) -> Result<usize> {
-        let base = match self.live_base {
-            Some(base) => base,
-            None => *self.live_base.insert(state.fixed_live_bytes()?),
-        };
-        let copied_storage = if state.length_width.is_some() {
-            Bytes::owner_overhead_bytes()
-                .checked_add(output)
-                .ok_or(Error::Overflow)?
-        } else {
-            0
-        };
-        PacketSegmentStorage::required_heap_bytes(segments)?
-            .checked_add(copied_storage)
-            .and_then(|n| n.checked_add(base))
+        if self.live_base == Self::UNCHECKED_STORAGE {
+            self.establish_storage_bound(state)?;
+        }
+        if self.live_base == Self::LIMITS_FIT {
+            return Ok(0);
+        }
+        self.live_base
+            .checked_add(Self::added_storage(
+                segments,
+                output,
+                state.length_width.is_some(),
+            )?)
             .ok_or(Error::Overflow)
     }
     fn append<M>(
