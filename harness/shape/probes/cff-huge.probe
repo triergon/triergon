@@ -1,0 +1,50 @@
+# Coordinates past 32 bits: local 0 draws 256 lines of (32767, 32767) and
+# local 1 of (-32767, -32767), 8388352 each way per call. Glyph 1 calls local
+# 0 256 times (to 2147418112, inside 32 bits), glyph 2 257 times (2155806464,
+# past 2^31), glyph 3 calls local 1 257 times, glyph 4 180 times local 1 and
+# then 360 times local 0 (-1509903360 to 1509903360, a size past 2^31), so
+# the extents show how sides past 32 bits convert and sizes wrap. Glyphs 5
+# to 10 alternate the two 300, 350, 400, 450, 500 and 540 times, staying
+# near the origin; glyph 11 calls local 0 300 times.
+local
+  32767*512 rlineto return
+end
+local
+  -32767*512 rlineto return
+end
+glyph
+  endchar
+end
+glyph
+  [ -107 callsubr ]*256 endchar
+end
+glyph
+  [ -107 callsubr ]*257 endchar
+end
+glyph
+  [ -106 callsubr ]*257 endchar
+end
+glyph
+  [ -106 callsubr ]*180 [ -107 callsubr ]*360 endchar
+end
+glyph
+  [ -107 callsubr -106 callsubr ]*150 endchar
+end
+glyph
+  [ -107 callsubr -106 callsubr ]*175 endchar
+end
+glyph
+  [ -107 callsubr -106 callsubr ]*200 endchar
+end
+glyph
+  [ -107 callsubr -106 callsubr ]*225 endchar
+end
+glyph
+  [ -107 callsubr -106 callsubr ]*250 endchar
+end
+glyph
+  [ -107 callsubr -106 callsubr ]*270 endchar
+end
+glyph
+  [ -107 callsubr ]*300 endchar
+end

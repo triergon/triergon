@@ -1,0 +1,74 @@
+# The box HarfBuzz's OpenType font functions give a CFF glyph, and how they
+# round it. Each glyph draws one shape; its extents show which points count
+# and how each side is rounded.
+glyph # 0: no drawing
+  endchar
+end
+glyph # 1: lines: x 100..400, y 200..600
+  100 200 rmoveto 300 0 rlineto 0 400 rlineto endchar
+end
+glyph # 2: a curve whose control points lie above its arc (arc top 75)
+  0 0 rmoveto 0 100 100 0 0 -100 rrcurveto endchar
+end
+glyph # 3: a lone moveto
+  500 500 rmoveto endchar
+end
+glyph # 4: two movetos, then a line from the second
+  500 500 rmoveto 100 100 rmoveto 10 0 rlineto endchar
+end
+glyph # 5: a line, then a moveto that draws nothing
+  0 0 rmoveto 10 10 rlineto 500 500 rmoveto endchar
+end
+glyph # 6: a line of zero length at the origin
+  0 0 rmoveto 0 0 rlineto endchar
+end
+glyph # 7: fractions: x 0.5..100.75, y 0.5..101
+  fixed:0.5 fixed:0.5 rmoveto fixed:100.25 0 rlineto 0 fixed:100.5 rlineto endchar
+end
+glyph # 8: negative fractions: x -11..-0.5, y -4..-1.5
+  fixed:-0.5 fixed:-1.5 rmoveto fixed:-10.5 fixed:-2.5 rlineto endchar
+end
+glyph # 9: x 0.4..1.6, y 0.4..1.4: sides rounded alone or the size rounded
+  fixed:0.4 fixed:0.4 rmoveto fixed:1.2 fixed:1 rlineto endchar
+end
+glyph # 10: x -1.6..-0.4, y -1.4..-0.4
+  fixed:-0.4 fixed:-0.4 rmoveto fixed:-1.2 fixed:-1 rlineto endchar
+end
+glyph # 11: x 8191.4999847..8201.4999847: whether the side is narrowed to a float
+  fixed:0x1FFF7FFF fixed:0x1FFF7FFF rmoveto 10 10 rlineto endchar
+end
+glyph # 12: x -8201.4999847..-8191.4999847
+  fixed:0xE0008001 fixed:0xE0008001 rmoveto -10 -10 rlineto endchar
+end
+glyph # 13: x 2.5..3.5 and y -3.5..-2.5: halves
+  fixed:2.5 fixed:-2.5 rmoveto 1 -1 rlineto endchar
+end
+glyph # 14: coordinates past 16 bits: 30000 to 60000
+  30000 30000 rmoveto 30000 30000 rlineto endchar
+end
+glyph # 15: coordinates past 16 bits below zero: x -90000..0, y -40000..0
+  0 0 rmoveto -30000 -20000 rlineto -30000 -20000 rlineto -30000 0 rlineto endchar
+end
+glyph # 16: a moveto, then a curve (control points 10..90 above and below)
+  0 0 rmoveto 30 90 40 -180 30 90 rrcurveto endchar
+end
+glyph # 17: an empty charstring
+end
+glyph # 18: no endchar after a line
+  10 10 rmoveto 20 30 rlineto
+end
+glyph # 19: a horizontal line away from the origin: x 100..150 at y 200
+  100 200 rmoveto 50 0 rlineto endchar
+end
+glyph # 20: a vertical line away from the origin: y 200..250 at x 100
+  100 200 rmoveto 0 50 rlineto endchar
+end
+glyph # 21: a degenerate curve along one row: x 100..160 at y -300
+  100 -300 rmoveto 20 0 20 0 20 0 rrcurveto endchar
+end
+glyph # 22: a box of less than one unit: x 10.2..10.4, y 10.2..10.3
+  fixed:10.2 fixed:10.2 rmoveto fixed:0.2 fixed:0.1 rlineto endchar
+end
+glyph # 23: two subpaths far apart: x -500..520, y -500..520
+  -500 -500 rmoveto 10 10 rlineto 1000 1000 rmoveto 10 10 rlineto endchar
+end
