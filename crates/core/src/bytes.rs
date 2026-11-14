@@ -523,6 +523,11 @@ impl<T> BudgetVec<T> {
             self.charge.shrink_by(size);
             return Err(error);
         }
+        if old == 0 {
+            // The first allocation has no elements or old charge to move.
+            self.data = replacement;
+            return Ok(());
+        }
         replacement.append(&mut self.data);
         let previous = std::mem::replace(&mut self.data, replacement);
         drop(previous);
