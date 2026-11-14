@@ -490,7 +490,7 @@ impl<T> BudgetVec<T> {
     /// allocation leaves the vector as it was.
     pub fn try_shrink_to(&mut self, min_capacity: usize) -> Result<()> {
         let target = min_capacity.max(self.len());
-        if target >= self.capacity() {
+        if size_of::<T>() == 0 || target >= self.capacity() {
             return Ok(());
         }
         self.reallocate(target)
@@ -795,6 +795,31 @@ mod tests {
         vec.try_shrink_to(64).unwrap();
         assert_eq!(vec.capacity(), 10);
         drop(vec);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn shrinking_preserves_zero_sized_elements_with_drop() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static DROPS: AtomicUsize = AtomicUsize::new(0);
+        struct Element;
+        impl Drop for Element {
+            fn drop(&mut self) {
+                DROPS.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        let pool = Budget::new(4096).unwrap();
+        let mut items = BudgetVec::new(&pool);
+        for _ in 0..3 {
+            items.try_push(Element).map_err(|err| err.error).unwrap();
+        }
+        items.try_shrink_to(0).unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(DROPS.load(Ordering::Relaxed), 0);
+        drop(items);
+        assert_eq!(DROPS.load(Ordering::Relaxed), 3);
         assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
