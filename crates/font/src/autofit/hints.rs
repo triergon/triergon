@@ -194,6 +194,9 @@ pub(super) struct Segment {
     /// The primary segment of a serif.
     pub(super) serif: Option<usize>,
     pub(super) score: i64,
+    /// How far it overlaps the segment it links to, along the dimension;
+    /// only the CJK writing system's linking keeps it.
+    pub(super) len: i64,
     pub(super) first: usize,
     pub(super) last: usize,
 }
@@ -213,6 +216,7 @@ impl Segment {
         link: None,
         serif: None,
         score: 32000,
+        len: 0,
         first: 0,
         last: 0,
     };

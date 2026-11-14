@@ -27,7 +27,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "the auto-hinter's CJK writing system, for the hinted outlines of the glyphs it gives a CJK or Indic style",
     "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
   ],
   "open_cases": [
@@ -70,10 +69,6 @@
     {
       "id": "cousine-regular-ttf-default-16384",
       "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
-    },
-    {
-      "id": "dejavumathtexgyre-ttf-default-16384",
-      "requirement": "the auto-hinter's CJK writing system, for the hinted outlines of the glyphs it gives a CJK or Indic style"
     },
     {
       "id": "dejavusans-bold-ttf-default-16384",

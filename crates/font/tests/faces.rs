@@ -1,6 +1,6 @@
 mod support;
 
-use support::{bytes, cff_tables, collection, font, truetype_tables};
+use support::{bytes, cff_tables, cjk_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::{
     Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
@@ -261,6 +261,36 @@ fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
     let (points, metrics) = default_load(&small, 1).unwrap();
     assert_eq!(points, [(21, 0), (21, 84), (105, 84), (105, 0)]);
     assert_eq!(metrics, [192, 448, 0, 128, 128, 128]);
+}
+
+#[test]
+fn ideographs_follow_freetypes_cjk_auto_hinter() {
+    let face = parse(&font(b"\0\x01\0\0", &cjk_tables()));
+    // A scale of one 26.6 unit per font unit, 16 pixels per em.
+    let sized = face.at_size(1280).unwrap();
+    assert_eq!(sized.metrics().x_ppem, 16);
+    // The box is the standard character, a stem 180 units wide and 750
+    // tall, and gives both blue zones, each of one value: a top at 730,
+    // fitted to 704, and a bottom at -20, fitted to 0. Its horizontal
+    // edges snap to them; its 180/64 pixel stem becomes 182/64 and,
+    // centred at 109..291, moves 19 up to start on a pixel. The advance is
+    // the scaled one, rounded, as the CJK writing system leaves it.
+    let (points, metrics) = default_load(&sized, 1).unwrap();
+    assert_eq!(points, [(128, 0), (128, 704), (310, 704), (310, 0)]);
+    assert_eq!(metrics, [384, 1024, 128, 704, 192, 704]);
+    assert_eq!(sized.default_advance(GlyphId(1)), Ok(384));
+    assert_eq!(sized.default_vertical_advance(GlyphId(1)), Ok(1024));
+    // The empty notdef takes the CJK fallback style.
+    assert_eq!(
+        default_load(&sized, 0),
+        Ok((Vec::new(), [512, 1024, 0, 0, 0, 0]))
+    );
+    // The Indic writing system is not ported; its advances are.
+    assert_eq!(
+        default_load(&sized, 2),
+        Err(Error::Unsupported("the Indic auto-hinter"))
+    );
+    assert_eq!(sized.default_advance(GlyphId(2)), Ok(384));
 }
 
 #[test]

@@ -2,7 +2,9 @@
 //! a dimension, the stems and serifs they form, the edges they group into
 //! and the blue zones those edges lie in.
 
-use super::super::hints::{Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point};
+use super::super::hints::{
+    AxisHints, Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point,
+};
 use super::{Axis, Metrics, blue, constant};
 use crate::long::{abs, div_fix, mul_fix, wrap};
 use crate::work::charge;
@@ -61,7 +63,7 @@ impl Extent {
 /// along it (`v`); one-point contours give one-point segments. A glyph of
 /// more than 1000 segments gets none. Segment heights then grow by half the
 /// distance to the points just outside them, which helps tell serifs.
-pub(super) fn compute_segments(
+pub(in super::super) fn compute_segments(
     hints: &mut GlyphHints,
     dim: Dimension,
     units_per_em: u16,
@@ -402,7 +404,7 @@ pub(super) fn compute_edges(
     };
     let segment_width_threshold = div_fix(32, scale);
     let edge_distance_threshold = div_fix(
-        mul_fix(latin.edge_distance_threshold, scale).min(64 / 4),
+        mul_fix(latin.stems.edge_distance_threshold, scale).min(64 / 4),
         scale,
     );
     let axis = &mut hints.axis[dim.index()];
@@ -426,20 +428,7 @@ pub(super) fn compute_edges(
                 && e.dir == segment.dir
         });
         match found {
-            None => {
-                let at = axis.new_edge(segment.pos, segment.dir, top_to_bottom)?;
-                let opos = mul_fix(i64::from(segment.pos), scale);
-                axis.edges[at] = Edge {
-                    fpos: segment.pos,
-                    opos,
-                    pos: opos,
-                    dir: segment.dir,
-                    first: s,
-                    last: s,
-                    ..Edge::default()
-                };
-                axis.segments[s].edge_next = Some(s);
-            }
+            None => start_edge(axis, s, scale, top_to_bottom)?,
             Some(e) => add_to_edge(axis.segments.as_mut_slice(), &mut axis.edges[e], s),
         }
     }
@@ -457,8 +446,25 @@ pub(super) fn compute_edges(
             add_to_edge(axis.segments.as_mut_slice(), &mut axis.edges[e], s);
         }
     }
-    let segments = axis.segments.as_mut_slice();
-    let edges = axis.edges.as_mut_slice();
+    edge_properties(
+        axis.segments.as_mut_slice(),
+        axis.edges.as_mut_slice(),
+        work,
+    )
+}
+
+/// The second half of `af_latin_hints_compute_edges` and of
+/// `af_cjk_hints_compute_edges`, which agree: gives each segment its edge,
+/// then each edge the link and the serif its segments point to (the nearer
+/// where two do), marks the edges serifs point to, and makes each edge
+/// round where most of its segments are. A link or serif to a segment on
+/// no edge is passed over, which the CJK writing system, putting every
+/// segment on one, never needs.
+pub(in super::super) fn edge_properties(
+    segments: &mut [Segment],
+    edges: &mut [Edge],
+    work: &mut WorkBudget,
+) -> Result<()> {
     for (e, edge) in edges.iter().enumerate() {
         let mut s = edge.first;
         loop {
@@ -469,7 +475,7 @@ pub(super) fn compute_edges(
             }
         }
     }
-    charge(work, count)?;
+    charge(work, segments.len())?;
     for e in 0..edges.len() {
         let (mut round, mut straight) = (0, 0);
         let mut s = edges[e].first;
@@ -534,8 +540,33 @@ pub(super) fn compute_edges(
     Ok(())
 }
 
+/// Starts an edge of segment `s` alone, kept in order (`af_axis_hints_new_edge`
+/// for the segment's position and direction), at the segment's position
+/// scaled by `scale`.
+pub(in super::super) fn start_edge(
+    axis: &mut AxisHints,
+    s: usize,
+    scale: i64,
+    top_to_bottom: bool,
+) -> Result<()> {
+    let segment = axis.segments[s];
+    let at = axis.new_edge(segment.pos, segment.dir, top_to_bottom)?;
+    let opos = mul_fix(i64::from(segment.pos), scale);
+    axis.edges[at] = Edge {
+        fpos: segment.pos,
+        opos,
+        pos: opos,
+        dir: segment.dir,
+        first: s,
+        last: s,
+        ..Edge::default()
+    };
+    axis.segments[s].edge_next = Some(s);
+    Ok(())
+}
+
 /// Adds segment `s` to the circular segment list of `edge`.
-fn add_to_edge(segments: &mut [Segment], edge: &mut Edge, s: usize) {
+pub(in super::super) fn add_to_edge(segments: &mut [Segment], edge: &mut Edge, s: usize) {
     segments[s].edge_next = Some(edge.first);
     segments[edge.last].edge_next = Some(s);
     edge.last = s;
@@ -551,7 +582,7 @@ pub(super) fn detect_features(
 ) -> Result<()> {
     let latin = &metrics.axis[dim.index()];
     compute_segments(hints, dim, metrics.units_per_em, work)?;
-    link_segments(hints, dim, metrics.units_per_em, latin.widths(), work)?;
+    link_segments(hints, dim, metrics.units_per_em, latin.stems.widths(), work)?;
     compute_edges(hints, dim, latin, top_to_bottom, work)
 }
 

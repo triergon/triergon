@@ -133,7 +133,9 @@ for review.
 
 ## Timing and memory
 
-`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282).
+`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282;
+a workload settled below the ceiling stops at 20, see
+[early stop](../../docs/quality.md#early-stop)).
 `cargo xtask codecs memory --candidate target/release/codec-worker --reference
 target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
 --root . --out DIR` measures both workers' `OP-memory` runs under the shared observer

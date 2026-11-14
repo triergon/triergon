@@ -163,11 +163,12 @@ does.
   `SizedMetrics` takes glyph extents and contour points from the font crate's
   default load (`SizedFont::load` with `Load::Default`), which hints CFF, CFF2
   and CID-keyed glyphs as FreeType does, and TrueType glyphs without bytecode
-  as its auto-hinter does in the Latin and dummy styles, but not instructed
-  TrueType glyphs or those the auto-hinter gives a CJK or Indic style
-  (`Unsupported`), but for the empty extents of a glyph without points, which
-  every FreeType load gives it. So fallback mark positioning in such a font
-  without GPOS marks fails where it measures a glyph with an outline.
+  as its auto-hinter does in the Latin, CJK and dummy styles, but not instructed
+  TrueType glyphs or those the auto-hinter gives an Indic style (`Unsupported`),
+  but for the empty extents of a glyph without points, which every FreeType load
+  gives it. So mark positioning that reads such a glyph with an outline (a GPOS
+  anchor on a contour point, or fallback positioning in a font without GPOS
+  marks) fails.
   Faces whose character map libass would convert (Windows multibyte encodings)
   are refused.
 - `OtMetrics`'s CFF glyph extents where HarfBuzz's charstring interpreter
@@ -251,9 +252,8 @@ Paragraphs are limited to 2³² characters.
     and extents, that load's outline for contour points, and
     `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
     `Font::at_size`. This compares device tables, contour-point anchors and
-    FreeType's advances. Six cases are open: NotoEmoji's, whose fallback mark
-    positioning reads the extents of glyphs FreeType's auto-hinter gives a CJK
-    style.
+    FreeType's advances, and the extents fallback mark positioning reads from
+    glyphs FreeType's auto-hinter gives a CJK style (NotoEmoji).
   - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
     script (1,768 cases, 103,031 runs; 1,746 and 101,691 before the charmap face
     joined them), with HarfBuzz's built-in font functions
@@ -291,3 +291,13 @@ Paragraphs are limited to 2³² characters.
 The comparison establishes agreement with HarfBuzz and FriBidi on that corpus,
 not conformance with the OpenType or Unicode specifications; for bidi, the
 conformance files check UAX #9 itself.
+
+## Licence
+
+MIT or Apache-2.0, at your option, with HarfBuzz 14.6.0's "Old MIT" licence and libass
+0.17.5's ISC licence for the modules derived from them: the shaping pipeline, layout
+tables, script shapers and their generated tables are translated from HarfBuzz, and the
+sized font functions and `@` font rotations follow libass. `LICENSE` holds the
+notices, including the Unicode data notices described in
+[THIRD-PARTY.md](THIRD-PARTY.md), and
+[docs/provenance.md](../../docs/provenance.md#triergon-shape) lists the modules.

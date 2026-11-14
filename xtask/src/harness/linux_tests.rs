@@ -545,13 +545,13 @@ fn an_active_sample_is_a_nonpass_after_calibration() {
         .and_then(|o| o.get("observer"))
         .cloned()
         .unwrap();
-    assert!(linux::sample_valid(
-        Some(&data),
+    assert!(linux::certificate_valid(
         Some(&certificate),
         &f.linked,
         Some(&f.observer),
         Some(&f.probe)
     ));
+    assert!(linux::guard_component_valid(&data));
     for key in [
         "guard_calls",
         "guard_window_calls",
@@ -559,13 +559,7 @@ fn an_active_sample_is_a_nonpass_after_calibration() {
     ] {
         set(&mut data, &[key], "6", Value::int(1));
     }
-    assert!(!linux::sample_valid(
-        Some(&data),
-        Some(&certificate),
-        &f.linked,
-        Some(&f.observer),
-        Some(&f.probe)
-    ));
+    assert!(!linux::guard_component_valid(&data));
 }
 
 #[test]
@@ -1071,7 +1065,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     let result = super::memory::evaluate(
         std::path::Path::new("."),
         &samples,
-        2,
+        crate::harness::timing::Pairs::fixed(2),
         0,
         &certificate,
         None,
@@ -1080,6 +1074,29 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         result.get("status").and_then(Value::as_str),
         Some("qualified")
     );
+    // The kernel certificate is the collection's and is verified once, but any
+    // sample that used the kernel bound, first or later, still needs it.
+    for index in [0, 1] {
+        let mut kernel = samples.clone();
+        set(
+            &mut kernel[index],
+            &["reference_rss", "observer"],
+            "kernel_rss_requested",
+            Value::int(1),
+        );
+        let refused = super::memory::evaluate(
+            std::path::Path::new("."),
+            &kernel,
+            crate::harness::timing::Pairs::fixed(2),
+            0,
+            &certificate,
+            None,
+        );
+        assert_eq!(
+            refused.get("status").and_then(Value::as_str),
+            Some("observer-unqualified")
+        );
+    }
     let outputs = v(
         r#"{"candidate":{"bytes":100,"fnv1a64":"1234"},"reference":{"bytes":120,"fnv1a64":"5678"}}"#,
     );
@@ -1099,7 +1116,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         super::memory::evaluate(
             std::path::Path::new("."),
             &[sample.clone(), sample.clone()],
-            2,
+            crate::harness::timing::Pairs::fixed(2),
             0,
             &certificate,
             outputs,
@@ -1152,7 +1169,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     let without_growth = super::memory::evaluate(
         std::path::Path::new("."),
         &samples,
-        2,
+        crate::harness::timing::Pairs::fixed(2),
         0,
         &certificate,
         None,

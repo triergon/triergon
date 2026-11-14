@@ -37,6 +37,8 @@ pub struct Options {
     pub pairs: usize,
     pub seed: u64,
     pub only: Option<String>,
+    /// Let a gate session stop at an early look (`--no-early-stop` clears it).
+    pub early_stop: bool,
 }
 
 /// The work one unobserved `-memory` run reports: its last stdout line.
@@ -192,16 +194,25 @@ pub fn run(options: &Options) -> Result<(), String> {
                             Value::object([("candidate", candidate), ("reference", reference)]);
                         record.push(("expected_outputs".into(), expected.clone()));
                         let arguments = [format!("{operation}-memory"), python::path(&input)];
-                        memory::collect_command(
-                            &options.repository,
-                            &options.candidate,
-                            &options.reference,
-                            &input,
-                            options.pairs,
-                            options.seed,
-                            &arguments,
-                            &expected,
-                        )?
+                        let workers = memory::WorkerPaths {
+                            candidate: &options.candidate,
+                            reference: &options.reference,
+                            registered: false,
+                        };
+                        memory::collect_one(memory::Job::new(&workers, [input.clone()], |slot| {
+                            memory::collect_command(
+                                slot,
+                                &options.repository,
+                                &options.candidate,
+                                &options.reference,
+                                &input,
+                                memory::Pairs::gate(options.pairs, memory::CEILING)
+                                    .early_stop(options.early_stop),
+                                options.seed,
+                                &arguments,
+                                &expected,
+                            )
+                        }))?
                     }
                     (Ok(candidate), Ok(reference)) => Value::object([
                         ("status", Value::str("unequal-memory-work")),

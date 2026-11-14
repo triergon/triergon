@@ -690,9 +690,10 @@ pub(crate) static SCRIPTS: [Script; 60] = [
 ];
 
 /// `af_style_classes`: the styles of `afstyles.h` in order: their writing
-/// system, script, blue strings (for the latin writing system) and whether
-/// they cover characters by the script's ranges (`AF_COVERAGE_DEFAULT`)
-/// rather than by an OpenType feature, which needs HarfBuzz.
+/// system, script, blue strings (for the latin and CJK writing systems) and
+/// whether they cover characters by the script's ranges
+/// (`AF_COVERAGE_DEFAULT`) rather than by an OpenType feature, which needs
+/// HarfBuzz.
 pub(crate) static STYLES: [Style; 87] = [
     // adlm_dflt
     Style {
@@ -1300,7 +1301,7 @@ pub(crate) static STYLES: [Style; 87] = [
     Style {
         writing_system: Cjk,
         script: 59,
-        blues: &[],
+        blues: &BLUES_HANI,
         default_coverage: true,
     },
 ];
@@ -2349,6 +2350,18 @@ static BLUES_VAII: [BlueString; 2] = [
     },
     BlueString {
         text: "\u{a5cd} \u{a616} \u{a619} \u{a5de} \u{a505} \u{a562} \u{a59c} \u{a506}",
+        properties: 0x00,
+    },
+];
+
+/// `AF_BLUE_STRINGSET_HANI`.
+static BLUES_HANI: [BlueString; 2] = [
+    BlueString {
+        text: "\u{4ed6} \u{4eec} \u{4f60} \u{4f86} \u{5011} \u{5230} \u{548c} \u{5730} \u{5bf9} \u{5c0d} \u{5c31} \u{5e2d} \u{6211} \u{65f6} \u{6642} \u{6703} \u{6765} \u{70ba} \u{80fd} \u{8230} \u{8aaa} \u{8bf4} \u{8fd9} \u{9019} \u{9f4a} | \u{519b} \u{540c} \u{5df2} \u{613f} \u{65e2} \u{661f} \u{662f} \u{666f} \u{6c11} \u{7167} \u{73b0} \u{73fe} \u{7406} \u{7528} \u{7f6e} \u{8981} \u{8ecd} \u{90a3} \u{914d} \u{91cc} \u{958b} \u{96f7} \u{9732} \u{9762} \u{987e}",
+        properties: 0x01,
+    },
+    BlueString {
+        text: "\u{4e2a} \u{4e3a} \u{4eba} \u{4ed6} \u{4ee5} \u{4eec} \u{4f60} \u{4f86} \u{500b} \u{5011} \u{5230} \u{548c} \u{5927} \u{5bf9} \u{5c0d} \u{5c31} \u{6211} \u{65f6} \u{6642} \u{6709} \u{6765} \u{70ba} \u{8981} \u{8aaa} \u{8bf4} | \u{4e3b} \u{4e9b} \u{56e0} \u{5b83} \u{60f3} \u{610f} \u{7406} \u{751f} \u{7576} \u{770b} \u{7740} \u{7f6e} \u{8005} \u{81ea} \u{8457} \u{88e1} \u{8fc7} \u{8fd8} \u{8fdb} \u{9032} \u{904e} \u{9053} \u{9084} \u{91cc} \u{9762}",
         properties: 0x00,
     },
 ];

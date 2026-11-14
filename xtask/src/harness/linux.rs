@@ -1656,17 +1656,6 @@ pub fn conditional_coverage(parsed: &Value, owner: &Value, admission: Option<&Ad
     Value::Object(fields)
 }
 
-pub fn sample_valid(
-    data: Option<&Value>,
-    certificate: Option<&Value>,
-    linked: &Value,
-    observer_sha: Option<&str>,
-    probe_sha: Option<&str>,
-) -> bool {
-    certificate_valid(certificate, linked, observer_sha, probe_sha)
-        && data.is_some_and(|d| zero_active(d).is_ok())
-}
-
 // ---------------------------------------------------------------------------
 // Optional kernel resident-set bound.
 

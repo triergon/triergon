@@ -259,10 +259,18 @@ pub fn mix_q15_into(matrix: &Q15Matrix, planes: &[Vec<f32>], samples: usize, out
 }
 
 /// Full scale 1.0 maps to 32768, rounded toward negative infinity and
-/// saturated: the reference device path's observed conversion.
+/// saturated: the reference device path's observed conversion. NaN maps to 0.
+///
+/// The floor is the conversion toward zero, less one where that rounded up; both
+/// steps saturate, and so does the narrowing to 16 bits. `f32::floor` would be a
+/// library call on 32-bit ARM, which has no rounding instruction before ARMv8; this
+/// is a conversion, a comparison and integer saturation on every target.
 #[inline]
 pub fn to_s16(sample: f32) -> i16 {
-    (sample * 32768.0).floor().clamp(-32768.0, 32767.0) as i16
+    let x = sample * 32768.0;
+    let toward_zero = x as i32;
+    let floor = toward_zero.saturating_sub(i32::from(toward_zero as f32 > x));
+    floor.clamp(i16::MIN.into(), i16::MAX.into()) as i16
 }
 
 #[cfg(test)]
@@ -527,6 +535,32 @@ mod tests {
                 .all(|(pair, &x)| pair == [(x * 32768.0) as i16; 2]),
             "a 16-bit stereo pair passes through exactly"
         );
+    }
+
+    #[test]
+    fn to_s16_floors_and_saturates() {
+        let floored = |x: f32| (x * 32768.0).floor().clamp(-32768.0, 32767.0) as i16;
+        let specials = [
+            0.0,
+            -0.0,
+            f32::MIN_POSITIVE,
+            -f32::MIN_POSITIVE,
+            0.5 / 32768.0,
+            -0.5 / 32768.0,
+            32767.5 / 32768.0,
+            -32768.5 / 32768.0,
+            1.0,
+            -1.0,
+            f32::MAX,
+            f32::MIN,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+        ];
+        let sweep = (0..=u32::MAX).step_by(997).map(f32::from_bits);
+        for x in specials.into_iter().chain(sweep) {
+            assert_eq!(to_s16(x), floored(x), "{x:e}");
+        }
     }
 
     #[test]

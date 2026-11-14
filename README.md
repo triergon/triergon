@@ -96,8 +96,10 @@ lto = "fat"
 codegen-units = 1
 ```
 
-Cargo's default profile runs measurably slower, up to a quarter more instructions on
-32-bit ARM; `panic = "abort"` is safe to add and saves a little more. See
+Cargo's default profile runs measurably slower on 32-bit ARM: without fat LTO the
+playback worker executes up to 25.0% more instructions, and 16 codegen units add up to
+another 2.5%. `panic = "abort"` saves a further 2 to 3%; it is safe unless the program
+wraps calls into these crates in `catch_unwind`. See
 [measuring performance](docs/quality.md#measuring-performance).
 
 ## Documentation
@@ -105,6 +107,7 @@ Cargo's default profile runs measurably slower, up to a quarter more instruction
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract
 - [Quality](docs/quality.md): the reference gates, corpus, harness and measurement rules
 - [Status](docs/status.md): verified scope and current results per module
+- [Provenance](docs/provenance.md): licences of the modules derived from FreeType, HarfBuzz and libass
 - [Contributing](CONTRIBUTING.md)
 
 ## Licence
@@ -112,3 +115,12 @@ Cargo's default profile runs measurably slower, up to a quarter more instruction
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
 Test media and specification texts keep their own terms. Patent licensing for codecs
 is the responsibility of whoever ships them.
+
+`triergon-font`, `triergon-shape`, `triergon-ass` and `triergon-raster` contain modules
+translated from FreeType 2.15.0 (FreeType License), HarfBuzz 14.6.0 ("Old MIT") and
+libass 0.17.5 (ISC), which keep those licences too; each crate's `LICENSE` holds the
+notices, and [docs/provenance.md](docs/provenance.md) lists the modules. Software that
+includes `triergon-font` credits FreeType in its documentation:
+
+> Portions of this software are copyright © 2026 The FreeType Project
+> (<https://freetype.org>). All rights reserved.

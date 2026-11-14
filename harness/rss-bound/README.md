@@ -11,11 +11,15 @@ The observer opens `/dev/triergon_rss_bound` from its constructor, before the
 worker's `main` and before any input is loaded. The module then sums the process's
 RSS counters once, exactly, across all CPUs, and adds every positive file, anonymous
 and shared-memory counter update until the observer's END ioctl. Releases are never
-subtracted, so the result bounds the resident peak from above. The bound holds only
-under the deployment conditions the module enforces and reports:
+subtracted, so the result bounds the resident peak from above. Up to 32 processes are
+measured side by side, each in a session of its own: a counter update counts only
+toward the session of the memory map it belongs to, and a process holds one session
+at a time. The bound holds only under the deployment conditions the module enforces
+and reports:
 
-- one single-threaded process, opened with transparent huge pages disabled;
-- every probe stays armed with nothing missed;
+- each session one single-threaded process, opened with transparent huge pages disabled;
+- every probe stays armed with nothing missed while the session is open, whatever
+  process the miss happened in;
 - no updates from another process's memory map;
 - no write to the kprobes control file during a session.
 
@@ -47,7 +51,8 @@ same layout through the module's 32-bit ioctl entry point. For such a user space
    (eight errors, none missed);
 2. unloads it and loads it again;
 3. hands the device to the measurement user and runs a positive check (no errors,
-   nothing missed, at least 2,048 positive pages);
+   nothing missed, at least 2,048 positive pages), then four such checks side by side,
+   each holding its session open for a second;
 4. writes `OUT/RSS-PROOF.json`.
 
 The module must be unloaded during timing runs. It is loaded for memory collection
@@ -59,10 +64,10 @@ The same module binary can be loaded again on the same boot without a new proof
 
 ```sh
 cargo xtask build-workers
-cargo xtask report --benchmark --contract … --manifest … --corpus … --output TIMING
+taskset -c 1 cargo xtask report --benchmark --contract … --manifest … --corpus … --output TIMING
 harness/rss-bound/prove.sh REVIEW .research/rss-bound
 TRIERGON_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
-TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask report --memory --contract … --manifest … --corpus … --output MEMORY
+TRIERGON_RSS_KERNEL_BOUND=1 taskset -c 1-15 cargo xtask report --memory --contract … --manifest … --corpus … --output MEMORY
 cargo xtask grade TIMING/report.json MEMORY/report.json --contract … --manifest … --output GRADED
 sudo rmmod triergon_rss_bound
 ```

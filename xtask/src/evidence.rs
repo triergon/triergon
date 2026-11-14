@@ -10,7 +10,8 @@
 //!
 //! Every upload lands under `qualification/`, which the archive expires 90 days
 //! after upload. A set moves under `evidence/`, which is kept, only when a result
-//! cites it, so nothing is kept that nothing cites.
+//! cites it, so nothing is kept that nothing cites. A set's index entry lists the
+//! gate results it holds, which later gate runs reuse once it is kept.
 
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Read, Write};
@@ -361,9 +362,10 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
         Retention::Expiring.prefix(),
         compression.suffix()
     );
+    let results = gate_results(archive, compression)?;
     let location = archive_location()?;
     aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
-    let entry = Value::object([
+    let mut entry = vec![
         ("name", Value::str(name)),
         ("path", Value::str(name)),
         ("retention", Value::str(Retention::Expiring.label())),
@@ -371,8 +373,51 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
         ("key", Value::str(key)),
         ("sha256", Value::str(sha)),
         ("bytes", Value::int(bytes)),
-    ]);
+    ];
+    if !results.is_empty() {
+        entry.push(("results", Value::Array(results)));
+    }
+    let entry = Value::object(entry);
     Ok(crate::json::to_python(&entry, Some(1)))
+}
+
+/// The fresh gate results a packed set holds ([`crate::harness::reuse`]), which a
+/// later gate run reuses once the set is kept.
+fn gate_results(archive: &Path, compression: Compression) -> Result<Vec<Value>, String> {
+    struct Results {
+        entries: Vec<(String, Vec<u8>)>,
+        current: bool,
+    }
+    impl TarFiles for Results {
+        fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
+            self.current = path.rsplit('/').next() == Some(crate::harness::reuse::RESULT);
+            if self.current {
+                self.entries
+                    .push((path.trim_start_matches("./").to_owned(), Vec::new()));
+            }
+            Ok(())
+        }
+        fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
+            if self.current {
+                self.entries
+                    .last_mut()
+                    .expect("begun")
+                    .1
+                    .extend_from_slice(chunk);
+            }
+            Ok(())
+        }
+        fn end(&mut self) -> Result<(), String> {
+            self.current = false;
+            Ok(())
+        }
+    }
+    let mut tar = TarReader::new(Results {
+        entries: Vec::new(),
+        current: false,
+    });
+    compression.unpack(archive, &mut tar)?;
+    crate::harness::reuse::listed(&tar.finish()?.entries)
 }
 
 /// `cargo xtask evidence promote SET`: copy an indexed set from `qualification/`
