@@ -265,6 +265,24 @@ struct ActiveSeek {
 }
 
 fn mp4_tick_before(ticks: i64, base: TimeBase, target: Time) -> Result<bool> {
+    // `ticks · n / d < N / D` as `ticks · n · D < N · d`. When `ticks · n`, `N`
+    // and `D` fit 64 bits, both sides are products of two 64-bit magnitudes:
+    // widening multiplications, where the general path multiplies 128-bit values
+    // with overflow checks, a long library call on 32-bit targets.
+    if let (Ok(scaled), Ok(target_numerator), Ok(target_denominator)) = (
+        u64::try_from(widening_product(ticks.unsigned_abs(), base.numerator())),
+        i64::try_from(target.numerator()),
+        u64::try_from(target.denominator()),
+    ) {
+        let left = widening_product(scaled, target_denominator);
+        let right = widening_product(target_numerator.unsigned_abs(), base.denominator());
+        return Ok(match (ticks < 0, target_numerator < 0) {
+            (false, false) => left < right,
+            (true, true) => left > right,
+            (true, false) => left != 0 || right != 0,
+            (false, true) => false,
+        });
+    }
     // A signed 64-bit tick count times an unsigned 64-bit scale fits i128.
     // Compare the fractions before reducing them to Time.
     let numerator = i128::from(ticks) * i128::from(base.numerator());
@@ -279,6 +297,15 @@ fn mp4_tick_before(ticks: i64, base: TimeBase, target: Time) -> Result<bool> {
     Ok(Time::from_ticks(i128::from(ticks), base)? < target)
 }
 
+/// `a · b` from four 32-bit limb products, which 32-bit targets multiply in
+/// instructions.
+fn widening_product(a: u64, b: u64) -> u128 {
+    let (a_low, a_high) = (a & 0xffff_ffff, a >> 32);
+    let (b_low, b_high) = (b & 0xffff_ffff, b >> 32);
+    let middle = u128::from(a_high * b_low) + u128::from(a_low * b_high);
+    (u128::from(a_high * b_high) << 64) + (middle << 32) + u128::from(a_low * b_low)
+}
+
 #[test]
 fn mp4_seek_tick_comparison_keeps_exact_order() {
     let audio = TimeBase::new(1, 48_000).unwrap();
@@ -291,6 +318,63 @@ fn mp4_seek_tick_comparison_keeps_exact_order() {
     ] {
         let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
         assert_eq!(mp4_tick_before(ticks, base, target).unwrap(), pts < target);
+    }
+    let bases = [
+        (1, 48_000),
+        (1, 90_000),
+        (1001, 30_000),
+        (1, 1),
+        (u64::MAX, 3),
+        (7, u64::MAX),
+    ]
+    .map(|(n, d)| TimeBase::new(n, d).unwrap());
+    let targets = [
+        (0, 1),
+        (3072, 125),
+        (-3072, 125),
+        (60, 1),
+        (1, 3),
+        (-1, 90_000),
+        (i128::from(i64::MAX), 1),
+        (i128::from(i64::MIN), 1),
+        (i128::from(i64::MAX) + 1, 7),
+        (5, u128::from(u64::MAX) + 2),
+    ]
+    .map(|(n, d)| Time::new(n, d).unwrap());
+    let ticks = [
+        0,
+        1,
+        -1,
+        2,
+        -2,
+        1023,
+        -1023,
+        48_000,
+        -90_000,
+        i64::MAX,
+        i64::MIN,
+        1 << 40,
+    ];
+    for base in bases {
+        for target in targets {
+            for ticks in ticks {
+                let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
+                assert_eq!(
+                    mp4_tick_before(ticks, base, target).unwrap(),
+                    pts < target,
+                    "{ticks} in {base:?} before {target:?}"
+                );
+            }
+        }
+    }
+    for (a, b) in [
+        (0, 0),
+        (u64::MAX, u64::MAX),
+        (u64::MAX, 1),
+        (1 << 32, 1 << 32),
+        (0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321),
+    ] {
+        assert_eq!(widening_product(a, b), u128::from(a) * u128::from(b));
     }
 }
 

@@ -1,5 +1,5 @@
 //! Reference demux signed/null field representation, never a source clock type.
-use triergon_core::{Error, Result, Rounding, Time, TimeBase};
+use triergon_core::{Error, Result, Rounding, TickScale, Time, TimeBase};
 
 /// A usable timebase from the source declaration, when available.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -93,17 +93,28 @@ pub enum SchedulingClock {
 }
 impl SchedulingClock {
     pub fn from_demux_clock(field: ClockField, base: TimeBase) -> Result<Self> {
+        Self::from_scaled_clock(field, &TickScale::new(base, TimeBase::MICROSECONDS))
+    }
+
+    /// [`Self::from_demux_clock`] with the demux base's conversion to
+    /// microseconds prepared once for the track (`to` is microseconds).
+    pub fn from_scaled_clock(field: ClockField, micros: &TickScale) -> Result<Self> {
+        debug_assert_eq!(micros.to(), TimeBase::MICROSECONDS);
         let Some(ticks) = field.api_ticks() else {
             return Ok(Self::ApiSentinel);
         };
+        let base = micros.from();
         // The exact clock in microseconds, rounded to nearest with ties away from
         // zero; `None` when it does not fit `i128`. The scaled magnitude fits 128
         // bits for every source timescale; wider products go through exact time.
-        let exact = match u128::from(ticks.unsigned_abs())
-            .checked_mul(u128::from(base.numerator()) * 1_000_000)
-        {
-            Some(scaled) => {
-                let magnitude = nearest_away(scaled, base.denominator());
+        let magnitude = match micros.nearest_away_magnitude(ticks.unsigned_abs()) {
+            Some(magnitude) => Some(u128::from(magnitude)),
+            None => u128::from(ticks.unsigned_abs())
+                .checked_mul(u128::from(base.numerator()) * 1_000_000)
+                .map(|scaled| nearest_away(scaled, base.denominator())),
+        };
+        let exact = match magnitude {
+            Some(magnitude) => {
                 if ticks < 0 {
                     0i128.checked_sub_unsigned(magnitude)
                 } else {
@@ -111,7 +122,7 @@ impl SchedulingClock {
                 }
             }
             None => match Time::from_ticks(i128::from(ticks), base)?
-                .to_ticks(TimeBase::new(1, 1_000_000)?, Rounding::NearestAway)
+                .to_ticks(TimeBase::MICROSECONDS, Rounding::NearestAway)
             {
                 Ok(value) => Some(value),
                 Err(Error::Overflow) => None,

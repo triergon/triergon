@@ -83,6 +83,152 @@ impl TimeBase {
     }
 }
 
+/// The conversion of one time base's ticks into another's, prepared once for a
+/// stream: [`TickScale::rescale`] returns what [`TimeBase::rescale`] returns, but
+/// divides by a reciprocal computed here, where `rescale` divides for every call.
+/// Without a divide instruction, as on 32-bit ARMv7, each such division is a
+/// software loop.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TickScale {
+    from: TimeBase,
+    to: TimeBase,
+    /// The reduced ratio `factor / divisor` of `from` in `to`, and the divisor's
+    /// reciprocal, when both terms fit 64 bits; `rescale` handles the others.
+    reduced: Option<(u64, Reciprocal)>,
+}
+
+impl TickScale {
+    pub fn new(from: TimeBase, to: TimeBase) -> Self {
+        // Both bases are reduced, so the ratio `(a · d) / (b · c)` of `a/b` in
+        // `c/d` reduces by `gcd(a, c) · gcd(b, d)`.
+        let numerators = binary_gcd(from.numerator(), to.numerator());
+        let denominators = binary_gcd(from.denominator(), to.denominator());
+        let factor =
+            u128::from(from.numerator() / numerators) * u128::from(to.denominator() / denominators);
+        let divisor =
+            u128::from(from.denominator() / denominators) * u128::from(to.numerator() / numerators);
+        let reduced = u64::try_from(factor)
+            .ok()
+            .zip(u64::try_from(divisor).ok())
+            .and_then(|(factor, divisor)| Some((factor, Reciprocal::new(divisor)?)));
+        Self { from, to, reduced }
+    }
+
+    pub fn from(&self) -> TimeBase {
+        self.from
+    }
+
+    pub fn to(&self) -> TimeBase {
+        self.to
+    }
+
+    /// `ticks` of `from` in ticks of `to`, rounded as asked.
+    pub fn rescale(&self, ticks: i64, rounding: Rounding) -> Result<i64> {
+        let Some((quotient, remainder, at_least_half)) = self.divide(ticks.unsigned_abs()) else {
+            return self.from.rescale(ticks, self.to, rounding);
+        };
+        let result = rounded(
+            u128::from(quotient),
+            remainder,
+            at_least_half,
+            ticks < 0,
+            rounding,
+        )?;
+        i64::try_from(result).map_err(|_| Error::Overflow)
+    }
+
+    /// The magnitude of `ticks` in ticks of `to`, rounded to nearest with ties
+    /// away from zero, when the scaled magnitude fits 64 bits.
+    pub fn nearest_away_magnitude(&self, ticks: u64) -> Option<u64> {
+        let (quotient, _, at_least_half) = self.divide(ticks)?;
+        // A zero remainder is never at least half of a nonzero divisor.
+        Some(quotient + u64::from(at_least_half))
+    }
+
+    /// The quotient of `ticks · factor / divisor`, whether a remainder is left
+    /// and whether it is at least half the divisor; `None` when the product
+    /// does not fit 64 bits.
+    fn divide(&self, ticks: u64) -> Option<(u64, bool, bool)> {
+        let (factor, divisor) = self.reduced?;
+        let (quotient, remainder) = divisor.divide(ticks.checked_mul(factor)?);
+        Some((
+            quotient,
+            remainder != 0,
+            remainder != 0 && remainder >= divisor.get() - remainder,
+        ))
+    }
+}
+
+/// The greatest common divisor of two nonzero values by shifts and subtractions
+/// alone, for a stream's setup on targets that divide in software.
+fn binary_gcd(mut a: u64, mut b: u64) -> u64 {
+    debug_assert!(a != 0 && b != 0);
+    let shift = (a | b).trailing_zeros();
+    a >>= a.trailing_zeros();
+    loop {
+        b >>= b.trailing_zeros();
+        if a > b {
+            (a, b) = (b, a);
+        }
+        b -= a;
+        if b == 0 {
+            return a << shift;
+        }
+    }
+}
+
+/// A nonzero 64-bit divisor with its reciprocal `⌊(2⁶⁴ − 1) / d⌋`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Reciprocal {
+    divisor: NonZeroU64,
+    reciprocal: u64,
+}
+
+impl Reciprocal {
+    fn new(divisor: u64) -> Option<Self> {
+        let divisor = NonZeroU64::new(divisor)?;
+        Some(Self {
+            divisor,
+            reciprocal: u64::MAX / divisor,
+        })
+    }
+
+    fn get(self) -> u64 {
+        self.divisor.get()
+    }
+
+    /// `value / d` and `value % d`. Since `2⁶⁴ − d · reciprocal ≤ d`, the exact
+    /// `value · reciprocal / 2⁶⁴` lies less than `value / 2⁶⁴ · (1 + 1/d) < 2` below
+    /// `value / d`, so its integer part is at most two below the quotient and never
+    /// above it: at most two corrections follow, and `quotient · d` never exceeds
+    /// `value`.
+    fn divide(self, value: u64) -> (u64, u64) {
+        let divisor = self.get();
+        if divisor == 1 {
+            return (value, 0);
+        }
+        let mut quotient = high_product(value, self.reciprocal);
+        let mut remainder = value - quotient * divisor;
+        while remainder >= divisor {
+            quotient += 1;
+            remainder -= divisor;
+        }
+        (quotient, remainder)
+    }
+}
+
+/// The high 64 bits of `a · b`, from 32-bit limbs: four multiplications that
+/// 32-bit targets execute as instructions.
+fn high_product(a: u64, b: u64) -> u64 {
+    let (a_low, a_high) = (a & 0xffff_ffff, a >> 32);
+    let (b_low, b_high) = (b & 0xffff_ffff, b >> 32);
+    let low = a_low * b_low;
+    let middle_a = a_high * b_low;
+    let middle_b = a_low * b_high;
+    let carry = ((low >> 32) + (middle_a & 0xffff_ffff) + (middle_b & 0xffff_ffff)) >> 32;
+    a_high * b_high + (middle_a >> 32) + (middle_b >> 32) + carry
+}
+
 /// Canonical exact source time. Unknown time is `Option<Time>`; no value is a
 /// sentinel. Arithmetic reduces before checking the public representation's
 /// bounds; a wider intermediate alone is not a reason to reject valid time.
@@ -385,5 +531,142 @@ impl Ord for Time {
 impl PartialOrd for Time {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+mod tick_scale_tests {
+    use super::*;
+
+    fn values() -> Vec<u64> {
+        let mut values = vec![
+            0,
+            1,
+            2,
+            3,
+            7,
+            1 << 31,
+            (1 << 32) - 1,
+            1 << 32,
+            (1 << 32) + 1,
+        ];
+        values.extend([
+            u64::MAX,
+            u64::MAX - 1,
+            u64::MAX / 3,
+            i64::MAX as u64,
+            1 << 63,
+        ]);
+        let mut x = 0x9e37_79b9_7f4a_7c15_u64;
+        for _ in 0..2000 {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            values.push(x >> (x % 64));
+        }
+        values
+    }
+
+    #[test]
+    fn reciprocal_division_is_exact() {
+        let values = values();
+        for &divisor in values.iter().filter(|&&d| d != 0).take(600) {
+            let reciprocal = Reciprocal::new(divisor).unwrap();
+            for &value in &values {
+                assert_eq!(
+                    reciprocal.divide(value),
+                    (value / divisor, value % divisor),
+                    "{value} / {divisor}"
+                );
+            }
+        }
+        assert!(Reciprocal::new(0).is_none());
+    }
+
+    #[test]
+    fn binary_gcd_matches_euclid() {
+        let values = values();
+        for &a in values.iter().filter(|&&v| v != 0).take(300) {
+            for &b in values.iter().filter(|&&v| v != 0).take(300) {
+                assert_eq!(binary_gcd(a, b), gcd_u64(a, b), "gcd({a}, {b})");
+            }
+        }
+    }
+
+    #[test]
+    fn high_product_matches_wide_multiplication() {
+        let values = values();
+        for &a in values.iter().take(300) {
+            for &b in values.iter().take(300) {
+                let wide = (u128::from(a) * u128::from(b)) >> 64;
+                assert_eq!(u128::from(high_product(a, b)), wide);
+            }
+        }
+    }
+
+    #[test]
+    fn tick_scale_matches_rescale() {
+        let bases = [
+            (1, 1),
+            (1, 1_000),
+            (1, 90_000),
+            (1, 48_000),
+            (1, 44_100),
+            (1, 600),
+            (1001, 30_000),
+            (1, 1_000_000),
+            (1, 1_000_000_000),
+            (3, 7),
+            (u64::MAX, 1),
+            (1, u64::MAX),
+            (u64::MAX - 1, u64::MAX),
+            (1 << 40, 3),
+        ]
+        .map(|(n, d)| TimeBase::new(n, d).unwrap());
+        let roundings = [
+            Rounding::TowardZero,
+            Rounding::AwayFromZero,
+            Rounding::Floor,
+            Rounding::Ceil,
+            Rounding::NearestAway,
+        ];
+        let magnitudes = values();
+        for from in bases {
+            for to in bases {
+                let scale = TickScale::new(from, to);
+                let factor = u128::from(from.numerator()) * u128::from(to.denominator());
+                let divisor = u128::from(from.denominator()) * u128::from(to.numerator());
+                for &magnitude in magnitudes.iter().take(400) {
+                    for ticks in [
+                        magnitude as i64,
+                        (magnitude as i64).wrapping_neg(),
+                        i64::MIN,
+                    ] {
+                        for rounding in roundings {
+                            assert_eq!(
+                                scale.rescale(ticks, rounding),
+                                from.rescale(ticks, to, rounding),
+                                "{ticks} from {from:?} to {to:?} {rounding:?}"
+                            );
+                        }
+                    }
+                    // The unreduced product can exceed 128 bits where the
+                    // reduced one fits 64; those are covered by `rescale` above.
+                    if let (Some(nearest), Some(scaled)) = (
+                        scale.nearest_away_magnitude(magnitude),
+                        u128::from(magnitude).checked_mul(factor),
+                    ) {
+                        let (quotient, remainder) = (scaled / divisor, scaled % divisor);
+                        let exact = quotient
+                            + u128::from(remainder != 0 && remainder >= divisor - remainder);
+                        assert_eq!(
+                            u128::from(nearest),
+                            exact,
+                            "{magnitude} from {from:?} to {to:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
