@@ -669,10 +669,8 @@ impl PacketPlan {
         } else {
             3
         };
-        let end = self
-            .offset
-            .checked_add(self.length)
-            .ok_or(Error::Overflow)?;
+        // Scan verified the complete NAL before entering this phase.
+        let end = self.offset + self.length;
         let segment = NalPacketSegment::packet(self.offset..end, prefix, state.total);
         self.append(state, segment)?;
         self.offset = end;
@@ -750,14 +748,15 @@ impl PacketEmission {
         let parts = state.segments.as_slice();
         while let Some(part) = parts.get(self.copy_segment) {
             let prefix = usize::from(part.prefix_bytes());
-            let end = prefix.checked_add(part.len()).ok_or(Error::Overflow)?;
+            // Planning checked the complete output extent, including every prefix.
+            let end = prefix + part.len();
             let buffer = self
                 .output
                 .as_mut()
                 .ok_or(Error::Invalid("missing packet buffer"))?;
             // Charge and check cancellation at the prefix, payload chunks
             // and segment boundary, including when resuming a partial copy.
-            while self.copied < prefix {
+            if self.copied < prefix {
                 let count = work_count(work).min(prefix - self.copied);
                 if count == 0 {
                     return Ok(YIELD);
@@ -768,6 +767,11 @@ impl PacketEmission {
                 self.copied += count;
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
+                }
+                // A partial prefix used all remaining work: prefixes are at
+                // most four bytes and always fit within a copy chunk.
+                if self.copied < prefix {
+                    return Ok(YIELD);
                 }
             }
             if self.copied < end {
