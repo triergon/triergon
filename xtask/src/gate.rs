@@ -1944,6 +1944,14 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .is_some_and(only_open_cases)
         })
         .collect();
+    // A run of part of the plan says so first, so nothing takes it for the full gate.
+    if let Some(names) = &selection {
+        println!(
+            "partial run, not the full gate: {} items: {}",
+            names.len(),
+            names.join(" ")
+        );
+    }
     println!(
         "{} steps on {} shards, {} failed, {} of them only on the contract's listed open cases",
         steps.len(),
@@ -1955,6 +1963,13 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
         file,
         &Value::object([
             ("schema", Value::str("gate-summary-v1")),
+            ("partial", Value::Bool(selection.is_some())),
+            (
+                "selection",
+                selection
+                    .as_ref()
+                    .map_or(Value::Null, |names| Value::strings(names.iter().cloned())),
+            ),
             ("shards", Value::Array(shards)),
             ("steps", Value::Array(steps)),
             ("failed", Value::strings(failed.clone())),

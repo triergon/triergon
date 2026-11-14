@@ -631,7 +631,10 @@ worker runs its numeric modes only on native Linux AArch64. `cargo xtask gate pl
 its own host; the weights are the minutes each item took on a c6g.4xlarge, the more of
 the two targets. `--items NAME,...`, given to every gate command of a run, narrows the
 plan to those items, for a run of part of the gate; the shards record it, and `gate
-summary` checks them against the same narrowed plan.
+summary` checks them against the same narrowed plan, prints that the run is partial and
+writes `"partial": true` with the selection at the top of its result. A result cited as
+the full gate is a summary whose `partial` is false; a partial one is cited only for the
+items it ran.
 
 A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
 timing step whose report holds a case not `measured`, or a memory step one not

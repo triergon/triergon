@@ -511,6 +511,7 @@ run() {
             "$(grep DONE "$out/shard-$i/gate-host.log" 2>/dev/null | tail -1)"
     done | tee "$out/hosts.txt"
     say "outputs archived under $RUN_OBJECT/"
+    [ -z "$items" ] || say "a partial run, not the full gate: $items"
     return "$failed"
 }
 
