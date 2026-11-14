@@ -137,9 +137,9 @@ impl<'a> IndexCursor<'a> {
         }
     }
 
-    fn starts_before_sync(track: DemuxTrack<'_>) -> bool {
+    fn starts_before_sync(track: DemuxTrack<'_>, reordered_avc: bool) -> bool {
         track.fragments.is_empty()
-            && (track.table.has_avc_composition_offsets()
+            && ((reordered_avc && track.table.has_avc_composition_offsets())
                 || (track.edits.is_none() && track.table.unused_sync_entries() != 0))
     }
 
@@ -158,7 +158,7 @@ impl<'a> IndexCursor<'a> {
         Ok(Self::from_cursor(
             cursor,
             limits.max_entries,
-            Self::starts_before_sync(track),
+            Self::starts_before_sync(track, false),
             false,
         ))
     }
@@ -174,7 +174,8 @@ impl<'a> IndexCursor<'a> {
         Ok(Self::from_cursor(
             cursor,
             max_entries,
-            encoded_edit.is_some() || Self::starts_before_sync(track),
+            encoded_edit.is_some()
+                || Self::starts_before_sync(track, checked.reordered_avc_edits()),
             encoded_edit.is_some_and(crate::EncodedEditPlan::has_dependency_view),
         ))
     }

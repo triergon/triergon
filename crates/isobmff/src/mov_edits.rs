@@ -124,13 +124,24 @@ impl<'a> EditCursor<'a> {
         movie_base: TimeBase,
         limits: EditLimits,
     ) -> Result<Self> {
+        Self::with_reordered_avc(table, edits, media_base, movie_base, limits, false)
+    }
+
+    pub(crate) fn with_reordered_avc(
+        table: &'a SampleTable,
+        edits: &'a EditList,
+        media_base: TimeBase,
+        movie_base: TimeBase,
+        limits: EditLimits,
+        allow_reordered_avc: bool,
+    ) -> Result<Self> {
         if table.sample_count() == 0 || edits.is_empty() || table.sync_entry_count() == Some(0) {
             return Err(Error::Unsupported(
                 "native edited empty source/list/sync profile",
             ));
         }
         let zero = Time::new(0, 1)?;
-        let reordered = table.has_avc_composition_offsets();
+        let reordered = allow_reordered_avc && table.has_avc_composition_offsets();
         Ok(Self {
             table,
             edits,

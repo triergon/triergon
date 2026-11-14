@@ -313,9 +313,9 @@ rejects boxes extending past the source.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
   The recovery opener reads complete `elst` rows within the box extent.
-  `compat::mov::edits::EditCursor` can project repeated rate-one AVC edits from
-  nonnegative version-0 composition offsets. It uses source sync samples for
-  decode preroll and retains reordered packets needed at the end of an edit.
+  `PacketCursor::enable_reordered_avc_edits` projects repeated rate-one AVC
+  edits from nonnegative version-0 composition offsets. It uses source sync
+  samples for decode preroll and retains reordered packets at the end of an edit.
   A front-metadata cursor can project checked encoded edits for regular tracks
   within one finite media extent. The forward playback index checks the
   projected byte order before delivering any packet.

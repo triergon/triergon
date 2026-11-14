@@ -1147,6 +1147,13 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                     EncodedEditProfile,
                 )?
             };
+            if tracks
+                .as_slice()
+                .iter()
+                .any(|track| track.edits.is_some() && track.table.has_avc_composition_offsets())
+            {
+                cursor.enable_reordered_avc_edits()?;
+            }
             let result = self.deliver_rows(
                 model,
                 &mut cursor,
