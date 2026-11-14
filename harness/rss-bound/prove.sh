@@ -47,12 +47,22 @@ else
     measure_root() { sudo -n sh -c "$*"; }
 fi
 
-grep -q "\"module_source_sha256\": \"$(sha harness/rss-bound/triergon_rss_bound.c)\"" "$review" ||
-    { echo "review does not cover this module source" >&2; exit 1; }
-grep -q "\"kernel_release\": \"$release\"" "$review" ||
-    { echo "review does not cover kernel $release" >&2; exit 1; }
-grep -q '"status": "reviewed-conditional-upper-bound"' "$review" ||
-    { echo "review is not a reviewed upper bound" >&2; exit 1; }
+# The review's own fields, as preflight reads them: a prior source or kernel the
+# review names elsewhere does not count.
+python3 - "$review" "$(sha harness/rss-bound/triergon_rss_bound.c)" "$release" <<'EOF' || exit 1
+import json
+import sys
+
+review, source, release = sys.argv[1:]
+document = json.load(open(review))
+for key, wanted, covers in (
+    ("module_source_sha256", source, "this module source"),
+    ("kernel_release", release, "kernel " + release),
+    ("status", "reviewed-conditional-upper-bound", "a reviewed upper bound"),
+):
+    if document.get(key) != wanted:
+        sys.exit(f"review does not cover {covers}: {review}")
+EOF
 for binary in target/harness/allocations.so target/harness/memory-check; do
     [ -f "$binary" ] || { echo "$binary missing: run cargo xtask build-workers" >&2; exit 1; }
 done
