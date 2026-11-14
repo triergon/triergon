@@ -44,8 +44,7 @@
  * are read before the operation; libass opens the default font file itself.
  * The timed span runs from the configured renderer to the last frame's fold:
  * reading the script or running the stream, and rendering. The setup before
- * it, whose setters each empty the renderer's caches (ass_reconfigure,
- * ass_render_api.c:29-37), and the teardown after it, which frees them, are
+ * it, whose setters each empty the renderer's caches, and the teardown after it, which frees them, are
  * not timed.
  * `ass-render-dump` prints the same values as lines:
  *   frame TIME CHANGED IMAGES
@@ -120,11 +119,11 @@ static void assr_fold_row(uint64_t *digest, const uint8_t *bytes, size_t n) {
 #define ASSR_IMAGE_BOX 3
 
 /* Whether an image's own buffer (ASS_ImagePriv's) is the box add_background
- * draws behind a BorderStyle 4 event (ass_render.c:2759-2790): the only buffer
+ * draws behind a BorderStyle 4 event: the only buffer
  * ass_aligned_alloc aligns to one byte. An image without a buffer of its own
  * points into a cached composite, and the copy blend_vector_clip makes is
- * aligned to the engine's rows (ass_render.c:700-813), 16 bytes for the C
- * engine the reference sets. ass_aligned_alloc (ass_utils.c:59-74) puts a
+ * aligned to the engine's rows, 16 bytes for the C
+ * engine the reference sets. ass_aligned_alloc puts a
  * one-byte-aligned buffer one pointer past the block malloc returns, which
  * malloc aligns to two pointers, so it is never aligned to the rows. */
 static int assr_is_box(const void *buffer) { return buffer && ((uintptr_t)buffer & 15) != 0; }
