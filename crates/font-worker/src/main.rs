@@ -28,7 +28,8 @@ enum Operation {
     /// Face data and unscaled outlines.
     Faces,
     /// What libass obtains at a size with hinting off: size metrics, kerning, and
-    /// every glyph's unhinted outline and advance with its synthetic styles.
+    /// every glyph's unhinted outline and advance with its synthetic styles, each
+    /// outline with its orientation.
     Scaled(i32),
     /// The default-load (hinted) advance of every glyph at a size.
     Hinted(i32),
@@ -231,8 +232,10 @@ fn scaled(
                 oblique: !matches!(style, Style::Bold),
                 embolden: !matches!(style, Style::Oblique),
             };
+            // `synthesize` answers `false` where it refuses to embolden, as
+            // FreeType refuses an outline without an orientation.
             let applied = styled.copy_from(&outline).is_ok()
-                && sized.synthesize(&mut styled, synthesis).is_ok();
+                && matches!(sized.synthesize(&mut styled, synthesis), Ok(true));
             sink.record(Record::Styled {
                 style,
                 index: glyph.0,

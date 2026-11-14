@@ -1,0 +1,27 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs with borders, shadows and blur: \bord, \xbord
+; and \ybord, \shad, \xshad and \yshad, \be and \blur, an opaque box
+; (BorderStyle 3), and karaoke.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+Style: Box,Arimo,40,&H00FFFFFF,&H000000FF,&H00804000,&H80202020,0,0,-1,-1,100,100,0,0,3,4,2,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)\bord3\shad4\3c&H0000FF&\4c&H00FF00&}border and shadow
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,100)\xbord6\ybord1\xshad-3\yshad5}uneven
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,180)\bord2\be2}edge blur {\blur3}gaussian
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,260)\bord0\shad3}shadow only
+Dialogue: 0,0:00:00.00,0:00:01.00,Box,,0,0,0,,{\pos(20,340)}opaque box
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,440)\bord2\k50}ka{\kf50}ra{\ko50}oke

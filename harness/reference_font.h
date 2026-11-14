@@ -24,7 +24,9 @@
  *                kerning at the size of every pair the `kern` table lists
  *                (FT_KERNING_DEFAULT); and for every glyph the unhinted outline and
  *                advance libass draws (FT_LOAD_NO_HINTING), then that outline
- *                emboldened, slanted, and both (libass's order);
+ *                emboldened, slanted, and both (libass's order), each outline
+ *                after its orientation (FT_Outline_Get_Orientation), which sets
+ *                the direction libass runs a glyph's underline and strike-out in;
  *     advances   every glyph's default-load (FT_LOAD_DEFAULT) advance, which
  *                libass's HarfBuzz callbacks report.
  *     vertical   every glyph's vertical advances, which libass uses for the glyphs
@@ -171,6 +173,23 @@ static void font_outline(FontWork *w, const FT_Outline *o) {
     }
     w->packets++;
     w->bytes += (uint64_t)o->n_points;
+}
+
+/* The orientation FT_Outline_Get_Orientation finds: 0 TrueType (fill on the
+ * right), 1 PostScript (fill on the left), 2 none, as font-worker folds
+ * triergon_font::Orientation. */
+static void font_orientation(FontWork *w, const FT_Outline *o) {
+    static const char *const names[] = {"truetype", "postscript", "none"};
+    int orientation;
+    switch (FT_Outline_Get_Orientation((FT_Outline *)o)) {
+    case FT_ORIENTATION_TRUETYPE: orientation = 0; break;
+    case FT_ORIENTATION_POSTSCRIPT: orientation = 1; break;
+    default: orientation = 2; break;
+    }
+    if (w->dump)
+        fprintf(w->dump, "%s ", names[orientation]);
+    else
+        font_fold(w, (uint64_t)orientation);
 }
 
 /* Every charmap FreeType lists but the variation-sequence subtables of formats
@@ -489,6 +508,7 @@ static void font_styled(FontWork *w, int style, long g, const FT_Outline *o, int
             return;
         }
     }
+    font_orientation(w, o);
     font_outline(w, o);
 }
 
@@ -514,6 +534,7 @@ static void font_scaled(FT_Library library, FT_Face face, long height, FontWork 
             font_fold(w, (uint64_t)g);
             font_fold(w, font_signed(face->glyph->advance.x));
         }
+        font_orientation(w, o);
         font_outline(w, o);
         FT_Outline copy;
         if (FT_Outline_New(library, (FT_UInt)o->n_points, o->n_contours, &copy)) abort();
