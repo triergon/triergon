@@ -126,8 +126,8 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
 fn same_case(timed: &Value, measured: &Value) -> R<()> {
     let case = |row: &Value| -> R<Value> {
         let mut case = without(row, &["timing", "memory"])?;
-        // The reference can log process addresses. Keep both raw traces in
-        // their collections and compare the trace status, exit and stdout.
+        // The reference can log process addresses. Compare the diagnostic text
+        // outside those addresses and keep both raw traces in their collections.
         if let Some(trace) = case.get("reference_trace")
             && let Some(stderr) = trace.get("stderr")
         {
@@ -151,10 +151,10 @@ fn same_case(timed: &Value, measured: &Value) -> R<()> {
 fn reference_diagnostics(stderr: &str) -> String {
     let mut normalized = String::with_capacity(stderr.len());
     for line in stderr.split_inclusive('\n') {
-        if let Some((header, rest)) = line
-            .strip_prefix('[')
-            .and_then(|line| line.split_once(" @ 0x"))
-            && let Some((address, message)) = rest.split_once(']')
+        if let Some((prefix, message)) =
+            line.strip_prefix('[').and_then(|line| line.split_once(']'))
+            && let Some((header, address)) = prefix.rsplit_once(" @ 0x")
+            && !header.is_empty()
             && !address.is_empty()
             && address.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
@@ -1746,6 +1746,12 @@ mod tests {
         assert_eq!(
             reference_diagnostics("packet at 0x1234\n"),
             "packet at 0x1234\n"
+        );
+        let message = "[mov,mp4] invalid offset @ 0xaaaa]\n";
+        assert_eq!(reference_diagnostics(message), message);
+        assert_ne!(
+            reference_diagnostics(message),
+            reference_diagnostics("[mov,mp4] invalid offset @ 0xbbbb]\n")
         );
         change(
             &mut fixture.measured,
