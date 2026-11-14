@@ -37,6 +37,8 @@ pub struct Options {
     pub pairs: usize,
     pub seed: u64,
     pub only: Option<String>,
+    /// Part I of N (zero-based I): every Nth workload from the Ith.
+    pub part: Option<(usize, usize)>,
     /// Let a gate session stop at an early look (`--no-early-stop` clears it).
     pub early_stop: bool,
 }
@@ -193,9 +195,9 @@ pub fn run(options: &Options) -> Result<(), String> {
     write(&options.out.join("identity.json"), &identity)?;
     let mut summary = Vec::new();
     let mut unmeasured = Vec::new();
-    for w in &workloads {
+    for (index, w) in workloads.iter().enumerate() {
         let id = text(w, "id")?;
-        if only.as_ref().is_some_and(|o| !o.contains(&id)) {
+        if only.as_ref().is_some_and(|o| !o.contains(&id)) || !in_part(index, options.part) {
             continue;
         }
         let operation = text(w, "operation")?;
@@ -307,6 +309,12 @@ pub fn run(options: &Options) -> Result<(), String> {
     measured_all("memory", &unmeasured)
 }
 
+/// Whether the workload at `index` is in `part` (zero-based I of N): every Nth
+/// workload from the Ith; every workload without a part.
+pub fn in_part(index: usize, part: Option<(usize, usize)>) -> bool {
+    part.is_none_or(|(i, n)| index % n == i)
+}
+
 /// A collection measures every workload it selects, or it fails naming those it did
 /// not, after writing every record.
 pub fn measured_all(what: &str, unmeasured: &[String]) -> Result<(), String> {
@@ -336,6 +344,15 @@ mod tests {
     fn gates(value: &Value) -> (bool, bool, bool) {
         let flag = |k: &str| value.get(k).is_some_and(Value::truthy);
         (flag("heap_gate"), flag("rss_gate"), flag("memory_gate"))
+    }
+
+    #[test]
+    fn parts_take_every_nth_workload_and_together_take_each_once() {
+        let taken: Vec<Vec<usize>> = (0..3)
+            .map(|i| (0..8).filter(|&w| in_part(w, Some((i, 3)))).collect())
+            .collect();
+        assert_eq!(taken, vec![vec![0, 3, 6], vec![1, 4, 7], vec![2, 5]]);
+        assert!((0..8).all(|w| in_part(w, None)));
     }
 
     #[test]

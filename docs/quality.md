@@ -252,7 +252,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   parity, timing and memory runs), `external-vector`, `trace-identities` and `fuzz
   --contract` (unless `--timeout-seconds` is given) honour it, and `cargo xtask
   check-design` fails on any other value. `raster-sweep` sets 120 for its heaviest
-  cases on 32-bit ARMv7.
+  cases on 32-bit ARMv7. `parity_timeout_seconds`, within the same bounds, limits the
+  worker runs of `report`'s parity comparison alone: a parity run is not timed and
+  both folds must still be equal, so a reference slow on one target can have more time
+  there while timing and memory keep `timeout_seconds`. The font, shaping and ASS
+  contracts set 120: on 32-bit ARMv7 FreeType folds the NotoSansCJK collection's
+  outlines at 16384 in up to 29.78 s, and 120 is four times that, rounded up.
   A contract with `"pinned_per_target": true` pins each case per target triple:
   `pins.json` maps each case to a fold for each of the contract's
   `required_targets`, except the targets `unpinned_targets` lists for a case
@@ -605,12 +610,27 @@ may override that count for diagnostic comparisons.
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
 measurements, the packet-framing and progressive TS suites, the codecs' parity, a codec
-workload list's timing and memory, a capture case, the checked or the release tests, and
-the font, shaping, rasterising and ASS comparisons. Every registered feature is either
-one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated (an
-on-demand or diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on
-any other. `cargo xtask gate plan --shards N` splits the items into N shards of about
-equal planning weight, each for its own host.
+workload list's timing, a part of its memory (`codecs memory --part I/N`, every Nth
+workload), a capture case, the checked or the release tests, and the font, shaping,
+rasterising and ASS comparisons. Every registered feature is either one of them or
+named, in `xtask/src/gate.rs`, with the reason it is not gated (an on-demand or
+diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
+target leaves out an item that cannot measure there, with the reason `gate plan
+--target TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback
+worker runs its numeric modes only on native Linux AArch64. `cargo xtask gate plan
+--shards N` splits the items into N shards of about equal planning weight, each for
+its own host; the weights are the minutes each item took on a c6g.4xlarge, the more of
+the two targets. `--items NAME,...`, given to every gate command of a run, narrows the
+plan to those items, for a run of part of the gate; the shards record it, and `gate
+summary` checks them against the same narrowed plan.
+
+A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
+timing step whose report holds a case not `measured`, or a memory step one not
+`qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
+they did not measure, after writing every record. So no feature measures nothing in
+silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
+run limit per target triple (30 s when absent), and every memory observation records how
+long its run took (`process_elapsed_ns`).
 
 `cargo xtask gate check --shards N` runs on any machine in a second, before a host
 exists: it resolves the preflight of every shard as the shard resolves it, and fails,

@@ -24,15 +24,16 @@ use crate::sha256;
 
 type R<T> = Result<T, String>;
 
-pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N]
-       cargo xtask gate check [--shards N]
+pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N] [--target TARGET]
+       cargo xtask gate check [--shards N] [--target TARGET]
        cargo xtask gate preflight [--shard I/N] [--review FILE] [--kernel]
        cargo xtask gate run --stage timing|memory --output DIR [--shard I/N] [--full]
        cargo xtask gate summary --output FILE DIR...
        cargo xtask gate test --profile checked|release --output DIR [--full]
 
   plan       print the gate's items and their planning weights (minutes on a
-             32-bit ARMv7 c6g.4xlarge), split into N shards (default 1)
+             32-bit ARMv7 c6g.4xlarge), split into N shards (default 1), for
+             TARGET (default: every item), and the items a target leaves out
   check      on any machine, before a host is launched: every file the preflight
              of each of N shards reads, resolved as the shard resolves it, is
              committed, generated from committed sources by a host's prepare,
@@ -109,23 +110,23 @@ pub struct Item {
 
 /// The features the gate measures through `report`, with their corpus
 /// directory and planning weight: the minutes their timing, memory and grade took
-/// with early stop on a 32-bit ARMv7 c6g.4xlarge.
+/// with early stop on a c6g.4xlarge, the more of 32-bit ARMv7 and Linux AArch64.
 const FEATURES: [(&str, Option<&str>, u32); 26] = [
     ("mp4-forward", None, 2),
-    ("mp4-range", None, 3),
-    ("mpegts-access-units", None, 3),
-    ("subtitle-pgs-capsules", None, 5),
+    ("mp4-range", None, 4),
+    ("mpegts-access-units", None, 6),
+    ("subtitle-pgs-capsules", None, 9),
     ("ts-program", None, 2),
     ("matroska-audio-clocks", None, 1),
     ("raw-annex-b", None, 1),
     ("mpegts-pes", None, 3),
-    ("hls-segments", Some("harness/fixtures/hls"), 4),
+    ("hls-segments", Some("harness/fixtures/hls"), 5),
     (
         "matroska-startup-seek",
         Some(".research/startup-seek-fixtures"),
-        2,
+        3,
     ),
-    ("matroska-colour", Some(".research/colour-fixtures"), 2),
+    ("matroska-colour", Some(".research/colour-fixtures"), 3),
     ("matroska-cues-preroll", Some(".research/seek-fixtures"), 1),
     ("matroska-demux", Some(".research/fixtures"), 1),
     (
@@ -139,15 +140,15 @@ const FEATURES: [(&str, Option<&str>, u32); 26] = [
         5,
     ),
     ("matroska-zlib", Some(".research/zlib-fixtures"), 1),
-    ("ass-render", Some(""), 20),
+    ("ass-render", Some(""), 22),
     ("ass-render-host", Some(""), 1),
     ("subtitle-text", Some(""), 16),
-    ("subtitle-text-host", Some(""), 1),
-    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 17),
+    ("subtitle-text-host", Some(""), 2),
+    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 18),
     ("subtitle-dvb", Some(SUBTITLE_CORPUS), 13),
     ("subtitle-dvd", Some(SUBTITLE_CORPUS), 9),
     ("subtitle-dvd-host", Some(SUBTITLE_CORPUS), 1),
-    ("subtitle-cc", Some(SUBTITLE_CORPUS), 9),
+    ("subtitle-cc", Some(SUBTITLE_CORPUS), 10),
     ("subtitle-teletext", Some(SUBTITLE_CORPUS), 5),
 ];
 const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
@@ -240,6 +241,35 @@ fn coverage_problems(root: &Path) -> R<Vec<String>> {
     }
     Ok(problems)
 }
+/// Items a target leaves out of its plan, with the reason `gate plan` gives: what
+/// they measure cannot run there, so a run would only record nothing measured.
+const NOT_ON_TARGET: [(&str, &str, &str); 1] = [(
+    "progressive",
+    "thumbv7neon-unknown-linux-gnueabihf",
+    "the playback worker's progressive numeric modes run only on native Linux AArch64",
+)];
+
+/// Each capture case's planning weight, as [`FEATURES`] gives the features'; a case
+/// not listed weighs [`CAPTURE_WEIGHT`].
+const CAPTURE_WEIGHTS: [(&str, u32); 15] = [
+    ("c01-ui-static-960", 10),
+    ("c02-ui-scroll-960", 10),
+    ("c03-ui-transition-960", 10),
+    ("c04-motion-960", 13),
+    ("c05-noise-960", 31),
+    ("c06-ui-scroll-960-bottomup", 10),
+    ("c07-ui-static-480-bottomup", 3),
+    ("c08-ui-scroll-480-bottomup", 3),
+    ("c09-motion-480-bottomup", 4),
+    ("c10-ui-transition-480-topdown", 3),
+    ("c11-motion-960-rate1", 13),
+    ("c12-motion-960-1m", 14),
+    ("c13-motion-960-6m", 14),
+    ("c14-motion-960-rate255", 15),
+    ("c15-noise-480-bottomup", 8),
+];
+const CAPTURE_WEIGHT: u32 = 10;
+
 /// How many parts the ISO BMFF suite's measurements are split into.
 const ISOBMFF_PARTS: usize = 3;
 /// The capture cases, which the capture items split between them.
@@ -451,7 +481,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     ));
     items.push(Item {
         name: "framing".into(),
-        weight: 3,
+        weight: 4,
         steps,
         preflight: owned(&[
             "--feature",
@@ -473,7 +503,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     };
     items.push(Item {
         name: "progressive".into(),
-        weight: 3,
+        weight: 2,
         steps: collections(
             "progressive",
             progressive("benchmark"),
@@ -555,15 +585,25 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         steps: codecs,
         preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
     });
-    for (name, workloads, weight) in [
-        ("codec-workloads", "harness/codecs/workloads.json", 19),
+    // Each list's timing is one item and its memory is in parts, each part every
+    // Nth workload: a list's memory took up to 108 minutes in one piece.
+    for (name, workloads, timing_weight, parts, part_weight) in [
+        (
+            "codec-workloads",
+            "harness/codecs/workloads.json",
+            20,
+            5,
+            22,
+        ),
         (
             "codec-file-workloads",
             "harness/codecs/file-workloads.json",
-            10,
+            4,
+            3,
+            22,
         ),
     ] {
-        let codecs = |mode: &str| {
+        let codecs = |mode: &str, part: Option<usize>| {
             let mut args = xtask(&[
                 "codecs",
                 mode,
@@ -585,17 +625,31 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                     "--label",
                     target,
                 ]));
+            } else if let Some(part) = part {
+                args.push(format!("{out}/memory/{name}-{part}"));
+                args.extend(["--part".to_owned(), format!("{part}/{parts}")]);
             } else {
                 args.push(format!("{out}/memory/{name}"));
             }
             with_full(args)
         };
+        let [timing, _] = collections(name, codecs("time", None), Vec::new());
         items.push(Item {
             name: name.into(),
-            weight,
-            steps: collections(name, codecs("time"), codecs("memory")).into(),
+            weight: timing_weight,
+            steps: vec![timing],
             preflight: owned(&["--codecs", workloads]),
         });
+        for part in 1..=parts {
+            let part_name = format!("{name}-{part}");
+            let [_, memory] = collections(&part_name, Vec::new(), codecs("memory", Some(part)));
+            items.push(Item {
+                name: part_name,
+                weight: part_weight,
+                steps: vec![memory],
+                preflight: owned(&["--codecs", workloads]),
+            });
+        }
     }
 
     // Each capture case on its own: one is up to a quarter of an hour on ARMv7.
@@ -630,7 +684,10 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         qualify.environment.push(("TRIERGON_PYTHON", "python3"));
         items.push(Item {
             name,
-            weight: 10,
+            weight: CAPTURE_WEIGHTS
+                .iter()
+                .find(|(case, _)| case == id)
+                .map_or(CAPTURE_WEIGHT, |(_, weight)| *weight),
             steps: vec![qualify],
             preflight: owned(&["--capture", CAPTURE_CASES]),
         });
@@ -714,6 +771,11 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         ],
         preflight: Vec::new(),
     });
+    items.retain(|item| {
+        !NOT_ON_TARGET
+            .iter()
+            .any(|(name, on, _)| item.name == *name && target == *on)
+    });
     items
 }
 
@@ -763,6 +825,8 @@ struct Options {
     kernel: bool,
     full: bool,
     profile: Option<String>,
+    target: Option<String>,
+    selection: Option<Vec<String>>,
     directories: Vec<PathBuf>,
 }
 
@@ -777,6 +841,8 @@ impl Options {
             kernel: false,
             full: false,
             profile: None,
+            target: None,
+            selection: None,
             directories: Vec::new(),
         };
         let mut rest = args.iter();
@@ -807,6 +873,10 @@ impl Options {
                 "--kernel" => options.kernel = true,
                 "--full" => options.full = true,
                 "--profile" => options.profile = Some(value()?),
+                "--target" => options.target = Some(value()?),
+                "--items" => {
+                    options.selection = Some(value()?.split(',').map(str::to_owned).collect());
+                }
                 flag if flag.starts_with("--") => return Err(USAGE.into()),
                 directory => options.directories.push(PathBuf::from(directory)),
             }
@@ -816,11 +886,40 @@ impl Options {
 }
 
 /// The items of shard `index` of `count`, writing under `out`.
-fn shard_items(root: &Path, out: &str, full: bool, (index, count): (usize, usize)) -> R<Vec<Item>> {
+fn shard_items(
+    root: &Path,
+    out: &str,
+    full: bool,
+    (index, count): (usize, usize),
+    selection: Option<&[String]>,
+) -> R<Vec<Item>> {
     let target = crate::harness::report::gate_target()?;
     let release = crate::harness::gate_build::release_dir()?;
-    let all = items(out, full, &target, &release, &capture_cases(root)?);
+    let all = select(
+        items(out, full, &target, &release, &capture_cases(root)?),
+        selection,
+    )?;
     Ok(shards(all, count).swap_remove(index))
+}
+
+/// The plan's items named in `selection` (all without one), in plan order: a run of
+/// part of the gate. A name the plan does not hold is an error.
+fn select(items: Vec<Item>, selection: Option<&[String]>) -> R<Vec<Item>> {
+    let Some(names) = selection else {
+        return Ok(items);
+    };
+    if let Some(unknown) = names
+        .iter()
+        .find(|name| !items.iter().any(|item| &item.name == *name))
+    {
+        return Err(format!(
+            "--items {unknown}: not an item of this target's plan"
+        ));
+    }
+    Ok(items
+        .into_iter()
+        .filter(|item| names.contains(&item.name))
+        .collect())
 }
 
 /// Where a host gets an input from.
@@ -1026,14 +1125,17 @@ fn kept_files(root: &Path) -> R<BTreeMap<String, String>> {
 }
 
 /// `gate check`: every shard's preflight reads only what a prepared host has.
-fn check(root: &Path, count: usize) -> R<i32> {
-    let all = items(
-        "OUT",
-        false,
-        "TARGET",
-        "target/release",
-        &capture_cases(root)?,
-    );
+fn check(root: &Path, count: usize, target: &str, selection: Option<&[String]>) -> R<i32> {
+    let all = select(
+        items(
+            "OUT",
+            false,
+            target,
+            "target/release",
+            &capture_cases(root)?,
+        ),
+        selection,
+    )?;
     let mut tree = Tree::load(root)?;
     let mut failed = 0;
     for (index, shard) in shards(all, count).iter().enumerate() {
@@ -1082,13 +1184,17 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let options = Options::parse(rest)?;
     match command.as_str() {
         "plan" => {
-            let all = items(
-                "OUT",
-                false,
-                "TARGET",
-                "target/release",
-                &capture_cases(root)?,
-            );
+            let target = options.target.as_deref().unwrap_or("TARGET");
+            let all = select(
+                items(
+                    "OUT",
+                    false,
+                    target,
+                    "target/release",
+                    &capture_cases(root)?,
+                ),
+                options.selection.as_deref(),
+            )?;
             for (i, shard) in shards(all, options.shards).iter().enumerate() {
                 let weight: u32 = shard.iter().map(|item| item.weight).sum();
                 let names: Vec<&str> = shard.iter().map(|item| item.name.as_str()).collect();
@@ -1098,6 +1204,9 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                     options.shards,
                     names.join(" ")
                 );
+            }
+            for (item, on, reason) in NOT_ON_TARGET {
+                println!("{item}: not run on {on}, {reason}");
             }
             for (id, coverage) in COVERED {
                 match coverage {
@@ -1111,10 +1220,21 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             }
             Ok(i32::from(!problems.is_empty()))
         }
-        "check" => check(root, options.shards),
+        "check" => check(
+            root,
+            options.shards,
+            options.target.as_deref().unwrap_or("TARGET"),
+            options.selection.as_deref(),
+        ),
         "preflight" => {
             let mut args = vec!["preflight".to_owned()];
-            for item in shard_items(root, "OUT", false, options.shard)? {
+            for item in shard_items(
+                root,
+                "OUT",
+                false,
+                options.shard,
+                options.selection.as_deref(),
+            )? {
                 args.extend(item.preflight);
             }
             if let Some(review) = options.review {
@@ -1134,7 +1254,14 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                 .stage
                 .ok_or("gate run needs --stage timing|memory")?;
             let output = options.output.ok_or("gate run needs --output DIR")?;
-            run(root, &output, stage, options.shard, options.full)
+            run(
+                root,
+                &output,
+                stage,
+                options.shard,
+                options.full,
+                options.selection.as_deref(),
+            )
         }
         "summary" => {
             let output = options.output.ok_or("gate summary needs --output FILE")?;
@@ -1187,13 +1314,20 @@ fn append(path: &Path, line: &str) -> R<()> {
 }
 
 /// Runs the steps of one stage of a shard; returns 1 if any failed.
-fn run(root: &Path, output: &Path, stage: Stage, shard: (usize, usize), full: bool) -> R<i32> {
+fn run(
+    root: &Path,
+    output: &Path,
+    stage: Stage,
+    shard: (usize, usize),
+    full: bool,
+    selection: Option<&[String]>,
+) -> R<i32> {
     fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
     let output = output
         .canonicalize()
         .map_err(|e| format!("{}: {e}", output.display()))?;
     let out = output.display().to_string();
-    let items = shard_items(root, &out, full, shard)?;
+    let items = shard_items(root, &out, full, shard, selection)?;
     // A stage's records describe this run of it alone: the timing stage starts a
     // run afresh, and the memory stage replaces only its own steps' records.
     let records = output.join("steps");
@@ -1221,6 +1355,10 @@ fn run(root: &Path, output: &Path, stage: Stage, shard: (usize, usize), full: bo
             (
                 "items",
                 Value::strings(items.iter().map(|item| item.name.clone())),
+            ),
+            (
+                "selection",
+                selection.map_or(Value::Null, |names| Value::strings(names.iter().cloned())),
             ),
         ]),
     )?;
@@ -1368,9 +1506,17 @@ fn run_step(
         .status()
         .map_or(127, |s| s.code().unwrap_or(1));
     let seconds = clock.elapsed().as_secs_f64();
+    // A measurement that exits 0 with cases it did not measure fails here, so no
+    // feature measures nothing in silence.
+    let unmeasured = if code == 0 {
+        unmeasured_cases(step)
+    } else {
+        Vec::new()
+    };
+    let code = if unmeasured.is_empty() { code } else { 1 };
     append(log, &format!("{} EXIT={code}", step.name))?;
     // A grade's verdict lines, which tell listed open cases from other failures.
-    let outcome: Vec<String> = if step.placement == Placement::Grade {
+    let mut outcome: Vec<String> = if step.placement == Placement::Grade {
         fs::read_to_string(logs.join(format!("{}.log", step.name)))
             .unwrap_or_default()
             .lines()
@@ -1382,6 +1528,13 @@ fn run_step(
     } else {
         Vec::new()
     };
+    if !unmeasured.is_empty() {
+        outcome.push(format!(
+            "{} of its cases not measured: {}",
+            unmeasured.len(),
+            unmeasured.join(", ")
+        ));
+    }
     let mut shown = step.command.clone();
     if let Some(cpus) = cpus {
         shown.splice(0..0, owned(&["taskset", "-c", cpus]));
@@ -1404,6 +1557,53 @@ fn run_step(
         ]),
     )?;
     Ok(code)
+}
+
+/// The cases of a timing or memory step's report (`--output DIR`/report.json) that
+/// it did not measure: a timing that is not `measured`, a memory collection that is
+/// not `qualified`. Steps without such a report check their own collections.
+fn unmeasured_cases(step: &Step) -> Vec<String> {
+    let (key, measured) = match step.placement {
+        Placement::Timed => ("timing", "measured"),
+        Placement::Memory => ("memory", "qualified"),
+        _ => return Vec::new(),
+    };
+    let Some(output) = step
+        .command
+        .windows(2)
+        .find(|pair| pair[0] == "--output")
+        .map(|pair| PathBuf::from(&pair[1]))
+    else {
+        return Vec::new();
+    };
+    let Ok(report) = crate::checks::read_json(&output.join("report.json")) else {
+        return Vec::new();
+    };
+    unmeasured_in(&report, key, measured)
+}
+
+/// The ids of `report`'s cases whose `key` collection has a status other than
+/// `measured`.
+fn unmeasured_in(report: &Value, key: &str, measured: &str) -> Vec<String> {
+    report
+        .get("cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter(|case| {
+            case.get(key)
+                .filter(|collection| matches!(collection, Value::Object(_)))
+                .is_some_and(|collection| {
+                    collection.get("status").and_then(Value::as_str) != Some(measured)
+                })
+        })
+        .map(|case| {
+            case.get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("case")
+                .to_owned()
+        })
+        .collect()
 }
 
 fn git(root: &Path, args: &[&str]) -> R<String> {
@@ -1591,7 +1791,7 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
     if indices != expected {
         problems.push(format!("shards {indices:?} of {count:?}: each shard once"));
     }
-    for key in ["count", "revision", "changes", "target"] {
+    for key in ["count", "revision", "changes", "target", "selection"] {
         let values: Vec<Option<Value>> = shards.iter().map(|s| field(s, key)).collect();
         if values.windows(2).any(|w| w[0] != w[1]) {
             problems.push(format!("the shards differ in {key}"));
@@ -1618,19 +1818,38 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect();
     let capture = capture_cases(root)?;
-    let planned = items("OUT", false, "TARGET", "target/release", &capture);
+    // The plan the shards ran: their target's, narrowed to their selection.
+    let target = shards
+        .first()
+        .and_then(|shard| field(shard, "target"))
+        .and_then(|target| target.as_str().map(str::to_owned))
+        .unwrap_or_else(|| "TARGET".into());
+    let selection: Option<Vec<String>> = shards
+        .first()
+        .and_then(|shard| field(shard, "selection"))
+        .and_then(|names| names.as_array().map(<[Value]>::to_vec))
+        .map(|names| {
+            names
+                .iter()
+                .filter_map(|n| n.as_str().map(str::to_owned))
+                .collect()
+        });
+    let plan_of = || {
+        select(
+            items("OUT", false, &target, "target/release", &capture),
+            selection.as_deref(),
+        )
+    };
+    let planned = plan_of()?;
     // Each shard ran the items the plan gives it.
     let count = count.unwrap_or(0.0) as usize;
     if count > 0 {
         let names =
             |items: Vec<Item>| -> Vec<String> { items.into_iter().map(|i| i.name).collect() };
-        let plan: Vec<Vec<String>> = self::shards(
-            items("OUT", false, "TARGET", "target/release", &capture),
-            count,
-        )
-        .into_iter()
-        .map(names)
-        .collect();
+        let plan: Vec<Vec<String>> = self::shards(plan_of()?, count)
+            .into_iter()
+            .map(names)
+            .collect();
         for shard in &shards {
             let index = field(shard, "index")
                 .and_then(|i| i.as_f64())
@@ -1755,7 +1974,10 @@ mod tests {
         for item in &plan {
             let timed = item.steps.iter().any(|s| s.placement == Placement::Timed);
             let memory = item.steps.iter().any(|s| s.placement == Placement::Memory);
-            assert!(!memory || timed, "{}", item.name);
+            // A collection is timed in its item, but for a codec list's memory parts,
+            // whose list is timed in an item of its own.
+            let part = item.name.starts_with("codec-") && item.steps.len() == 1;
+            assert!(!memory || timed || part, "{}", item.name);
             for step in &item.steps {
                 assert_eq!(
                     step.placement == Placement::Memory,
@@ -1769,7 +1991,13 @@ mod tests {
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
         assert!(names.contains(&"capture-c04"));
-        assert!(names.contains(&"memory-codec-file-workloads") && names.contains(&"test-release"));
+        assert!(
+            names.contains(&"memory-codec-file-workloads-3") && names.contains(&"test-release")
+        );
+        assert!(
+            names.contains(&"memory-codec-workloads-5")
+                && names.contains(&"benchmark-codec-workloads")
+        );
     }
 
     #[test]
@@ -1902,12 +2130,20 @@ mod tests {
         }
     }
 
+    /// An item's preflight in the AArch64 plan, which leaves no item out.
     fn preflight_of(name: &str) -> Vec<String> {
-        plan()
-            .into_iter()
-            .find(|item| item.name == name)
-            .unwrap()
-            .preflight
+        let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
+        items(
+            "/o",
+            false,
+            "aarch64-unknown-linux-gnu",
+            "target/release",
+            &capture,
+        )
+        .into_iter()
+        .find(|item| item.name == name)
+        .unwrap()
+        .preflight
     }
 
     #[test]
@@ -1943,6 +2179,55 @@ mod tests {
         let (_, problems) = tree.problems(&args);
         assert_eq!(problems.len(), 1, "{problems:?}");
         assert!(problems[0].starts_with(&format!("{listed}: pinned as")));
+    }
+
+    #[test]
+    fn a_measurement_with_an_unmeasured_case_names_it() {
+        let report = crate::json::parse(
+            r#"{"cases": [
+                {"id": "a", "timing": {"status": "measured"}, "memory": {"status": "qualified"}},
+                {"id": "b", "timing": {"status": "warmup-failed"}, "memory": {"status": "invalid-memory-work"}},
+                {"id": "c", "timing": null}
+            ]}"#,
+        )
+        .unwrap();
+        assert_eq!(unmeasured_in(&report, "timing", "measured"), vec!["b"]);
+        assert_eq!(unmeasured_in(&report, "memory", "qualified"), vec!["b"]);
+        let all =
+            crate::json::parse(r#"{"cases": [{"id": "a", "timing": {"status": "measured"}}]}"#)
+                .unwrap();
+        assert!(unmeasured_in(&all, "timing", "measured").is_empty());
+    }
+
+    #[test]
+    fn armv7_leaves_progressive_out_of_its_plan_and_aarch64_keeps_it() {
+        let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
+        let names = |target: &str| -> Vec<String> {
+            items("/o", false, target, "target/release", &capture)
+                .into_iter()
+                .map(|item| item.name)
+                .collect()
+        };
+        assert!(!names("thumbv7neon-unknown-linux-gnueabihf").contains(&"progressive".to_owned()));
+        assert!(names("aarch64-unknown-linux-gnu").contains(&"progressive".to_owned()));
+    }
+
+    #[test]
+    fn a_selection_narrows_the_plan_and_refuses_names_it_lacks() {
+        let names = |selection: &[&str]| {
+            let selection: Vec<String> = selection.iter().map(|&s| s.to_owned()).collect();
+            select(plan(), Some(&selection))
+                .map(|items| items.into_iter().map(|i| i.name).collect::<Vec<_>>())
+        };
+        assert_eq!(
+            names(&["codec-workloads-2", "font-shape-raster-ass"]),
+            Ok(vec![
+                "codec-workloads-2".to_owned(),
+                "font-shape-raster-ass".to_owned()
+            ])
+        );
+        assert!(names(&["progressive"]).is_err());
+        assert_eq!(select(plan(), None).unwrap().len(), plan().len());
     }
 
     #[test]

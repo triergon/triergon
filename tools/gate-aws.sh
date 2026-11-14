@@ -11,7 +11,7 @@
 #       replacing the earlier ones and their snapshots. INPUT is a media inputs
 #       archive (.tar.gz, repository-relative paths): a local file or s3:KEY in
 #       the evidence archive
-#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full]
+#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full] [--items NAME,...]
 #       the full gate of REVISION on SHARDS hosts from the target's image, in
 #       parallel: each takes the references of REVISION from its image or the
 #       archive, gets ready, and runs its shard (tools/gate-host.sh); the
@@ -19,9 +19,10 @@
 #       and records copied to OUT, and joined by `cargo xtask gate summary`
 #       into OUT/summary.json. Each host is terminated as soon as its shard's
 #       outputs are archived and checked. It launches nothing unless this
-#       checkout is REVISION, unchanged, and `cargo xtask gate check --shards
-#       SHARDS` passes in it. The RSS module review is the one REVISION commits
-#       for its module source and the image's kernel
+#       checkout is REVISION, unchanged, and `cargo xtask gate check` passes in it
+#       for SHARDS shards of the target. The RSS module review is the one REVISION commits
+#       for its module source and the image's kernel. --items runs those items of
+#       the plan alone
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
 # start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to;
@@ -393,7 +394,17 @@ summarise() {
 }
 
 run() {
-    local target=$1 count=$2 revision=$3 out=$4 full=${5:-}
+    local target=$1 count=$2 revision=$3 out=$4 full="" items=""
+    shift 4
+    while [ $# -gt 0 ]; do
+        case $1 in
+        --full) full=--full ;;
+        --items) items=$2; shift ;;
+        *) echo "unknown option $1" >&2; return 2 ;;
+        esac
+        shift
+    done
+    [ -z "$items" ] || ENVIRONMENT+=("ITEMS=$items")
     local name="triergon-gate-$target" ami stamp checkout
     # Before any host: every input each shard's preflight reads is one a prepared
     # host has. The check reads this checkout, so it must be REVISION, unchanged.
@@ -403,7 +414,13 @@ run() {
         echo "check out $revision here, unchanged: the gate check reads this checkout" >&2
         return 2
     fi
-    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask gate check --shards "$count") ||
+    local triple
+    case $target in
+    aarch64) triple=aarch64-unknown-linux-gnu ;;
+    armv7) triple=thumbv7neon-unknown-linux-gnueabihf ;;
+    *) echo "unknown target $target" >&2; return 2 ;;
+    esac
+    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask gate check --shards "$count" --target "$triple" ${items:+--items "$items"}) ||
         { echo "the gate check fails: no host launched" >&2; return 1; }
     stamp=$(date -u +%Y%m%d-%H%M%S)
     ami=$(aws ec2 describe-images --owners self \
