@@ -136,6 +136,8 @@ prove() { # OUT: build, load and prove the module, leaving it loaded
 ready() {
     local shard=$1 review=$2
     prepare
+    # The grades run from a release build of xtask; build it before anything is timed.
+    step xtask-release inside "cargo build --release --locked -p xtask"
     step preflight inside "cargo xtask gate preflight --shard $shard --review $review"
     step prove-scratch prove "$review" .research/rss-bound-scratch
     sudo rmmod triergon_rss_bound
