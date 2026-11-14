@@ -21,25 +21,54 @@
 #       for its module source and the image's kernel
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
-# start in; TRIERGON_SSH_CIDR, the only address range SSH is open to;
+# start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to;
 # TRIERGON_EVIDENCE_ARCHIVE, the s3:// evidence archive; optionally
-# TRIERGON_BASE_IMAGE (default: the current Ubuntu 24.04 arm64 image),
-# TRIERGON_INSTANCE_TYPE (default c6g.4xlarge, Graviton2, which runs 32-bit user
-# spaces) and TRIERGON_VOLUME_GB (default 200). Every resource is tagged
-# Project=triergon; hosts terminate when they shut down and shut down after 72
-# hours whatever happens. Each command removes its hosts, security group and key
-# pair when it ends.
+# TRIERGON_BASE_IMAGE (default: the current Ubuntu 24.04 arm64 image) and
+# TRIERGON_VOLUME_GB (default 200). Hosts are c6g.4xlarge: Graviton2, which runs
+# 32-bit user spaces, with the 32 GiB kernel-bound memory is qualified on. Every
+# resource is tagged Project=triergon; hosts terminate when they shut down, and a
+# timer on disk shuts each down 72 hours after it boots, whatever happens. Each
+# command removes its hosts, security group and key pair when it ends, and exits
+# non-zero when a shard did not finish or the summary fails.
 set -euo pipefail
 
 : "${AWS_PROFILE:?}" "${AWS_REGION:?}" "${TRIERGON_SUBNET:?}" "${TRIERGON_SSH_CIDR:?}"
 : "${TRIERGON_EVIDENCE_ARCHIVE:?}"
-TYPE=${TRIERGON_INSTANCE_TYPE:-c6g.4xlarge}
+case $TRIERGON_SSH_CIDR in
+*/32) ;;
+*) echo "TRIERGON_SSH_CIDR must be one address (/32): $TRIERGON_SSH_CIDR" >&2; exit 2 ;;
+esac
+TYPE=c6g.4xlarge
 VOLUME=${TRIERGON_VOLUME_GB:-200}
 HERE=$(cd "$(dirname "$0")" && pwd)
 ARCHIVE=${TRIERGON_EVIDENCE_ARCHIVE%/}
 BUCKET=${ARCHIVE#s3://}; BUCKET=${BUCKET%%/*}
 PREFIX=${ARCHIVE#s3://"$BUCKET"}; PREFIX=${PREFIX#/}; PREFIX=${PREFIX:+$PREFIX/}
 USERLAND=evidence/armv7-userland/f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533.tar.gz
+# First-boot user data: a timer, kept on disk and so in an image made from the host,
+# that powers the host off (and so terminates it) 72 hours after each boot.
+EXPIRY='#!/bin/sh
+cat > /etc/systemd/system/triergon-expire.service <<EOF
+[Unit]
+Description=Power off a gate host
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl poweroff
+EOF
+cat > /etc/systemd/system/triergon-expire.timer <<EOF
+[Unit]
+Description=Power off a gate host 72 hours after it boots
+[Timer]
+OnBootSec=72h
+[Install]
+WantedBy=timers.target
+EOF
+systemctl daemon-reload
+systemctl enable --now triergon-expire.timer
+'
+# Seconds between polls of a host; a run polls rarely, and on CPU 0, so as not to
+# disturb what it times on CPU 1.
+POLL=60
 STATE=
 ARCHIVE_RUN=
 NAME=
@@ -72,14 +101,22 @@ session() {
 }
 
 teardown() {
+    local removed=1
     if [ ${#INSTANCES[@]} -gt 0 ]; then
-        aws ec2 terminate-instances --instance-ids "${INSTANCES[@]}" >/dev/null || true
-        aws ec2 wait instance-terminated --instance-ids "${INSTANCES[@]}" || true
-        say "terminated ${INSTANCES[*]}"
+        if aws ec2 terminate-instances --instance-ids "${INSTANCES[@]}" >/dev/null &&
+            aws ec2 wait instance-terminated --instance-ids "${INSTANCES[@]}"; then
+            say "terminated ${INSTANCES[*]}"
+        else
+            removed=0
+        fi
     fi
-    [ -z "$SG" ] || aws ec2 delete-security-group --group-id "$SG" || true
-    [ -z "$NAME" ] || aws ec2 delete-key-pair --key-name "$NAME" || true
-    [ -z "$STATE" ] || rm -rf "$STATE"
+    [ -z "$SG" ] || aws ec2 delete-security-group --group-id "$SG" || removed=0
+    [ -z "$NAME" ] || aws ec2 delete-key-pair --key-name "$NAME" || removed=0
+    if [ "$removed" = 1 ]; then
+        [ -z "$STATE" ] || rm -rf "$STATE"
+    else
+        say "could not remove ${INSTANCES[*]} $SG $NAME; their key and addresses are in $STATE"
+    fi
 }
 
 # COUNT hosts from IMAGE; sets INSTANCES and writes STATE/ip-I.
@@ -90,7 +127,7 @@ launch() {
         --subnet-id "$TRIERGON_SUBNET" --security-group-ids "$SG" --key-name "$NAME" \
         --associate-public-ip-address --instance-initiated-shutdown-behavior terminate \
         --block-device-mappings "DeviceName=/dev/sda1,Ebs={VolumeSize=$VOLUME,VolumeType=gp3,DeleteOnTermination=true}" \
-        --user-data "$(printf '#!/bin/sh\nshutdown -h +4320\n')" \
+        --user-data "$EXPIRY" \
         --tag-specifications "$(tags instance "$NAME")" "$(tags volume "$NAME")" \
         --query 'Instances[].InstanceId' --output text)
     read -r -a INSTANCES <<< "$ids"
@@ -128,8 +165,8 @@ detached() {
     local i=$1 marker=$2; shift 2
     on "$i" "setsid nohup env $(printf '%q ' "${ENVIRONMENT[@]}") bash ~/gate-host.sh $* > ~/gate-host.out 2>&1 < /dev/null &"
     local failures=0 state
-    while sleep 60; do
-        if state=$(on "$i" "tail -1 ~/gate-host.log; pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
+    while sleep "$POLL"; do
+        if state=$(on "$i" "taskset -c 0 tail -1 ~/gate-host.log; taskset -c 0 pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
             failures=0
             case $state in *"$marker"*) return 0;; esac
             case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
@@ -265,6 +302,7 @@ run() {
         --filters "Name=tag:Name,Values=$name" "Name=tag:Project,Values=triergon" \
         --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
     session "triergon-gate-run-$target-$stamp"
+    POLL=300
     ARCHIVE_RUN="$ARCHIVE/qualification/gate-runs/$revision-$target-$stamp"
     mkdir -p "$out"
     launch "$ami" "$count"
@@ -274,7 +312,10 @@ run() {
         shard "$i" "$count" "$target" "$revision" "$out" "$full" > "$out/shard-$i.log" 2>&1 &
         pids+=($!)
     done
-    for i in "${!pids[@]}"; do wait "${pids[$i]}" || say "shard $((i + 1)) did not finish"; done
+    local failed=0
+    for i in "${!pids[@]}"; do
+        wait "${pids[$i]}" || { say "shard $((i + 1)) did not finish"; failed=1; }
+    done
     local repository inside shards=""
     repository=$(repository_path "$target"); inside=$(inside_command "$target")
     for i in $(seq 1 "$count"); do
@@ -283,8 +324,11 @@ run() {
             on 1 "mkdir -p $repository/.research/gate/shards && tar -xf - -C $repository/.research/gate/shards"
         shards="$shards .research/gate/shards/shard-$i"
     done
-    on 1 "$inside 'cd ~/triergon && . ~/.cargo/env && cargo xtask gate summary --output .research/gate/summary.json$shards'" \
-        > "$out/summary.txt" || true
+    if ! on 1 "$inside 'cd ~/triergon && . ~/.cargo/env && cargo xtask gate summary --output .research/gate/summary.json$shards'" \
+        > "$out/summary.txt"; then
+        say "the summary fails: $out/summary.txt"
+        failed=1
+    fi
     on 1 "cat $repository/.research/gate/summary.json" > "$out/summary.json" || true
     aws s3 cp --only-show-errors "$out/summary.json" "$ARCHIVE_RUN/summary.json" || true
     for i in $(seq 1 "$count"); do
@@ -293,6 +337,7 @@ run() {
             "$(grep DONE "$out/shard-$i/gate-host.log" 2>/dev/null | tail -1)"
     done | tee "$out/hosts.txt"
     say "outputs archived under ${ARCHIVE_RUN#"$ARCHIVE"/}/"
+    return "$failed"
 }
 
 command=${1:?usage: tools/gate-aws.sh image|run ...}

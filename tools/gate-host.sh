@@ -35,7 +35,6 @@ LOG=$HOME/gate-host.log
 REPOSITORY=${TRIERGON_REPOSITORY:-https://github.com/triergon/triergon.git}
 ARM32=thumbv7neon-unknown-linux-gnueabihf
 USERLAND_SHA256=f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533
-NIGHTLY=nightly-2026-10-17
 PACKAGES="build-essential pkg-config zlib1g-dev python3 python3-numpy make git zstd curl
     ca-certificates jq time binutils autoconf automake libtool autopoint gettext
     linux-headers-$(uname -r) linux-tools-common linux-tools-$(uname -r)"
@@ -60,7 +59,10 @@ fetch() { case $1 in http*) curl -fsS --retry 3 "$1";; *) cat "$1";; esac; }
 rust() { # TARGETS...: rustup with the pinned toolchain, the targets and the pinned nightly
     inside "command -v rustup >/dev/null || curl -fsS https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none >/dev/null"
     inside "rustup toolchain install \$(sed -n 's/^channel *= *\"\\(.*\\)\"/\\1/p' rust-toolchain.toml) --profile minimal -c rustfmt -c clippy $* >/dev/null"
-    inside "rustup toolchain install $NIGHTLY --profile minimal $* >/dev/null"
+    # The nightly the checks and the core time test use, as xtask pins it.
+    local nightly
+    nightly=$(sed -n 's/.*const NIGHTLY: &str = "\(.*\)";/\1/p' "$(repository)/xtask/src/main.rs")
+    inside "rustup toolchain install $nightly --profile minimal $* >/dev/null"
 }
 
 setup() {

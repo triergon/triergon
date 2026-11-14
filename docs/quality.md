@@ -901,7 +901,11 @@ checks out REVISION on each, restores reference builds whose keys changed from t
 archive's packs (building and uploading the others), gets each host ready and runs
 shard I of N on host I. The shards' outputs are archived under
 `qualification/gate-runs/`, where they expire after 90 days unless promoted, and the
-logs, step records and the summary are copied to OUT.
+logs, step records and the summary are copied to OUT; each host is terminated once its
+outputs are collected. The command exits non-zero when a shard did not finish or the
+summary fails. Every host is a c6g.4xlarge, the class kernel-bound memory is qualified
+on, SSH is open to one address (`TRIERGON_SSH_CIDR`, a /32), and a timer on the host's
+disk powers it off, and so terminates it, 72 hours after it boots.
 
 ## Robustness
 
