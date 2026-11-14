@@ -963,7 +963,10 @@ archived stays until the command ends. OUT/hosts.txt records when each host was
 launched, ready, done and terminated. The command exits non-zero when a shard did not
 finish or the summary fails. Every host is a c6g.4xlarge, the class kernel-bound memory is qualified
 on, SSH is open to one address (`TRIERGON_SSH_CIDR`, a /32), and a timer on the host's
-disk powers it off, and so terminates it, 72 hours after it boots. When a poll fails because the workstation's
+disk powers it off, and so terminates it, 72 hours after it boots. Both
+commands refuse to launch anything unless `TRIERGON_SSH_CIDR` is the workstation's
+current public address as a /32, which they read from `https://checkip.amazonaws.com`
+and print beside it; they never widen it. When a poll fails because the workstation's
 public address is no longer the one the session's security group admits, the run says so
 and waits, polling on, instead of giving up on hosts that are still working: open the
 group to the new address (one /32) and it carries on. It never changes the group itself.

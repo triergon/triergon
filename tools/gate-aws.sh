@@ -25,7 +25,8 @@
 #       the plan alone
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
-# start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to;
+# start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to, which must be
+# this workstation's current public address or nothing is launched;
 # TRIERGON_EVIDENCE_ARCHIVE, the s3:// evidence archive; optionally
 # TRIERGON_BASE_IMAGE (default: the current Ubuntu 24.04 arm64 image) and
 # TRIERGON_VOLUME_GB (default 200). Hosts are c6g.4xlarge, the class the gates
@@ -176,6 +177,18 @@ reachable() {
 # This workstation's public address, as AWS sees it; empty when it cannot be read.
 workstation() { curl -fsS --max-time 10 https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]'; }
 
+# Refuse to launch unless TRIERGON_SSH_CIDR is this workstation's current address
+# as a /32: the hosts must be reachable from here, and from nowhere else.
+require_address() {
+    local address
+    address=$(workstation)
+    echo "workstation address ${address:-unknown}, TRIERGON_SSH_CIDR $TRIERGON_SSH_CIDR"
+    if [ -z "$address" ] || [ "$address/32" != "$TRIERGON_SSH_CIDR" ]; then
+        echo "TRIERGON_SSH_CIDR must be this workstation's address as a /32: launching nothing" >&2
+        return 2
+    fi
+}
+
 # Whether the session's security group lets ADDRESS reach the hosts by SSH.
 admitted() {
     aws ec2 describe-security-groups --group-ids "$SG" \
@@ -253,6 +266,7 @@ repository_path() { if [ "$1" = armv7 ]; then echo /srv/armhf/home/ubuntu/trierg
 
 image() {
     local target=$1 revision=$2; shift 2
+    require_address
     local base=${TRIERGON_BASE_IMAGE:-$(aws ssm get-parameter --name \
         /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id \
         --query Parameter.Value --output text)}
@@ -430,6 +444,7 @@ run() {
         shift
     done
     [ -z "$items" ] || ENVIRONMENT+=("ITEMS=$items")
+    require_address
     local name="triergon-gate-$target" ami stamp checkout
     # Before any host: every input each shard's preflight reads is one a prepared
     # host has. The check reads this checkout, so it must be REVISION, unchanged.
