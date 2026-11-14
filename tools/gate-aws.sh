@@ -305,7 +305,9 @@ image() {
 shard() {
     local i=$1 count=$2 target=$3 revision=$4 out=$5 full=$6
     mkdir -p "$out/shard-$i"
-    trap 'collect "$i" "$target" "$revision" "$out"; release "$i" "$count" "$out"' EXIT
+    # The values now: the trap can run after this function's locals are gone.
+    # shellcheck disable=SC2064
+    trap "$(printf 'collect %q %q %q %q; release %q %q %q' "$i" "$target" "$revision" "$out" "$i" "$count" "$out")" EXIT
     reachable "$i"
     copy "$i" "$HERE/gate-host.sh" gate-host.sh
     on "$i" "bash ~/gate-host.sh checkout $revision" | tail -n +2 |
@@ -409,7 +411,9 @@ run() {
     # Before any host: every input each shard's preflight reads is one a prepared
     # host has. The check reads this checkout, so it must be REVISION, unchanged.
     checkout=$(cd "$HERE/.." && pwd)
-    if [ "$(git -C "$checkout" rev-parse "$revision^{commit}")" != "$(git -C "$checkout" rev-parse HEAD)" ] ||
+    # Hosts fetch the revision by its full name.
+    revision=$(git -C "$checkout" rev-parse "$revision^{commit}")
+    if [ "$revision" != "$(git -C "$checkout" rev-parse HEAD)" ] ||
         ! git -C "$checkout" diff --quiet HEAD; then
         echo "check out $revision here, unchanged: the gate check reads this checkout" >&2
         return 2
