@@ -3,6 +3,7 @@ use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
+use triergon_mpegts::TraceEvent;
 
 mod mp4_native_seek;
 mod mp4_range;
@@ -92,9 +93,9 @@ pub enum Delivery {
     Present,
     UnknownTime,
 }
-pub(crate) struct OutputScope {
+pub(crate) struct OutputScope<Pool = Budget> {
     source: triergon_core::SourceId,
-    pool: Budget,
+    pool: Pool,
     session: u64,
     epoch: u64,
     generation: u64,
@@ -122,15 +123,14 @@ pub struct Output {
     bytes: usize,
 }
 impl Output {
-    pub(crate) fn into_matroska_replay(mut self) -> Option<MatroskaReplayOutput> {
-        let pool = self.pool.take().unwrap_or_else(|| self.pool().clone());
+    pub(crate) fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
         let RawEvent::Matroska(event) = self.event else {
             return None;
         };
         Some(MatroskaReplayOutput {
             scope: OutputScope {
                 source: self.source,
-                pool,
+                pool: self.pool,
                 session: self.session,
                 epoch: self.epoch,
                 generation: self.generation,
@@ -148,15 +148,25 @@ impl Output {
         self.pool().same_pool(pool)
     }
     pub(crate) fn pool(&self) -> &Budget {
-        match &self.event {
+        Self::event_budget(&self.event)
+            .or(self.pool.as_ref())
+            .expect("output without a payload budget retains its allocation budget")
+    }
+
+    #[inline]
+    fn event_budget(event: &RawEvent) -> Option<&Budget> {
+        match event {
             RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) => {
-                packet.configuration.budget()
+                Some(packet.configuration.budget())
             }
-            RawEvent::NativeTs { packet, .. } => packet.spans.budget(),
-            _ => self
-                .pool
-                .as_ref()
-                .expect("output without a payload budget retains its allocation budget"),
+            RawEvent::NativeTs { packet, .. } => Some(packet.spans.budget()),
+            RawEvent::Ts(event) => match &event.source {
+                TraceEvent::Transport(packet) => Some(packet.source.budget()),
+                TraceEvent::Section(section) => Some(section.bytes().budget()),
+                TraceEvent::Pes(packet) => Some(packet.header_source_ranges.budget()),
+                _ => None,
+            },
+            _ => None,
         }
     }
 
@@ -186,9 +196,11 @@ impl Output {
     }
 }
 pub(crate) struct MatroskaReplayOutput {
-    scope: OutputScope,
+    // Packet configurations already retain the pool. Other events carry the
+    // same explicit budget handle as their original output.
+    scope: OutputScope<Option<Budget>>,
     pub event: triergon_matroska::typed::Event,
-    delivery: Delivery,
+    pub(crate) delivery: Delivery,
     bytes: usize,
 }
 
@@ -196,7 +208,7 @@ impl MatroskaReplayOutput {
     pub fn into_output(self) -> Output {
         Output {
             source: self.scope.source,
-            pool: Some(self.scope.pool),
+            pool: self.scope.pool,
             session: self.scope.session,
             epoch: self.scope.epoch,
             generation: self.scope.generation,
@@ -1197,7 +1209,7 @@ impl<S: Source> Player<S> {
             e,
             RawEvent::Matroska(triergon_matroska::typed::Event::Configuration(_))
                 | RawEvent::Ts(crate::TsEvent {
-                    source: triergon_mpegts::TraceEvent::ProgramMap { active: true, .. },
+                    source: TraceEvent::ProgramMap { active: true, .. },
                     ..
                 })
         ) {
@@ -1210,7 +1222,7 @@ impl<S: Source> Player<S> {
                 && matches!(
                     e,
                     RawEvent::Ts(crate::TsEvent {
-                        source: triergon_mpegts::TraceEvent::Pes(pes),
+                        source: TraceEvent::Pes(pes),
                         ..
                     }) if self.engine.as_ref().is_some_and(|engine| {
                         engine.replaces_source_ts_pes(pes.pid)
@@ -1348,15 +1360,9 @@ impl<S: Source> Player<S> {
         };
         *destination = Some(Output {
             source,
-            pool: if matches!(
-                &event,
-                RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
-                    | RawEvent::NativeTs { .. }
-            ) {
-                None
-            } else {
-                Some(self.pool.clone())
-            },
+            pool: Output::event_budget(&event)
+                .is_none()
+                .then(|| self.pool.clone()),
             session: self.session,
             epoch: self.epoch,
             generation: self.generation,

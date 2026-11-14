@@ -71,7 +71,6 @@ pub struct DemuxTimeView {
 }
 
 /// Demux encoded-header time, without validated source timestamp fields.
-#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncodedTimeView {
     pub encoded_pts_raw33: u64,
@@ -81,17 +80,32 @@ pub struct EncodedTimeView {
     pub origin: ClockOrigin,
 }
 
+/// The window of 2³³ ticks the demuxer places every timestamp of a program in,
+/// opened by the program's first 33-bit timestamp `reference`.
+///
+/// FFmpeg's mpegts demuxer reports each later timestamp as the one value
+/// congruent to it modulo 2³³ in the window, which starts 60 s (5,400,000
+/// ticks) before `reference`, as observed with first timestamps from 0 to
+/// 2³³ − 1 and followers on either side of them:
+///
+/// - below 5,400,000 the window starts at 0: after a first timestamp of 1 a
+///   later 0 stays 0, and after a first 0 a later 2³³ − 1 stays
+///   8,589,934,591;
+/// - from 5,400,000 to 2³³ − 5,400,001 it starts 60 s earlier: with
+///   5,400,001 first, a later 1 stays 1 and a later 0 becomes 2³³;
+/// - from 2³³ − 5,400,000 up it starts 60 s before `reference` − 2³³, so the
+///   first timestamp itself comes out negative: 2³³ − 5,400,000 as
+///   −5,400,000 and 2³³ − 1 as −1, with a later 0 as 0.
 fn initial_interval(reference: u64) -> ClockOrigin {
-    // The fixed 90-kHz behavioural profile admits one congruent representative
-    // in an interval of width PERIOD90. Its 60-second lead is contract data.
-    // At this timebase the near-end window is narrower than an eighth period.
-    // No observed peer timestamp is an input to this interval construction.
     const LEAD90: i128 = 60 * 90_000;
     let reference90 = i128::from(reference);
     let candidate = reference90 - LEAD90;
     let interval_origin90 = if reference90 >= PERIOD90 - LEAD90 {
+        // Within 60 s of the wrap: the window takes the first timestamp
+        // as negative, so that the wrapped ones after it continue from 0.
         candidate - PERIOD90
     } else {
+        // Within 60 s of zero the window does not start below 0.
         candidate.max(0)
     };
     ClockOrigin {
@@ -123,6 +137,55 @@ pub struct DemuxClock {
     origin: Option<ClockOrigin>,
 }
 impl DemuxClock {
+    /// Optional encoded timing from finite source-fault recovery. No source
+    /// timestamp or anchor is created, including for forbidden timing flags.
+    pub fn project_pes_fault(
+        &mut self,
+        packet: &crate::demux_transport::PesFaultPacket,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<DiagnosticTimeView>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if work.remaining() == 0 {
+            return Ok(None);
+        }
+        if packet.program != self.program {
+            return Err(Error::Invalid("transport fault clock program mismatch"));
+        }
+        self.project_optional_encoded(
+            packet.pid,
+            packet.encoded_header.encoded_pts_raw33(),
+            work,
+            cancel,
+        )
+    }
+    /// Place encoded PTS from a faulted transport packet in this demux interval.
+    /// Raw DTS stays absent; `dts90` is only the compatibility PTS-only result.
+    /// This creates no source timestamp or clock anchor.
+    pub fn project_transport_fault(
+        &mut self,
+        packet: &crate::demux_transport::TransportFaultPacket,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<EncodedTimeView>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if work.remaining() == 0 {
+            return Ok(None);
+        }
+        if packet.program != self.program {
+            return Err(Error::Invalid("transport fault clock program mismatch"));
+        }
+        self.project_encoded_pts(
+            packet.pid,
+            packet.encoded_header.encoded_pts_raw33(),
+            work,
+            cancel,
+        )
+    }
     /// Explicit compatibility input from checked encoding in a rejected carrier.
     /// Shares the demux interval context, never creates a source PesHeader/time.
     #[cfg(feature = "reference-trace")]
@@ -133,6 +196,15 @@ impl DemuxClock {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<EncodedTimeView>> {
+        self.project_encoded_pts(pid, header.encoded_pts_raw33(), work, cancel)
+    }
+    fn project_encoded_pts(
+        &mut self,
+        pid: u16,
+        raw: u64,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<EncodedTimeView>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -140,7 +212,6 @@ impl DemuxClock {
             return Ok(None);
         }
         crate::checked_pid(pid)?;
-        let raw = header.encoded_pts_raw33();
         check_raw33(raw)?;
         let origin = self.origin.unwrap_or_else(|| initial_interval(raw));
         let ticks = representative(Some(raw), Some(origin))?
@@ -203,8 +274,7 @@ impl DemuxClock {
             (3, Some(_), Some(_)) => TimestampOrigin::SourceDts,
             _ => return Err(Error::Invalid("native clock source time flags")),
         };
-        let demux_dts = dts.or(pts);
-        let next_origin = self.origin.or_else(|| demux_dts.map(initial_interval));
+        let (next_origin, pts90, dts90) = self.placed(pts, dts)?;
         let result = DemuxTimeView {
             profile: DemuxProfile::PesPackets,
             program: self.program,
@@ -212,8 +282,8 @@ impl DemuxClock {
             source_epochs: epochs,
             source_pts_raw33: pts,
             source_dts_raw33: dts,
-            pts90: representative(pts, next_origin)?,
-            dts90: representative(demux_dts, next_origin)?,
+            pts90,
+            dts90,
             pts_origin: if pts.is_some() {
                 TimestampOrigin::SourcePts
             } else {
@@ -227,6 +297,33 @@ impl DemuxClock {
         }
         self.origin = next_origin;
         Ok(Some(result))
+    }
+    /// A packet's raw PTS and DTS in the demuxer's interval, the DTS falling
+    /// back to the PTS, as [`Self::project_header`] places them.
+    pub fn place(
+        &mut self,
+        pts: Option<u64>,
+        dts: Option<u64>,
+    ) -> Result<(Option<i128>, Option<i128>)> {
+        for raw in [pts, dts].into_iter().flatten() {
+            check_raw33(raw)?;
+        }
+        let (origin, pts90, dts90) = self.placed(pts, dts)?;
+        self.origin = origin;
+        Ok((pts90, dts90))
+    }
+    fn placed(
+        &self,
+        pts: Option<u64>,
+        dts: Option<u64>,
+    ) -> Result<(Option<ClockOrigin>, Option<i128>, Option<i128>)> {
+        let dts = dts.or(pts);
+        let origin = self.origin.or_else(|| dts.map(initial_interval));
+        Ok((
+            origin,
+            representative(pts, origin)?,
+            representative(dts, origin)?,
+        ))
     }
     /// None is a work yield; timestamp absence is represented inside the result.
     /// A fresh object represents a fresh demux context; source epochs do not reset it.
@@ -247,7 +344,6 @@ impl DemuxClock {
 }
 
 /// Optional encoded time for a rejected source header, never source PTS/DTS.
-#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DiagnosticTimeView {
     pub encoded_pts_raw33: Option<u64>,
@@ -256,12 +352,21 @@ pub struct DiagnosticTimeView {
     pub dts90: Option<i128>,
     pub origin: Option<ClockOrigin>,
 }
-#[cfg(feature = "reference-trace")]
 impl DemuxClock {
+    #[cfg(feature = "reference-trace")]
     pub fn project_diagnostic_header(
         &mut self,
         pid: u16,
         header: &crate::demux_recovery::DiagnosticHeader,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<DiagnosticTimeView>> {
+        self.project_optional_encoded(pid, header.encoded_pts_raw33(), work, cancel)
+    }
+    fn project_optional_encoded(
+        &mut self,
+        pid: u16,
+        raw: Option<u64>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<DiagnosticTimeView>> {
@@ -272,7 +377,6 @@ impl DemuxClock {
             return Ok(None);
         }
         crate::checked_pid(pid)?;
-        let raw = header.encoded_pts_raw33();
         if let Some(raw) = raw {
             check_raw33(raw)?;
         }

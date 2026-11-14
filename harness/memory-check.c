@@ -14,7 +14,10 @@ int main(void){
     size_t old=malloc_size(a);a=realloc(a,123456);live-=old;add(a);
     void *c=NULL;if(posix_memalign(&c,4096,65536))return 3;add(c);
     void *d=aligned_alloc(256,131072);add(d);
-    drop(d);drop(c);drop(b);drop(a);
+    char *e=strdup("triergon"),*f=strndup("triergon",3);
+    if(!e||!f||strcmp(e,"triergon")||strcmp(f,"tri"))return 5;
+    add(e);add(f);
+    drop(f);drop(e);drop(d);drop(c);drop(b);drop(a);
     if(write(1,"TRIERGON_END_V1\n",16)!=16)return 2;
     printf("{\"expected_peak_bytes\":%zu,\"expected_live_end\":%zu}\n",peak,live);
     return live?4:0;

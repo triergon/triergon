@@ -234,6 +234,23 @@ fn competing_grid_is_visible_refusal() {
     ));
 }
 #[test]
+fn adjacent_payload_bytes_do_not_create_a_competing_grid() {
+    let mut bytes = [0; 8 * 192];
+    for carrier in bytes.chunks_exact_mut(192) {
+        carrier[4] = 0x47;
+    }
+    for n in 0..8 {
+        let false_sync = 18 + n * 188;
+        let marker = false_sync - 1 - n % 2;
+        bytes[marker] = 0x47;
+        bytes[marker + 1..=false_sync].fill(0x46);
+    }
+    let (_, input, window) = setup(&bytes, true);
+    let context = complete(&input, &window, PacketFormat::M2ts192);
+    assert_eq!(context.inspected_bytes(), bytes.len());
+}
+
+#[test]
 fn damaged_sync_is_visible_refusal() {
     let bytes = include_bytes!("data/native-input-v1/seventh-sync-zero.bin");
     let (_, i, w) = setup(bytes, true);
@@ -321,4 +338,127 @@ fn bound_observer_does_not_retain_unrelated_startup_backing_after_inspection() {
             .unwrap(),
         AssemblyStep::NeedPayload
     ));
+}
+
+#[cfg(feature = "reference-trace")]
+#[test]
+fn selected_transport_fault_admission_keeps_the_validated_input_cursor() {
+    use triergon_mpegts::reference_trace::recovery::RecoveryObserver;
+    for data in [
+        include_bytes!("data/transport-tei.ts").as_slice(),
+        include_bytes!("data/transport-scrambled.ts").as_slice(),
+    ] {
+        let (budget, mut input, window) = setup(data, true);
+        let context = complete(&input, &window, PacketFormat::Ts188);
+        let mut recovery = RecoveryObserver::new_selected_avc_faults(
+            DemuxProfile::PesPackets,
+            observer(&budget).scope(),
+            budget.clone(),
+            ParseLimits::default(),
+        )
+        .unwrap();
+        recovery.bind_input(&context, &input).unwrap();
+        let mut packet = parse_transport(
+            window.bytes().slice(376..564).unwrap(),
+            PacketFormat::Ts188,
+            376,
+        )
+        .unwrap();
+        packet.source_id = Some(SourceId(1));
+        let source_context = SourceContext {
+            source_event_ordinal: 8,
+            epochs: SourceEpochs::default(),
+            byte_run_epoch: None,
+        };
+        let other = InputCursor::new(
+            &budget,
+            SourceId(2),
+            SourceCapabilities {
+                length: Some(data.len() as u64),
+                random_access: true,
+            },
+            16384,
+        )
+        .unwrap();
+        let refused = recovery
+            .push_accepted_with_input(packet.clone(), source_context, &other)
+            .unwrap_err();
+        assert_eq!(refused.error, Error::SourceMismatch);
+        assert!(refused.value.source.shares_storage_with(&packet.source));
+        recovery
+            .push_accepted_with_input(packet.clone(), source_context, &input)
+            .unwrap();
+        assert_eq!(
+            recovery
+                .poll_with_input(&other, &mut WorkBudget::new(0), &AtomicBool::new(true))
+                .unwrap_err(),
+            Error::SourceMismatch
+        );
+        assert!(matches!(
+            recovery.poll_with_input(&input, &mut WorkBudget::new(0), &AtomicBool::new(false)),
+            Ok(AssemblyStep::Yield)
+        ));
+        assert_eq!(
+            recovery
+                .poll_with_input(&input, &mut WorkBudget::new(0), &AtomicBool::new(true))
+                .unwrap_err(),
+            Error::Cancelled
+        );
+        assert!(matches!(
+            recovery.poll_with_input(&input, &mut WorkBudget::new(1), &AtomicBool::new(false)),
+            Ok(AssemblyStep::NeedPayload)
+        ));
+        recovery
+            .confirm_source_fault(
+                &triergon_mpegts::TraceFault {
+                    kind: triergon_mpegts::FaultKind::Transport,
+                    pid: Some(256),
+                    location: triergon_core::SourceLocation {
+                        source: SourceId(1),
+                        offset: 376,
+                    },
+                    error: if packet.transport_error {
+                        Error::Invalid("TS transport error indicator")
+                    } else {
+                        Error::Unsupported("scrambled TS payload")
+                    },
+                    rejected: None,
+                },
+                SourceContext {
+                    source_event_ordinal: 10,
+                    ..source_context
+                },
+            )
+            .unwrap();
+        let mut emitted = false;
+        for _ in 0..10 {
+            match recovery.poll_with_input(&input, &mut WorkBudget::new(1), &AtomicBool::new(false)).unwrap() {
+                AssemblyStep::Yield => {},
+                AssemblyStep::Output(triergon_mpegts::reference_trace::recovery::DemuxObservation::FromSelectedDiagnostic(output)) => {
+                    assert_eq!(output.position, 376);
+                    assert_eq!(output.payload_len, 27);
+                    assert!(output.carrier.backing_bytes().shares_storage_with(&packet.source));
+                    emitted = true;
+                    break;
+                }
+                step => panic!("bound recovery lost its packet: {step:?}"),
+            }
+        }
+        assert!(emitted);
+        input.reset(0).unwrap();
+        let refused = recovery
+            .push_accepted_with_input(
+                packet,
+                SourceContext {
+                    source_event_ordinal: 11,
+                    ..source_context
+                },
+                &input,
+            )
+            .unwrap_err();
+        assert_eq!(
+            refused.error,
+            Error::Invalid("stale native startup request")
+        );
+    }
 }

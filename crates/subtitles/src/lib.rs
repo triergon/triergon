@@ -12,10 +12,13 @@ pub mod compat;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
 
+mod canvas;
 pub mod dvb;
 pub mod text;
 
 pub mod context;
 
+pub mod cc;
 pub mod dvd;
 pub mod pgs;
+pub(crate) mod teletext;

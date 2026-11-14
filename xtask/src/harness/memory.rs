@@ -22,17 +22,6 @@ use crate::stats;
 
 type R<T> = Result<T, String>;
 
-const ALLOCATORS_AND_WRITES: [&str; 8] = [
-    "malloc",
-    "calloc",
-    "realloc",
-    "free",
-    "aligned_alloc",
-    "posix_memalign",
-    "write",
-    "writev",
-];
-
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -67,6 +56,12 @@ pub trait Host {
     fn nm(&self, args: &[&str], path: &Path) -> R<String>;
     fn environment(&self) -> R<Value>;
     fn kernel_requested(&self) -> Option<String>;
+    /// Put each worker file in the same page-cache state before an observer
+    /// run: none of its pages cached.
+    fn evict(&self, workers: &[&Path]) -> R<()> {
+        let _ = workers;
+        Ok(())
+    }
 }
 
 /// The real host, with workers and instrumentation under `root/target/harness`.
@@ -143,6 +138,34 @@ impl Host for Native<'_> {
 
     fn kernel_requested(&self) -> Option<String> {
         std::env::var("TRIERGON_RSS_KERNEL_BOUND").ok()
+    }
+
+    /// A freshly written copy can be cached in larger blocks than a file read
+    /// back, and the kernel then makes more of an executable resident when it
+    /// maps it, by run. Each worker is written back (`sync FILE`) and its cached
+    /// pages dropped (`dd iflag=nocache`, `POSIX_FADV_DONTNEED`), so every run of
+    /// either worker maps its executable from the same, empty, state.
+    fn evict(&self, workers: &[&Path]) -> R<()> {
+        if !self.linux() {
+            return Ok(());
+        }
+        let run = |command: &mut std::process::Command| -> R<()> {
+            let status = command
+                .status()
+                .map_err(|e| format!("page-cache eviction: {e}"))?;
+            if status.success() {
+                Ok(())
+            } else {
+                Err(format!("page-cache eviction failed: {status}"))
+            }
+        };
+        for worker in workers {
+            run(std::process::Command::new("sync").arg(worker))?;
+            run(std::process::Command::new("dd")
+                .arg(format!("if={}", worker.display()))
+                .args(["iflag=nocache", "count=0", "status=none"]))?;
+        }
+        Ok(())
     }
 }
 
@@ -270,15 +293,21 @@ fn observe(
                 ])
             });
         }
-        let data =
-            json::parse(&String::from_utf8_lossy(&raw.unwrap())).map_err(|e| e.to_string())?;
-        let last = String::from_utf8(stdout)
-            .map_err(|e| e.to_string())?
-            .lines()
-            .last()
-            .map(str::to_owned)
-            .ok_or("list index out of range")?;
-        let output = json::parse(&last).map_err(|e| e.to_string())?;
+        let raw = raw.unwrap();
+        let observer_output = String::from_utf8_lossy(&raw);
+        let work = std::str::from_utf8(&stdout)
+            .ok()
+            .and_then(|text| text.lines().last())
+            .and_then(|line| json::parse_observations(line).ok());
+        let data = json::parse_observations(&observer_output);
+        let (Ok(data), Some(output)) = (data, work) else {
+            return Ok(obj(vec![
+                ("status", Value::str("observer-invalid")),
+                ("observer_raw", Value::str(observer_output)),
+                ("stdout", Value::str(String::from_utf8_lossy(&stdout))),
+                ("stderr", Value::str(String::from_utf8_lossy(&stderr))),
+            ]));
+        };
         let sha = linux::file_sha(library)?;
         if !matches!(output, Value::Object(_)) {
             return Ok(obj(vec![
@@ -301,7 +330,10 @@ fn observe(
             || py_int(data.get("schema")) != Some(2)
             || s(&data, "status") != Some("measured")
             || s(&data, "mode") != Some(mode)
-            || (linux && (!linux::valid_receipt(&data, mode) || requested != kernel));
+            || (linux
+                && (s(&data, "observer") != Some(linux::OBSERVER)
+                    || !linux::valid_receipt(&data, mode)
+                    || requested != kernel));
         if invalid {
             let mut fields = vec![
                 ("status", Value::str("observer-invalid")),
@@ -573,8 +605,9 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
             .to_owned();
         exports = Value::str(&export_text);
         let names = linux::symbol_versions(&export_text)?;
-        let mut missing: Vec<&str> = ALLOCATORS_AND_WRITES
+        let mut missing: Vec<&str> = linux::ALLOCATORS
             .iter()
+            .chain(&["write", "writev"])
             .chain(&linux::GUARD_ORDER)
             .copied()
             .filter(|n| !names.contains_key(*n))
@@ -649,13 +682,13 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
         let observer_sha = identities[0].1.as_str().unwrap_or_default().to_owned();
         let probe_sha = identities[1].1.as_str().unwrap_or_default().to_owned();
         guard = cached(&GUARD_CACHE, &key).unwrap_or(Value::Null);
-        let v3 =
-            |r: &Value| r.get("observer").and_then(|o| s(o, "observer")) == Some("linux-glibc-v3");
+        let current =
+            |r: &Value| r.get("observer").and_then(|o| s(o, "observer")) == Some(linux::OBSERVER);
         if guard == Value::Null
             && s(&heap, "status") == Some("measured")
             && s(&rss, "status") == Some("measured")
-            && v3(&heap)
-            && v3(&rss)
+            && current(&heap)
+            && current(&rss)
         {
             records = vec![
                 Value::object([
@@ -670,8 +703,9 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
                 ]),
             ];
             for mode in ["heap", "rss"] {
-                for case in
-                    std::iter::once("scope-startup").chain(linux::GUARD_CASES.iter().map(|c| c.0))
+                for case in linux::calibration_cases()
+                    .into_iter()
+                    .filter(|c| *c != "default")
                 {
                     let observed =
                         host.observe(&probe, None, None, mode, &[case.to_owned()], false);
@@ -699,15 +733,14 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
         ) {
             errors.push("Linux active-window guard certificate unproven".into());
         }
+        let admission = linux::Admission::new(
+            Some(&guard),
+            &linked_value,
+            Some(&observer_sha),
+            Some(&probe_sha),
+        );
         for (role, target, owner, parsed) in parsed_targets {
-            let reviewed = linux::conditional_coverage(
-                &parsed,
-                &owner,
-                Some(&guard),
-                &linked_value,
-                Some(&observer_sha),
-                Some(&probe_sha),
-            );
+            let reviewed = linux::conditional_coverage(&parsed, &owner, admission.as_ref());
             let remaining = reviewed
                 .get("remaining_uncovered")
                 .cloned()
@@ -1122,21 +1155,30 @@ fn measure(
     seed: u64,
     certificate: &Value,
     invocation: Invocation<'_>,
-) -> R<Value> {
+) -> Value {
     if s(certificate, "status") != Some("qualified-selected-workers") {
-        return Ok(obj(vec![
+        return obj(vec![
             ("status", Value::str("observer-unqualified")),
             ("certificate", certificate.clone()),
-        ]));
+        ]);
     }
     let linux = s(certificate, "platform") == Some("Linux");
     if linux && !linux::certificate_current(root, certificate) {
-        return Ok(obj(vec![
+        return obj(vec![
             ("status", Value::str("instrumentation-changed")),
             ("certificate", certificate.clone()),
-        ]));
+        ]);
     }
-    let input_sha = file_sha(invocation.input)?;
+    let input_sha = match file_sha(invocation.input) {
+        Ok(hash) => hash,
+        Err(error) => {
+            return obj(vec![
+                ("status", Value::str("input-check-failed")),
+                ("input_error", Value::str(error)),
+                ("certificate", certificate.clone()),
+            ]);
+        }
+    };
     let mut rng = PyRandom::new(seed);
     let kernel = certificate
         .get("kernel_rss_required")
@@ -1157,14 +1199,20 @@ fn measure(
             } else {
                 reference
             };
-            let observed = host.observe(
-                worker,
-                invocation.operation,
-                Some(invocation.input),
-                mode,
-                invocation.arguments_for(name == "candidate"),
-                kernel && mode == "rss",
-            );
+            let observed = match host.evict(&[candidate, reference]) {
+                Ok(()) => host.observe(
+                    worker,
+                    invocation.operation,
+                    Some(invocation.input),
+                    mode,
+                    invocation.arguments_for(name == "candidate"),
+                    kernel && mode == "rss",
+                ),
+                Err(error) => obj(vec![
+                    ("status", Value::str("page-cache-eviction-failed")),
+                    ("error", Value::str(error)),
+                ]),
+            };
             row.push((format!("{name}_{mode}"), observed));
         }
         samples.push(Value::Object(row));
@@ -1189,13 +1237,18 @@ fn measure(
         )
     };
     push(&mut result, "input_sha256", Value::str(&input_sha));
-    if file_sha(invocation.input)? != input_sha {
-        push(&mut result, "status", Value::str("input-changed"));
+    match file_sha(invocation.input) {
+        Ok(hash) if hash == input_sha => (),
+        Ok(_) => push(&mut result, "status", Value::str("input-changed")),
+        Err(error) => {
+            push(&mut result, "status", Value::str("input-check-failed"));
+            push(&mut result, "input_error", Value::str(error));
+        }
     }
     if linux && !linux::certificate_current(root, certificate) {
         push(&mut result, "status", Value::str("instrumentation-changed"));
     }
-    Ok(result)
+    result
 }
 
 /// Check the exact worker closure and emit the observer's calibration results.
@@ -1241,12 +1294,18 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
     result
 }
 
+pub(crate) struct WorkerPaths<'a> {
+    pub candidate: &'a Path,
+    pub reference: &'a Path,
+    /// Both executables come from the runner's registered build.
+    pub registered: bool,
+}
+
 /// One memory collection under the measurement lock, rejected (but kept) when
 /// tracked processes used CPU meanwhile.
 pub fn collect(
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     input: &Path,
     pairs: usize,
     seed: u64,
@@ -1268,8 +1327,7 @@ pub fn collect(
         let reference_arguments = arguments(false)?;
         return collect_invocation(
             root,
-            candidate,
-            reference,
+            workers,
             pairs,
             seed,
             Invocation {
@@ -1278,7 +1336,7 @@ pub fn collect(
                 arguments: &reference_arguments,
                 candidate_arguments: Some(&candidate_arguments),
                 expected_outputs: None,
-                work_fields: Some(&operation.work_fields),
+                work_fields: Some(&operation.work.fields),
                 timeout: operation.timeout,
             },
         );
@@ -1291,8 +1349,7 @@ pub fn collect(
         .collect();
     collect_invocation(
         root,
-        candidate,
-        reference,
+        workers,
         pairs,
         seed,
         Invocation {
@@ -1301,7 +1358,7 @@ pub fn collect(
             arguments: &arguments,
             candidate_arguments: None,
             expected_outputs: None,
-            work_fields: Some(&operation.work_fields),
+            work_fields: Some(&operation.work.fields),
             timeout: operation.timeout,
         },
     )
@@ -1321,8 +1378,11 @@ pub(crate) fn collect_command(
 ) -> R<Value> {
     collect_invocation(
         root,
-        candidate,
-        reference,
+        WorkerPaths {
+            candidate,
+            reference,
+            registered: false,
+        },
         pairs,
         seed,
         Invocation {
@@ -1356,8 +1416,11 @@ pub(crate) fn collect_commands(
 ) -> R<Value> {
     collect_invocation(
         root,
-        candidate,
-        reference,
+        WorkerPaths {
+            candidate,
+            reference,
+            registered: true,
+        },
         pairs,
         seed,
         Invocation {
@@ -1372,10 +1435,19 @@ pub(crate) fn collect_commands(
     )
 }
 
+fn prepare_workers(root: &Path, candidate: &Path, reference: &Path) -> R<[PathBuf; 2]> {
+    let workers = worker::WorkerPair::read(candidate, reference)?;
+    // Grading rechecks the worker paths in the observer certificate. Keep the
+    // measured copies in the build tree and reuse their paths for these bytes.
+    let directory = root
+        .join("target/harness/.memory-workers")
+        .join(workers.content_key());
+    workers.write(&directory)
+}
+
 fn collect_invocation(
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     pairs: usize,
     seed: u64,
     invocation: Invocation<'_>,
@@ -1389,24 +1461,54 @@ fn collect_invocation(
             ("samples", Value::Array(vec![])),
         ]));
     }
+    let before = cpu_snapshot()?;
     let host = Native {
         root,
         timeout: invocation.timeout,
     };
-    let before = cpu_snapshot()?;
-    let certificate = qualification(&host, root, candidate, reference);
+    let WorkerPaths {
+        candidate,
+        reference,
+        registered,
+    } = workers;
+    let prepared = registered
+        && host.linux()
+        && linux::relocatable_worker(candidate)
+        && linux::relocatable_worker(reference);
+    let [candidate, reference] = if prepared {
+        prepare_workers(root, candidate, reference)?
+    } else {
+        [candidate.to_path_buf(), reference.to_path_buf()]
+    };
+    let certificate = qualification(&host, root, &candidate, &reference);
     let mut result = measure(
         &host,
         root,
-        candidate,
-        reference,
+        &candidate,
+        &reference,
         pairs,
         seed,
         &certificate,
         invocation,
-    )?;
+    );
     let after = cpu_snapshot()?;
     let contaminants = active_cpu(&before, &after, false);
+    push(
+        &mut result,
+        "worker_preparation",
+        Value::str(if prepared {
+            "sequential-copies"
+        } else {
+            "original-paths"
+        }),
+    );
+    if cfg!(target_os = "linux") {
+        push(
+            &mut result,
+            "worker_page_cache",
+            Value::str("both workers evicted before each run"),
+        );
+    }
     push(&mut result, "cpu_before", before);
     push(&mut result, "cpu_after", after);
     push(
@@ -1467,6 +1569,9 @@ pub fn evidence_valid_with_outputs(
         let mut covered = s(certificate, "status")? == "qualified-selected-workers"
             && !certificate.get("errors")?.truthy()
             && equal(certificate.get("worker_hashes")?, selected);
+        if require_linux || s(certificate, "platform") == Some("Linux") {
+            covered &= linux::measured_workers_current(certificate);
+        }
         if py_int(identity.get("schema")).unwrap_or(1) >= 2 {
             covered &= !memory.get("contaminants").is_some_and(Value::truthy)
                 && active_cpu(
@@ -1538,6 +1643,118 @@ pub fn evidence_valid_with_outputs(
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn eviction_leaves_the_workers_unchanged() {
+        let root = crate::walk::scratch("memory-worker-eviction");
+        fs::create_dir_all(&root).unwrap();
+        let workers = [root.join("candidate"), root.join("reference")];
+        for (worker, bytes) in workers.iter().zip([&b"candidate"[..], b"reference"]) {
+            fs::write(worker, bytes).unwrap();
+        }
+        let host = Native {
+            root: &root,
+            timeout: Duration::from_secs(5),
+        };
+        host.evict(&[&workers[0], &workers[1]]).unwrap();
+        assert_eq!(fs::read(&workers[0]).unwrap(), b"candidate");
+        assert_eq!(fs::read(&workers[1]).unwrap(), b"reference");
+        assert!(host.evict(&[&root.join("missing")]).is_err() || !host.linux());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn memory_preparation_replaces_both_files_and_keeps_certificate_paths() {
+        use std::os::unix::fs::MetadataExt;
+
+        let root = crate::walk::scratch("memory-worker-copies");
+        fs::create_dir_all(&root).unwrap();
+        let candidate = root.join("candidate");
+        let reference = root.join("longer-reference-name");
+        fs::write(&candidate, b"candidate").unwrap();
+        fs::write(&reference, b"reference").unwrap();
+        let paths = prepare_workers(&root, &candidate, &reference).unwrap();
+        let first = paths.each_ref().map(|path| fs::File::open(path).unwrap());
+        assert_eq!(paths[0].as_os_str().len(), paths[1].as_os_str().len());
+        assert_eq!(
+            paths,
+            prepare_workers(&root, &candidate, &reference).unwrap()
+        );
+        for (path, before) in paths.iter().zip(first) {
+            assert_ne!(
+                fs::metadata(path).unwrap().ino(),
+                before.metadata().unwrap().ino()
+            );
+        }
+        assert_eq!(fs::read(&paths[0]).unwrap(), fs::read(&candidate).unwrap());
+        assert_eq!(fs::read(&paths[1]).unwrap(), fs::read(&reference).unwrap());
+
+        let roles = ["candidate", "reference"];
+        let hashes = paths.each_ref().map(|path| file_sha(path).unwrap());
+        let certificate = Value::object([
+            (
+                "worker_hashes",
+                Value::object(roles.into_iter().zip(hashes.iter().map(Value::str))),
+            ),
+            (
+                "linked_libraries",
+                Value::object(roles.into_iter().zip(paths.iter().zip(&hashes).map(
+                    |(path, hash)| {
+                        Value::object([(
+                            "inspected_artifact",
+                            Value::object([
+                                ("path", Value::str(path.display().to_string())),
+                                ("sha256", Value::str(hash)),
+                            ]),
+                        )])
+                    },
+                ))),
+            ),
+        ]);
+
+        fs::write(&reference, b"rebuilt reference").unwrap();
+        let rebuilt = prepare_workers(&root, &candidate, &reference).unwrap();
+        assert_ne!(rebuilt, paths);
+        assert!(linux::measured_workers_current(&certificate));
+        fs::write(&paths[1], b"different bytes").unwrap();
+        assert!(!linux::measured_workers_current(&certificate));
+        fs::remove_file(&paths[1]).unwrap();
+        assert!(!linux::measured_workers_current(&certificate));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn unreadable_memory_input_returns_a_failed_row() {
+        let root = crate::walk::scratch("unreadable-memory-input");
+        let input = root.join("missing.ts");
+        let certificate = Value::object([("status", Value::str("qualified-selected-workers"))]);
+        let result = measure(
+            &Native {
+                root: &root,
+                timeout: worker::DEFAULT_TIMEOUT,
+            },
+            &root,
+            &root,
+            &root,
+            1,
+            0,
+            &certificate,
+            Invocation {
+                operation: Some("memory"),
+                input: &input,
+                arguments: &[],
+                candidate_arguments: None,
+                expected_outputs: None,
+                work_fields: None,
+                timeout: worker::DEFAULT_TIMEOUT,
+            },
+        );
+        assert_eq!(s(&result, "status"), Some("input-check-failed"));
+        assert!(s(&result, "input_error").unwrap().contains("missing.ts"));
+        assert_eq!(result.get("certificate"), Some(&certificate));
+    }
 
     #[test]
     fn memory_work_requires_both_digests_even_when_all_roles_omit_the_second() {

@@ -221,10 +221,18 @@ impl Bitmap {
         let (shift_x, shift_y) = ((offset.x & 63) as u32, (offset.y & 63) as u32);
         if shift_x != 0 {
             for row in self.rows_mut() {
-                for x in (1..row.len()).rev() {
-                    let moved = ((u32::from(row[x - 1]) * shift_x) >> 6) as u8;
-                    row[x - 1] -= moved;
-                    row[x] = row[x].wrapping_add(moved);
+                // Right to left, each pixel gives its share to the one after
+                // it; walked without indexing, so no bounds check stays in
+                // the loop wherever it is inlined.
+                let mut pixels = row.iter_mut().rev();
+                let Some(mut right) = pixels.next() else {
+                    continue;
+                };
+                for left in pixels {
+                    let moved = ((u32::from(*left) * shift_x) >> 6) as u8;
+                    *left -= moved;
+                    *right = right.wrapping_add(moved);
+                    right = left;
                 }
             }
         }

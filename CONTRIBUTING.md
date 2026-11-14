@@ -29,11 +29,23 @@ benchmarks assume it.
   incremental input), it passes the same gates as our own code, and reusing it is
   clearly cheaper than writing and owning the bounded component. Open an issue with
   that comparison before adding one. Tooling follows the same rule.
-- **Specifications first.** Implement from the standard. FFmpeg is consulted as a
-  black box: its inputs and outputs, never its source. Do not translate FFmpeg or any
-  other implementation. Tables the specification declares normative but does not
+- **Specifications first.** Implement from the standard. Every reference
+  implementation (FFmpeg, FreeType, HarfBuzz, libass and the rest) is consulted as a
+  black box: its inputs and outputs, never its source. Nothing new is translated from
+  another implementation. The modules listed in
+  [docs/provenance.md](docs/provenance.md) are earlier translations of FreeType,
+  HarfBuzz and libass, kept for now under those projects' permissive licences and
+  notices. They may be rewritten from specifications later, and a listed module that
+  has a public specification may be rewritten from it whenever it is being changed
+  anyway. The CJK auto-hinter in `triergon-font` is the only translation added after
+  this rule, by explicit decision; it is listed with the others and may likewise be
+  rewritten later. The reference implementations Unicode publishes with its standards
+  count as specification. Tables the specification declares normative but does not
   print may be recovered from reference output, provided the recovery is scripted and
-  reproducible (see `crates/codec-dca`).
+  reproducible (see `crates/codec-dca`). Behaviour, rules as well as tables, may
+  likewise be recovered by scripted, reproducible black-box probes of the reference
+  binary where no specification text is available; the code documents it as observed
+  behaviour and names the probe that establishes it.
 - **Lints are policy.** Clippy (`all` and `pedantic`) and rustdoc run with
   `-D warnings`. The workspace `[lints]` table states the pedantic lints the code does
   not follow and why; each library's `lib.rs` enables the documentation, visibility,
@@ -69,6 +81,15 @@ benchmarks assume it.
    edited by hand. Put the
    per-case results in the pull request and update [docs/status.md](docs/status.md).
 
+Register comparisons in `harness/features/<id>/contract.json`. The contract
+selects the candidate, reference and operation. Set its `gate` to `required`
+to include the comparison in `cargo xtask check`. Worker identities bind the
+registered contracts and their corpus inputs. Generated manifests record and
+verify their pins against the reference named in the contract. A generated
+feature can set `pin_note` to describe those pins. Required comparisons check
+manifest profiles and expected folds before running. Set `compare_order` to
+order a generator's reports. Unranked features follow in ID order.
+
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.
 
@@ -88,6 +109,12 @@ Contributions are dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE
 Media fixtures and specification texts keep their own terms; record the source,
 licence and hash of any new input, and keep inputs without redistribution rights out
 of the repository.
+
+`triergon-font`, `triergon-shape`, `triergon-ass` and `triergon-raster` contain modules
+translated from FreeType, HarfBuzz and libass. Each of these crates ships the projects'
+notices in its `LICENSE` file, and [docs/provenance.md](docs/provenance.md) lists the
+modules, versions and licences. A change that rewrites a listed module from its
+specification updates that list.
 
 `xtask` (repository tooling, never linked into a library crate) contains a deflate
 encoder derived from zlib, under the zlib licence, and an MT19937 generator seeded as

@@ -1,13 +1,13 @@
 //! Atomic typed packet-batch publication; source leaf storage is already bounded.
 use super::{
     configuration::{Configuration, StateChangeJob, StateCopyJob},
-    lace::{Frames, LaceJob},
+    lace::LaceJob,
     mapping::TrackExtensionsJob,
     side_data::{BlockGroupSource, GroupJob, GroupLocation},
     syntax::check,
 };
 use crate::matroska::typed::syntax::Required;
-use crate::zlib::typed_restore::{RestoreJob, RestorePlan};
+use crate::zlib::typed_restore::{COPY_CHUNK_BYTES, RestoreJob, RestorePlan};
 use crate::{
     Error, Limits, Result, ebml,
     incremental::ParseStep,
@@ -16,7 +16,7 @@ use crate::{
     timing::BlockTiming,
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
-use triergon_core::{Budget, BudgetVec, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Time, WorkBudget};
 
 /// Shared Block/SimpleBlock syntax. A caller may supply just the actual prefix;
 /// the same failure is retained until full-body parsing by the scan controller.
@@ -288,9 +288,9 @@ impl Staged {
 /// a frame is restored, so RestoreJob deliberately remains a separate field.
 /// This union needs no new allocation and preserves the original pool minima.
 #[derive(Debug)]
-#[expect(
+#[allow(
     clippy::large_enum_variant,
-    reason = "one exclusive inline workspace preserves allocation-free common paths and original pool minima; packet/lace fixed resource ceilings are tested"
+    reason = "variant sizes vary by target and one inline workspace preserves the packet budget"
 )]
 enum BatchWork {
     Idle,
@@ -403,20 +403,20 @@ impl PacketBatchJob {
         let BatchWork::Lace(job) = &self.job else {
             return Err(Error::Invalid("missing frame plan"));
         };
-        job.frames().map(Frames::len).required("missing frame plan")
+        job.frame_count().required("missing frame plan")
     }
-    fn frame_range(&self, index: usize) -> Result<Range<usize>> {
+    fn frame_range(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Range<usize>>> {
         if (self.flags >> 1) & 3 == 0 {
-            return (index == 0)
-                .then(|| self.payload.clone())
-                .required("missing frame range");
+            return Ok(Some(self.payload.clone()));
         }
-        let BatchWork::Lace(job) = &self.job else {
+        let BatchWork::Lace(job) = &mut self.job else {
             return Err(Error::Invalid("missing frame range"));
         };
-        job.frames()
-            .and_then(|frames| frames.get(index))
-            .required("missing frame range")
+        job.frame_range(self.frame, work, cancel)
     }
     pub(crate) fn step(
         &mut self,
@@ -633,26 +633,23 @@ impl PacketBatchJob {
                         }
                         continue;
                     }
+                    let Some(range) = self.frame_range(work, cancel)? else {
+                        return Ok(ParseStep::Yield);
+                    };
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
                     let track = &self.live_configuration()?.tracks()[self.track];
                     let laced = frames != 1;
-                    if !laced && track.packet_decoder.is_none() && track.packet_prefix.is_empty() {
+                    let plain = scan_track_is_plain(track);
+                    if !laced && plain {
                         // Exactly RestorePlan::identity's immutable source view.
                         // The same one-unit StartFrame admission and subsequent
                         // loop cancellation/Store work gate remain in force.
-                        let range = self.frame_range(self.frame)?;
                         self.ready = Some(std::mem::take(&mut self.source).into_slice(range)?);
                         self.phase = Phase::Store;
                         continue;
                     }
-                    let plan = if let Some(decoder) = &track.packet_decoder {
-                        RestorePlan::from_decoder(decoder)
-                            .borrow_single_stored(!laced && decoder.is_zlib_only())
-                    } else {
-                        RestorePlan::header(track.packet_prefix.clone())
-                    };
                     let limit = if laced {
                         self.limits
                             .block_bytes
@@ -661,7 +658,30 @@ impl PacketBatchJob {
                     } else {
                         self.limits.block_bytes
                     };
-                    let range = self.frame_range(self.frame)?;
+                    let size = range.len();
+                    if plain
+                        && size <= limit.min(COPY_CHUNK_BYTES)
+                        && work.remaining() >= size as u64 + 3
+                        && let Some(input) = self.source.get(range.clone())
+                    {
+                        check(cancel)?;
+                        if let Ok(bytes) =
+                            Bytes::copy_from_slice(self.live_configuration()?.budget(), input)
+                        {
+                            // Charge transform admission, reserve, bytes and freeze.
+                            // Each lace still owns exactly its restored payload.
+                            work.take(size as u64 + 3);
+                            self.ready = Some(SharedBytes::from_core(bytes));
+                            self.phase = Phase::Store;
+                            continue;
+                        }
+                    }
+                    let plan = if let Some(decoder) = &track.packet_decoder {
+                        RestorePlan::from_decoder(decoder)
+                            .borrow_single_stored(!laced && decoder.is_zlib_only())
+                    } else {
+                        RestorePlan::header(track.packet_prefix.clone())
+                    };
                     self.restore = Some(RestoreJob::new(
                         self.source.slice(range)?,
                         plan,

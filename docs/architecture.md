@@ -7,22 +7,24 @@ input, explicit resource bounds and exact timing over convenience.
 
 ## Layers
 
-Crates depend only on layers below them. Core never depends on a format.
+Crates depend only on layers below them. Core never depends on a format. The subtitle and
+H.264/HEVC decoder crates take NAL unit splitting, headers and type classes from
+`triergon-framing`.
 
 | Layer | Crates | Role |
 |---|---|---|
 | Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`); bit reading, RBSP, CABAC and CRCs |
 | Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) (native FLAC, MPEG audio, ADTS, AC-3) | Container readers: tracks, packets, metadata, seeking |
-| Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations) |
+| Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, H.264 and HEVC NAL units and their type classes, ADTS, AC-3, DTS core, AV1, VP9; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Fonts | [`triergon-font`](../crates/font) | OpenType and TrueType faces: tables, collections, cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | Shaping | [`triergon-shape`](../crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
 | Rasterising | [`triergon-raster`](../crates/raster) | Glyph outlines in 26.6 fixed point, their transforms, border stroking, the tile rasteriser, blur, composition and clipping of the alpha bitmaps a subtitle is drawn from |
 | Subtitle scripts | [`triergon-ass`](../crates/ass) | ASS and SSA scripts and Matroska packet streams, styles, typed override tags, the state of every glyph of an event at a time, karaoke, drawings, and rendering them to positioned alpha images |
-| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA |
+| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA, subtitle palette Y'CbCr to RGB |
 | Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-flac`](../crates/codec-flac), [`-mp3`](../crates/codec-mp3), [`-opus`](../crates/codec-opus), [`-vorbis`](../crates/codec-vorbis), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits, audio vocabulary and the shared inverse MDCT; software decoders; MPEG-1 video encoder |
 | Composition | [`triergon`](../crates/triergon), [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Consumer facade with `AnyReader`; packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
-| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`font-worker`](../crates/font-worker), [`shape-worker`](../crates/shape-worker), [`raster-worker`](../crates/raster-worker), [`ass-worker`](../crates/ass-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
+| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`subtitle-worker`](../crates/subtitle-worker), [`triergon-harness-runner`](../crates/harness-runner), [`font-worker`](../crates/font-worker), [`shape-worker`](../crates/shape-worker), [`raster-worker`](../crates/raster-worker), [`ass-worker`](../crates/ass-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
 
 The FFmpeg reference workers, the FreeType font reference, the HarfBuzz and FriBidi
 shaping reference and the libass rasterising and ASS parsing references live in
@@ -106,6 +108,11 @@ choice deliberately and document it. A crate keeps three kinds of API apart:
 A rename keeps every value that reaches a trace (profile strings, error texts)
 unchanged, so worker traces stay byte-identical.
 
+A format whose only consumer need is FFmpeg's result has no specification decoder.
+The DVB, PGS and DVD bitmap subtitles in `triergon-subtitles` are decoded only by
+their receivers in `compat`. The crate root keeps the segment, packet and container
+configuration types that playback binds its tracks with.
+
 ## Dispatch and errors
 
 Readers are concrete types implementing `ContainerReader`, used through generics. A
@@ -119,8 +126,9 @@ limit violation).
 Open structural work. Each step keeps worker traces byte-identical and re-runs the
 performance gates where it touches hot code.
 
-1. **Formats.** MPEG-TS implements `ContainerReader` and becomes an `AnyReader`
-   variant. Track classification moves out of playback into the readers.
+1. **Formats.** The MPEG-TS access-unit reader implements `ContainerReader` and
+   is available through `AnyReader`. Its [supported carriages](../crates/mpegts/README.md#access-units)
+   use format-owned track classification. Additional carriages and seeking are open.
 2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
@@ -135,7 +143,7 @@ performance gates where it touches hot code.
    | Crate | Role |
    |---|---|
    | `triergon-font` | Faces, `cmap`, names, outlines, metrics, `kern`, face matching, a budgeted value `Store`; raw table access for the shaper |
-   | `triergon-shape` | Unicode data generated from the pinned UCD releases its references compiled, the bidirectional algorithm as FriBidi resolves it, and OpenType shaping (GDEF, GSUB, GPOS, `kern` fallback) with the script shapers libass reaches through HarfBuzz: default, Arabic, Hebrew, Indic, Khmer, Myanmar, Thai, Hangul and the Universal Shaping Engine |
+   | `triergon-shape` | Unicode data generated from the pinned UCD releases its references compiled, the bidirectional algorithm of UAX #9 with FriBidi's results where the two differ, and OpenType shaping (GDEF, GSUB, GPOS, `kern` fallback) with the script shapers libass reaches through HarfBuzz: default, Arabic, Hebrew, Indic, Khmer, Myanmar, Thai, Hangul and the Universal Shaping Engine |
    | `triergon-raster` | Outlines in 26.6 fixed point, the glyph transform and its quantisation, flattening, stroking for borders, the tile rasteriser, Gaussian and box blur, the alpha bitmaps borders and shadows combine into, and their rectangle clipping |
    | `triergon-ass` | Script and Matroska-packet parsing, styles, typed override tags, animation, karaoke, drawings, font selection and fallback, line wrapping, alignment, collisions, `\clip`/`\iclip`, and the renderer |
 
@@ -144,8 +152,8 @@ performance gates where it touches hot code.
    fonts with fallback, shapes, wraps, lays out, resolves collisions and draws
    the image list through `triergon-raster`. A Triergon worker and a libass
    worker render the same scripts and packet streams at the same times and
-   frame sizes, and the harness compares every image exactly; vertical text
-   (`@` fonts) is open. Behaviour where libass departs from the ASS
+   frame sizes, and the harness compares every image exactly, `@` fonts
+   included. Behaviour where libass departs from the ASS
    specification by choice will follow the compat-policy convention above.
    The renderer offers no hinting option until libass's hinting-enabled modes and
    FreeType's auto-hinter pass the reference and are gated.

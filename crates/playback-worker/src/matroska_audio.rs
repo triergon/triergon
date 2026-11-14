@@ -19,7 +19,7 @@ use triergon_playback::{
     ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection,
     io::SourceOwner,
     matroska_feed::{
-        MatroskaClock, MatroskaClockPrefix, MatroskaDiscovery, MatroskaDiscoveryLimits,
+        MatroskaClock, MatroskaClockPrefix, MatroskaCompactDiscovery, MatroskaDiscoveryLimits,
         MatroskaDiscoveryStep, MatroskaFeedSetup, MatroskaHevcDolbyFeed, MatroskaHevcDolbySetup,
         MatroskaPacketTiming, MatroskaTrackFeed,
     },
@@ -73,9 +73,16 @@ enum Clock<'a> {
     Dolby(MatroskaClock<'a, MatroskaHevcDolbyFeed>),
 }
 
-fn source_packet(output: &Output) -> Option<&MatroskaPacket> {
-    match output.event() {
-        RawEvent::Matroska(Event::Packet(packet)) => Some(packet),
+fn output_packet(output: &Output) -> Option<&MatroskaPacket> {
+    let RawEvent::Matroska(event) = output.event() else {
+        return None;
+    };
+    source_packet(event)
+}
+
+fn source_packet(event: &Event) -> Option<&MatroskaPacket> {
+    match event {
+        Event::Packet(packet) => Some(packet),
         _ => None,
     }
 }
@@ -138,7 +145,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
         triergon_matroska::Limits::default(),
         QUANTUM,
     )?;
-    let mut discovery = MatroskaDiscovery::new(
+    let mut discovery = MatroskaCompactDiscovery::new(
         engine,
         SourceOwner::new(ByteSource::new(id, raw.clone(), QUANTUM)?),
         Selection::All,
@@ -153,10 +160,9 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
     let mut player = discovered.player;
     let prefix = discovered.prefix;
     let configuration = prefix
-        .as_slice()
-        .iter()
-        .find_map(|output| match output.event() {
-            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+        .events()
+        .find_map(|event| match event {
+            Event::Configuration(configuration) => Some(configuration),
             _ => None,
         })
         .ok_or("no Matroska configuration before the first packet")?;
@@ -165,7 +171,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
     // The discovery prefix is projected as one unit per selected track before any
     // of its rows is delivered, as the native clock resolves earlier unknown times.
     let mut counts = vec![0_usize; feeds.len()];
-    for packet in prefix.as_slice().iter().filter_map(source_packet) {
+    for packet in prefix.events().filter_map(source_packet) {
         if let Some(count) = counts.get_mut(packet.packet.track) {
             *count += 1;
         }
@@ -178,9 +184,11 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
                 let mut probe = feed
                     .native_aac_clock_probe(pool, count)?
                     .ok_or("AAC clock probe")?;
-                for output in prefix.as_slice() {
-                    if source_packet(output).is_some_and(|p| p.packet.track == track) {
-                        let mut job = feed.packet(output)?.ok_or("AAC feed packet")?;
+                for (ordinal, event) in prefix.events().enumerate() {
+                    if source_packet(event).is_some_and(|p| p.packet.track == track) {
+                        let mut job = prefix
+                            .feed_packet(ordinal, feed)?
+                            .ok_or("AAC feed packet")?;
                         probe.push(&ready(|work| job.step(work, &cancel))?)?;
                     }
                 }
@@ -190,7 +198,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
                 let mut probe = feed
                     .native_dolby_clock_probe(pool, count)?
                     .ok_or("Dolby clock probe")?;
-                for packet in prefix.as_slice().iter().filter_map(source_packet) {
+                for packet in prefix.events().filter_map(source_packet) {
                     if packet.packet.track == track {
                         probe.push_source(packet)?;
                     }
@@ -201,7 +209,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
     }
 
     let mut ordinals = vec![0_usize; feeds.len()];
-    for packet in prefix.as_slice().iter().filter_map(source_packet) {
+    for packet in prefix.events().filter_map(source_packet) {
         let track = packet.packet.track;
         let Some(Some(clock)) = prefixes.get(track) else {
             continue;
@@ -229,7 +237,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
     loop {
         let progress = player.read_output(&mut pending, &mut WorkBudget::new(WORK), &cancel)?;
         if let Some(output) = pending.take()
-            && let Some(packet) = source_packet(&output)
+            && let Some(packet) = output_packet(&output)
         {
             let track = packet.packet.track;
             if let Some(Some(clock)) = clocks.get_mut(track) {

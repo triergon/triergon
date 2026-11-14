@@ -1,10 +1,10 @@
 # triergon-pixel
 
-Picture types and the two fixed pixel conversions shared by the capture and playback
-sides: borrowed views of decoded pictures, a macroblock-aligned YUV 4:2:0 picture,
-RGBA → YUV 4:2:0 with ITU-R BT.601 coefficients, and a letterbox that converts a
+Picture types and the fixed pixel conversions shared by the capture, playback and
+subtitle sides: borrowed views of decoded pictures, a macroblock-aligned YUV 4:2:0
+picture, RGBA → YUV 4:2:0 with ITU-R BT.601 coefficients, a letterbox that converts a
 decoded 4:2:0 picture into a 1920×1080 RGBA canvas exactly as FFmpeg's scale/pad
-chain does. It is the pixel layer below the codec crates and depends only on `std`.
+chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer below the codec crates and depends only on `std`.
 It does no general scaling, colour management or other canvas sizes.
 
 ## Usage
@@ -65,6 +65,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 | Coded picture | `Picture` at the macroblock-aligned size of a `Geometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
 | RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass |
 | Letterbox input | 4:2:0, 8-bit and high bit depth (10-bit verified); limited and full range |
+| Palette Y'CbCr → RGB | `YcbcrMatrix::BT601` and `BT709`, studio range in, full range out, `ChannelRounding::Nearest` or `HalfDown`; `rgb(y, cr, cb, rounding)` gives `0xRRGGBB` |
 | Letterbox matrices | H.273 codes 1 (BT.709), 4 (FCC), 7 (SMPTE 240M) and 9 (BT.2020 NCL) select their coefficients; every other code uses BT.601. The same-size 8-bit path also maps code 10 to BT.2020 |
 
 ## Behaviour and limits
@@ -87,6 +88,12 @@ the coded padding.
 with `offset = crop_top * stride + crop_left` (chroma: both halved), so samples left
 of the crop window stay reachable. A view whose `data` starts at the visible origin
 (`offset < stride`) is valid but treated as uncropped on the left.
+
+**Palette Y'CbCr → RGB.** The coefficients are the matrix's, widened by 255/219
+(luma) and 255/224 (chroma) and rounded to 1/1024; each channel sum is rounded once,
+to nearest or half a step below, and clamped to 0–255. This is how FFmpeg's DVD, DVB
+and PGS subtitle decoders convert palette entries, and how its MP4 demuxer converts
+a DVD colour table (half a step below).
 
 **Letterbox.** `Scaler::letterbox` writes the complete canvas: opaque black padding
 and the fitted picture. It reproduces FFmpeg's
@@ -122,6 +129,8 @@ impulses, ramps and constant fields through its public filter API).
   pseudo-random pictures passed through FFmpeg 9.0.2's chain: 8- and 10-bit, 64×240
   to 3840×2160, limited and full range, seven matrix codes, odd fitted widths and a
   tall 528×4216 picture (`tests/fixtures/rgba-reference-digests.txt`).
+- A unit test pins the BT.601 palette conversion, in both roundings, against
+  FFmpeg's DVD palettes.
 - Unit tests pin the fit rule, taps against reference measurements (including
   near ties), the left-crop alignment rule, filter normalisation, the BT.601
   coefficients against their derivation, primaries and extremes, centre-sited

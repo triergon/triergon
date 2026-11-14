@@ -14,13 +14,20 @@
  *   -DTRIERGON_RASTER_REFERENCE   outlines, strokes, rasterising, blur and composition
  *                                 with libass's internal stages (reference_raster.h)
  *   -DTRIERGON_ASS_REFERENCE      ASS scripts, Matroska packets, override tags,
- *                                 drawings and karaoke with libass (reference_ass.h)
+ *                                 drawings, karaoke and frames with libass, its
+ *                                 sources compiled in with checks (reference_ass.h)
+ *   -DTRIERGON_ASS_PLAYER_REFERENCE  frames with libass.a linked untouched, the
+ *                                 measurement reference (reference_ass_player.h)
  *   otherwise                     the container operations below, with the feed
  *                                 and Matroska audio clock
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment, MP4
  *                                 range, MP4 forward, TS program and raw Annex B
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
- *                                 (TRIERGON_COMBINED_REFERENCE) variants. */
+ *                                 (TRIERGON_COMBINED_REFERENCE) variants, and
+ *                                 the subtitle decoders (TRIERGON_SUBTITLE_REFERENCE,
+ *                                 reference_subtitles.h, with the flagging wrappers of
+ *                                 reference_subtitles_host.h; TRIERGON_SUBTITLE_PLAIN_REFERENCE
+ *                                 without them, for timing and memory). */
 #if defined(TRIERGON_DECODE_REFERENCE)
 #include "reference_decode.h"
 #elif defined(TRIERGON_CAPTURE_REFERENCE)
@@ -33,6 +40,8 @@
 #include "reference_raster.h"
 #elif defined(TRIERGON_ASS_REFERENCE)
 #include "reference_ass.h"
+#elif defined(TRIERGON_ASS_PLAYER_REFERENCE)
+#include "reference_ass_player.h"
 #else
 #include <libavformat/avformat.h>
 #ifdef TRIERGON_COMBINED_REFERENCE
@@ -229,6 +238,12 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #include "reference_ts_program.h"
 #include "reference_raw_video.h"
 #include "reference_ts.h"
+/* The formats profile also carries the subtitle demuxers and decoders. */
+#include "reference_pgs.h"
+#include "reference_subtitle_text.h"
+#endif
+#if defined(TRIERGON_SUBTITLE_REFERENCE) || defined(TRIERGON_SUBTITLE_PLAIN_REFERENCE)
+#include "reference_subtitles.h"
 #endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
@@ -242,6 +257,9 @@ int main(int argc,char **argv){
         printf("}\n");return 0;}
 #ifdef TRIERGON_HLS_REFERENCE
     if(!strncmp(argv[1],"progressive-",12))return progressive_main(argc,argv);
+#endif
+#if defined(TRIERGON_SUBTITLE_REFERENCE) || defined(TRIERGON_SUBTITLE_PLAIN_REFERENCE)
+    if(!strncmp(argv[1],"sub-",4))return sub_main(argc,argv);
 #endif
     FILE *file=fopen(argv[2],"rb");if(!file)return 2;
     if(fseek(file,0,SEEK_END)||ftell(file)<0){fclose(file);return 2;}
@@ -260,6 +278,8 @@ int main(int argc,char **argv){
     if(!strncmp(argv[1],"ts-program-",11)){int result=ts_program_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"raw-video-",10)){int result=raw_video_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"ts-",3)){int result=ts_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"pgs-",4)){int result=pgs_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"subtitle-text-",14)){int result=text_main(argc,argv,data,size);free(data);return result;}
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);

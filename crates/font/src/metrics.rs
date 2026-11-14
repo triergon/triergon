@@ -1,6 +1,7 @@
-//! The face-wide tables: `head`, `hhea`, `maxp`, `OS/2` and `hmtx` (OpenType).
+//! The face-wide tables: `head`, `hhea` and `vhea`, `maxp`, `OS/2`, and `hmtx`
+//! and `vmtx` (OpenType).
 
-use crate::read::{Reader, u16_at};
+use crate::read::{Reader, u16_at, u32_at};
 use crate::sfnt::Table;
 use triergon_core::{Error, Result};
 
@@ -39,32 +40,66 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
     })
 }
 
-/// The `hhea` fields a face needs.
+/// The `hhea` fields a face needs, or those of `vhea`, which has the same
+/// layout: vertical ascender, descender and line gap, the largest advance
+/// height and the number of `vmtx` records.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Hhea {
     pub(crate) ascender: i16,
     pub(crate) descender: i16,
     pub(crate) line_gap: i16,
     pub(crate) advance_max: u16,
-    pub(crate) metrics: u16,
+    pub(crate) metrics: u32,
 }
 
-pub(crate) fn hhea(data: &[u8]) -> Result<Hhea> {
-    let mut r = Reader::new(data);
-    r.skip(4)?; // version
-    let ascender = r.i16()?;
-    let descender = r.i16()?;
-    let line_gap = r.i16()?;
-    let advance_max = r.u16()?;
-    r.skip(22)?; // minLeftSideBearing .. metricDataFormat
-    let metrics = r.u16()?;
-    Ok(Hhea {
-        ascender,
-        descender,
-        line_gap,
-        advance_max,
-        metrics,
-    })
+/// A metrics header and the table of its records as FreeType's
+/// `sfnt_load_face` finds them (`tt_face_load_hhea`, `tt_face_load_hmtx`):
+/// the lower-case header (`hhea` or `vhea`) with the lower-case records, else
+/// the extended upper-case header with the upper-case records. `None` when
+/// either is missing.
+///
+/// FreeType reads the header's 34 bytes and its record count, 16-bit or for
+/// an extended header 32-bit, from the file at the table's offset rather than
+/// from the table: a short header reads on into the bytes after it.
+///
+/// # Errors
+///
+/// `Invalid` when the header runs past the end of the file, where FreeType
+/// fails to open the face.
+pub(crate) fn header_and_records(
+    file: &[u8],
+    header: [Option<Table>; 2],
+    records: [Option<Table>; 2],
+) -> Result<Option<(Hhea, Table)>> {
+    let (table, extended) = match header {
+        [Some(table), _] => (table, false),
+        [None, Some(table)] => (table, true),
+        [None, None] => return Ok(None),
+    };
+    let short = |_| Error::Invalid("metrics header past the end of the file");
+    let mut r = Reader::at(file, table.offset).map_err(short)?;
+    let mut read = || -> Result<Hhea> {
+        r.skip(4)?; // version
+        let ascender = r.i16()?;
+        let descender = r.i16()?;
+        let line_gap = r.i16()?;
+        let advance_max = r.u16()?;
+        r.skip(22)?; // minLeftSideBearing .. metricDataFormat
+        let metrics = if extended {
+            r.u32()?
+        } else {
+            u32::from(r.u16()?)
+        };
+        Ok(Hhea {
+            ascender,
+            descender,
+            line_gap,
+            advance_max,
+            metrics,
+        })
+    };
+    let header = read().map_err(short)?;
+    Ok(records[usize::from(extended)].map(|records| (header, records)))
 }
 
 /// `maxp.numGlyphs`; FreeType does not check the table version.
@@ -190,21 +225,31 @@ pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
     }
 }
 
-/// Horizontal advances: `numberOfHMetrics` long records, then side bearings that
-/// reuse the last advance.
+/// Whether `post` declares the face fixed pitch (`isFixedPitch`), which
+/// FreeType reports as `FT_FACE_FLAG_FIXED_WIDTH`; false when the table is
+/// absent or shorter than its 32-byte header.
+pub(crate) fn fixed_pitch(data: Option<&[u8]>) -> bool {
+    match data {
+        Some(post) if post.len() >= 32 => u32_at(post, 12).is_some_and(|v| v != 0),
+        _ => false,
+    }
+}
+
+/// `hmtx` or `vmtx`: long records of an advance (width or height) and a side
+/// bearing (left or top), then side bearings that reuse the last advance.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Hmtx {
+pub(crate) struct LongMetrics {
     table: Table,
     metrics: u16,
 }
 
-impl Hmtx {
+impl LongMetrics {
     /// Records beyond the glyph count are ignored. Reads past the table give
     /// zero, as FreeType reads a short table.
-    pub(crate) fn new(table: Table, metrics: u16, glyphs: u16) -> Self {
+    pub(crate) fn new(table: Table, metrics: u32, glyphs: u16) -> Self {
         Self {
             table,
-            metrics: metrics.min(glyphs),
+            metrics: u16::try_from(metrics).map_or(glyphs, |m| m.min(glyphs)),
         }
     }
 
@@ -224,10 +269,10 @@ impl Hmtx {
         u16_at(bytes, at).unwrap_or(0)
     }
 
-    /// The left side bearing of `glyph`: from its long record, else from the
-    /// side-bearing array after the records; zero where the table lacks it or
-    /// there are no records, as FreeType reads them.
-    pub(crate) fn side_bearing(self, data: &[u8], glyph: u16) -> i16 {
+    /// The side bearing of `glyph`, left or top: from its long record, else
+    /// from the side-bearing array after the records; zero where the table
+    /// lacks it or there are no records, as FreeType reads them.
+    pub(crate) fn bearing(self, data: &[u8], glyph: u16) -> i16 {
         let (glyph, metrics) = (usize::from(glyph), usize::from(self.metrics));
         if metrics == 0 {
             return 0;
@@ -243,7 +288,7 @@ impl Hmtx {
 
 #[cfg(test)]
 mod tests {
-    use super::{Hmtx, glyph_count, head, os2};
+    use super::{LongMetrics, glyph_count, head, header_and_records, os2};
     use crate::sfnt::Table;
 
     #[test]
@@ -265,20 +310,45 @@ mod tests {
         // Two records (100, 200) and one side bearing.
         let data = [0, 100, 0, 0, 0, 200, 0, 0, 0, 5];
         let table = Table { offset: 0, len: 10 };
-        let hmtx = Hmtx::new(table, 2, 3);
+        let hmtx = LongMetrics::new(table, 2, 3);
         assert_eq!([0, 1, 2].map(|g| hmtx.advance(&data, g)), [100, 200, 200]);
-        assert_eq!(
-            [0, 1, 2, 3].map(|g| hmtx.side_bearing(&data, g)),
-            [0, 0, 5, 0]
-        );
+        assert_eq!([0, 1, 2, 3].map(|g| hmtx.bearing(&data, g)), [0, 0, 5, 0]);
         // A record cut off reads as zero; so does a table without records.
-        let short = Hmtx::new(Table { offset: 0, len: 7 }, 2, 3);
+        let short = LongMetrics::new(Table { offset: 0, len: 7 }, 2, 3);
         assert_eq!([0, 1, 2].map(|g| short.advance(&data, g)), [100, 0, 200]);
-        let empty = Hmtx::new(table, 0, 3);
+        let empty = LongMetrics::new(table, 0, 3);
+        assert_eq!((empty.advance(&data, 1), empty.bearing(&data, 1)), (0, 0));
+    }
+
+    #[test]
+    fn metrics_headers_read_from_the_file_as_freetype_reads_them() {
+        let mut file = vec![0_u8; 34];
+        file[4..6].copy_from_slice(&800_i16.to_be_bytes());
+        // A 32-byte `vhea` whose record count is the first advance of the
+        // `vmtx` after it, then that `vmtx`.
+        file.extend([0, 3, 0, 9, 0, 7]);
+        let vhea = Table { offset: 0, len: 32 };
+        let vmtx = Table { offset: 34, len: 4 };
+        let (header, records) = header_and_records(&file, [Some(vhea), None], [Some(vmtx), None])
+            .unwrap()
+            .unwrap();
+        assert_eq!((header.ascender, header.metrics, records), (800, 3, vmtx));
+        // The extended header's count is 32-bit, and its records are the
+        // extended table's; a missing records table leaves both out.
+        let extended = header_and_records(&file, [None, Some(vhea)], [Some(vmtx), Some(vmtx)]);
+        assert_eq!(extended.unwrap().unwrap().0.metrics, 0x3_0009);
         assert_eq!(
-            (empty.advance(&data, 1), empty.side_bearing(&data, 1)),
-            (0, 0)
+            header_and_records(&file, [None, Some(vhea)], [Some(vmtx), None]),
+            Ok(None)
         );
+        assert_eq!(
+            header_and_records(&file, [None, None], [Some(vmtx), None]),
+            Ok(None)
+        );
+        // A header that runs past the end of the file fails the face.
+        let late = Table { offset: 4, len: 32 };
+        assert!(header_and_records(&file[..39], [Some(late), None], [Some(vmtx), None]).is_err());
+        assert!(header_and_records(&file, [Some(late), None], [Some(vmtx), None]).is_ok());
     }
 
     #[test]

@@ -1,8 +1,11 @@
-//! Paired runtime measurement: warm both workers, then time them in randomly
-//! ordered pairs under a host-wide lock, rejecting any run during which a
-//! compiler, linker or FFmpeg process used CPU (or, on Linux, steal time grew).
-//! The whole run is observed: each pair starts from the snapshot that closed the
-//! one before. Every raw sample is kept; equal work is proven by the work digest.
+//! Paired runtime measurement, shared by every timing runner (`report`,
+//! `external-vector`, `codecs time`, `capture qualify`): warm both workers, then
+//! time them in randomly ordered pairs under a host-wide lock, rejecting any run
+//! during which a compiler, linker or FFmpeg process used CPU (or, on Linux,
+//! steal time grew). The whole run is observed: each pair starts from the
+//! snapshot that closed the one before. Every raw sample is kept; equal work is
+//! proven by the work digest. [`benchmark`] writes the one timing record and
+//! [`validate`] grades it.
 
 use std::ffi::OsString;
 use std::fs::{self, File};
@@ -12,6 +15,9 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use super::acceptance::{LINUX_CPU_KEY, active_cpu};
+pub use super::comparison::Work;
+use super::diff::equal;
+use super::linux::py_int;
 use super::validation::{array, field, text};
 use super::worker::{self, arg, data, ok};
 use crate::json::Value;
@@ -480,8 +486,7 @@ pub struct Operation {
     pub arguments: Vec<OsString>,
     /// Candidate compatibility options before the operation name.
     pub candidate_options: Vec<OsString>,
-    /// Contract work fields in addition to the mandatory packet/byte/digest work.
-    pub work_fields: Vec<String>,
+    pub work: Work,
     /// How long one worker run may take.
     pub timeout: Duration,
 }
@@ -546,20 +551,67 @@ pub fn benchmark(
     seed: u64,
     operation: &Operation,
 ) -> Result<Value, String> {
+    lock()?.benchmark(
+        candidate,
+        reference,
+        input,
+        pairs,
+        iterations,
+        seed,
+        operation,
+        || Ok(()),
+    )
+}
+
+impl Lock {
+    /// Call the preparation hook once, immediately before the first worker runs.
+    #[allow(clippy::too_many_arguments)] // Timing inputs and the preparation hook.
+    pub(crate) fn benchmark(
+        &self,
+        candidate: &Path,
+        reference: &Path,
+        input: &Path,
+        pairs: usize,
+        iterations: u32,
+        seed: u64,
+        operation: &Operation,
+        prepare: impl FnOnce() -> Result<(), String>,
+    ) -> Result<Value, String> {
+        let mut prepare = Some(prepare);
+        retry_contaminated(seed, |seed| {
+            benchmark_once(
+                candidate,
+                reference,
+                input,
+                pairs,
+                iterations,
+                seed,
+                operation,
+                &mut prepare,
+            )
+        })
+    }
+}
+
+fn retry_contaminated(
+    first_seed: u64,
+    mut measure: impl FnMut(u64) -> Result<Value, String>,
+) -> Result<Value, String> {
+    let last_seed = first_seed.checked_add(2).ok_or("timing seed overflow")?;
     let mut rejected = Vec::new();
-    let mut last = Value::Null;
-    for attempt in 0..3 {
-        let result = benchmark_once(
-            candidate,
-            reference,
-            input,
-            pairs,
-            iterations,
-            seed + attempt,
-            operation,
-        )?;
+    for seed in first_seed..=last_seed {
+        let mut result = match measure(seed) {
+            Ok(result) => result,
+            Err(error) if rejected.is_empty() => return Err(error),
+            Err(error) => Value::object([
+                ("status", Value::str("timing-attempt-failed")),
+                ("error", Value::str(error)),
+            ]),
+        };
+        if let Value::Object(fields) = &mut result {
+            fields.push(("seed".into(), Value::int(seed)));
+        }
         if result.get("status").and_then(Value::as_str) != Some("contaminated") {
-            let mut result = result;
             if let Value::Object(fields) = &mut result {
                 fields.push((
                     "rejected_contaminated_attempts".into(),
@@ -568,18 +620,18 @@ pub fn benchmark(
             }
             return Ok(result);
         }
-        rejected.push(result.clone());
-        last = result;
+        rejected.push(result);
     }
+    let contaminants = rejected
+        .last()
+        .and_then(|result| result.get("contaminants"))
+        .cloned()
+        .unwrap_or(Value::Array(vec![]));
     Ok(Value::object([
         ("status", Value::str("contaminated")),
         ("rejected_contaminated_attempts", Value::Array(rejected)),
-        (
-            "contaminants",
-            last.get("contaminants")
-                .cloned()
-                .unwrap_or(Value::Array(vec![])),
-        ),
+        ("contaminants", contaminants),
+        ("seed", Value::int(last_seed)),
     ]))
 }
 
@@ -594,39 +646,56 @@ pub struct TimedWorkers {
     directory: PathBuf,
     pub candidate: PathBuf,
     pub reference: PathBuf,
+    reserved_slots: usize,
 }
 
 impl TimedWorkers {
     pub fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
+        let pair = worker::WorkerPair::read(candidate, reference)?;
         let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
-        let copy = |slot: &str, worker: &Path| -> Result<PathBuf, String> {
-            let target = directory.join(slot);
-            fs::create_dir_all(&target).map_err(|e| format!("{}: {e}", target.display()))?;
-            let target = target.join("worker");
-            let bytes = fs::read(worker).map_err(|e| format!("{}: {e}", worker.display()))?;
-            fs::write(&target, bytes).map_err(|e| format!("{}: {e}", target.display()))?;
-            let permissions = fs::metadata(worker)
-                .map_err(|e| format!("{}: {e}", worker.display()))?
-                .permissions();
-            fs::set_permissions(&target, permissions)
-                .map_err(|e| format!("{}: {e}", target.display()))?;
-            Ok(target)
-        };
-        let (candidate, reference) = (copy("a", candidate)?, copy("b", reference)?);
-        Ok(TimedWorkers {
+        let mut timed = Self::reserve(directory)?;
+        timed.reserve_slots()?;
+        pair.write(&timed.directory)?;
+        Ok(timed)
+    }
+
+    fn reserve(directory: PathBuf) -> Result<Self, String> {
+        fs::create_dir(&directory).map_err(|error| format!("{}: {error}", directory.display()))?;
+        let [candidate, reference] = worker::WorkerPair::paths(&directory);
+        Ok(Self {
             directory,
             candidate,
             reference,
+            reserved_slots: 0,
         })
+    }
+
+    fn reserve_slots(&mut self) -> Result<(), String> {
+        for worker in [&self.candidate, &self.reference] {
+            let slot = worker.parent().ok_or("worker path has no parent")?;
+            fs::create_dir(slot).map_err(|error| format!("{}: {error}", slot.display()))?;
+            self.reserved_slots += 1;
+        }
+        Ok(())
     }
 }
 
 impl Drop for TimedWorkers {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.directory);
+        for worker in [&self.candidate, &self.reference]
+            .into_iter()
+            .take(self.reserved_slots)
+        {
+            let _ = fs::remove_file(worker);
+            if let Some(parent) = worker.parent() {
+                let _ = fs::remove_dir(parent);
+            }
+        }
+        let _ = fs::remove_dir(&self.directory);
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Timing inputs and the preparation hook.
 fn benchmark_once(
     candidate: &Path,
     reference: &Path,
@@ -635,6 +704,7 @@ fn benchmark_once(
     iterations: u32,
     seed: u64,
     operation: &Operation,
+    prepare: &mut Option<impl FnOnce() -> Result<(), String>>,
 ) -> Result<Value, String> {
     if pairs < 2 || iterations < 1 {
         return Err("need at least two pairs and one iteration".into());
@@ -687,9 +757,24 @@ fn benchmark_once(
             }
         }};
     }
-    let _lock = lock()?;
+    macro_rules! observe {
+        ($observation:expr) => {
+            match $observation {
+                Ok(value) => value,
+                Err(error) => {
+                    return Ok(status_only(
+                        "timing-environment-invalid",
+                        &samples,
+                        &warmups,
+                        &observations,
+                        vec![("error", Value::str(error))],
+                    ));
+                }
+            }
+        };
+    }
     module_check!("before-timing-session");
-    let busy = competing_builds()?;
+    let busy = observe!(competing_builds());
     if !busy.is_empty() {
         return Ok(status_only(
             "contaminated",
@@ -703,9 +788,23 @@ fn benchmark_once(
         .iter()
         .map(|(n, w)| Ok((*n, digest(w)?)))
         .collect::<Result<_, String>>()?;
-    let input_sha = digest(input)?;
+    let input_sha = match digest(input) {
+        Ok(hash) => hash,
+        Err(error) => {
+            return Ok(status_only(
+                "input-check-failed",
+                &samples,
+                &warmups,
+                &observations,
+                vec![("input_error", Value::str(error))],
+            ));
+        }
+    };
     for (name, worker) in &workers {
         module_check!(format!("before-warmup:{name}"));
+        if let Some(prepare) = prepare.take() {
+            prepare()?;
+        }
         let warm = worker::execute(&argv(name, worker), operation.timeout);
         warmups.push(Value::object([
             ("worker", Value::str(*name)),
@@ -723,7 +822,7 @@ fn benchmark_once(
         }
     }
     let Ok(warm_work) =
-        super::comparison::warmup_work(&warmups, i128::from(iterations), &operation.work_fields)
+        super::comparison::warmup_work(&warmups, i128::from(iterations), &operation.work)
     else {
         return Ok(status_only(
             "unequal-work",
@@ -733,8 +832,9 @@ fn benchmark_once(
             vec![],
         ));
     };
-    let mut before = cpu_snapshot()?;
+    let mut before = observe!(cpu_snapshot());
     let mut watch = ContaminationWatch::new(before.clone());
+    let mut values = Vec::new();
     for index in 0..pairs {
         let mut order = [0usize, 1];
         rng.shuffle(&mut order);
@@ -758,23 +858,28 @@ fn benchmark_once(
             *samples.last_mut().expect("row") = Value::Object(row.clone());
             module_check!(format!("after-pair:{index}:{name}"));
         }
-        let after = cpu_snapshot()?;
+        let after = observe!(cpu_snapshot());
         row.push(("cpu_after".into(), after.clone()));
-        *samples.last_mut().expect("row") = Value::Object(row);
+        let row = Value::Object(row);
         let mut busy = active_cpu(&before, &after, false);
         busy.extend(watch.observe(&after, Instant::now()));
-        if !busy.is_empty() {
-            return Ok(status_only(
-                "contaminated",
-                &samples,
-                &warmups,
-                &observations,
-                vec![("contaminants", Value::strings(busy))],
-            ));
+        let pair = checked_pair(&row, &warm_work, iterations, operation, !busy.is_empty());
+        *samples.last_mut().expect("row") = row;
+        match pair {
+            Ok(pair) => values.push(pair),
+            Err(status) => {
+                return Ok(status_only(
+                    status,
+                    &samples,
+                    &warmups,
+                    &observations,
+                    vec![("contaminants", Value::strings(busy))],
+                ));
+            }
         }
         before = after;
     }
-    let busy = watch.close()?;
+    let busy = observe!(watch.close());
     if !busy.is_empty() {
         return Ok(status_only(
             "contaminated",
@@ -784,52 +889,24 @@ fn benchmark_once(
             vec![("contaminants", Value::strings(busy))],
         ));
     }
-    let mut values = Vec::new();
-    for row in &samples {
-        if workers.iter().any(|(n, _)| !row.get(n).is_some_and(ok)) {
+    let input_after = match digest(input) {
+        Ok(hash) => hash,
+        Err(error) => {
             return Ok(status_only(
-                "worker-failure",
+                "input-check-failed",
                 &samples,
                 &warmups,
                 &observations,
-                vec![],
+                vec![("input_error", Value::str(error))],
             ));
         }
-        let (a, b) = (
-            data(row.get("candidate").unwrap()),
-            data(row.get("reference").unwrap()),
-        );
-        let work = super::comparison::paired_timing_work(
-            row.get("candidate").expect("checked candidate"),
-            row.get("reference").expect("checked reference"),
-            i128::from(iterations),
-            &operation.work_fields,
-        );
-        if !work
-            .as_ref()
-            .is_ok_and(|w| super::diff::equal(w, &warm_work))
-        {
-            return Ok(status_only(
-                "unequal-work",
-                &samples,
-                &warmups,
-                &observations,
-                vec![],
-            ));
-        }
-        let elapsed = |d: &Value| {
-            d.get("elapsed_ns")
-                .and_then(Value::as_f64)
-                .unwrap_or(f64::NAN)
-        };
-        values.push((elapsed(a), elapsed(b)));
-    }
+    };
     let unchanged = [candidate, reference]
         .into_iter()
         .chain(workers.iter().map(|(_, w)| w.as_path()))
         .zip(hashes.iter().chain(&hashes))
         .all(|(w, (_, h))| digest(w).is_ok_and(|d| &d == h))
-        && digest(input)? == input_sha;
+        && input_after == input_sha;
     if !unchanged {
         return Ok(status_only(
             "worker-or-input-changed",
@@ -863,17 +940,9 @@ fn benchmark_once(
             Value::object(hashes.iter().map(|(n, h)| (*n, Value::str(h)))),
         ),
         ("input_sha256", Value::str(input_sha)),
-        ("seed", Value::int(seed as i64)),
         ("iterations", Value::int(iterations)),
         ("pairs", Value::int(pairs as i64)),
-        (
-            "ratio",
-            Value::object([
-                ("median", Value::float(summary.median)),
-                ("lower_95", Value::float(summary.lower_95)),
-                ("upper_95", Value::float(summary.upper_95)),
-            ]),
-        ),
+        ("ratio", interval_value(&summary)),
         ("samples", Value::Array(samples.clone())),
         ("warmups", Value::Array(warmups)),
         ("contaminants", Value::Array(vec![])),
@@ -886,9 +955,374 @@ fn benchmark_once(
     ]))
 }
 
+/// Check a completed pair before its attempt can be retried for contamination.
+fn checked_pair(
+    row: &Value,
+    warm_work: &Value,
+    iterations: u32,
+    operation: &Operation,
+    contaminated: bool,
+) -> Result<(f64, f64), &'static str> {
+    let candidate = row
+        .get("candidate")
+        .filter(|result| ok(result))
+        .ok_or("worker-failure")?;
+    let reference = row
+        .get("reference")
+        .filter(|result| ok(result))
+        .ok_or("worker-failure")?;
+    let work = super::comparison::paired_timing_work(
+        candidate,
+        reference,
+        i128::from(iterations),
+        &operation.work,
+    )
+    .map_err(|_| "unequal-work")?;
+    if !equal(&work, warm_work) {
+        return Err("unequal-work");
+    }
+    let elapsed = |outcome: &Value| {
+        data(outcome)
+            .get("elapsed_ns")
+            .and_then(Value::as_f64)
+            .filter(|elapsed| elapsed.is_finite() && *elapsed > 0.0)
+            .ok_or("invalid-timing")
+    };
+    let values = (elapsed(candidate)?, elapsed(reference)?);
+    if contaminated {
+        return Err("contaminated");
+    }
+    Ok(values)
+}
+
+/// A ratio interval as timing records store it.
+pub fn interval_value(interval: &stats::Interval) -> Value {
+    Value::object([
+        ("median", Value::float(interval.median)),
+        ("lower_95", Value::float(interval.lower_95)),
+        ("upper_95", Value::float(interval.upper_95)),
+    ])
+}
+
+/// What a timing record must show to count, beyond its own consistency.
+pub struct Expected<'a> {
+    /// The SHA-256 of each worker, by role.
+    pub worker_hashes: &'a Value,
+    /// The SHA-256 of the input, where the caller knows it.
+    pub input_sha256: Option<&'a Value>,
+    pub minimum_pairs: i128,
+    pub work: &'a Work,
+    /// Whether every CPU snapshot must carry Linux accounting.
+    pub require_linux: bool,
+    /// Whether the record must prove the RSS kernel module absent; a record
+    /// that names the policy is always held to it.
+    pub module_absence: bool,
+}
+
+/// Grade a timing record written by [`benchmark`]: the declared pairs, the
+/// worker and input bindings, module absence, a clean CPU record around every
+/// pair, the same work in both warmups and every pair, and a ratio interval
+/// that the samples reproduce. Returns that interval.
+pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interval, String> {
+    let raw = timing
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap_or_default();
+    let (Some(pairs), Some(iterations)) = (
+        py_int(timing.get("pairs")),
+        py_int(timing.get("iterations")),
+    ) else {
+        return Err("timing without pairs or iterations".into());
+    };
+    if raw.len() as i128 != pairs || (raw.len() as i128) < expected.minimum_pairs {
+        return Err("timing pairs incomplete".into());
+    }
+    if !timing
+        .get("worker_hashes")
+        .is_some_and(|hashes| equal(hashes, expected.worker_hashes))
+    {
+        return Err("timed workers differ".into());
+    }
+    if expected
+        .input_sha256
+        .is_some_and(|input| timing.get("input_sha256") != Some(input))
+    {
+        return Err("timed input differs".into());
+    }
+    if timing.get("timing_module_policy").is_some() || expected.module_absence {
+        validate_module_absence(timing, raw, expected.require_linux)?;
+    }
+    let work = expected.work;
+    let mut expected_work = match timing.get("warmups") {
+        Some(Value::Array(warmups)) => {
+            Some(super::comparison::warmup_work(warmups, iterations, work)?)
+        }
+        // Records from before warmups were kept prove the ordinary work only.
+        None if work.is_base() => None,
+        _ => return Err("timing without warmups".into()),
+    };
+    let mut paired = Vec::new();
+    for (index, sample) in raw.iter().enumerate() {
+        if py_int(sample.get("pair")) != Some(index as i128)
+            || matches!(sample.get("pair"), Some(Value::Bool(_)))
+        {
+            return Err(format!("timing pair {index} out of order"));
+        }
+        let (Some(before), Some(after)) = (sample.get("cpu_before"), sample.get("cpu_after"))
+        else {
+            return Err(format!("timing pair {index} without CPU snapshots"));
+        };
+        let busy = active_cpu(before, after, expected.require_linux);
+        if !busy.is_empty() {
+            return Err(format!(
+                "timing pair {index} contaminated: {}",
+                busy.join(", ")
+            ));
+        }
+        let (Some(candidate), Some(reference)) = (sample.get("candidate"), sample.get("reference"))
+        else {
+            return Err(format!("timing pair {index} incomplete"));
+        };
+        let done = super::comparison::paired_timing_work(candidate, reference, iterations, work)?;
+        if expected_work.as_ref().is_some_and(|w| !equal(w, &done)) {
+            return Err(format!("timing pair {index} did other work"));
+        }
+        expected_work = Some(done);
+        let elapsed = |outcome: &Value| py_int(data(outcome).get("elapsed_ns")).unwrap_or(0) as f64;
+        paired.push((elapsed(candidate), elapsed(reference)));
+    }
+    let seed = py_int(timing.get("seed")).unwrap_or(0);
+    let interval = stats::ratio_interval(&paired, seed as u64, 4000)?;
+    if !timing
+        .get("ratio")
+        .is_some_and(|ratio| equal(ratio, &interval_value(&interval)))
+    {
+        return Err("recorded ratio differs from its samples".into());
+    }
+    Ok(interval)
+}
+
+/// The fewest pairs a runtime gate result rests on.
+pub const GATE_PAIRS: usize = 30;
+
+/// A timing session and its grade.
+pub struct Graded {
+    /// The session's timing record, as [`benchmark`] wrote it.
+    pub record: Value,
+    /// The validator's interval, or why the session does not count.
+    pub interval: Result<stats::Interval, String>,
+}
+
+impl Graded {
+    /// `measured`, `invalid-timing` for a measured record the validator
+    /// refuses, or the status the session ended with.
+    pub fn status(&self) -> &str {
+        match (
+            self.record.get("status").and_then(Value::as_str),
+            &self.interval,
+        ) {
+            (_, Ok(_)) => "measured",
+            (Some("measured"), Err(_)) => "invalid-timing",
+            (status, Err(_)) => status.unwrap_or("timing-attempt-failed"),
+        }
+    }
+
+    /// The fields every timing result carries: its status, the validator's
+    /// interval, or its reason when it refuses a measured record, and the
+    /// record itself. Only a graded result has a `ratio`.
+    pub fn into_fields(self) -> Vec<(String, Value)> {
+        let mut fields = vec![("status".to_owned(), Value::str(self.status()))];
+        match (
+            self.record.get("status").and_then(Value::as_str),
+            &self.interval,
+        ) {
+            (_, Ok(interval)) => fields.push(("ratio".to_owned(), interval_value(interval))),
+            (Some("measured"), Err(reason)) => {
+                fields.push(("invalid".to_owned(), Value::str(reason)));
+            }
+            _ => {}
+        }
+        fields.push(("timing".to_owned(), self.record));
+        fields
+    }
+}
+
+/// One session of `pairs` pairs under the benchmark lock, graded as
+/// [`Lock::measure`] grades it.
+pub fn measure(
+    candidate: &Path,
+    reference: &Path,
+    input: &Path,
+    pairs: usize,
+    iterations: u32,
+    seed: u64,
+    operation: &Operation,
+) -> Result<Graded, String> {
+    lock()?.measure(
+        candidate,
+        reference,
+        input,
+        pairs,
+        iterations,
+        seed,
+        operation,
+        || Ok(()),
+    )
+}
+
+impl Lock {
+    /// One session of `pairs` pairs, graded against the workers and input as
+    /// they are now: every pair the session was asked for must be there.
+    /// `prepare` runs once, immediately before the first worker. A session that
+    /// fails once it has prepared is kept as a `timing-attempt-failed` record;
+    /// one that fails before is an error.
+    #[allow(clippy::too_many_arguments)] // Timing inputs and the preparation hook.
+    pub(crate) fn measure(
+        &self,
+        candidate: &Path,
+        reference: &Path,
+        input: &Path,
+        pairs: usize,
+        iterations: u32,
+        seed: u64,
+        operation: &Operation,
+        prepare: impl FnOnce() -> Result<(), String>,
+    ) -> Result<Graded, String> {
+        let mut prepared = false;
+        let record = self.benchmark(
+            candidate,
+            reference,
+            input,
+            pairs,
+            iterations,
+            seed,
+            operation,
+            || {
+                prepare()?;
+                prepared = true;
+                Ok(())
+            },
+        );
+        let record = match record {
+            Ok(record) => record,
+            Err(error) if prepared => Value::object([
+                ("status", Value::str("timing-attempt-failed")),
+                ("error", Value::str(error)),
+            ]),
+            Err(error) => return Err(error),
+        };
+        let interval = match record.get("status").and_then(Value::as_str) {
+            Some("measured") => {
+                let hashes = Value::object([
+                    ("candidate", Value::str(digest(candidate)?)),
+                    ("reference", Value::str(digest(reference)?)),
+                ]);
+                validate(
+                    &record,
+                    &Expected {
+                        worker_hashes: &hashes,
+                        input_sha256: Some(&Value::str(digest(input)?)),
+                        minimum_pairs: pairs as i128,
+                        work: &operation.work,
+                        require_linux: is_linux(),
+                        module_absence: true,
+                    },
+                )
+            }
+            status => Err(format!("timing {}", status.unwrap_or("not measured"))),
+        };
+        Ok(Graded { record, interval })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn worker_failure_and_work_mismatch_precede_contamination() {
+        let operation = Operation {
+            prefix: String::new(),
+            arguments: vec![],
+            candidate_options: vec![],
+            work: Work::default(),
+            timeout: Duration::from_secs(1),
+        };
+        let run = |packets| {
+            Value::object([
+                ("status", Value::str("ok")),
+                (
+                    "data",
+                    Value::object([
+                        ("iterations", Value::int(2)),
+                        ("packets", Value::int(packets)),
+                        ("bytes", Value::int(188)),
+                        ("digest", Value::int(17)),
+                        ("elapsed_ns", Value::int(20)),
+                    ]),
+                ),
+            ])
+        };
+        let warm =
+            super::super::comparison::paired_timing_work(&run(1), &run(1), 2, &operation.work)
+                .unwrap();
+        let row = |candidate| Value::object([("candidate", candidate), ("reference", run(1))]);
+        let check = |candidate| checked_pair(&row(candidate), &warm, 2, &operation, true);
+        assert_eq!(
+            check(Value::object([("status", Value::str("failed"))])),
+            Err("worker-failure")
+        );
+        assert_eq!(check(run(2)), Err("unequal-work"));
+        assert_eq!(check(run(1)), Err("contaminated"));
+    }
+
+    #[test]
+    fn three_contaminated_attempts_keep_each_seed_and_the_last() {
+        let result = retry_contaminated(280, |_| {
+            Ok(Value::object([("status", Value::str("contaminated"))]))
+        })
+        .unwrap();
+        assert_eq!(result.get("seed"), Some(&Value::int(282)));
+        let seeds: Vec<_> = result
+            .get("rejected_contaminated_attempts")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .map(|attempt| attempt.get("seed").cloned())
+            .collect();
+        assert_eq!(seeds, [280, 281, 282].map(|seed| Some(Value::int(seed))));
+    }
+
+    #[test]
+    fn failed_retry_preserves_rejected_samples() {
+        let first = Value::object([
+            ("status", Value::str("contaminated")),
+            ("samples", Value::Array(vec![Value::int(17)])),
+        ]);
+        let result = retry_contaminated(280, |seed| match seed {
+            280 => Ok(first.clone()),
+            281 => Err("input unreadable".into()),
+            _ => panic!("timing must stop on a failed retry"),
+        })
+        .unwrap();
+        assert_eq!(
+            result.get("status").and_then(Value::as_str),
+            Some("timing-attempt-failed")
+        );
+        assert_eq!(
+            result.get("error").and_then(Value::as_str),
+            Some("input unreadable")
+        );
+        assert_eq!(
+            result.get("rejected_contaminated_attempts"),
+            Some(&Value::Array(vec![Value::object([
+                ("status", Value::str("contaminated")),
+                ("samples", Value::Array(vec![Value::int(17)])),
+                ("seed", Value::int(280)),
+            ])]))
+        );
+        assert_eq!(result.get("seed"), Some(&Value::int(281)));
+    }
 
     #[test]
     fn failed_timing_preserves_complete_warmups_and_module_observations() {
@@ -910,12 +1344,91 @@ mod tests {
     }
 
     #[test]
+    fn a_worker_whose_own_output_changes_between_pairs_is_refused() {
+        let run = |digest: i64| {
+            Value::object([
+                ("status", Value::str("ok")),
+                (
+                    "data",
+                    Value::object([
+                        ("iterations", Value::int(1)),
+                        ("elapsed_ns", Value::int(100)),
+                        ("packets", Value::int(2)),
+                        ("bytes", Value::int(40)),
+                        ("digest", Value::int(digest)),
+                    ]),
+                ),
+            ])
+        };
+        let hashes = Value::object([
+            ("candidate", Value::str("a")),
+            ("reference", Value::str("b")),
+        ]);
+        let interval = stats::ratio_interval(&[(100.0, 100.0); 2], 0, 4000).unwrap();
+        let record = |second: i64| {
+            let samples = [7, second]
+                .into_iter()
+                .enumerate()
+                .map(|(pair, digest)| {
+                    Value::object([
+                        ("pair", Value::int(pair as i64)),
+                        ("order", Value::strings(["candidate", "reference"])),
+                        ("candidate", run(digest)),
+                        ("reference", run(9)),
+                        ("cpu_before", Value::Object(vec![])),
+                        ("cpu_after", Value::Object(vec![])),
+                    ])
+                })
+                .collect();
+            let warmup = |worker: &str, digest: i64| {
+                Value::object([("worker", Value::str(worker)), ("result", run(digest))])
+            };
+            Value::object([
+                ("pairs", Value::int(2)),
+                ("iterations", Value::int(1)),
+                ("seed", Value::int(0)),
+                ("worker_hashes", hashes.clone()),
+                ("ratio", interval_value(&interval)),
+                (
+                    "warmups",
+                    Value::Array(vec![warmup("candidate", 7), warmup("reference", 9)]),
+                ),
+                ("samples", Value::Array(samples)),
+            ])
+        };
+        let own = Work {
+            fields: vec![],
+            own: vec!["digest".to_owned()],
+        };
+        let expected = Expected {
+            worker_hashes: &hashes,
+            input_sha256: None,
+            minimum_pairs: 2,
+            work: &own,
+            require_linux: false,
+            module_absence: false,
+        };
+        assert!(validate(&record(7), &expected).is_ok());
+        assert_eq!(
+            validate(&record(8), &expected).unwrap_err(),
+            "timing pair 1 did other work"
+        );
+        // Without own work, the two workers' different digests are unequal work.
+        let shared = Work::default();
+        let strict = Expected {
+            work: &shared,
+            ..expected
+        };
+        assert!(validate(&record(7), &strict).is_err());
+    }
+
+    #[test]
     fn compatibility_options_apply_only_to_the_candidate() {
         let operation = Operation {
             prefix: "open-".into(),
             arguments: ["1", "0", "memory", "4096"].map(OsString::from).to_vec(),
             candidate_options: vec!["--bounded-timing".into(), "--bounded-sync".into()],
-            work_fields: vec![],
+            work: Work::default(),
             timeout: worker::DEFAULT_TIMEOUT,
         };
         let expected = ["open-bench", "input.mov", "50", "1", "0", "memory", "4096"]
@@ -939,7 +1452,7 @@ mod tests {
             prefix: "hls-".into(),
             arguments: vec!["avc".into(), "aac".into()],
             candidate_options: vec![],
-            work_fields: vec![],
+            work: Work::default(),
             timeout: worker::DEFAULT_TIMEOUT,
         };
         for candidate in [false, true] {
@@ -967,6 +1480,37 @@ mod tests {
         let directory = timed.directory.clone();
         drop(timed);
         assert!(!directory.exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn timed_workers_keep_other_output_in_the_staging_directory() {
+        let dir = crate::walk::scratch("timed-workers-output");
+        let candidate = dir.join("candidate");
+        let reference = dir.join("reference");
+        fs::write(&candidate, b"candidate").unwrap();
+        fs::write(&reference, b"reference").unwrap();
+        let timed = TimedWorkers::new(&candidate, &reference).unwrap();
+        let grade = timed.directory.join("a/report.json");
+        fs::write(&grade, b"saved grade").unwrap();
+        assert!(TimedWorkers::new(&candidate, &reference).is_err());
+        assert_eq!(fs::read(&grade).unwrap(), b"saved grade");
+        drop(timed);
+        assert_eq!(fs::read(&grade).unwrap(), b"saved grade");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn timed_workers_keep_another_commands_empty_reservation() {
+        let dir = crate::walk::scratch("timed-workers-reserved-slot");
+        let mut timed = TimedWorkers::reserve(dir.join("staging")).unwrap();
+        let grade = timed.directory.join("b");
+        fs::create_dir(&grade).unwrap();
+        assert!(timed.reserve_slots().is_err());
+        assert!(timed.directory.join("a").is_dir());
+        drop(timed);
+        assert!(grade.is_dir());
+        assert!(!dir.join("staging/a").exists());
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -1204,9 +1748,6 @@ mod tests {
         let expected =
             crate::json::parse(r#"{"123": {"name": "clang", "cpu_ticks": 6234, "state": "S"}}"#)
                 .unwrap();
-        assert!(
-            super::super::diff::equal(&snapshot, &expected),
-            "{snapshot:?}"
-        );
+        assert!(equal(&snapshot, &expected), "{snapshot:?}");
     }
 }

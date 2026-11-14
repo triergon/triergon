@@ -6,11 +6,6 @@
     "sha256": "7ac8da8b122174fd8fc2f1b18228b0a9aa5a467c4c312b35dd61511024f522b5",
     "bytes": 135925
   },
-  "actual_mapped2": {
-    "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/encoded-cursor-1/ACTUAL-EVIDENCE.json",
-    "sha256": "d2e1f26b67fa34a1a63f6a2341508ee627441a87a32850238b0fdb10914a4313",
-    "bytes": 20900
-  },
   "primary": {
     "url": "https://www.etsi.org/deliver/etsi_en/300700_300799/300743/01.06.01_60/en_300743v010601p.pdf",
     "sha256": "1a5b211303397c52b771eb11e8f9f844d88727ecccd3fe0a5e8a6ac961d93e87",
@@ -21,9 +16,8 @@
     ]
   },
   "origins": {
-    ".source-dvb/.source-indices/.source-palette": "Independent original source art/oracle, byte-identical; not native decoder output.",
-    ".native-indices/.native-rgba": "Literal full old12 default native observations, all words and transparent RGB retained in unchanged cases.rs.",
-    "mapped-controls": "Original whole authored carriers, source and independent source indices; actual mapped2 selects encoded suppression, not normative policy."
+    ".source-dvb": "Independent original source art, byte-identical; not native decoder output.",
+    ".native-indices/.native-rgba": "Literal full old12 default native observations, all words and transparent RGB retained in unchanged cases.rs."
   },
   "fixture_copies": [
     {
@@ -55,24 +49,6 @@
     },
     {
       "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-literal-flag0.source-indices",
-        "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag0.source-indices",
-      "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-literal-flag0.source-palette",
-        "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce",
-        "bytes": 16
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag0.source-palette",
-      "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce"
-    },
-    {
-      "original": {
         "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-literal-flag1.native-indices",
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
@@ -97,24 +73,6 @@
       },
       "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag1.source-dvb",
       "sha256": "e5289acc1800dcf5cc5daa228b0f3a23e001f4d979af769d2dadb5a1f12d970c"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-literal-flag1.source-indices",
-        "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag1.source-indices",
-      "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-literal-flag1.source-palette",
-        "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce",
-        "bytes": 16
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag1.source-palette",
-      "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce"
     },
     {
       "original": {
@@ -145,24 +103,6 @@
     },
     {
       "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-run-flag0.source-indices",
-        "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag0.source-indices",
-      "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-run-flag0.source-palette",
-        "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce",
-        "bytes": 16
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag0.source-palette",
-      "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce"
-    },
-    {
-      "original": {
         "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-run-flag1.native-indices",
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
@@ -187,24 +127,6 @@
       },
       "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag1.source-dvb",
       "sha256": "7dda9e1dfaa33113383af2c0b2145ca15573a6f5903e6c5ebfd565d2dea2e7bb"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-run-flag1.source-indices",
-        "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag1.source-indices",
-      "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb2-run-flag1.source-palette",
-        "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce",
-        "bytes": 16
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag1.source-palette",
-      "sha256": "4670ed24fdf3e6c2c427096bfd0e938e4c59015cff67fa72948499e790082fce"
     },
     {
       "original": {
@@ -235,24 +157,6 @@
     },
     {
       "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-literal-flag0.source-indices",
-        "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag0.source-indices",
-      "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-literal-flag0.source-palette",
-        "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04",
-        "bytes": 64
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag0.source-palette",
-      "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04"
-    },
-    {
-      "original": {
         "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-literal-flag1.native-indices",
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
@@ -277,24 +181,6 @@
       },
       "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag1.source-dvb",
       "sha256": "fd8be94e05c39faab0aded260b9e2ab787571431baff601afc1b4e08053bd091"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-literal-flag1.source-indices",
-        "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag1.source-indices",
-      "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-literal-flag1.source-palette",
-        "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04",
-        "bytes": 64
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag1.source-palette",
-      "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04"
     },
     {
       "original": {
@@ -325,24 +211,6 @@
     },
     {
       "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-run-flag0.source-indices",
-        "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag0.source-indices",
-      "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-run-flag0.source-palette",
-        "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04",
-        "bytes": 64
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag0.source-palette",
-      "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04"
-    },
-    {
-      "original": {
         "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-run-flag1.native-indices",
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
@@ -367,24 +235,6 @@
       },
       "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag1.source-dvb",
       "sha256": "4e096b134929bee1079de32ab21029716095c7fd1ed8423bf40817b58125e1b7"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-run-flag1.source-indices",
-        "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag1.source-indices",
-      "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb4-run-flag1.source-palette",
-        "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04",
-        "bytes": 64
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag1.source-palette",
-      "sha256": "13e5954920345957419dbed7236aac90958b4d4f6de7367b525995376e069c04"
     },
     {
       "original": {
@@ -415,24 +265,6 @@
     },
     {
       "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-literal-flag0.source-indices",
-        "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag0.source-indices",
-      "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-literal-flag0.source-palette",
-        "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276",
-        "bytes": 1024
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag0.source-palette",
-      "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276"
-    },
-    {
-      "original": {
         "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-literal-flag1.native-indices",
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
@@ -457,24 +289,6 @@
       },
       "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag1.source-dvb",
       "sha256": "92210ecca8df6091e6ad7e56c60d1918a3002e136c42cee9f182d911793edb24"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-literal-flag1.source-indices",
-        "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag1.source-indices",
-      "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-literal-flag1.source-palette",
-        "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276",
-        "bytes": 1024
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag1.source-palette",
-      "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276"
     },
     {
       "original": {
@@ -505,24 +319,6 @@
     },
     {
       "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-run-flag0.source-indices",
-        "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag0.source-indices",
-      "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-run-flag0.source-palette",
-        "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276",
-        "bytes": 1024
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag0.source-palette",
-      "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276"
-    },
-    {
-      "original": {
         "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-run-flag1.native-indices",
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
@@ -547,87 +343,6 @@
       },
       "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag1.source-dvb",
       "sha256": "eb87c388ffdc2e078b2aa7fc8eaad5a1992078da7b181f7bb5631654c3c472a7"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-run-flag1.source-indices",
-        "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag1.source-indices",
-      "sha256": "cfb61343aa286427acc445b5433eb029a66712259df6a9c56d8521831022abaa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/dvb8-run-flag1.source-palette",
-        "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276",
-        "bytes": 1024
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag1.source-palette",
-      "sha256": "b2be8c436e76fe117839204b6527980e9513d0c087f9e96a2347cad13fcc9276"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/fixtures/logical-width-overrun.dvb",
-        "sha256": "619fb7344ad9c634cc54110ff3e98374488c5e3340fedbeb6b1254ae18a4f577",
-        "bytes": 103
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/logical-width-overrun.dvb",
-      "sha256": "619fb7344ad9c634cc54110ff3e98374488c5e3340fedbeb6b1254ae18a4f577"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/mapped-controls/map2to4-raw1-to2-raw2-to1.dvb",
-        "sha256": "c75d8b131d0d4d615b5ef85557a981b16a2c7cdf4bbc2cee3e781a9538cd67fa",
-        "bytes": 177
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/mapped-controls/map2to4-raw1-to2-raw2-to1.dvb",
-      "sha256": "c75d8b131d0d4d615b5ef85557a981b16a2c7cdf4bbc2cee3e781a9538cd67fa"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/mapped-controls/map2to4-raw1-to2-raw2-to1.mkv",
-        "sha256": "1087534edf27f2d9c4fd1ce1da4ae90b6c3e5c2d019c6b9f6779355dc06e0c4c",
-        "bytes": 488
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/mapped-controls/map2to4-raw1-to2-raw2-to1.mkv",
-      "sha256": "1087534edf27f2d9c4fd1ce1da4ae90b6c3e5c2d019c6b9f6779355dc06e0c4c"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/mapped-controls/map2to4-raw1-to2-raw2-to1.source-indices",
-        "sha256": "aa10a960c070c93dda8ea0b506d6327012dc3071625ececf0da8f57dc30d1b23",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/mapped-controls/map2to4-raw1-to2-raw2-to1.source-indices",
-      "sha256": "aa10a960c070c93dda8ea0b506d6327012dc3071625ececf0da8f57dc30d1b23"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/mapped-controls/map2to8-raw1-to2-raw2-to1.dvb",
-        "sha256": "0c929b89893b548186ee904777631379b34a37f7912f081ec4bde623f6f9e0ef",
-        "bytes": 1619
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/mapped-controls/map2to8-raw1-to2-raw2-to1.dvb",
-      "sha256": "0c929b89893b548186ee904777631379b34a37f7912f081ec4bde623f6f9e0ef"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/mapped-controls/map2to8-raw1-to2-raw2-to1.mkv",
-        "sha256": "f2fe0ac5b1f4dada3bc9b13bdf704c5137897bc9776ea55e0f1f1fbdae617276",
-        "bytes": 1930
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/mapped-controls/map2to8-raw1-to2-raw2-to1.mkv",
-      "sha256": "f2fe0ac5b1f4dada3bc9b13bdf704c5137897bc9776ea55e0f1f1fbdae617276"
-    },
-    {
-      "original": {
-        "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/mapped-controls/map2to8-raw1-to2-raw2-to1.source-indices",
-        "sha256": "aa10a960c070c93dda8ea0b506d6327012dc3071625ececf0da8f57dc30d1b23",
-        "bytes": 10
-      },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/mapped-controls/map2to8-raw1-to2-raw2-to1.source-indices",
-      "sha256": "aa10a960c070c93dda8ea0b506d6327012dc3071625ececf0da8f57dc30d1b23"
     }
   ],
   "actual101_completion": {

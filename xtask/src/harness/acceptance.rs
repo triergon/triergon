@@ -12,7 +12,6 @@ use super::diff::equal;
 use super::gate_build;
 use super::policy::Runtime;
 use crate::json::Value;
-use crate::stats;
 
 pub const LINUX_CPU_KEY: &str = "__linux_cpu__";
 
@@ -129,41 +128,6 @@ pub fn active_cpu(before: &Value, after: &Value, require_linux: bool) -> Vec<Str
     names
 }
 
-fn sample_work_ok(
-    sample: &Value,
-    iterations: i128,
-    fields: &[String],
-) -> Result<(f64, f64, Value), ()> {
-    let work = super::comparison::paired_timing_work(
-        sample.get("candidate").ok_or(())?,
-        sample.get("reference").ok_or(())?,
-        iterations,
-        fields,
-    )
-    .map_err(|_| ())?;
-    let a = sample
-        .get("candidate")
-        .and_then(|c| c.get("data"))
-        .ok_or(())?;
-    let b = sample
-        .get("reference")
-        .and_then(|c| c.get("data"))
-        .ok_or(())?;
-    Ok((
-        int(a.get("elapsed_ns")).unwrap() as f64,
-        int(b.get("elapsed_ns")).unwrap() as f64,
-        work,
-    ))
-}
-
-fn interval_value(interval: &stats::Interval) -> Value {
-    Value::object([
-        ("median", Value::float(interval.median)),
-        ("lower_95", Value::float(interval.lower_95)),
-        ("upper_95", Value::float(interval.upper_95)),
-    ])
-}
-
 /// Compare complete output objects without coercing integer and float fields.
 pub(crate) fn output_matches(actual: &Value, expected: &Value, timed: bool) -> bool {
     let (Value::Object(actual), Value::Object(expected)) = (actual, expected) else {
@@ -261,88 +225,37 @@ pub(crate) fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
             })
 }
 
-/// Check a timing row's samples, worker bindings, isolation and recorded interval.
+/// Check a timing row against its contract: the declared iteration count, any
+/// pinned outputs, and the record itself as [`super::timing::validate`] grades it.
 pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
     let timing = row.get("timing").unwrap_or(&Value::Null);
-    let raw = timing
-        .get("samples")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
-    let (Some(pairs), Some(iterations)) = (int(timing.get("pairs")), int(timing.get("iterations")))
-    else {
-        return false;
-    };
-    let minimum = int(contract.get("minimum_pairs")).unwrap_or(i128::MAX);
-    let mut valid = raw.len() as i128 == pairs
-        && raw.len() as i128 >= minimum
-        && timing
-            .get("iterations")
-            .is_some_and(|count| super::validation::iterations_valid(contract, count));
-    valid &= timing
-        .get("worker_hashes")
-        .is_some_and(|h| equal(h, selected));
-    if let Some(input) = row.get("input_sha256").filter(|v| v.truthy()) {
-        valid &= timing.get("input_sha256") == Some(input);
-    }
-    if let Some(expected) = row.get("expected_time_outputs") {
-        valid &= timing_outputs_match(timing, expected);
-    }
-    if timing.get("timing_module_policy").is_some()
-        || contract.get("case_operations") == Some(&Value::Bool(true))
-    {
-        valid &= super::timing::validate_module_absence(timing, raw, require_linux).is_ok();
-    }
-    if !valid {
-        return false;
-    }
     let Ok(fields) = super::comparison::work_fields(contract) else {
         return false;
     };
-    let mut expected_work = match timing.get("warmups") {
-        Some(Value::Array(warmups)) => {
-            match super::comparison::warmup_work(warmups, iterations, &fields) {
-                Ok(work) => Some(work),
-                Err(_) => return false,
-            }
-        }
-        None if fields.len() == super::comparison::BASE_WORK_FIELDS.len() => None,
-        _ => return false,
+    let work = super::comparison::Work {
+        fields,
+        own: vec![],
     };
-    let mut paired = Vec::new();
-    for (index, sample) in raw.iter().enumerate() {
-        if int(sample.get("pair")) != Some(index as i128)
-            || matches!(sample.get("pair"), Some(Value::Bool(_)))
-        {
-            return false;
-        }
-        let (Some(before), Some(after)) = (sample.get("cpu_before"), sample.get("cpu_after"))
-        else {
-            return false;
-        };
-        if !active_cpu(before, after, require_linux).is_empty() {
-            return false;
-        }
-        match sample_work_ok(sample, iterations, &fields) {
-            Ok((a, b, work)) => {
-                if expected_work
-                    .as_ref()
-                    .is_some_and(|expected| !equal(expected, &work))
-                {
-                    return false;
-                }
-                expected_work = Some(work);
-                paired.push((a, b));
-            }
-            Err(()) => return false,
-        }
-    }
-    let seed = int(timing.get("seed")).unwrap_or(0);
-    match stats::ratio_interval(&paired, seed as u64, 4000) {
-        Ok(interval) => timing
-            .get("ratio")
-            .is_some_and(|r| equal(r, &interval_value(&interval))),
-        Err(_) => false,
-    }
+    timing
+        .get("iterations")
+        .is_some_and(|count| super::validation::iterations_valid(contract, count))
+        && row
+            .get("expected_time_outputs")
+            .is_none_or(|expected| timing_outputs_match(timing, expected))
+        && super::timing::validate(
+            timing,
+            &super::timing::Expected {
+                worker_hashes: selected,
+                input_sha256: row.get("input_sha256").filter(|v| v.truthy()),
+                minimum_pairs: int(contract.get("minimum_pairs"))
+                    .unwrap_or(i128::MAX)
+                    .max(super::timing::GATE_PAIRS as i128),
+                work: &work,
+                require_linux,
+                module_absence: contract.get("case_operations") == Some(&Value::Bool(true)),
+            },
+        )
+        .is_ok()
 }
 
 /// Shared per-case results. Only this module constructs a verdict from evidence.
@@ -497,7 +410,7 @@ fn grade_case_with_runtime(
     }
 }
 
-pub(super) fn parity_passes(row: &Value) -> bool {
+pub(crate) fn parity_passes(row: &Value) -> bool {
     row.get("parity").is_some_and(|proof| {
         s(proof, "status") == Some("pass") && s(proof, "source_timing_status") == Some("pass")
     })
@@ -608,6 +521,22 @@ pub fn acceptance(
     )
 }
 
+/// The declared profiles absent from the supplied case set.
+pub(super) fn missing_profiles(contract: &Value, present: &BTreeSet<String>) -> Vec<String> {
+    let mut missing: Vec<String> = contract
+        .get("required_profiles")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|profile| !present.contains(*profile))
+        .map(str::to_owned)
+        .collect();
+    missing.sort();
+    missing.dedup();
+    missing
+}
+
 /// Grade owned rows one at a time, retaining only identities, profiles and findings.
 /// An input error or a missing registered refusal withholds acceptance.
 pub(crate) fn acceptance_iter(
@@ -688,17 +617,7 @@ pub(crate) fn acceptance_iter(
     for id in registered.keys().filter(|id| !refusals.contains(**id)) {
         reasons.push(format!("{id}: required refusal missing or invalid"));
     }
-    let mut missing: Vec<String> = contract
-        .get("required_profiles")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|profile| !passed.contains(*profile))
-        .map(str::to_owned)
-        .collect();
-    missing.sort();
-    missing.dedup();
+    let missing = missing_profiles(contract, &passed);
     if !missing.is_empty() {
         reasons.push(format!("missing required profiles: {}", missing.join(", ")));
     }
@@ -1010,7 +929,7 @@ mod policy_tests {
                 ("candidate", Value::str("candidate-hash")),
                 ("reference", Value::str("reference-hash")),
             ]);
-            let interval = stats::ratio_interval(
+            let interval = crate::stats::ratio_interval(
                 &vec![
                     (candidate_ns as f64, f64::from(reference_ns));
                     usize::try_from(pairs).unwrap()
@@ -1037,7 +956,7 @@ mod policy_tests {
                         ("iterations", Value::int(1)),
                         ("seed", Value::int(0)),
                         ("worker_hashes", hashes.clone()),
-                        ("ratio", interval_value(&interval)),
+                        ("ratio", super::super::timing::interval_value(&interval)),
                         ("warmups", Value::Array(warmups)),
                         ("samples", Value::Array(samples)),
                         (

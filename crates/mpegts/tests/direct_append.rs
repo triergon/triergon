@@ -2,7 +2,8 @@
 //! or call read_append directly.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
+    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
+    Step, WorkBudget,
 };
 use triergon_mpegts::{PacketFormat, TransportFramer};
 
@@ -129,6 +130,44 @@ fn reserved_inline_carriers_need_no_temporary_backing_and_retry_freeze_pressure(
         assert_eq!(pool.used(), control + alias.source.retained_storage_bytes());
         drop(alias);
         assert_eq!(pool.used(), control);
+    }
+}
+
+#[test]
+fn buffered_carriers_remain_tight_after_freeze_pressure() {
+    let pool = Budget::new(4096).unwrap();
+    let format = PacketFormat::M2ts192;
+    let width = format.bytes();
+    let raw = &include_bytes!("data/m2ts192-opaque-prefix.m2ts")[..2 * width];
+    let caps = SourceCapabilities {
+        length: Some(raw.len() as u64),
+        random_access: false,
+    };
+    let mut input = InputCursor::new(&pool, SourceId(51), caps, raw.len()).unwrap();
+    let backing = Bytes::copy_from_slice(&pool, raw).unwrap();
+    let window = InputWindow::new(input.source(), input.token(), 0, backing.clone()).unwrap();
+    input.provide(&window).unwrap();
+    let mut framer = TransportFramer::new(pool.clone(), format);
+    let cancel = AtomicBool::new(false);
+
+    // The carrier bytes fit on their own, but the shared header cannot fit yet.
+    let hold = pool.reserve(pool.available() - width).unwrap();
+    let mut work = WorkBudget::new(4096);
+    assert!(matches!(
+        framer.poll(&mut input, &mut work, &cancel),
+        Err(Error::Backpressure { .. })
+    ));
+    assert_eq!(input.position(), width as u64);
+    assert_eq!(work.spent(), width as u64 + 2);
+    drop(hold);
+
+    for (index, wire) in raw.chunks_exact(width).enumerate() {
+        let Step::Ready(packet) = framer.poll(&mut input, &mut work, &cancel).unwrap() else {
+            panic!("expected a complete carrier");
+        };
+        assert_eq!(packet.source_offset, (index * width) as u64);
+        assert_eq!(packet.source.as_ref(), wire);
+        assert!(!packet.source.shares_storage_with(&backing));
     }
 }
 

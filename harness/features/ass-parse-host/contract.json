@@ -6,6 +6,7 @@
   "worker_operation": "ass-",
   "reference": "libass-ass-native",
   "gate": "required",
+  "compare_order": 3,
   "pinned_per_target": true,
   "contract": [
     "the operations of ass-parse-scripts, ass-parse-chunks and ass-parse-events whose libass result differs by target, one fixture each, recorded as those features record them. The reference flags every conversion from double to int whose result C leaves to the target out of range or for NaN, by an explicit check where libass makes it: a drawing coordinate in 26.6 (double_to_d6, lrint narrowed from long to int), \\pbo copied into a drawing glyph, an animated \\clip or \\iclip, \\fade's alpha (interpolate_alpha) and the delay of a Banner or Scroll effect, and a drawing coordinate landing on INT_MIN, whose abs libass's bound check takes. Reads of values that go through C long beyond int, an event time read with sscanf's %d and a Matroska packet's ReadOrder read with atoi, differ by target without a flag",
@@ -20,7 +21,7 @@
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf"
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "pending_module_requirements": [
     "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
@@ -39,7 +40,7 @@
       "requirement": "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
       "targets": [
         "aarch64-unknown-linux-gnu",
-        "armv7-unknown-linux-gnueabihf"
+        "thumbv7neon-unknown-linux-gnueabihf"
       ]
     },
     {
@@ -47,7 +48,7 @@
       "requirement": "a deliberate divergence: libass built with GCC accepts a coordinate landing exactly on INT_MIN through abs(INT_MIN) overflow, and the crate rejects it",
       "targets": [
         "aarch64-unknown-linux-gnu",
-        "armv7-unknown-linux-gnueabihf"
+        "thumbv7neon-unknown-linux-gnueabihf"
       ]
     },
     {

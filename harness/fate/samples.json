@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "note": "Upstream regression samples, and local remuxes of them, that subtitle corpora measure: fetched into the ignored corpus cache by these hashes and compared locally, never redistributed. Their redistribution rights are unreviewed.",
+  "samples": [
+    {
+      "path": "fate/filter/242_4.mkv",
+      "sha256": "b5e175e331d02f7479771eb890e32fce7dbdae55ac48ab6e00c69e8459567253",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/filter/242_4.mkv"
+    },
+    {
+      "path": "fate/mpeg2/dvd_single_frame.vob",
+      "sha256": "3054d653e9e575ba0592de2ce223c813d9b8bc593981a1fc184ff6f49790942b",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/mpeg2/dvd_single_frame.vob"
+    },
+    {
+      "path": "fate/mpeg2/dvd_still_frame.vob",
+      "sha256": "651dfc3a55a96de26cf6eb4a3851a8d8b5fdb57a8ab8dc8adb14e6c302fb409a",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/mpeg2/dvd_still_frame.vob"
+    },
+    {
+      "path": "fate/sub/Closedcaption_rollup.m2v",
+      "sha256": "d03cfbc04957d8672ffb4910de0f3fcee22e2b204d76b848d1473f1ba9ae9afa",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/Closedcaption_rollup.m2v"
+    },
+    {
+      "path": "fate/sub/dvbsubtest_filter.ts",
+      "sha256": "93ad6d0be649bb29697275ff522a983d475a1e58ab070271f912b86799e04a86",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/dvbsubtest_filter.ts"
+    },
+    {
+      "path": "fate/sub/pgs_sub.sup",
+      "sha256": "ce6d8ed89cf557e34b90d49c5ce955731935c485b93892f69ab276cfe0c36c27",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/pgs_sub.sup"
+    },
+    {
+      "path": "fate/sub/scte20.ts",
+      "sha256": "18ad3b05ae0bffb9c014a2d0ce445d62670be020f42ea76336bebbac374886e6",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/scte20.ts"
+    },
+    {
+      "path": "fate/sub/vobsub.idx",
+      "sha256": "c4d073e2bbf515409e9ee8bf32114b81c1a11178d3bf0d52d88ebab0615525e2",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/vobsub.idx"
+    },
+    {
+      "path": "fate/sub/witch.scc",
+      "sha256": "4f924b6960a1b6ab986a495c1dcb7647ef79c4c8eed0a0ddd8b04cc34fc09758",
+      "source": "rsync://fate-suite.ffmpeg.org/fate-suite/sub/witch.scc"
+    },
+    {
+      "path": "pgs/fate-pgs_sub.m2ts",
+      "sha256": "e4e544c03d2a4a984456ca4460cc9638307a52ad5556c59b1a41a85481fc2d92",
+      "source": "fate-suite sub/pgs_sub.sup, muxed by ffmpeg 9.0.2"
+    },
+    {
+      "path": "pgs/fate-pgs_sub.mkv",
+      "sha256": "c928ea53e2acdf1cbaa3b0934510b65ca2f5381e2293c1067c20ff47eefa3918",
+      "source": "fate-suite sub/pgs_sub.sup, muxed by ffmpeg 9.0.2"
+    },
+    {
+      "path": "fate/mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "source": "https://fate-suite.ffmpeg.org/mov/mp4-init-nonkeyframe.mp4"
+    }
+  ]
+}

@@ -209,17 +209,27 @@ selective style overrides), in the frame and storage size and margins of its
   faces it gathers: the one selected for it, then, for a character none of
   them maps, one selected for that character from the requested family, the
   default family or the default font file, so fallback depends on what was
-  drawn before, as in libass. The default font file's face gets an id of its
+  drawn before, as in libass. Each face reads characters through the charmap
+  libass selects on opening it; a face selected for a character it does not
+  map is tried through each of its charmaps in turn and keeps the one that
+  maps it, or the last, for every later lookup and for shaping until another
+  such lookup moves it (`ass_font_get_index`). That is how libass draws C1
+  controls (U+0080 to U+009F) through a Macintosh Roman charmap. The retry is
+  `Error::Unsupported` for a face with charmaps FreeType lists and
+  `triergon-font` does not read, as is any lookup through a charmap whose
+  codes libass converts (`Font::text_lookup`). The default font file's face gets an id of its
   own, so a font never takes it for a face it already has: libass leaves
   that id uninitialised, and this is its result whenever the id does not
   collide with a registered face's; the reference is built with locals
   zeroed, so it never does.
 - **Shaping.** Scripts per character, HarfBuzz's ignorables, runs of one face,
   script and style, FriBidi levels per run (or per paragraph for `\fe-1`),
-  and OpenType shaping of each run at 256 pixels with libass's font functions
-  and features through `triergon-shape`.
+  and OpenType shaping of each run at the size its glyphs load at with
+  libass's font functions and features through `triergon-shape`.
 - **Layout.** Outlines at 256 pixels with libass's synthetic bold and oblique
-  and its underline and strike-out lines, scaled to the glyph's size; the
+  and its underline and strike-out lines, scaled to the glyph's size (a font
+  size of 0 keeps libass's size 0, at which FreeType loads glyphs and their
+  advances unscaled, in font units, with no line ascent or descent); the
   italic correction and letter spacing; wrapping (greedy, then rebalanced
   unless `\q1`), whitespace trimming and line metrics; karaoke; the visual
   order of each line; alignment and justification; the baseline shear; the
@@ -229,7 +239,11 @@ selective style overrides), in the frame and storage size and margins of its
   `triergon_raster::Raster::render`, quantised against its run, and each run
   composited with its blur, `\be` and shadow by `Raster::compose`; then each
   run's shadow, border and fill as images, clipped by the clip rectangle (with `\kf`'s
-  split), multiplied by a vector clip, and the box of `BorderStyle` 4.
+  split), multiplied by a vector clip, and the box of `BorderStyle` 4. A
+  vector clip whose drawing has no contour empties every image of a regular
+  clip and leaves those of an inverse clip, as libass's empty mask does; one
+  whose drawing libass cannot place (its centre 125,000 frame pixels or more
+  from the origin) is not applied, as in libass.
 - **The frame.** Events are taken in layer and read order, and in the
   script's order where both are equal (libass's `qsort` leaves that order
   unspecified; a whole script's events differ in ReadOrder, a stream's need
@@ -240,29 +254,51 @@ selective style overrides), in the frame and storage size and margins of its
 - **Change detection.** `Frame::change` is what libass's `ass_detect_change`
   reports: `Change::Content` when the image count differs or an image's size,
   stride, colour or bitmap does, `Change::Positions` when only places do,
-  else `Change::None`. Bitmaps are told apart as libass's caches tell them
-  apart: an image of a run shows the same bitmap as one of the previous frame
-  when the run's composite key (its effects key, and each glyph's bitmap
-  key, with its outline only where the bitmaps depend on it, and origin in
-  the run) and the image's part and window are equal, so glyphs that draw
-  nothing but an opaque box compare equal whatever their outlines; pixels a
-  vector clip or a `BorderStyle` 4 box makes are always new.
+  else `Change::None`. Bitmaps are told apart as libass tells them apart, by
+  the cached composite they show: an image shows the same bitmap as one of
+  the previous frame when it is the same part and window of the same
+  composite. A run finds the composite of an equal key (its effects key, and
+  each glyph's fill and border bitmap keys and origins in the run), and a
+  glyph the bitmap of an equal key (its outline and quantised transform), so
+  glyphs that draw nothing but an opaque box find the same composite
+  whatever their outlines. Whatever the previous frame shows survives the
+  caches' cut, so eviction changes no change value; pixels a vector clip or
+  a `BorderStyle` 4 box makes are always new.
   A frame of a script without events reports new content and leaves the
   previous frame in place for the next comparison, as libass does.
 
 Settings beyond the frame and storage size (margins, `use_margins`, a pixel
 aspect, font scale, line spacing and position) follow libass's formulas but
-are not compared. Not rendered: the glyphs of `@` fonts, which libass draws
-rotated with vertical metrics (`Error::Unsupported`), libass's simple shaping
+are not compared. The glyphs of `@` fonts from U+02F1 on are drawn as libass
+draws them, turned by 90° about their scaled vertical advance and the
+typographic descender and advancing by their linear vertical advance, and are
+shaped with the default-load vertical advance of every glyph libass's glyph
+metrics cache keeps rotated: a glyph's first lookup through a character from
+U+02F1 decides, for the renderer's life and for each requested font (family,
+weight, slant), face and size, as libass keys that cache. Not rendered: libass's simple shaping
 level, its hinting modes, selective style overrides and track features.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
 default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of
 composites), and `CacheLimits::new(glyphs, megabytes)` gives what
-`ass_set_cache_limits` sets. The outline count bounds the outline cache:
-glyph and drawing outlines are kept between frames and cut to it at each
-frame as libass cuts its outline cache, least recently used first, never one
-the previous frame's images were drawn from. Requested fonts and the faces
+`ass_set_cache_limits` sets. Outlines (glyphs, drawings, stroked
+borders and the unit square of opaque boxes), glyph bitmaps (with a
+bitmap that draws nothing) and composited runs are kept between frames in one kind of cache, bounded by
+the outline count and the two byte limits. When a frame
+starts the composites, then the bitmaps, then the outlines are cut as libass
+cuts its caches (`ass_cache_cut`): least recently used first, until what is
+kept fits, never one the previous frame's images or another entry's key
+hold, which leaves the order and goes the moment nothing holds it; a run
+holds its glyphs' bitmaps while it is drawn, and a vector clip its bitmap. A cache is
+also cut the same way when an insertion takes it past its limit and when
+the renderer lets go of a run or an event, so it holds at most its limit
+beyond what is in use; libass keeps a frame's entries until the next frame,
+and nothing it would show differs. Sizes are counted as libass counts them:
+an outline as 1; a bitmap's pixels, libass's records in the target's words
+and the points and segments of its outline; a composite's pixels and
+records. A composite is keyed by its glyphs' bitmap keys where libass holds
+the bitmaps, which finds the same composites and lets the bitmaps go.
+Requested fonts and the faces
 they gathered are kept up to `CacheLimits::fonts` font descriptions (10,000
 by default), cut at each frame the same way, never one the previous frame
 asked for; libass keeps them all, so a font asked for again after it left
@@ -270,9 +306,9 @@ starts over from its first face. A caller that wants libass's behaviour sets
 `CacheLimits::fonts` to `usize::MAX`. Shaping plans are kept up to 256. All of it
 is charged to the renderer's budget, family names and drawing texts by
 length, and looked up by the names and texts the script holds, without
-copying them. The byte limits bound nothing: there is no bitmap or composite
-cache, so glyph bitmaps and composites are drawn again each frame, with the
-same images.
+copying them. Every bitmap or composite lookup charges `Settings::work` a
+unit per bitmap and per glyph of a composite key; only a miss charges the
+drawing besides.
 
 ## Arithmetic
 
@@ -319,11 +355,34 @@ metrics), its `lround`s (the layout resolution, `\kf`'s split column, a
 collision box, line borders, the baseline shear, the content area) and
 `double_to_d6` (`triergon_raster::pixels_26_6`) all saturate at `int`'s range
 with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
-keeps the boxes placed so far in order of their top edges, compared as values;
-libass sorts them with `cmp_rect_y0`, which subtracts them and so overflows,
-undefined in C, for tops more than 2³¹ apart, and leaves equal tops in an
-unspecified order, where the crate keeps the order they were placed in. No
-fixture of `ass-render` converts out of range or places boxes that far apart.
+sorts the boxes placed so far as libass does on glibc: `qsort` with
+`cmp_rect_y0`, which subtracts their tops in `int` and so overflows, undefined
+in C and wrapping as GCC builds it, for tops 2³¹ or more apart, run as glibc's
+stable merge sort. While the tops lie closer that comparison is a total
+preorder and the crate orders them by value, keeping equal tops in the order
+they were placed in. Farther apart it is not transitive, and the order
+depends on which pairs the sort compares: the crate sorts with a top-down
+merge sort that sorts the first half, of the length halved and rounded down,
+and then the rest, and merges them stably. `collision-far-margins.ass` of
+`ass-render` places boxes that far apart, each within `int`'s range, and the
+crate places its events there as libass does on both targets; rounding the
+half up instead places them differently. Another C library's `qsort` may
+order such boxes, or equal tops, differently. The far event's position there
+leaves `int`'s range in 26.6 fixed point: libass for ARMv7 and the crate draw
+nothing of it, and libass for AArch64 draws it inside the frame, so the case
+clips it away. No other fixture of `ass-render` converts out of range.
+
+libass's renderer also overflows `int`, undefined in C, where it doubles an
+event's horizontal border for the width of its box. Built with GCC it wraps,
+and the renderer doubles it in wrapping `int` arithmetic too, so a
+`BorderStyle` 4 event whose horizontal border exceeds 2³⁰ frame pixels loses
+its box as it does in libass. The case is `ass-render-host`'s, pinned per
+target: libass built with GCC for `aarch64-unknown-linux-gnu` converts the
+event box's top, height, left and width from `double` to `int` together, with
+vector instructions that keep the low 32 bits of each where 32-bit ARM
+saturates, so there it also loses the box of a vertical border beyond 2³⁰
+frame pixels, and a huge border moves colliding events elsewhere. The renderer
+follows 32-bit ARM.
 
 ## Behaviour and limits
 
@@ -346,9 +405,11 @@ outlines (each one built and its points), layout (a pass per stage over the
 glyphs, and one for every rebalancing pass), drawing (glyph bitmaps,
 composites and vector clips, charged as `triergon-raster` charges them) and
 collision handling (each event against those placed before it in its
-layer). The charge grows linearly with the events and their text. Where
+layer, and the merge sort of the placed boxes after each one joins them). The charge grows linearly with the events and their text. Where
 libass would go on drawing, running out is `Error::Policy`; a caller that
-wants libass's unbounded behaviour raises the setting. Shaping and bidi also
+wants libass's unbounded behaviour raises the setting. With the `work-probe`
+feature, a development aid, `Renderer::work_spent` gives what the last frame
+spent. Shaping and bidi also
 run under the limits of their crates.
 Malformed input is read as libass reads it, skipping what it skips, and never
 panics.
@@ -369,24 +430,72 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 25 scripts and 3 packet streams of
+- `ass-render` renders the 36 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB): 54/56 pass. The box behind a `BorderStyle` 4 event is
-  compared without its kind, since libass leaves its type uninitialised. The
-  two open cases are the fixture with an `@` font.
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 78 pass. The
+  box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised,
+  is told by its own buffer, also after a collision shift has cut rows off its
+  top, and compared as a kind of its own.
+- `ass-render-host` renders, as `ass-render` does, the fixtures whose libass
+  result differs by target (`border-x-overflow.ass`, and `collision-far-tops.ass`,
+  colliding events whose boxes end up 2³¹ or more rows apart), each pinned for
+  `aarch64-unknown-linux-gnu` and `thumbv7neon-unknown-linux-gnueabihf` from that
+  target's reference. All four cases pass on ARMv7; on AArch64 all four are
+  open as a deliberate divergence.
+- Runtime and memory of both features are taken against `libass-player-native`
+  (`harness/reference_ass_player.h`: `libass.a` linked into the worker, none of
+  its sources compiled in) by `cargo xtask report`, 30 timing and 30 memory
+  pairs per case, and graded by `cargo xtask grade`. The reference replaces
+  libass's bitmap engine with its plain C one, and libass is built with `-O2
+  -ffp-contract=off -ftrivial-auto-var-init=zero`; a player's libass with its
+  NEON code on AArch64 is faster than this reference. The timed spans favour
+  the renderer slightly: in 12 cases libass opens the default font file inside
+  its span, which the renderer reads before its own, and libass's side copies
+  the script inside its span.
+- Measured at `5b3e03f0` on a c6g.2xlarge, before the later default glyph load
+  with CFF hinting and the harness's memory and worker change, which are not
+  timed on AArch64. At that revision every passing case was within the
+  runtime ceiling of [docs/quality.md](../../docs/quality.md) and lower than
+  libass in peak heap and total RSS. On Linux AArch64 the `ass-render` ratios
+  had a median of 0.813 and a highest upper bound of 1.066
+  (`cache-keys-ass-720p`), with peak heap ≤0.841 and total RSS ≤0.943. On
+  ARMv7, over all 80 cases, the highest upper bound was 0.943, peak heap
+  ≤0.928 and total RSS ≤0.961, the renderer's virtual peak over libass's
+  resident peak. Measured again at `3df7ae6d` for
+  `thumbv7neon-unknown-linux-gnueabihf` under the kernel RSS bound, over all
+  82 cases on ARMv7 the highest upper bound is 0.778, peak heap ≤0.929 and
+  total RSS ≤0.911.
+  [docs/status.md](../../docs/status.md) names the evidence.
+- `cargo xtask ass equivalence --base REV` renders the `ass-render`
+  fixtures at their frames and every 40 ms, mutations of them with varied
+  settings and style overrides, and scripts generated from a seed, with the
+  renderer of REV and of the working tree (`examples/equivalence.rs`, built
+  with the `work-probe` feature), and requires the same change, images,
+  error and work for every frame (`--work any` leaves the work out, for a
+  change such as a cache that does less of it, and counts apart a case whose
+  frames part where one side runs out of work; `--cache` gives every case
+  other cache limits); it prints the peak budget of each workload for
+  both.
 
 The comparison establishes agreement with libass on that corpus, not conformance
 with any specification of the format.
 
 ## Not here
 
-Vertical text (`@` fonts), libass's simple shaping level and hinting modes,
+libass's simple shaping level and hinting modes,
 its selective style override (`ass_set_selective_style_override`; with libass's
 default settings it changes nothing), track features (`ass_track_set_feature`),
 `ass_step_sub`, `ass_configure_prune` (a player calls
 `prune_events`), reading files and charset conversion.
+
+## Licence
+
+MIT or Apache-2.0, at your option, with libass 0.17.5's ISC licence: the script reader,
+the tag parser and the renderer's stages are translated from libass. `LICENSE`
+holds the notice, and [docs/provenance.md](../../docs/provenance.md#triergon-ass) lists
+the modules.

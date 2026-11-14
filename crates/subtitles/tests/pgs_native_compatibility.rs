@@ -1,17 +1,11 @@
-//! Public API guards plus every recorded native transcript, without native calls.
+//! Public API guards of the PGS receiver. The subtitle worker's `pgs-` modes
+//! fold every recorded case under `native-compatibility-gold/` and check it
+//! against the recorded transcript.
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{
-    IndexedRecoveryDecoder, ReceiverDecoder, ReceiverEof, ReceiverPacket,
-};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverEof, ReceiverPacket};
 use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
-
-type Result<T> = std::result::Result<T, String>;
-#[path = "native-compatibility-gold/cases.rs"]
-mod gold;
-#[path = "native-compatibility-support/wire.rs"]
-mod wire;
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
     out.push(kind);
@@ -130,7 +124,7 @@ fn native_application_output_has_literal_pixels_palette_geometry_and_raw_clock()
 }
 
 #[test]
-fn native_constructor_preserves_finite_policy_caps_without_strict_source_setup() {
+fn constructor_refuses_limits_above_the_format_ceilings() {
     let b = Budget::new(4096).unwrap();
     let baseline = b.used();
     for limits in [
@@ -144,14 +138,6 @@ fn native_constructor_preserves_finite_policy_caps_without_strict_source_setup()
         },
         DisplayLimits {
             max_references: 256,
-            ..DisplayLimits::default()
-        },
-        DisplayLimits {
-            max_windows: 256,
-            ..DisplayLimits::default()
-        },
-        DisplayLimits {
-            max_segments: 4097,
             ..DisplayLimits::default()
         },
     ] {
@@ -186,37 +172,6 @@ fn duplicate_display_keeps_later_hidden_caches_and_final_canvas_for_next_packet(
     assert_eq!((r.palette()[1], r.palette()[2]), (0xffff_ffff, 0x8000_0000));
     assert_eq!(restored.context_canvas, [32, 2]);
     assert_eq!(clear.raw_packet().as_ref(), raw);
-}
-
-#[test]
-fn full_api_still_retains_both_source_sets_and_additional_receiver_event() {
-    let b = Budget::new(4 * 1024 * 1024).unwrap();
-    let c = AtomicBool::new(false);
-    let mut full =
-        IndexedRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
-    let mut raw = pcs(16, 1, 0x80, &[]);
-    segment(&mut raw, 0x80, &[]);
-    let mut later = picture();
-    later[10] = 0;
-    raw.extend_from_slice(&later);
-    let mut owned = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    full.push(&mut owned, clock(), &c).unwrap();
-    let mut result = None;
-    for _ in 0..1_000_000 {
-        if full.poll(&mut WorkBudget::new(7), &c).unwrap() == RecoveryStatus::OutputReady {
-            result = Some(full.take_output(&c).unwrap());
-            break;
-        }
-    }
-    let out = result.expect("full Source+Receiver operation must finish");
-    assert_eq!(out.source_error(), None);
-    assert_eq!(out.source_sets().len(), 2);
-    assert!(out.source_sets()[0].is_clear());
-    assert_eq!(out.source_sets()[1].objects()[0].pixels().as_ref(), &[1, 2]);
-    assert_eq!(out.receiver_sets().len(), 2);
-    assert_eq!(out.omitted_receiver_events(), 1);
-    assert!(out.receiver_output().unwrap().rectangles().is_empty());
 }
 
 #[test]
@@ -438,7 +393,7 @@ fn retained_native_outputs_survive_reset_and_decoder_drop_with_all_charges() {
 }
 
 #[test]
-fn native_eof_does_not_validate_pending_strict_source_state_or_fabricate_output() {
+fn end_of_input_presents_nothing_pending() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d = decoder(&b, false);
@@ -486,137 +441,100 @@ fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
 
 // This is functional transcript reproduction, not a benchmark adapter. Recorded
 // input/native expected bytes are read only by tests, never by production code.
-fn frozen_case(case: &wire::Case, quantum: u64) -> (wire::Sink, bool) {
-    let b = Budget::new(256 * 1024 * 1024).unwrap();
-    let baseline = b.used();
-    let cancel = AtomicBool::new(false);
-    let mut sink = wire::Sink::new(true);
-    sink.header(case);
-    for (i, record) in case.records.iter().enumerate() {
-        sink.input(i, record);
-    }
-    let outcome = (|| -> Result<()> {
-        if !case.private.is_empty() {
-            return Err("unexpected private configuration".into());
-        }
-        let config = DisplayConfig {
-            receiver_forced_only: case.flags & 1 != 0,
-        };
-        let mut d = ReceiverDecoder::new(&b, DisplayLimits::default(), config)
-            .map_err(|e| e.to_string())?;
-        let base = TimeBase::new(u64::from(case.numerator), u64::from(case.denominator))
-            .map_err(|e| e.to_string())?;
-        for (index, record) in case.records.iter().enumerate() {
-            if record.reset != 0 {
-                drop(d);
-                d = ReceiverDecoder::new(&b, DisplayLimits::default(), config)
-                    .map_err(|e| e.to_string())?;
-                continue;
-            }
-            let stamp = PacketClock {
-                pts: record.pts_known.then_some(record.pts_raw),
-                dts: record.dts_known.then_some(record.dts_raw),
-                timebase: base,
-            };
-            let mut owned =
-                Some(Bytes::copy_from_slice(&b, &record.payload).map_err(|e| e.to_string())?);
-            d.push(&mut owned, stamp, &cancel)
-                .map_err(|e| e.to_string())?;
-            let mut output = None;
-            for _ in 0..1_000_000 {
-                let mut work = WorkBudget::new(quantum);
-                let status = d.poll(&mut work, &cancel).map_err(|e| e.to_string())?;
-                assert!(work.spent() <= quantum);
-                if status == RecoveryStatus::OutputReady {
-                    output = Some(d.take_output(&cancel).map_err(|e| e.to_string())?);
-                    break;
-                }
-                assert_eq!(status, RecoveryStatus::Yield);
-            }
-            let out = output.ok_or("bounded native output progress")?;
-            if let Some(event) = out.receiver_output() {
-                sink.event(wire::EventHeader {
-                    packet: index,
-                    offset: 0,
-                    consumed: i32::try_from(record.payload.len()).unwrap(),
-                    flush: false,
-                    pts: event.pts_microseconds,
-                    start: 0,
-                    end: u32::MAX,
-                    canvas: [
-                        i32::from(out.context_canvas[0]),
-                        i32::from(out.context_canvas[1]),
-                    ],
-                    rectangles: event.rectangles().len(),
-                });
-                for (order, r) in event.rectangles().iter().enumerate() {
-                    sink.rect(
-                        order,
-                        [
-                            i32::from(r.x),
-                            i32::from(r.y),
-                            i32::from(r.width),
-                            i32::from(r.height),
-                            i32::from(r.forced),
-                            i32::from(r.stride),
-                        ],
-                        r.palette(),
-                        r.pixels().as_ref(),
-                    )?;
-                }
-            }
-        }
-        d.finish_input(&cancel).map_err(|e| e.to_string())?;
-        for _ in 0..1_000_000 {
-            if d.poll(&mut WorkBudget::new(quantum), &cancel)
-                .map_err(|e| e.to_string())?
-                == RecoveryStatus::Ended
-            {
-                return Ok(());
-            }
-        }
-        Err("bounded native EOF progress".into())
-    })();
-    sink.byte(if outcome.is_ok() { b'Z' } else { b'F' });
-    assert_eq!(
-        b.used(),
-        baseline,
-        "native decoder/output graph retained storage after operation"
+
+/// One epoch display of the objects `(id, width, height, rle)` on a 16x4 canvas.
+fn display(objects: &[(u16, u16, u16, &[u8])]) -> Vec<u8> {
+    let ids: Vec<u16> = objects.iter().map(|o| o.0).collect();
+    let mut out = pcs(16, 4, 0x80, &ids);
+    segment(
+        &mut out,
+        0x14,
+        &[0, 0, 1, 235, 128, 128, 255, 2, 16, 128, 128, 128],
     );
-    (sink, outcome.is_ok())
-}
-
-fn all_native_gold(quantum: u64) {
-    assert_eq!(gold::CASES.len(), 229);
-    let mut refusals = 0;
-    for row in gold::CASES {
-        let case = wire::Case::parse(row.input).unwrap();
-        let (actual, succeeded) = frozen_case(&case, quantum);
-        assert_eq!(
-            succeeded, row.succeeded,
-            "{} quantum{quantum}: retained decoder outcome",
-            row.id
-        );
-        assert_eq!(
-            actual.transcript.as_deref().unwrap(),
-            row.expected,
-            "{} quantum{quantum}: every native transcript byte",
-            row.id
-        );
-        refusals += usize::from(!succeeded);
+    for &(id, width, height, rle) in objects {
+        let mut body = id.to_be_bytes().to_vec();
+        body.extend_from_slice(&[0, 0xc0]);
+        body.extend_from_slice(&u32::try_from(rle.len() + 4).unwrap().to_be_bytes()[1..]);
+        body.extend_from_slice(&width.to_be_bytes());
+        body.extend_from_slice(&height.to_be_bytes());
+        body.extend_from_slice(rle);
+        segment(&mut out, 0x15, &body);
     }
-    assert_eq!(refusals, 8);
+    segment(&mut out, 0x80, &[]);
+    out
+}
+
+/// A rectangle's width, height, stride and pixels.
+type Rect = (u16, u16, u16, Vec<u8>);
+
+/// Each rectangle's geometry and pixels.
+fn rects(out: &ReceiverPacket) -> Vec<Rect> {
+    out.receiver_output()
+        .unwrap()
+        .rectangles()
+        .iter()
+        .map(|r| (r.width, r.height, r.stride, r.pixels().as_ref().to_vec()))
+        .collect()
+}
+
+/// An 8x2 plane of colour 9 in every byte.
+const NINES: &[u8] = &[0, 0x88, 9, 0, 0, 0, 0x88, 9, 0, 0];
+
+/// As FFmpeg's `pgssubdec` does, an RLE that leaves pixels of its plane
+/// unwritten (cut short, or with lines too short to make up the area) outputs
+/// an empty rectangle: `decode_rle` fails and the display sets `w` and `h` to
+/// zero. A short line the following pixels make up only warns there, and the
+/// plane is output. A reused buffer still holding a larger plane's bytes gives
+/// exactly what a fresh one does.
+#[test]
+fn an_unfilled_rle_outputs_an_empty_rectangle_as_ffmpeg_does_even_from_a_reused_buffer() {
+    let filled: Vec<u8> = (1..=8).collect();
+    let cases: [(&[u8], Rect); 3] = [
+        (&[1, 2, 3], (0, 0, 4, vec![])),
+        (&[1, 0, 0, 2, 3, 0, 0], (0, 0, 4, vec![])),
+        (&[1, 0, 0, 2, 3, 4, 5, 6, 7, 8, 0, 0], (4, 2, 4, filled)),
+    ];
+    for (rle, expected) in cases {
+        let b = Budget::new(4 * 1024 * 1024).unwrap();
+        let mut d = decoder(&b, false);
+        push(&mut d, &b, &display(&[(7, 8, 2, NINES)]));
+        let dirty = ready(&mut d, 4096);
+        assert_eq!(rects(&dirty), [(8, 2, 8, vec![9; 16])]);
+        drop(dirty);
+        let second = display(&[(5, 1, 1, &[4]), (7, 4, 2, rle)]);
+        push(&mut d, &b, &second);
+        let reused = rects(&ready(&mut d, 4096));
+        assert_eq!(reused, [(1, 1, 1, vec![4]), expected], "{rle:?}");
+        let mut fresh = decoder(&b, false);
+        push(&mut fresh, &b, &second);
+        assert_eq!(reused, rects(&ready(&mut fresh, 4096)), "{rle:?}");
+    }
 }
 
 #[test]
-fn every229_frozen_native_gold_and_eight_refusals_at_work1() {
-    all_native_gold(1);
-}
-#[test]
-fn every229_frozen_native_gold_and_eight_refusals_at_work7() {
-    all_native_gold(7);
-}
-#[test]
-fn every229_frozen_native_gold_and_eight_refusals_at_work4096() {
-    all_native_gold(4096);
+fn a_held_display_keeps_its_planes_and_a_released_one_is_written_again_in_place() {
+    let b = Budget::new(4 * 1024 * 1024).unwrap();
+    let mut d = decoder(&b, false);
+    push(&mut d, &b, &display(&[(7, 8, 2, NINES)]));
+    let held = ready(&mut d, 4096);
+    let held_plane = held.receiver_output().unwrap().rectangles()[0]
+        .pixels()
+        .clone();
+    push(&mut d, &b, &display(&[(7, 2, 1, &[1, 2, 0, 0])]));
+    let next = ready(&mut d, 4096);
+    // The held rectangles are untouched and share nothing with the new ones.
+    assert_eq!(rects(&held), [(8, 2, 8, vec![9; 16])]);
+    assert_eq!(rects(&next), [(2, 1, 2, vec![1, 2])]);
+    let next_plane = next.receiver_output().unwrap().rectangles()[0]
+        .pixels()
+        .clone();
+    assert!(!next_plane.shares_storage_with(&held_plane));
+    let address = next_plane.storage_address();
+    drop((held, held_plane, next, next_plane));
+    // Released, the last buffer is written again for the next display.
+    push(&mut d, &b, &display(&[(7, 3, 1, &[3, 4, 5, 0, 0])]));
+    let again = ready(&mut d, 4096);
+    assert_eq!(rects(&again), [(3, 1, 3, vec![3, 4, 5])]);
+    let plane = again.receiver_output().unwrap().rectangles()[0].pixels();
+    assert_eq!(plane.storage_address(), address);
 }

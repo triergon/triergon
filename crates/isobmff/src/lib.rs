@@ -240,12 +240,14 @@ pub use tfra::{
 
 // Source-only movie targeting/recovery; reference demux views above stay separate.
 mod movie_seek;
+mod opus_seek;
 mod recovery;
 pub use movie_seek::{
     CompositionTarget, MovieEditLocator, MovieEmptyEdit, MoviePoint, MovieSeekClocks,
     MovieSeekLimits, MovieSeekResult, MovieSeekStatus, MovieSourcePoint, MovieSourceSeekContext,
     MovieSourceSeekPlanner, SourceCompositionLookup,
 };
+pub use opus_seek::OpusRecoveryLanding;
 pub use recovery::{
     RecoveryDefinitionOrigin, RecoveryDescription, RecoveryDescriptions, RecoveryKind,
     RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin, RecoveryMappings, RecoveryScope,
@@ -279,7 +281,7 @@ pub(crate) use sample_entry_header::{
 mod encoded_stream;
 pub use encoded_stream::{
     AacConfiguration, AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
-    check_dts_core_description,
+    ObjectTypeScan, check_dts_core_description,
 };
 pub(crate) use encoded_stream::{EncodedEntryKind, EncodedStream};
 
@@ -317,4 +319,4 @@ pub use fragment::OwnedFragmentCursor;
 pub mod open;
 
 mod container;
-pub use container::{Packet, Reader, ReaderEvent, ReaderLimits, Track};
+pub use container::{Packet, Reader, ReaderEvent, ReaderLimits, Track, media_kind};

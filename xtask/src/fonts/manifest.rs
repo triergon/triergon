@@ -1,13 +1,13 @@
 //! The font features' corpus manifests, generated. Every file of the font corpus
 //! (`harness/fonts/corpus.json`) becomes cases of each feature's load settings; the
 //! work each case must fold is pinned in `harness/features/<id>/pins.json`, the
-//! FreeType reference's folds (see [`crate::lanes`]).
+//! FreeType reference's folds (see [`crate::generators`]).
 
 use std::path::Path;
 
 use super::{CORPUS, corpus};
+use crate::generators::{self, Generator};
 use crate::json::Value;
-use crate::lanes::{self, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -30,7 +30,15 @@ const HINTING_HEIGHTS: [i32; 9] = [4800, 5280, 3200, 3072, 2400, 2160, 853, 1568
 /// At a size: the unhinted outlines and metrics libass draws, and the default-load
 /// advances HarfBuzz receives. Each is a case of its own, so an advance the crate
 /// cannot give fails only its case.
-const MODES: [&str; 2] = ["outlines", "advances"];
+const MODES: &[&str] = &["outlines", "advances"];
+
+/// libass's default size adds the vertical advances it uses for the glyphs of an
+/// `@` font, unhinted and of the default load.
+const DEFAULT_MODES: &[&str] = &["outlines", "advances", "vertical"];
+
+/// What libass's shaper reads from the default load at its default size: every
+/// glyph's metrics and hinted outline.
+const DEFAULT_LOAD: &[&str] = &["default"];
 
 /// The cases `cargo xtask check` mutates: one file of each outline format but the
 /// collection, small enough for the dev build within the per-input timeout (the
@@ -49,25 +57,25 @@ enum Load {
     /// Face data and unscaled outlines.
     Faces,
     /// Each mode at each height.
-    Sized(&'static [i32]),
+    Sized(&'static [&'static str], &'static [i32]),
 }
 
-pub const FEATURES: [&str; 3] = ["font-outlines", "font-hinting-none", "font-hinting-modes"];
-
-pub const LANE: Lane = Lane {
+pub const GENERATOR: Generator = Generator {
     command: "fonts",
     main: super::main,
-    features: &FEATURES,
-    reference: "freetype-native",
-    pin_note: "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    candidate: "font-worker",
+    pin_note: (
+        "freetype-native",
+        "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    ),
     report_directory: ".research/font-report",
     manifest_directory: ".research/fonts/manifests",
     row_sources: &ROW_SOURCES,
     rows,
     note,
     directory: |_| DIRECTORY,
-    write_inputs: lanes::no_inputs,
-    check_inputs: lanes::no_checks,
+    write_inputs: generators::no_inputs,
+    check_inputs: generators::no_checks,
     smoke: &[
         ("font-outlines", &SMOKE_CASES),
         ("font-hinting-none", &SMOKE_CASES),
@@ -77,8 +85,9 @@ pub const LANE: Lane = Lane {
 fn load(id: &str) -> R<Load> {
     match id {
         "font-outlines" => Ok(Load::Faces),
-        "font-hinting-none" => Ok(Load::Sized(&[UNHINTED_HEIGHT])),
-        "font-hinting-modes" => Ok(Load::Sized(&HINTING_HEIGHTS)),
+        "font-hinting-none" => Ok(Load::Sized(DEFAULT_MODES, &[UNHINTED_HEIGHT])),
+        "font-hinting-default" => Ok(Load::Sized(DEFAULT_LOAD, &[UNHINTED_HEIGHT])),
+        "font-hinting-modes" => Ok(Load::Sized(MODES, &HINTING_HEIGHTS)),
         _ => Err(format!("{id}: not a font feature")),
     }
 }
@@ -120,9 +129,9 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
             };
             match load {
                 Load::Faces => rows.push(row(stem.clone(), Vec::new())),
-                Load::Sized(heights) => {
+                Load::Sized(modes, heights) => {
                     for &height in heights {
-                        for mode in MODES {
+                        for &mode in modes {
                             let arguments = vec![mode.to_owned(), height.to_string()];
                             rows.push(row(format!("{stem}-{mode}-{height}"), arguments));
                         }
@@ -140,7 +149,10 @@ fn note(id: &str) -> &'static str {
             "Every file of the font corpus with every face: face data and unscaled outlines."
         }
         "font-hinting-none" => {
-            "Every file of the font corpus as libass 0.17.5 loads it by default (ASS_HINTING_NONE): unhinted outlines at 256 pixels (16384 in 26.6) and the FT_LOAD_DEFAULT advances there."
+            "Every file of the font corpus as libass 0.17.5 loads it by default (ASS_HINTING_NONE): unhinted outlines at 256 pixels (16384 in 26.6), the FT_LOAD_DEFAULT advances there, and the vertical advances of both loads."
+        }
+        "font-hinting-default" => {
+            "Every file of the font corpus at libass 0.17.5's default size of 256 pixels (16384 in 26.6): every glyph's FT_LOAD_DEFAULT metrics and hinted outline, which libass's HarfBuzz callbacks read for advances, extents and contour points."
         }
         _ => {
             "Every file of the font corpus at the nine other 26.6 heights libass requests when hinting is on: unhinted outlines and FT_LOAD_DEFAULT advances."
@@ -155,9 +167,14 @@ mod tests {
     #[test]
     fn every_font_feature_generates_its_pinned_cases() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        assert!(LANE.check(root).is_empty(), "{:?}", LANE.check(root));
+        assert!(
+            GENERATOR.check(root).is_empty(),
+            "{:?}",
+            GENERATOR.check(root)
+        );
         let count = |id| {
-            LANE.manifest(root, id)
+            GENERATOR
+                .manifest(root, id)
                 .unwrap()
                 .get("cases")
                 .and_then(Value::as_array)
@@ -165,14 +182,21 @@ mod tests {
                 .len()
         };
         assert_eq!(
-            FEATURES.map(|f| (f, count(f))),
             [
-                ("font-outlines", 51),
-                ("font-hinting-none", 102),
-                ("font-hinting-modes", 918)
+                "font-outlines",
+                "font-hinting-none",
+                "font-hinting-default",
+                "font-hinting-modes"
+            ]
+            .map(|f| (f, count(f))),
+            [
+                ("font-outlines", 53),
+                ("font-hinting-none", 159),
+                ("font-hinting-default", 53),
+                ("font-hinting-modes", 954)
             ]
         );
-        let none = LANE.manifest(root, "font-hinting-none").unwrap();
+        let none = GENERATOR.manifest(root, "font-hinting-none").unwrap();
         let first = &none.get("cases").and_then(Value::as_array).unwrap()[1];
         assert_eq!(
             first.get("id").and_then(Value::as_str),
@@ -201,17 +225,20 @@ mod tests {
         };
         copy("contract.json");
         copy("pins.json");
-        assert!(LANE.check(&root).is_empty());
+        assert!(GENERATOR.check(&root).is_empty());
         let pins = std::fs::read_to_string(feature.join("pins.json")).unwrap();
+        let other_reference = pins.replacen("freetype-native", "other-reference", 1);
+        std::fs::write(feature.join("pins.json"), other_reference).unwrap();
+        assert!(GENERATOR.check(&root)[0].contains("pin reference differs"));
         std::fs::write(feature.join("pins.json"), pins.replace("\n  ", "\n ")).unwrap();
         assert!(
-            LANE.check(&root)[0].contains("not in the form"),
+            GENERATOR.check(&root)[0].contains("not in the form"),
             "hand formatting"
         );
         let renamed = pins.replacen("arimo-bold-ttf", "arimo-bold", 1);
         std::fs::write(feature.join("pins.json"), renamed).unwrap();
         assert!(
-            LANE.check(&root)[0].contains("pinned as"),
+            GENERATOR.check(&root)[0].contains("pinned as"),
             "a case id differs"
         );
         std::fs::remove_dir_all(root).unwrap();

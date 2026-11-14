@@ -5,13 +5,17 @@ use crate::{
     Access, BoxView, ClockField, CursorStatus, EditEntry, EditList, EncodedEntryKind,
     EncodedStream, PacketView, Sample, SampleCursor, SampleStep, SampleTable,
 };
-use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, atomic::AtomicBool};
 use triergon_core::{
-    Budget, Error, InputCursor, InputToken, Result, Rounding, SourceId, Time, TimeBase, WorkBudget,
+    Budget, BudgetVec, Charged, Error, InputCursor, InputToken, Reservation, Result, Rounding,
+    SourceId, Time, TimeBase, WorkBudget,
 };
 use triergon_framing::{
-    Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration, BuildStep,
+    AacAscParser, AacConfigLimits, AacSource, Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser,
+    Ac3Configuration, BuildStep, OPUS_RATE, aac_fixed_channel_count, indexed_aac_frequency,
 };
+
+pub(crate) mod fragment_aac;
 
 // ETSI TS 102 366 Annex F.2: an AC-3 or E-AC-3 ISO media sample covers six blocks.
 const DOLBY_SAMPLE_TICKS: u32 = 1536;
@@ -37,6 +41,45 @@ pub struct EncodedEditContext<'a> {
     pub media_base: TimeBase,
     pub movie_base: TimeBase,
 }
+#[derive(Clone, Copy, Debug)]
+enum EditTiming {
+    Video,
+    FixedAudio(u32),
+    Opus,
+}
+
+#[derive(Debug)]
+struct OpusDurationRun {
+    end_sample: u64,
+    end_tick: i128,
+    ticks: u32,
+}
+
+#[derive(Debug)]
+struct OpusTiming {
+    first: u64,
+    first_tick: i128,
+    durations: BudgetVec<OpusDurationRun>,
+    _charge: Reservation,
+}
+
+impl OpusTiming {
+    fn duration(&self, occurrence: u64) -> Result<u32> {
+        let runs = self.durations.as_slice();
+        runs.get(runs.partition_point(|run| run.end_sample <= occurrence))
+            .map(|run| run.ticks)
+            .ok_or(Error::Invalid("missing Opus occurrence duration"))
+    }
+
+    fn has_decode_tick(&self, tick: i128) -> bool {
+        let runs = self.durations.as_slice();
+        let row = runs.partition_point(|run| run.end_tick <= tick);
+        let start = if row == 0 { 0 } else { runs[row - 1].end_tick };
+        runs.get(row)
+            .is_some_and(|run| (tick - start) % i128::from(run.ticks) == 0)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct EncodedEditPlan {
     source_table: BoxView,
@@ -51,7 +94,8 @@ pub struct EncodedEditPlan {
     source_end: i128,
     presentation_end: i128,
     count: u64,
-    frame: u32, // Media ticks per coded audio sample. Zero for video.
+    timing: EditTiming,
+    opus_timing: Option<Arc<OpusTiming>>,
     dts_scale: Option<u32>,
     dependency_table: bool,
     dependency_recovery: bool,
@@ -90,6 +134,77 @@ impl EncodedEditPlan {
     pub fn selected_end_ticks(&self) -> i128 {
         self.end
     }
+    /// End of the regular Opus presentation window on the edited timeline.
+    /// The final source duration can shorten the last coded packet.
+    pub fn opus_presentation_end(&self) -> Result<Time> {
+        if !matches!(self.timing, EditTiming::Opus) {
+            return Err(Error::Unsupported("Opus presentation needs an Opus edit"));
+        }
+        let end = self.end.min(self.source_end);
+        Time::from_ticks(
+            end.checked_sub(self.anchor).ok_or(Error::Overflow)?,
+            self.media_base,
+        )
+    }
+
+    pub(crate) fn opus_seek_timestamp(
+        &self,
+        pts: i64,
+        video_base: TimeBase,
+        audio_base: TimeBase,
+    ) -> Result<i64> {
+        let target = Time::from_ticks(i128::from(pts), video_base)?;
+        if target >= self.opus_presentation_end()? {
+            return Err(Error::Unsupported("Opus seek reaches the presentation end"));
+        }
+        target.to_i64_ticks(audio_base, Rounding::Floor)
+    }
+
+    pub(crate) fn opus_occurrence(&self, sample: u64) -> Result<u64> {
+        let timing = self
+            .opus_timing
+            .as_ref()
+            .ok_or(Error::Invalid("missing Opus timing"))?;
+        sample.checked_sub(timing.first).ok_or(Error::Unsupported(
+            "Opus recovery precedes the retained edit prefix",
+        ))
+    }
+
+    pub(crate) fn opus_roll_scope(&self) -> Result<crate::RecoveryScope<'_>> {
+        if !matches!(self.timing, EditTiming::Opus) {
+            return Err(Error::Unsupported("Opus recovery needs an Opus edit"));
+        }
+        let facts = self
+            .recovery_observation
+            .as_ref()
+            .ok_or(Error::Invalid("missing Opus recovery observation"))?
+            .source_result()
+            .map_err(|fault| fault.error)?;
+        let scope = facts.source_scope(crate::RecoveryKind::Roll);
+        if scope.mappings.is_none() || scope.track_descriptions.is_none() {
+            return Err(Error::Unsupported("missing Opus roll group"));
+        }
+        Ok(scope)
+    }
+
+    pub(crate) fn align_seek_timestamp(&self, timestamp: i64, base: TimeBase) -> Result<i64> {
+        let Some(opus) = &self.opus_timing else {
+            return Ok(timestamp);
+        };
+        // MOV keeps an exact secondary seek hit. Between samples it
+        // searches 10 ms earlier. Source roll recovery is a separate policy.
+        let source_tick = i128::from(timestamp)
+            .checked_add(self.anchor)
+            .ok_or(Error::Overflow)?;
+        if source_tick >= opus.first_tick
+            && source_tick < self.end.min(self.source_end)
+            && opus.has_decode_tick(source_tick)
+        {
+            return Ok(timestamp);
+        }
+        let lead = Time::new(1, 100)?.to_i64_ticks(base, Rounding::NearestAway)?;
+        timestamp.checked_sub(lead).ok_or(Error::Overflow)
+    }
     pub(crate) fn matches(
         &self,
         table: &SampleTable,
@@ -107,7 +222,8 @@ impl EncodedEditPlan {
             && self.source_edit.bytes().as_ref().as_ptr() == edits.raw().bytes().as_ref().as_ptr()
             && self.source_edit.bytes().len() == edits.raw().bytes().len()
     }
-    pub(crate) fn project(&self, source: &Sample) -> Result<Option<PacketView>> {
+    // Return the projected packet and its one-based edit sequence.
+    pub(crate) fn project(&self, source: &Sample) -> Result<Option<(PacketView, u64)>> {
         if source.ordinal == 0 || source.ordinal > self.count {
             return Err(Error::Invalid("encoded edit source ordinal"));
         }
@@ -117,9 +233,19 @@ impl EncodedEditPlan {
         let cts = source
             .cts_ticks
             .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
-        if self.frame != 0 && dts >= self.end {
+        let audio = !matches!(self.timing, EditTiming::Video);
+        if audio && dts >= self.end {
             return Ok(None);
         }
+        let (duration, sequence) = match &self.opus_timing {
+            Some(opus) if opus.first > 1 => {
+                let Some(occurrence) = source.ordinal.checked_sub(opus.first) else {
+                    return Ok(None);
+                };
+                (opus.duration(occurrence)?, occurrence + 1)
+            }
+            _ => (source.duration_ticks, source.ordinal),
+        };
         let dts_field =
             ClockField::from_exact_ticks(dts.checked_sub(self.anchor).ok_or(Error::Overflow)?)?;
         let pts_field =
@@ -127,12 +253,12 @@ impl EncodedEditPlan {
         let source_end = dts
             .checked_add(i128::from(source.duration_ticks))
             .ok_or(Error::Overflow)?;
-        let discard = if self.frame != 0 {
+        let discard = if audio {
             source_end <= i128::from(self.entry.media_time)
         } else {
             cts < self.anchor || cts >= self.presentation_end
         };
-        Ok(Some(PacketView {
+        let packet = PacketView {
             source_ordinal: source.ordinal,
             source_description: source.description_index,
             source_range: source.range.clone(),
@@ -140,7 +266,7 @@ impl EncodedEditPlan {
             dts: dts_field.api_ticks(),
             pts_field,
             dts_field,
-            duration: i64::from(source.duration_ticks),
+            duration: i64::from(duration),
             flags: u32::from(source.is_container_sync())
                 | if discard { 4 } else { 0 }
                 | if self.dependency_table
@@ -160,16 +286,19 @@ impl EncodedEditPlan {
                 } else {
                     0
                 },
-        }))
+        };
+        Ok(Some((packet, sequence)))
     }
     /// Demux skip-samples side data for a sample from this plan's source track.
     /// The first two little-endian words give leading and trailing sample counts.
-    /// DTS counts use the sample-entry clock. The packet retains the original
-    /// source sample duration, including a shortened final DTS sample.
+    /// DTS counts use the sample-entry clock. The MOV Opus projection reports
+    /// leading trim in media ticks and trailing trim in 48 kHz samples.
     pub fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
-        if self.frame == 0 {
-            return Ok(None);
-        }
+        let frame = match self.timing {
+            EditTiming::Video => return Ok(None),
+            EditTiming::FixedAudio(frame) => frame,
+            EditTiming::Opus => return self.opus_skip_samples(source),
+        };
         let dts = source
             .dts_ticks
             .ok_or(Error::Unsupported("encoded edit source DTS unknown"))?;
@@ -189,9 +318,7 @@ impl EncodedEditPlan {
             let desired = self.end.min(self.source_end);
             // stts can shorten the last DTS packet without changing the
             // number of samples it decodes. Measure trim from the coded size.
-            let nominal = dts
-                .checked_add(i128::from(self.frame))
-                .ok_or(Error::Overflow)?;
+            let nominal = dts.checked_add(i128::from(frame)).ok_or(Error::Overflow)?;
             u32::try_from(nominal.checked_sub(desired).ok_or(Error::Overflow)?.max(0))
                 .map_err(|_| Error::Overflow)?
         } else {
@@ -200,15 +327,49 @@ impl EncodedEditPlan {
         let scale = self.dts_scale.unwrap_or(1);
         let start = start.div_ceil(scale);
         let end = end / scale;
-        if start == 0 && end == 0 {
+        Ok(skip_side_data(start, end))
+    }
+
+    fn opus_skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
+        let first = self.opus_timing.as_ref().map_or(1, |opus| opus.first);
+        let dts = source
+            .dts_ticks
+            .ok_or(Error::Unsupported("encoded edit source DTS unknown"))?;
+        if source.ordinal < first || dts >= self.end {
             return Ok(None);
         }
-        let mut bytes = [0; 10];
-        bytes[..4].copy_from_slice(&start.to_le_bytes());
-        bytes[4..8].copy_from_slice(&end.to_le_bytes());
-        Ok(Some(bytes))
+        let start = if source.ordinal == first {
+            u32::try_from(self.anchor.checked_sub(dts).ok_or(Error::Overflow)?)
+                .map_err(|_| Error::Overflow)?
+        } else {
+            0
+        };
+        let next = dts
+            .checked_add(i128::from(source.duration_ticks))
+            .ok_or(Error::Overflow)?;
+        let end = if next > self.end {
+            let padding = next.checked_sub(self.end).ok_or(Error::Overflow)?;
+            let pcm_base = TimeBase::new(1, u64::from(OPUS_RATE))?;
+            let ticks = Time::from_ticks(padding, self.media_base)?
+                .to_ticks(pcm_base, Rounding::NearestAway)?;
+            u32::try_from(ticks).map_err(|_| Error::Overflow)?
+        } else {
+            0
+        };
+        Ok(skip_side_data(start, end))
     }
 }
+
+fn skip_side_data(start: u32, end: u32) -> Option<[u8; 10]> {
+    if start == 0 && end == 0 {
+        return None;
+    }
+    let mut bytes = [0; 10];
+    bytes[..4].copy_from_slice(&start.to_le_bytes());
+    bytes[4..8].copy_from_slice(&end.to_le_bytes());
+    Some(bytes)
+}
+
 #[allow(missing_debug_implementations)] // Holds a framing parser that has no `Debug`.
 pub struct EncodedEditJob<'a> {
     context: EncodedEditContext<'a>,
@@ -231,7 +392,14 @@ pub struct EncodedEditJob<'a> {
     source_end: i128,
     count: u64,
     frame: u32,
-    preserve_aac_media_durations: bool,
+    opus_preroll_boundary: i128,
+    opus_first: u64,
+    opus_first_tick: i128,
+    opus_durations: BudgetVec<OpusDurationRun>,
+    range_playback: bool,
+    non_sync_prefix: bool,
+    sync_after_edit: bool,
+    aac_program: Option<Box<Charged<AacAscParser>>>,
     dts_scale: Option<u32>,
     dolby_config: Option<Ac3ConfigParser>,
     descriptions: u32,
@@ -333,6 +501,8 @@ impl<'a> EncodedEditJob<'a> {
     /// Range playback admits leading encoder-delay edits for AC-3, E-AC-3
     /// and DTS. DTS also supports a leading empty edit before the media edit.
     /// AAC uses the sample durations in `stts` and the coded frame length for trim.
+    /// Opus uses the edit list for priming and keeps each source duration.
+    /// A regular video edit can begin on the presentation tick of a non-sync sample at decode origin.
     pub fn new_range_playback(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -341,9 +511,35 @@ impl<'a> EncodedEditJob<'a> {
     ) -> Result<Self> {
         crate::encoded_configs::validate_range_configs(context.table, configs, input.budget())?;
         let mut job = Self::new_recovery_bound(context, input, limits, configs.len())?;
-        job.preserve_aac_media_durations = true;
+        job.range_playback = true;
         let stream = job.context.stream;
         let kind = match stream.kind() {
+            EncodedEntryKind::Aac => {
+                let config = &stream.demux().extradata;
+                if config.as_ref().get(1).is_some_and(|byte| byte & 0x78 == 0) {
+                    let parser = AacAscParser::new(
+                        input.budget(),
+                        AacSource {
+                            source: input.source(),
+                            generation: input.token().generation(),
+                            offset: 0,
+                        },
+                        config.clone(),
+                        AacConfigLimits {
+                            maximum_record_bytes: 4096,
+                            maximum_pce_elements: 64,
+                            maximum_comment_bytes: 255,
+                        },
+                    )?;
+                    let parser = Charged::try_new(
+                        input.budget(),
+                        size_of::<Charged<AacAscParser>>(),
+                        || parser,
+                    )?;
+                    job.aac_program = Some(Box::new(parser));
+                }
+                return Ok(job);
+            }
             EncodedEntryKind::Ac3 => Ac3ConfigKind::Dac3,
             EncodedEntryKind::Eac3 => Ac3ConfigKind::Dec3,
             _ => return Ok(job),
@@ -485,7 +681,14 @@ impl<'a> EncodedEditJob<'a> {
             source_end: 0,
             count: 0,
             frame,
-            preserve_aac_media_durations: false,
+            opus_preroll_boundary: 0,
+            opus_first: 1,
+            opus_first_tick: 0,
+            opus_durations: BudgetVec::new(input.budget()),
+            range_playback: false,
+            non_sync_prefix: false,
+            sync_after_edit: false,
+            aac_program: None,
             dts_scale,
             dolby_config: None,
             descriptions,
@@ -600,12 +803,33 @@ impl<'a> EncodedEditJob<'a> {
             }
             self.empty_recovery = None;
         }
+        if let Some(parser) = &mut self.aac_program {
+            let config = match parser.step(work, cancel)? {
+                BuildStep::Ready(config) => config,
+                BuildStep::Yield => return Ok(CursorStatus::Yield),
+                BuildStep::Complete => return Err(Error::Invalid("missing AAC program")),
+            };
+            let facts = config.facts();
+            if config.syntax_issues() != 0
+                || config.program_config().is_none()
+                || !(1..=8).contains(&facts.core_channels)
+                || facts.sbr.is_present()
+                || facts.ps.is_present()
+            {
+                return Err(Error::Unsupported("encoded AAC program clock"));
+            }
+            self.aac_program = None;
+        }
         if !self.initialized {
             if !work.try_charge(1) {
                 return Ok(CursorStatus::Yield);
             }
             let duration = self.entry.duration(self.context.movie_base)?;
-            let rounding = if self.dts_scale.is_some() {
+            let rounding = if self.dts_scale.is_some()
+                || self.context.stream.kind() == EncodedEntryKind::Aac
+            {
+                // The MOV view rounds AAC edit duration to the nearest media
+                // tick. This also determines which packet carries the tail trim.
                 Rounding::NearestAway
             } else {
                 Rounding::Floor
@@ -620,22 +844,30 @@ impl<'a> EncodedEditJob<'a> {
             match self.context.stream.kind() {
                 kind if kind.is_video() => {}
                 EncodedEntryKind::Dts => {}
+                EncodedEntryKind::Opus => {
+                    // Opus in ISO BMFF, section 4.4. dOps PreSkip does not
+                    // determine the presentation window.
+                    self.anchor = Some(i128::from(self.entry.media_time));
+                    // The MOV view retains the sample at or before one second
+                    // of history when an edit crops the front of the track.
+                    let second =
+                        Time::new(1, 1)?.to_ticks(self.context.media_base, Rounding::Floor)?;
+                    self.opus_preroll_boundary = i128::from(self.entry.media_time) - second;
+                }
                 EncodedEntryKind::Aac => {
-                    // Narrow LC/standard-rate/channel-config profile. Body
-                    // tools, PCE, SBR signalling and decoder validity stay opaque.
+                    // Indexed AAC-LC with 1024 core samples. Range playback
+                    // also accepts the out-of-band program validated above.
                     let b = self.context.stream.demux().extradata.as_ref();
                     let a = *b.first().ok_or(Error::Truncated)?;
                     let c = *b.get(1).ok_or(Error::Truncated)?;
-                    let index = usize::from(((a & 7) << 1) | (c >> 7));
-                    const RATES: [u32; 13] = [
-                        96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000,
-                        11025, 8000, 7350,
-                    ];
+                    let index = ((a & 7) << 1) | (c >> 7);
+                    let channel_configuration = (c >> 3) & 15;
+                    let program = self.range_playback && channel_configuration == 0;
                     if a >> 3 != 2
                         || c & 7 != 0
-                        || ((c >> 3) & 15) == 0
-                        || ((c >> 3) & 15) > 7
-                        || RATES.get(index).map(|x| u64::from(*x))
+                        || (!program && aac_fixed_channel_count(channel_configuration).is_none())
+                        || (!self.range_playback && channel_configuration > 7)
+                        || indexed_aac_frequency(index).map(u64::from)
                             != Some(self.context.media_base.denominator())
                         || self.context.media_base.numerator() != 1
                     {
@@ -678,6 +910,36 @@ impl<'a> EncodedEditJob<'a> {
         loop {
             self.check(input, work, cancel)?;
             if self.scan_done {
+                if self.context.stream.kind() == EncodedEntryKind::Opus {
+                    // The MOV duration run starts at the first retained occurrence.
+                    // Keep the source sample clock intact alongside that projection.
+                    let runs = self.context.table.decode_runs();
+                    loop {
+                        let previous = self.opus_durations.as_slice().last();
+                        let samples = previous.map_or(0, |run| run.end_sample);
+                        let end_tick = previous.map_or(0, |run| run.end_tick);
+                        if samples >= self.count {
+                            break;
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(CursorStatus::Yield);
+                        }
+                        let row = self.opus_durations.len() as u32;
+                        let count = u64::from(runs.word(row, 0)?);
+                        let ticks = runs.word(row, 4)?;
+                        let end_sample = samples.checked_add(count).ok_or(Error::Overflow)?;
+                        let end_tick = end_tick
+                            .checked_add(i128::from(count) * i128::from(ticks))
+                            .ok_or(Error::Overflow)?;
+                        self.opus_durations
+                            .try_push(OpusDurationRun {
+                                end_sample,
+                                end_tick,
+                                ticks,
+                            })
+                            .map_err(|error| error.error)?;
+                    }
+                }
                 if !work.try_charge(1) {
                     return Ok(CursorStatus::Yield);
                 }
@@ -702,18 +964,51 @@ impl<'a> EncodedEditJob<'a> {
                         "encoded Dolby edit must end at source end",
                     ));
                 }
-                if self.frame == 0 {
+                let timing = if self.context.stream.kind() == EncodedEntryKind::Opus {
+                    if i128::from(self.entry.media_time) >= self.source_end {
+                        return Err(Error::Invalid("Opus edit starts after the last sample"));
+                    }
+                    EditTiming::Opus
+                } else if self.frame != 0 {
+                    EditTiming::FixedAudio(self.frame)
+                } else {
                     let duration = self
                         .end
                         .checked_sub(i128::from(self.entry.media_time))
                         .ok_or(Error::Overflow)?;
                     self.end = anchor.checked_add(duration).ok_or(Error::Overflow)?;
-                    if self.maximum_cts.is_some_and(|x| x >= self.end) {
+                    // Reordered non-sync packets beyond a zero-origin edit
+                    // can still be needed to decode the complete edit.
+                    let keeps_reordered_tail = self.range_playback
+                        && anchor == 0
+                        && self.end == self.source_end
+                        && !self.sync_after_edit;
+                    if !keeps_reordered_tail && self.maximum_cts.is_some_and(|x| x >= self.end) {
                         return Err(Error::Unsupported(
                             "encoded video tail selection not established",
                         ));
                     }
-                }
+                    EditTiming::Video
+                };
+                let opus_timing = if matches!(timing, EditTiming::Opus) {
+                    let layout = std::alloc::Layout::new::<[usize; 2]>()
+                        .extend(std::alloc::Layout::new::<OpusTiming>())
+                        .map_err(|_| Error::Overflow)?
+                        .0
+                        .pad_to_align();
+                    let charge = self.pool.reserve(layout.size())?;
+                    Some(Arc::new(OpusTiming {
+                        first: self.opus_first,
+                        first_tick: self.opus_first_tick,
+                        durations: std::mem::replace(
+                            &mut self.opus_durations,
+                            BudgetVec::new(&self.pool),
+                        ),
+                        _charge: charge,
+                    }))
+                } else {
+                    None
+                };
                 self.result = Some(EncodedEditPlan {
                     source_table: self.context.table.raw().clone(),
                     source_edit: self.context.edits.raw().clone(),
@@ -727,7 +1022,8 @@ impl<'a> EncodedEditJob<'a> {
                     source_end: self.source_end,
                     presentation_end,
                     count: self.count,
-                    frame: self.frame,
+                    timing,
+                    opus_timing,
                     dts_scale: self.dts_scale,
                     dependency_table: self.dependency_table,
                     dependency_recovery: self.dependency_recovery,
@@ -765,8 +1061,14 @@ impl<'a> EncodedEditJob<'a> {
                 let c = s
                     .cts_ticks
                     .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
-                if self.count == 0 && (d != 0 || !s.is_container_sync()) {
-                    return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                if self.count == 0 {
+                    let allows_non_sync = self.range_playback
+                        && self.context.stream.kind().is_video()
+                        && c == i128::from(self.entry.media_time);
+                    self.non_sync_prefix = !s.is_container_sync();
+                    if d != 0 || (!allows_non_sync && self.non_sync_prefix) {
+                        return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
                 }
                 if d != self.source_end {
                     return Err(Error::Invalid("encoded edit source decode continuity"));
@@ -803,17 +1105,35 @@ impl<'a> EncodedEditJob<'a> {
                                 "encoded Dolby source packet clock profile",
                             ));
                         }
-                    } else if c != d
-                        || (s.duration_ticks > self.frame && !self.preserve_aac_media_durations)
-                    {
+                    } else if c != d || (s.duration_ticks > self.frame && !self.range_playback) {
                         return Err(Error::Unsupported(
                             "encoded AAC source packet clock profile",
                         ));
                     }
-                } else if c >= i128::from(self.entry.media_time) {
-                    self.anchor = Some(self.anchor.map_or(c, |prior| prior.min(c)));
+                } else if self.context.stream.kind() == EncodedEntryKind::Opus {
+                    if c != d || !s.is_container_sync() {
+                        return Err(Error::Invalid("Opus sample timing or sync flag"));
+                    }
+                    if d <= self.opus_preroll_boundary {
+                        self.opus_first = s.ordinal;
+                        self.opus_first_tick = d;
+                    }
+                } else {
+                    let media_start = i128::from(self.entry.media_time);
+                    // A reordered sync sample at the edit start can replace
+                    // the prefix even when decoded after its first sample.
+                    if self.non_sync_prefix && c <= media_start && s.is_container_sync() {
+                        return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
+                    if c >= media_start && self.anchor.is_none_or(|prior| c < prior) {
+                        self.anchor = Some(c);
+                    }
+                    // The presentation anchor can only extend the scan's end.
+                    if c >= self.end {
+                        self.maximum_cts = Some(self.maximum_cts.map_or(c, |prior| prior.max(c)));
+                        self.sync_after_edit |= s.is_container_sync();
+                    }
                 }
-                self.maximum_cts = Some(self.maximum_cts.map_or(c, |prior| prior.max(c)));
                 self.source_end = d
                     .checked_add(i128::from(s.duration_ticks))
                     .ok_or(Error::Overflow)?;

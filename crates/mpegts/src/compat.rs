@@ -10,6 +10,119 @@
 //! Projections that exist only to compare traces with FFmpeg are not policies. They
 //! are compiled only with the `reference-trace` feature.
 
+pub mod adts {
+    //! Parser packet boundaries for ADTS carried in MPEG-TS. Original PES
+    //! timing and extents remain available on every result.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+
+    use crate::Pes;
+    use triergon_core::Error;
+
+    /// Select how a transport reader handles bytes outside complete ADTS frames.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PacketPolicy {
+        /// Use the specification reader and the selected audio EOF policy.
+        #[default]
+        Strict,
+        /// Use bounded parser framing and report opaque prefixes and EOF tails
+        /// through `ReaderEvent::AdtsFragment`.
+        ReportFragments,
+    }
+
+    /// Admission of an ADTS PES with a zero packet-length field.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PesPolicy {
+        #[default]
+        Strict,
+        /// Assemble the original bytes until a following PES start or logical
+        /// EOF, and report the wire violation with the assembled source.
+        ReportUnbounded,
+    }
+
+    /// Original header, bytes and source ranges of a length-zero ADTS PES.
+    #[derive(Debug)]
+    pub struct UnboundedPes(pub(crate) Pes);
+
+    impl UnboundedPes {
+        pub fn pes(&self) -> &Pes {
+            &self.0
+        }
+
+        pub fn rejection(&self) -> Error {
+            crate::pes::UNBOUNDED_NON_VIDEO
+        }
+    }
+}
+
+pub mod annex_b;
+
+pub mod latm {
+    //! Packet boundaries for LATM in MPEG-TS, as observed with FFmpeg git
+    //! revision `d32b387f` on the 9.0 branch with parsers and NOFILLIN.
+    use crate::clock::ClockKey;
+    use crate::{Pes, SourceEvent, TraceEvent, Track};
+
+    /// Choose LOAS envelope framing or the demuxer's unsplit PES boundaries.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum PacketPolicy {
+        #[default]
+        Strict,
+        /// Emit each validated, nonempty LATM PES as a separate observation.
+        PreservePes,
+    }
+
+    /// An unsplit PES observation with its exact source and clock facts.
+    #[derive(Clone, Debug)]
+    pub struct PesPacket {
+        track: Track,
+        source: SourceEvent,
+        clock_key: ClockKey,
+        clock_quarantined: bool,
+    }
+
+    impl PesPacket {
+        pub(crate) fn new(
+            track: Track,
+            source: SourceEvent,
+            clock_key: ClockKey,
+            clock_quarantined: bool,
+        ) -> Self {
+            Self {
+                track,
+                source,
+                clock_key,
+                clock_quarantined,
+            }
+        }
+
+        pub fn track_info(&self) -> &Track {
+            &self.track
+        }
+
+        pub fn source(&self) -> &SourceEvent {
+            &self.source
+        }
+
+        pub fn clock_key(&self) -> ClockKey {
+            self.clock_key
+        }
+
+        pub fn clock_is_quarantined(&self) -> bool {
+            self.clock_quarantined
+        }
+
+        pub fn pes(&self) -> &Pes {
+            let TraceEvent::Pes(pes) = self.source.event() else {
+                unreachable!("LATM packet owns its source PES");
+            };
+            pes
+        }
+    }
+}
+
+pub mod opaque_video;
+
 pub mod pes {
     //! The demuxer's PES packets and clock.
     //!
@@ -22,21 +135,86 @@ pub mod pes {
     //! select the carriage: [`RegisteredCarriage`] for AVC, HEVC and AAC,
     //! [`PrivateAudioCarriage`] for AC-3 and E-AC-3, and
     //! [`DvbSubtitlesDescriptors`] for DVB subtitles.
+    //! [`TransportFaultRecovery`] adds opt-in extraction from finite TS188 AVC
+    //! carriers with TEI or scrambling. Its [`TransportObservation::Faulted`]
+    //! result retains the actual source diagnostic and opaque bytes separately
+    //! from validated source PES.
+    //! [`PesFaultPolicy`] separately opts into isolated timing-header faults and
+    //! fully checked rejected clock fields. [`PesFaultPacket`] retains the source
+    //! refusal; [`DiagnosticTimeView`] reports optional encoded compatibility time.
+    //! A source-signalled PCR/DI transition needs [`TransportFaultRecovery::confirm_source_timeline`].
+    //! Opt-in terminal transport handling needs real core/framer EOF and source
+    //! Finished; [`TransportTailConfirmation`] retains the excluded source fault.
+    //!
+    //! [`PesCutter`] cuts one PID of any stream type into the packets the demuxer
+    //! hands a decoder ([`CutPes`]): each starts at a unit start and ends at its
+    //! declared length, the next unit start or the end of the input, keeps its raw
+    //! timestamps and the program clock it started under, and is never empty.
+    //! [`pcr_bounded_pts`] is the demuxer's teletext PTS, bounded by that clock
+    //! ([`CutPes::pcr_bounded_pts`] for a cut packet).
     //!
     //! [`DemuxClock`] places a packet's timestamps in the demuxer's 33-bit interval,
     //! fixed by the first timestamp it sees, and returns a [`DemuxTimeView`] beside
-    //! the raw source values.
+    //! the raw source values ([`DemuxClock::place`] for raw values alone).
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::demux_clock::{
-        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, TimestampOrigin,
+        ClockOrigin, DemuxClock, DemuxProfile, DemuxTimeView, DiagnosticTimeView, EncodedTimeView,
+        TimestampOrigin,
     };
     pub use crate::demux_pes::{
-        CompactDemuxPacket, CompactPayload, DemuxBoundary, DemuxObserver, DemuxPacket,
+        CompactDemuxPacket, CompactPayload, CutPes, DemuxBoundary, DemuxObserver, DemuxPacket,
         DemuxPayloadKind, DemuxScope, DemuxSpan, DemuxSpanView, DemuxSpanViews,
-        DvbSubtitlesDescriptors, PayloadCursor, PrivateAudioCarriage, PrivateAudioDescriptors,
-        ReadyContinuation, RegisteredCarriage, SourceContext,
+        DvbSubtitlesDescriptors, PayloadCursor, PesCutter, PrivateAudioCarriage,
+        PrivateAudioDescriptors, ReadyContinuation, RegisteredCarriage, SourceContext,
+        pcr_bounded_pts, selected_track_kind,
     };
+    pub use crate::demux_transport::{
+        MalformedInputCompletion, MalformedInputFact, MalformedInputKind,
+        MalformedSourceDisposition, MalformedSourceEvent, NoPacketsConfirmation,
+    };
+    pub use crate::demux_transport::{
+        PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,
+        TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
+        TransportObservation, TransportTailConfirmation,
+    };
+    /// Control-only completion from complete physical carrier coverage and
+    /// actual source EOF. The confirmation never creates a validated PES scope
+    /// or accepts media from a rejected carrier.
+    pub use crate::packet_completion::{
+        ControlCarrierKind, ControlPatFact, NoMediaConfirmation, PacketCompletion, PhysicalCarrier,
+        PhysicalNullRun,
+    };
+
+    /// Reporting of unframed payload in a private-audio carriage at logical EOF.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum UnframedAudioPolicy {
+        /// Require the source namespace before admitting a private-audio framer.
+        #[default]
+        Strict,
+        /// With unspecified namespace, admit one finite private-audio PES per
+        /// uninterrupted run when its payload has no AC-3 or E-AC-3 syncword
+        /// and does not end with the first byte of one.
+        /// The observation preserves the track's source codec and namespace.
+        ReportAtEof,
+    }
+}
+
+pub mod stream {
+    //! The demuxer's streams.
+    //!
+    //! [`ProgramReader`] reads the PAT and PMT sections the demuxer accepts and
+    //! reports each [`Program`] with its elementary streams. [`codec`] is the
+    //! codec the demuxer opens for a PMT entry, [`is_video`] whether it opens a
+    //! video stream, and [`configuration`] the decoder configuration it derives
+    //! from the entry's DVB subtitling or teletext descriptor. The standard
+    //! readings are [`TransportStream`] and [`ElementaryStream::codec`].
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+    //!
+    //! [`TransportStream`]: crate::TransportStream
+    //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
+    pub use crate::demux_stream::{Program, ProgramReader, codec, configuration, is_video};
 }
 
 pub mod input {

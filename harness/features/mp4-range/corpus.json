@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "directory": ".research/mp4-range-fixtures",
   "cases": [
     {
       "id": "regular-open",
@@ -55,6 +56,680 @@
         "packets": 186,
         "bytes": 62932,
         "digest": 1562922133773717379
+      }
+    },
+    {
+      "id": "fragmented-open",
+      "profile": "fragmented-open",
+      "file": "fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 7927680340045287421
+      }
+    },
+    {
+      "id": "fragmented-before-sync",
+      "profile": "fragmented-before-sync",
+      "file": "fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4095"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 7927680340045287421
+      }
+    },
+    {
+      "id": "fragmented-seek",
+      "profile": "fragmented-seek",
+      "file": "fragmented-avc-aac.mp4",
+      "sha256": "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 74,
+        "bytes": 30999,
+        "digest": 2297253848353618229
+      }
+    },
+    {
+      "id": "fragmented-rescaled-open",
+      "profile": "fragmented-rescaled-open",
+      "file": "fragmented-aac-media-clock.mp4",
+      "sha256": "07acb7a739b83a9597b462b561fb97db1767a2b3ccc2bba3b2bb219a985b563d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 16257532825513011650
+      }
+    },
+    {
+      "id": "fragmented-rescaled-seek",
+      "profile": "fragmented-rescaled-seek",
+      "file": "fragmented-aac-media-clock.mp4",
+      "sha256": "07acb7a739b83a9597b462b561fb97db1767a2b3ccc2bba3b2bb219a985b563d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 75,
+        "bytes": 31255,
+        "digest": 16684294720659653080
+      }
+    },
+    {
+      "id": "dvh1-open",
+      "profile": "dvh1-open",
+      "file": "dvh1.mp4",
+      "sha256": "b605e3873529a8bc857b7bdae9ce08184eba955a0000ca848c812900c92e0a84",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 265368919262385015
+      }
+    },
+    {
+      "id": "dvh1-seek",
+      "profile": "dvh1-seek",
+      "file": "dvh1.mp4",
+      "sha256": "b605e3873529a8bc857b7bdae9ce08184eba955a0000ca848c812900c92e0a84",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "40"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 265368919262385015
+      }
+    },
+    {
+      "id": "dvhe-open",
+      "profile": "dvhe-open",
+      "file": "dvhe.mp4",
+      "sha256": "22b2a2b95d866df543f8c4d6172fbf1fb84f652ab7000931f5b97fb8366dc2cd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 6289861727786914679
+      }
+    },
+    {
+      "id": "dvhe-seek",
+      "profile": "dvhe-seek",
+      "file": "dvhe.mp4",
+      "sha256": "22b2a2b95d866df543f8c4d6172fbf1fb84f652ab7000931f5b97fb8366dc2cd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "40"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 3438,
+        "digest": 6289861727786914679
+      }
+    },
+    {
+      "id": "dav1-open",
+      "profile": "dav1-open",
+      "file": "dav1.mp4",
+      "sha256": "10442e57ff92c76c30ed0bcd8e6be708e986208193c65442c44b05377916f191",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 6,
+        "bytes": 4097,
+        "digest": 1285709537707954380
+      }
+    },
+    {
+      "id": "dav1-seek",
+      "profile": "dav1-seek",
+      "file": "dav1.mp4",
+      "sha256": "10442e57ff92c76c30ed0bcd8e6be708e986208193c65442c44b05377916f191",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "16384"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2192,
+        "digest": 4884662521198875690
+      }
+    },
+    {
+      "id": "opus-open",
+      "profile": "opus-open",
+      "file": "avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 241,
+        "bytes": 65677,
+        "digest": 15624301091816995394
+      }
+    },
+    {
+      "id": "opus-seek",
+      "profile": "opus-seek",
+      "file": "avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 92,
+        "bytes": 25673,
+        "digest": 5125035269830725090
+      }
+    },
+    {
+      "id": "opus-seek-edit-boundary",
+      "profile": "opus-seek-edit-boundary",
+      "file": "avc-opus-seek-boundary.mp4",
+      "sha256": "b638bd26179ce0d091bc1e96f770788c3a6437a64d38342dcf1d6f896b015de4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 91,
+        "bytes": 25535,
+        "digest": 8414310448937091467
+      }
+    },
+    {
+      "id": "opus-trim-end",
+      "profile": "opus-trim-end",
+      "file": "avc-opus-trimmed-end.mp4",
+      "sha256": "d13e84fd4307cfba2a3e9c49f2e07f1d0cff85c8aa328f9355def77fa1b08511",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 50269,
+        "digest": 5934296594475595056
+      }
+    },
+    {
+      "id": "opus-trim-rescaled",
+      "profile": "opus-trim-rescaled",
+      "file": "avc-opus-rescaled-edit.mp4",
+      "sha256": "d553d89ec289ae117de866f5965bf90efed4aed78433ebb361b04a75bcbaf57c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 131,
+        "bytes": 50269,
+        "digest": 7154259262571099376
+      }
+    },
+    {
+      "id": "opus-crop-open",
+      "profile": "opus-crop-open",
+      "file": "avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 233,
+        "bytes": 64822,
+        "digest": 8468210823864242940
+      }
+    },
+    {
+      "id": "opus-crop-seek",
+      "profile": "opus-crop-seek",
+      "file": "avc-opus-cropped-edit.mp4",
+      "sha256": "aa39c47facc37101f7d3df72c2070623929406bdc457719dd2c56a9802baea24",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 17176,
+        "digest": 15900364185324428767
+      }
+    },
+    {
+      "id": "opus-recovery-start",
+      "profile": "opus-recovery-start",
+      "file": "avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "0",
+        "opus-roll"
+      ],
+      "expected": {
+        "packets": 241,
+        "bytes": 65677,
+        "digest": 10527166544542341228
+      }
+    },
+    {
+      "id": "opus-recovery-seek",
+      "profile": "opus-recovery-seek",
+      "file": "avc-opus-edit.mp4",
+      "sha256": "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "opus-roll"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 26088,
+        "digest": 15507622761405975333
+      }
+    },
+    {
+      "id": "opus-recovery-edit-boundary",
+      "profile": "opus-recovery-edit-boundary",
+      "file": "avc-opus-seek-boundary.mp4",
+      "sha256": "b638bd26179ce0d091bc1e96f770788c3a6437a64d38342dcf1d6f896b015de4",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "opus-roll"
+      ],
+      "expected": {
+        "packets": 95,
+        "bytes": 26088,
+        "digest": 5937862538032964389
+      }
+    },
+    {
+      "id": "opus-recovery-long-roll",
+      "profile": "opus-recovery-long-roll",
+      "file": "avc-opus-long-roll.mp4",
+      "sha256": "d41d2655fee91bdd7652bd10d0a54af9135b8d0365aacab1375771715eef09a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "41000",
+        "opus-roll"
+      ],
+      "expected": {
+        "packets": 97,
+        "bytes": 26371,
+        "digest": 17550833167330169510
+      }
+    },
+    {
+      "id": "opus-recovery-composition-offset",
+      "profile": "opus-recovery-composition-offset",
+      "file": "avc-opus-video-composition-offset.mp4",
+      "sha256": "f18067fb267cd1da91c23ba63d706106906ceb6fb315ec671894cba4736f91aa",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "opus-roll"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 25808,
+        "digest": 16784415058963717857
+      }
+    },
+    {
+      "id": "quicktime-aac-open",
+      "profile": "quicktime-aac-open",
+      "file": "avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 289,
+        "bytes": 174560,
+        "digest": 8952730278029084733
+      }
+    },
+    {
+      "id": "quicktime-aac-seek",
+      "profile": "quicktime-aac-seek",
+      "file": "avc-aac-quicktime-surround.mov",
+      "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 145,
+        "bytes": 85958,
+        "digest": 4047899442073086333
+      }
+    },
+    {
+      "id": "quicktime-aac-minimal-wave-open",
+      "profile": "quicktime-aac-minimal-wave-open",
+      "file": "avc-aac-quicktime-minimal-wave.mov",
+      "sha256": "5cb6c10eda05f3926d5a3cc65bc7ced39ef268cec19d5f577b69e9b544a29827",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 289,
+        "bytes": 174560,
+        "digest": 8952730278029084733
+      }
+    },
+    {
+      "id": "quicktime-aac-minimal-wave-seek",
+      "profile": "quicktime-aac-minimal-wave-seek",
+      "file": "avc-aac-quicktime-minimal-wave.mov",
+      "sha256": "5cb6c10eda05f3926d5a3cc65bc7ced39ef268cec19d5f577b69e9b544a29827",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 145,
+        "bytes": 85958,
+        "digest": 4047899442073086333
+      }
+    },
+    {
+      "id": "quicktime-aac-reordered-open",
+      "profile": "quicktime-aac-reordered-open",
+      "file": "avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 274,
+        "bytes": 61802,
+        "digest": 11057392877255542627
+      }
+    },
+    {
+      "id": "quicktime-aac-reordered-seek",
+      "profile": "quicktime-aac-reordered-seek",
+      "file": "avc-aac-quicktime-reordered.mov",
+      "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 141,
+        "bytes": 30781,
+        "digest": 3570639560812143604
+      }
+    },
+    {
+      "id": "quicktime-aac-fragmented-open",
+      "profile": "quicktime-aac-fragmented-open",
+      "file": "avc-aac-quicktime-fragmented.mov",
+      "sha256": "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 93,
+        "bytes": 39981,
+        "digest": 1939830974683508522
+      }
+    },
+    {
+      "id": "quicktime-aac-fragmented-seek",
+      "profile": "quicktime-aac-fragmented-seek",
+      "file": "avc-aac-quicktime-fragmented.mov",
+      "sha256": "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 73,
+        "bytes": 30733,
+        "digest": 1084237239961408002
+      }
+    },
+    {
+      "id": "quicktime-aac-7-1-open",
+      "profile": "quicktime-aac-7-1-open",
+      "file": "avc-aac-quicktime-7-1.mov",
+      "sha256": "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 274,
+        "bytes": 92570,
+        "digest": 4686448036394174807
+      }
+    },
+    {
+      "id": "quicktime-aac-7-1-seek",
+      "profile": "quicktime-aac-7-1-seek",
+      "file": "avc-aac-quicktime-7-1.mov",
+      "sha256": "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 141,
+        "bytes": 47093,
+        "digest": 5018453331173239581
+      }
+    },
+    {
+      "id": "rtp-hints-open",
+      "profile": "rtp-hints-open",
+      "file": "avc-aac-rtp-hints.mp4",
+      "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 289,
+        "bytes": 72260,
+        "digest": 16322489954875018336
+      }
+    },
+    {
+      "id": "rtp-hints-seek",
+      "profile": "rtp-hints-seek",
+      "file": "avc-aac-rtp-hints.mp4",
+      "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "26880"
+      ],
+      "expected": {
+        "packets": 145,
+        "bytes": 35398,
+        "digest": 5283456504139288625
+      }
+    },
+    {
+      "id": "aac-program-open",
+      "profile": "aac-program-open",
+      "file": "avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 174,
+        "bytes": 91514,
+        "digest": 9360453060203789492
+      }
+    },
+    {
+      "id": "aac-program-seek",
+      "profile": "aac-program-seek",
+      "file": "avc-aac-program.mov",
+      "sha256": "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24000"
+      ],
+      "expected": {
+        "packets": 102,
+        "bytes": 54337,
+        "digest": 7863734754543817612
+      }
+    },
+    {
+      "id": "fragmented-subtitles-open",
+      "profile": "fragmented-subtitles-open",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 229,
+        "bytes": 47344,
+        "digest": 17268720163590035113
+      }
+    },
+    {
+      "id": "fragmented-subtitles-seek-start",
+      "profile": "fragmented-subtitles-seek-start",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "0"
+      ],
+      "expected": {
+        "packets": 229,
+        "bytes": 47344,
+        "digest": 17268720163590035113
+      }
+    },
+    {
+      "id": "fragmented-subtitles-seek-during-cue",
+      "profile": "fragmented-subtitles-seek-during-cue",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24576"
+      ],
+      "expected": {
+        "packets": 172,
+        "bytes": 35623,
+        "digest": 9383543265607670677
+      }
+    },
+    {
+      "id": "fragmented-subtitles-seek-after-cue",
+      "profile": "fragmented-subtitles-seek-after-cue",
+      "file": "fragmented-subtitles.mp4",
+      "sha256": "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "60000"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 11998,
+        "digest": 2935735271173150781
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-open",
+      "profile": "fragmented-subtitle-edit-open",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 228,
+        "bytes": 47342,
+        "digest": 4913362454912207988
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-start",
+      "profile": "fragmented-subtitle-edit-seek-start",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "0"
+      ],
+      "expected": {
+        "packets": 228,
+        "bytes": 47342,
+        "digest": 4913362454912207988
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-during-cue",
+      "profile": "fragmented-subtitle-edit-seek-during-cue",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "24576"
+      ],
+      "expected": {
+        "packets": 173,
+        "bytes": 35629,
+        "digest": 17500664033615905035
+      }
+    },
+    {
+      "id": "fragmented-subtitle-edit-seek-after-cue",
+      "profile": "fragmented-subtitle-edit-seek-after-cue",
+      "file": "fragmented-subtitle-edit.mp4",
+      "sha256": "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "60000"
+      ],
+      "expected": {
+        "packets": 61,
+        "bytes": 12004,
+        "digest": 15718313594074699357
+      }
+    },
+    {
+      "id": "fate-non-sync-prefix-open",
+      "profile": "fate-non-sync-prefix-open",
+      "file": "mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/mov/mp4-init-nonkeyframe.mp4",
+      "arguments": [],
+      "expected": {
+        "packets": 293,
+        "bytes": 1158487,
+        "digest": 4548821196215711946
+      }
+    },
+    {
+      "id": "fate-non-sync-prefix-seek",
+      "profile": "fate-non-sync-prefix-seek",
+      "file": "mov/mp4-init-nonkeyframe.mp4",
+      "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/mov/mp4-init-nonkeyframe.mp4",
+      "arguments": [
+        "91091"
+      ],
+      "expected": {
+        "packets": 72,
+        "bytes": 317984,
+        "digest": 3463143097373344921
       }
     }
   ]

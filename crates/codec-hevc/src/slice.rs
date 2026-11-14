@@ -2,8 +2,8 @@
 
 use crate::bits::{BitCursor, BitSource, Ranged};
 use crate::error::{DecodeError, Result};
-use crate::nal;
 use crate::ps::{Pps, ShortTermRps, Sps, parse_st_rps};
+use triergon_framing::hevc;
 
 pub const SLICE_B: u8 = 0;
 pub const SLICE_P: u8 = 1;
@@ -107,7 +107,7 @@ fn ceil_log2(v: u32) -> u32 {
 pub fn peek_pps_id(rbsp: &[u8], nal_unit_type: u8) -> Result<(bool, u8)> {
     let mut r = BitCursor::new(rbsp);
     let first = r.flag()?;
-    if (nal::BLA_W_LP..=nal::RSV_IRAP_23).contains(&nal_unit_type) {
+    if hevc::is_irap(nal_unit_type) {
         r.skip(1)?;
     }
     let id = r.ue_max(63, "slice_pic_parameter_set_id")? as u8;
@@ -180,7 +180,7 @@ pub fn parse_slice_header(
     let mut r = BitCursor::new(rbsp);
     let first_slice_segment_in_pic = r.flag()?;
     let mut no_output_of_prior_pics = false;
-    if (nal::BLA_W_LP..=nal::RSV_IRAP_23).contains(&nal_unit_type) {
+    if hevc::is_irap(nal_unit_type) {
         no_output_of_prior_pics = r.flag()?;
     }
     let pps_id = r.ue_max(63, "slice_pic_parameter_set_id")? as u8;
@@ -254,7 +254,7 @@ pub fn parse_slice_header(
         if pps.output_flag_present {
             sh.pic_output_flag = r.flag()?;
         }
-        if !nal::is_idr(nal_unit_type) {
+        if !hevc::is_idr(nal_unit_type) {
             sh.poc_lsb = r.read(sps.log2_max_poc_lsb)?;
             let st_sps = r.flag()?;
             let num_st = sps.num_short_term_ref_pic_sets;

@@ -15,7 +15,7 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
 | `correctness-manifest.json` | The 775 correctness vectors: 454 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
 | `reader-manifest.json`, `reader-rules.json`, `reader-differences.json` | The 305 reader comparison inputs; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
-| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 17 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
+| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 20 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
 | `downmix-*.json`, [downmix-integer.md](downmix-integer.md) | Observed stereo downmix (`-ac 2`) rules, for float and for integer decoder output |
@@ -48,6 +48,20 @@ cargo xtask codecs readers --manifest harness/codecs/reader-manifest.json --root
 `mp3`, `mp2`, `mp1`, `vorbis` and `opus` lanes, which read their file through the
 container readers and apply its trims as the CLI does. Every run checks each input
 against its manifest SHA-256 and writes one row per input, whatever its outcome.
+A manifest may list `open_cases`, names of its vectors that fail today. `summarize`
+counts such a row as `open` when it fails and needs a disposition for it; it fails
+when a listed vector no longer fails, so the list only shrinks, as a contract's open
+cases do ([docs/quality.md](../../docs/quality.md)).
+
+The [AAC MOV manifest](aac/mov-manifest.json) uses the same `codecs grade` command
+with the `audio-decode` example. It compares all PCM from the neutral reader's
+original access units. The reference reads the original sample table with
+`-ignore_editlist 1` and emits the complete decoder output with
+`-flags2 +skip_manual`. The comparison checks rate, speaker layout, sample count
+and every float sample under the AAC accuracy rules.
+For fixed configurations 5 and 6, FFmpeg labels the single surround pair as
+back and the decoder labels it as side. The comparison records both labels
+and checks both corresponding PCM planes in their original order.
 
 The vectors are the FATE suite's `aac`, `ac3`, `eac3`, `dts`, `h264-conformance` and
 `hevc-conformance` directories in `.research/fate-samples`, plus 71 elementary streams
@@ -119,11 +133,11 @@ for review.
 
 ## Timing and memory
 
-`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280).
+`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282).
 `cargo xtask codecs memory --candidate target/release/codec-worker --reference
 target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
 --root . --out DIR` measures both workers' `OP-memory` runs under the shared observer
-of `target/harness` (30 pairs, seed 282). Each worker's work is checked first and must
+of `target/harness` (30 pairs, seed 283). Each worker's work is checked first and must
 be equal; the gate is the paired 95% upper bounds of peak heap
 (`heap_ratio_upper_95`) and total resident peak RSS (`total_rss_ratio_upper_95`), both
 below 1.0, on native AArch64 Linux with the gate build. `DIR` keeps every raw
@@ -139,3 +153,7 @@ observation per workload and `summary.json`.
   `CORRECTNESS-MANIFEST-AC3-NODITHER.json` is the dither-stripped comparison set.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).
+- `ps-open-*.adts` ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open
+  Parametric Stereo cases, the manifest's `open_cases`: crafted streams of paths the
+  probes did not recover, which `summarize` requires to keep failing; their
+  numbers are in the known differences of [crates/codec-aac](../../crates/codec-aac/README.md).

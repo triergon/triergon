@@ -1,6 +1,7 @@
 //! Repository integrity checks: local Markdown links, harness data files and the
 //! safe-Rust, dependency-free workspace rule.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -103,8 +104,8 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     errors.extend(runtime_mentions(root));
     errors.extend(contract_fields(root));
     // Generated manifests: the case ids and the pins match, in the recorded form.
-    for lane in crate::lanes::LANES {
-        errors.extend(lane.check(root));
+    for generator in crate::generators::GENERATORS {
+        errors.extend(generator.check(root));
     }
     let modules = gates
         .get("modules")
@@ -144,22 +145,31 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
 }
 
 /// The fields every feature contract (`harness/features/<id>/contract.json`) may
-/// declare that the harness reads the same way for all of them: `timeout_seconds`.
+/// declare that the harness reads the same way for all of them: `timeout_seconds`
+/// and `measurement_reference`.
 fn contract_fields(root: &Path) -> Vec<String> {
     let features = root.join("harness/features");
     walk::files(&features, &|rel| rel.ends_with("contract.json"))
         .into_iter()
-        .filter_map(|path| {
+        .flat_map(|path| {
             let rel = path
                 .strip_prefix(root)
                 .expect("walked under root")
-                .display();
-            match read_json(&path) {
-                Ok(contract) => crate::harness::worker::contract_timeout(&contract)
-                    .err()
-                    .map(|error| format!("{rel}: {error}")),
-                Err(error) => Some(format!("{rel}: {error}")),
-            }
+                .display()
+                .to_string();
+            let errors = match read_json(&path) {
+                Ok(contract) => [
+                    crate::harness::worker::contract_timeout(&contract).err(),
+                    crate::harness::build::measurement_reference_error(&contract),
+                ]
+                .into_iter()
+                .flatten()
+                .collect(),
+                Err(error) => vec![error],
+            };
+            errors
+                .into_iter()
+                .map(move |error| format!("{rel}: {error}"))
         })
         .collect()
 }
@@ -301,6 +311,183 @@ fn pass_count(cell: &str) -> Option<(u64, u64)> {
     Some((passing.parse().ok()?, cases.parse().ok()?))
 }
 
+/// Every commit `docs/status.md` cites is an ancestor of `HEAD`, so the
+/// source revision of a result stays fetchable once its pull request is merged.
+///
+/// A citation is a code span of 7 to 40 lowercase hexadecimal digits that is not a
+/// prefix of the pinned FFmpeg revision.
+pub fn revisions(root: &Path) -> Result<String, Vec<String>> {
+    let one = |error: String| vec![error];
+    let status = fs::read_to_string(root.join("docs/status.md"))
+        .map_err(|e| one(format!("docs/status.md: {e}")))?;
+    if git(root, &["rev-parse", "--is-shallow-repository"]).map_err(one)? == "true" {
+        return Err(one(
+            "the checkout is shallow: cited revisions are checked against the full history".into(),
+        ));
+    }
+    let reachable = git(root, &["rev-list", "HEAD"]).map_err(one)?;
+    let reachable: HashSet<&str> = reachable.lines().collect();
+    let cited = cited_revisions(&status, &[crate::prepare::REVISION]);
+    let mut errors = Vec::new();
+    for &revision in &cited {
+        let objects =
+            git(root, &["rev-parse", &format!("--disambiguate={revision}")]).map_err(one)?;
+        let mut matches = objects.lines();
+        let error = match (matches.next(), matches.next()) {
+            (_, Some(_)) => "matches more than one Git object: cite more digits",
+            (Some(commit), None) if reachable.contains(commit) => continue,
+            _ => "does not name a commit in HEAD's history",
+        };
+        errors.push(format!("docs/status.md cites `{revision}`, which {error}"));
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    Ok(format!(
+        "Cited revisions OK: {} citations reachable from HEAD",
+        cited.len()
+    ))
+}
+
+/// Distinct commit citations in the status document's paragraphs, headings and tables.
+fn cited_revisions<'a>(text: &'a str, external: &[&str]) -> Vec<&'a str> {
+    let mut cited = Vec::new();
+    let mut paragraph = 0;
+    let mut offset = 0;
+    let mut table = false;
+    let mut lines = text.split_inclusive('\n').peekable();
+    while let Some(line) = lines.next() {
+        let end = offset + line.len();
+        let boundary = line.trim().is_empty() || is_atx_heading(line);
+        table = !boundary && (table || lines.peek().is_some_and(|next| starts_table(line, next)));
+        if boundary || table {
+            cite_inline(&text[paragraph..offset], external, &mut cited);
+            if table {
+                for cell in pipe_cells(line) {
+                    cite_inline(cell, external, &mut cited);
+                }
+            } else {
+                cite_inline(line, external, &mut cited);
+            }
+            paragraph = end;
+        }
+        offset = end;
+    }
+    cite_inline(&text[paragraph..], external, &mut cited);
+    cited
+}
+
+fn is_atx_heading(line: &str) -> bool {
+    let line = line.trim_end_matches(['\r', '\n']);
+    let start = line.trim_start_matches(' ');
+    let content = start.trim_start_matches('#');
+    line.len() - start.len() <= 3
+        && (1..=6).contains(&(start.len() - content.len()))
+        && (content.is_empty() || content.starts_with([' ', '\t']))
+}
+
+fn starts_table(header: &str, delimiter: &str) -> bool {
+    if table_pipes(header).next().is_none() && table_pipes(delimiter).next().is_none() {
+        return false;
+    }
+    let mut width = 0;
+    for cell in pipe_cells(delimiter) {
+        let cell = cell.trim();
+        let dashes = cell.strip_prefix(':').unwrap_or(cell);
+        let dashes = dashes.strip_suffix(':').unwrap_or(dashes);
+        if dashes.is_empty() || !dashes.bytes().all(|byte| byte == b'-') {
+            return false;
+        }
+        width += 1;
+    }
+    width == pipe_cells(header).count()
+}
+
+fn table_pipes(line: &str) -> impl Iterator<Item = usize> + '_ {
+    // Table splitting precedes inline escape processing.
+    line.match_indices('|')
+        .filter_map(move |(at, _)| (!line[..at].ends_with('\\')).then_some(at))
+}
+
+fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
+    let line = line.trim();
+    let row = line
+        .strip_suffix('|')
+        .filter(|before| !before.ends_with('\\'))
+        .unwrap_or(line);
+    let row = row.strip_prefix('|').unwrap_or(row);
+    let mut start = 0;
+    table_pipes(row)
+        .chain(std::iter::once(row.len()))
+        .map(move |end| {
+            let cell = &row[start..end];
+            start = end + 1;
+            cell
+        })
+}
+
+fn escaped(text: &str, offset: usize) -> bool {
+    text.as_bytes()[..offset]
+        .iter()
+        .rev()
+        .take_while(|&&byte| byte == b'\\')
+        .count()
+        % 2
+        != 0
+}
+
+fn cite_inline<'a>(mut text: &'a str, external: &[&str], cited: &mut Vec<&'a str>) {
+    while let Some(open) = text.find('`') {
+        let start = &text[open + usize::from(escaped(text, open))..];
+        let content = start.trim_start_matches('`');
+        let width = start.len() - content.len();
+        text = content;
+        if width == 0 {
+            continue;
+        }
+
+        let mut search = content;
+        while let Some(close) = search.find('`') {
+            let delimiter = &search[close..];
+            search = delimiter.trim_start_matches('`');
+            if delimiter.len() - search.len() != width {
+                continue;
+            }
+
+            let span = content[..content.len() - delimiter.len()].trim();
+            let hex = span
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+            if hex
+                && (7..=40).contains(&span.len())
+                && !external.iter().any(|e| e.starts_with(span))
+                && !cited.contains(&span)
+            {
+                cited.push(span);
+            }
+            text = search;
+            break;
+        }
+    }
+}
+
+fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("cannot run git: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {} failed:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
+    Ok(text.trim_end().to_owned())
+}
+
 pub fn read_json(path: &Path) -> Result<Value, String> {
     let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
     json::parse(&text).map_err(|e| e.to_string())
@@ -419,6 +606,85 @@ mod tests {
     use super::*;
 
     #[test]
+    fn cites_hexadecimal_code_spans_of_commit_length() {
+        let text = "at `ceb5076` and `03f3efd3a0fde0d558c68f5408c521d632802fb7`, again \
+                    `ceb5076`; FFmpeg `d32b387f`; not `abc123`, `ABCDEF0`, `deadbeefx`, \
+                    `1000 ms`, a digest `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` \
+                    or text between `spans` cafe1234 `here`";
+        assert_eq!(
+            cited_revisions(text, &["d32b387f2b0a484599d4587d651891f0c63c4238"]),
+            ["ceb5076", "03f3efd3a0fde0d558c68f5408c521d632802fb7"]
+        );
+    }
+
+    #[test]
+    fn pairs_backtick_runs_of_the_same_length() {
+        let text =
+            "at `` abc1234 `` and `def1234`, with ``embedded `bad1234` ticks`` and `cafe1234";
+        assert_eq!(cited_revisions(text, &[]), ["abc1234", "def1234"]);
+        assert_eq!(
+            cited_revisions("`` unmatched before `abc1234`", &[]),
+            ["abc1234"]
+        );
+    }
+
+    #[test]
+    fn escaped_openers_leave_later_citations_visible() {
+        assert_eq!(
+            cited_revisions(r"Literal \` marker. Measured at `deadbee`.", &[]),
+            ["deadbee"]
+        );
+        assert_eq!(cited_revisions(r"Slash \\`deadbee`.", &[]), ["deadbee"]);
+        assert_eq!(cited_revisions(r"Literal \```deadbee``.", &[]), ["deadbee"]);
+    }
+
+    #[test]
+    fn unclosed_delimiters_do_not_cross_status_blocks() {
+        let text = "Unclosed ` marker.\n \nMeasured at `deadbee`.\n\n\
+                    | Result | Revision |\n| --- | --- |\n\
+                    | Unclosed ` marker | `def1234` |\n\
+                    | Unclosed ` marker |\n| `abc1234` |";
+        assert_eq!(
+            cited_revisions(text, &[]),
+            ["deadbee", "def1234", "abc1234"]
+        );
+        assert_eq!(
+            cited_revisions("Measured at `\ndeadbee`.", &[]),
+            ["deadbee"]
+        );
+    }
+
+    #[test]
+    fn table_cells_can_omit_outer_pipes() {
+        let text = "| Result | Revision |\n| :--- | ---: |\n\
+                    Literal ` marker | `deadbee` |\n\
+                    Escaped \\| literal ` marker | `abc1234`";
+        assert_eq!(cited_revisions(text, &[]), ["deadbee", "abc1234"]);
+    }
+
+    #[test]
+    fn escaped_table_pipes_are_consumed_before_inline_escapes() {
+        let text = concat!(
+            "| Result | Notes |\n",
+            "| --- | --- |\n",
+            r"| `x\\|` measured at `deadbee` | ok |"
+        );
+        assert_eq!(cited_revisions(text, &[]), ["deadbee"]);
+    }
+
+    #[test]
+    fn atx_heading_can_interrupt_a_paragraph() {
+        assert_eq!(
+            cited_revisions("Unclosed ` marker.\n## Measured `deadbee`", &[]),
+            ["deadbee"]
+        );
+        assert_eq!(
+            cited_revisions("Start `\n#tag ` measured at `deadbee`.", &[]),
+            ["deadbee"]
+        );
+    }
+
+    #[test]
     fn finds_link_targets_like_the_markdown_pattern() {
         assert_eq!(
             link_targets("[a](b.md) [c](d#e) ]() [f](g"),
@@ -513,6 +779,7 @@ mod tests {
         let root = walk::scratch("design");
         fs::create_dir_all(root.join("research/sub")).unwrap();
         fs::create_dir_all(root.join("harness/fate")).unwrap();
+        fs::create_dir_all(root.join("harness/features")).unwrap();
         let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#;
         let gates = r#"{"modules": [{"accepted": false}, {"accepted": false}]}"#;
         fs::write(root.join("harness/policy.json"), policy).unwrap();

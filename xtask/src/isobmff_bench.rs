@@ -43,7 +43,6 @@ const CORPUS_SHA: &str = "03761df0849a8d60a3cc2222e35dd8fe02308c0fe774b3e442b685
 const SUBSET_SHA: &str = "d5efa68f708ffe403018a8c34aaeb10aa693cb4e5abcf9a0b571339c69d40b61";
 const WORK_CONTRACT: &str = "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
 const ITERATIONS: u32 = 50;
-const MINIMUM_PAIRS: usize = 30;
 const PARITY_CHECKS: usize = 1020;
 const TIMABLE_OUTPUTS: usize = 972;
 const PHYSICAL_OPERATIONS: usize = 956;
@@ -278,7 +277,7 @@ impl Case {
             prefix: format!("{}-", self.mode),
             arguments: self.arguments.iter().map(OsString::from).collect(),
             candidate_options: self.candidate_options.iter().map(OsString::from).collect(),
-            work_fields: vec![],
+            work: timing::Work::default(),
             timeout: worker::DEFAULT_TIMEOUT,
         }
     }
@@ -733,8 +732,8 @@ impl Options {
                 "target/isobmff-open-index/{stamp}-{}",
                 std::process::id()
             )),
-            pairs: MINIMUM_PAIRS,
-            memory_pairs: MINIMUM_PAIRS,
+            pairs: timing::GATE_PAIRS,
+            memory_pairs: timing::GATE_PAIRS,
             seed: 37,
         };
         let mut args = args.iter();
@@ -771,8 +770,8 @@ impl Options {
                 _ => return Err(format!("unknown option {argument}\n{USAGE}")),
             }
         }
-        if options.pairs < MINIMUM_PAIRS
-            || options.memory_pairs < MINIMUM_PAIRS
+        if options.pairs < timing::GATE_PAIRS
+            || options.memory_pairs < timing::GATE_PAIRS
             || options.seed > i64::MAX as u64 - 2
         {
             return Err("need at least 30 pairs and a seed below the signed 64-bit limit".into());
@@ -895,7 +894,7 @@ fn measure(
             contract,
             &evidence,
             &build.identity,
-            &report::host_target(),
+            &report::gate_target()?,
         );
         let pass = verdict.timing_pass && sampling_matches(&raw, options.pairs, options.seed);
         let digest = write_json(&directory.join("timing.json"), &raw)?;
@@ -955,7 +954,7 @@ fn measure(
             contract,
             &evidence,
             &build.identity,
-            &report::host_target(),
+            &report::gate_target()?,
         );
         let pass =
             verdict.memory_pass && sampling_matches(&raw, options.memory_pairs, options.seed);
@@ -1171,7 +1170,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         ("schema", Value::int(1)),
         ("contract", Value::str("isobmff-open-index")),
         ("contract_id", Value::str("isobmff-open-index")),
-        ("target", Value::str(report::host_target())),
+        ("target", Value::str(report::gate_target()?)),
         ("counts", counts()),
         ("contract_sha256", Value::str(CONTRACT_SHA)),
         ("corpus_sha256", Value::str(CORPUS_SHA)),
@@ -1319,7 +1318,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         &suite.contract,
         observations.chain(errors),
         &build.identity,
-        &report::host_target(),
+        &report::gate_target()?,
         &[],
         &[],
     );
@@ -1927,7 +1926,9 @@ mod tests {
             fs::create_dir(&directory).unwrap();
             let result = trace(
                 &root,
-                &root.join("target/release/isobmff-worker"),
+                &root
+                    .join(gate_build::release_dir().unwrap())
+                    .join("isobmff-worker"),
                 &root.join("target/harness/ffmpeg-isobmff-worker"),
                 case,
                 &directory,

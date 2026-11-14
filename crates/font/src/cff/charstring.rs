@@ -1,9 +1,13 @@
-//! Type 2 charstrings (Adobe Technical Note 5177) and CFF2 charstrings, unhinted,
-//! evaluated in 16.16 fixed point as FreeType's CFF engine evaluates them.
+//! Type 2 charstrings (Adobe Technical Note 5177) and CFF2 charstrings, evaluated
+//! in 16.16 fixed point as FreeType's CFF engine evaluates them.
 //!
-//! Hints are counted, so that mask lengths are known, and otherwise ignored. Drawing
-//! operators consume complete operand groups and drop a malformed remainder, and
-//! CFF2 charstrings may leave operands on the stack, as FreeType accepts both.
+//! Stem hints and masks go to the glyph path, which hints with them at a size
+//! and otherwise only needs the mask lengths. As in FreeType, the stems are
+//! fixed by the first hint mask or move: later stem operators are ignored, and
+//! so is a later mask operator with more than one operand, whose mask bytes then
+//! run as charstring. Drawing operators consume complete operand groups and
+//! drop a malformed remainder, and CFF2 charstrings may leave operands on the
+//! stack, as FreeType accepts both.
 //! Arithmetic wraps at 32 bits and rounds as FreeType's does; operands are not
 //! typed, so an integer operator accepts any number and rounds it.
 //!
@@ -11,11 +15,12 @@
 
 use super::dict::{CFF_OPERANDS, CFF2_OPERANDS, Stack};
 use super::number::shared_integer;
-use super::path::{Builder, Contours, Fixed, Path};
+use super::path::{Builder, Contours, Fixed, Path, Scaling};
 use super::{Cff, Private, Version};
 use crate::Limits;
 use crate::fixed::{div_fix, mul_fix, sqrt_fixed};
 use crate::outline::Outline;
+use crate::postscript::STANDARD_ENCODING;
 use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
@@ -23,82 +28,9 @@ use triergon_core::{Error, Result, WorkBudget};
 /// Nested subroutine calls FreeType's CFF engine allows (`CF2_MAX_SUBR`). TN 5177
 /// Appendix B states 10, but real fonts nest deeper and FreeType renders them.
 const MAX_SUBR_DEPTH: u32 = 16;
-/// TN 5177 Appendix B: stem hints and transient slots.
-const MAX_STEM_HINTS: usize = 96;
+/// TN 5177 Appendix B: transient slots.
 const TRANSIENT_SLOTS: usize = 32;
 const ONE: Fixed = 0x1_0000;
-
-/// Standard Encoding: character code to SID, for `seac` (TN 5176 Appendix B).
-const STANDARD_ENCODING: [u8; 256] = {
-    let mut table = [0_u8; 256];
-    let mut code = 32;
-    while code <= 126 {
-        table[code] = (code - 31) as u8;
-        code += 1;
-    }
-    let high: [(usize, u8); 54] = [
-        (161, 96),
-        (162, 97),
-        (163, 98),
-        (164, 99),
-        (165, 100),
-        (166, 101),
-        (167, 102),
-        (168, 103),
-        (169, 104),
-        (170, 105),
-        (171, 106),
-        (172, 107),
-        (173, 108),
-        (174, 109),
-        (175, 110),
-        (177, 111),
-        (178, 112),
-        (179, 113),
-        (180, 114),
-        (182, 115),
-        (183, 116),
-        (184, 117),
-        (185, 118),
-        (186, 119),
-        (187, 120),
-        (188, 121),
-        (189, 122),
-        (191, 123),
-        (193, 124),
-        (194, 125),
-        (195, 126),
-        (196, 127),
-        (197, 128),
-        (198, 129),
-        (199, 130),
-        (200, 131),
-        (202, 132),
-        (203, 133),
-        (205, 134),
-        (206, 135),
-        (207, 136),
-        (208, 137),
-        (225, 138),
-        (227, 139),
-        (232, 140),
-        (233, 141),
-        (234, 142),
-        (235, 143),
-        (241, 144),
-        (245, 145),
-        (248, 146),
-        (249, 147),
-        (250, 148),
-        (251, 149),
-    ];
-    let mut i = 0;
-    while i < high.len() {
-        table[high[i].0] = high[i].1;
-        i += 1;
-    }
-    table
-};
 
 /// An integer as a charstring number.
 const fn int(v: i32) -> Fixed {
@@ -481,17 +413,19 @@ fn token(r: &mut Reader<'_>, version: Version) -> Result<Token> {
         .ok_or(Error::Invalid("reserved charstring operator"))
 }
 
-/// Loads `glyph`'s charstring into `outline`, in whole font units.
+/// Loads `glyph`'s charstring into `outline` at `scaling`: whole font units
+/// unhinted ([`Scaling::UNHINTED`]), else hinted 26.6 pixels.
 pub(super) fn outline(
     cff: &Cff,
     table: &[u8],
     glyph: u32,
+    scaling: &Scaling,
     outline: &mut Outline,
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<()> {
     outline.begin(limits.points);
-    let mut run = Run::new(cff, table, work, limits, Builder::new(outline), ());
+    let mut run = Run::new(cff, table, work, limits, scaling, Builder::new(outline), ());
     run.top_glyph(glyph)?;
     run.builder.close()
 }
@@ -512,6 +446,7 @@ pub(super) fn operators(
         table,
         work,
         limits,
+        &Scaling::UNHINTED,
         Builder::new(outline),
         OperatorSet::default(),
     );
@@ -528,7 +463,15 @@ pub(super) fn bounds(
     limits: &Limits,
     work: &mut WorkBudget,
 ) -> Result<Option<CharstringBounds>> {
-    let mut run = Run::new(cff, table, work, limits, (), Bounds::default());
+    let mut run = Run::new(
+        cff,
+        table,
+        work,
+        limits,
+        &Scaling::UNHINTED,
+        (),
+        Bounds::default(),
+    );
     run.top_glyph(glyph)?;
     Ok(run.observer.bounds)
 }
@@ -538,6 +481,7 @@ struct Run<'a, C, O> {
     table: &'a [u8],
     work: &'a mut WorkBudget,
     depth: u32,
+    scaling: &'a Scaling,
     builder: C,
     observer: O,
 }
@@ -560,21 +504,22 @@ struct Seac {
 }
 
 /// The current point and the path under construction.
-struct Pen {
+struct Pen<'s> {
     x: Fixed,
     y: Fixed,
-    path: Path,
+    path: Path<'s>,
 }
 
 struct State<'p, const N: usize> {
     private: &'p Private,
     stack: Stack<Fixed, N>,
     transient: [Fixed; TRANSIENT_SLOTS],
-    pen: Pen,
+    pen: Pen<'p>,
     width_seen: bool,
-    stems: usize,
     seac: Option<Seac>,
     vsindex: usize,
+    /// Whether a `blend` ran, after which `vsindex` is refused.
+    blended: bool,
     random: u32,
 }
 
@@ -584,6 +529,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         table: &'a [u8],
         work: &'a mut WorkBudget,
         limits: &Limits,
+        scaling: &'a Scaling,
         builder: C,
         observer: O,
     ) -> Self {
@@ -597,6 +543,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
             table,
             work,
             depth,
+            scaling,
             builder,
             observer,
         }
@@ -625,16 +572,16 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
             pen: Pen {
                 x: origin.0,
                 y: origin.1,
-                path: Path::new(),
+                path: Path::new(self.scaling, origin.1),
             },
             width_seen: self.cff.version == Version::Cff2,
-            stems: 0,
             seac: None,
             vsindex: private.vsindex,
+            blended: false,
             random: 0,
         };
         self.run(charstring, 0, &mut s)?;
-        s.pen.path.close(&mut self.builder)?;
+        s.pen.path.close(&mut self.builder, self.work)?;
         if let Some(seac) = s.seac {
             if !top || self.cff.is_cid_keyed() {
                 return Err(Error::Invalid("seac inside seac or in a CID-keyed font"));
@@ -648,8 +595,7 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 let sid = STANDARD_ENCODING[code];
                 let component = self
                     .cff
-                    .glyph_for_sid(self.table, u16::from(sid))
-                    .filter(|_| sid != 0)
+                    .glyph_for_sid(sid)
                     .ok_or(Error::Invalid("seac component"))?;
                 self.glyph::<N>(component, at, false)?;
             }
@@ -698,16 +644,27 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         use CharstringOperator as Op;
         match op {
             Op::HStem | Op::VStem | Op::HStemHm | Op::VStemHm => {
-                Self::width(s, s.stack.len() % 2 == 1);
-                Self::stems(s)?;
+                if s.pen.path.takes_stems() {
+                    Self::width(s, s.stack.len() % 2 == 1);
+                    let horizontal = matches!(op, Op::HStem | Op::HStemHm);
+                    s.pen.path.stems(horizontal, s.stack.as_slice());
+                }
+                s.stack.clear();
+            }
+            // With the stems fixed, FreeType skips a mask operator that has
+            // operands, but not the mask bytes after it.
+            Op::HintMask | Op::CntrMask if s.stack.len() > 1 && !s.pen.path.takes_stems() => {
+                s.stack.clear();
             }
             Op::HintMask | Op::CntrMask => {
                 // Operands before the first mask are vertical stems.
                 Self::width(s, s.stack.len() % 2 == 1);
-                Self::stems(s)?;
-                r.skip(s.stems.div_ceil(8))?;
+                s.pen.path.stems(false, s.stack.as_slice());
+                s.stack.clear();
                 if op == Op::HintMask {
-                    s.pen.path.hint_mask();
+                    s.pen.path.hint_mask(r)?;
+                } else {
+                    s.pen.path.counter_mask(r, self.work)?;
                 }
             }
             Op::RMoveTo | Op::HMoveTo | Op::VMoveTo => self.move_to(op, s)?,
@@ -742,9 +699,15 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 s.stack.clear();
                 return Ok(Flow::End);
             }
+            // As FreeType's CFF2 interpreter: a negative index is ignored,
+            // and one outside the variation store fails at its `blend`.
             Op::VsIndex => {
-                s.vsindex = index(s.stack.pop()?)?;
-                self.cff.region_scalars(s.vsindex)?;
+                if s.blended {
+                    return Err(Error::Invalid("CFF2 vsindex after blend"));
+                }
+                if let Ok(vsindex) = usize::try_from(to_int(s.stack.pop()?)) {
+                    s.vsindex = vsindex;
+                }
                 s.stack.clear();
             }
             Op::Blend => self.blend(s)?,
@@ -763,15 +726,6 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
                 s.stack.shift();
             }
         }
-    }
-
-    fn stems<const N: usize>(s: &mut State<'_, N>) -> Result<()> {
-        s.stems += s.stack.len() / 2;
-        s.stack.clear();
-        if s.stems > MAX_STEM_HINTS {
-            return Err(Error::Invalid("more than 96 stem hints"));
-        }
-        Ok(())
     }
 
     fn move_to<const N: usize>(
@@ -796,7 +750,8 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
         pen.x = pen.x.wrapping_add(dx);
         pen.y = pen.y.wrapping_add(dy);
         self.observer.move_to();
-        pen.path.move_to(&mut self.builder, (pen.x, pen.y))
+        pen.path
+            .move_to(&mut self.builder, (pen.x, pen.y), self.work)
     }
 
     /// `rlineto` takes pairs; `hlineto` and `vlineto` alternate the axis. A
@@ -939,34 +894,35 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
 
     fn blend<const N: usize>(&mut self, s: &mut State<'_, N>) -> Result<()> {
         let count = index(s.stack.pop()?)?;
-        let scalars = self.cff.region_scalars(s.vsindex)?;
+        let scalars = self.cff.blend_scalars(s.vsindex)?;
         s.stack.blend(count, scalars.len(), |value, deltas| {
             deltas
                 .iter()
                 .zip(scalars)
                 .fold(value, |sum, (&d, &weight)| {
-                    // Region scalars are 0 or 1 at the default instance.
-                    let weight = if weight == 0.0 { 0 } else { ONE };
                     sum.wrapping_add(mul_fix(i64::from(d), i64::from(weight)) as Fixed)
                 })
-        })
+        })?;
+        s.blended = true;
+        Ok(())
     }
 
-    fn line_by(&mut self, pen: &mut Pen, dx: Fixed, dy: Fixed) -> Result<()> {
+    fn line_by(&mut self, pen: &mut Pen<'_>, dx: Fixed, dy: Fixed) -> Result<()> {
         let from = (pen.x, pen.y);
         pen.x = pen.x.wrapping_add(dx);
         pen.y = pen.y.wrapping_add(dy);
         self.observer.draw(from, &[(pen.x, pen.y)]);
-        pen.path.line_to(&mut self.builder, (pen.x, pen.y))
+        pen.path
+            .line_to(&mut self.builder, (pen.x, pen.y), self.work)
     }
 
-    fn curve_by(&mut self, pen: &mut Pen, d: [Fixed; 6]) -> Result<()> {
+    fn curve_by(&mut self, pen: &mut Pen<'_>, d: [Fixed; 6]) -> Result<()> {
         let c1 = (pen.x.wrapping_add(d[0]), pen.y.wrapping_add(d[1]));
         let c2 = (c1.0.wrapping_add(d[2]), c1.1.wrapping_add(d[3]));
         let end = (c2.0.wrapping_add(d[4]), c2.1.wrapping_add(d[5]));
         self.observer.draw((pen.x, pen.y), &[c1, c2, end]);
         (pen.x, pen.y) = end;
-        pen.path.curve_to(&mut self.builder, c1, c2, end)
+        pen.path.curve_to(&mut self.builder, c1, c2, end, self.work)
     }
 }
 
@@ -1179,7 +1135,8 @@ fn flex(op: CharstringOperator, a: &[Fixed]) -> Result<[[Fixed; 6]; 2]> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CharstringOperator as Op, STANDARD_ENCODING, bias, flex, int, to_int};
+    use super::{CharstringOperator as Op, bias, flex, int, to_int};
+    use crate::postscript::STANDARD_ENCODING;
 
     #[test]
     fn bias_flex_numbers_and_standard_codes() {

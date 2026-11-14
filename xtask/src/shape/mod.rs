@@ -10,7 +10,7 @@ mod reference;
 mod texts;
 mod ucd;
 
-pub use manifest::LANE;
+pub use manifest::GENERATOR;
 
 use std::path::Path;
 
@@ -20,6 +20,7 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
        cargo xtask shape manifest [--record] [--output DIR]
        cargo xtask shape compare [--all] [REPORT OPTION]...
        cargo xtask shape ucd [--check]
+       cargo xtask shape conformance
 
   prepare   build the pinned FriBidi and HarfBuzz releases into .research/harfbuzz;
             then `cargo xtask build-workers` builds their reference worker
@@ -35,8 +36,13 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
             goes to OUTPUT/<feature> (OUTPUT: --output, default
             .research/shape-report)
   ucd       fetch the hash-pinned Unicode Character Database files and regenerate
-            the tables in crates/shape/src/unicode; --check fails if they would
-            change";
+            the tables in crates/shape/src/unicode, and the language tags in
+            crates/shape/src/language from the unpacked HarfBuzz release; --check
+            fails if they would change
+  conformance
+            fetch Unicode 14.0.0's hash-pinned BidiTest.txt and
+            BidiCharacterTest.txt into .research/ucd and run the bidi_conformance
+            example on them; fails unless every case passes";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
@@ -56,8 +62,11 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             println!("{}", built.display());
             Ok(())
         }
-        [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),
+        [command, rest @ ..] if command == "manifest" => {
+            GENERATOR.manifest_command(root, rest, USAGE)
+        }
         [command, rest @ ..] if command == "ucd" => ucd::main(root, rest),
+        [command, rest @ ..] if command == "conformance" => ucd::conformance(root, rest),
         _ => Err(USAGE.into()),
     }
 }

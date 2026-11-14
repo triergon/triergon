@@ -51,12 +51,32 @@ pub(crate) fn work_summary(data: &Value, fields: &[String]) -> Result<Value, Str
     Ok(Value::Object(work))
 }
 
-/// Equal work by both timed roles, including the declared iteration count.
+/// The work every run of a timed operation must report.
+#[derive(Clone, Debug, Default)]
+pub struct Work {
+    /// Contract work fields in addition to the mandatory packet/byte/digest work.
+    pub fields: Vec<String>,
+    /// Work fields each worker reports of its own output, equal between its runs
+    /// but not between the two workers: the byte count and digest of two
+    /// encoders, or the digest of two decoders whose outputs may differ.
+    pub own: Vec<String>,
+}
+
+impl Work {
+    /// Whether this is no more than the ordinary shared work.
+    pub(crate) fn is_base(&self) -> bool {
+        self.own.is_empty() && required_fields(&self.fields).len() == BASE_WORK_FIELDS.len()
+    }
+}
+
+/// The work of one timed pair: each role's complete work, after checking the
+/// iteration count, the elapsed time and that both roles report the same value
+/// for every field outside `work.own`.
 pub(crate) fn paired_timing_work(
     candidate: &Value,
     reference: &Value,
     iterations: i128,
-    fields: &[String],
+    work: &Work,
 ) -> Result<Value, String> {
     for outcome in [candidate, reference] {
         let data = super::worker::data(outcome);
@@ -67,19 +87,29 @@ pub(crate) fn paired_timing_work(
             return Err("invalid timed worker result".into());
         }
     }
-    let a = work_summary(super::worker::data(candidate), fields)?;
-    let b = work_summary(super::worker::data(reference), fields)?;
-    if !super::diff::equal(&a, &b) {
+    let a = work_summary(super::worker::data(candidate), &work.fields)?;
+    let b = work_summary(super::worker::data(reference), &work.fields)?;
+    let shared = |summary: &Value| match summary {
+        Value::Object(members) => Value::Object(
+            members
+                .iter()
+                .filter(|(key, _)| !work.own.contains(key))
+                .cloned()
+                .collect(),
+        ),
+        _ => Value::Null,
+    };
+    if !super::diff::equal(&shared(&a), &shared(&b)) {
         return Err("unequal timed work".into());
     }
-    Ok(a)
+    Ok(Value::object([("candidate", a), ("reference", b)]))
 }
 
 /// Both warmups publish the same complete work before any timed pair runs.
 pub(crate) fn warmup_work(
     warmups: &[Value],
     iterations: i128,
-    fields: &[String],
+    work: &Work,
 ) -> Result<Value, String> {
     if warmups.len() != 2
         || warmups[0].get("worker").and_then(Value::as_str) != Some("candidate")
@@ -91,7 +121,7 @@ pub(crate) fn warmup_work(
         warmups[0].get("result").ok_or("missing candidate warmup")?,
         warmups[1].get("result").ok_or("missing reference warmup")?,
         iterations,
-        fields,
+        work,
     )
 }
 
@@ -202,6 +232,21 @@ pub fn reference_named(identity: &Value, name: &str) -> Result<Value, String> {
     Ok(Value::Object(members))
 }
 
+/// Refuses a reference that instruments its library's own code: the ASS
+/// parsing reference compiles libass's sources with checks that note each
+/// conversion C leaves to the target, so its results are compared but its
+/// time and memory are not libass's.
+pub fn measurable(record: &Value) -> Result<(), String> {
+    if record.get("instrumented") == Some(&Value::Bool(true)) {
+        return Err(format!(
+            "{} instruments the library it runs and is never timed or measured; \
+             name an uninstrumented build as the contract's measurement_reference",
+            s(record, "id").unwrap_or("the reference")
+        ));
+    }
+    Ok(())
+}
+
 pub fn reference_summary(record: &Value) -> Value {
     Value::object(
         ["id", "sha256", "kind"].map(|k| (k, record.get(k).cloned().unwrap_or(Value::Null))),
@@ -228,6 +273,22 @@ pub fn validate_case_evidence(
     {
         return Err("case reference does not match the built selected worker".into());
     }
+    // Timing and memory are measured against the contract's measurement
+    // reference when it names one.
+    let measured = match s(case, "measurement_worker") {
+        Some(name) => {
+            let record = reference_named(identity, name)?;
+            if !case
+                .get("measurement_reference")
+                .is_some_and(|r| super::diff::equal(r, &reference_summary(&record)))
+            {
+                return Err("case measurement reference does not match the built worker".into());
+            }
+            record
+        }
+        None => selected,
+    };
+    measurable(&measured)?;
     if let Some(rule) = rule {
         let parity = case.get("parity").cloned().unwrap_or(Value::Object(vec![]));
         if parity.get("comparison_rule") != rule.get("id") {
@@ -267,7 +328,7 @@ pub fn validate_case_evidence(
         ("candidate", candidate.cloned().unwrap_or(Value::Null)),
         (
             "reference",
-            selected.get("sha256").cloned().unwrap_or(Value::Null),
+            measured.get("sha256").cloned().unwrap_or(Value::Null),
         ),
     ]))
 }
@@ -276,6 +337,33 @@ pub fn validate_case_evidence(
 mod work_tests {
     use super::*;
     use crate::json::parse;
+
+    #[test]
+    fn an_instrumented_reference_is_never_measured() {
+        let identity = parse(
+            r#"{"comparison_references":{
+                "observed":{"path":"a","sha256":"1","kind":"k","instrumented":true},
+                "player":{"path":"b","sha256":"2","kind":"k","instrumented":false}}}"#,
+        )
+        .unwrap();
+        let case = |extra: &str| {
+            parse(&format!(
+                r#"{{"reference_worker":"observed","reference":{{"id":"observed","sha256":"1","kind":"k"}}{extra}}}"#
+            ))
+            .unwrap()
+        };
+        let error = validate_case_evidence(&case(""), &identity, None).unwrap_err();
+        assert!(error.contains("never timed or measured"), "{error}");
+        let measured = case(
+            r#","measurement_worker":"player","measurement_reference":{"id":"player","sha256":"2","kind":"k"}"#,
+        );
+        let hashes = validate_case_evidence(&measured, &identity, None).unwrap();
+        assert_eq!(hashes.get("reference"), Some(&Value::str("2")));
+        let stale = case(
+            r#","measurement_worker":"player","measurement_reference":{"id":"player","sha256":"3","kind":"k"}"#,
+        );
+        assert!(validate_case_evidence(&stale, &identity, None).is_err());
+    }
 
     fn v(text: &str) -> Value {
         parse(text).unwrap()
@@ -323,22 +411,28 @@ mod work_tests {
 
     #[test]
     fn pairs_and_warmups_require_every_declared_field_on_both_roles() {
-        let fields = work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap();
+        let shared = Work {
+            fields: work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap(),
+            own: vec![],
+        };
         let complete = result(Some(4));
-        let summary = paired_timing_work(&complete, &complete, 50, &fields).unwrap();
-        assert_eq!(summary.get("digest_b"), Some(&Value::int(4)));
+        let summary = paired_timing_work(&complete, &complete, 50, &shared).unwrap();
+        assert_eq!(
+            summary.get("reference").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(4))
+        );
         for (a, b) in [
             (result(None), complete.clone()),
             (complete.clone(), result(None)),
             (result(None), result(None)),
             (result(Some(5)), complete.clone()),
         ] {
-            assert!(paired_timing_work(&a, &b, 50, &fields).is_err());
+            assert!(paired_timing_work(&a, &b, 50, &shared).is_err());
             let warmups = [
                 Value::object([("worker", Value::str("candidate")), ("result", a)]),
                 Value::object([("worker", Value::str("reference")), ("result", b)]),
             ];
-            assert!(warmup_work(&warmups, 50, &fields).is_err());
+            assert!(warmup_work(&warmups, 50, &shared).is_err());
         }
         let warmups = [
             Value::object([
@@ -347,6 +441,30 @@ mod work_tests {
             ]),
             Value::object([("worker", Value::str("reference")), ("result", complete)]),
         ];
-        assert_eq!(warmup_work(&warmups, 50, &fields).unwrap(), summary);
+        assert_eq!(warmup_work(&warmups, 50, &shared).unwrap(), summary);
+    }
+
+    #[test]
+    fn own_work_may_differ_between_roles_but_is_still_required() {
+        let shared = Work {
+            fields: work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap(),
+            own: vec![],
+        };
+        let own = Work {
+            own: vec!["digest_b".to_owned()],
+            ..shared.clone()
+        };
+        let (four, five) = (result(Some(4)), result(Some(5)));
+        let work = paired_timing_work(&four, &five, 50, &own).unwrap();
+        assert_eq!(
+            work.get("candidate").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(4))
+        );
+        assert_eq!(
+            work.get("reference").and_then(|w| w.get("digest_b")),
+            Some(&Value::int(5))
+        );
+        assert!(paired_timing_work(&four, &result(None), 50, &own).is_err());
+        assert!(paired_timing_work(&four, &five, 50, &shared).is_err());
     }
 }

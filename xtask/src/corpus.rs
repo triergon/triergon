@@ -29,13 +29,13 @@ pub struct Paths {
 }
 
 impl Paths {
-    fn fixtures(&self, dir: &str) -> Result<PathBuf, String> {
+    pub(crate) fn fixtures(&self, dir: &str) -> Result<PathBuf, String> {
         let path = self.out.join(".research").join(dir);
         fs::create_dir_all(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(path)
     }
 
-    fn manifest(&self, name: &str, value: &Value) -> Result<PathBuf, String> {
+    pub(crate) fn manifest(&self, name: &str, value: &Value) -> Result<PathBuf, String> {
         let path = self.out.join("harness").join(name);
         write_json(&path, value)?;
         Ok(path)
@@ -66,12 +66,15 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         catalogue(paths, &source)?,
         playback_capsules(paths)?,
         mp4_range(paths)?,
+        crate::transport_fixtures::generate(paths)?,
     ])
 }
 
 fn mp4_range(paths: &Paths) -> Result<String, String> {
     const CONTROL: &str = "regular-avc-aac.mp4";
     const VARIABLE: &str = "variable-aac-duration.mp4";
+    const FRAGMENTED: &str = "fragmented-avc-aac.mp4";
+    const RESCALED: &str = "fragmented-aac-media-clock.mp4";
     let output = paths.fixtures("mp4-range-fixtures")?;
     let seed = paths
         .root
@@ -87,12 +90,27 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     variable[83_745..83_749].copy_from_slice(&272_u32.to_be_bytes());
     write(&output.join(CONTROL), &control)?;
     write(&output.join(VARIABLE), &variable)?;
-    let cases = [
+    let seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(FRAGMENTED);
+    let fragmented = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "a258b6b9f59997eff8fb806503d1ca42c70f9be2d3cb81aa60c80fc319be5fe7"
+    {
+        return Err("fragmented MP4 range seed changed".into());
+    }
+    let mut rescaled = fragmented.clone();
+    // Use a 44.1 kHz mdhd clock with the original 48 kHz AAC configuration.
+    rescaled[833..837].copy_from_slice(&44_100_u32.to_be_bytes());
+    write(&output.join(FRAGMENTED), &fragmented)?;
+    write(&output.join(RESCALED), &rescaled)?;
+    let mut cases: Vec<_> = [
         (
             "regular-open",
             CONTROL,
             &control,
-            false,
+            None,
             237,
             81_478,
             994_214_068_017_485_484_u64,
@@ -101,7 +119,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "regular-seek",
             CONTROL,
             &control,
-            true,
+            Some("28000"),
             185,
             62_763,
             15_577_132_028_095_841_482,
@@ -110,7 +128,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-open",
             VARIABLE,
             &variable,
-            false,
+            None,
             237,
             81_478,
             1_650_792_575_122_043_820,
@@ -119,41 +137,620 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             "variable-seek",
             VARIABLE,
             &variable,
-            true,
+            Some("28000"),
             186,
             62_932,
             1_562_922_133_773_717_379,
         ),
+        (
+            "fragmented-open",
+            FRAGMENTED,
+            &fragmented,
+            None,
+            93,
+            39_981,
+            7_927_680_340_045_287_421,
+        ),
+        (
+            "fragmented-before-sync",
+            FRAGMENTED,
+            &fragmented,
+            Some("4095"),
+            93,
+            39_981,
+            7_927_680_340_045_287_421,
+        ),
+        (
+            "fragmented-seek",
+            FRAGMENTED,
+            &fragmented,
+            Some("4096"),
+            74,
+            30_999,
+            2_297_253_848_353_618_229,
+        ),
+        (
+            "fragmented-rescaled-open",
+            RESCALED,
+            &rescaled,
+            None,
+            93,
+            39_981,
+            16_257_532_825_513_011_650,
+        ),
+        (
+            "fragmented-rescaled-seek",
+            RESCALED,
+            &rescaled,
+            Some("4096"),
+            75,
+            31_255,
+            16_684_294_720_659_653_080,
+        ),
     ]
     .into_iter()
     .map(|(id, file, data, seek, packets, bytes, digest)| {
-        authored(
-            id,
-            file,
-            data,
-            vec![
-                ("arguments", Value::strings(seek.then_some("28000"))),
-                (
-                    "expected",
-                    Value::object([
-                        ("packets", Value::int(packets)),
-                        ("bytes", Value::int(bytes)),
-                        ("digest", Value::int(digest)),
-                    ]),
-                ),
-            ],
-        )
+        mp4_range_case(id, file, data, seek, (packets, bytes, digest))
     })
     .collect();
+    cases.extend(mp4_range_entries(paths, &output)?);
+    let opus_file = "avc-opus-edit.mp4";
+    let boundary_file = "avc-opus-seek-boundary.mp4";
+    let tail_file = "avc-opus-trimmed-end.mp4";
+    let rescaled_file = "avc-opus-rescaled-edit.mp4";
+    let crop_file = "avc-opus-cropped-edit.mp4";
+    let seed = paths
+        .root
+        .join("crates/isobmff/tests/fixtures/range-encoded-edits")
+        .join(opus_file);
+    let opus = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&opus) != "109d8d19991c550fc5381c26c8a7fe9f1f006fa400a80d84ea31675cc0e0c18a" {
+        return Err("MP4 Opus seed changed".into());
+    }
+    let mut boundary = opus.clone();
+    // At a two-second video landing this puts the second audio candidate
+    // exactly on the receiver's earlier search timestamp.
+    boundary[1512..1516].copy_from_slice(&528_i32.to_be_bytes());
+    let mut tail = opus.clone();
+    // The audio edit ends inside a coded packet, while the video continues.
+    for offset in [1420, 1508] {
+        tail[offset..offset + 4].copy_from_slice(&1003_u32.to_be_bytes());
+    }
+    let mut rescaled = tail.clone();
+    // Double the Opus media clock and all media ticks, leaving dOps unchanged.
+    for (offset, value) in [
+        (1512, 672_u32),
+        (1548, 96_000),
+        (1552, 307_968),
+        (1784, 2016),
+        (1792, 1920),
+        (1800, 672),
+    ] {
+        rescaled[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    let mut crop = opus.clone();
+    // Crop 1.1 seconds from the front. Make the first duration run span 20
+    // packets so the retained and original run boundaries differ.
+    for (offset, value) in [
+        (1420, 2050_u32),
+        (1508, 2050),
+        (1512, 52_800),
+        (1552, 154_896),
+        (1780, 20),
+        (1788, 140),
+    ] {
+        crop[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    write(&output.join(opus_file), &opus)?;
+    write(&output.join(boundary_file), &boundary)?;
+    write(&output.join(tail_file), &tail)?;
+    write(&output.join(rescaled_file), &rescaled)?;
+    write(&output.join(crop_file), &crop)?;
+    cases.extend([
+        mp4_range_case(
+            "opus-open",
+            opus_file,
+            &opus,
+            None,
+            (241, 65_677, 15_624_301_091_816_995_394),
+        ),
+        mp4_range_case(
+            "opus-seek",
+            opus_file,
+            &opus,
+            Some("32000"),
+            (92, 25_673, 5_125_035_269_830_725_090),
+        ),
+        mp4_range_case(
+            "opus-seek-edit-boundary",
+            boundary_file,
+            &boundary,
+            Some("32000"),
+            (91, 25_535, 8_414_310_448_937_091_467),
+        ),
+        mp4_range_case(
+            "opus-trim-end",
+            tail_file,
+            &tail,
+            None,
+            (131, 50_269, 5_934_296_594_475_595_056),
+        ),
+        mp4_range_case(
+            "opus-trim-rescaled",
+            rescaled_file,
+            &rescaled,
+            None,
+            (131, 50_269, 7_154_259_262_571_099_376),
+        ),
+        mp4_range_case(
+            "opus-crop-open",
+            crop_file,
+            &crop,
+            None,
+            (233, 64_822, 8_468_210_823_864_242_940),
+        ),
+        mp4_range_case(
+            "opus-crop-seek",
+            crop_file,
+            &crop,
+            Some("32000"),
+            (33, 17_176, 15_900_364_185_324_428_767),
+        ),
+    ]);
+    let long_roll_file = "avc-opus-long-roll.mp4";
+    let composition_file = "avc-opus-video-composition-offset.mp4";
+    let mut long_roll = opus.clone();
+    // Request six preceding packets in the seed's Opus roll description.
+    long_roll[2872..2874].copy_from_slice(&(-6_i16).to_be_bytes());
+    let composition = mp4_opus_composition_fixture(&opus);
+    write(&output.join(long_roll_file), &long_roll)?;
+    write(&output.join(composition_file), &composition)?;
+    cases.extend([
+        mp4_range_case(
+            "opus-recovery-start",
+            opus_file,
+            &opus,
+            ["0", "opus-roll"],
+            (241, 65_677, 10_527_166_544_542_341_228),
+        ),
+        mp4_range_case(
+            "opus-recovery-seek",
+            opus_file,
+            &opus,
+            ["32000", "opus-roll"],
+            (95, 26_088, 15_507_622_761_405_975_333),
+        ),
+        mp4_range_case(
+            "opus-recovery-edit-boundary",
+            boundary_file,
+            &boundary,
+            ["32000", "opus-roll"],
+            (95, 26_088, 5_937_862_538_032_964_389),
+        ),
+        mp4_range_case(
+            "opus-recovery-long-roll",
+            long_roll_file,
+            &long_roll,
+            ["41000", "opus-roll"],
+            (97, 26_371, 17_550_833_167_330_169_510),
+        ),
+        mp4_range_case(
+            "opus-recovery-composition-offset",
+            composition_file,
+            &composition,
+            ["32000", "opus-roll"],
+            (93, 25_808, 16_784_415_058_963_717_857),
+        ),
+    ]);
+    let surround_file = "avc-aac-quicktime-surround.mov";
+    let minimal_wave_file = "avc-aac-quicktime-minimal-wave.mov";
+    let surround_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(surround_file);
+    let surround =
+        fs::read(&surround_seed).map_err(|e| format!("{}: {e}", surround_seed.display()))?;
+    if sha256::hex(&surround) != "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5"
+    {
+        return Err("QuickTime surround AAC range seed changed".into());
+    }
+    let mut minimal_wave = surround.clone();
+    // Replace the optional wave format and marker atoms with free boxes of equal size.
+    minimal_wave[1989..1993].copy_from_slice(b"free");
+    minimal_wave[2001..2005].copy_from_slice(b"free");
+    write(&output.join(surround_file), &surround)?;
+    write(&output.join(minimal_wave_file), &minimal_wave)?;
+    let open = (289, 174_560, 8_952_730_278_029_084_733);
+    let seek = (145, 85_958, 4_047_899_442_073_086_333);
+    cases.extend([
+        mp4_range_case("quicktime-aac-open", surround_file, &surround, [], open),
+        mp4_range_case(
+            "quicktime-aac-seek",
+            surround_file,
+            &surround,
+            ["26880"],
+            seek,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-open",
+            minimal_wave_file,
+            &minimal_wave,
+            [],
+            open,
+        ),
+        mp4_range_case(
+            "quicktime-aac-minimal-wave-seek",
+            minimal_wave_file,
+            &minimal_wave,
+            ["26880"],
+            seek,
+        ),
+    ]);
+    let reordered_file = "avc-aac-quicktime-reordered.mov";
+    let reordered_seed = surround_seed.with_file_name(reordered_file);
+    let reordered =
+        fs::read(&reordered_seed).map_err(|e| format!("{}: {e}", reordered_seed.display()))?;
+    if sha256::hex(&reordered) != "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b"
+    {
+        return Err("Reordered QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(reordered_file), &reordered)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-reordered-open",
+            reordered_file,
+            &reordered,
+            [],
+            (274, 61_802, 11_057_392_877_255_542_627),
+        ),
+        mp4_range_case(
+            "quicktime-aac-reordered-seek",
+            reordered_file,
+            &reordered,
+            ["26880"],
+            (141, 30_781, 3_570_639_560_812_143_604),
+        ),
+    ]);
+    let fragmented_file = "avc-aac-quicktime-fragmented.mov";
+    let fragmented_seed = surround_seed.with_file_name(fragmented_file);
+    let fragmented =
+        fs::read(&fragmented_seed).map_err(|e| format!("{}: {e}", fragmented_seed.display()))?;
+    if sha256::hex(&fragmented)
+        != "be592508645005099c312154a45504c5bb5be002d9616cc94af399394e493b83"
+    {
+        return Err("Fragmented QuickTime AAC range seed changed".into());
+    }
+    write(&output.join(fragmented_file), &fragmented)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-fragmented-open",
+            fragmented_file,
+            &fragmented,
+            [],
+            (93, 39_981, 1_939_830_974_683_508_522),
+        ),
+        mp4_range_case(
+            "quicktime-aac-fragmented-seek",
+            fragmented_file,
+            &fragmented,
+            ["4096"],
+            (73, 30_733, 1_084_237_239_961_408_002),
+        ),
+    ]);
+    let eight_channel_file = "avc-aac-quicktime-7-1.mov";
+    let eight_channel_seed = surround_seed.with_file_name(eight_channel_file);
+    let eight_channel = fs::read(&eight_channel_seed)
+        .map_err(|e| format!("{}: {e}", eight_channel_seed.display()))?;
+    if sha256::hex(&eight_channel)
+        != "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c"
+    {
+        return Err("QuickTime 7.1 AAC range seed changed".into());
+    }
+    write(&output.join(eight_channel_file), &eight_channel)?;
+    cases.extend([
+        mp4_range_case(
+            "quicktime-aac-7-1-open",
+            eight_channel_file,
+            &eight_channel,
+            [],
+            (274, 92_570, 4_686_448_036_394_174_807),
+        ),
+        mp4_range_case(
+            "quicktime-aac-7-1-seek",
+            eight_channel_file,
+            &eight_channel,
+            ["26880"],
+            (141, 47_093, 5_018_453_331_173_239_581),
+        ),
+    ]);
+    let hinted_file = "avc-aac-rtp-hints.mp4";
+    let hinted_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(hinted_file);
+    let hinted = fs::read(&hinted_seed).map_err(|e| format!("{}: {e}", hinted_seed.display()))?;
+    if sha256::hex(&hinted) != "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273" {
+        return Err("RTP hint MP4 range seed changed".into());
+    }
+    write(&output.join(hinted_file), &hinted)?;
+    cases.extend([
+        mp4_range_case(
+            "rtp-hints-open",
+            hinted_file,
+            &hinted,
+            [],
+            (289, 72_260, 16_322_489_954_875_018_336),
+        ),
+        mp4_range_case(
+            "rtp-hints-seek",
+            hinted_file,
+            &hinted,
+            ["26880"],
+            (145, 35_398, 5_283_456_504_139_288_625),
+        ),
+    ]);
+    let program_file = "avc-aac-program.mov";
+    let program_seed = paths
+        .root
+        .join("crates/playback/tests/fixtures/mp4")
+        .join(program_file);
+    let program =
+        fs::read(&program_seed).map_err(|error| format!("{}: {error}", program_seed.display()))?;
+    if sha256::hex(&program) != "94d4bb82ba6895b4b1de5408ea028b0643eaf838a211724343ab6d09ff9c7cd9" {
+        return Err("AAC program range seed changed".into());
+    }
+    write(&output.join(program_file), &program)?;
+    cases.extend([
+        mp4_range_case(
+            "aac-program-open",
+            program_file,
+            &program,
+            [],
+            (174, 91_514, 9_360_453_060_203_789_492),
+        ),
+        mp4_range_case(
+            "aac-program-seek",
+            program_file,
+            &program,
+            ["24000"],
+            (102, 54_337, 7_863_734_754_543_817_612),
+        ),
+    ]);
+    for (name, hash, folds) in [
+        (
+            "fragmented-subtitles",
+            "0ceb6b7d7773a8cec5d2f963219da627625266976db03abec2e2cb81ad9941f1",
+            [
+                (229, 47_344, 17_268_720_163_590_035_113),
+                (229, 47_344, 17_268_720_163_590_035_113),
+                (172, 35_623, 9_383_543_265_607_670_677),
+                (60, 11_998, 2_935_735_271_173_150_781),
+            ],
+        ),
+        (
+            "fragmented-subtitle-edit",
+            "b87060c003dda2d673805d7860206f70902280aa1a67b6b30bde8092cd30faef",
+            [
+                (228, 47_342, 4_913_362_454_912_207_988),
+                (228, 47_342, 4_913_362_454_912_207_988),
+                (173, 35_629, 17_500_664_033_615_905_035),
+                (61, 12_004, 15_718_313_594_074_699_357),
+            ],
+        ),
+    ] {
+        let file = format!("{name}.mp4");
+        let source = paths
+            .root
+            .join("crates/playback/tests/fixtures/mp4")
+            .join(&file);
+        let bytes = fs::read(&source).map_err(|error| format!("{}: {error}", source.display()))?;
+        if sha256::hex(&bytes) != hash {
+            return Err(format!("Fragmented subtitle range seed changed: {file}"));
+        }
+        write(&output.join(&file), &bytes)?;
+        for ((operation, target), expected) in [
+            ("open", None),
+            ("seek-start", Some("0")),
+            ("seek-during-cue", Some("24576")),
+            ("seek-after-cue", Some("60000")),
+        ]
+        .into_iter()
+        .zip(folds)
+        {
+            cases.push(mp4_range_case(
+                &format!("{name}-{operation}"),
+                &file,
+                &bytes,
+                target,
+                expected,
+            ));
+        }
+    }
+    cases.extend(mp4_range_fate_cases(&paths.root)?);
+    let count = cases.len();
     paths.manifest(
         "features/mp4-range/corpus.json",
-        &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
+        &Value::object([
+            ("schema", Value::int(1)),
+            ("directory", Value::str(".research/mp4-range-fixtures")),
+            ("cases", Value::Array(cases)),
+        ]),
     )?;
-    Ok("MP4 range corpus: four playback comparisons".into())
+    Ok(format!("MP4 range corpus: {count} playback comparisons"))
+}
+
+fn mp4_opus_composition_fixture(seed: &[u8]) -> Vec<u8> {
+    // Move the second video keyframe's presentation by 40 ms. Keep decode
+    // timing and payloads intact and account for the added box in chunk offsets.
+    let mut offsets = [40_u32.to_be_bytes(), *b"ctts", [0; 4], 3_u32.to_be_bytes()].concat();
+    for (count, ticks) in [(50_u32, 0_u32), (1, 640), (29, 0)] {
+        offsets.extend_from_slice(&count.to_be_bytes());
+        offsets.extend_from_slice(&ticks.to_be_bytes());
+    }
+    let grow = offsets.len() as u32;
+    let mut data = seed.to_vec();
+    for at in [32, 148, 284, 369, 433] {
+        let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
+        data[at..at + 4].copy_from_slice(&(size + grow).to_be_bytes());
+    }
+    for table in [1048, 2508] {
+        let count = u32::from_be_bytes(
+            seed[table + 12..table + 16]
+                .try_into()
+                .expect("chunk count"),
+        );
+        for at in (table + 16..).step_by(4).take(count as usize) {
+            let chunk = u32::from_be_bytes(seed[at..at + 4].try_into().expect("chunk offset"));
+            data[at..at + 4].copy_from_slice(&(chunk + grow).to_be_bytes());
+        }
+    }
+    data.splice(1384..1384, offsets);
+    data
+}
+
+fn mp4_range_case<'a>(
+    id: &str,
+    file: &str,
+    data: &[u8],
+    arguments: impl IntoIterator<Item = &'a str>,
+    expected: (u32, u32, u64),
+) -> Value {
+    authored(
+        id,
+        file,
+        data,
+        vec![
+            ("arguments", Value::strings(arguments)),
+            ("expected", mp4_range_expected(expected)),
+        ],
+    )
+}
+
+fn mp4_range_expected((packets, bytes, digest): (u32, u32, u64)) -> Value {
+    Value::object([
+        ("packets", Value::int(packets)),
+        ("bytes", Value::int(bytes)),
+        ("digest", Value::int(digest)),
+    ])
+}
+
+fn mp4_range_fate_cases(root: &Path) -> Result<[Value; 2], String> {
+    const FILE: &str = "mov/mp4-init-nonkeyframe.mp4";
+    let registry = crate::checks::read_json(&root.join("harness/fate/samples.json"))?;
+    let path = format!("fate/{FILE}");
+    let sha256 = registry
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .find(|sample| sample.get("path").and_then(Value::as_str) == Some(&path))
+        .and_then(|sample| sample.get("sha256").and_then(Value::as_str))
+        .ok_or("missing FATE non-sync prefix input hash")?;
+    let case = |id, target, expected| {
+        Value::object([
+            ("id", Value::str(id)),
+            ("profile", Value::str(id)),
+            ("file", Value::str(FILE)),
+            ("sha256", Value::str(sha256)),
+            ("rights", Value::str("fetched-not-redistributed")),
+            ("source", Value::str(format!("fate-suite/{FILE}"))),
+            ("arguments", Value::strings(target)),
+            ("expected", mp4_range_expected(expected)),
+        ])
+    };
+    Ok([
+        case(
+            "fate-non-sync-prefix-open",
+            None,
+            (293, 1158487, 4548821196215711946),
+        ),
+        case(
+            "fate-non-sync-prefix-seek",
+            Some("91091"),
+            (72, 317984, 3463143097373344921),
+        ),
+    ])
+}
+
+fn mp4_range_entries(paths: &Paths, output: &Path) -> Result<Vec<Value>, String> {
+    let seed = |name: &str, expected: &str| {
+        let file = paths.root.join("crates/playback/tests/fixtures").join(name);
+        let bytes = fs::read(&file).map_err(|error| format!("{}: {error}", file.display()))?;
+        if sha256::hex(&bytes) != expected {
+            return Err(format!("MP4 range seed changed: {name}"));
+        }
+        Ok(bytes)
+    };
+    let hevc = seed(
+        "mp4/encoded-hevc-aac-front.mp4",
+        "94113774ce6260e885c685713a1e4a35c76d997ba49c0d62a669396649d3d6f9",
+    )?;
+    let av1 = seed(
+        "av1/six-frames.mp4",
+        "76383e7d9d646a2873ed6e8af7e52b48903b7a9a1fc95f1d807575b90c66b9c6",
+    )?;
+    // Retag the sole video sample description in each pinned seed. The
+    // decoder configuration and samples are the original authored bytes.
+    let mut cases = Vec::new();
+    for (tag, source, offset, original, seek, open_fold, seek_fold) in [
+        (
+            "dvh1",
+            &hevc,
+            421,
+            b"hvc1",
+            "40",
+            (4, 3438, 265_368_919_262_385_015),
+            (4, 3438, 265_368_919_262_385_015),
+        ),
+        (
+            "dvhe",
+            &hevc,
+            421,
+            b"hvc1",
+            "40",
+            (4, 3438, 6_289_861_727_786_914_679),
+            (4, 3438, 6_289_861_727_786_914_679),
+        ),
+        (
+            "dav1",
+            &av1,
+            461,
+            b"av01",
+            "16384",
+            (6, 4097, 1_285_709_537_707_954_380),
+            (3, 2192, 4_884_662_521_198_875_690),
+        ),
+    ] {
+        let mut data = source.clone();
+        let entry = data
+            .get_mut(offset..offset + 4)
+            .ok_or("missing MP4 range sample entry")?;
+        if entry != original {
+            return Err("unexpected MP4 range sample entry".into());
+        }
+        entry.copy_from_slice(tag.as_bytes());
+        let file = format!("{tag}.mp4");
+        write(&output.join(&file), &data)?;
+        cases.push(mp4_range_case(
+            &format!("{tag}-open"),
+            &file,
+            &data,
+            None,
+            open_fold,
+        ));
+        cases.push(mp4_range_case(
+            &format!("{tag}-seek"),
+            &file,
+            &data,
+            Some(seek),
+            seek_fold,
+        ));
+    }
+    Ok(cases)
 }
 
 /// One manifest row for an authored fixture.
-fn authored(name: &str, file: &str, data: &[u8], extra: Vec<(&str, Value)>) -> Value {
+pub(crate) fn authored(name: &str, file: &str, data: &[u8], extra: Vec<(&str, Value)>) -> Value {
     let mut row = vec![
         ("id", Value::str(name)),
         ("profile", Value::str(name)),
@@ -1918,6 +2515,7 @@ mod tests {
             "features/matroska-colour/corpus.json",
             "features/matroska-segment-metadata/corpus.json",
             "features/mp4-range/corpus.json",
+            "features/mpegts-access-units/corpus.json",
         ] {
             let ours = fs::read_to_string(out.join("harness").join(name)).unwrap();
             let committed = fs::read_to_string(root.join("harness").join(name)).unwrap();

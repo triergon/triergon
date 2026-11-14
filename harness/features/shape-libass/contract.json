@@ -6,6 +6,7 @@
   "worker_operation": "shape-libass-",
   "reference": "harfbuzz-native",
   "gate": "required",
+  "compare_order": 1,
   "contract": [
     "one font file read from memory; every face of a collection opened with FreeType and set up as libass 0.17.5 sets up its faces with hinting off (ASS_HINTING_NONE): its charmap (ass_charmap_magic), GDI face metrics (set_font_metrics) and a REAL_DIM size request of 256 pixels (16384 in 26.6, ass_face_set_size)",
     "a HarfBuzz font over the face's tables (ass_create_hb_font) with libass's font functions (init_font_funcs, get_hb_font): ass_font_index_magic and FT_Get_Char_Index or FT_Face_GetCharVariantIndex for glyphs; FT_LOAD_DEFAULT | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH | FT_LOAD_IGNORE_TRANSFORM metrics, cached per glyph, for advances and extents; that load's outline for contour points; FT_KERNING_DEFAULT kerning; the scale (x and y scale times units per em, shifted down by 16) and ppem of the size; the font is not an @ font",
@@ -43,46 +44,6 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "FreeType auto-hinter for FT_LOAD_DEFAULT advances",
-    "FreeType's hinted load (FT_LOAD_DEFAULT) for glyph extents, which fallback mark positioning reads in fonts without GPOS mark positioning"
-  ],
-  "open_cases": [
-    {
-      "id": "dejavumathtexgyre-ttf-latn-libass",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "notoemoji-wght-ttf-zyyy-libass",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "notoemoji-wght-ttf-zyyy-no-kerning",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "notoemoji-wght-ttf-zyyy-no-ligatures",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "notoemoji-wght-ttf-zyyy-opposite",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "notoemoji-wght-ttf-zyyy-c",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "notoemoji-wght-ttf-zyyy-plain",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "authored-cmap-formats-ttf-latn-libass",
-      "requirement": "FreeType auto-hinter for FT_LOAD_DEFAULT advances"
-    },
-    {
-      "id": "authored-cff-features-otf-latn-libass",
-      "requirement": "FreeType's hinted load (FT_LOAD_DEFAULT) for glyph extents, which fallback mark positioning reads in fonts without GPOS mark positioning"
-    }
-  ]
+  "pending_module_requirements": [],
+  "open_cases": []
 }

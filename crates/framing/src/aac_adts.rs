@@ -141,6 +141,26 @@ pub struct AacAdtsFrame {
     crc: Option<u16>,
 }
 impl AacAdtsFrame {
+    fn from_envelope(raw: Bytes, source: AacSource, header: AacAdtsHeader) -> Result<Self> {
+        let header_bytes = header
+            .single_block_header_bytes()
+            .ok_or(Error::Unsupported("ADTS block layout"))?;
+        let crc = if header.protection_absent() {
+            None
+        } else {
+            let bytes = raw.get(7..9).ok_or(Error::Truncated)?;
+            Some(u16::from_be_bytes([bytes[0], bytes[1]]))
+        };
+        let payload = raw.slice(header_bytes..raw.len())?;
+        Ok(Self {
+            raw,
+            payload,
+            source,
+            header,
+            crc,
+        })
+    }
+
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
@@ -301,6 +321,11 @@ impl AacAdtsParameters {
         if f.core_object_type.code != 2 || f.core_frequency.index == 15 {
             return Err(Error::Unsupported(
                 "ASC cannot be represented by selected indexed ADTS core",
+            ));
+        }
+        if f.channel_configuration > 7 {
+            return Err(Error::Unsupported(
+                "ASC channel configuration does not fit ADTS",
             ));
         }
         if f.ga.frame_length_flag || f.ga.core_coder_delay.is_some() {

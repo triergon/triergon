@@ -56,6 +56,42 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+QuickTime range playback reads AAC configuration from version 1 and version 2
+sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
+fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
+also runs with the optional format and marker atoms replaced by free boxes.
+`avc-aac-quicktime-reordered.mov` adds 44.1 kHz AAC and AVC with B pictures.
+`avc-aac-quicktime-fragmented.mov` exercises open and seek with empty
+initialization sample tables and a version 1 sound description. It remuxes the
+synthetic `fragmented-avc-aac.mp4` fixture under the same MIT or Apache-2.0 license.
+`avc-aac-quicktime-7-1.mov` uses the same synthetic video pattern and distinct
+tones at 251, 379, 503, 71, 641, 769, 911 and 1031 Hz for the eight speakers.
+FFmpeg 9.0.2 encoded the fixture as 44.1 kHz AAC-LC with channel configuration
+12. The fixture is distributed under the repository's dual licence. The
+[range corpus](../../harness/features/mp4-range/corpus.json) records its SHA-256.
+
+`avc-aac-program.mov` uses an authored AVC pattern and seven independent tones
+in a 48 kHz AAC-LC program with a leading edit. The range corpus compares its
+original configuration and every selected packet on open and backward seek.
+The fixture uses the repository's dual licence. To regenerate it with FFmpeg
+9.0.2 and libx264:
+
+```sh
+signal='0.13*sin(2*PI*107*t)|0.13*sin(2*PI*211*t)|0.13*sin(2*PI*307*t)|0.13*sin(2*PI*53*t)|0.13*sin(2*PI*409*t)|0.13*sin(2*PI*509*t)|0.13*sin(2*PI*601*t)'
+ffmpeg -nostdin -f lavfi -i 'testsrc2=s=96x64:r=25' \
+  -f lavfi -i "aevalsrc=${signal}:s=48000:c=6.1(back)" -t 2.4 \
+  -c:v libx264 -threads:v 1 -g 25 -keyint_min 25 -sc_threshold 0 -bf 0 -pix_fmt yuv420p \
+  -c:a aac -aac_pce 1 -threads:a 1 -b:a 224k -flags:a +bitexact -fflags +bitexact \
+  -video_track_timescale 16000 -movie_timescale 48000 -use_editlist 1 -movflags +faststart \
+  avc-aac-program.mov
+```
+
+`Mp4RangeOpen::for_media` projects media tracks for playback and seek alignment.
+Data tracks such as RTP hints and timecode still have their sample extents checked.
+Supply any edit plans in source track order, with `None` for each data track.
+The `avc-aac-rtp-hints.mp4` test fixture contains a synthetic AVC test pattern,
+AAC sine audio and two RTP hint tracks, with the first hint track between the
+video and audio tracks.
 
 ## Supported
 
@@ -73,11 +109,16 @@ packet projections before merging the tracks for delivery.
 | Progressive TS188 | `ts_progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
-| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
-| Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdJob, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `dvb_ts::DvbTsBridge` |
+| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge` (including MP4 `av01` and `dav1`); MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
+| Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `mp4_dvd::{Mp4DvdSetup, Mp4DvdTrack}`, `dvb_ts::DvbTsBridge`, `pgs_ts::PgsTsTrack`, `teletext_ts::TeletextTsBridge`, `caption_bridge::CaptionBridge` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
 ## Behaviour and limits
+
+**Compact Matroska replay.** `MatroskaReplayPrefix::feed_packet` prepares a
+buffered AAC or AVC packet through the same selection and configuration checks
+as the live feed. A caller can inspect the prefix before delivering its events
+in order.
 
 **Source protocol.** `Source::poll` must return promptly. `Pending` and empty
 data never mean end of stream; only `SourceReply::End` does, and transport
@@ -90,6 +131,8 @@ retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
 defaults to 16 FIFO slots (at most 64), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
 that use `Player::read_output` with one caller-owned slot.
+Transport carrier, section and PES outputs use the budget of their retained
+storage for pool identity.
 
 **Clocks.** Every packet keeps its exact source timestamps. FFmpeg-compatible
 packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`,
@@ -119,10 +162,34 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+When the movie header's duration is unknown or exceeds the presentation clock,
+range playback finds the latest packet end while checking projections. It scans
+in merged order when the seek restarts could reach their count or storage limit.
+Fragmented files support an open-ended rate-one media edit. Forward playback
+applies it from the front movie, including tracks first seen in later fragments. A
+leading empty subtitle edit delays the subtitle packet clocks. When video
+seeks before the first sync packet of a secondary fragment track, range
+playback replays that track from its first packet. An AAC track with a
+single initialization edit carries leading trim in the first packet's
+`Mp4Packet::encoded_skip_samples`. A recovered short first packet carries its
+leading trim in `Mp4NativeShortPacket::encoded_skip_samples`. The MPEG-4 object
+type identifies AAC. An edited MP3 track has the projected clocks without AAC
+trim. Source sample
+clocks and byte ranges stay literal while the compatibility packet clocks
+reflect the edit.
+For regular front-metadata input with one finite media extent,
+`compat::mov::forward_encoded_edits` accepts checked encoded edit plans
+and delivers projected packets in source byte order. AAC packets include the
+decoder priming and end-of-edit trim needed for PCM playback. The index refuses
+edits that require revisiting media bytes.
+`Mp4RangePlayer::prepare_seek_with_opus_recovery` includes the regular
+Opus track's declared preroll. Decode from the reported first sample and
+present PCM from the video landing through the track's edited end. A refused
+recovery leaves the active playback generation and ordinary seek available.
 For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
 use the timing prefix covered by the sample sizes for forward playback and
 `Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view
-requires exact coverage.
+requires exact coverage. `subp` tracks are subtitle tracks.
 
 The FFmpeg-compatible packet view opens with `Mp4Open::new_recovery`. When
 the opener read the metadata before any media
@@ -145,7 +212,8 @@ physical end, or as an unsupported layout once the source passes its start.
 
 **MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
-admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
+admission, and a subtitle track when a DVB namespace names DVB subtitling or
+teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 8 KiB input window. The DVB native PES parser caps a continued segment at
 65,536 bytes. PES outputs reuse their payload storage's budget handle, which
 remains valid while a caller retains an output after closing the player.
@@ -169,6 +237,25 @@ validation, work and retirement boundaries. Independently retained AAC frames
 still keep the full backing allocation charged. Both framers also expose
 `push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
 Both paths share track, configuration-epoch and source-clock admission checks.
+
+**Subtitles.** The TS bridges bind to one PID of one active PMT and take its
+strict private-stream PES; a new generation, PMT epoch or clock epoch needs a
+new bridge. Their times are the PES times on the player's timeline; teletext
+times are bounded by the program clock as FFmpeg's demuxer bounds them, read
+from the transport packets offered to `TeletextTsBridge::observe`.
+`PgsTsTrack` hands each PES to `PgsBridge`. `Mp4DvdSetup` reads the colour
+table of an `mp4s` entry, and its `Mp4DvdTrack` hands each sample to
+`DvdReceiver`; a subpicture without a stop ends with its packet's duration.
+A Matroska VobSub track's `vobsub_settings` reads its palette and canvas; the
+DVD queue places pictures on that canvas.
+Teletext pages and closed captions become opaque ASS `TextSource`s, which
+`TextBridge` reports as it reports a Matroska ASS track's cues; an empty
+teletext page is a clear. A teletext decode needs the decoder's whole packet
+work in one budget. `CaptionBridge` takes H.264 or HEVC access units or MPEG-2
+PES payloads in decode order and decodes the caption frames FFmpeg's
+extraction settles, in its order. It charges one unit per packet byte and,
+per frame, the receiver's packet work for its size, each paid over as many
+polls as needed.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source
@@ -214,7 +301,9 @@ native gate-build qualification remains pending.
 - MP4: ISO/IEC 14496-12 and the [QuickTime seek tables](https://developer.apple.com/documentation/quicktime-file-format/seeking_with_a_quicktime_file);
   AV1 per the [AV1-ISOBMFF sample format](https://aomediacodec.github.io/av1-isobmff/v1.3.0.html#av1-sample-format).
 - MPEG-TS: ITU-T H.222.0 (§2.14.1 AVC delimiters); DVB subtitles per
-  [ETSI EN 300 468 §6.2.41](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf).
+  [ETSI EN 300 468 §6.2.41](https://www.etsi.org/deliver/etsi_en/300400_300499/300468/01.18.01_60/en_300468v011801p.pdf),
+  teletext per ETSI EN 300 472.
+- Closed captions: ATSC A/53 Part 4 `cc_data()` in ITU-T T.35 SEI messages.
 - AVC/HEVC parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
 Integration tests in `tests/` replay authored and FFmpeg-generated fixtures
@@ -228,9 +317,40 @@ with FFprobe 9.0.2, and where FFprobe refused the header it requires the run
 to refuse while opening, before any packet. With `Mp4Open::new_recovery`
 499/499 rows pass: 497 identical packet lists and 2 matching header refusals.
 With `Mp4Open::new` 446/499 pass; the test pins the other 53 outcomes.
+
+The synthetic `forward-aac-priming.mp4` fixture uses a 64 × 48 AVC test
+pattern at 12 fps and a 440 Hz mono AAC tone at 44.1 kHz. To reproduce it with
+FFmpeg 9.0.2 and libx264, run:
+
+```sh
+ffmpeg -nostdin -v error \
+  -f lavfi -i 'testsrc2=s=64x48:r=12' -f lavfi -i 'sine=f=440:r=44100' \
+  -t 0.35 -map 0:v:0 -map 1:a:0 -c:v libx264 -threads:v 1 -profile:v baseline \
+  -pix_fmt yuv420p -g 2 -bf 0 -c:a aac -b:a 40k -movflags +faststart forward-aac-priming.mp4
+```
+
+`forward-aac-tail-trim.mp4` keeps the 44,100 Hz movie timescale and sets
+the audio edit to media time zero and duration 16,459.
+`forward-aac-fractional-edit.mp4` sets the movie timescale to 1,000, its
+duration and the video edit's duration to 334, and the audio edit's media
+time and duration to 64 and 45. The audio edit rounds to an end one sample
+into the third packet. All three fixtures use the repository's dual license.
+The four fragmented fixtures also use the repository's dual license.
+`forward-fragment-aac-edit.mp4` and `forward-fragment-aac-late-track.mp4`
+use an FFmpeg-generated AVC test pattern and mono AAC tone. Both carry an
+open-ended audio initialization edit. The latter starts with a video-only
+fragment. `forward-fragment-aac-short.mp4` truncates an authored AVC/AAC
+fragment inside its first AAC packet. `forward-fragment-mp3-edit.mp4` uses a
+generated mono MP3 tone with an initialization edit to exercise the same clock
+projection for a different MPEG-4 audio object type. The
+[`mp4-forward` corpus](../../harness/features/mp4-forward/corpus.json) records
+their hashes and compares source byte offsets, reduced time bases and AAC trim
+along with the packet data.
+
 Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
 [Dolby clocks](tests/fixtures/dolby-clock/README.md),
 [subtitle probes](tests/fixtures/matroska-subtitle-probe/README.md),
+[subtitle bridges](tests/fixtures/subtitles/README.md),
 [terminal-media FFprobe records](tests/fixtures/terminal-matrix/README.md).
 Gates and measurement policy: [docs/quality.md](../../docs/quality.md).

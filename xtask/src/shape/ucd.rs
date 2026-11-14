@@ -1,16 +1,16 @@
 //! `cargo xtask shape ucd`: the Unicode property tables of triergon-shape.
 //!
-//! HarfBuzz and FriBidi each compile their own snapshot of the Unicode Character
-//! Database, and the two differ: HarfBuzz 14.6.0 carries Unicode 18.0.0, while the
-//! tables in the FriBidi 1.0.17 release were generated (by FriBidi 1.0.12) from
-//! Unicode 14.0.0; the newer data files in its `gen.tab/unidata` are not used by its
-//! build. Each table here is derived from the release its reference compiled, with
-//! the rules of that reference's own generator, from hash-pinned files on
-//! unicode.org cached under `.research/ucd/<version>/`.
+//! The shaping tables follow HarfBuzz 14.6.0, which carries Unicode 18.0.0, with
+//! the rules of HarfBuzz's own generators. The bidi tables are Unicode 14.0.0's,
+//! the data that libass's FriBidi 1.0.17 resolves text with. Every table is
+//! derived from hash-pinned files on unicode.org cached under
+//! `.research/ucd/<version>/`.
 
+mod bidi;
+mod cmap;
 mod emit;
-mod fribidi;
 mod harfbuzz;
+mod language;
 mod pack;
 mod source;
 mod syllabic;
@@ -24,7 +24,8 @@ use crate::sha256;
 const USAGE: &str = "usage: cargo xtask shape ucd [--check]
 
   Fetch the hash-pinned Unicode Character Database files into .research/ucd and
-  regenerate the tables in crates/shape/src/unicode; --check regenerates them in
+  regenerate the tables in crates/shape/src/unicode, and the language tags in
+  crates/shape/src/language from HarfBuzz's tree; --check regenerates them in
   memory and fails if the committed files differ.";
 
 /// One file of a Unicode release, by its path under `Public/<version>/ucd/`.
@@ -123,10 +124,14 @@ const USE_IGNORABLES: Release = Release {
     }],
 };
 
-/// FriBidi 1.0.17: the `lib/*.tab.i` tables of its release, from Unicode 14.0.0.
-const FRIBIDI: Release = Release {
+/// The bidi tables, from Unicode 14.0.0.
+const BIDI: Release = Release {
     version: "14.0.0",
     files: &[
+        File {
+            path: "extracted/DerivedBidiClass.txt",
+            sha256: "e5fe51acc74e3e83b4fb4c7b25f3c34491d6eb8095c9955d0712dafbca7b3c2b",
+        },
         File {
             path: "UnicodeData.txt",
             sha256: "36018e68657fdcb3485f636630ffe8c8532e01c977703d2803f5b89d6c5feafb",
@@ -146,10 +151,26 @@ const FRIBIDI: Release = Release {
     ],
 };
 
-/// The largest file, UnicodeData.txt, is under 2.5 MiB.
+/// Unicode 14.0.0's bidi conformance tests, which `cargo xtask shape conformance`
+/// runs the bidi tables and resolver through.
+const BIDI_TESTS: Release = Release {
+    version: "14.0.0",
+    files: &[
+        File {
+            path: "BidiTest.txt",
+            sha256: "306a86c1c29458531e56c29ffde6badede65897275a5941ac7fc6985d6b0994f",
+        },
+        File {
+            path: "BidiCharacterTest.txt",
+            sha256: "7739891361250475fe55cfc7eeee7024ba2626bdce8c7db02bf7ae9d1bcdfb3f",
+        },
+    ],
+};
+
+/// The largest file, BidiTest.txt, is under 8 MiB.
 const FILE_LIMIT: usize = 8 << 20;
 
-const OUTPUT: &str = "crates/shape/src/unicode";
+const OUTPUT: &str = "crates/shape/src";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     let check = match args {
@@ -161,19 +182,50 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+/// `cargo xtask shape conformance`: fetch the pinned conformance tests and run the
+/// `bidi_conformance` example on them, which fails unless every case passes.
+pub fn conformance(root: &Path, args: &[String]) -> Result<(), String> {
+    if !args.is_empty() {
+        return Err(super::USAGE.to_owned());
+    }
+    Loaded::fetch(root, &BIDI_TESTS, &fetch::Network)?;
+    let cache = root.join(".research/ucd").join(BIDI_TESTS.version);
+    let paths: Vec<String> = BIDI_TESTS
+        .files
+        .iter()
+        .map(|file| cache.join(file.path).display().to_string())
+        .collect();
+    let mut args = vec![
+        "run",
+        "--release",
+        "--locked",
+        "-p",
+        "triergon-shape",
+        "--example",
+        "bidi_conformance",
+        "--",
+    ];
+    args.extend(paths.iter().map(String::as_str));
+    crate::cargo(root, None, &args)
+}
+
 fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> {
     let harfbuzz = Loaded::fetch(root, &HARFBUZZ, net)?;
-    let fribidi = Loaded::fetch(root, &FRIBIDI, net)?;
+    let bidi = Loaded::fetch(root, &BIDI, net)?;
     let shapers = Loaded::fetch(root, &SYLLABIC, net)?;
     let ignorables = Loaded::fetch(root, &USE_IGNORABLES, net)?;
     let tree = syllabic::TreeFiles::load(root)?;
+    let languages = language::load(root)?;
+    let remaps = cmap::load(root)?;
     let outputs = [
-        ("tables.rs", harfbuzz::generate(&harfbuzz)?),
-        ("fribidi/tables.rs", fribidi::generate(&fribidi)?),
+        ("unicode/tables.rs", harfbuzz::generate(&harfbuzz)?),
+        ("unicode/bidi/tables.rs", bidi::generate(&bidi)?),
         (
-            "syllabic_tables.rs",
+            "unicode/syllabic_tables.rs",
             syllabic::generate(&shapers, &ignorables, &tree)?,
         ),
+        ("language/tables.rs", language::generate(&languages)?),
+        ("cmap/tables.rs", cmap::generate(&remaps)?),
     ];
     let mut stale = Vec::new();
     for (name, generated) in &outputs {

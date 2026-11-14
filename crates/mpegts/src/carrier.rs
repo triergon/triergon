@@ -25,7 +25,7 @@ pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
     Some((pid, control & 15))
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct CarrierHeader {
     pid: u16,
     pusi: bool,
@@ -53,7 +53,7 @@ impl CarrierHeader {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct PlainCarrier {
     header: CarrierHeader,
     payload_start: usize,
@@ -64,15 +64,17 @@ pub(crate) struct PlainCarrier {
 impl PlainCarrier {
     /// Validate payload-only carriers and adaptations containing flags, an
     /// optional PCR and stuffing. Charge the incremental path's fields/bytes.
-    pub(crate) fn inspect_ts188(
+    pub(crate) fn inspect(
         source: &Bytes,
+        format: PacketFormat,
         source_offset: u64,
         work: &mut WorkBudget,
     ) -> Option<Self> {
-        let data = source.as_ref();
-        if data.len() != TS188_BYTES || source_offset.checked_add(TS188_BYTES as u64).is_none() {
+        let width = format.bytes();
+        if source.len() != width || source_offset.checked_add(width as u64).is_none() {
             return None;
         }
+        let data = &source.as_ref()[format.prefix_bytes()..];
         let header = CarrierHeader::parse(data).ok()?;
         let (payload_start, flags, pcr, charge) = match header.afc {
             1 => (4, None, None, 2),
@@ -117,13 +119,16 @@ impl PlainCarrier {
     pub(crate) fn into_packet(
         self,
         source: Bytes,
+        format: PacketFormat,
         source_offset: u64,
         source_id: Option<SourceId>,
     ) -> Result<TransportPacket> {
-        let payload = source.slice(self.payload_start..188)?;
+        let sync = format.prefix_bytes();
+        let payload_start = sync + self.payload_start;
+        let payload = source.slice(payload_start..format.bytes())?;
         let adaptation = if let Some(flags) = self.flags {
             Some(Adaptation {
-                source: source.slice(4..self.payload_start)?,
+                source: source.slice(sync + 4..payload_start)?,
                 discontinuity: flags & 128 != 0,
                 random_access_indicator: flags & 64 != 0,
                 elementary_priority: flags & 32 != 0,
@@ -136,11 +141,16 @@ impl PlainCarrier {
         } else {
             None
         };
+        let prefix = if sync == 0 {
+            None
+        } else {
+            Some(source.slice(0..sync)?)
+        };
         Ok(TransportPacket {
             source,
             source_offset,
             source_id,
-            prefix: None,
+            prefix,
             pid: self.header.pid,
             payload_unit_start: self.header.pusi,
             transport_priority: self.header.priority,
@@ -150,9 +160,9 @@ impl PlainCarrier {
             adaptation,
             payload: Some(payload),
             payload_source_offset: source_offset
-                .checked_add(self.payload_start as u64)
+                .checked_add(payload_start as u64)
                 .ok_or(Error::Overflow)?,
-            sync: 0,
+            sync,
             pcr_range: self.pcr.map(|_| 6..12),
         })
     }
@@ -184,9 +194,75 @@ impl PlainContinuation {
         self.layout.into_packet(
             self.source
                 .ok_or(Error::Invalid("missing continuation source"))?,
+            PacketFormat::Ts188,
             self.offset,
             self.entity,
         )
+    }
+}
+
+/// The validated transport carrier borrowed during an access-unit read.
+#[derive(Clone, Copy, Debug)]
+pub struct TransportObservation<'a>(ObservedTransport<'a>);
+
+#[derive(Clone, Copy, Debug)]
+enum ObservedTransport<'a> {
+    Packet(&'a TransportPacket),
+    Continuation(&'a PlainContinuation, &'a Bytes),
+}
+
+impl<'a> TransportObservation<'a> {
+    pub(crate) fn continuation(carrier: &'a PlainContinuation, source: &'a Bytes) -> Self {
+        Self(ObservedTransport::Continuation(carrier, source))
+    }
+
+    pub fn pid(self) -> u16 {
+        match self.0 {
+            ObservedTransport::Packet(packet) => packet.pid,
+            ObservedTransport::Continuation(carrier, _) => carrier.pid(),
+        }
+    }
+
+    pub fn source_location(self) -> Option<SourceLocation> {
+        match self.0 {
+            ObservedTransport::Packet(packet) => packet.source_id.map(|source| SourceLocation {
+                source,
+                offset: packet.source_offset,
+            }),
+            ObservedTransport::Continuation(carrier, _) => {
+                carrier.entity.map(|source| SourceLocation {
+                    source,
+                    offset: carrier.offset,
+                })
+            }
+        }
+    }
+
+    /// The entire wire carrier, including any format prefix and adaptation bytes.
+    pub fn source_bytes(self) -> &'a [u8] {
+        match self.0 {
+            ObservedTransport::Packet(packet) => packet.source.as_ref(),
+            ObservedTransport::Continuation(_, source) => source.as_ref(),
+        }
+    }
+
+    /// Keep a complete carrier with the original shared backing storage.
+    pub fn to_packet(self) -> Result<TransportPacket> {
+        match self.0 {
+            ObservedTransport::Packet(packet) => Ok(packet.clone()),
+            ObservedTransport::Continuation(carrier, source) => carrier.layout.into_packet(
+                source.clone(),
+                PacketFormat::Ts188,
+                carrier.offset,
+                carrier.entity,
+            ),
+        }
+    }
+}
+
+impl<'a> From<&'a TransportPacket> for TransportObservation<'a> {
+    fn from(packet: &'a TransportPacket) -> Self {
+        Self(ObservedTransport::Packet(packet))
     }
 }
 
@@ -220,10 +296,6 @@ pub struct RejectedTransport {
     error: Error,
     secondary: Option<Error>,
     complete_check: bool,
-    #[cfg_attr(
-        not(feature = "reference-trace"),
-        allow(dead_code, reason = "read only by the recovery projection")
-    )]
     envelope: Envelope,
 }
 impl RejectedTransport {
@@ -258,7 +330,6 @@ impl RejectedTransport {
             bytes: self.bytes.len(),
         })
     }
-    #[cfg(feature = "reference-trace")]
     pub(crate) fn envelope(&self) -> &Envelope {
         &self.envelope
     }
@@ -754,7 +825,7 @@ mod tests {
     fn assert_fallback(bytes: &Bytes, offset: u64) {
         for units in [0, 1, 9, 4096] {
             let mut work = WorkBudget::new(units);
-            assert!(PlainCarrier::inspect_ts188(bytes, offset, &mut work).is_none());
+            assert!(PlainCarrier::inspect(bytes, PacketFormat::Ts188, offset, &mut work).is_none());
             assert_eq!(work.spent(), 0);
         }
     }
@@ -782,16 +853,31 @@ mod tests {
                             let charge = 10 + stuffing as u64;
                             for units in [0, 1, charge - 1, charge, charge + 1] {
                                 let mut work = WorkBudget::new(units);
-                                let result = PlainCarrier::inspect_ts188(&bytes, offset, &mut work);
+                                let result = PlainCarrier::inspect(
+                                    &bytes,
+                                    PacketFormat::Ts188,
+                                    offset,
+                                    &mut work,
+                                );
                                 assert_eq!(result.is_some(), units >= charge);
                                 assert_eq!(work.spent(), if units >= charge { charge } else { 0 });
                             }
                             let mut work = WorkBudget::new(charge);
-                            let plain =
-                                PlainCarrier::inspect_ts188(&bytes, offset, &mut work).unwrap();
+                            let plain = PlainCarrier::inspect(
+                                &bytes,
+                                PacketFormat::Ts188,
+                                offset,
+                                &mut work,
+                            )
+                            .unwrap();
                             assert!(!plain.is_plain_continuation());
                             let fast = plain
-                                .into_packet(bytes.clone(), offset, Some(SourceId(7)))
+                                .into_packet(
+                                    bytes.clone(),
+                                    PacketFormat::Ts188,
+                                    offset,
+                                    Some(SourceId(7)),
+                                )
                                 .unwrap();
                             assert_eq!(
                                 fast.adaptation.as_ref().unwrap().pcr,
@@ -905,6 +991,33 @@ mod tests {
     }
 
     #[test]
+    fn plain_m2ts_keeps_prefix_and_pcr_ranges() {
+        let pool = Budget::new(8192).unwrap();
+        let format = PacketFormat::M2ts192;
+        let mut wire = [0; 192];
+        wire[..4].copy_from_slice(&[0x47, 0x10, 0x80, 0x01]);
+        wire[4..].copy_from_slice(&pcr_carrier(90000, 15, 31, 0x40));
+        let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+        let source = Some(SourceId(7));
+        let offset = 192;
+        let mut fast_work = WorkBudget::new(4096);
+        let fast = PlainCarrier::inspect(&bytes, format, offset, &mut fast_work)
+            .unwrap()
+            .into_packet(bytes.clone(), format, offset, source)
+            .unwrap();
+        let mut slow_work = WorkBudget::new(4096);
+        let mut inspector = TransportInspector::detached(bytes, format, offset, source).unwrap();
+        let AssemblyStep::Output(TransportInspection::Accepted(slow)) = inspector
+            .poll(&mut slow_work, &AtomicBool::new(false))
+            .unwrap()
+        else {
+            panic!("expected a valid M2TS carrier");
+        };
+        assert_eq!(fast_work.spent(), slow_work.spent());
+        assert_same_packet(&fast, &slow);
+    }
+
+    #[test]
     fn plain_adaptation_matches_incremental_work_fields_and_payload() {
         let pool = Budget::new(8192).unwrap();
         let mut wire = [0xff; 188];
@@ -913,8 +1026,11 @@ mod tests {
         let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
         let source = Some(SourceId(7));
         let mut fast_work = WorkBudget::new(4096);
-        let plain = PlainCarrier::inspect_ts188(&bytes, 188, &mut fast_work).unwrap();
-        let fast = plain.into_packet(bytes.clone(), 188, source).unwrap();
+        let plain =
+            PlainCarrier::inspect(&bytes, PacketFormat::Ts188, 188, &mut fast_work).unwrap();
+        let fast = plain
+            .into_packet(bytes.clone(), PacketFormat::Ts188, 188, source)
+            .unwrap();
         let mut slow_work = WorkBudget::new(4096);
         let mut inspector =
             TransportInspector::detached(bytes, PacketFormat::Ts188, 188, source).unwrap();
@@ -944,7 +1060,7 @@ mod tests {
         wire[104] = 0;
         let malformed = Bytes::copy_from_slice(&pool, &wire).unwrap();
         let mut work = WorkBudget::new(4096);
-        assert!(PlainCarrier::inspect_ts188(&malformed, 0, &mut work).is_none());
+        assert!(PlainCarrier::inspect(&malformed, PacketFormat::Ts188, 0, &mut work).is_none());
         assert_eq!(work.spent(), 0);
     }
 }

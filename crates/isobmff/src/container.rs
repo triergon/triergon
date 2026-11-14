@@ -35,14 +35,14 @@ use triergon_core::{
 };
 
 /// The one mapping from a track handler and sample entry code. `raw ` needs the
-/// handler, and `mp4a` needs its stated object type (ISO/IEC 14496-1
-/// objectTypeIndication; 0xDD is the private value FFmpeg reads as Vorbis):
-/// without one it stays [`CodecId::Other`].
+/// handler, and `mp4a` and `mp4s` need their stated object type (ISO/IEC 14496-1
+/// objectTypeIndication; 0xDD is the private value FFmpeg reads as Vorbis, 0xE0
+/// the one it reads as VobSub): without one they stay [`CodecId::Other`].
 fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>) -> CodecId<'a> {
     match (handler, format) {
         (b"vide", b"avc1" | b"avc3") => CodecId::H264,
-        (b"vide", b"hvc1" | b"hev1") => CodecId::Hevc,
-        (b"vide", b"av01") => CodecId::Av1,
+        (b"vide", b"hvc1" | b"hev1" | b"dvh1" | b"dvhe") => CodecId::Hevc,
+        (b"vide", b"av01" | b"dav1") => CodecId::Av1,
         (b"vide", b"vp09") => CodecId::Vp9,
         (b"vide", b"raw ") => CodecId::RawVideo,
         (b"soun", b"mp4a") => match object_type {
@@ -61,6 +61,10 @@ fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>)
         (b"soun", b".mp3") => CodecId::MpegAudio,
         (b"soun", b"raw " | b"twos") => CodecId::Pcm,
         (b"sbtl" | b"text" | b"subt", b"tx3g") => CodecId::Tx3g,
+        (b"subp", b"mp4s") => match object_type {
+            Some(0xe0) => CodecId::VobSub,
+            _ => CodecId::Other(format),
+        },
         _ => CodecId::Other(format),
     }
 }
@@ -81,11 +85,13 @@ fn configuration_box(codec: CodecId<'_>) -> Option<[u8; 4]> {
     })
 }
 
-fn media_kind(handler: &[u8; 4]) -> MediaKind {
+/// Classify an `hdlr` handler code without copying or allocating.
+/// Unrecognized handlers remain [`MediaKind::Unknown`].
+pub fn media_kind(handler: &[u8; 4]) -> MediaKind {
     match handler {
         b"vide" => MediaKind::Video,
         b"soun" => MediaKind::Audio,
-        b"sbtl" | b"text" | b"subt" => MediaKind::Subtitle,
+        b"sbtl" | b"text" | b"subt" | b"subp" => MediaKind::Subtitle,
         b"meta" | b"hint" | b"tmcd" => MediaKind::Data,
         _ => MediaKind::Unknown,
     }
@@ -774,7 +780,10 @@ fn entry_scan(
     entry: &SampleDescription,
     limits: &ReaderLimits,
 ) -> (Option<EntryScan>, Configuration) {
-    if (&header.handler, &entry.format) == (b"soun", b"mp4a") {
+    if matches!(
+        (&header.handler, &entry.format),
+        (b"soun", b"mp4a") | (b"subp", b"mp4s")
+    ) {
         let scan = ObjectTypeScan::new(entry, limits.configuration).ok();
         return (scan.map(EntryScan::ObjectType), Configuration::Entry);
     }
@@ -939,7 +948,10 @@ mod tests {
             (b"vide", b"avc3", None, CodecId::H264),
             (b"vide", b"hvc1", None, CodecId::Hevc),
             (b"vide", b"hev1", None, CodecId::Hevc),
+            (b"vide", b"dvh1", None, CodecId::Hevc),
+            (b"vide", b"dvhe", None, CodecId::Hevc),
             (b"vide", b"av01", None, CodecId::Av1),
+            (b"vide", b"dav1", None, CodecId::Av1),
             (b"vide", b"vp09", None, CodecId::Vp9),
             (b"vide", b"raw ", None, CodecId::RawVideo),
             (b"soun", b"mp4a", Some(0x40), CodecId::Aac),
@@ -961,6 +973,7 @@ mod tests {
             (b"sbtl", b"tx3g", None, CodecId::Tx3g),
             (b"text", b"tx3g", None, CodecId::Tx3g),
             (b"subt", b"tx3g", None, CodecId::Tx3g),
+            (b"subp", b"mp4s", Some(0xe0), CodecId::VobSub),
         ] {
             assert_eq!(codec_id(handler, format, object_type), id);
         }
@@ -981,6 +994,8 @@ mod tests {
             (b"vide", b"mp4a", Some(0x40)),
             (b"soun", b"avc1", None),
             (b"meta", b"tx3g", None),
+            (b"subp", b"mp4s", None),
+            (b"subp", b"mp4s", Some(0x40)),
         ] {
             assert_eq!(
                 codec_id(handler, format, object_type),

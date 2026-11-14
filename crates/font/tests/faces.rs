@@ -1,11 +1,11 @@
 mod support;
 
-use support::{bytes, cff_tables, collection, font, truetype_tables};
-use triergon_core::{Budget, Bytes, Error};
+use support::{bytes, cff_tables, cjk_tables, collection, font, truetype_tables};
+use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_font::{
-    Bounds, Built, CharEncoding, CharstringBounds, CmapFormat, ControlBox, FaceInfo, Font, GlyphId,
-    Limits, Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment,
-    Store, StoreKey, Style, select,
+    Bounds, Built, CharEncoding, CharmapKind, CharstringBounds, CmapFormat, ControlBox, FaceInfo,
+    Font, GlyphId, Limits, Load, Orientation, Outline, OutlineFormat, Platform, Point, PointKind,
+    Request, Segment, SizedFont, Store, StoreKey, Style, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -55,11 +55,11 @@ fn truetype_metrics_names_and_charmap() {
     assert_eq!(font.glyph_index('D'), None);
     let charmap = font.text_charmap().unwrap();
     assert_eq!(
-        (charmap.platform(), charmap.encoding(), charmap.format()),
+        (charmap.platform(), charmap.encoding(), charmap.kind()),
         (
             Platform::Windows,
             CharEncoding::Unicode,
-            CmapFormat::SegmentDelta
+            CharmapKind::Subtable(CmapFormat::SegmentDelta)
         )
     );
     assert_eq!(charmap.mappings().count(), 3);
@@ -124,11 +124,9 @@ fn sizes_scale_as_freetype_does_for_libass() {
     assert_eq!(sized.harfbuzz_scale(), (12800, 12800));
     assert_eq!(sized.embolden_strength(), 200);
     assert_eq!(sized.kerning(GlyphId(1), GlyphId(2)), -512);
-    // No bytecode: FreeType would auto-hint, which this crate does not.
-    assert!(matches!(
-        sized.hinted_advance(GlyphId(1)),
-        Err(Error::Unsupported(_))
-    ));
+    // No bytecode: the auto-hinter's advance, here the stem's distance to the
+    // phantom points kept, 80 pixels.
+    assert_eq!(sized.default_advance(GlyphId(1)), Ok(5120));
     let budget = Budget::new(1 << 20).unwrap();
     let mut outline = Outline::new(&budget);
     let metrics = sized.outline_into(GlyphId(1), &mut outline).unwrap();
@@ -154,19 +152,145 @@ fn sizes_scale_as_freetype_does_for_libass() {
         &truetype_tables(400, 0, "ABCDEF+PMingLiU", "Regular"),
     ));
     assert_eq!(
-        tricky.at_size(16384).unwrap().hinted_advance(GlyphId(1)),
+        tricky.at_size(16384).unwrap().default_advance(GlyphId(1)),
         Err(Error::Unsupported(
             "hinted advances of a tricky TrueType font"
         ))
     );
     assert!(face.at_size(-1).is_err());
-    assert!(face.at_size(1).is_err());
+    // No pixels per em: FreeType loads glyphs unscaled and unhinted.
+    let unscaled = face.at_size(0).unwrap();
+    assert_eq!(unscaled.metrics().x_ppem, 0);
+    assert_eq!(unscaled.ascent_descent(), (0, 0));
+    assert_eq!(unscaled.harfbuzz_scale(), (0, 0));
+    let metrics = unscaled.outline_into(GlyphId(1), &mut outline).unwrap();
+    assert_eq!(outline.points()[2].point, Point::new(250, 200));
+    assert_eq!(metrics.advance, 400);
+    assert_eq!(unscaled.default_advance(GlyphId(1)), Ok(400));
+    assert_eq!(face.at_size(1).unwrap().metrics().x_ppem, 0);
 
     let cff = parse(&font(b"OTTO", &cff_tables()));
     let sized = cff.at_size(16384).unwrap();
     // hhea 800 and -200 without OS/2: 410 units are 6717.4 26.6 units, rounded to 105 pixels.
-    assert_eq!(sized.hinted_advance(GlyphId(1)), Ok(6720));
+    assert_eq!(sized.default_advance(GlyphId(1)), Ok(6720));
     assert!(cff.is_postscript());
+}
+
+/// A default load: the outline's points and the metrics as (advance,
+/// vertical advance, bearing x, bearing y, width, height).
+type Loaded = (Vec<(i32, i32)>, [i32; 6]);
+
+/// The default load of `glyph`.
+fn default_load(sized: &SizedFont<'_>, glyph: u16) -> Result<Loaded, Error> {
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut outline = Outline::new(&budget);
+    let mut work = WorkBudget::new(1 << 20);
+    let m = sized.load(GlyphId(glyph), Load::Default, &mut outline, &mut work)?;
+    let points = outline
+        .points()
+        .iter()
+        .map(|p| (p.point.x, p.point.y))
+        .collect();
+    let metrics = [
+        m.advance,
+        m.vertical_advance,
+        m.bearing_x,
+        m.bearing_y,
+        m.width,
+        m.height,
+    ];
+    Ok((points, metrics))
+}
+
+#[test]
+fn auto_hinted_glyphs_follow_freetypes_auto_hinter() {
+    // 'A', 'B' and 'C' map to glyphs 1 to 3: the Latin style, whose blue
+    // zones come from 'C' alone (a top at 120 and a bottom at 0 units). With
+    // no standard character the standard width is 50/2048 em, 24 units.
+    let face = parse(&font(
+        b"\0\x01\0\0",
+        &truetype_tables(400, 0, "Test Sans", "Regular"),
+    ));
+    // 12.8 26.6 units per font unit, 200 pixels per em.
+    let sized = face.at_size(16_384).unwrap();
+    // The square's stem is 200 units, 40 pixels: its edges stay on the
+    // pixels they scale to, the bottom on the bottom zone and the top a
+    // stem's height above it. The vertical advance is the typographic
+    // 1050 units, the scale unadjusted without an x height zone.
+    let (points, metrics) = default_load(&sized, 1).unwrap();
+    assert_eq!(points, [(640, 0), (640, 2560), (3200, 2560), (3200, 0)]);
+    assert_eq!(metrics, [5120, 13440, 640, 2560, 2560, 2560]);
+    assert_eq!(sized.default_vertical_advance(GlyphId(1)), Ok(13440));
+    // The quadratic bump has no vertical edges: its advance is rounded,
+    // its base snaps to the bottom zone and its control point follows.
+    let (points, metrics) = default_load(&sized, 2).unwrap();
+    assert_eq!(points, [(0, 0), (640, 1280), (1280, 0)]);
+    assert_eq!(metrics, [3840, 13440, 0, 1280, 1280, 1280]);
+    // The composite takes the bump's 300-unit advance around the inner
+    // square's stem.
+    assert_eq!(sized.default_advance(GlyphId(3)), Ok(3840));
+    // The empty notdef is no character's: the CJK fallback style, whose
+    // advance is the scaled one and which leaves an outline without points
+    // empty.
+    assert_eq!(sized.default_advance(GlyphId(0)), Ok(6400));
+    assert_eq!(sized.default_vertical_advance(GlyphId(0)), Ok(13440));
+    assert_eq!(
+        default_load(&sized, 0),
+        Ok((Vec::new(), [6400, 13440, 0, 0, 0, 0]))
+    );
+
+    // At 7 pixels per em (scale 27546) the stem, 84/64 pixel, is centred
+    // between pixels: its edges at 21 and 105 move to 48 and 132, and the
+    // standard width is extra light, so the stem keeps its width.
+    let small = face.at_size(538).unwrap();
+    assert_eq!(small.metrics().x_ppem, 7);
+    let (points, metrics) = default_load(&small, 1).unwrap();
+    assert_eq!(points, [(48, 0), (48, 84), (132, 84), (132, 0)]);
+    // The left side bearing, under 24/64 pixel, gets 8/64 less before
+    // rounding: the phantom points round to 0 and 192.
+    assert_eq!(metrics, [192, 448, 0, 128, 192, 128]);
+    assert_eq!(small.default_advance(GlyphId(1)), Ok(192));
+
+    // An italic face is hinted vertically only: x stays scaled and the
+    // advance is the scaled one, rounded.
+    let italic = parse(&font(
+        b"\0\x01\0\0",
+        &truetype_tables(400, 1, "Test Sans", "Italic"),
+    ));
+    let small = italic.at_size(538).unwrap();
+    let (points, metrics) = default_load(&small, 1).unwrap();
+    assert_eq!(points, [(21, 0), (21, 84), (105, 84), (105, 0)]);
+    assert_eq!(metrics, [192, 448, 0, 128, 128, 128]);
+}
+
+#[test]
+fn ideographs_follow_freetypes_cjk_auto_hinter() {
+    let face = parse(&font(b"\0\x01\0\0", &cjk_tables()));
+    // A scale of one 26.6 unit per font unit, 16 pixels per em.
+    let sized = face.at_size(1280).unwrap();
+    assert_eq!(sized.metrics().x_ppem, 16);
+    // The box is the standard character, a stem 180 units wide and 750
+    // tall, and gives both blue zones, each of one value: a top at 730,
+    // fitted to 704, and a bottom at -20, fitted to 0. Its horizontal
+    // edges snap to them; its 180/64 pixel stem becomes 182/64 and,
+    // centred at 109..291, moves 19 up to start on a pixel. The advance is
+    // the scaled one, rounded, as the CJK writing system leaves it.
+    let (points, metrics) = default_load(&sized, 1).unwrap();
+    assert_eq!(points, [(128, 0), (128, 704), (310, 704), (310, 0)]);
+    assert_eq!(metrics, [384, 1024, 128, 704, 192, 704]);
+    assert_eq!(sized.default_advance(GlyphId(1)), Ok(384));
+    assert_eq!(sized.default_vertical_advance(GlyphId(1)), Ok(1024));
+    // The empty notdef takes the CJK fallback style.
+    assert_eq!(
+        default_load(&sized, 0),
+        Ok((Vec::new(), [512, 1024, 0, 0, 0, 0]))
+    );
+    // The Indic writing system is not ported; its advances are.
+    assert_eq!(
+        default_load(&sized, 2),
+        Err(Error::Unsupported("the Indic auto-hinter"))
+    );
+    assert_eq!(sized.default_advance(GlyphId(2)), Ok(384));
 }
 
 #[test]
@@ -191,10 +315,11 @@ fn cff_charstrings_with_subroutines_hints_and_flex() {
 
 #[test]
 fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
+    let work = || WorkBudget::new(1 << 20);
     let cff = parse(&font(b"OTTO", &cff_tables()));
     let unit = |v: i32| v << 16;
     assert_eq!(
-        cff.control_box(GlyphId(1)),
+        cff.control_box(GlyphId(1), &mut work()),
         Ok(ControlBox::Charstring(CharstringBounds {
             x_min: unit(50),
             y_min: 0,
@@ -202,7 +327,7 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
             y_max: unit(100),
         }))
     );
-    let Ok(ControlBox::Charstring(curve)) = cff.control_box(GlyphId(2)) else {
+    let Ok(ControlBox::Charstring(curve)) = cff.control_box(GlyphId(2), &mut work()) else {
         panic!("glyph 2 draws a curve");
     };
     let (points, _, _) = points(&cff, 2);
@@ -222,15 +347,18 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
         Err(Error::Policy(_))
     ));
     assert_eq!(
-        cff.control_box(GlyphId(2)),
+        cff.control_box(GlyphId(2), &mut work()),
         Ok(ControlBox::Charstring(curve))
     );
 
     let tables = truetype_tables(400, 0, "Test Sans", "Regular");
     let truetype = parse(&font(b"\0\x01\0\0", &tables));
-    assert_eq!(truetype.control_box(GlyphId(0)), Ok(ControlBox::Empty));
     assert_eq!(
-        truetype.control_box(GlyphId(1)),
+        truetype.control_box(GlyphId(0), &mut work()),
+        Ok(ControlBox::Empty)
+    );
+    assert_eq!(
+        truetype.control_box(GlyphId(1), &mut work()),
         Ok(ControlBox::Glyf(Bounds {
             x_min: 100,
             y_min: 0,
@@ -240,7 +368,7 @@ fn control_boxes_come_from_glyf_headers_and_unrounded_charstrings() {
     );
     assert_eq!(truetype.side_bearing(GlyphId(1)), Ok(50));
     assert!(matches!(
-        truetype.control_box(GlyphId(4)),
+        truetype.control_box(GlyphId(4), &mut work()),
         Err(Error::Invalid(_))
     ));
 }
@@ -301,7 +429,7 @@ fn collections_select_faces_and_matching_scores_styles() {
     };
     assert_eq!(select(&faces, &any_slant), Some(2));
     let needs_c = Request {
-        character: Some('C'),
+        character: Some(u32::from('C')),
         ..request("Test Sans", 0, 0)
     };
     assert_eq!(select(&faces[3..], &needs_c), None);
@@ -398,4 +526,110 @@ fn the_store_shares_parsed_faces() {
         .unwrap();
     assert!(std::sync::Arc::ptr_eq(&a, &b));
     assert!(store.retained_bytes() > 0);
+}
+
+#[test]
+fn vertical_advances_follow_each_way_freetype_reads_them() {
+    let fonts = support::authored_fonts();
+    let (_, data) = fonts
+        .iter()
+        .find(|(name, _)| *name == "authored-vertical.ttc")
+        .unwrap();
+    let (budget, bytes) = bytes(data);
+    let mut outline = Outline::new(&budget);
+    // Per face: whether it has vertical metrics, and each glyph's advance
+    // height in font units.
+    let expected: [(bool, [i32; 5]); 4] = [
+        // 65535, level phantom points, the bump's own, the bump's through
+        // USE_MY_METRICS instead of the composite's 800, and the last record's.
+        (true, [65535, 0, 1500, 1500, 800]),
+        // Made up from the typographic ascender and descender.
+        (false, [1050; 5]),
+        // Two records, counted by the bytes after a short `vhea`.
+        (true, [1000, 900, 900, 900, 900]),
+        // `VHEA` and `VMTX`.
+        (true, [65535, 0, 1500, 1500, 1500]),
+    ];
+    for (index, (vertical, advances)) in expected.into_iter().enumerate() {
+        let font = Font::new(bytes.clone(), index as u32, &budget, Limits::default()).unwrap();
+        assert_eq!(font.has_vertical_metrics(), vertical, "face {index}");
+        for (glyph, advance) in advances.into_iter().enumerate() {
+            let metrics = font
+                .outline_into(GlyphId(glyph as u16), &mut outline)
+                .unwrap();
+            assert_eq!(
+                (metrics.vertical_advance, metrics.linear_vertical_advance),
+                (advance, i64::from(advance)),
+                "face {index}, glyph {glyph}"
+            );
+        }
+    }
+    // A `vhea` cut short at the end of the file fails the face.
+    let mut tables = truetype_tables(400, 0, "Test Sans", "Regular");
+    tables.push((*b"vhea", support::vhea(4, false)[..20].to_vec()));
+    let data = font(b"\0\x01\0\0", &tables);
+    let (budget, bytes) = support::bytes(&data);
+    assert!(matches!(
+        Font::new(bytes, 0, &budget, Limits::default()),
+        Err(Error::Invalid(_))
+    ));
+}
+
+#[test]
+fn cff_faces_list_freetype_charmaps_in_its_order() {
+    let data = support::authored_fonts()
+        .into_iter()
+        .find(|(name, _)| *name == "authored-charmaps.otf")
+        .unwrap()
+        .1;
+    let font = parse(&data);
+    let kinds: Vec<_> = font
+        .charmaps()
+        .map(|c| (c.platform(), c.encoding_id(), c.kind()))
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            (
+                Platform::Macintosh,
+                1,
+                CharmapKind::Subtable(CmapFormat::HighByte)
+            ),
+            (
+                Platform::Windows,
+                10,
+                CharmapKind::Subtable(CmapFormat::Mixed)
+            ),
+            (Platform::Windows, 1, CharmapKind::GlyphNames),
+            (Platform::Other(7), 2, CharmapKind::CffEncoding),
+        ]
+    );
+    // libass reads text through the Windows UCS-4 subtable.
+    assert_eq!(font.text_charmap_index(), Some(1));
+    let maps: Vec<Vec<(u32, u16)>> = font
+        .charmaps()
+        .map(|c| {
+            c.mappings()
+                .map(|m| m.map(|(c, g)| (c, g.0)).unwrap())
+                .collect()
+        })
+        .collect();
+    assert_eq!(maps[0], [(0x41, 7), (0x42, 1), (0x8140, 2)]);
+    assert_eq!(maps[1], [(0x42, 8), (0x1_f600, 4)]);
+    // Names: A, B (twice), é and the emoji, space with U+00A0 and Delta
+    // (U+2206) with U+0394 besides; A.swash is a variant of A.
+    let names: Vec<u32> = maps[2].iter().map(|&(c, _)| c).collect();
+    assert_eq!(
+        names,
+        [0x20, 0x41, 0x42, 0xa0, 0xe9, 0x394, 0x2206, 0x1_f600]
+    );
+    let names = font.charmap(2).unwrap();
+    assert_eq!(names.glyph(0x41), Some(GlyphId(1)));
+    assert_eq!(names.glyph(0xe9), Some(GlyphId(3)));
+    assert_eq!(names.glyph(0x394), Some(GlyphId(6)));
+    assert_eq!(
+        maps[3],
+        [(0x80, 1), (0x81, 2), (0x82, 3), (0x83, 4), (0xc0, 9)]
+    );
+    assert_eq!(names.encoding(), CharEncoding::Unicode);
 }

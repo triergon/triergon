@@ -2,7 +2,7 @@
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
-use triergon_font::{Band, Charmap, Outline, PointKind, SizeMetrics, SizedFont};
+use triergon_font::{Band, Charmap, GlyphMetrics, Outline, PointKind, SizeMetrics, SizedFont};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 
 /// What one size reports besides its glyphs.
@@ -128,6 +128,19 @@ pub enum Record<'a> {
         index: u16,
         advance: Option<i32>,
     },
+    /// The vertical advances of the unhinted load and of the default load;
+    /// `None` where the glyph cannot be loaded.
+    Vertical {
+        index: u16,
+        unhinted: Option<GlyphMetrics>,
+        hinted: Option<i32>,
+    },
+    /// The default-load metrics and outline; `None` when the glyph cannot be
+    /// loaded.
+    Default {
+        index: u16,
+        loaded: Option<(GlyphMetrics, &'a Outline)>,
+    },
 }
 
 /// Consumes the records of one operation.
@@ -156,6 +169,8 @@ const SIZE_ERROR: u64 = 22;
 const SCALED_GLYPH: u64 = 23;
 const STYLED: u64 = 24;
 const HINTED: u64 = 25;
+const VERTICAL: u64 = 26;
+const DEFAULT: u64 = 27;
 const ABSENT: u64 = u64::MAX;
 
 const fn point_tag(kind: PointKind) -> u8 {
@@ -196,7 +211,8 @@ impl Work {
                 tag,
                 c.platform().id().into(),
                 c.encoding_id().into(),
-                c.format().number().into(),
+                // FreeType's `FT_Get_CMap_Format`: -1 for a charmap it adds.
+                signed(c.kind().format_number().map_or(-1, i64::from)),
             ]),
             None => self.words(&[tag, ABSENT]),
         }
@@ -348,6 +364,38 @@ impl Sink for Work {
                 self.words(&[HINTED, index.into(), advance]);
                 self.packets += 1;
             }
+            Record::Vertical {
+                index,
+                unhinted,
+                hinted,
+            } => {
+                let (linear, advance) = unhinted.map_or((ABSENT, ABSENT), |m| {
+                    (
+                        signed(m.linear_vertical_advance),
+                        signed(m.vertical_advance.into()),
+                    )
+                });
+                let hinted = hinted.map_or(ABSENT, |a| signed(a.into()));
+                self.words(&[VERTICAL, index.into(), linear, advance, hinted]);
+                self.packets += 1;
+            }
+            Record::Default { index, loaded } => {
+                self.words(&[DEFAULT, index.into()]);
+                if let Some((m, outline)) = loaded {
+                    self.words(&[
+                        signed(m.advance.into()),
+                        signed(m.vertical_advance.into()),
+                        signed(m.bearing_x.into()),
+                        signed(m.bearing_y.into()),
+                        signed(m.width.into()),
+                        signed(m.height.into()),
+                    ]);
+                    self.outline(outline);
+                } else {
+                    fold(&mut self.digest, ABSENT);
+                    self.packets += 1;
+                }
+            }
         }
         Ok(())
     }
@@ -388,7 +436,7 @@ fn charmap_text(charmap: Option<Charmap<'_>>) -> String {
                 "{} {} {}",
                 c.platform().id(),
                 c.encoding_id(),
-                c.format().number()
+                c.kind().format_number().map_or(-1, i32::from)
             )
         },
     )
@@ -493,6 +541,36 @@ impl<W: Write> Sink for Dump<W> {
             Record::Hinted { index, advance } => match advance {
                 Some(advance) => writeln!(self.0, "hinted {index} {advance}"),
                 None => writeln!(self.0, "hinted {index} error"),
+            },
+            Record::Vertical {
+                index,
+                unhinted,
+                hinted,
+            } => {
+                write!(self.0, "vertical {index}")?;
+                match unhinted {
+                    Some(m) => write!(
+                        self.0,
+                        " {} {}",
+                        m.linear_vertical_advance, m.vertical_advance
+                    )?,
+                    None => write!(self.0, " error")?,
+                }
+                match hinted {
+                    Some(advance) => writeln!(self.0, " {advance}"),
+                    None => writeln!(self.0, " error"),
+                }
+            }
+            Record::Default { index, loaded } => match loaded {
+                Some((m, outline)) => {
+                    write!(
+                        self.0,
+                        "default {index} {} {} {} {} {} {} ",
+                        m.advance, m.vertical_advance, m.bearing_x, m.bearing_y, m.width, m.height
+                    )?;
+                    self.outline(outline)
+                }
+                None => writeln!(self.0, "default {index} error"),
             },
         }
     }

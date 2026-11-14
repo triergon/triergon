@@ -521,6 +521,7 @@ struct Observed {
     inner: ByteSource,
     calls: Arc<Mutex<Vec<Call>>>,
     fail: Arc<AtomicBool>,
+    end: Option<(u64, Arc<AtomicBool>)>,
     sequential: bool,
     next: u64,
     pending: usize,
@@ -551,6 +552,12 @@ impl Source for Observed {
             return Err(C::Invalid(
                 "test sequential source was asked to rewind or skip",
             ));
+        }
+        if let Some((at, release)) = &self.end
+            && r.offset == *at
+            && !release.load(Ordering::Relaxed)
+        {
+            return Ok(SourceReply::Pending);
         }
         let out = self.inner.poll(r, w, c)?;
         if let SourceReply::Data(win) = &out {
@@ -585,6 +592,7 @@ fn observed(
             inner: ByteSource::new(ID, Bytes::copy_from_slice(b, raw).unwrap(), quantum).unwrap(),
             calls: calls.clone(),
             fail: fail.clone(),
+            end: None,
             sequential,
             next: 0,
             pending: 0,
@@ -2247,6 +2255,11 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
     use triergon_playback::av1_bridge::{Av1BridgeSetup, Av1Input};
 
     let mp4_raw = include_bytes!("fixtures/av1/six-frames.mp4");
+    let mut dolby_entry = mp4_raw.to_vec();
+    let table = mp4_raw.windows(4).position(|kind| kind == b"stsd").unwrap();
+    let entry = table + 16; // FullBox fields, entry count and sample entry size.
+    assert_eq!(&dolby_entry[entry..entry + 4], b"av01");
+    dolby_entry[entry..entry + 4].copy_from_slice(b"dav1");
     let webm_raw = include_bytes!("fixtures/av1/six-frames.webm");
     let expected = include_bytes!("fixtures/av1/six-frames.obu");
     let obu_limits = Av1ObuLimits {
@@ -2281,7 +2294,11 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
         panic!("bridge setup stalled");
     };
 
-    for quantum in [7, 4096] {
+    for (mp4_raw, quantum) in [
+        (mp4_raw.as_slice(), 7),
+        (mp4_raw.as_slice(), 4096),
+        (&dolby_entry, 7),
+    ] {
         let (mut mp4, mp4_pool) = mp4(mp4_raw, Mp4View::SourcePhysical, quantum, 3).unwrap();
         let (selected, mkv_pool, _) = probe(webm_raw, quantum, false);
         let engine = Engine::matroska(
@@ -3072,6 +3089,319 @@ fn bounded_timing_accepts_forward_index_with_finite_media() {
 }
 
 #[test]
+fn forward_encoded_edits_keep_aac_preroll_and_trim_in_source_order() {
+    use triergon_playback::progressive::ProgressiveLimits;
+
+    let raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4");
+    let (selected, budget, calls) = probe(raw, 37, true);
+    let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+    run_open(&mut open, 17).unwrap();
+    let mut opened = open.finish().unwrap();
+    let plans = encoded_plans(&mut opened);
+    let limits = PlanLimits::default();
+    let mut index = compat::mov::forward_encoded_edits(&opened.movie, &plans, limits).unwrap();
+    while !index.poll(&mut WorkBudget::new(17), &off()).unwrap() {}
+    let engine = Engine::mp4_native_terminal_v1(
+        opened.input,
+        index.finish().unwrap(),
+        1 << 20,
+        ProgressiveLimits::default(),
+    )
+    .unwrap();
+    let mut player = Player::new_direct(
+        engine,
+        opened.source,
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    let out = collect(&mut player, 17).unwrap();
+    let packets = mp4_packets(&out);
+    assert!(
+        packets
+            .windows(2)
+            .all(|rows| { rows[0].source.sample.range.end <= rows[1].source.sample.range.start })
+    );
+    let audio: Vec<_> = packets
+        .iter()
+        .filter(|packet| packet.configuration.track.handler == *b"soun")
+        .collect();
+    let trim = |packet: &Mp4Packet| {
+        let data = packet.encoded_skip_samples.unwrap();
+        (
+            u32::from_le_bytes(data[..4].try_into().unwrap()),
+            u32::from_le_bytes(data[4..8].try_into().unwrap()),
+        )
+    };
+    assert_eq!(
+        audio.first().unwrap().native.as_ref().unwrap().demux.pts,
+        Some(-1024)
+    );
+    assert_eq!(trim(audio.first().unwrap()), (1024, 0));
+    assert_eq!(trim(audio.last().unwrap()), (0, 949));
+    for packet in packets {
+        let range = &packet.source.sample.range;
+        assert_eq!(
+            packet.source.payload.as_ref(),
+            &raw[range.start as usize..range.end as usize]
+        );
+    }
+    let offsets: Vec<_> = calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|call| {
+            if let Call::Poll(offset) = call {
+                Some(*offset)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(offsets.windows(2).all(|rows| rows[0] < rows[1]));
+    drop(out);
+    drop(player);
+    drop(plans);
+    drop(opened.movie);
+    assert_eq!(budget.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn forward_fragment_edits_keep_source_clocks_and_trim_once() {
+    use triergon_playback::progressive::ProgressiveLimits;
+
+    for raw in [
+        include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").as_slice(),
+        include_bytes!("fixtures/mp4/forward-fragment-aac-late-track.mp4").as_slice(),
+    ] {
+        let (selected, budget, calls) = probe(raw, 37, true);
+        let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+        run_open(&mut open, 17).unwrap();
+        let opened = open.finish().unwrap();
+        let mut index =
+            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+        assert!((0..100_000).any(|_| index.poll(&mut WorkBudget::new(17), &off()).unwrap()));
+        let engine = Engine::mp4_native_terminal_v1(
+            opened.input,
+            index.finish().unwrap(),
+            1 << 20,
+            ProgressiveLimits::default(),
+        )
+        .unwrap();
+        let mut player = Player::new_direct(
+            engine,
+            opened.source,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+        let out = collect(&mut player, 17).unwrap();
+        let packets = mp4_packets(&out);
+        assert_eq!(packets.len(), 21);
+        assert!(
+            packets.windows(2).all(|rows| {
+                rows[0].source.sample.range.end <= rows[1].source.sample.range.start
+            })
+        );
+        let mut audio_count = 0;
+        for packet in packets {
+            let source = &packet.source.sample;
+            let range = &source.range;
+            assert_eq!(
+                packet.source.payload.as_ref(),
+                &raw[range.start as usize..range.end as usize]
+            );
+            if packet.configuration.track.handler == *b"soun" {
+                let expected = 1024 * audio_count;
+                let occurrence = packet.native.as_ref().unwrap();
+                assert_eq!(source.dts_ticks, Some(i128::from(expected)));
+                assert_eq!(occurrence.demux.dts, Some(expected - 1024));
+                assert_eq!(occurrence.demux.pts, Some(expected - 1024));
+                let mut leading_trim = [0; 10];
+                leading_trim[..4].copy_from_slice(&1024u32.to_le_bytes());
+                assert_eq!(
+                    packet.encoded_skip_samples,
+                    (audio_count == 0).then_some(leading_trim)
+                );
+                audio_count += 1;
+            }
+        }
+        assert_eq!(audio_count, 17);
+        let calls = calls.lock().unwrap();
+        let offsets: Vec<_> = calls
+            .iter()
+            .filter_map(|call| match call {
+                Call::Poll(offset) => Some(*offset),
+                _ => None,
+            })
+            .collect();
+        assert!(offsets.windows(2).all(|rows| rows[0] < rows[1]));
+        drop(calls);
+        drop(out);
+        drop(player);
+        drop(opened.movie);
+        assert_eq!(budget.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
+fn forward_fragment_ranges_are_checked_before_initialization_edit_support() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").to_vec();
+    let edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();
+    assert_eq!(&raw[edit + 12..edit + 16], &0u32.to_be_bytes());
+    raw[edit + 12..edit + 16].copy_from_slice(&1u32.to_be_bytes());
+    let index_error = |bytes: &[u8]| {
+        let (selected, _, _) = probe(bytes, 37, true);
+        let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+        run_open(&mut open, 17).unwrap();
+        let opened = open.finish().unwrap();
+        let mut index =
+            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+        for _ in 0..100_000 {
+            match index.poll(&mut WorkBudget::new(17), &off()) {
+                Err(error) => return error,
+                Ok(false) => {}
+                Ok(true) => panic!("the edited source was accepted"),
+            }
+        }
+        panic!("the index did not finish")
+    };
+    assert_eq!(
+        index_error(&raw),
+        C::Unsupported("fragment edit needs open-ended rate-one media")
+    );
+
+    let run = raw.windows(4).position(|kind| kind == b"trun").unwrap();
+    assert_eq!(raw[run + 7] & 1, 1);
+    raw[run + 12..run + 16].copy_from_slice(&0i32.to_be_bytes());
+    assert_eq!(
+        index_error(&raw),
+        C::Invalid("sample outside self-contained mdat")
+    );
+}
+
+#[test]
+fn forward_encoded_edit_drains_samples_outside_the_presentation() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
+    let audio_edit = raw.windows(4).rposition(|kind| kind == b"elst").unwrap();
+    let duration = &mut raw[audio_edit + 12..audio_edit + 16];
+    assert_eq!(duration, &15_435_u32.to_be_bytes());
+    duration.copy_from_slice(&4_410_u32.to_be_bytes());
+
+    for truncate in [0, 11] {
+        let budget = pool();
+        let bytes = &raw[..raw.len() - truncate];
+        let (mut source, _, _) = observed(&budget, bytes, 37, true);
+        let release = Arc::new(AtomicBool::new(false));
+        source.end = Some((bytes.len() as u64, release.clone()));
+        let selected = SelectedInput {
+            input: InputCursor::new(
+                &budget,
+                ID,
+                SourceCapabilities {
+                    length: None,
+                    random_access: false,
+                },
+                4096,
+            )
+            .unwrap(),
+            source: SourceOwner::new(source),
+            format: Format::Mp4,
+        };
+        let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+        run_open(&mut open, 17).unwrap();
+        let mut opened = open.finish().unwrap();
+        let plans = encoded_plans(&mut opened);
+        let mut index =
+            compat::mov::forward_encoded_edits(&opened.movie, &plans, PlanLimits::default())
+                .unwrap();
+        common::run_index(&mut index, 17).unwrap();
+        let prepared = index.finish().unwrap();
+        assert_eq!(prepared.source_rows().len(), 21);
+        assert_eq!(prepared.rows(), 10);
+        let engine = Engine::mp4_native_terminal_v1(
+            opened.input,
+            prepared,
+            1 << 20,
+            progressive::ProgressiveLimits::default(),
+        )
+        .unwrap();
+        let mut player = Player::new_direct(
+            engine,
+            opened.source,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+        let mut output = None;
+        let mut packets = 0;
+        let request = (0..10_000)
+            .find_map(|_| {
+                let progress = player
+                    .read_output(&mut output, &mut WorkBudget::new(17), &off())
+                    .unwrap();
+                if let Some(event) = output.take() {
+                    packets +=
+                        usize::from(matches!(event.event(), RawEvent::Mp4(Mp4Event::Packet(_))));
+                }
+                assert!(!matches!(progress, Progress::Ended));
+                match progress {
+                    Progress::NeedInput(request) if request.offset == bytes.len() as u64 => {
+                        Some(request)
+                    }
+                    _ => None,
+                }
+            })
+            .unwrap();
+        assert_eq!(packets, 10);
+        let Progress::NeedInput(retry) = player
+            .read_output(&mut output, &mut WorkBudget::new(17), &off())
+            .unwrap()
+        else {
+            panic!("expected the pending end request to be retried");
+        };
+        assert_eq!(retry.token, request.token);
+        assert_eq!(retry.offset, request.offset);
+        assert!(output.is_none());
+        release.store(true, Ordering::Relaxed);
+        let result = common::bounded("edited source end", || {
+            let progress = player.read_output(&mut output, &mut WorkBudget::new(17), &off())?;
+            assert!(output.is_none());
+            Ok(matches!(progress, Progress::Ended))
+        });
+        assert_eq!(
+            result,
+            if truncate == 0 {
+                Ok(())
+            } else {
+                Err(C::Truncated)
+            }
+        );
+    }
+}
+
+#[test]
+fn forward_encoded_edit_order_refusal_survives_repeated_poll() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-aac-priming.mp4").to_vec();
+    let audio_offsets = raw.windows(4).rposition(|kind| kind == b"stco").unwrap();
+    // Place the first AAC sample one byte after the first video sample starts.
+    let audio_start = &mut raw[audio_offsets + 12..audio_offsets + 16];
+    assert_eq!(audio_start, &1572_u32.to_be_bytes());
+    audio_start.copy_from_slice(&1749_u32.to_be_bytes());
+
+    let (selected, _, _) = probe(&raw, 37, true);
+    let mut open = Mp4Open::new_progressive(selected, OpenLimits::default()).unwrap();
+    run_open(&mut open, 17).unwrap();
+    let mut opened = open.finish().unwrap();
+    let plans = encoded_plans(&mut opened);
+    let mut index =
+        compat::mov::forward_encoded_edits(&opened.movie, &plans, PlanLimits::default()).unwrap();
+    let expected = C::Unsupported("forward encoded edits revisit media");
+    assert_eq!(common::run_index(&mut index, 17), Err(expected));
+    assert_eq!(index.poll(&mut WorkBudget::new(17), &off()), Err(expected));
+}
+
+#[test]
 fn bounded_timing_range_playback_preserves_packets_and_seeks() {
     use triergon_isobmff::{TimingRunPolicy, TimingRunSurplus};
 
@@ -3177,6 +3507,46 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         drop((resumed, seek, events, player));
         drop(opened.movie);
         assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
+fn range_playback_derives_duration_when_the_movie_header_is_unknown() {
+    let seed = include_bytes!("fixtures/mp4/r-front-stco.mov");
+    let mut short = seed.to_vec();
+    short[52..56].copy_from_slice(&u32::MAX.to_be_bytes());
+    // The version-one fixture widens the same header and keeps all media bytes.
+    let wide = include_bytes!("fixtures/mp4/r-unknown-movie-duration.mov");
+    let mut oversized = wide.to_vec();
+    oversized[60..68].copy_from_slice(&(u64::MAX - 1).to_be_bytes());
+    for (bytes, declared) in [
+        (short.as_slice(), None),
+        (wide.as_slice(), None),
+        (oversized.as_slice(), Some(u64::MAX - 1)),
+    ] {
+        let (opened, _) = open(bytes, 97, 64).unwrap();
+        assert_eq!(opened.movie.header().declared_duration_ticks(), declared);
+        let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+        assert!((0..1000).any(|_| job.poll(&mut WorkBudget::new(16), &off()).unwrap()));
+        let mut player = job
+            .finish(
+                opened.input,
+                opened.source,
+                1 << 20,
+                Selection::All,
+                PlayerPolicy::default(),
+            )
+            .unwrap();
+        assert_eq!(player.duration_us(), 6_000_000);
+        let outputs: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
+        let packets = mp4_packets(&outputs);
+        assert_eq!(packets.len(), 6);
+        for (ordinal, packet) in packets.iter().enumerate() {
+            assert_eq!(
+                packet.native.as_ref().unwrap().demux.dts,
+                Some(ordinal as i64 * 1000)
+            );
+        }
     }
 }
 
@@ -3506,19 +3876,36 @@ fn encoded_range_open(
     mp4_open::OpenedMp4<ByteSource>,
     Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>>,
 ) {
+    let (mut opened, _) = open(raw, 97, 4096).unwrap();
+    let plans = encoded_plans(&mut opened);
+    (opened, plans)
+}
+
+fn encoded_plans<S: triergon_playback::Source>(
+    opened: &mut mp4_open::OpenedMp4<S>,
+) -> Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>> {
     use triergon_isobmff::compat::mov::{
         edits::{EncodedEditContext, EncodedEditJob},
         packets::CursorStatus,
     };
-    let (mut opened, _) = open(raw, 97, 4096).unwrap();
     let cancel = off();
     let mut plans = Vec::new();
     for track in opened.movie.tracks() {
+        if triergon_isobmff::media_kind(&track.header().handler)
+            == triergon_core::container::MediaKind::Data
+        {
+            plans.push(None);
+            continue;
+        }
+        let Some(edits) = track.edits() else {
+            plans.push(None);
+            continue;
+        };
         let configs = range_configs(track, opened.movie.major_brand(), &mut opened.input);
         let mut edit = EncodedEditJob::new_range_playback(
             EncodedEditContext {
                 table: track.table(),
-                edits: track.edits().unwrap(),
+                edits,
                 stream: &configs[0],
                 media_base: track.header().time_base().unwrap(),
                 movie_base: opened.movie.header().time_base().unwrap(),
@@ -3535,7 +3922,203 @@ fn encoded_range_open(
         {}
         plans.push(Some(edit.take(&mut opened.input, &cancel).unwrap()));
     }
-    (opened, plans)
+    plans
+}
+
+const RTP_HINTS: &[u8] = include_bytes!("fixtures/mp4/avc-aac-rtp-hints.mp4");
+
+fn rtp_hints_with_wide_clock() -> Vec<u8> {
+    let mut bytes = RTP_HINTS.to_vec();
+    let (at, _) = bytes
+        .windows(4)
+        .enumerate()
+        .filter(|(_, word)| *word == b"mdhd")
+        .nth(1)
+        .unwrap();
+    assert_eq!(bytes[at + 4], 0); // version 0
+    bytes[at + 16..at + 20].copy_from_slice(&(1_u32 << 31).to_be_bytes());
+    bytes
+}
+
+#[test]
+fn range_media_projection_keeps_packets_and_both_seek_paths() {
+    let (opened, plans) = encoded_range_open(RTP_HINTS);
+    let kinds: Vec<_> = opened
+        .movie
+        .tracks()
+        .iter()
+        .map(|track| track.header().handler)
+        .collect();
+    assert_eq!(kinds, [*b"vide", *b"hint", *b"soun", *b"hint"]);
+    assert!(plans[0].is_some() && plans[1].is_none() && plans[2].is_some() && plans[3].is_none());
+
+    let mut complete =
+        Mp4RangeOpen::new(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
+    let refusal = (0..100_000).find_map(|_| match complete.poll(&mut WorkBudget::new(3), &off()) {
+        Ok(false) => None,
+        Ok(true) => panic!("expected the hint track edit to be refused"),
+        Err(error) => Some(error),
+    });
+    assert_eq!(
+        refusal,
+        Some(C::Unsupported(
+            "native edit reordered/zero-delta/recovery profile"
+        ))
+    );
+    drop(complete);
+
+    let mut projected =
+        Mp4RangeOpen::for_media(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
+    assert!((0..100_000).any(|_| projected.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+    let mut player = projected
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    let startup: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
+    let startup = mp4_packets(&startup);
+    assert_eq!(
+        startup
+            .iter()
+            .filter(|p| p.configuration.track.track_id == 1)
+            .count(),
+        100
+    );
+    assert_eq!(
+        startup
+            .iter()
+            .filter(|p| p.configuration.track.track_id == 2)
+            .count(),
+        189
+    );
+    assert_eq!(startup.len(), 289);
+
+    let seek = |player: &mut Mp4RangePlayer<'_, ByteSource>| {
+        let mut job = player
+            .prepare_seek(Mp4NativeSeekRequest {
+                video: 1,
+                timestamp: 26_880,
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+            })
+            .unwrap();
+        assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+        let mut command = job.finish().unwrap();
+        assert_eq!(command.landing().selected.occurrence.track_id, 1);
+        assert_eq!(command.landing().selected.timestamp, 25_600);
+        assert!(
+            player
+                .apply_seek(&mut command, &mut WorkBudget::new(1), &off())
+                .unwrap()
+        );
+        std::iter::from_fn(|| next_range_output(player)).collect::<Vec<_>>()
+    };
+    let require_source_track_limit = |player: &Mp4RangePlayer<'_, ByteSource>| {
+        let mut limits = triergon_isobmff::compat::mov::seek::SeekLimits::default();
+        limits.index.packets.max_tracks = 2;
+        assert!(matches!(
+            player.prepare_seek(Mp4NativeSeekRequest {
+                video: 1,
+                timestamp: 26_880,
+                limits,
+            }),
+            Err(C::Limit {
+                requested: 4,
+                maximum: 2,
+            })
+        ));
+    };
+    require_source_track_limit(&player);
+    let with_checkpoints = seek(&mut player);
+    require_source_track_limit(&player);
+    assert!(player.discard_seek_checkpoints());
+    require_source_track_limit(&player);
+    let without_checkpoints = seek(&mut player);
+    let with_checkpoints = mp4_packets(&with_checkpoints);
+    let without_checkpoints = mp4_packets(&without_checkpoints);
+    assert!(!with_checkpoints.is_empty());
+    assert_eq!(with_checkpoints.len(), without_checkpoints.len());
+    for (left, right) in with_checkpoints.into_iter().zip(without_checkpoints) {
+        let left_row = left.native.as_ref().unwrap();
+        let right_row = right.native.as_ref().unwrap();
+        assert!(matches!(left_row.track_id, 1 | 2));
+        assert_eq!(left_row.track_id, right_row.track_id);
+        assert_eq!(left_row.demux, right_row.demux);
+        assert_eq!(left_row.source, right_row.source);
+        assert_eq!(left.encoded_skip_samples, right.encoded_skip_samples);
+        assert_eq!(left.source.payload.as_ref(), right.source.payload.as_ref());
+    }
+}
+
+#[test]
+fn range_projection_does_not_admit_a_demux_clock_for_data_tracks() {
+    let raw = rtp_hints_with_wide_clock();
+    let (opened, plans) = encoded_range_open(&raw);
+    assert_eq!(opened.movie.tracks()[1].header().handler, *b"hint");
+    assert_eq!(opened.movie.tracks()[1].header().timescale, 1_u32 << 31);
+    let mut range =
+        Mp4RangeOpen::for_media(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
+    assert!((0..100_000).any(|_| range.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+    let mut player = range
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    assert!(player.discard_seek_checkpoints());
+    let mut seek = player
+        .prepare_seek(Mp4NativeSeekRequest {
+            video: 1,
+            timestamp: 26_880,
+            limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+        })
+        .unwrap();
+    assert!((0..100_000).any(|_| seek.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+    let mut command = seek.finish().unwrap();
+    assert_eq!(command.landing().selected.occurrence.track_id, 1);
+    assert_eq!(command.landing().selected.timestamp, 25_600);
+    assert!(
+        player
+            .apply_seek(&mut command, &mut WorkBudget::new(1), &off())
+            .unwrap()
+    );
+}
+
+#[test]
+fn range_media_projection_checks_excluded_sample_extents() {
+    use triergon_isobmff::{BoxStep, Limits};
+
+    let (opened, _) = open(RTP_HINTS, 97, 4096).unwrap();
+    let hint = &opened.movie.tracks()[1];
+    assert_eq!(hint.header().handler, *b"hint");
+    let mut children = hint.table().raw().children(0, Limits::default()).unwrap();
+    let offset = loop {
+        match children.poll(&mut WorkBudget::new(16)).unwrap() {
+            BoxStep::Box(view) if view.header().kind == *b"stco" => {
+                break view.header().start as usize + usize::from(view.header().header_size) + 8;
+            }
+            BoxStep::Box(_) | BoxStep::Yield => {}
+            BoxStep::End => panic!("hint track has no chunk offsets"),
+        }
+    };
+    let mut invalid = rtp_hints_with_wide_clock();
+    invalid[offset..offset + 4].copy_from_slice(&u32::MAX.to_be_bytes());
+    let (opened, plans) = encoded_range_open(&invalid);
+    let mut projected =
+        Mp4RangeOpen::for_media(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
+    let refusal =
+        (0..100_000).find_map(|_| match projected.poll(&mut WorkBudget::new(3), &off()) {
+            Ok(false) => None,
+            Ok(true) => panic!("an excluded sample exceeds the source extent"),
+            Err(error) => Some(error),
+        });
+    assert_eq!(refusal, Some(C::Invalid("sample outside media extent")));
 }
 
 fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
@@ -3765,6 +4348,161 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                 (Some(pts), Some(pts), 40, flags)
             );
             assert_eq!(packet.encoded_skip_samples, None);
+        }
+    }
+}
+
+#[test]
+fn range_open_releases_seek_restarts_to_read_the_aac_trim() {
+    let mut raw = include_bytes!("fixtures/mp4/forward-fragment-aac-edit.mp4").to_vec();
+    let program = include_bytes!("fixtures/mp4/avc-aac-program.mov");
+    let atom = |data: &[u8], kind: &[u8; 4]| {
+        let at = data.windows(4).rposition(|bytes| bytes == kind).unwrap() - 4;
+        let size = u32::from_be_bytes(data[at..at + 4].try_into().unwrap()) as usize;
+        at..at + size
+    };
+    let esds = atom(&raw, b"esds");
+    let replacement = atom(program, b"esds");
+    let added = u32::try_from(replacement.len() - esds.len()).unwrap();
+    // The fragment data offsets are relative to their moof. Growing the
+    // front movie leaves the fragment payload declarations intact.
+    for kind in [
+        b"moov", b"trak", b"mdia", b"minf", b"stbl", b"stsd", b"mp4a",
+    ] {
+        let range = atom(&raw, kind);
+        assert!(range.start < esds.start && range.end >= esds.end);
+        let size = u32::try_from(range.len()).unwrap() + added;
+        raw[range.start..range.start + 4].copy_from_slice(&size.to_be_bytes());
+    }
+    raw.splice(esds, program[replacement].iter().copied());
+    let (opened, pool) = open(&raw, 97, 4096).unwrap();
+    let cancel = off();
+    let mut index = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    // Record the allocation retained by the open plan and seek restarts.
+    assert!((0..4096).any(|_| index.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
+    let retained = pool.used();
+    drop(index);
+
+    // Hold the rest of the pool once that storage is live, before the
+    // temporary program configuration reserves its element vector.
+    let mut index = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..4096).any(|_| {
+        assert!(!index.poll(&mut WorkBudget::new(1), &cancel).unwrap());
+        pool.used() == retained
+    }));
+    let held = pool.reserve(pool.available()).unwrap();
+    assert!((0..4096).any(|_| index.poll(&mut WorkBudget::new(1), &cancel).unwrap()));
+    drop(held);
+    assert!(
+        pool.used() < retained,
+        "the optional restarts should be released"
+    );
+}
+
+#[test]
+fn range_player_keeps_seek_checkpoints_for_unedited_fragments() {
+    let raw = include_bytes!("fixtures/mp4/avc-aac-quicktime-fragmented.mov");
+    let (opened, _) = open(raw, 97, 4096).unwrap();
+    assert!(opened.movie.tracks().iter().all(|track| {
+        track.edits().is_none()
+            && track.table().sample_count() == 0
+            && !track.fragments().is_empty()
+    }));
+    let cancel = off();
+    let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..1000).any(|_| job.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
+    let mut player = job
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    assert!(player.discard_seek_checkpoints());
+}
+
+#[test]
+fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
+    let seed = include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/avc-opus-edit.mp4");
+    let mut ended = seed.to_vec();
+    for at in [1420, 1508] {
+        ended[at..at + 4].copy_from_slice(&1500_u32.to_be_bytes());
+    }
+    let mut incomplete = seed.to_vec();
+    assert_eq!(&incomplete[2902..2906], &157_u32.to_be_bytes());
+    incomplete[2902..2906].copy_from_slice(&156_u32.to_be_bytes());
+
+    let mut fragmented = include_bytes!("fixtures/mp4/fragmented-avc-aac.mp4").to_vec();
+    // The fragment packet bytes stay opaque. Use the regular Opus sample
+    // description and pad it to the existing entry size.
+    assert_eq!(&fragmented[978..982], b"mp4a");
+    assert_eq!(&seed[1693..1697], b"Opus");
+    fragmented[974..1049].copy_from_slice(&seed[1689..1764]);
+    fragmented[974..978].copy_from_slice(&110_u32.to_be_bytes());
+    fragmented[1049..1053].copy_from_slice(&35_u32.to_be_bytes());
+    fragmented[1053..1057].copy_from_slice(b"free");
+    fragmented[1057..1084].fill(0);
+
+    for (raw, is_fragmented, timestamp) in [
+        (ended.as_slice(), false, 32_000),
+        (incomplete.as_slice(), false, 32_000),
+        (fragmented.as_slice(), true, 12_800),
+    ] {
+        for checkpoints in [true, false] {
+            let (opened, plans) = if is_fragmented {
+                (open(raw, 97, 4096).unwrap().0, Vec::new())
+            } else {
+                encoded_range_open(raw)
+            };
+            let edits = (!is_fragmented).then_some(plans.as_slice());
+            let tracks = opened.movie.tracks();
+            let video = tracks[0].header().track_id;
+            let audio = tracks[1].header().track_id;
+            let mut job = Mp4RangeOpen::new(&opened.movie, edits, PlanLimits::default()).unwrap();
+            let cancel = off();
+            assert!((0..1000).any(|_| job.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
+            let mut player = job
+                .finish(
+                    opened.input,
+                    opened.source,
+                    1 << 20,
+                    Selection::All,
+                    PlayerPolicy::default(),
+                )
+                .unwrap();
+            let first = next_range_output(&mut player).unwrap();
+            if !checkpoints {
+                assert!(player.discard_seek_checkpoints());
+            }
+            let request = Mp4NativeSeekRequest {
+                video,
+                timestamp,
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+            };
+            let error = match player.prepare_seek_with_opus_recovery(request, audio) {
+                Err(error) => error,
+                Ok(mut job) => (0..1000)
+                    .find_map(|_| match job.poll(&mut WorkBudget::new(64), &cancel) {
+                        Err(error) => Some(error),
+                        Ok(false) => None,
+                        Ok(true) => panic!("invalid Opus recovery completed"),
+                    })
+                    .expect("Opus recovery refusal"),
+            };
+            assert!(matches!(error, C::Unsupported(_)), "{error:?}");
+            assert!(player.current(&first));
+            let mut ordinary = player.prepare_seek(request).unwrap();
+            assert!((0..1000).any(|_| ordinary.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
+            let mut command = ordinary.finish().unwrap();
+            assert!(
+                player
+                    .apply_seek(&mut command, &mut WorkBudget::new(4096), &cancel)
+                    .unwrap()
+            );
+            assert!(!player.current(&first));
+            assert!(next_range_output(&mut player).is_some());
         }
     }
 }

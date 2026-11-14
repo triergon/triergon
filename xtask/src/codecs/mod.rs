@@ -2,6 +2,9 @@
 //! comparison, paired timing and memory, and output identities of the codec crates
 //! against the pinned FFmpeg decoders.
 
+mod aac_access_units;
+mod aac_ps_tables;
+mod aac_sources;
 pub mod correctness;
 pub mod equivalence;
 pub mod fuzz;
@@ -14,8 +17,15 @@ use std::path::{Path, PathBuf};
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
+  aac-access-units --out DIR [--record]
+                 prepare the configured AAC-LC workloads and compare every native PCM plane
+  aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
+                 rerun the Parametric Stereo table recovery against the pinned FFmpeg 9.0.2
+                 decoder and write, or with --check compare, the generated PS tables
+  aac-sources --out DIR
+                 author the fixed-layout and indexed-rate AAC-LC sources
   manifest --out M.json LANE=DIR[,DIR...]...
-                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, dts, flac,
+                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
@@ -30,12 +40,12 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  difference lists of reader-differences.json; appends one row per input
                  and view, and writes the observed lists to OUT.differences.json
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
-       [--only ID,...] [--recollect-contaminated LABEL]
-                 paired timing of the decoder workloads (30 pairs, seed 280)
+       [--only ID,...]
+                 paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282)
   memory --candidate W --reference W --workloads F --root R --out DIR
          [--pairs N] [--seed S] [--only ID,...]
                  paired peak heap and total resident peak RSS of the decoder workloads
-                 under the shared observer (30 pairs, seed 282)
+                 under the shared observer (30 pairs, seed 283)
   equivalence --output F [--compare F] [--jobs N]
                  record every decoder output identity; --compare checks an earlier record
   fuzz --lane LANE --output DIR [--rounds N] [--seed N] [--timeout-seconds S] [--only SUBSTR,...]
@@ -119,6 +129,26 @@ pub fn default_jobs() -> usize {
 pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
     let (command, rest) = args.split_first().ok_or(USAGE)?;
     match command.as_str() {
+        "aac-access-units" => {
+            let a = Args::parse(rest, &["out"], &["record"])?;
+            aac_access_units::run(root, &a.path("out")?, a.get("record").is_some())?;
+        }
+        "aac-ps-tables" => {
+            let a = Args::parse(rest, &["ffmpeg", "python", "work"], &["check"])?;
+            return aac_ps_tables::main(
+                root,
+                &aac_ps_tables::Options {
+                    check: a.get("check").is_some(),
+                    ffmpeg: a.get("ffmpeg").map(PathBuf::from),
+                    python: a.get("python").unwrap_or("python3").to_owned(),
+                    work: a.get("work").map(PathBuf::from),
+                },
+            );
+        }
+        "aac-sources" => {
+            let a = Args::parse(rest, &["out"], &[])?;
+            aac_sources::run(root, &a.path("out")?)?;
+        }
         "manifest" => {
             let a = Args::parse(rest, &["out"], &[])?;
             if a.positional.is_empty() {
@@ -217,7 +247,6 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "out",
                     "label",
                     "only",
-                    "recollect-contaminated",
                 ],
                 &[],
             )?;
@@ -231,10 +260,6 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 label: a.required("label")?.to_owned(),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
-                recollect_contaminated: a
-                    .get("recollect-contaminated")
-                    .filter(|o| !o.is_empty())
-                    .map(str::to_owned),
             })?;
         }
         "equivalence" => {

@@ -31,6 +31,9 @@ pub enum Profile {
     /// The Matroska reference plus the H.264 and HEVC decoders, which stream
     /// discovery uses to learn the B-picture delay; the Matroska build is untouched.
     Video,
+    /// The subtitle decoders (PGS, DVB, DVD, teletext through libzvbi, closed
+    /// captions) with the demuxers and video decoders their inputs need.
+    Subtitles,
     /// FFmpeg's default configuration (static libraries, `ffmpeg`, `ffprobe`):
     /// the decoder comparison reference, and the independent decoder and demuxer
     /// of the capture comparison.
@@ -56,6 +59,7 @@ impl Profile {
             Profile::Matroska => ".research/reference",
             Profile::Formats => ".research/reference-formats",
             Profile::Video => ".research/reference-video",
+            Profile::Subtitles => ".research/reference-subtitles",
             Profile::Decode => ".research/reference-decode",
             Profile::Capture => ".research/reference-capture-static",
             Profile::CaptureSmall => ".research/reference-capture-small-static",
@@ -64,7 +68,9 @@ impl Profile {
 
     fn source(self) -> Source {
         match self {
-            Profile::Matroska | Profile::Formats | Profile::Video => Source::Revision,
+            Profile::Matroska | Profile::Formats | Profile::Video | Profile::Subtitles => {
+                Source::Revision
+            }
             Profile::Decode | Profile::Capture | Profile::CaptureSmall => Source::Release,
         }
     }
@@ -74,6 +80,7 @@ impl Profile {
             Profile::Matroska,
             Profile::Formats,
             Profile::Video,
+            Profile::Subtitles,
             Profile::Decode,
             Profile::Capture,
             Profile::CaptureSmall,
@@ -87,6 +94,7 @@ impl Profile {
             Profile::Matroska => "matroska",
             Profile::Formats => "formats",
             Profile::Video => "video",
+            Profile::Subtitles => "subtitles",
             Profile::Decode => "decode",
             Profile::Capture => "capture",
             Profile::CaptureSmall => "capture-small",
@@ -148,7 +156,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             return release(&args);
         }
         Profile::Decode => return release(&DECODE_ARGS),
-        Profile::Matroska | Profile::Formats | Profile::Video => {}
+        Profile::Matroska | Profile::Formats | Profile::Video | Profile::Subtitles => {}
     }
     let mut argv: Vec<String> = [
         "./configure",
@@ -184,6 +192,24 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             .to_owned();
         }
         argv.push("--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata".into());
+    }
+    if profile == Profile::Subtitles {
+        for flag in &mut argv {
+            *flag = match flag.as_str() {
+                "--enable-demuxer=matroska" => {
+                    "--enable-demuxer=matroska,mov,mpegts,mpegps,sup,vobsub,mpegvideo,h264,hevc,scc"
+                }
+                "--enable-decoder=pcm_s16le" => {
+                    "--enable-decoder=pcm_s16le,pgssub,dvdsub,dvbsub,ccaption,libzvbi_teletext,h264,hevc,mpeg2video,mpeg1video"
+                }
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => {
+                    "--enable-parser=h264,hevc,aac,ac3,vorbis,mpegvideo,dvdsub,dvbsub"
+                }
+                other => other,
+            }
+            .to_owned();
+        }
+        argv.push("--enable-libzvbi".into());
     }
     if profile == Profile::Video {
         for flag in &mut argv {
@@ -279,6 +305,19 @@ pub fn prepare(
             .env("GIT_CEILING_DIRECTORIES", &cache);
         command
     };
+    // The teletext decoder links the pinned libzvbi, found through pkg-config.
+    let zvbi = if profile == Profile::Subtitles {
+        Some(zvbi(&cache, jobs, net)?)
+    } else {
+        None
+    };
+    let build = |program: &str| {
+        let mut command = build(program);
+        if let Some(prefix) = &zvbi {
+            command.env("PKG_CONFIG_PATH", prefix.join("lib/pkgconfig"));
+        }
+        command
+    };
     let configured = source.join("config.h").exists();
     if !configured || recorded.as_ref() != Some(&configuration) {
         if configured {
@@ -318,6 +357,20 @@ pub fn prepare(
             ),
         ),
     ];
+    if let Some(prefix) = &zvbi {
+        manifest.push((
+            "zvbi",
+            Value::object([
+                ("version", Value::str(ZVBI_VERSION)),
+                ("archive_sha256", Value::str(ZVBI_SHA256)),
+                (
+                    "configure_argv",
+                    Value::strings(ZVBI_CONFIGURE.iter().map(ToString::to_string)),
+                ),
+                ("prefix", Value::str(prefix.display().to_string())),
+            ]),
+        ));
+    }
     if profile != Profile::Matroska {
         let lib = prefix.join("lib");
         let mut archives = Vec::new();
@@ -347,6 +400,65 @@ pub fn prepare(
     let path = cache.join("build.json");
     crate::corpus::write_json(&path, &Value::object(manifest))?;
     Ok(path.display().to_string())
+}
+
+/// The libzvbi release the subtitles profile's teletext decoder links.
+pub const ZVBI_VERSION: &str = "0.2.46";
+/// SHA-256 of the GitHub source archive of tag `v0.2.46`.
+pub const ZVBI_SHA256: &str = "817a26118e2654155ee761cd39414885986a4315fdb6617af5314090ddfffd10";
+const ZVBI_CONFIGURE: [&str; 11] = [
+    "--enable-static",
+    "--disable-shared",
+    "--without-x",
+    "--without-doxygen",
+    "--disable-v4l",
+    "--disable-dvb",
+    "--disable-bktr",
+    "--disable-proxy",
+    "--disable-nls",
+    "--disable-tests",
+    "--disable-examples",
+];
+
+/// Download (once), hash-check, unpack and build the pinned libzvbi as a static
+/// library under `CACHE/zvbi`; returns that prefix. The source archive carries no
+/// generated `configure`, so the host needs autoconf, automake, libtool and
+/// gettext's autopoint.
+fn zvbi(cache: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, String> {
+    let prefix = cache.join("zvbi");
+    let archive_path = cache.join(format!("zvbi-{ZVBI_VERSION}.tar.gz"));
+    if !archive_path.exists() {
+        let url = format!(
+            "https://codeload.github.com/zapping-vbi/zvbi/tar.gz/refs/tags/v{ZVBI_VERSION}"
+        );
+        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
+        fetch::publish(&archive_path, &data)?;
+    }
+    let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
+    if sha256::hex(&archive) != ZVBI_SHA256 {
+        return Err("Pinned libzvbi archive hash mismatch".into());
+    }
+    let source = cache.join(format!("zvbi-{ZVBI_VERSION}"));
+    if prefix.join("lib/pkgconfig/zvbi-0.2.pc").is_file() {
+        return Ok(prefix);
+    }
+    if !source.exists() {
+        run(Command::new("tar")
+            .arg("-xzf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(cache))?;
+    }
+    run(Command::new("sh").arg("autogen.sh").current_dir(&source))?;
+    run(Command::new("./configure")
+        .arg(format!("--prefix={}", prefix.display()))
+        .args(ZVBI_CONFIGURE)
+        .current_dir(&source))?;
+    run(Command::new("make")
+        .arg(format!("-j{jobs}"))
+        .current_dir(&source))?;
+    run(Command::new("make").arg("install").current_dir(&source))?;
+    Ok(prefix)
 }
 
 /// Download (once), hash-check and unpack the pinned git revision; the unpacked

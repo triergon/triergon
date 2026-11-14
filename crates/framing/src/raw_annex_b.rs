@@ -1,7 +1,7 @@
 //! Ordered access-unit bytes for an Annex B source, without a container clock.
 
 use crate::{
-    Codec, NalFraming, NalHeader, NalReader, NalUnit, ReaderLimits, avc_picture::AvcPictures,
+    Codec, NalFraming, NalHeader, NalReader, NalUnit, ReaderLimits, avc_picture::AvcPictures, hevc,
 };
 use std::{
     ops::Range,
@@ -98,7 +98,7 @@ struct Role {
     random_access: bool,
 }
 
-fn hevc_role(nal: &NalUnit) -> Result<Role> {
+fn hevc_role(nal: &NalUnit, reader: &NalReader) -> Result<Role> {
     let NalHeader::Hevc {
         nal_unit_type,
         layer_id,
@@ -109,13 +109,17 @@ fn hevc_role(nal: &NalUnit) -> Result<Role> {
     };
     // H.265 7.4.2.4.4. Only base-layer NALs choose the access-unit
     // boundary. Every other NAL retains its source bytes in order.
-    let vcl = layer_id == 0 && matches!(nal_unit_type, 0..=9 | 16..=21);
+    let vcl = layer_id == 0 && hevc::is_slice(nal_unit_type);
     let first_slice = vcl && nal.bytes().get(2).ok_or(Error::Truncated)? & 0x80 != 0;
-    let leading = layer_id == 0 && matches!(nal_unit_type, 32..=35 | 39 | 41..=44 | 48..=55);
+    // FFmpeg's parser looks at a NAL unit once a byte after its two-byte
+    // header is in, so a header-only unit that ends the stream begins nothing.
+    let leading = layer_id == 0
+        && hevc::begins_access_unit(nal_unit_type)
+        && (nal.bytes().len() > 2 || nal.facts().trailing_zero_bytes > 0 || !reader.ended());
     Ok(Role {
         vcl,
         begins: first_slice || leading,
-        random_access: first_slice && matches!(nal_unit_type, 16..=21),
+        random_access: first_slice && matches!(nal_unit_type, hevc::BLA_W_LP..=hevc::CRA),
     })
 }
 
@@ -191,6 +195,23 @@ impl RawAnnexBReader {
     pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
         self.healthy()?;
         self.nal.provide_owned(window)
+    }
+
+    /// Consume a borrowed slice that fits wholly inside the current NAL
+    /// payload. If the reader needs to inspect a possible boundary, the caller
+    /// can provide the same slice as a regular input window.
+    pub fn append_payload(
+        &mut self,
+        request: &InputRequest,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        self.healthy()?;
+        if self.pending.is_some() || self.end.is_some() {
+            return Ok(false);
+        }
+        self.nal.append_annex_payload(request, bytes, work, cancel)
     }
 
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
@@ -285,7 +306,7 @@ impl RawAnnexBReader {
                 }
                 let role = match &mut self.avc {
                     Some(pictures) => avc_role(pictures, &pending.nal, self.has_vcl)?,
-                    None => hevc_role(&pending.nal)?,
+                    None => hevc_role(&pending.nal, &self.nal)?,
                 };
                 pending.role = Some(role);
                 role
@@ -359,6 +380,24 @@ impl RawAnnexBReader {
             random_access: std::mem::take(&mut self.random_access),
             nals,
         }
+    }
+
+    /// Mutable buffers and completed NALs held while requesting more input.
+    ///
+    /// Returns an error if input or an unprocessed NAL is buffered.
+    #[doc(hidden)]
+    pub fn input_wait_storage(&self) -> Result<(usize, &[NalUnit])> {
+        if self.pending.is_some() {
+            return Err(Error::Invalid("Annex B reader has an unprocessed NAL"));
+        }
+        let nal_capacity = self.nal.input_wait_buffer_capacity()?;
+        let capacity = self
+            .unit
+            .capacity()
+            .checked_mul(size_of::<NalUnit>())
+            .and_then(|bytes| bytes.checked_add(nal_capacity))
+            .ok_or(Error::Overflow)?;
+        Ok((capacity, self.unit.as_slice()))
     }
 
     pub fn request(&self) -> InputRequest {

@@ -41,8 +41,87 @@ pub fn compiler(root: &Path, search_path: Option<&OsStr>) -> Result<String, Stri
     String::from_utf8(output.stdout).map_err(|e| format!("rustc -vV: {e}"))
 }
 
+/// One `key: value` field of `rustc -vV`.
+fn field<'a>(compiler: &'a str, key: &str) -> Option<&'a str> {
+    compiler
+        .lines()
+        .find_map(|line| line.strip_prefix(key)?.strip_prefix(": "))
+}
+
 fn release(compiler: &str) -> Option<&str> {
-    compiler.lines().find_map(|l| l.strip_prefix("release: "))
+    field(compiler, "release")
+}
+
+fn host_of(compiler: &str) -> Result<&str, String> {
+    field(compiler, "host").ok_or_else(|| "rustc reports no host".to_owned())
+}
+
+/// The gate target on 32-bit ARM: Thumb-2, assuming NEON. The armhf compilers that
+/// build the FFmpeg and libass references emit Thumb-2 by default, while rustup's
+/// 32-bit ARM host toolchain, [`ARM32_HOST`], emits A32 without NEON.
+pub const ARM32_TARGET: &str = "thumbv7neon-unknown-linux-gnueabihf";
+
+/// The host triple of rustup's 32-bit ARM hard-float toolchain, which builds the
+/// tooling there but no worker.
+const ARM32_HOST: &str = "armv7-unknown-linux-gnueabihf";
+
+/// The host triple of the toolchain cargo resolves in the current directory.
+pub fn host() -> Result<&'static str, String> {
+    static HOST: std::sync::OnceLock<Result<String, String>> = std::sync::OnceLock::new();
+    HOST.get_or_init(|| {
+        let compiler = compiler(Path::new("."), None)?;
+        host_of(&compiler).map(str::to_owned)
+    })
+    .as_deref()
+    .map_err(Clone::clone)
+}
+
+/// The target the workers and the tests are compiled for.
+pub fn worker_target() -> Result<&'static str, String> {
+    host().map(target_for)
+}
+
+fn target_for(host: &str) -> &str {
+    if host == ARM32_HOST {
+        ARM32_TARGET
+    } else {
+        host
+    }
+}
+
+/// The `--target` arguments cargo needs to compile for [`worker_target`]; none where
+/// it is the host's, so those builds stay as they are.
+pub fn target_args() -> Result<Vec<String>, String> {
+    host().map(target_arguments)
+}
+
+fn target_arguments(host: &str) -> Vec<String> {
+    let target = target_for(host);
+    if target == host {
+        Vec::new()
+    } else {
+        vec!["--target".to_owned(), target.to_owned()]
+    }
+}
+
+/// Where cargo puts release binaries for [`worker_target`], relative to its target
+/// directory.
+pub fn release_subdir() -> Result<String, String> {
+    host().map(release_path)
+}
+
+fn release_path(host: &str) -> String {
+    let target = target_for(host);
+    if target == host {
+        "release".to_owned()
+    } else {
+        format!("{target}/release")
+    }
+}
+
+/// Where the workers are, relative to the repository root.
+pub fn release_dir() -> Result<String, String> {
+    Ok(format!("target/{}", release_subdir()?))
 }
 
 /// Whether an environment variable changes how cargo compiles a worker.
@@ -324,6 +403,40 @@ mod tests {
     use super::*;
 
     const PIN: &str = "1.99.1";
+
+    #[test]
+    fn the_host_is_read_from_rustc_or_refused() {
+        let version = "rustc 1.99.1\nbinary: rustc\nhost: aarch64-apple-darwin\nrelease: 1.99.1\n";
+        assert_eq!(host_of(version), Ok("aarch64-apple-darwin"));
+        assert_eq!(release(version), Some("1.99.1"));
+        assert_eq!(
+            host_of("rustc 1.99.1\nrelease: 1.99.1\n"),
+            Err("rustc reports no host".to_owned())
+        );
+        assert_eq!(field("hostname: x\n", "host"), None);
+    }
+
+    #[test]
+    fn workers_compile_for_thumb2_on_32_bit_arm_and_for_the_host_elsewhere() {
+        assert_eq!(target_for(ARM32_HOST), ARM32_TARGET);
+        assert_eq!(
+            target_arguments(ARM32_HOST),
+            ["--target", "thumbv7neon-unknown-linux-gnueabihf"]
+        );
+        assert_eq!(
+            release_path(ARM32_HOST),
+            "thumbv7neon-unknown-linux-gnueabihf/release"
+        );
+        for host in [
+            "aarch64-unknown-linux-gnu",
+            "aarch64-apple-darwin",
+            "x86_64-unknown-linux-gnu",
+        ] {
+            assert_eq!(target_for(host), host);
+            assert!(target_arguments(host).is_empty());
+            assert_eq!(release_path(host), "release");
+        }
+    }
 
     /// A record of the gate build with one field replaced.
     fn record(key: &str, value: Option<Value>) -> Value {

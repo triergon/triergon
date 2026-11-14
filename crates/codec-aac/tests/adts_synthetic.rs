@@ -1,6 +1,8 @@
 //! Self-contained ADTS tests with synthetic (self-authored) bitstreams.
 use triergon_codec::Budget;
-use triergon_codec_aac::{AudioFrame, DecodeError, Decoder, Feature, Limits, Speaker};
+use triergon_codec_aac::{
+    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcDecoder, Speaker,
+};
 
 struct Bw {
     bits: Vec<u8>,
@@ -98,6 +100,325 @@ fn block(cpe: bool) -> Vec<u8> {
     let mut w = Bw::new();
     silent_block(&mut w, cpe);
     w.bytes()
+}
+
+#[test]
+fn an_explicit_container_edit_supersedes_the_adts_delay_signature() {
+    let mut bits = Bw::new();
+    bits.put(6, 3); // ID_FIL
+    bits.put(15, 4);
+    bits.put(1, 8); // escape count, 15 + 1 - 1
+    bits.put(0, 4); // EXT_FILL
+    bits.put(0, 13);
+    for byte in b"libfaac 1.23" {
+        bits.put(u32::from(*byte), 8);
+    }
+    bits.put(0, 7); // remainder of the fill element
+    silent_block(&mut bits, false);
+    let packet = adts(1, 3, 1, &[bits.bytes()], false);
+
+    let mut pcm = AudioFrame::default();
+    Decoder::new().decode(&packet, &mut pcm).unwrap();
+    assert_eq!(pcm.samples_per_channel, 0);
+
+    let mut decoder =
+        Decoder::new().with_priming_policy(triergon_codec_aac::compat::priming::Policy::Container);
+    decoder.decode(&packet, &mut pcm).unwrap();
+    assert_eq!((pcm.sample_rate, pcm.samples_per_channel), (48_000, 1024));
+    decoder.reset();
+    decoder.decode(&packet, &mut pcm).unwrap();
+    assert_eq!(pcm.samples_per_channel, 1024);
+}
+
+#[test]
+fn raw_fixed_layouts_follow_the_speaker_configuration() {
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight,
+        FrontRightOfCenter, LowFrequency, SideLeft, SideRight, TopFrontLeft, TopFrontRight,
+    };
+    let cases: &[(u8, &[u32], &[Speaker])] = &[
+        (
+            6,
+            &[0, 1, 1, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            7,
+            &[0, 1, 1, 1, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                FrontLeftOfCenter,
+                FrontRightOfCenter,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            11,
+            &[0, 1, 1, 0, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                BackCenter,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            12,
+            &[0, 1, 1, 1, 3],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                BackLeft,
+                BackRight,
+                SideLeft,
+                SideRight,
+            ],
+        ),
+        (
+            14,
+            &[0, 1, 1, 3, 1],
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                SideLeft,
+                SideRight,
+                TopFrontLeft,
+                TopFrontRight,
+            ],
+        ),
+    ];
+    let budget = Budget::new(4 << 20).unwrap();
+    for &(config, elements, speakers) in cases {
+        let mut bits = Bw::new();
+        for (tag, &kind) in elements.iter().enumerate() {
+            bits.put(kind, 3);
+            bits.put(tag as u32, 4);
+            if kind == 1 {
+                bits.put(0, 1); // common_window
+                silent_ics(&mut bits);
+            }
+            silent_ics(&mut bits);
+        }
+        bits.put(7, 3); // END
+        let mut decoder = RawLcDecoder::new_in(4, config, &budget).unwrap();
+        let mut frame = AudioFrame::default();
+        decoder.decode(&bits.bytes(), &mut frame).unwrap();
+        assert_eq!(frame.layout.speakers(), speakers);
+        assert_eq!(
+            (frame.sample_rate, frame.samples_per_channel),
+            (44_100, 1024)
+        );
+    }
+}
+
+#[test]
+fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    assert_eq!(
+        decoder.decode(
+            &vec![0; RawLcDecoder::MAX_ACCESS_UNIT_BYTES + 1],
+            &mut frame
+        ),
+        Err(DecodeError::ResourceLimit("raw AAC access unit"))
+    );
+    let mut packet = block(false);
+    packet.push(0);
+    assert_eq!(
+        decoder.decode(&packet, &mut frame),
+        Err(DecodeError::InvalidData("AAC access unit extent"))
+    );
+    let mut bits = Bw::new();
+    bits.put(6, 3); // FIL
+    bits.put(1, 4); // one byte
+    bits.put(13, 4); // EXT_SBR_DATA
+    bits.put(0, 4);
+    bits.put(7, 3); // END
+    assert_eq!(
+        decoder.decode(&bits.bytes(), &mut frame),
+        Err(DecodeError::Unsupported(Feature::RawSbr))
+    );
+    assert_eq!(frame.samples_per_channel, 0);
+    decoder.decode(&block(false), &mut frame).unwrap();
+    assert_eq!(frame.samples_per_channel, 1024);
+}
+
+#[test]
+fn raw_program_matches_tags_and_keeps_the_container_layout() {
+    let mut program = Bw::new();
+    program_config(&mut program, [&[(false, 2), (false, 9)], &[], &[]], &[]);
+    let program = program.bytes();
+    let budget = Budget::new(4 << 20).unwrap();
+    assert!(RawLcDecoder::with_program_config_in(3, &program, &budget).is_err());
+    let mut decoder = RawLcDecoder::with_program_config_in(4, &program, &budget).unwrap();
+    let packet = |tags: &[u32]| {
+        let mut bits = Bw::new();
+        bits.put(5, 3); // An in-band PCE cannot replace the container program.
+        program_config(&mut bits, [&[(false, 0)], &[], &[]], &[]);
+        for &tag in tags {
+            bits.put(0, 3); // SCE
+            bits.put(tag, 4);
+            if tag == 9 {
+                noise_ics(&mut bits);
+            } else {
+                silent_ics(&mut bits);
+            }
+        }
+        bits.put(7, 3);
+        bits.bytes()
+    };
+    let mut frame = AudioFrame::default();
+    for tags in [&[2][..], &[2, 2], &[2, 3]] {
+        assert!(decoder.decode(&packet(tags), &mut frame).is_err());
+        assert_eq!(frame.samples_per_channel, 0);
+    }
+    decoder.decode(&packet(&[9, 2]), &mut frame).unwrap();
+    assert_eq!(frame.samples_per_channel, 1024);
+    assert_eq!(
+        frame.layout.speakers(),
+        &[Speaker::FrontLeft, Speaker::FrontRight]
+    );
+    assert!(frame.planes[0].iter().all(|&sample| sample == 0.0));
+    assert!(frame.planes[1].iter().any(|&sample| sample != 0.0));
+}
+
+#[test]
+fn raw_program_places_a_rear_pair_of_single_elements() {
+    use Speaker::{BackLeft, BackRight, FrontLeft, FrontRight, SideLeft, SideRight};
+    let mut program = Bw::new();
+    program_config(
+        &mut program,
+        [&[(true, 0)], &[], &[(true, 1), (false, 2), (false, 3)]],
+        &[],
+    );
+    let mut packet = Bw::new();
+    for (kind, tag, noise) in [(1, 0, false), (1, 1, true), (0, 2, true), (0, 3, false)] {
+        packet.put(kind, 3);
+        packet.put(tag, 4);
+        if kind == 1 {
+            packet.put(0, 1);
+            silent_ics(&mut packet);
+        }
+        if noise {
+            noise_ics(&mut packet);
+        } else {
+            silent_ics(&mut packet);
+        }
+    }
+    packet.put(7, 3);
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    decoder.decode(&packet.bytes(), &mut frame).unwrap();
+    assert_eq!(
+        frame.layout.speakers(),
+        &[
+            FrontLeft, FrontRight, BackLeft, BackRight, SideLeft, SideRight
+        ]
+    );
+    let audible: Vec<_> = frame
+        .planes
+        .iter()
+        .map(|plane| plane.iter().any(|&sample| sample != 0.0))
+        .collect();
+    assert_eq!(audible, [false, false, true, false, false, true]);
+}
+
+#[test]
+fn raw_program_uses_only_crc_valid_height_information() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let packet = block(false);
+    for (comment, expected) in [
+        (&[0xac, 0x40, 0xf4][..], Speaker::TopFrontCenter),
+        (&[0xac, 0x40, 0xf5][..], Speaker::FrontCenter),
+        (&[0xac, 0x40][..], Speaker::FrontCenter),
+    ] {
+        let mut program = Bw::new();
+        program_config(&mut program, [&[(false, 0)], &[], &[]], comment);
+        let mut decoder =
+            RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget).unwrap();
+        let mut frame = AudioFrame::default();
+        decoder.decode(&packet, &mut frame).unwrap();
+        assert_eq!(frame.layout.speakers(), &[expected]);
+    }
+}
+
+#[test]
+fn raw_program_refuses_ambiguous_speaker_positions() {
+    let mut program = Bw::new();
+    program_config(
+        &mut program,
+        [
+            &[(false, 0)],
+            &[(true, 0)],
+            &[(true, 1), (false, 1), (false, 2)],
+        ],
+        &[],
+    );
+    let budget = Budget::new(4 << 20).unwrap();
+    assert!(matches!(
+        RawLcDecoder::with_program_config_in(4, &program.bytes(), &budget),
+        Err(DecodeError::Unsupported(Feature::RawProgramLayout))
+    ));
+}
+
+#[test]
+fn raw_output_capacity_is_charged_before_overlap_advances() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut tested = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut reference = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let packet = noise_block(false, false, false);
+    let mut expected = AudioFrame::default();
+    let mut actual = AudioFrame::default();
+    tested.decode(&packet, &mut actual).unwrap();
+    reference.decode(&packet, &mut expected).unwrap();
+    let pressure = budget.reserve(budget.available()).unwrap();
+    let mut larger = AudioFrame {
+        planes: vec![Vec::with_capacity(2048)],
+        ..AudioFrame::default()
+    };
+    assert!(matches!(
+        tested.decode(&packet, &mut larger),
+        Err(DecodeError::Budget(_))
+    ));
+    assert_eq!(larger.samples_per_channel, 0);
+    drop(pressure);
+    tested.decode(&packet, &mut actual).unwrap();
+    reference.decode(&packet, &mut expected).unwrap();
+    assert!(expected.planes[0].iter().any(|&sample| sample != 0.0));
+    assert_eq!(actual.planes, expected.planes);
+}
+
+#[test]
+fn a_truncated_raw_coupling_element_releases_its_charge() {
+    let budget = Budget::new(4 << 20).unwrap();
+    let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    let packet = block(false);
+    decoder.decode(&packet, &mut frame).unwrap();
+    let used = budget.used();
+    assert!(decoder.decode(&[0x40], &mut frame).is_err()); // CCE with no body
+    assert_eq!(budget.used(), used);
+    decoder.decode(&packet, &mut frame).unwrap();
 }
 
 #[test]
@@ -297,22 +618,33 @@ fn noise_ics(w: &mut Bw) {
     w.put(0, 3); // pulse, tns, gain control
 }
 
+fn program_config(w: &mut Bw, groups: [&[(bool, u32)]; 3], comment: &[u8]) {
+    w.put(0, 4); // element_instance_tag
+    w.put(1, 2); // object_type: LC
+    w.put(4, 4); // sampling_frequency_index
+    for group in groups {
+        w.put(group.len() as u32, 4);
+    }
+    w.put(0, 2 + 3 + 4); // LFE, data and coupling elements
+    w.put(0, 3); // no mixdowns
+    for &(pair, tag) in groups.into_iter().flatten() {
+        w.put(u32::from(pair), 1);
+        w.put(tag, 4);
+    }
+    w.align();
+    w.put(comment.len() as u32, 8);
+    for &byte in comment {
+        w.put(u32::from(byte), 8);
+    }
+}
+
 /// A raw data block: optionally a PCE of one front element, then that element (an SCE or a
 /// CPE) of noise, optionally an SBR fill element after it, then END.
 fn noise_block(pce: bool, cpe: bool, sbr: bool) -> Vec<u8> {
     let mut w = Bw::new();
     if pce {
         w.put(5, 3); // ID_PCE
-        w.put(0, 4); // element_instance_tag
-        w.put(1, 2); // object_type: LC
-        w.put(4, 4); // sampling_frequency_index
-        w.put(1, 4); // front elements
-        w.put(0, 4 + 4 + 2 + 3 + 4); // side, back, LFE, data and coupling elements
-        w.put(0, 3); // no mixdowns
-        w.put(cpe as u32, 1);
-        w.put(0, 4); // its tag
-        w.align();
-        w.put(0, 8); // comment_field_bytes
+        program_config(&mut w, [&[(cpe, 0)], &[], &[]], &[]);
     }
     if cpe {
         w.put(1, 3);

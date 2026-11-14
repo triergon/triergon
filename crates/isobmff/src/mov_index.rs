@@ -2,9 +2,11 @@
 //! Original Samples and clock/config/edit provenance travel with every entry.
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
+use crate::mov_cursor::TrackProjection;
 use crate::{
-    BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock, PacketCursor,
-    PacketLimits, PacketOccurrence, ResumePoint,
+    BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
+    OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
+    opus_seek::OpusRecoverySeek,
 };
 use std::{
     ops::Range,
@@ -111,14 +113,14 @@ pub struct IndexCursor<'a> {
     carry: Option<RunCarry>,
     ready: Option<IndexEntry>,
     failed: Option<Error>,
-    recovery_initial_nonkey: bool,
+    allow_initial_nonkey: bool,
     dependency_table: bool,
 }
 impl<'a> IndexCursor<'a> {
     fn from_cursor(
         cursor: PacketCursor<'a>,
         max_entries: u64,
-        recovery_initial_nonkey: bool,
+        allow_initial_nonkey: bool,
         dependency_table: bool,
     ) -> Self {
         Self {
@@ -130,7 +132,7 @@ impl<'a> IndexCursor<'a> {
             carry: None,
             ready: None,
             failed: None,
-            recovery_initial_nonkey,
+            allow_initial_nonkey,
             dependency_table,
         }
     }
@@ -195,12 +197,12 @@ impl<'a> IndexCursor<'a> {
         Ok(Self::from_cursor(
             cursor,
             limits.max_entries,
-            false,
+            plans[0].is_some(),
             plans.iter().flatten().any(|p| p.has_dependency_view()),
         ))
     }
     pub(crate) fn allow_recovery_initial_nonkey(&mut self) {
-        self.recovery_initial_nonkey = true;
+        self.allow_initial_nonkey = true;
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
@@ -262,14 +264,12 @@ impl<'a> IndexCursor<'a> {
                     (
                         Some((previous_fragment, _)),
                         Some(previous),
-                        Some((fragment, current_run, flags)),
+                        Some((fragment, current_run, _)),
                     ) => {
                         fragment > previous_fragment
                             && current_run == 0
                             && previous.source_ordinal.checked_add(1)
                                 == Some(occurrence.source.ordinal)
-                            && previous.flags & 0x400 != 0
-                            && flags & 0x400 != 0
                     }
                     _ => false,
                 };
@@ -295,9 +295,14 @@ impl<'a> IndexCursor<'a> {
                     }
                     _ => false,
                 };
-                if !key
-                    && ((self.next == 0 && !self.recovery_initial_nonkey)
-                        || (run.is_some() && run != self.run && !continued_run && !starts_fragment))
+                let first_fragment_sample =
+                    self.next == 0 && source_run.is_some() && occurrence.source.ordinal == 1;
+                let starts_at_zero = key
+                    || starts_fragment
+                    || first_fragment_sample
+                    || (self.next == 0 && self.allow_initial_nonkey);
+                if !starts_at_zero
+                    && (self.next == 0 || (run.is_some() && run != self.run && !continued_run))
                 {
                     return Err(Error::Unsupported(
                         "native index no-key append distance carry",
@@ -308,14 +313,13 @@ impl<'a> IndexCursor<'a> {
                 // 0,0,1. Keep the last emitted distance, carry it once at an
                 // accepted append boundary, then increment inside that run.
                 // Flag presence alone does not introduce a per-sample lag.
-                let distance =
-                    if key || starts_fragment || (self.next == 0 && self.recovery_initial_nonkey) {
-                        0
-                    } else if run.is_some() && run != self.run {
-                        self.distance
-                    } else {
-                        self.distance.checked_add(1).ok_or(Error::Overflow)?
-                    };
+                let distance = if starts_at_zero {
+                    0
+                } else if run.is_some() && run != self.run {
+                    self.distance
+                } else {
+                    self.distance.checked_add(1).ok_or(Error::Overflow)?
+                };
                 let raw_flag_bits = u8::from(key)
                     | if occurrence.demux.flags & 4 != 0 {
                         2
@@ -389,6 +393,8 @@ pub struct SeekLanding {
     pub selected: IndexEntry,
     pub scanned_entries: u64,
     pub used_first_fallback: bool,
+    /// Decoder preroll when the caller requests source Opus recovery.
+    pub opus_recovery: Option<OpusRecoveryLanding>,
 }
 #[derive(Debug, Clone)]
 struct Context<'a> {
@@ -407,11 +413,13 @@ pub struct SeekJob<'a> {
     context: Context<'a>,
     index: IndexCursor<'a>,
     timestamp: i64,
+    index_timestamp: i128,
     first: Option<IndexEntry>,
     best: Option<IndexEntry>,
     previous: Option<i64>,
     unordered_minimum: Option<i64>,
     scanned: u64,
+    allow_initial_prefix: bool,
     ready: bool,
     failed: Option<Error>,
 }
@@ -481,11 +489,13 @@ impl<'a> SeekJob<'a> {
             context,
             index,
             timestamp,
+            index_timestamp: i128::from(timestamp),
             first: None,
             best: None,
             previous: None,
             unordered_minimum: None,
             scanned: 0,
+            allow_initial_prefix: false,
             ready: false,
             failed: None,
         })
@@ -518,6 +528,19 @@ impl<'a> SeekJob<'a> {
                     if entry.timestamp == i64::MIN {
                         return Err(Error::Unsupported("native seek null index clock"));
                     }
+                    if self.scanned == 0 {
+                        // A fragment seek subtracts the media start from its
+                        // query. A leading empty edit delays index timestamps.
+                        self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
+                        // A secondary track can replay its non-sync prefix.
+                        // The primary needs a preceding key.
+                        if entry.flags & 1 == 0
+                            && (entry.occurrence.source.fragment_flags.is_some()
+                                || self.context.encoded_edits.is_some())
+                        {
+                            self.first = Some(entry.clone());
+                        }
+                    }
                     if self.previous.is_some_and(|prior| entry.timestamp <= prior)
                         || self.unordered_minimum.is_some()
                     {
@@ -532,7 +555,7 @@ impl<'a> SeekJob<'a> {
                         if self.first.is_none() {
                             self.first = Some(entry.clone());
                         }
-                        if entry.timestamp <= self.timestamp {
+                        if i128::from(entry.timestamp) <= self.index_timestamp {
                             self.best = Some(entry);
                         }
                     }
@@ -546,13 +569,18 @@ impl<'a> SeekJob<'a> {
                     // searches stay refused until the demux search is established.
                     if self
                         .unordered_minimum
-                        .is_some_and(|minimum| self.timestamp >= minimum)
+                        .is_some_and(|minimum| self.index_timestamp >= i128::from(minimum))
                     {
                         return Err(Error::Unsupported(
                             "native seek overlapping index clock query",
                         ));
                     }
-                    if self.first.is_none() {
+                    if self.best.is_none()
+                        && self
+                            .first
+                            .as_ref()
+                            .is_none_or(|entry| entry.flags & 1 == 0 && !self.allow_initial_prefix)
+                    {
                         return Err(Error::Unsupported("native seek no observed key fallback"));
                     }
                     self.ready = true;
@@ -581,6 +609,7 @@ impl<'a> SeekJob<'a> {
                 selected,
                 scanned_entries: self.scanned,
                 used_first_fallback,
+                opus_recovery: None,
             },
         })
     }
@@ -710,11 +739,14 @@ pub struct GlobalSeekJob<'a> {
     limits: SeekLimits,
     profile: DemuxProfile,
     encoded_edits: Option<EncodedEdits<'a>>,
+    projection: TrackProjection,
     reference_index: usize,
     reference_base: TimeBase,
     reference: Option<SeekLanding>,
     anchors: BudgetVec<ResumePoint>,
     child: Option<SeekJob<'a>>,
+    opus_track: Option<usize>,
+    opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
     at: usize,
     scanned: u64,
     ready: bool,
@@ -728,6 +760,7 @@ pub struct GlobalSeekPlan<'a> {
     limits: SeekLimits,
     profile: DemuxProfile,
     encoded_edits: Option<EncodedEdits<'a>>,
+    projection: TrackProjection,
     reference: SeekLanding,
     anchors: BudgetVec<ResumePoint>,
 }
@@ -735,6 +768,10 @@ enum GlobalSeekMode<'a> {
     SameBase,
     Rescaled,
     Encoded(EncodedEdits<'a>),
+    Projected {
+        plans: Option<EncodedEdits<'a>>,
+        projection: TrackProjection,
+    },
 }
 impl<'a> GlobalSeekJob<'a> {
     pub fn new_complete_source(
@@ -799,6 +836,31 @@ impl<'a> GlobalSeekJob<'a> {
         )
     }
 
+    /// Plan a rescaled seek for the same track ordinals selected for playback.
+    /// Edit plans are indexed by the complete source track order.
+    pub fn new_projected(
+        pool: &Budget,
+        tracks: &[DemuxTrack<'a>],
+        media: &'a [Range<u64>],
+        reference: (u32, i64),
+        limits: SeekLimits,
+        plans: Option<EncodedEdits<'a>>,
+        include: impl FnMut(usize) -> bool,
+    ) -> Result<Self> {
+        Self::build(
+            pool,
+            tracks,
+            media,
+            reference,
+            limits,
+            DemuxProfile::NoParseNoFillin,
+            GlobalSeekMode::Projected {
+                plans,
+                projection: TrackProjection::new(tracks.len(), include)?,
+            },
+        )
+    }
+
     fn build(
         pool: &Budget,
         tracks: &[DemuxTrack<'a>],
@@ -809,13 +871,14 @@ impl<'a> GlobalSeekJob<'a> {
         mode: GlobalSeekMode<'a>,
     ) -> Result<Self> {
         let (track_id, timestamp) = request;
-        let encoded_edits = match mode {
-            GlobalSeekMode::Encoded(plans) if plans.len() == tracks.len() => Some(plans),
-            GlobalSeekMode::Encoded(_) => {
-                return Err(Error::Invalid("encoded edit track coverage"));
-            }
-            _ => None,
+        let (encoded_edits, projection) = match mode {
+            GlobalSeekMode::Encoded(plans) => (Some(plans), TrackProjection::default()),
+            GlobalSeekMode::Projected { plans, projection } => (plans, projection),
+            _ => (None, TrackProjection::default()),
         };
+        if encoded_edits.is_some_and(|plans| plans.len() != tracks.len()) {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
         let maximum = limits.index.packets.max_tracks.min(64);
         if tracks.len() > maximum {
             return Err(Error::Limit {
@@ -826,6 +889,7 @@ impl<'a> GlobalSeekJob<'a> {
         let reference_index = tracks
             .iter()
             .position(|t| t.track_id == track_id)
+            .filter(|&at| projection.includes(at))
             .ok_or(Error::Invalid("native seek reference track absent"))?;
         let base = MediaClock::from_source(tracks[reference_index].media_base)?.demux_base;
         let mut owned = BudgetVec::new(pool);
@@ -836,11 +900,13 @@ impl<'a> GlobalSeekJob<'a> {
             if tracks[..i].iter().any(|t| t.track_id == track.track_id) {
                 return Err(Error::Invalid("duplicate native seek track"));
             }
-            let track_base = MediaClock::from_source(track.media_base)?.demux_base;
-            if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
-                return Err(Error::Unsupported(
-                    "native global seek unequal timebase rescale",
-                ));
+            if projection.includes(i) {
+                let track_base = MediaClock::from_source(track.media_base)?.demux_base;
+                if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
+                    return Err(Error::Unsupported(
+                        "native global seek unequal timebase rescale",
+                    ));
+                }
             }
             owned.try_push(*track).map_err(|e| e.error)?;
             anchors
@@ -857,11 +923,14 @@ impl<'a> GlobalSeekJob<'a> {
             limits,
             profile,
             encoded_edits,
+            projection,
             reference_index,
             reference_base: base,
             reference: None,
             anchors,
             child: None,
+            opus_track: None,
+            opus_recovery: None,
             at: 0,
             scanned: 0,
             ready: false,
@@ -883,6 +952,31 @@ impl<'a> GlobalSeekJob<'a> {
             encoded_edits: self.encoded_edits.map(|plans| &plans[at..at + 1]),
         }
     }
+    /// Use a secondary regular Opus track's source roll groups for decoder
+    /// recovery. Select this before the seek lands on the reference track.
+    pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
+        if self.reference.is_some() || self.opus_track.is_some() || self.failed.is_some() {
+            return Err(Error::Invalid(
+                "Opus recovery must be selected before the seek",
+            ));
+        }
+        let at = self
+            .tracks
+            .as_slice()
+            .iter()
+            .position(|track| track.track_id == track_id)
+            .filter(|&at| at != self.reference_index && self.projection.includes(at))
+            .ok_or(Error::Invalid("missing secondary Opus track"))?;
+        self.opus_edit(at)?.opus_roll_scope()?;
+        self.opus_track = Some(at);
+        Ok(self)
+    }
+
+    fn opus_edit(&self, at: usize) -> Result<&'a crate::EncodedEditPlan> {
+        self.encoded_edits
+            .and_then(|plans| plans[at].as_ref())
+            .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))
+    }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -900,6 +994,21 @@ impl<'a> GlobalSeekJob<'a> {
             }
             if self.ready {
                 return Ok(BuildStatus::Ready);
+            }
+            if let Some(recovery) = &mut self.opus_recovery {
+                let Some(landing) = recovery.poll(work, cancel)? else {
+                    return Ok(BuildStatus::Yield);
+                };
+                self.anchors.as_mut_slice()[self.at].occurrence = self
+                    .opus_edit(self.at)?
+                    .opus_occurrence(landing.first_sample)?;
+                self.reference
+                    .as_mut()
+                    .expect("Opus recovery follows the reference seek")
+                    .opus_recovery = Some(landing);
+                self.opus_recovery = None;
+                self.at += 1;
+                continue;
             }
             if let Some(child) = &mut self.child {
                 if child.poll(work, cancel)? == BuildStatus::Yield {
@@ -924,11 +1033,25 @@ impl<'a> GlobalSeekJob<'a> {
                 } else {
                     self.at
                 };
-                self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
-                if self.reference.is_none() {
-                    self.reference = Some(landing);
+                if self.opus_track == Some(at) {
+                    let sample = &landing.selected.occurrence.source;
+                    let edit = self.opus_edit(at)?;
+                    if landing.selected.ordinal != edit.opus_occurrence(sample.ordinal)? {
+                        return Err(Error::Invalid("Opus seek occurrence order"));
+                    }
+                    self.opus_recovery = Some(OpusRecoverySeek::new(
+                        &self.pool,
+                        self.tracks.as_slice()[at],
+                        edit.opus_roll_scope()?,
+                        sample,
+                    )?);
                 } else {
-                    self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
+                    self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
+                    if self.reference.is_none() {
+                        self.reference = Some(landing);
+                    } else {
+                        self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
+                    }
                 }
                 continue;
             }
@@ -939,34 +1062,50 @@ impl<'a> GlobalSeekJob<'a> {
                 self.ready = true;
                 return Ok(BuildStatus::Ready);
             }
-            if self.at == self.reference_index {
+            if self.at == self.reference_index || !self.projection.includes(self.at) {
                 self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
                 continue;
             }
-            let timestamp = self
+            let selected = &self
                 .reference
                 .as_ref()
                 .ok_or(Error::Invalid("native reference selection absent"))?
-                .selected
-                .timestamp;
+                .selected;
+            let recovering_opus = self.opus_track == Some(self.at);
             let track = self.tracks.as_slice()[self.at];
             let base = MediaClock::from_source(track.media_base)?.demux_base;
-            let timestamp = if self.reference_base == base {
-                timestamp
+            let timestamp = if recovering_opus {
+                let pts = selected
+                    .occurrence
+                    .demux
+                    .pts
+                    .ok_or(Error::Invalid("missing video landing PTS"))?;
+                self.opus_edit(self.at)?
+                    .opus_seek_timestamp(pts, self.reference_base, base)?
             } else {
-                self.reference_base
-                    .rescale(timestamp, base, Rounding::NearestAway)?
+                let timestamp =
+                    self.reference_base
+                        .rescale(selected.timestamp, base, Rounding::NearestAway)?;
+                match self.encoded_edits.and_then(|plans| plans[self.at].as_ref()) {
+                    Some(edit) => edit.align_seek_timestamp(timestamp, base)?,
+                    None => timestamp,
+                }
             };
-            self.child = Some(SeekJob::build(self.track_context(self.at), timestamp)?);
+            // If a secondary track has no preceding sync sample, replay
+            // its verified non-sync prefix from the beginning.
+            let mut child = SeekJob::build(self.track_context(self.at), timestamp)?;
+            child.allow_initial_prefix = true;
+            self.child = Some(child);
         }
     }
-    pub fn finish(self) -> Result<GlobalSeekPlan<'a>> {
+    pub fn finish(mut self) -> Result<GlobalSeekPlan<'a>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
         if !self.ready {
             return Err(Error::Invalid("native global seek plan not ready"));
         }
+        self.projection.retain(&mut self.anchors);
         Ok(GlobalSeekPlan {
             pool: self.pool,
             tracks: self.tracks,
@@ -974,6 +1113,7 @@ impl<'a> GlobalSeekJob<'a> {
             limits: self.limits,
             profile: self.profile,
             encoded_edits: self.encoded_edits,
+            projection: self.projection,
             reference: self
                 .reference
                 .ok_or(Error::Invalid("native reference selection absent"))?,
@@ -989,8 +1129,17 @@ impl<'a> GlobalSeekPlan<'a> {
         self.anchors.as_slice()
     }
     pub fn cursor(&self) -> Result<PacketCursor<'a>> {
-        if let Some(plans) = self.encoded_edits {
-            return PacketCursor::new_encoded_regular(
+        let cursor = if !self.projection.is_all() {
+            PacketCursor::new_projected(
+                &self.pool,
+                self.tracks.as_slice(),
+                self.media,
+                self.limits.index.packets,
+                self.encoded_edits,
+                |index| self.projection.includes(index),
+            )?
+        } else if let Some(plans) = self.encoded_edits {
+            PacketCursor::new_encoded_regular(
                 &self.pool,
                 self.tracks.as_slice(),
                 self.media,
@@ -998,15 +1147,15 @@ impl<'a> GlobalSeekPlan<'a> {
                 plans,
                 crate::EncodedEditProfile,
             )?
-            .with_resume_points(self.anchors.as_slice(), self.limits.index.packets);
-        }
-        PacketCursor::new_complete_source_at(
-            &self.pool,
-            self.tracks.as_slice(),
-            self.media,
-            self.limits.index.packets,
-            self.profile,
-            self.anchors.as_slice(),
-        )
+        } else {
+            PacketCursor::new_complete_source(
+                &self.pool,
+                self.tracks.as_slice(),
+                self.media,
+                self.limits.index.packets,
+                self.profile,
+            )?
+        };
+        cursor.with_resume_points(self.anchors.as_slice(), self.limits.index.packets)
     }
 }

@@ -1,6 +1,9 @@
-//! Sparse restart states for regular tracks that passed the demux range scan.
+//! Sparse restart states for tracks that passed the demux range scan.
 use super::{PacketCursor, Phase, Slot, count};
-use crate::{BuildStatus, CursorStatus, IndexEntry, SchedulingClock, SeekLanding, SeekLimits};
+use crate::{
+    BuildStatus, CursorStatus, IndexEntry, SchedulingClock, SeekLanding, SeekLimits,
+    opus_seek::OpusRecoverySeek,
+};
 use std::{
     ops::Range,
     sync::{
@@ -13,21 +16,61 @@ use triergon_core::{Budget, BudgetVec, Error, Reservation, Result, Rounding, Wor
 const CHECKPOINT_INTERVAL: u64 = 8192;
 const SHORT_CHECKPOINT_INTERVAL: u64 = 32;
 const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
+const MAX_FRAGMENT_CHECKPOINTS_PER_TRACK: usize = 8;
 const MAX_CHECKPOINTS: usize = 256;
+const EXTRA_CHECKPOINT_LIMIT: usize = MAX_CHECKPOINTS / 2;
 
-#[derive(Clone, Debug)]
+pub(super) fn can_record_by_track(points: usize, budget: &Budget) -> bool {
+    // A growing vector keeps its old allocation until the new one is charged.
+    // Allow for spare capacity and that overlap so early extras cannot crowd
+    // out another track's first restart.
+    const SLOTS_PER_POINT: usize = 4;
+    points <= EXTRA_CHECKPOINT_LIMIT
+        && points * SLOTS_PER_POINT * size_of::<Checkpoint<'_>>() <= budget.available()
+}
+
+pub(super) fn track_checkpoint_bound(slot: &Slot<'_>, last_source_ordinal: u64) -> usize {
+    // The first periodic point is at zero. Fragment extras stop at eight
+    // total points per track, and regular short points stop at four.
+    let extra = if slot.saw_fragment {
+        MAX_FRAGMENT_CHECKPOINTS_PER_TRACK - 1
+    } else if slot.track.edits.is_none() || slot.encoded_edit.is_some() {
+        MAX_SHORT_CHECKPOINTS_PER_TRACK - 1
+    } else {
+        // An edited regular track can repeat source samples.
+        return usize::MAX;
+    };
+    // Validation checked increasing ordinals, so the final ordinal bounds
+    // the number of source samples even when an index starts partway through.
+    usize::try_from(last_source_ordinal.div_ceil(CHECKPOINT_INTERVAL))
+        .unwrap_or(usize::MAX)
+        .saturating_add(extra)
+}
+
+#[derive(Debug)]
 struct Checkpoint<'a> {
     ordinal: u64,
     timestamp: i64,
-    previous_sync: u64,
+    previous_sync: Option<u64>,
     slot: Slot<'a>,
+}
+
+impl Checkpoint<'_> {
+    fn try_clone(&self) -> Result<Self> {
+        Ok(Self {
+            ordinal: self.ordinal,
+            timestamp: self.timestamp,
+            previous_sync: self.previous_sync,
+            slot: self.slot.try_clone()?,
+        })
+    }
 }
 
 #[derive(Debug)]
 struct Track<'a> {
     points: BudgetVec<Checkpoint<'a>>,
     previous: Option<i64>,
-    previous_sync: u64,
+    previous_sync: Option<u64>,
     entries: u64,
 }
 
@@ -54,7 +97,7 @@ impl<'a> Checkpoints<'a> {
                 .try_push(Track {
                     points: BudgetVec::new(budget),
                     previous: None,
-                    previous_sync: 0,
+                    previous_sync: None,
                     entries: 0,
                 })
                 .map_err(|e| e.error)?;
@@ -82,10 +125,19 @@ impl<'a> Checkpoints<'a> {
         } else {
             0
         };
-        // The regular demux index accepts this flag/size/clock profile.
-        // Anything ambiguous stays on the original full seek planner.
+        // A verified regular edit can start with a non-sync sample.
+        // Fragments also permit non-sync starts at their boundaries.
+        if !key && (track.entries == 0 || slot.starts_fragment_run) {
+            let regular_prefix =
+                track.entries == 0 && row.source.ordinal == 1 && slot.encoded_edit.is_some();
+            let fragment_start = row.source.fragment_flags.is_some()
+                && row.source.ordinal == track.entries + 1
+                && (track.entries == 0 || slot.append_run.is_some_and(|(_, run)| run == 0));
+            if !regular_prefix && !fragment_start {
+                return None;
+            }
+        }
         if track.previous.is_some_and(|before| timestamp <= before)
-            || (track.entries == 0 && !key)
             || flags & !admitted != 0
             || row.source.range.start > i64::MAX as u64
             || row.source.range.end.checked_sub(row.source.range.start)? > 0x1fff_ffff
@@ -93,16 +145,31 @@ impl<'a> Checkpoints<'a> {
             return None;
         }
         if key {
-            track.previous_sync = track.entries;
+            track.previous_sync = Some(track.entries);
         }
         // Short regular tracks can use their existing checkpoint capacity
         // for earlier restarts without growing the index.
+        let short_interval = track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL);
         let spare = self.use_spare_capacity
-            && track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
+            && short_interval
             && track.points.len() < track.points.capacity().min(MAX_SHORT_CHECKPOINTS_PER_TRACK);
-        if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) || spare {
+        // Keep nearby restarts for short fragment sequences and denser tracks
+        // such as audio. Limit the extra points so long sources still have room
+        // for the regular interval and can drop extra points under pressure.
+        let periodic = track.entries.is_multiple_of(CHECKPOINT_INTERVAL);
+        let fragment_restart = !periodic
+            && slot.saw_fragment
+            && (short_interval
+                || (slot.starts_fragment_run && slot.append_run.is_some_and(|(_, run)| run == 0)))
+            && self.stored < EXTRA_CHECKPOINT_LIMIT
+            && track.points.len() < MAX_FRAGMENT_CHECKPOINTS_PER_TRACK
+            && track.points.try_reserve(1).is_ok();
+        if periodic || spare || fragment_restart {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
+            }
+            if slot.saw_fragment && track.points.is_empty() {
+                track.points.try_reserve_exact(1).ok()?;
             }
             track
                 .points
@@ -110,7 +177,7 @@ impl<'a> Checkpoints<'a> {
                     ordinal: track.entries,
                     timestamp,
                     previous_sync: track.previous_sync,
-                    slot: slot.clone(),
+                    slot: slot.try_clone().ok()?,
                 })
                 .ok()?;
             self.stored += 1;
@@ -123,18 +190,21 @@ impl<'a> Checkpoints<'a> {
 }
 
 impl<'a> PacketCursor<'a> {
-    /// Collect optional seek restarts as the complete regular range is checked.
+    /// Collect optional seek restarts as the complete range is checked.
     /// The cursor must be exhausted and rewound before using the restarts.
     pub fn enable_range_seek_checkpoints(&mut self) {
-        if matches!(self.phase, Phase::Media)
-            && self.complete_source
-            && !self.front_source
-            && self.limits.max_occurrences <= i32::MAX as u64
-            && self
-                .slots
-                .as_slice()
-                .iter()
-                .all(|slot| slot.resume_remaining == 0 && slot.track.fragments.is_empty())
+        if matches!(self.phase, Phase::Media) && self.complete_source && !self.front_source {
+            self.recording_seek_checkpoints = true;
+        }
+    }
+
+    pub(super) fn initialize_range_seek_checkpoints(&mut self) {
+        self.recording_seek_checkpoints = false;
+        if self.limits.max_occurrences <= i32::MAX as u64
+            && self.slots.as_slice().iter().all(|slot| {
+                slot.resume_remaining == 0
+                    && (slot.track.fragments.is_empty() || slot.track.table.sample_count() == 0)
+            })
         {
             self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.as_slice())
                 .ok()
@@ -178,7 +248,7 @@ impl<'a> PacketCursor<'a> {
             || index.total > limits.index.max_entries
             || index.total > packets.max_occurrences
             || self.validated > packets.max_source_samples
-            || self.slots.len() > packets.max_tracks
+            || self.source_tracks > packets.max_tracks
             || self.media.len() > packets.max_media_extents
             || self.limits.edit.max_occurrences > packets.edit.max_occurrences
             || self.limits.edit.max_scanned_samples > packets.edit.max_scanned_samples
@@ -206,12 +276,15 @@ impl<'a> PacketCursor<'a> {
             slots,
             media: self.media,
             packet_limits: self.limits,
+            source_tracks: self.source_tracks,
             validated: self.validated,
             reference,
             timestamp,
             landing: None,
             at: 0,
             scan: None,
+            opus_track: None,
+            opus_recovery: None,
             skipped: 0,
             maximum_skipped: limits.max_replayed_occurrences,
             failed: None,
@@ -232,20 +305,20 @@ struct TrackSeek<'a> {
     next: u64,
     best: Option<Checkpoint<'a>>,
     cursor: Slot<'a>,
-    previous_sync: u64,
+    previous_sync: Option<u64>,
     fallback: bool,
     search: Search,
 }
 
 impl<'a> TrackSeek<'a> {
-    fn new(points: &[Checkpoint<'a>], target: i64) -> Self {
+    fn new(points: &[Checkpoint<'a>], target: i64) -> Result<Self> {
         let at = points.partition_point(|point| point.timestamp <= target);
         let point = &points[at.saturating_sub(1)];
-        Self {
+        Ok(Self {
             target,
             next: point.ordinal,
-            best: (at == 0).then(|| point.clone()),
-            cursor: point.slot.clone(),
+            best: (at == 0).then(|| point.try_clone()).transpose()?,
+            cursor: point.slot.try_clone()?,
             previous_sync: point.previous_sync,
             fallback: at == 0,
             search: if at == 0 {
@@ -253,21 +326,35 @@ impl<'a> TrackSeek<'a> {
             } else {
                 Search::Forward
             },
-        }
+        })
     }
 
-    fn finish_forward(&mut self, points: &[Checkpoint<'a>]) {
+    fn finish_forward(&mut self, points: &[Checkpoint<'a>]) -> Result<()> {
         if self.best.is_some() {
             self.search = Search::Ready;
-        } else {
+        } else if let Some(previous_sync) = self.previous_sync {
             // The target falls within a long non-key interval. The recorded
             // preceding sync may be in an earlier interval; restart there.
-            let at = points.partition_point(|point| point.ordinal <= self.previous_sync);
-            let point = &points[at - 1];
-            self.cursor = point.slot.clone();
-            self.next = point.ordinal;
-            self.search = Search::PreviousSync;
+            self.restart_at(points, previous_sync)?;
+        } else {
+            self.best = Some(points[0].try_clone()?);
+            self.fallback = true;
+            self.search = Search::Ready;
         }
+        Ok(())
+    }
+
+    fn restart_at(&mut self, points: &[Checkpoint<'a>], ordinal: u64) -> Result<()> {
+        let at = points.partition_point(|point| point.ordinal <= ordinal);
+        let point = &points[at - 1];
+        self.cursor = point
+            .slot
+            .try_clone_with_edit_storage(self.cursor.edited.take())?;
+        self.next = point.ordinal;
+        self.previous_sync = Some(ordinal);
+        self.best = None;
+        self.search = Search::PreviousSync;
+        Ok(())
     }
 
     fn poll(
@@ -284,7 +371,7 @@ impl<'a> TrackSeek<'a> {
                 match self.cursor.fill(work, true, false, false)? {
                     CursorStatus::Yield => return Ok(false),
                     CursorStatus::End if self.search == Search::Forward => {
-                        self.finish_forward(points);
+                        self.finish_forward(points)?;
                         continue;
                     }
                     CursorStatus::End => return Err(Error::Invalid("checked seek lost sync")),
@@ -305,20 +392,21 @@ impl<'a> TrackSeek<'a> {
                 .ok_or(Error::Invalid("checked seek clock missing"))?;
             let key = head.demux.flags & 1 != 0;
             let previous_sync =
-                self.search == Search::PreviousSync && self.next == self.previous_sync;
+                self.search == Search::PreviousSync && self.previous_sync == Some(self.next);
             if self.search == Search::Forward && timestamp > self.target {
-                self.finish_forward(points);
+                self.finish_forward(points)?;
                 continue;
             }
             if previous_sync && !key {
                 return Err(Error::Invalid("checked seek lost sync"));
             }
             if previous_sync || (self.search == Search::Forward && key) {
+                let storage = self.best.take().and_then(|point| point.slot.edited);
                 self.best = Some(Checkpoint {
                     ordinal: self.next,
                     timestamp,
-                    previous_sync: self.next,
-                    slot: self.cursor.clone(),
+                    previous_sync: Some(self.next),
+                    slot: self.cursor.try_clone_with_edit_storage(storage)?,
                 });
                 if previous_sync || timestamp == self.target {
                     self.search = Search::Ready;
@@ -332,25 +420,57 @@ impl<'a> TrackSeek<'a> {
     }
 }
 
-/// Source-bound seek over the sparse regular-track restarts from range open.
+/// Source-bound seek over the sparse track restarts from range open.
 #[derive(Debug)]
 pub struct RangeSeekJob<'a> {
     index: Arc<Checkpoints<'a>>,
     slots: BudgetVec<Slot<'a>>,
     media: &'a [Range<u64>],
     packet_limits: super::PacketLimits,
+    source_tracks: usize,
     validated: u64,
     reference: usize,
     timestamp: i64,
     landing: Option<SeekLanding>,
     at: usize,
     scan: Option<TrackSeek<'a>>,
+    opus_track: Option<usize>,
+    opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
     skipped: u64,
     maximum_skipped: u64,
     failed: Option<Error>,
 }
 
 impl<'a> RangeSeekJob<'a> {
+    /// Use a secondary regular Opus track's source roll groups for decoder
+    /// recovery. Select this before polling the seek.
+    pub fn with_opus_recovery(mut self, track_id: u32) -> Result<Self> {
+        if self.scan.is_some()
+            || self.landing.is_some()
+            || self.opus_track.is_some()
+            || self.failed.is_some()
+        {
+            return Err(Error::Invalid(
+                "Opus recovery must be selected before the seek",
+            ));
+        }
+        let at = self
+            .index
+            .tracks
+            .as_slice()
+            .iter()
+            .position(|track| track.points.as_slice()[0].slot.track.track_id == track_id)
+            .filter(|&at| at != self.reference)
+            .ok_or(Error::Invalid("missing secondary Opus track"))?;
+        self.index.tracks.as_slice()[at].points.as_slice()[0]
+            .slot
+            .encoded_edit
+            .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))?
+            .opus_roll_scope()?;
+        self.opus_track = Some(at);
+        Ok(self)
+    }
+
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -376,9 +496,55 @@ impl<'a> RangeSeekJob<'a> {
                 self.at
             };
             let points = self.index.tracks.as_slice()[at].points.as_slice();
+            if let Some(recovery) = &mut self.opus_recovery {
+                let Some(landing) = recovery.poll(work, cancel)? else {
+                    return Ok(BuildStatus::Yield);
+                };
+                let edit = points[0]
+                    .slot
+                    .encoded_edit
+                    .ok_or(Error::Invalid("missing Opus seek edit"))?;
+                self.scan
+                    .as_mut()
+                    .expect("Opus recovery follows the audio search")
+                    .restart_at(points, edit.opus_occurrence(landing.first_sample)?)?;
+                self.landing
+                    .as_mut()
+                    .expect("Opus recovery follows the reference seek")
+                    .opus_recovery = Some(landing);
+                self.opus_recovery = None;
+                self.opus_track = None;
+                continue;
+            }
             if let Some(scan) = self.scan.as_mut() {
                 if !scan.poll(points, work, cancel)? || !work.try_charge(1) {
                     return Ok(BuildStatus::Yield);
+                }
+                if self.opus_track == Some(at) {
+                    let best = scan
+                        .best
+                        .as_ref()
+                        .ok_or(Error::Invalid("missing Opus seek sample"))?;
+                    let sample = &best
+                        .slot
+                        .head
+                        .as_ref()
+                        .ok_or(Error::Invalid("missing Opus seek sample"))?
+                        .source;
+                    let edit = best
+                        .slot
+                        .encoded_edit
+                        .ok_or(Error::Unsupported("Opus recovery needs an Opus edit"))?;
+                    if best.ordinal != edit.opus_occurrence(sample.ordinal)? {
+                        return Err(Error::Invalid("Opus seek occurrence order"));
+                    }
+                    self.opus_recovery = Some(OpusRecoverySeek::new(
+                        self.slots.budget(),
+                        best.slot.track,
+                        edit.opus_roll_scope()?,
+                        sample,
+                    )?);
+                    continue;
                 }
                 let scan = self.scan.take().expect("polled track seek");
                 self.finish_track(at, scan)?;
@@ -392,20 +558,42 @@ impl<'a> RangeSeekJob<'a> {
                     self.at += 1;
                     continue;
                 }
-                let reference_base = self.slots.as_slice()[0].clock.demux_base;
-                let target_base = points[0].slot.clock.demux_base;
-                reference_base.rescale(
-                    landing.selected.timestamp,
-                    target_base,
-                    Rounding::NearestAway,
-                )?
+                let reference_base = self.slots.as_slice()[0].clock()?.demux_base;
+                let target_base = points[0].slot.clock()?.demux_base;
+                if self.opus_track == Some(at) {
+                    let pts = landing
+                        .selected
+                        .occurrence
+                        .demux
+                        .pts
+                        .ok_or(Error::Invalid("missing video landing PTS"))?;
+                    let edit = points[0]
+                        .slot
+                        .encoded_edit
+                        .ok_or(Error::Invalid("missing Opus seek edit"))?;
+                    edit.opus_seek_timestamp(pts, reference_base, target_base)?
+                } else {
+                    let timestamp = reference_base.rescale(
+                        landing.selected.timestamp,
+                        target_base,
+                        Rounding::NearestAway,
+                    )?;
+                    if let Some(edit) = points[0].slot.encoded_edit {
+                        edit.align_seek_timestamp(timestamp, target_base)?
+                    } else {
+                        timestamp
+                    }
+                }
             } else {
                 self.timestamp
             };
             if target == i64::MIN {
                 return Err(Error::Unsupported("native seek null timestamp argument"));
             }
-            self.scan = Some(TrackSeek::new(points, target));
+            // A query below the signed index range still lands at its first
+            // key. Every checkpoint has a defined DTS above the null value.
+            let target = target.saturating_sub(points[0].slot.fragment_seek_offset());
+            self.scan = Some(TrackSeek::new(points, target)?);
         }
     }
 
@@ -423,6 +611,9 @@ impl<'a> RangeSeekJob<'a> {
             .as_mut()
             .ok_or(Error::Invalid("missing checked seek head"))?;
         if self.landing.is_none() {
+            if head.demux.flags & 1 == 0 {
+                return Err(Error::Unsupported("native seek no observed key fallback"));
+            }
             let mut occurrence = head.clone();
             occurrence.scheduling_clock = SchedulingClock::SingleTrack;
             let discarded = occurrence.demux.flags & 4 != 0;
@@ -442,12 +633,13 @@ impl<'a> RangeSeekJob<'a> {
                 },
                 scanned_entries: self.index.tracks.as_slice()[at].entries,
                 used_first_fallback: scan.fallback,
+                opus_recovery: None,
             });
         } else {
             self.at += 1;
         }
         head.scheduling_clock = if self.index.tracks.len() > 1 {
-            SchedulingClock::from_demux_clock(head.demux.dts_field, slot.clock.demux_base)?
+            SchedulingClock::from_demux_clock(head.demux.dts_field, head.media_clock.demux_base)?
         } else {
             SchedulingClock::SingleTrack
         };
@@ -468,6 +660,7 @@ impl<'a> RangeSeekJob<'a> {
         let mut slots = self.slots;
         slots.as_mut_slice()[..=self.reference].rotate_left(1);
         let mut cursor = PacketCursor::from_slots(slots, self.media, self.packet_limits);
+        cursor.source_tracks = self.source_tracks;
         cursor.complete_source = true;
         cursor.phase = Phase::Fill;
         cursor.validated = self.validated;

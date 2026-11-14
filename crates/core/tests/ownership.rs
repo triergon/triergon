@@ -1,31 +1,46 @@
 use triergon_core::{Budget, BudgetVec, Bytes, Error, WorkBudget};
 
 #[test]
-fn reused_bytes_keep_the_same_allocation_and_charge() {
+fn a_writer_rewrites_an_unshared_allocation_in_place_and_grows_it() {
     let budget = Budget::new(4096).unwrap();
     let original = Bytes::copy_from_slice(&budget, b"abcdefgh").unwrap();
-    let address = original.as_ptr();
     let charged = budget.used();
     let alias = original.slice(2..4).unwrap();
-    let original = original.try_reuse().unwrap_err();
-    assert_eq!(alias.as_ref(), b"cd");
+    let original = original.try_into_writer().unwrap_err();
     assert_eq!(original.as_ref(), b"abcdefgh");
-    assert_eq!(alias.try_reuse().unwrap_err().as_ref(), b"cd");
-    let mut writer = original.try_reuse().unwrap();
+    assert_eq!(alias.try_into_writer().unwrap_err().as_ref(), b"cd");
+    let mut writer = original.try_into_writer().unwrap();
     assert!(writer.belongs_to(&budget));
     assert_eq!(budget.used(), charged);
-    writer.append_repeated(9, 3).unwrap();
-    assert!(
-        writer
-            .append_runs([(1, 1), (2, writer.capacity())])
-            .is_err()
-    );
-    writer.append_runs([(7, 1), (7, 1)]).unwrap();
+    // In place, the fill sees the earlier bytes.
+    let seen = writer.try_write_at(2, 3, |bytes| {
+        let seen = bytes.to_vec();
+        bytes.copy_from_slice(b"XYZ");
+        Ok::<_, Error>(seen)
+    });
+    assert_eq!(seen.unwrap(), b"cde");
+    // Past the end, it grows; new bytes read zero.
+    writer
+        .try_write_at(6, 6, |bytes| {
+            assert_eq!(&bytes[..2], b"gh");
+            assert_eq!(&bytes[2..], [0; 4]);
+            bytes[5] = b'!';
+            Ok::<_, Error>(())
+        })
+        .unwrap();
+    assert_eq!(budget.used(), charged + writer.capacity() - 8);
+    // A refused charge leaves the bytes, the capacity and the charge as they were.
+    let before = (budget.used(), writer.capacity());
+    assert!(matches!(
+        writer.try_write_at(0, 8192, |_| Ok::<_, Error>(())),
+        Err(Error::Limit { .. })
+    ));
+    assert_eq!((budget.used(), writer.capacity()), before);
     let updated = writer.finish();
-    assert_eq!(updated.as_ptr(), address);
-    assert_eq!(updated.as_ref(), &[9, 9, 9, 7, 7]);
-    assert_eq!(budget.used(), charged);
-    drop(updated);
+    assert_eq!(updated.as_ref(), b"abXYZfgh\0\0\0!");
+    let reused = updated.try_into_writer().unwrap().finish();
+    assert_eq!(reused.as_ref(), b"abXYZfgh\0\0\0!");
+    drop(reused);
     assert_eq!(budget.used(), Budget::control_storage_bytes());
 }
 

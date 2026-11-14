@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 #![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+pub mod compat;
 mod engines;
 pub mod io;
 mod mp4_native_replay;
@@ -40,7 +41,12 @@ pub mod matroska_feed;
 pub mod text_bridge;
 
 pub mod bitmap_bridge;
+pub mod caption_bridge;
 pub mod dvb_ts;
+pub mod mp4_dvd;
+pub mod pgs_ts;
+pub mod teletext_ts;
+mod ts_pes;
 
 pub mod input;
 pub use input::{ByteSource, Source, SourceReply};

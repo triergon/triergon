@@ -75,6 +75,80 @@ impl<'a> Drive<'a> {
     }
 }
 
+#[test]
+fn borrowed_payload_preserves_boundary_and_original_bytes() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let prefix = [0, 0, 1, 0x26, 1, 0x80, 0x42];
+    let mut interior = [0x55; 32];
+    interior[7] = 0;
+    let mut boundary = [0x55; 32];
+    boundary[7..9].fill(0);
+    let mut reader = RawAnnexBReader::new(
+        &pool,
+        Codec::Hevc,
+        ID,
+        SourceCapabilities {
+            length: Some((prefix.len() + interior.len()) as u64),
+            random_access: false,
+        },
+        RawAnnexBLimits::default(),
+    )
+    .unwrap();
+    let request = reader.request();
+    let bytes = Bytes::copy_from_slice(&pool, &prefix).unwrap();
+    reader
+        .provide_owned(InputWindow::new(request.source, request.token, 0, bytes).unwrap())
+        .unwrap();
+    let mut work = WorkBudget::new(4096);
+    let Step::NeedInput(request) = reader.step(&mut work, &OFF).unwrap() else {
+        panic!("expected NAL payload input");
+    };
+    assert_eq!(request.offset, prefix.len() as u64);
+    assert!(
+        !reader
+            .append_payload(&request, &boundary, &mut work, &OFF)
+            .unwrap()
+    );
+    assert_eq!(reader.request().offset, request.offset);
+    assert!(
+        reader
+            .append_payload(&request, &interior, &mut work, &OFF)
+            .unwrap()
+    );
+    let end = reader.request();
+    assert_eq!(end.offset, (prefix.len() + interior.len()) as u64);
+    reader.finish(end.source, end.token).unwrap();
+    let Step::Ready(unit) = reader.step(&mut work, &OFF).unwrap() else {
+        panic!("expected the final access unit");
+    };
+    assert_eq!(
+        unit.segments().flatten().copied().collect::<Vec<_>>(),
+        [prefix.as_slice(), interior.as_slice()].concat()
+    );
+}
+
+#[test]
+fn storage_audit_refuses_buffered_input() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let source = Bytes::copy_from_slice(&pool, &[0, 0, 1, 9, 0xf0]).unwrap();
+    let mut drive = Drive::new(
+        &pool,
+        Codec::Avc,
+        &source,
+        source.len(),
+        true,
+        RawAnnexBLimits::default(),
+    );
+    assert!(drive.reader.input_wait_storage().is_ok());
+    let q = drive.reader.request();
+    let window = InputWindow::new(q.source, q.token, q.offset, source.clone()).unwrap();
+    drive.reader.provide(&window).unwrap();
+    assert!(matches!(
+        drive.reader.input_wait_storage(),
+        Err(Error::Invalid(_))
+    ));
+}
+
 fn compare(codec: Codec, input: &[u8], expected: &str) {
     for (quantum, work, known_length) in [(1, 1, false), (7, 31, true), (4096, 4096, true)] {
         let pool = Budget::new(1 << 20).unwrap();
@@ -138,6 +212,13 @@ fn hevc_access_unit_wire_matches_the_raw_demuxer_with_and_without_aud() {
         include_bytes!("../fixtures/raw-annex-b/hevc-aud1.hevc"),
         include_str!("../fixtures/raw-annex-b/hevc-aud1.packets"),
     );
+    // An end of sequence starts the CRA access unit; the end of bitstream
+    // ending the stream stays in the last one.
+    compare(
+        Codec::Hevc,
+        include_bytes!("../fixtures/raw-annex-b/hevc-eos.hevc"),
+        include_str!("../fixtures/raw-annex-b/hevc-eos.packets"),
+    );
 }
 
 fn hevc_nal(out: &mut Vec<u8>, zeros: usize, kind: u8, layer: u8, body: u8) {
@@ -152,10 +233,10 @@ fn authored_hevc() -> (Vec<u8>, usize) {
     hevc_nal(&mut bytes, 2, 19, 0, 0x40); // another slice in the same picture
     hevc_nal(&mut bytes, 3, 40, 0, 0x33); // suffix SEI
     hevc_nal(&mut bytes, 2, 1, 1, 0x80); // a non-base NAL cannot split the AU
-    hevc_nal(&mut bytes, 3, 36, 0, 0x80); // EOS
-    hevc_nal(&mut bytes, 2, 37, 0, 0x80); // EOB
     let second = bytes.len();
-    hevc_nal(&mut bytes, 3, 39, 0, 0x55); // prefix SEI begins the next AU
+    hevc_nal(&mut bytes, 3, 36, 0, 0x80); // EOS begins the next AU, as in FFmpeg's parser
+    hevc_nal(&mut bytes, 2, 37, 0, 0x80); // EOB
+    hevc_nal(&mut bytes, 3, 39, 0, 0x55); // prefix SEI
     hevc_nal(&mut bytes, 2, 1, 0, 0x80);
     bytes.extend([0; 5]);
     (bytes, second)
@@ -174,7 +255,7 @@ fn hevc_retains_prefix_suffix_other_layer_and_padding_at_literal_boundaries() {
         false,
         RawAnnexBLimits::default(),
     );
-    for (range, nals, key) in [(0..second, 7, true), (second..input.len(), 2, false)] {
+    for (range, nals, key) in [(0..second, 5, true), (second..input.len(), 4, false)] {
         let unit = drive.next(1).unwrap().unwrap();
         assert_eq!(unit.range, range.start as u64..range.end as u64);
         assert_eq!(unit.nals().len(), nals);
@@ -187,6 +268,52 @@ fn hevc_retains_prefix_suffix_other_layer_and_padding_at_literal_boundaries() {
         );
     }
     assert!(drive.next(1).unwrap().is_none());
+}
+
+#[test]
+fn only_base_layer_types_32_to_37_39_41_to_44_and_48_to_55_start_an_access_unit() {
+    // Every type 0 to 63 between an IRAP picture and the next picture's first
+    // slice, in the base layer and in layer 1. The reference, probed with each
+    // type inserted after a picture, raw and in TS, starts the next access
+    // unit with these base-layer types only: H.265 §7.4.2.4.4's and the end
+    // of sequence and of bitstream (36, 37).
+    let starts = |kind: u8| matches!(kind, 32..=37 | 39 | 41..=44 | 48..=55);
+    for layer in [0, 1] {
+        for kind in 0..64 {
+            let mut input = Vec::new();
+            hevc_nal(&mut input, 2, 32, 0, 0x55);
+            hevc_nal(&mut input, 2, 19, 0, 0x80);
+            let inserted = input.len();
+            // A slice of this type would continue the picture (first slice flag 0).
+            hevc_nal(&mut input, 2, kind, layer, 0x01);
+            let after = input.len();
+            hevc_nal(&mut input, 2, 1, 0, 0x80);
+            let second = if layer == 0 && starts(kind) {
+                inserted
+            } else {
+                after
+            };
+            let pool = Budget::new(1 << 20).unwrap();
+            let source = Bytes::copy_from_slice(&pool, &input).unwrap();
+            let mut drive = Drive::new(
+                &pool,
+                Codec::Hevc,
+                &source,
+                7,
+                false,
+                RawAnnexBLimits::default(),
+            );
+            for range in [0..second, second..input.len()] {
+                let unit = drive.next(64).unwrap().unwrap();
+                assert_eq!(
+                    unit.range,
+                    range.start as u64..range.end as u64,
+                    "type {kind} in layer {layer}"
+                );
+            }
+            assert!(drive.next(64).unwrap().is_none());
+        }
+    }
 }
 
 #[test]

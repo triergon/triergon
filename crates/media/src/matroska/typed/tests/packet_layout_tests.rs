@@ -4,11 +4,11 @@ use crate::{Error, Limits};
 use std::mem::size_of;
 
 #[test]
-fn packed_lace_workspace_keeps_full_width_offsets_within_one_word_per_frame() {
-    let ceiling = (256 + 40) * size_of::<usize>();
+fn lace_range_cursor_keeps_full_width_offsets_in_constant_storage() {
+    let ceiling = 40 * size_of::<usize>();
     assert!(
         size_of::<lace::LaceJob>() <= ceiling,
-        "lace workspace={} ceiling={ceiling}; retain each frame end once",
+        "lace workspace={} ceiling={ceiling}",
         size_of::<lace::LaceJob>()
     );
 }
@@ -46,7 +46,7 @@ fn all_lace_modes_keep_empty_frames_and_last_frame_bounds_under_work_one() {
             let before = pool.used();
             let range = 6..6 + bytes.len();
             let mut job = lace::LaceJob::new(source.clone(), range, mode).unwrap();
-            assert!(job.frames().is_none());
+            assert!(job.frame_count().is_none());
             assert!(matches!(
                 job.step_descriptors(&mut WorkBudget::new(0), &AtomicBool::new(false))
                     .unwrap(),
@@ -69,20 +69,45 @@ fn all_lace_modes_keep_empty_frames_and_last_frame_bounds_under_work_one() {
                         done = true;
                         break;
                     }
-                    ParseStep::Yield => assert!(job.frames().is_none()),
+                    ParseStep::Yield => assert!(job.frame_count().is_none()),
                     other => panic!("bounded lace: {other:?}"),
                 }
             }
             assert!(done);
-            let frames = job.frames().unwrap();
-            assert_eq!(frames.len(), sizes.len());
+            assert_eq!(job.frame_count(), Some(sizes.len()));
             let mut at = 6 + data_at;
             for (index, size) in sizes.into_iter().enumerate() {
-                assert_eq!(frames.get(index), Some(at..at + size));
+                let mut range = None;
+                for _ in 0..4096 {
+                    let mut work = WorkBudget::new(quantum);
+                    let step = job
+                        .frame_range(index, &mut work, &AtomicBool::new(false))
+                        .unwrap();
+                    assert!(work.spent() <= quantum);
+                    assert_eq!(pool.used(), before);
+                    if let Some(value) = step {
+                        range = Some(value);
+                        break;
+                    }
+                }
+                assert_eq!(range, Some(at..at + size));
+                let mut exhausted = WorkBudget::new(0);
+                assert!(matches!(
+                    job.frame_range(index, &mut exhausted, &AtomicBool::new(false)).unwrap(),
+                    Some(cached) if cached == (at..at + size)
+                ));
+                assert_eq!(exhausted.spent(), 0);
                 at += size;
             }
             assert_eq!(at, 6 + bytes.len());
-            assert!(frames.get(frames.len()).is_none());
+            assert!(
+                job.frame_range(
+                    job.frame_count().unwrap(),
+                    &mut WorkBudget::new(1),
+                    &AtomicBool::new(false)
+                )
+                .is_err()
+            );
             drop(source);
             assert_eq!(
                 pool.used(),
@@ -108,7 +133,7 @@ fn malformed_lace_and_cancellation_publish_no_partial_descriptor_plan() {
         let mut rejected = false;
         for _ in 0..1024 {
             match job.step_descriptors(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-                Ok(ParseStep::Yield) => assert!(job.frames().is_none()),
+                Ok(ParseStep::Yield) => assert!(job.frame_count().is_none()),
                 Err(Error::Invalid(_) | Error::Truncated | Error::Overflow) => {
                     rejected = true;
                     break;
@@ -117,7 +142,7 @@ fn malformed_lace_and_cancellation_publish_no_partial_descriptor_plan() {
             }
         }
         assert!(rejected);
-        assert!(job.frames().is_none());
+        assert!(job.frame_count().is_none());
     }
     let pool = Budget::new(8192).unwrap();
     let baseline = pool.used();
@@ -132,7 +157,7 @@ fn malformed_lace_and_cancellation_publish_no_partial_descriptor_plan() {
         job.step_descriptors(&mut WorkBudget::new(0), &AtomicBool::new(true)),
         Err(Error::Cancelled)
     ));
-    assert!(job.frames().is_none());
+    assert!(job.frame_count().is_none());
     drop(job);
     assert_eq!(pool.used(), baseline);
 }

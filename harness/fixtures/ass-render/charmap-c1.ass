@@ -1,0 +1,22 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 3000
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,10,10,10,1
+Style: Missing,No Such Font,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,8,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,10,,abcd
+Dialogue: 0,0:00:00.00,0:00:03.00,Default,,0,0,90,, x 
+Dialogue: 0,0:00:00.00,0:00:01.00,Missing,,0,0,10,,été  été
+Dialogue: 0,0:00:01.00,0:00:02.00,Missing,,0,0,10,,déjà vu
+Dialogue: 0,0:00:02.00,0:00:03.00,Missing,,0,0,10,,€uro déjà vu

@@ -29,6 +29,9 @@ impl<const N: usize> Fixed<N> {
     pub(super) fn clear(&mut self) {
         self.length = 0;
     }
+    pub(super) fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.length]
+    }
 }
 impl<const N: usize> fmt::Write for Fixed<N> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
@@ -52,36 +55,63 @@ impl Writer {
             frozen: None,
         }
     }
+    /// Moves what is pending to the output, one unit per byte, refusing to
+    /// grow it beyond `maximum` bytes.
     pub(super) fn drain(
         &mut self,
         maximum: usize,
         funding: &mut Funding,
         caller: &mut WorkBudget,
     ) -> Result<bool> {
-        while self.at < self.pending.length {
-            let moving = if self.data.len() == self.data.capacity() {
-                self.data.len()
-            } else {
-                0
-            };
-            if !funding.pay(moving.checked_add(1).ok_or(Error::Overflow)?, caller)? {
-                return Ok(false);
-            }
-            if self.data.len() >= maximum {
-                return Err(Error::Limit {
-                    requested: self.data.len().saturating_add(1),
-                    maximum,
-                });
-            }
-            self.data
-                .try_push(self.pending.bytes[self.at])
-                .map_err(|e| e.error)?;
-            self.at += 1;
-            funding.commit();
+        let pending = &self.pending.bytes[self.at..self.pending.length];
+        if pending.is_empty() {
+            return Ok(true);
         }
+        if !funding.pay(pending.len(), caller)? {
+            return Ok(false);
+        }
+        if self.data.len() + pending.len() > maximum {
+            return Err(Error::Limit {
+                requested: maximum.saturating_add(1),
+                maximum,
+            });
+        }
+        self.data.try_reserve(pending.len())?;
+        self.data.try_extend_from_slice(pending)?;
+        funding.commit();
         self.at = 0;
         self.pending.clear();
         Ok(true)
+    }
+    /// Room for `additional` more output bytes, in one allocation.
+    pub(super) fn reserve(&mut self, additional: usize) -> Result<()> {
+        self.data.try_reserve_exact(additional)
+    }
+    /// Appends `bytes` to the output, as [`push_parts`](Self::push_parts).
+    pub(super) fn push(&mut self, bytes: &[u8], maximum: usize) -> Result<()> {
+        self.push_parts(&[bytes], maximum)
+    }
+    /// Appends `parts` to the output in one step, once [`drain`](Self::drain)
+    /// has moved what is pending: the output never grows beyond `maximum`
+    /// bytes, and a refused reservation appends nothing.
+    pub(super) fn push_parts(&mut self, parts: &[&[u8]], maximum: usize) -> Result<()> {
+        let size = parts.iter().map(|part| part.len()).sum::<usize>();
+        if size == 0 {
+            return Ok(());
+        }
+        if self.data.len().saturating_add(size) > maximum {
+            return Err(Error::Limit {
+                requested: maximum.saturating_add(1),
+                maximum,
+            });
+        }
+        // Amortised growth: an exact reservation per step would copy the
+        // output again for every step.
+        self.data.try_reserve(size)?;
+        for part in parts {
+            self.data.try_extend_from_slice(part)?;
+        }
+        Ok(())
     }
     pub(super) fn freeze(
         &mut self,

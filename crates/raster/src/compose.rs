@@ -1,12 +1,14 @@
 //! Combining a run's glyph bitmaps into its fill, border and shadow bitmaps:
 //! blur, `\be`, the border's subtraction of the fill and the sub-pixel shadow.
 
+use std::ops::Deref;
+
 use triergon_core::{Error, Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
 use crate::fp;
 use crate::geometry::{Vector, pixels_26_6};
-use crate::glyph::{FrameScale, GlyphBitmaps};
+use crate::glyph::{FrameScale, GlyphBitmaps, PlacedBitmap};
 use crate::limits::{charge, row_work};
 use crate::raster::Raster;
 
@@ -80,16 +82,25 @@ pub struct Effects {
 impl Effects {
     /// What identifies the composite of these effects in a frame scaled by
     /// `frame`: the blur and the shadow offset quantised as libass quantises
-    /// them. Glyphs with equal [`ShapedKey`](crate::ShapedKey)s and
-    /// offsets compose into equal bitmaps under equal keys, as libass's
-    /// composite cache finds them.
+    /// them. Equal glyph bitmaps at equal places compose into equal bitmaps
+    /// under equal keys, as libass's composite cache finds them.
     pub fn key(&self, frame: &FrameScale) -> EffectsKey {
         EffectsKey(Filter::new(self, frame))
     }
+
+    /// Whether the run casts a shadow (libass's `FILTER_NONZERO_SHADOW` once
+    /// `render_and_combine_glyphs` has applied its rules): its offset is
+    /// nonzero, and it has a border or a shadow that keeps the fill, as an
+    /// opaque box's always does. An opaque box that is not
+    /// [`shown`](Border::OpaqueBox) is drawn only then.
+    pub fn casts_shadow(&self) -> bool {
+        FilterFlags::new(self).shadow
+    }
 }
 
-/// What identifies a run's effects in a frame; see [`Effects::key`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+/// What identifies a run's effects in a frame; see [`Effects::key`]. The
+/// default is the key of no effects in an unscaled frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EffectsKey(Filter);
 
 /// libass's filter flags, from a run's effects as its renderer sets them.
@@ -238,7 +249,7 @@ impl Raster {
     /// # Errors
     ///
     /// `Policy` when `work` or the limits run out, and the budget's errors.
-    pub fn compose<'g, I>(
+    pub fn compose<'g, I, B>(
         &mut self,
         effects: &Effects,
         frame: &FrameScale,
@@ -246,8 +257,9 @@ impl Raster {
         work: &mut WorkBudget,
     ) -> Result<Composite>
     where
-        I: IntoIterator<Item = &'g GlyphBitmaps>,
+        I: IntoIterator<Item = &'g GlyphBitmaps<B>>,
         I::IntoIter: Clone,
+        B: Deref<Target = Bitmap> + 'g,
     {
         let glyphs = glyphs.into_iter();
         let Some(origin) = glyphs
@@ -259,16 +271,17 @@ impl Raster {
         };
         let filter = Filter::new(effects, frame);
         let pad = be_padding(filter.be);
-        let placed = |bitmap: fn(&GlyphBitmaps) -> Option<&Bitmap>| {
+        let placed = |bitmap: fn(&GlyphBitmaps<B>) -> Option<&PlacedBitmap<B>>| {
             glyphs.clone().filter_map(move |g| {
+                let placed = bitmap(g)?;
                 let at = Vector::new(
-                    g.origin().x.wrapping_sub(origin.x),
-                    g.origin().y.wrapping_sub(origin.y),
+                    placed.origin.x.wrapping_sub(origin.x),
+                    placed.origin.y.wrapping_sub(origin.y),
                 );
-                Some((bitmap(g)?, at))
+                Some((&*placed.bitmap, at))
             })
         };
-        let mut fill = self.combine(placed(GlyphBitmaps::glyph), pad, work)?;
+        let mut fill = self.combine(placed(GlyphBitmaps::fill), pad, work)?;
         let mut border = self.combine(placed(GlyphBitmaps::border), pad, work)?;
         let flags = filter.flags;
         let variance = filter.variances();
@@ -390,7 +403,7 @@ mod tests {
         let glyph = |at| {
             let mut bitmap = Bitmap::new(&budget, 4, 4, &Limits::default()).unwrap();
             bitmap.position = Vector::new(at, at);
-            GlyphBitmaps::of_glyph(bitmap, Vector::default())
+            GlyphBitmaps::of_fill(bitmap, Vector::default())
         };
         let frame = FrameScale {
             blur: [1.0, 1.0],

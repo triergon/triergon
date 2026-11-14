@@ -2,8 +2,12 @@
 
 #![allow(dead_code)]
 
-use triergon_core::{Budget, Bytes};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, select};
+use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_font::{FaceInfo, Font, GlyphId, Limits, Load, Outline, Request, select};
+
+mod cff;
+
+use cff::{CffProgram, Part, charstring, n};
 
 pub fn u16s(values: &[u16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_be_bytes()).collect()
@@ -275,138 +279,37 @@ pub fn truetype_tables(weight: u16, fs_selection: u16, family: &str, subfamily: 
     ]
 }
 
-/// A CFF number with a fixed five-byte encoding, so offsets do not move.
-fn long(value: i32) -> Vec<u8> {
-    let mut v = vec![29];
-    v.extend(value.to_be_bytes());
-    v
-}
-
-fn index(objects: &[Vec<u8>]) -> Vec<u8> {
-    if objects.is_empty() {
-        return vec![0, 0];
-    }
-    let mut out = u16s(&[objects.len() as u16]);
-    out.push(4);
-    let mut offset = 1_u32;
-    out.extend(offset.to_be_bytes());
-    for object in objects {
-        offset += object.len() as u32;
-        out.extend(offset.to_be_bytes());
-    }
-    for object in objects {
-        out.extend(object);
-    }
-    out
-}
-
-/// A one-byte charstring number (-107..=107).
-fn n(value: i16) -> u8 {
-    (value + 139) as u8
-}
-
-/// A CFF number written as a real (TN 5176 Table 5), from its decimal text.
-fn real(text: &str) -> Vec<u8> {
-    let mut nibbles: Vec<u8> = Vec::new();
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        nibbles.push(match c {
-            '0'..='9' => c as u8 - b'0',
-            '.' => 0xa,
-            'E' if chars.peek() == Some(&'-') => {
-                chars.next();
-                0xc
-            }
-            'E' => 0xb,
-            '-' => 0xe,
-            _ => panic!("not a real: {text}"),
-        });
-    }
-    nibbles.push(0xf);
-    if nibbles.len() % 2 == 1 {
-        nibbles.push(0xf);
-    }
-    let mut out = vec![30];
-    out.extend(nibbles.chunks(2).map(|pair| pair[0] << 4 | pair[1]));
-    out
-}
-
-/// The parts of a name-keyed CFF table.
-pub struct CffProgram {
-    pub glyphs: Vec<Vec<u8>>,
-    pub global: Vec<Vec<u8>>,
-    pub local: Vec<Vec<u8>>,
-    /// The SID of each glyph after .notdef, as a format 0 charset; the ISOAdobe
-    /// charset when absent.
-    pub charset: Option<Vec<u16>>,
-    /// FontMatrix entries as decimal text.
-    pub matrix: Option<[&'static str; 6]>,
-    pub nominal_width: i32,
-}
-
-impl CffProgram {
-    /// The CFF table. Offsets use the five-byte integer form, so the layout is
-    /// computed once with placeholders and once for real.
-    pub fn build(&self) -> Vec<u8> {
-        let private = |subrs: i32| {
-            let mut p = long(self.nominal_width);
-            p.push(21); // nominalWidthX
-            if !self.local.is_empty() {
-                p.extend(long(subrs));
-                p.push(19); // Subrs, relative to the Private DICT
-            }
-            p
-        };
-        let private_len = private(0).len();
-        let top = |charstrings: i32, charset: i32, private_offset: i32| {
-            let mut t = long(charstrings);
-            t.push(17);
-            if self.charset.is_some() {
-                t.extend(long(charset));
-                t.push(15);
-            }
-            if let Some(matrix) = self.matrix {
-                for value in matrix {
-                    t.extend(real(value));
-                }
-                t.extend([12, 7]);
-            }
-            t.extend(long(private_len as i32));
-            t.extend(long(private_offset));
-            t.push(18);
-            t
-        };
-        let charset = self.charset.as_ref().map(|sids| {
-            let mut c = vec![0];
-            c.extend(u16s(sids));
-            c
-        });
-        let header = vec![1, 0, 4, 4];
-        let names = index(&[b"Test".to_vec()]);
-        let top_len = index(&[top(0, 0, 0)]).len();
-        let strings = index(&[]);
-        let global = index(&self.global);
-        let charstrings_at = header.len() + names.len() + top_len + strings.len() + global.len();
-        let charstrings = index(&self.glyphs);
-        let charset_at = charstrings_at + charstrings.len();
-        let private_at = charset_at + charset.as_ref().map_or(0, Vec::len);
-        let mut out = header;
-        out.extend(names);
-        out.extend(index(&[top(
-            charstrings_at as i32,
-            charset_at as i32,
-            private_at as i32,
-        )]));
-        out.extend(strings);
-        out.extend(global);
-        out.extend(charstrings);
-        out.extend(charset.unwrap_or_default());
-        out.extend(private(private_len as i32));
-        if !self.local.is_empty() {
-            out.extend(index(&self.local));
-        }
-        out
-    }
+/// A TrueType face without bytecode whose glyph 1, a box at x 110..290 and
+/// y -20..730 with an advance of 400, is the ideographs' first standard
+/// character, 田 (U+7530), and a character of both of their blue strings,
+/// 他 (U+4ED6); glyph 2, the same box, is Tibetan KA (U+0F40).
+pub fn cjk_tables() -> Tables {
+    let bar: &[(i16, i16, bool)] = &[
+        (110, -20, true),
+        (110, 730, true),
+        (290, 730, true),
+        (290, -20, true),
+    ];
+    let (glyf, loca) = glyf(&[Vec::new(), simple(&[bar]), simple(&[bar])]);
+    vec![
+        (*b"head", head(1000, false, 0)),
+        (*b"hhea", hhea(3)),
+        (*b"maxp", maxp(3)),
+        (*b"OS/2", os2(400, 0)),
+        (*b"hmtx", hmtx(&[(500, 0), (400, 110), (400, 110)])),
+        (*b"cmap", cmap(&[(0x0f40, 2), (0x4ed6, 1), (0x7530, 1)])),
+        (
+            *b"name",
+            name(&[
+                (1, "Test Han"),
+                (2, "Regular"),
+                (4, "Test Han Regular"),
+                (6, "TestHan-Regular"),
+            ]),
+        ),
+        (*b"glyf", glyf),
+        (*b"loca", loca),
+    ]
 }
 
 /// A CFF table: glyph 1 a square drawn with a width, hints, a hintmask and a local
@@ -465,54 +368,13 @@ pub fn cff_table() -> Vec<u8> {
             ],
         ],
         charset: None,
+        strings: Vec::new(),
+        encoding: None,
         matrix: None,
         nominal_width: 400,
+        private: Vec::new(),
     }
     .build()
-}
-
-/// A two-byte charstring number (108..=1131 or -1131..=-108), or one byte inside
-/// -107..=107.
-pub fn number(value: i16) -> Vec<u8> {
-    match value {
-        -107..=107 => vec![n(value)],
-        108..=1131 => {
-            let v = value - 108;
-            vec![(v / 256 + 247) as u8, (v % 256) as u8]
-        }
-        -1131..=-108 => {
-            let v = -value - 108;
-            vec![(v / 256 + 251) as u8, (v % 256) as u8]
-        }
-        _ => {
-            let mut b = vec![28];
-            b.extend(value.to_be_bytes());
-            b
-        }
-    }
-}
-
-/// A charstring from numbers and operator bytes.
-fn charstring(parts: &[Part]) -> Vec<u8> {
-    parts
-        .iter()
-        .flat_map(|part| match *part {
-            Part::N(v) => number(v),
-            Part::Op(op) => vec![op],
-            Part::Escape(op) => vec![12, op],
-            Part::Byte(byte) => vec![byte],
-        })
-        .collect()
-}
-
-/// One element of an authored charstring.
-#[derive(Clone, Copy)]
-enum Part {
-    N(i16),
-    Op(u8),
-    Escape(u8),
-    /// A raw byte, such as a hint mask.
-    Byte(u8),
 }
 
 /// A CFF face exercising `seac`, arithmetic (`div`, `mul`, `add`, `sub`, `neg`,
@@ -765,8 +627,11 @@ fn cff_features_tables() -> Tables {
         local,
         // A, acute, D, B, C, E, F as standard strings.
         charset: Some(vec![34, 125, 37, 35, 36, 38, 39]),
+        strings: Vec::new(),
+        encoding: None,
         matrix: None,
         nominal_width: 500,
+        private: Vec::new(),
     };
     vec![
         (*b"head", head(1000, false, 0)),
@@ -831,8 +696,11 @@ fn cff_matrix_tables() -> Tables {
         global: Vec::new(),
         local: Vec::new(),
         charset: None,
+        strings: Vec::new(),
+        encoding: None,
         matrix: Some(["0.0005", "0", "0.0001", "0.0005", "0.025", "-0.0125"]),
         nominal_width: 0,
+        private: Vec::new(),
     };
     vec![
         (*b"head", head(2000, false, 0)),
@@ -1023,6 +891,222 @@ fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
         .collect()
 }
 
+/// A vertical metrics header (`vhea`, or the extended `VHEA` with a 32-bit
+/// record count) listing `metrics` records.
+pub fn vhea(metrics: u32, extended: bool) -> Vec<u8> {
+    let mut t = 0x0001_1000_u32.to_be_bytes().to_vec();
+    t.extend(i16s(&[500, -500, 0]));
+    t.extend(u16s(&[1500]));
+    t.extend([0; 22]);
+    if extended {
+        t.extend(metrics.to_be_bytes());
+    } else {
+        t.extend(u16s(&[metrics as u16]));
+    }
+    t
+}
+
+/// A format 2 subtable: single bytes 0x41 and 0x42 to glyphs 7 and 1 through
+/// the first subheader, and 0x8140 to glyph 2 through the subheader of lead
+/// byte 0x81.
+pub fn cmap_high_byte() -> Vec<u8> {
+    let mut keys = [0_u16; 256];
+    keys[0x81] = 8;
+    let mut t = u16s(&[2, 540, 0]);
+    t.extend(u16s(&keys));
+    // Subheaders at 518 and 526; each glyph array offset counts from its
+    // idRangeOffset word, at 524 and 532, to the arrays at 534 and 538.
+    t.extend(u16s(&[0x41, 2, 0, 10]));
+    t.extend(u16s(&[0x40, 1, 0, 6]));
+    t.extend(u16s(&[7, 1, 2]));
+    t
+}
+
+/// A format 8 subtable from (first, last, glyph) groups, all of 16-bit codes
+/// but those above 0xFFFF.
+pub fn cmap_mixed(groups: &[(u32, u32, u32)]) -> Vec<u8> {
+    let mut t = u16s(&[8, 0]);
+    t.extend((8208 + 12 * groups.len() as u32).to_be_bytes());
+    t.extend(0_u32.to_be_bytes());
+    t.extend([0_u8; 8192]);
+    t.extend((groups.len() as u32).to_be_bytes());
+    for &(a, b, g) in groups {
+        for v in [a, b, g] {
+            t.extend(v.to_be_bytes());
+        }
+    }
+    t
+}
+
+/// TrueType faces with each way FreeType reads vertical advances. Their
+/// glyphs: 1 a square, 2 a bump, 3 glyph 1 at half size plus glyph 2 with its
+/// metrics, 4 glyph 1 moved up without them; 'A' to 'D' map 1 to 4.
+/// - `Records`: four long `vmtx` records (an advance height of 65535, one of
+///   zero that leaves the phantom points level, and the composite's own,
+///   which `USE_MY_METRICS` replaces) and a top side bearing after them.
+/// - `Made Up`: a `vhea` without records, so FreeType makes the advances up.
+/// - `Short`: a 32-byte `vhea`, whose record count FreeType reads from the
+///   `vmtx` after it, the first record's top side bearing: two records.
+/// - `Extended`: only `VHEA` and `VMTX`, which FreeType reads for them.
+///
+/// An `fpgm` keeps the auto-hinter off them.
+fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
+    let square: &[(i16, i16, bool)] = &[
+        (100, 0, true),
+        (100, 200, true),
+        (300, 200, true),
+        (300, 0, true),
+    ];
+    let bump: &[(i16, i16, bool)] = &[(0, 0, true), (50, 100, false), (100, 0, true)];
+    let (glyf, loca) = glyf(&[
+        Vec::new(),
+        simple(&[square]),
+        simple(&[bump]),
+        composite(&[(0, 1, 10, 20, Some(0.5)), (0x0200, 2, 0, 0, None)]),
+        composite(&[(0, 1, 0, 300, None)]),
+    ]);
+    let records = hmtx(&[(65535, 10), (0, 100), (1500, -30), (800, 70)]);
+    let faces: [(&str, Tables); 4] = [
+        (
+            "Records",
+            vec![
+                (*b"vhea", vhea(4, false)),
+                (*b"vmtx", [records.clone(), i16s(&[-20])].concat()),
+            ],
+        ),
+        (
+            "Made Up",
+            vec![(*b"vhea", vhea(0, false)), (*b"vmtx", records.clone())],
+        ),
+        (
+            "Short",
+            vec![
+                (*b"vhea", vhea(2, false)[..32].to_vec()),
+                (
+                    *b"vmtx",
+                    [hmtx(&[(1000, 2), (900, 40)]), i16s(&[-10, 5, 15])].concat(),
+                ),
+            ],
+        ),
+        (
+            "Extended",
+            vec![
+                (*b"VHEA", vhea(3, true)),
+                (*b"VMTX", [records[..12].to_vec(), i16s(&[25, -5])].concat()),
+            ],
+        ),
+    ];
+    faces
+        .into_iter()
+        .map(|(style, vertical)| {
+            let full = format!("Authored Vertical {style}");
+            let postscript = format!("AuthoredVertical-{style}").replace(' ', "");
+            let mut tables = vec![
+                (*b"head", head(1000, false, 0)),
+                (*b"hhea", hhea(5)),
+                (*b"maxp", maxp(5)),
+                (*b"OS/2", os2(400, 0x40)),
+                (
+                    *b"hmtx",
+                    hmtx(&[(500, 0), (400, 50), (300, 0), (600, 0), (450, 100)]),
+                ),
+                (
+                    *b"cmap",
+                    cmap(&[(0x41, 1), (0x42, 2), (0x43, 3), (0x44, 4)]),
+                ),
+                (
+                    *b"name",
+                    name(&[
+                        (1, "Authored Vertical"),
+                        (2, style),
+                        (4, &full),
+                        (6, &postscript),
+                    ]),
+                ),
+                (*b"glyf", glyf.clone()),
+                (*b"loca", loca.clone()),
+                // PUSHB_1 0; POP
+                (*b"fpgm", vec![0xb0, 0, 0x21]),
+            ];
+            tables.extend(vertical);
+            (b"\0\x01\0\0", tables)
+        })
+        .collect()
+}
+
+/// A CFF face whose charmaps are all ones FreeType reads beyond the common
+/// formats: a format 2 subtable on (1, 1), a format 8 one on (3, 10), the
+/// Unicode charmap FreeType builds from glyph names, since no subtable is
+/// (3, 1) or Unicode-platform, and the charmap of a custom encoding with a
+/// supplement. The names are standard strings and strings of the face: an
+/// Adobe Glyph List name, a variant, `uniXXXX` and `uXXXXX` forms, `space` and
+/// `Delta`, which FreeType maps twice, a name used by two glyphs and one that
+/// maps to no code point.
+fn charmaps_tables() -> Tables {
+    use Part::{N, Op};
+    let square = |side: i16| {
+        charstring(&[
+            N(50),
+            N(0),
+            Op(21),
+            N(side),
+            Op(6),
+            N(side),
+            Op(7),
+            N(-side),
+            Op(6),
+            Op(14),
+        ])
+    };
+    let mut glyphs = vec![charstring(&[Op(14)])];
+    glyphs.extend((1..10).map(|g| square(100 + 40 * g)));
+    let program = CffProgram {
+        glyphs,
+        global: Vec::new(),
+        local: Vec::new(),
+        // A, A.swash, uni00E9, u1F600, space, Delta, B, B, glyph9.
+        charset: Some(vec![34, 391, 392, 393, 1, 394, 35, 35, 395]),
+        strings: [&b"A.swash"[..], b"uni00E9", b"u1F600", b"Delta", b"glyph9"]
+            .map(<[u8]>::to_vec)
+            .to_vec(),
+        // Format 1 with supplements: codes 0x80..=0x83 for glyphs 1 to 4, and
+        // code 0xC0 for SID 395 (glyph 9).
+        encoding: Some(vec![0x81, 1, 0x80, 3, 1, 0xc0, 0x01, 0x8b]),
+        matrix: None,
+        nominal_width: 0,
+        private: Vec::new(),
+    };
+    let metrics: Vec<(u16, i16)> = (0..10).map(|g| (300 + 50 * g, 50)).collect();
+    vec![
+        (*b"head", head(1000, false, 0)),
+        (*b"hhea", hhea(10)),
+        (*b"maxp", maxp(10)),
+        (*b"OS/2", os2(400, 0x40)),
+        (*b"hmtx", hmtx(&metrics)),
+        (
+            *b"cmap",
+            cmap_records(&[
+                (1, 1, cmap_high_byte()),
+                (
+                    3,
+                    10,
+                    cmap_mixed(&[(0x42, 0x42, 8), (0x1_f600, 0x1_f600, 4)]),
+                ),
+            ]),
+        ),
+        (
+            *b"name",
+            name(&[
+                (1, "Authored Charmaps"),
+                (2, "Regular"),
+                (4, "Authored Charmaps Regular"),
+                (6, "AuthoredCharmaps-Regular"),
+            ]),
+        ),
+        (*b"CFF ", program.build()),
+    ]
+}
+
 /// Authored fonts for the FreeType comparison: features the freely licensed
 /// corpus does not exercise. Named by their file in the corpus.
 pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
@@ -1040,6 +1124,8 @@ pub fn authored_fonts() -> Vec<(&'static str, Vec<u8>)> {
             font(b"\0\x01\0\0", &cmap_formats_tables()),
         ),
         ("authored-cmap-order.ttc", collection(&cmap_order_faces())),
+        ("authored-vertical.ttc", collection(&vertical_faces())),
+        ("authored-charmaps.otf", font(b"OTTO", &charmaps_tables())),
     ]
 }
 
@@ -1165,7 +1251,10 @@ pub fn exercise(data: &[u8], limits: Limits) {
             let _ = outline.segments().count();
             let _ = font.kerning(glyph, GlyphId(1));
             for size in &sized {
-                let _ = size.hinted_advance(glyph);
+                let _ = size.default_advance(glyph);
+                let _ = size.default_vertical_advance(glyph);
+                let mut work = WorkBudget::new(limits.work);
+                let _ = size.load(glyph, Load::Default, &mut scaled, &mut work);
                 let _ = size.kerning(glyph, GlyphId(1));
                 if size.outline_into(glyph, &mut scaled).is_ok() {
                     let _ = size.synthesize(&mut scaled, synthesis);
@@ -1181,7 +1270,7 @@ pub fn exercise(data: &[u8], limits: Limits) {
             family,
             weight: 700,
             slant: 100,
-            character: Some('A'),
+            character: Some(u32::from('A')),
         };
         let _ = select(&faces, &request);
     }

@@ -19,6 +19,25 @@ pub struct TextSource {
     source: SourceId,
     pool: Budget,
 }
+/// Where a caption receiver's event comes from.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AssIdentity {
+    pub source: SourceId,
+    pub generation: u64,
+    pub sequence: u64,
+}
+/// A receiver event's timing from its start in microseconds and display time
+/// in milliseconds; `None` where unknown.
+pub(crate) fn receiver_timing(start_us: Option<i64>, display_ms: Option<u32>) -> Result<Timing> {
+    Ok(Timing::exact(
+        start_us
+            .map(|us| Time::new(i128::from(us), 1_000_000))
+            .transpose()?,
+        display_ms
+            .map(|ms| Time::new(i128::from(ms), 1_000))
+            .transpose()?,
+    ))
+}
 pub struct RejectedOutput {
     pub output: Output,
     pub error: Error,
@@ -59,6 +78,33 @@ impl TextSource {
             record: Record::Document(input),
         }
     }
+    /// One ASS event line a caption receiver produced, laid out as a Matroska
+    /// `S_TEXT/ASS` block (`ReadOrder,Layer,Style,...,Text`), with its script
+    /// `header`: the bridge reports it as an opaque ASS cue.
+    pub(crate) fn ass_event(
+        pool: &Budget,
+        header: &Bytes,
+        line: &[u8],
+        timing: Timing,
+        identity: AssIdentity,
+    ) -> Result<Self> {
+        let input = Input {
+            format: text::Format::OpaqueAss,
+            encoding: text::Encoding::Opaque,
+            payload: Bytes::copy_from_slice(pool, line)?,
+            codec_id: None,
+            codec_private: Some(header.clone()),
+            charset_label: None,
+            addition: None,
+            timing,
+            source_id: identity.source,
+            generation: identity.generation,
+            sequence: identity.sequence,
+            configuration_epoch: 0,
+            container_position: None,
+        };
+        Ok(Self::document(pool, input))
+    }
     pub fn mp4(&self) -> Option<&Mp4Packet> {
         if let Record::Mp4(p) = &self.record {
             Some(p)
@@ -76,7 +122,7 @@ impl TextSource {
 }
 pub struct TextOutput {
     pub source: TextSource,
-    pub event: text::Event,
+    pub cue: text::Cue,
 }
 #[expect(
     clippy::large_enum_variant,
@@ -84,7 +130,7 @@ pub struct TextOutput {
 )]
 pub enum TextStep {
     Yield,
-    Event(TextOutput),
+    Cue(TextOutput),
     NeedPacket,
     Finished,
 }
@@ -440,13 +486,13 @@ impl TextBridge {
                 self.pending = None;
                 TextStep::Finished
             }
-            text::Status::Event(event) => TextStep::Event(TextOutput {
+            text::Status::Cue(cue) => TextStep::Cue(TextOutput {
                 source: self
                     .pending
                     .as_ref()
                     .ok_or(Error::Invalid("text event without source"))?
                     .clone(),
-                event,
+                cue,
             }),
         })
     }

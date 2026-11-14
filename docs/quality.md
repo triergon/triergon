@@ -42,9 +42,24 @@ resource limit becomes an explicit, reviewed rule for that case.
   and records the baseline version from the prepared installation. Version
   discovery for an unpacked archive stops at the reference source boundary.
   Containers are measured against git revision `d32b387f` on the 9.0 branch: `matroska`
-  for the container harness, `formats` for MOV, TS, subtitles and the HLS segment
-  reference, and `video` (the Matroska build plus the H.264 and HEVC decoders that
-  stream discovery needs) for the playback startup and seek reference. Decoders and
+  for the container harness, `formats` for MOV, TS and the HLS segment reference,
+  `video` (the Matroska build plus the H.264 and HEVC decoders that stream discovery
+  needs) for the playback startup and seek reference, and `subtitles` (the PGS, DVB,
+  DVD, closed-caption and teletext decoders, the latter through a hash-checked
+  libzvbi 0.2.46, with the video decoders caption extraction needs) for the subtitle
+  decode comparison. A decoder that refuses to open with the stream's
+  configuration and options is a result both subtitle workers fold alike, as no
+  subtitles and the one word 2^64 − 1, and trace as a `"refused":"open"` line in
+  place of the header. The `subtitles` worker is linked with `--wrap` for the C
+  library calls whose result can differ between its targets for the same
+  arguments: `strtol`, `strtoul` and `sscanf`'s integer conversions, which read
+  through `long`, and the rounding functions with results C leaves unspecified
+  out of range. Its `sub-fold` flags a run that reached such a difference
+  (`harness/reference_subtitles_host.h`), and a flagged case fails any feature
+  not pinned per target. Because the wrappers run inside the operation, that
+  build is never timed or measured: the subtitle features name the same build
+  without them, `ffmpeg-subtitles-plain-native`, as their
+  `measurement_reference`. Decoders and
   capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
   configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
   capture output independently, and `capture` (gating) and `capture-small` for the
@@ -57,13 +72,19 @@ resource limit becomes an explicit, reviewed rule for that case.
   links the reference worker (`harness/reference_font.h`). `cargo xtask fonts fetch`
   fetches the font corpus listed with sources, licences and hashes in
   `harness/fonts/corpus.json` and writes its authored fonts with the font crate's
-  `authored-fonts` example. Its files are the cases of three features run like
-  every other feature: `font-outlines` (face data and unscaled outlines) and
+  `authored-fonts` example. Its files are the cases of four features run like
+  every other feature: `font-outlines` (face data and unscaled outlines),
   `font-hinting-none` (libass's default configuration: unhinted outlines and
-  default-load advances at 256 pixels), which `cargo xtask check` requires, and
-  `font-hinting-modes` (the nine other heights libass requests when hinting is on),
-  run on demand and not gated yet. `cargo xtask fonts compare` reports the
-  required two, with `--all` all three.
+  default-load advances at 256 pixels) and `font-hinting-default` (every glyph's
+  default-load metrics and hinted outline there), which `cargo xtask check`
+  requires, and `font-hinting-modes` (the nine other heights libass requests when
+  hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
+  reports the required three, with `--all` all four. Behaviour of TrueType
+  programs that no specification settles is established by probes:
+  `harness/fonts/probes/*.probe` describe small faces and their programs,
+  `cargo xtask fonts probe` assembles them and loads them through both font
+  workers, and each `.dump` beside a probe records the reference's default load
+  on 32-bit ARMv7 (`--record`).
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
@@ -169,9 +190,29 @@ resource limit becomes an explicit, reviewed rule for that case.
   names, and compares every frame's change value (`ass_detect_change`) and
   every image's type, position, size, colour and alpha bytes in list order
   with `triergon_ass::Renderer`'s; the box behind a `BorderStyle` 4 event,
-  whose type libass leaves uninitialised, is told by its buffer and compared
-  without one. It is required by
-  `cargo xtask check` and reported by `cargo xtask ass compare`.
+  whose type libass leaves uninitialised, is told by its own buffer and
+  compared as a type of its own. It is required by
+  `cargo xtask check` and reported by `cargo xtask ass compare`. The fixtures
+  whose libass result differs by target, because libass's renderer overflows
+  `int` or converts out of its range on the way, are `ass-render-host`'s
+  instead, pinned per target like `ass-parse-host`; the renderer follows
+  libass built with GCC for 32-bit ARM hard-float.
+  The parity reference is instrumented: it compiles libass's rendering,
+  drawing and parsing sources into itself with checks of its own, so it is
+  never timed or measured. Both rendering features name a
+  `measurement_reference`, `libass-player-native`
+  (`harness/reference_ass_player.h`), which renders and folds the same frames
+  with `libass.a` linked as a player links it, none of its sources compiled in;
+  `report`, `grade` and the case evidence refuse runtime or memory against an
+  instrumented reference, and `cargo xtask check-design` requires a
+  `measurement_reference` to be an uninstrumented build of the same pinned
+  libraries. The timed span is reading the script or running the stream and
+  rendering its frames, from the configured renderer to the last frame on both
+  sides: libass's renderer setters each empty its caches (`ass_reconfigure`),
+  and the teardown frees them, so neither is timed. The memory window holds the
+  whole operation. These cases are timed by the same paired runner as the
+  codecs and capture: one lock, the same pair loop, contamination watch,
+  retries and validator, and the same minimum of pairs.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass
@@ -207,6 +248,15 @@ resource limit becomes an explicit, reviewed rule for that case.
   when a case is the same on every target (it belongs in a feature pinned for
   every target), and when a feature not pinned per target has a pin the
   reference flags.
+  A feature with a written manifest pins a case per target in its
+  `expected_by_target`. The five bitmap, caption and teletext subtitle features
+  pin each case once, from the reference on AArch64, and require 32-bit ARMv7
+  too, so every ARMv7 run compares that target's reference with those pins: a
+  case whose reference result differs between the targets fails there, flagged
+  or not, until a feature pinned per target holds it. `subtitle-dvd-host` holds
+  the DVD cases the subtitles reference flags. The decoder follows FFmpeg built
+  with GCC for 32-bit ARM hard-float, and such a case is open on
+  AArch64.
   Pins are recorded with the feature's `worker_operation`, the operation
   `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
   reference with these pins names the features in `cases_from` (`raster-simd`
@@ -228,9 +278,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
   without blocking it.
 - **Input rights.** A case is measured only when its `rights` are
-  `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
-  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
-  Any other case fails as `rights-unreviewed`.
+  `authored-synthetic`, `reviewed-licence` with a `licence` under which a
+  reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash, or
+  `fetched-not-redistributed` for an upstream regression sample, or a local remux
+  of one, whose hash `harness/fate/samples.json` records: fetched into the ignored
+  corpus cache, compared locally and never redistributed, its redistribution
+  rights unreviewed. Any other case fails as `rights-unreviewed`.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
@@ -294,15 +347,33 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the three font features with `font-worker` and FreeType,
-the six shaping features with `shape-worker` and HarfBuzz and FriBidi, the
-five rasterising features with `raster-worker` and libass, and the four ASS
-parsing features and `ass-render` with `ass-worker` and libass.
+and `formats` references, the six bitmap, caption and teletext `subtitle-*` features with
+`subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
+and the `formats` reference, the three font features with `font-worker` and FreeType, the six
+shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
+features with `raster-worker` and libass, and the four ASS parsing features,
+`ass-render` and `ass-render-host` with `ass-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
-certificates. The report records the build identity, source provenance digest and input
+certificates. The observers count `malloc`, `calloc`, `realloc`, `free`,
+`posix_memalign`, `aligned_alloc`, `strdup` and `strndup`. On Linux a worker is
+measured only if every allocation entry point it and its libraries import is one of
+these; a guarded one; an operator `new` or `delete` form, when one library of the
+closure, not the observer, defines every form and the probe ran this one at the same
+version; or a weak import that nothing in the closure defines, which assumes no library
+is loaded with `dlopen` before the operation. The probe links libstdc++ to run the
+twenty forms, so every Linux certificate's sealed closure includes libstdc++, libm and
+libgcc_s, and building it needs `-lstdc++`. Inside the operation, the Linux observer
+admits read-only file mappings, private or shared, and their exact `munmap`. Their
+resident pages count toward total RSS, the kernel bound adds each one's whole length
+(`VmPeak` already includes it), and the receipt reports them as `file_mappings` and
+`file_mapped_bytes`. Any other mapping or unmapping voids the measurement, on either
+side. The observer does not guard `mprotect`: a private file mapping made writable with it
+holds memory the heap figure misses, though total RSS still counts it. Receipts of this observer (`linux-glibc-v4`) list eight hooks in `symbol_order`,
+so a worker's `strdup` and `strndup` move from the `malloc` counters to their own; v2
+and v3 receipts list six and still validate when re-graded. The report records the build identity, source provenance digest and input
 hashes it was measured with; when a result is cited, its source revision and raw-sample
 SHA-256 go in the [measured revisions](status.md#measured-revisions) table. `cargo xtask compare` compares a single input, `cargo xtask external-vector`
 qualifies the mandatory external vector and `cargo xtask fate-run` runs one supported
@@ -311,6 +382,12 @@ identity every collection is checked against. `cargo xtask trace-identities` rec
 digest of every candidate trace, so a change can show its traces are byte-identical
 (`--compare` an earlier record): the Matroska cases for `media-worker`, every case of
 each feature that runs the `--candidate` worker through a prefix otherwise.
+Pass `--corpus FEATURE=DIR` for each prefix feature whose files are outside its
+recorded directory or whose manifest omits the directory. Relative directories are
+resolved from the repository root. Prefix comparisons verify the reference worker's
+build hash and the manifest hashes of the primary input, ordered entities and
+companion files before running a case. DVD palette paths resolve inside the
+selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
@@ -322,6 +399,19 @@ of and records the identities of the codec crates against the pinned FFmpeg deco
 and compares the packets of the audio container readers with its `ffprobe`
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
+`cargo xtask codecs aac-access-units` prepares the [configured AAC
+workloads](../harness/features/aac-access-units/contract.json) from the pinned
+QuickTime and authored audio-only packets. It compares the ordered speakers and
+every decoded PCM plane. The authored clips cover every supported fixed layout
+and indexed rate, and program configurations from mono to eight channels.
+`cargo xtask codecs aac-sources --out DIR` records the source
+clips from independently varying channel tones using the pinned encoder. The
+committed sources fix the encoded input bytes across architectures.
+The paired codec timing and memory commands require passing parity bound to
+the workload manifest, both workers, the pinned probe and the numeric rules.
+The measured work includes decoder construction, decoding every
+packet, folding every PCM plane, flushing and teardown. File loading and
+container parsing take place before that work.
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
 input (`--timeout-seconds`, 3 by default, or the contract's `timeout_seconds`). With `--contract` it builds that manifest from a prefix feature's cases: the
@@ -357,6 +447,14 @@ CPUs. CPU records are required in both reports. The memory build identity may ad
 a kernel RSS proof pin; every other identity field must match. Both input reports
 and their raw samples are hash-linked from the graded report.
 
+`cargo xtask report` writes each case's raw measurements once and records their
+SHA-256 in `partial.json`. After validating the complete collection it publishes
+the compact `collection.json`, then streams the self-contained `report.json`.
+Pass `collection.json` and keep its `measurements/` directory alongside it to grade
+large collections with one case's samples in memory at a time. Use a new `--output`
+directory for each invocation of `report`, `progressive` or `grade` so earlier
+measurements, traces and grades remain available.
+
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.
 `--require-slice-acceptance` requires the feature gates; `--require-acceptance` also
@@ -386,6 +484,29 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- Gate results assume the workspace release profile, `lto = "fat"` and
+  `codegen-units = 1`, and a program that depends on these crates matches them only
+  with the same two settings in its own release profile. On ARMv7, building the
+  playback worker without fat LTO, Cargo's default, adds 12.6% user-mode instructions
+  on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times as long;
+  Cargo's default of 16 codegen units adds up to another 2.5%. `panic = "abort"` saves
+  a further 2 to 3% and is safe: no library code catches or relies on unwinding. A
+  program that wraps calls into these crates in `catch_unwind` loses that protection
+  under abort.
+- `report`, `external-vector`, `codecs time` and `capture qualify` time through one
+  paired runner. It holds the host-wide benchmark lock, runs and checks one warm-up of
+  each worker, observes every pair from the snapshot that closed the one before, proves
+  the RSS kernel module absent at each stage, and retries a contaminated session up to
+  twice on the next seeds, keeping the rejected attempts. Each session writes one timing
+  record, and one validator grades it: the pairs, the worker and input hashes, a clean
+  CPU record around every pair, the same work in both warm-ups and every pair, and a
+  ratio interval its samples reproduce. Work a contract names must match between the
+  workers. A worker's own output, such as an encoder's stream or a decoder digest that
+  may differ, need only repeat across that worker's runs.
+- A sample is one worker run of the declared iterations, timed in-process from the first
+  iteration to the last; the process warm-up comes before the pairs. A capture sample is
+  one run of `--iterations` complete sessions, each opened afresh, and the run fails if
+  any session's stream differs. Work counts are totals over the iterations.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
   run may use and those online. Neither instance size nor pinning is required, but a
   bound measured pinned to one CPU is not comparable with one measured unpinned.
@@ -404,10 +525,21 @@ may override that count for diagnostic comparisons.
   --benchmark --baseline-worker W` from the changed tree, with `W` the same worker from
   the base tree. Correctness is still compared with the reference; the pairs and ratios
   are against `W`. Such a report is never an acceptance run.
-- Time copies, not build outputs. A freshly linked binary and a sequentially written
-  copy of it sit differently in the page cache, and identical bytes then time about
-  0.7% apart. `report`, `codecs time` and `capture qualify` write both workers afresh,
-  at paths of equal length, before each timing session.
+- Prepare both workers with the same sequential write and paths of equal length.
+  Linker output and a sequentially written copy can occupy the page cache differently.
+  Timing uses freshly written copies. Linux memory collection does the same for workers
+  selected by the report's build registration. It keeps both original paths for explicitly
+  supplied workers and when the loader resolves libraries relative to an executable.
+  Keep the measured executables with the raw memory samples. Grading Linux memory
+  results rehashes the worker paths in the observer certificate, including any copies
+  in the build tree. Before every memory run on Linux, both workers are written back and
+  their cached pages dropped (`sync FILE`, then `dd iflag=nocache`, which asks for
+  `POSIX_FADV_DONTNEED`; no root needed), so each run of either worker maps its
+  executable from the same, empty, page-cache state. Without it, a freshly written copy
+  can stay cached in larger blocks, and the kernel then makes more of the executable
+  resident on some runs than on others: 320 kB more of a subtitle worker's own mapping,
+  and so of the resident peak, on a c8g.xlarge. A failed eviction fails the run. Memory
+  results collected before this eviction may include that effect, on either side.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more
@@ -427,12 +559,17 @@ may override that count for diagnostic comparisons.
 
 ### 32-bit ARMv7
 
-The harness runs natively in a 32-bit ARM Linux user space. The same commands
-build xtask, the workers and the FFmpeg references there, and reports name the
-target of the toolchain that built them, `armv7-unknown-linux-gnueabihf`. That
-toolchain's default target has no NEON, while FFmpeg selects its NEON code at run
-time, so on this target the gate build compares Rust built without NEON with
-FFmpeg's NEON paths. An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
+The harness runs natively in a 32-bit ARM Linux user space. The gate target there is
+`thumbv7neon-unknown-linux-gnueabihf`: Thumb-2, as the armhf GCC that builds the FFmpeg
+and libass references compiles by default, and assuming NEON, whose code FFmpeg selects
+at run time on the same cores. Its workers therefore do not run on an ARMv7 core
+without NEON. rustup's host toolchain there, `armv7-unknown-linux-gnueabihf` (A32
+without NEON), builds xtask only: `cargo xtask build-workers`, `cargo xtask check` and
+the comparison commands compile the workers and every test, xtask's own included, with
+`--target thumbv7neon-unknown-linux-gnueabihf`, so the workers land in
+`target/thumbv7neon-unknown-linux-gnueabihf/release`, and reports name that target.
+Add it once with `rustup target add thumbv7neon-unknown-linux-gnueabihf`.
+An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
 on its AArch64 kernel; later Graviton generations cannot.
 
 The results in [status](status.md#32-bit-armv7) come from the Ubuntu 24.04 armhf user
@@ -459,9 +596,27 @@ time`. It has a user `ubuntu` (uid 1000, passwordless `sudo`); its home director
 part of the image.
 A user space built the same way later can pick up newer packages; compare its
 `dpkg-query -W` list before treating its results as comparable. Inside, install rustup
-as on any host, and run every command under `setarch linux32`. Memory uses the standard
-bounds: the kernel RSS proof module has no 32-bit ioctl entry point. Record the CPU,
-kernel and user-space package list with the results.
+as on any host, add the gate target, and run every command under `setarch linux32`. Record the CPU, kernel
+and user-space package list with the results. The `subtitles` reference builds libzvbi
+from its source archive, which needs `apt-get install autoconf automake libtool autopoint
+gettext` in the user space first.
+
+The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
+entry point. The module belongs to the host's kernel, so build and load it on the host,
+which needs the kernel's headers, and bind debugfs into the user space before entering
+it. Run `prove.sh` on the host from the repository inside the user space, naming the
+user space's root; it builds and runs the check, and records the architecture and page
+size, inside it:
+
+```sh
+sudo mount --bind /sys/kernel/debug /srv/armhf/sys/kernel/debug
+cd /srv/armhf/home/ubuntu/triergon
+harness/rss-bound/prove.sh .research/rss-bound/RSS-REVIEW.json .research/rss-bound /srv/armhf
+```
+
+Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
+`TRIERGON_RSS_KERNEL_BOUND=1` inside the user space, as the
+[kernel proof workflow](../harness/rss-bound/README.md) describes.
 
 ## Robustness
 
@@ -502,3 +657,11 @@ set to the archive location:
    passes, so a set larger than memory unpacks on a 32-bit host.
 
 The index also records how identifiers were renamed.
+
+Every revision status cites stays reachable from `main`: `cargo xtask check-revisions`,
+part of `check`, fails when `HEAD` does not reach a cited commit. A pull request that
+cites its own commits merges with a merge commit. A cited commit that is off `main`
+joins it through a merge that keeps `main`'s tree (`git merge -s ours`).
+An abbreviated revision must identify one Git object, and that object must be a
+commit in the checkout history. Keep a bundle of the measured source with the
+archived result so its exact commit can be recovered.

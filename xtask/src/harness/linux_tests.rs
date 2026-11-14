@@ -1,6 +1,9 @@
 //! Synthetic controls for the seven-hook v3 guard schema; nothing native runs.
 
-use super::linux::{self, GUARD_CASES, GUARD_ORDER, GUARD_POLICY, SCOPE_ERROR_BIT, TLS_IMPORTS};
+use super::linux::{
+    self, FILE_GUARD_CASES, FILE_MAPPING_CONTROL, GUARD_CASES, GUARD_ORDER, GUARD_POLICY, OBSERVER,
+    SCOPE_ERROR_BIT, TLS_IMPORTS,
+};
 use crate::json::{Value, parse};
 
 fn v(text: &str) -> Value {
@@ -54,8 +57,23 @@ impl Fixture {
 }
 
 /// Two closures sharing a sealed libc and interpreter, matching exports, and
-/// the 28 heap/RSS calibration records with every negative control rejected.
+/// the 28 heap/RSS calibration records of the v3 observer with every negative
+/// control rejected.
 fn fixture() -> Fixture {
+    fixture_of("linux-glibc-v3")
+}
+
+/// The same for the current observer: its 36 records, a sealed libstdc++
+/// defining every operator new and delete form, and a probe that imports and
+/// ran them all and reports its admitted file mapping.
+fn current() -> Fixture {
+    fixture_of(OBSERVER)
+}
+
+const LIBSTDCXX: &str = "/sealed/libstdc++.so.6";
+
+fn fixture_of(observer: &str) -> Fixture {
+    let v4 = observer == OBSERVER;
     let [libc, loader, observer_path, probe_path] = [
         "libc.so.6",
         "ld-linux-aarch64.so.1",
@@ -71,10 +89,14 @@ fn fixture() -> Fixture {
             ("sha256", Value::str(sha(path))),
         ])
     };
-    let libraries = Value::Array(vec![
+    let mut libraries = vec![
         library("libc.so.6", &libc),
         library("ld-linux-aarch64.so.1", &loader),
-    ]);
+    ];
+    if v4 {
+        libraries.push(library("libstdc++.so.6", LIBSTDCXX));
+    }
+    let libraries = Value::Array(libraries);
     let closure = |path: &str| {
         Value::object([
             ("status", Value::str("recorded")),
@@ -104,8 +126,13 @@ fn fixture() -> Fixture {
     let public = lines(&GUARD_ORDER, "@@GLIBC_2.17 T 100 20");
     let exports = lines(&GUARD_ORDER, " T 100 20");
     let private = lines(&TLS_IMPORTS, "@@GLIBC_PRIVATE T 100 20");
-    let undefined = lines(&GUARD_ORDER, "@GLIBC_2.17 U");
-    let bindings = Value::object([
+    let forms: Vec<String> = linux::cxx_forms("m").into_iter().collect();
+    let forms: Vec<&str> = forms.iter().map(String::as_str).collect();
+    let mut undefined = lines(&GUARD_ORDER, "@GLIBC_2.17 U");
+    if v4 {
+        undefined = format!("{undefined}\n{}", lines(&forms, "@GLIBCXX_3.4 U"));
+    }
+    let mut bindings = Value::object([
         ("observer_path", Value::str(&observer_path)),
         ("probe_path", Value::str(&probe_path)),
         ("observer_exports", Value::str(&exports)),
@@ -120,16 +147,31 @@ fn fixture() -> Fixture {
             ]),
         ),
     ]);
+    if v4 {
+        let exports = lines(&forms, "@@GLIBCXX_3.4 T 100 20");
+        set(
+            &mut bindings,
+            &["defined_objects"],
+            LIBSTDCXX,
+            Value::str(exports),
+        );
+    }
+    let mut cases = vec!["default", "scope-startup"];
+    cases.extend(GUARD_CASES.iter().map(|c| c.0));
+    if v4 {
+        cases.push(FILE_MAPPING_CONTROL);
+        cases.extend(FILE_GUARD_CASES.iter().map(|c| c.0));
+    }
     let zeros = || Value::Array(vec![Value::int(0); 7]);
     let mut records = Vec::new();
     for mode in ["heap", "rss"] {
-        for case in ["default", "scope-startup"]
-            .into_iter()
-            .chain(GUARD_CASES.iter().map(|c| c.0))
-        {
-            let guard_case = GUARD_CASES.iter().find(|c| c.0 == case);
+        for &case in &cases {
+            let guard_case = GUARD_CASES
+                .iter()
+                .chain(&FILE_GUARD_CASES)
+                .find(|c| c.0 == case);
             let mut data = v(&format!(
-                r#"{{"schema": 2, "observer": "linux-glibc-v3", "mode": "{mode}", "status": "measured", "error_bits": 0,
+                r#"{{"schema": 2, "observer": "{observer}", "mode": "{mode}", "status": "measured", "error_bits": 0,
                    "begins": 1, "ends": 1, "selected_thread_scope": 1, "unknown_window_releases": 0,
                    "heap_peak_bytes": 8192, "heap_live_start": 128, "heap_live_end": 128, "rss_start": 4096, "rss_peak_observed": 12288}}"#
             ));
@@ -175,6 +217,27 @@ fn fixture() -> Fixture {
                 ("required_guard_window_successes", zeros()),
                 ("required_guard_window_failures", zeros()),
             ]);
+            if v4 {
+                let mapped = if case == FILE_MAPPING_CONTROL {
+                    4096
+                } else {
+                    0
+                };
+                set(&mut data, &[], "file_mappings", Value::int(mapped / 4096));
+                set(&mut data, &[], "file_mapped_bytes", Value::int(mapped));
+                set(
+                    &mut work,
+                    &[],
+                    "expected_file_mapped_bytes",
+                    Value::int(mapped),
+                );
+                let ran = if case == "default" {
+                    forms.clone()
+                } else {
+                    vec![]
+                };
+                set(&mut work, &[], "cxx_forms", Value::strings(ran));
+            }
             let mut status = "measured";
             if case == "scope-startup" {
                 set(
@@ -425,17 +488,12 @@ fn private_tls_is_covered_only_for_the_exact_libc_and_private_version() {
         ),
     ]);
     let check = |owner: &Value, parsed: &Value, certificate: Option<&Value>| {
-        linux::conditional_coverage(
-            parsed,
-            owner,
-            certificate,
-            &f.linked,
-            Some(&f.observer),
-            Some(&f.probe),
-        )
-        .get("remaining_uncovered")
-        .cloned()
-        .unwrap()
+        let admission =
+            linux::Admission::new(certificate, &f.linked, Some(&f.observer), Some(&f.probe));
+        linux::conditional_coverage(parsed, owner, admission.as_ref())
+            .get("remaining_uncovered")
+            .cloned()
+            .unwrap()
     };
     assert_eq!(
         check(&owner, &parsed, Some(&certificate)),
@@ -522,11 +580,331 @@ fn allocator_imports_keep_raw_versions_and_flag_uncovered_entry_points() {
     );
     assert_eq!(
         parsed.get("uncovered"),
-        Some(&Value::strings(["_Znwm", "clone", "mmap64", "strdup"]))
+        Some(&Value::strings(["_Znwm", "clone", "mmap64"]))
     );
     assert!(linux::allocator_symbols("malloc X\n", true).is_err());
-    let darwin = linux::allocator_symbols("_malloc\n_free\n  _strdup  \n_read\n", false).unwrap();
-    assert_eq!(darwin.get("uncovered"), Some(&Value::strings(["strdup"])));
+    let darwin =
+        linux::allocator_symbols("_malloc\n_free\n  _strdup  \n_valloc\n_read\n", false).unwrap();
+    assert_eq!(darwin.get("uncovered"), Some(&Value::strings(["valloc"])));
+}
+
+/// What remains uncovered of a worker's `listing` under `certificate`.
+fn remaining(f: &Fixture, listing: &str, certificate: Option<&Value>) -> Value {
+    let parsed = linux::allocator_symbols(listing, true).unwrap();
+    let admission =
+        linux::Admission::new(certificate, &f.linked, Some(&f.observer), Some(&f.probe));
+    linux::conditional_coverage(&parsed, &v("{}"), admission.as_ref())
+        .get("remaining_uncovered")
+        .cloned()
+        .unwrap()
+}
+
+/// Appends `lines` to the export or import transcript at `path` in the bindings.
+fn extend(f: &mut Fixture, path: &[&str], key: &str, lines: &str) {
+    let mut node = &f.bindings;
+    for step in path {
+        node = node.get(step).unwrap();
+    }
+    let text = format!(
+        "{}\n{lines}",
+        node.get(key).and_then(Value::as_str).unwrap()
+    );
+    set(&mut f.bindings, path, key, Value::str(text));
+}
+
+fn none() -> Value {
+    Value::strings::<&str>([])
+}
+
+/// The index of the `mode` record of calibration `case`.
+fn record(f: &Fixture, mode: &str, case: &str) -> usize {
+    f.records
+        .iter()
+        .position(|r| {
+            r.get("case").and_then(Value::as_str) == Some(case)
+                && r.get("mode").and_then(Value::as_str) == Some(mode)
+        })
+        .unwrap()
+}
+
+#[test]
+fn the_current_observer_certifies_its_calibration_and_mapping_controls() {
+    let f = current();
+    let certificate = f.certify().unwrap();
+    assert_eq!(
+        certificate
+            .get("native_calibration_records")
+            .and_then(Value::as_array)
+            .map(<[_]>::len),
+        Some(36)
+    );
+    assert!(linux::certificate_valid(
+        Some(&certificate),
+        &f.linked,
+        Some(&f.observer),
+        Some(&f.probe)
+    ));
+    let mutations: Vec<Mutation> = vec![
+        // The probe did not report running a form, or reports none at all.
+        Box::new(|f| {
+            let i = record(f, "heap", "default");
+            set(
+                &mut f.records[i],
+                &["observed", "work"],
+                "cxx_forms",
+                Value::strings(["_Znwm"]),
+            );
+        }),
+        Box::new(|f| {
+            let i = record(f, "rss", "default");
+            set(
+                &mut f.records[i],
+                &["observed", "work"],
+                "cxx_forms",
+                Value::Null,
+            );
+        }),
+        // The probe does not import every form.
+        Box::new(|f| {
+            let undefined = f
+                .bindings
+                .get("probe_undefined")
+                .and_then(Value::as_str)
+                .unwrap();
+            let fewer = undefined.replace("_ZdaPvm@GLIBCXX_3.4 U", "");
+            set(&mut f.bindings, &[], "probe_undefined", Value::str(fewer));
+        }),
+        // The admitted file mapping is not reported, or with other bytes.
+        Box::new(|f| {
+            let i = record(f, "heap", FILE_MAPPING_CONTROL);
+            set(
+                &mut f.records[i],
+                &["observed", "observer"],
+                "file_mapped_bytes",
+                Value::int(0),
+            );
+        }),
+        Box::new(|f| {
+            let i = record(f, "rss", FILE_MAPPING_CONTROL);
+            set(
+                &mut f.records[i],
+                &["observed", "observer"],
+                "file_mappings",
+                Value::int(0),
+            );
+        }),
+        // A record of the earlier observer among the current one's.
+        Box::new(|f| {
+            let i = record(f, "rss", "guard-file-munmap");
+            set(
+                &mut f.records[i],
+                &["observed", "receipt"],
+                "observer",
+                Value::str("linux-glibc-v3"),
+            );
+        }),
+    ];
+    for (index, mutation) in mutations.iter().enumerate() {
+        let mut f = current();
+        mutation(&mut f);
+        assert!(f.certify().is_err(), "mutation {index}");
+    }
+    for index in 0..36 {
+        let mut f = current();
+        f.records.remove(index);
+        assert!(f.certify().is_err(), "{index}");
+    }
+}
+
+#[test]
+fn operator_new_and_delete_are_covered_only_from_one_provider_of_every_form() {
+    let listing = "_Znam@GLIBCXX_3.4 U\n_ZdlPvm@GLIBCXX_3.4 U\nmalloc@GLIBC_2.17 U\n";
+    let f = current();
+    let certificate = f.certify().unwrap();
+    assert_eq!(remaining(&f, listing, Some(&certificate)), none());
+    // Without a certificate, under the earlier observer's, or at a version
+    // the probe did not run, nothing is covered.
+    assert_eq!(
+        remaining(&f, listing, None),
+        Value::strings(["_ZdlPvm", "_Znam"])
+    );
+    let mut earlier = fixture();
+    extend(
+        &mut earlier,
+        &[],
+        "probe_undefined",
+        "_Znam@GLIBCXX_3.4 U\n_ZdlPvm@GLIBCXX_3.4 U",
+    );
+    let certificate = earlier.certify().unwrap();
+    assert_eq!(
+        remaining(&earlier, listing, Some(&certificate)),
+        Value::strings(["_ZdlPvm", "_Znam"])
+    );
+    let certificate = f.certify().unwrap();
+    assert_eq!(
+        remaining(&f, "_Znam@GLIBCXX_UNTESTED U\n", Some(&certificate)),
+        Value::strings(["_Znam"])
+    );
+    // A library replacing only `_Znwm` would take the allocations libstdc++'s
+    // `_Znam` forwards to it: no form is admitted.
+    let mut partial = current();
+    extend(
+        &mut partial,
+        &["defined_objects"],
+        "/sealed/libc.so.6",
+        "_Znwm@@GLIBCXX_3.4 T 100 20",
+    );
+    let certificate = partial.certify().unwrap();
+    assert_eq!(
+        remaining(&partial, listing, Some(&certificate)),
+        Value::strings(["_ZdlPvm", "_Znam"])
+    );
+    // Nor when the observer is the only provider.
+    let mut observed = current();
+    let forms = observed
+        .bindings
+        .get("defined_objects")
+        .and_then(|d| d.get(LIBSTDCXX))
+        .cloned();
+    set(
+        &mut observed.bindings,
+        &["defined_objects"],
+        LIBSTDCXX,
+        Value::str(""),
+    );
+    let exports = format!(
+        "{}\n{}",
+        observed
+            .bindings
+            .get("observer_exports")
+            .and_then(Value::as_str)
+            .unwrap(),
+        forms.as_ref().and_then(Value::as_str).unwrap()
+    );
+    set(
+        &mut observed.bindings,
+        &[],
+        "observer_exports",
+        Value::str(&exports),
+    );
+    set(
+        &mut observed.bindings,
+        &["defined_objects"],
+        "/sealed/allocations.so",
+        Value::str(&exports),
+    );
+    let certificate = observed.certify().unwrap();
+    assert_eq!(
+        remaining(&observed, listing, Some(&certificate)),
+        Value::strings(["_ZdlPvm", "_Znam"])
+    );
+}
+
+#[test]
+fn only_a_weak_import_nothing_defines_is_covered() {
+    let hook = "_ZN9__gnu_cxx21zoneinfo_dir_overrideEv";
+    let mut f = current();
+    let certificate = f.certify().unwrap();
+    for weak in [
+        format!("{hook} w\nfree@GLIBC_2.17 U\n"),
+        format!("{hook} v\n"),
+        format!("{hook}@GLIBCXX_3.4.30 w\n"),
+    ] {
+        assert_eq!(remaining(&f, &weak, Some(&certificate)), none(), "{weak}");
+        assert_eq!(remaining(&f, &weak, None), Value::strings([hook]));
+    }
+    for strong in [format!("{hook} U\n"), format!("{hook} w\n{hook} U\n")] {
+        assert_eq!(
+            remaining(&f, &strong, Some(&certificate)),
+            Value::strings([hook])
+        );
+    }
+    extend(
+        &mut f,
+        &["defined_objects"],
+        LIBSTDCXX,
+        &format!("{hook} T 100 20"),
+    );
+    let certificate = f.certify().unwrap();
+    assert_eq!(
+        remaining(&f, &format!("{hook} w\n"), Some(&certificate)),
+        Value::strings([hook])
+    );
+}
+
+/// `data` as observer `observer` listing the first `hooks` hooks.
+fn hooked(mut data: Value, observer: &str, hooks: usize) -> Value {
+    set(&mut data, &[], "observer", Value::str(observer));
+    if observer == OBSERVER {
+        for key in ["file_mappings", "file_mapped_bytes"] {
+            set(&mut data, &[], key, Value::int(0));
+        }
+    }
+    set(
+        &mut data,
+        &[],
+        "symbol_order",
+        Value::strings(linux::ALLOCATORS[..hooks].iter().copied()),
+    );
+    for key in ["symbol_attempts", "symbol_successes", "symbol_failures"] {
+        set(
+            &mut data,
+            &[],
+            key,
+            Value::Array(vec![Value::int(1); hooks]),
+        );
+    }
+    data
+}
+
+#[test]
+fn the_current_observer_lists_eight_hooks_and_earlier_ones_six() {
+    let valid = |data: Value, mode: &str| linux::valid_receipt(&data, mode);
+    assert!(valid(hooked(receipt("heap"), "linux-glibc-v2", 6), "heap"));
+    assert!(!valid(hooked(receipt("heap"), "linux-glibc-v2", 8), "heap"));
+    assert!(valid(hooked(kernel_receipt(), "linux-glibc-v3", 6), "rss"));
+    assert!(!valid(hooked(kernel_receipt(), "linux-glibc-v3", 8), "rss"));
+    assert!(valid(hooked(kernel_receipt(), OBSERVER, 8), "rss"));
+    for hooks in [6, 7] {
+        assert!(!valid(hooked(kernel_receipt(), OBSERVER, hooks), "rss"));
+    }
+    let mut short = hooked(kernel_receipt(), OBSERVER, 8);
+    set(
+        &mut short,
+        &[],
+        "symbol_failures",
+        Value::Array(vec![Value::int(0); 6]),
+    );
+    assert!(!valid(short, "rss"));
+}
+
+#[test]
+fn the_kernel_ceiling_adds_each_admitted_file_mapping() {
+    let mapped = |bytes: i64, upper: i64| {
+        let mut data = hooked(kernel_receipt(), OBSERVER, 8);
+        set(&mut data, &[], "file_mappings", Value::int(1));
+        set(&mut data, &[], "file_mapped_bytes", Value::int(bytes));
+        set(
+            &mut data,
+            &[],
+            "rss_peak_upper_bound_bytes",
+            Value::int(upper),
+        );
+        linux::valid_receipt(&data, "rss")
+    };
+    // Kernel bound 196,608 bytes and VmPeak 262,144 bytes.
+    assert!(mapped(8192, 204_800));
+    assert!(!mapped(8192, 196_608));
+    assert!(mapped(131_072, 262_144));
+    let mut earlier = kernel_receipt();
+    set(&mut earlier, &[], "file_mapped_bytes", Value::int(8192));
+    set(
+        &mut earlier,
+        &[],
+        "rss_peak_upper_bound_bytes",
+        Value::int(204_800),
+    );
+    assert!(!linux::valid_receipt(&earlier, "rss"));
 }
 
 /// A Linux v2 observer receipt with every provenance field.
@@ -923,8 +1301,11 @@ impl super::memory::Host for FakeHost {
                 .collect::<Vec<_>>()
                 .join("\n")
         };
+        let forms: Vec<String> = linux::cxx_forms("m").into_iter().collect();
+        let forms: Vec<&str> = forms.iter().map(String::as_str).collect();
         Ok(if args.contains(&"--defined-only") {
             match file.as_str() {
+                "libstdc++.so.6" => lines(&forms, "@@GLIBCXX_3.4 T 100 20"),
                 "libc.so.6" => lines(&GUARD_ORDER, "@@GLIBC_2.17 T 100 20"),
                 "ld-linux-aarch64.so.1" => lines(&TLS_IMPORTS, "@@GLIBC_PRIVATE T 100 20"),
                 "allocations.so" => {
@@ -937,7 +1318,11 @@ impl super::memory::Host for FakeHost {
             }
         } else {
             match file.as_str() {
-                "memory-check" => lines(&GUARD_ORDER, "@GLIBC_2.17 U"),
+                "memory-check" => format!(
+                    "{}\n{}",
+                    lines(&GUARD_ORDER, "@GLIBC_2.17 U"),
+                    lines(&forms, "@GLIBCXX_3.4 U")
+                ),
                 "libc.so.6" => lines(&TLS_IMPORTS, "@GLIBC_PRIVATE U"),
                 "ld-linux-aarch64.so.1" => String::new(),
                 _ => "malloc@GLIBC_2.17 U\nfree@GLIBC_2.17 U\nmmap64@GLIBC_2.17 U\nmunmap@GLIBC_2.17 U\n".into(),
@@ -966,6 +1351,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
         "memory-check",
         "libc.so.6",
         "ld-linux-aarch64.so.1",
+        "libstdc++.so.6",
     ] {
         std::fs::write(harness.join(name), format!("authored {name}")).unwrap();
     }
@@ -988,7 +1374,11 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
             ),
         ])
     };
-    let libraries = Value::Array(vec![library("libc.so.6"), library("ld-linux-aarch64.so.1")]);
+    let libraries = Value::Array(vec![
+        library("libc.so.6"),
+        library("ld-linux-aarch64.so.1"),
+        library("libstdc++.so.6"),
+    ]);
     let linked = Value::object(["candidate", "reference", "probe", "observer"].map(|role| {
         let file = match role {
             "probe" => "memory-check",
@@ -1023,7 +1413,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
     }));
     let mut host = FakeHost {
         root: harness.clone(),
-        records: fixture().records,
+        records: current().records,
         linked,
         calls: std::cell::RefCell::default(),
         corrupt: false,
@@ -1037,14 +1427,14 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
         "{:?}",
         result.get("errors")
     );
-    assert_eq!(host.calls.borrow().len(), 28);
+    assert_eq!(host.calls.borrow().len(), 36);
     let certificate = result.get("runtime_guard_certificate").unwrap();
     assert_eq!(
         certificate
             .get("native_calibration_records")
             .and_then(Value::as_array)
             .map(<[_]>::len),
-        Some(28)
+        Some(36)
     );
     let Some(Value::Object(details)) = result.get("allocator_import_details") else {
         panic!()
@@ -1070,7 +1460,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
             .get("attempted_guard_calibration")
             .and_then(Value::as_array)
             .map(<[_]>::len),
-        Some(28)
+        Some(36)
     );
     let key = format!("candidate:{}", path("candidate"));
     assert!(
@@ -1119,5 +1509,92 @@ fn a_shared_object_resolves_with_the_given_interpreter() {
     assert!(linux::linked_libraries(&object, None).is_err());
     let linked = linux::linked_libraries(&object, Some(interpreter)).unwrap();
     assert_eq!(linked.get("interpreter"), Some(&Value::str(interpreter)));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// The observer and probe as `build-workers` builds them: the probe's exact
+/// heap peak, which every hook and all twenty operator new and delete forms
+/// contribute to while held live together, is the observer's, and a read-only
+/// file mapping in the window is admitted and reported.
+#[cfg(target_os = "linux")]
+#[test]
+fn the_built_observer_counts_every_hook_and_operator_new_form() {
+    use std::process::Command;
+    let dir = crate::walk::scratch("observer-probe");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap();
+    for argv in super::build::instrumentation_commands("cc", root, &dir, true) {
+        assert!(
+            Command::new(&argv[0])
+                .args(&argv[1..])
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    let imports = Command::new("nm")
+        .args(["-D", "--undefined-only", "--format=posix"])
+        .arg(dir.join("memory-check"))
+        .output()
+        .unwrap();
+    let forms = String::from_utf8(imports.stdout)
+        .unwrap()
+        .lines()
+        .filter(|l| {
+            ["_Znw", "_Zna", "_Zdl", "_Zda"]
+                .iter()
+                .any(|p| l.starts_with(p))
+        })
+        .count();
+    assert_eq!(forms, 20);
+    let run = |case: &str| {
+        let receipt = dir.join(format!("{case}.json"));
+        let output = Command::new(dir.join("memory-check"))
+            .arg(case)
+            .env("LD_PRELOAD", dir.join("allocations.so"))
+            .env("TRIERGON_ALLOCATION_REPORT", &receipt)
+            .env("TRIERGON_MEMORY_MODE", "heap")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{case}");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let work = v(stdout.lines().last().unwrap());
+        (work, v(&std::fs::read_to_string(&receipt).unwrap()))
+    };
+    let (work, data) = run("default");
+    assert!(linux::valid_receipt(&data, "heap"));
+    assert_eq!(data.get("observer"), Some(&Value::str(OBSERVER)));
+    assert_eq!(data.get("heap_peak_bytes"), work.get("expected_peak_bytes"));
+    assert_eq!(data.get("heap_live_end"), data.get("heap_live_start"));
+    assert_eq!(
+        data.get("symbol_order"),
+        Some(&Value::strings(linux::ALLOCATORS))
+    );
+    let hits = data
+        .get("symbol_successes")
+        .and_then(Value::as_array)
+        .unwrap();
+    assert!(
+        hits.iter()
+            .all(|n| linux::py_int(Some(n)).is_some_and(|n| n > 0))
+    );
+    assert_eq!(
+        work.get("cxx_forms")
+            .and_then(Value::as_array)
+            .map(<[_]>::len),
+        Some(20)
+    );
+    // A read-only file mapping in the window is admitted and reported; a
+    // writable one still invalidates the receipt.
+    let (work, data) = run(FILE_MAPPING_CONTROL);
+    assert!(linux::valid_receipt(&data, "heap"));
+    assert_eq!(data.get("file_mappings"), Some(&Value::int(1)));
+    assert_eq!(
+        data.get("file_mapped_bytes"),
+        work.get("expected_file_mapped_bytes")
+    );
+    let (_, data) = run("guard-file-writable");
+    assert_eq!(data.get("status"), Some(&Value::str("invalid")));
     std::fs::remove_dir_all(dir).unwrap();
 }

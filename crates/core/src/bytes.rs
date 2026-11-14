@@ -209,23 +209,19 @@ impl Bytes {
     pub fn storage_address(&self) -> ByteStorageAddress {
         ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
     }
-    pub fn belongs_to(&self, budget: &Budget) -> bool {
-        self.storage.charge.budget.same_pool(budget)
-    }
-    /// Borrow the pool that charges this span's complete backing allocation.
+    /// The pool that accounts for the backing allocation.
     pub fn budget(&self) -> &Budget {
         &self.storage.charge.budget
     }
-    /// Clear a uniquely owned full allocation for another write. A shared
-    /// owner or a slice is returned intact.
-    pub fn try_reuse(mut self) -> std::result::Result<BytesWriter, Self> {
-        if self.range != (0..self.storage.data.len()) {
+    pub fn belongs_to(&self, budget: &Budget) -> bool {
+        self.budget().same_pool(budget)
+    }
+    /// Exclusive write access to a uniquely owned whole allocation, keeping its
+    /// bytes and capacity. A shared allocation or a slice is returned intact.
+    pub fn try_into_writer(mut self) -> std::result::Result<BytesWriter, Self> {
+        if self.range != (0..self.storage.data.len()) || Arc::get_mut(&mut self.storage).is_none() {
             return Err(self);
         }
-        let Some(storage) = Arc::get_mut(&mut self.storage) else {
-            return Err(self);
-        };
-        storage.data.clear();
         Ok(BytesWriter(self.storage))
     }
     /// Refills a uniquely owned allocation in place: `fill` gets its first `len` bytes
@@ -252,8 +248,9 @@ impl Bytes {
     }
 }
 
-/// Exclusive access to an existing charged byte allocation. Its capacity
-/// includes the shared owner, so publishing the new bytes needs no allocation.
+/// Exclusive access to a charged byte allocation, written in place across
+/// steps. No other handle exists while it does; [`finish`](Self::finish)
+/// publishes the bytes.
 #[derive(Debug)]
 pub struct BytesWriter(Arc<Storage>);
 
@@ -266,29 +263,44 @@ impl BytesWriter {
         self.0.charge.budget.same_pool(budget)
     }
 
-    pub fn append_repeated(&mut self, byte: u8, count: usize) -> Result<()> {
-        self.append_runs([(byte, count)])
-    }
-
-    /// Append runs to this allocation. Check the combined length before
-    /// writing any pixels so a rejected append leaves the writer intact.
-    pub fn append_runs<const N: usize>(&mut self, runs: [(u8, usize); N]) -> Result<()> {
-        let data = &mut Arc::get_mut(&mut self.0)
-            .expect("byte writer is the sole owner")
-            .data;
-        let end = runs.iter().try_fold(data.len(), |len, &(_, count)| {
-            len.checked_add(count).ok_or(Error::Overflow)
-        })?;
-        if end > data.capacity() {
-            return Err(Error::Limit {
-                requested: end,
-                maximum: data.capacity(),
-            });
+    /// Writes `len` bytes at `offset` through `fill`, which sees the bytes there
+    /// now: earlier contents, or zero past the earlier end. An allocation ending
+    /// before `offset + len` grows first; the growth is charged, old and new
+    /// buffers together, before it is reserved, and a refused charge or
+    /// allocation changes nothing.
+    pub fn try_write_at<T, E: From<Error>>(
+        &mut self,
+        offset: usize,
+        len: usize,
+        fill: impl FnOnce(&mut [u8]) -> std::result::Result<T, E>,
+    ) -> std::result::Result<T, E> {
+        let storage = Arc::get_mut(&mut self.0).ok_or(Error::Invalid("byte writer shared"))?;
+        let end = offset.checked_add(len).ok_or(Error::Overflow)?;
+        if end > storage.data.capacity() {
+            let held = storage.charge.bytes();
+            let during = storage
+                .data
+                .capacity()
+                .checked_add(end)
+                .and_then(|bytes| bytes.checked_add(STORAGE_BYTES))
+                .ok_or(Error::Overflow)?;
+            storage.charge.grow_to(during)?;
+            if storage
+                .data
+                .try_reserve_exact(end - storage.data.len())
+                .is_err()
+            {
+                storage.charge.shrink_by(storage.charge.bytes() - held);
+                return Err(Error::Allocation.into());
+            }
+            // The old buffer is gone: keep the charge of the one now held.
+            let after = storage.data.capacity() + STORAGE_BYTES;
+            storage.charge.resize_to(after)?;
         }
-        for (byte, count) in runs {
-            data.resize(data.len() + count, byte);
+        if end > storage.data.len() {
+            storage.data.resize(end, 0);
         }
-        Ok(())
+        fill(&mut storage.data[offset..end])
     }
 
     pub fn finish(self) -> Bytes {
@@ -470,11 +482,24 @@ impl<T> BudgetVec<T> {
         if target <= self.capacity() {
             return Ok(());
         }
-        self.grow_allocation(target)
+        self.reallocate(target)
     }
+    /// Gives back the capacity beyond `min_capacity` elements, or beyond the
+    /// length if that is more: the elements move to an allocation of that
+    /// size, charged before the old one is returned. A refused charge or
+    /// allocation leaves the vector as it was.
+    pub fn try_shrink_to(&mut self, min_capacity: usize) -> Result<()> {
+        let target = min_capacity.max(self.len());
+        if target >= self.capacity() {
+            return Ok(());
+        }
+        self.reallocate(target)
+    }
+    /// Moves the elements to an allocation of exactly `target` elements, at
+    /// least the length.
     #[cold]
     #[inline(never)]
-    fn grow_allocation(&mut self, target: usize) -> Result<()> {
+    fn reallocate(&mut self, target: usize) -> Result<()> {
         let size = target.checked_mul(size_of::<T>()).ok_or(Error::Overflow)?;
         // The replacement is charged on top of the current allocation's charge
         // for the whole copy, and the old part is returned only after the old
@@ -515,10 +540,28 @@ impl<T> BudgetVec<T> {
         Ok(())
     }
 
+    /// Room for `additional` more elements, grown as `try_push` grows: to
+    /// twice the capacity (at least 4) where that is more than needed, and
+    /// exactly what is needed where the budget allows no more. A refused
+    /// charge or allocation leaves the vector as it was.
+    #[inline]
+    pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
+        let needed = self.len().checked_add(additional).ok_or(Error::Overflow)?;
+        if needed <= self.capacity() {
+            return Ok(());
+        }
+        self.grow_amortized(needed)
+    }
+
     #[cold]
     #[inline(never)]
     fn grow_for_push(&mut self) -> Result<()> {
         let needed = self.len().checked_add(1).ok_or(Error::Overflow)?;
+        self.grow_amortized(needed)
+    }
+
+    /// Grows to at least `needed`, geometrically where the budget allows.
+    fn grow_amortized(&mut self, needed: usize) -> Result<()> {
         let target = needed.max(self.capacity().saturating_mul(2).max(4));
         self.grow_to(target).or_else(|error| {
             if target != needed
@@ -702,8 +745,53 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bytes, BytesView, nonzero_prefix_len};
+    use super::{BudgetVec, Bytes, BytesView, nonzero_prefix_len};
     use crate::Budget;
+
+    #[test]
+    fn reserving_grows_geometrically_and_exactly_at_the_limit() {
+        // Growth charges the new buffer alongside the old until the copy.
+        let pool = Budget::new(Budget::control_storage_bytes() + 40).unwrap();
+        let mut vec = BudgetVec::<u8>::new(&pool);
+        vec.try_reserve(3).unwrap();
+        assert_eq!(vec.capacity(), 4);
+        vec.try_extend_from_slice(b"abcd").unwrap();
+        vec.try_reserve(1).unwrap();
+        assert_eq!(vec.capacity(), 8);
+        vec.try_extend_from_slice(b"efgh").unwrap();
+        vec.try_reserve(8).unwrap();
+        assert_eq!(vec.capacity(), 16);
+        vec.try_extend_from_slice(&[0; 8]).unwrap();
+        // Doubling to 32 beside the 16 would need 48 of the 40: exactly 17.
+        vec.try_reserve(1).unwrap();
+        assert_eq!(vec.capacity(), 17);
+        assert_eq!(&vec.as_slice()[..8], b"abcdefgh");
+        // Beyond the pool even exactly: refused, and the vector unchanged.
+        assert!(vec.try_reserve(100).is_err());
+        assert_eq!((vec.len(), vec.capacity()), (16, 17));
+    }
+
+    #[test]
+    fn shrinking_keeps_the_elements_and_returns_the_charge() {
+        let pool = Budget::new(1 << 16).unwrap();
+        let mut vec = BudgetVec::new(&pool);
+        vec.try_reserve_exact(100).unwrap();
+        for i in 0..10_u64 {
+            vec.try_push(i).map_err(|e| e.error).unwrap();
+        }
+        let full = pool.used();
+        vec.try_shrink_to(16).unwrap();
+        assert_eq!(vec.capacity(), 16);
+        assert_eq!(vec.as_slice(), (0..10).collect::<Vec<_>>().as_slice());
+        assert_eq!(full - pool.used(), 84 * 8);
+        // Never below the length, and never growing.
+        vec.try_shrink_to(0).unwrap();
+        assert_eq!(vec.capacity(), 10);
+        vec.try_shrink_to(64).unwrap();
+        assert_eq!(vec.capacity(), 10);
+        drop(vec);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 
     #[test]
     fn borrowed_ranges_do_not_clone_storage_and_owned_ranges_keep_the_full_charge() {

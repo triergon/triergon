@@ -48,17 +48,33 @@ and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
 SIMD kernels.
 
+For ADTS packets carrying an explicit container priming edit, use
+`compat::aac::adts_decoder(PrimingPolicy::Container)` and apply the edit to
+the decoded PCM. The default AAC decoder uses the encoder signature.
+
+Use `TrackDecoder::aac_access_units_in` to decode raw AAC-LC from a checked
+AudioSpecificConfig with a fixed layout or a Program Configuration Element.
+`TrackDecoder::aac_access_units_with_layout_in` accepts
+`compat::aac::Policy::ConventionalSurround` for fixed layouts. Call
+`TrackDecoder::into_decoder` to use the configured decoder in an audio session.
+With parsed facts for a fixed layout, `AacAccessUnitConfig::decoder_with_layout_in`
+also builds a decoder for an audio session.
+
 ## Supported
 
 | Stream | Input | Output |
 |---|---|---|
 | Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
-| Audio | AC-3, E-AC-3, AAC (ADTS), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
+| Audio | AC-3, E-AC-3, AAC (ADTS or configured raw LC), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
-configuration (`audio_configuration`: Matroska CodecPrivate, ISO BMFF `dfLa`/`dOps`,
-Ogg headers), and its `decode(packet, frame)` drops what the container marks for
+configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
+generic AAC track decoder takes ADTS. For raw packets, call
+`TrackDecoder::aac_access_units_in` with the AudioSpecificConfig of the packet's
+sample description. Callers with parsed facts for a fixed layout can construct an
+`AacAccessUnitConfig` and build the same decoder for an `AudioSession`.
+`TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
 start trim carrying into the next packet when it is longer than one. `Discard::of(packet)`
@@ -98,6 +114,9 @@ input).
   Pro Logic II surround encoding) are honoured. A layout without speaker positions
   mixes as FFmpeg's default layout for its channel count, and 16-bit frames (FLAC) mix
   in integers as FFmpeg's resampler mixes them ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)).
+  Float mixes become s16 rounded toward negative infinity and saturated (`mix::to_s16`),
+  with a conversion, a comparison and integer saturation: no `floorf` call on 32-bit
+  ARM, which has no rounding instruction.
 - **Stream selection.** `StreamSelection` names a stream's video codec and its
   audio codec, if any. `StreamSelection::load` starts both sessions with the
   matching decoders; with `audio: None` the audio session stays `Idle`.

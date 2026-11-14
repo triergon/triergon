@@ -15,6 +15,7 @@ mod checksum;
 mod colour;
 mod content;
 mod header;
+mod mp4_range;
 mod reference_encodings;
 mod seek;
 mod timing;
@@ -39,6 +40,10 @@ struct Test {
 }
 
 const TESTS: &[Test] = &[
+    Test {
+        name: "transport::ordered_reference_entities",
+        run: |cx| crate::harness::build::test_transport_entities(cx.root),
+    },
     Test {
         name: "capture_contract::encoder_rate_loop_matches_the_approved_contract",
         run: capture_contract::encoder_rate_loop_matches_the_approved_contract,
@@ -88,6 +93,10 @@ const TESTS: &[Test] = &[
         run: header::header_encoding_does_not_rewrite_source_timing,
     },
     Test {
+        name: "mp4_range::opus_recovery_refuses_invalid_roll_maps",
+        run: mp4_range::opus_recovery_refuses_invalid_roll_maps,
+    },
+    Test {
         name: "reference_encodings::combined_private_scope_is_an_explicit_unsupported_reference_case",
         run: reference_encodings::combined_private_scope_is_an_explicit_unsupported_reference_case,
     },
@@ -134,7 +143,7 @@ pub fn run(root: &Path, filter: Option<&str>) -> Result<(), String> {
     if selected.is_empty() {
         return Err(format!("no worker test matches {}", filter.unwrap_or("")));
     }
-    let workers = Workers::new(root);
+    let workers = Workers::new(root)?;
     if let Some(missing) = workers.all().iter().find(|w| !w.is_file()) {
         return Err(format!(
             "{} is missing; run `cargo xtask build-workers` first",
@@ -199,12 +208,14 @@ pub struct Workers {
 }
 
 impl Workers {
-    fn new(root: &Path) -> Self {
-        Workers {
-            candidate: root.join("target/release/media-worker"),
+    fn new(root: &Path) -> Result<Self, String> {
+        Ok(Workers {
+            candidate: root
+                .join(crate::harness::gate_build::release_dir()?)
+                .join("media-worker"),
             reference: root.join("target/harness/ffmpeg-worker"),
             combined: root.join("target/harness/ffmpeg-combined-worker"),
-        }
+        })
     }
 
     fn all(&self) -> [&Path; 3] {

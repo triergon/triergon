@@ -12,9 +12,9 @@ use std::process::Command;
 use crate::json::{self, Value};
 use crate::sha256;
 
-/// Explicit inputs shared by container and playback operations. Changing an
-/// operation's inputs requires a fresh build identity.
-pub fn matroska_inputs() -> Vec<String> {
+/// Shared harness sources and the inputs named by every registered contract.
+/// A change requires a fresh build identity.
+pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
     let mut names: Vec<String> = [
         "specs/sources.json",
         "harness/fate/index.json",
@@ -26,6 +26,8 @@ pub fn matroska_inputs() -> Vec<String> {
         "xtask/src/harness/gate_build.rs",
         "xtask/src/harness/grade.rs",
         "xtask/src/harness/diff.rs",
+        "xtask/src/harness/features.rs",
+        "xtask/src/generators.rs",
         "xtask/src/harness/linux.rs",
         "xtask/src/harness/memory.rs",
         "xtask/src/harness/oracle.rs",
@@ -67,39 +69,39 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/features/progressive-ts188/inputs/duplicate-control-44100.ts",
         "harness/features/progressive-ts188/inputs/legal-duplicate-44100.ts",
         "harness/reference_mp4_range.h",
+        "harness/reference_mp4_roll.h",
         "harness/reference_packet_fold.h",
         "harness/reference_matroska_audio.h",
         "harness/reference_mp4_forward.h",
         "harness/reference_ts_program.h",
         "harness/reference_raw_video.h",
         "harness/reference_ts.h",
+        "harness/reference_ts_sequence.h",
+        "harness/reference_pgs.h",
+        "harness/reference_subtitle_text.h",
+        "harness/subtitle_corpus.py",
     ]
     .map(String::from)
     .to_vec();
-    for feature in [
-        "matroska-demux",
-        "matroska-header-removal",
-        "matroska-zlib",
-        "matroska-cues-preroll",
-        "matroska-colour",
-        "matroska-segment-metadata",
-        "matroska-startup-seek",
-        "hls-segments",
-        "progressive-ts188",
-        "mp4-range",
-        "matroska-audio-clocks",
-        "mp4-forward",
-        "ts-program",
-        "raw-annex-b",
-        "mpegts-pes",
-    ] {
-        for file in ["contract", "corpus"] {
-            names.push(format!("harness/features/{feature}/{file}.json"));
+    for contract in super::features::discover(root)? {
+        let id = &contract.id;
+        names.push(format!("harness/features/{id}/contract.json"));
+        let generator =
+            crate::generators::for_contract(&contract.document).filter(|_| contract.generated());
+        let manifest = contract.manifest();
+        if manifest.is_file() {
+            names.push(format!("harness/features/{id}/corpus.json"));
+        } else if generator.is_none() {
+            return Err(format!("{}: no corpus manifest", manifest.display()));
+        }
+        if let Some(generator) = generator {
+            names.extend(generator.inputs(root, id));
         }
     }
-    // Features whose manifests are generated from their pins and committed inputs.
-    names.extend(crate::lanes::provenance_inputs());
-    names
+    names.extend(crate::transport_fixtures::source_inputs());
+    names.sort_unstable();
+    names.dedup();
+    Ok(names)
 }
 
 /// `cargo metadata` for the host target, as the build ran it.
@@ -112,17 +114,7 @@ pub(crate) fn cargo_metadata_with_features(
     root: &Path,
     features: &[String],
 ) -> Result<Value, String> {
-    let rustc = Command::new("rustc")
-        .arg("-Vv")
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("rustc: {e}"))?;
-    let version = String::from_utf8_lossy(&rustc.stdout).into_owned();
-    let host = version
-        .lines()
-        .find_map(|l| l.strip_prefix("host: "))
-        .ok_or("rustc reports no host")?
-        .to_owned();
+    let target = super::gate_build::worker_target()?;
     let mut command = Command::new("cargo");
     command.args([
         "metadata",
@@ -131,7 +123,7 @@ pub(crate) fn cargo_metadata_with_features(
         "--locked",
         "--offline",
         "--filter-platform",
-        &host,
+        target,
     ]);
     if !features.is_empty() {
         command.arg("--features").arg(features.join(","));
@@ -446,7 +438,7 @@ pub fn source_identity_error(root: &Path, identity: &Value) -> Option<String> {
                     root,
                     &cargo_metadata(root)?,
                     "media-worker",
-                    &matroska_inputs(),
+                    &shared_inputs(root)?,
                 )?;
                 let same = identity
                     .get("selected_graph")
@@ -509,7 +501,7 @@ mod tests {
             root,
             &cargo_metadata(root).unwrap(),
             "media-worker",
-            &matroska_inputs(),
+            &shared_inputs(root).unwrap(),
         )
         .unwrap();
         let packages = graph.get("packages").and_then(Value::as_array).unwrap();
@@ -546,9 +538,10 @@ mod tests {
                 "missing source binding: {name}"
             );
         }
-        for feature in crate::lanes::LANES.iter().flat_map(|lane| lane.features) {
-            for file in ["contract", "pins"] {
-                let name = format!("harness/features/{feature}/{file}.json");
+        for contract in crate::harness::features::discover(root).unwrap() {
+            let id = &contract.id;
+            for file in ["contract", "corpus", "pins"] {
+                let name = format!("harness/features/{id}/{file}.json");
                 assert!(
                     shared.get(&name).is_some() || !root.join(&name).exists(),
                     "missing source binding: {name}"

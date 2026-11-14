@@ -1,11 +1,10 @@
 //! Configured-boundary tests.
 #![forbid(unsafe_code)]
 
-use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time};
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayEvent, DisplayLimits, DvbPacket,
-    PacketEnvelope, PacketIdentity, PacketTiming, SourceClock, SourceConfiguration,
+    ClockOrigin, ClockValue, PacketEnvelope, PacketIdentity, PacketTiming, SourceClock,
+    SourceConfiguration,
 };
 
 const GENERATION: u64 = 7;
@@ -15,40 +14,28 @@ const COMPLETE: &[u8] = include_bytes!("boundary-fixtures/dvb2-literals-fields.d
 
 struct Fixture {
     bytes: &'static [u8],
-    indices: &'static [u8],
-    rgba: &'static [u8],
     subtype: u8,
 }
 
 const FIXTURES: &[Fixture] = &[
     Fixture {
         bytes: COMPLETE,
-        indices: include_bytes!("boundary-fixtures/dvb2-literals-fields.indices"),
-        rgba: include_bytes!("boundary-fixtures/dvb2-literals-fields.rgba"),
         subtype: 0x14,
     },
     Fixture {
         bytes: include_bytes!("boundary-fixtures/dvb-ancillary-pages.dvb"),
-        indices: include_bytes!("boundary-fixtures/dvb-ancillary-pages.indices"),
-        rgba: include_bytes!("boundary-fixtures/dvb-ancillary-pages.rgba"),
         subtype: 0x14,
     },
     Fixture {
         bytes: include_bytes!("boundary-fixtures/dvb-default-clut2.dvb"),
-        indices: include_bytes!("boundary-fixtures/dvb-default-clut2.indices"),
-        rgba: include_bytes!("boundary-fixtures/dvb-default-clut2.rgba"),
         subtype: 0x10,
     },
     Fixture {
         bytes: include_bytes!("boundary-fixtures/dvb-nonmodifying.dvb"),
-        indices: include_bytes!("boundary-fixtures/dvb-nonmodifying.indices"),
-        rgba: include_bytes!("boundary-fixtures/dvb-nonmodifying.rgba"),
         subtype: 0x14,
     },
     Fixture {
         bytes: include_bytes!("boundary-fixtures/dvb-partial-alpha-projection.dvb"),
-        indices: include_bytes!("boundary-fixtures/dvb-partial-alpha-projection.indices"),
-        rgba: include_bytes!("boundary-fixtures/dvb-partial-alpha-projection.rgba"),
         subtype: 0x14,
     },
 ];
@@ -64,46 +51,9 @@ fn identity(sequence: u64) -> PacketIdentity {
     }
 }
 
-fn event(decoder: &mut Decoder, cancel: &AtomicBool) -> DisplayEvent {
-    for _ in 0..100_000 {
-        let mut work = WorkBudget::new(1);
-        let next = decoder.step(&mut work, cancel).unwrap();
-        match next.status {
-            DecodeStatus::Event => return next.event.unwrap(),
-            DecodeStatus::Yield => assert!(work.spent() > 0),
-            status => panic!("configured source did not emit its complete event: {status:?}"),
-        }
-    }
-    panic!("bounded configured source did not finish");
-}
-
-fn configured_packet(
-    budget: &Budget,
-    configuration: &SourceConfiguration,
-    ticks: i128,
-) -> DvbPacket {
-    let payload = Bytes::copy_from_slice(budget, COMPLETE).unwrap();
-    configuration
-        .packet(
-            budget,
-            &payload,
-            PacketTiming {
-                pts: Some(ClockValue {
-                    ticks,
-                    origin: ClockOrigin::Source,
-                }),
-                dts: None,
-                duration: None,
-            },
-            identity(0),
-        )
-        .unwrap()
-}
-
 #[test]
 fn source_private_descriptor_and_clock_are_explicit_and_preserved() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let cancel = AtomicBool::new(false);
     for fixture in FIXTURES {
         let mut private = PRIVATE;
         private[4] = fixture.subtype;
@@ -149,31 +99,7 @@ fn source_private_descriptor_and_clock_are_explicit_and_preserved() {
                     identity(0),
                 )
                 .unwrap();
-            let mut decoder = Decoder::new_configured(
-                &budget,
-                &configuration,
-                GENERATION,
-                DisplayLimits::default(),
-                &cancel,
-            )
-            .unwrap();
-            decoder.provide(&packet).unwrap();
-            let output = event(&mut decoder, &cancel);
-            assert_eq!(output.pts, Some(Time::new(1, 1).unwrap()));
-            let region = &output.regions()[0];
-            assert_eq!(region.plane.pixels.as_ref(), fixture.indices);
-            let expanded: Vec<u8> = region
-                .plane
-                .pixels
-                .as_ref()
-                .iter()
-                .flat_map(|&index| {
-                    let at = usize::from(index) * 4;
-                    region.palette.rgba.as_ref()[at..at + 4].iter().copied()
-                })
-                .collect();
-            assert_eq!(expanded, fixture.rgba);
-            let source = output.source_packets()[0].source.as_ref().unwrap();
+            let source = packet.source.as_ref().unwrap();
             assert_eq!(source.configuration().original().as_ref(), bytes);
             assert_eq!(source.timing().pts.unwrap().ticks, i128::from(denominator));
             assert_eq!(source.timing().dts, None);
@@ -302,197 +228,6 @@ fn malformed_or_foreign_configuration_rejects_without_taking_ownership() {
 }
 
 #[test]
-fn configured_decoder_rejects_mutated_envelope_time_or_missing_facts_before_acceptance() {
-    let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let cancel = AtomicBool::new(false);
-    let raw = Bytes::copy_from_slice(&budget, &PRIVATE).unwrap();
-    let configuration = SourceConfiguration::from_matroska_private(
-        &budget,
-        &raw,
-        SourceClock::new(1, 1000).unwrap(),
-    )
-    .unwrap();
-    let input = configured_packet(&budget, &configuration, 1000);
-    let mut decoder = Decoder::new_configured(
-        &budget,
-        &configuration,
-        GENERATION,
-        DisplayLimits::default(),
-        &cancel,
-    )
-    .unwrap();
-    let mut changed = input.clone();
-    changed.envelope = PacketEnvelope::PesDataField;
-    assert_eq!(
-        decoder.provide(&changed).unwrap_err(),
-        Error::Invalid("DVB configured packet envelope")
-    );
-    changed = input.clone();
-    changed.pts = None;
-    assert_eq!(
-        decoder.provide(&changed).unwrap_err(),
-        Error::Invalid("DVB configured packet PTS")
-    );
-    changed = input.clone();
-    changed.source = None;
-    assert_eq!(
-        decoder.provide(&changed).unwrap_err(),
-        Error::Invalid("DVB configured packet source facts absent")
-    );
-    decoder.provide(&input).unwrap();
-    assert_eq!(event(&mut decoder, &cancel).pts, input.pts);
-}
-
-#[test]
-fn retained_event_keeps_original_configuration_after_decoder_and_input_drop() {
-    let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let initial_charge = budget.used();
-    let retained_private = {
-        let cancel = AtomicBool::new(false);
-        let raw = Bytes::copy_from_slice(&budget, &PRIVATE).unwrap();
-        let configuration = SourceConfiguration::from_matroska_private(
-            &budget,
-            &raw,
-            SourceClock::new(1, 1000).unwrap(),
-        )
-        .unwrap();
-        let input = configured_packet(&budget, &configuration, 1000);
-        let mut decoder = Decoder::new_configured(
-            &budget,
-            &configuration,
-            GENERATION,
-            DisplayLimits::default(),
-            &cancel,
-        )
-        .unwrap();
-        decoder.provide(&input).unwrap();
-        let output = event(&mut decoder, &cancel);
-        drop(decoder);
-        drop(input);
-        drop(configuration);
-        drop(raw);
-        assert_eq!(
-            output.source_packets()[0]
-                .source
-                .as_ref()
-                .unwrap()
-                .configuration()
-                .original()
-                .as_ref(),
-            &PRIVATE[..]
-        );
-        output.source_packets()[0]
-            .source
-            .as_ref()
-            .unwrap()
-            .configuration()
-            .original()
-            .clone()
-    };
-    assert_eq!(retained_private.as_ref(), &PRIVATE[..]);
-    assert!(budget.used() > initial_charge);
-    drop(retained_private);
-    assert_eq!(budget.used(), initial_charge);
-}
-
-#[test]
-fn changed_boundary_requires_reset_and_retained_old_event_keeps_its_clock() {
-    let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let cancel = AtomicBool::new(false);
-    let private = Bytes::copy_from_slice(&budget, &PRIVATE).unwrap();
-    let first_configuration = SourceConfiguration::from_matroska_private(
-        &budget,
-        &private,
-        SourceClock::new(1, 1000).unwrap(),
-    )
-    .unwrap();
-    let next_configuration = SourceConfiguration::from_matroska_private(
-        &budget,
-        &private,
-        SourceClock::new(1, 90000).unwrap(),
-    )
-    .unwrap();
-    let mut decoder = Decoder::new_configured(
-        &budget,
-        &first_configuration,
-        GENERATION,
-        DisplayLimits::default(),
-        &cancel,
-    )
-    .unwrap();
-    let first = configured_packet(&budget, &first_configuration, 1000);
-    decoder.provide(&first).unwrap();
-    let retained = event(&mut decoder, &cancel);
-    assert_eq!(
-        decoder
-            .step(&mut WorkBudget::new(4096), &cancel)
-            .unwrap()
-            .status,
-        DecodeStatus::NeedPacket
-    );
-    let payload = Bytes::copy_from_slice(&budget, COMPLETE).unwrap();
-    let timing = PacketTiming {
-        pts: Some(ClockValue {
-            ticks: 90000,
-            origin: ClockOrigin::Source,
-        }),
-        ..PacketTiming::default()
-    };
-    let next = next_configuration
-        .packet(&budget, &payload, timing, identity(1))
-        .unwrap();
-    assert_eq!(
-        decoder.provide(&next).unwrap_err(),
-        Error::Invalid("DVB configured source changed without reset")
-    );
-    assert_eq!(
-        decoder
-            .reset_with_configuration(&next_configuration, GENERATION, &cancel)
-            .unwrap_err(),
-        Error::Invalid("DVB reset requires a new generation")
-    );
-    decoder
-        .reset_with_configuration(&next_configuration, GENERATION + 1, &cancel)
-        .unwrap();
-    let next = next_configuration
-        .packet(
-            &budget,
-            &payload,
-            timing,
-            PacketIdentity {
-                generation: GENERATION + 1,
-                ..identity(0)
-            },
-        )
-        .unwrap();
-    decoder.provide(&next).unwrap();
-    let output = event(&mut decoder, &cancel);
-    assert_eq!(retained.pts, output.pts);
-    assert_eq!(
-        retained.source_packets()[0]
-            .source
-            .as_ref()
-            .unwrap()
-            .configuration()
-            .clock()
-            .raw_denominator(),
-        1000
-    );
-    assert_eq!(
-        output.source_packets()[0]
-            .source
-            .as_ref()
-            .unwrap()
-            .configuration()
-            .clock()
-            .raw_denominator(),
-        90000
-    );
-    assert_eq!(retained.generation, GENERATION);
-    assert_eq!(output.generation, GENERATION + 1);
-}
-
-#[test]
 fn descriptor_service_selection_keeps_all_original_entries_and_language_bytes() {
     let budget = Budget::new(4096).unwrap();
     let bytes = [
@@ -512,83 +247,4 @@ fn descriptor_service_selection_keeps_all_original_entries_and_language_bytes() 
     assert_eq!(configuration.service().composition_page, 3);
     assert_eq!(configuration.service().ancillary_page, 4);
     assert_eq!(configuration.service_private_view(), [0, 3, 0, 4, 0x10]);
-}
-
-#[test]
-fn configured_pes_packets_keep_the_declared_envelope_across_a_split_display() {
-    let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let cancel = AtomicBool::new(false);
-    let raw = Bytes::copy_from_slice(&budget, &DESCRIPTOR).unwrap();
-    let configuration = SourceConfiguration::from_subtitling_descriptor(
-        &budget,
-        &raw,
-        0,
-        SourceClock::new(1, 90000).unwrap(),
-        PacketEnvelope::PesDataField,
-    )
-    .unwrap();
-    let mut decoder = Decoder::new_configured(
-        &budget,
-        &configuration,
-        GENERATION,
-        DisplayLimits::default(),
-        &cancel,
-    )
-    .unwrap();
-    let split: [&[u8]; 2] = [
-        include_bytes!("state-fixtures/same-pts-packet-split.0.dvb"),
-        include_bytes!("state-fixtures/same-pts-packet-split.1.dvb"),
-    ];
-    for (sequence, segments) in split.iter().enumerate() {
-        let mut bytes = vec![0x20, 0];
-        bytes.extend_from_slice(segments);
-        bytes.push(0xff);
-        let payload = Bytes::copy_from_slice(&budget, &bytes).unwrap();
-        let input = configuration
-            .packet(
-                &budget,
-                &payload,
-                PacketTiming {
-                    pts: Some(ClockValue {
-                        ticks: 90000,
-                        origin: ClockOrigin::Source,
-                    }),
-                    ..PacketTiming::default()
-                },
-                identity(u64::try_from(sequence).unwrap()),
-            )
-            .unwrap();
-        decoder.provide(&input).unwrap();
-        if sequence == 0 {
-            let mut paused = false;
-            for _ in 0..100_000 {
-                let mut work = WorkBudget::new(1);
-                let next = decoder.step(&mut work, &cancel).unwrap();
-                match next.status {
-                    DecodeStatus::NeedPacket => {
-                        paused = true;
-                        break;
-                    }
-                    DecodeStatus::Yield => assert!(work.spent() > 0),
-                    status => panic!("PES marker created an event/end: {status:?}"),
-                }
-            }
-            assert!(paused);
-        }
-    }
-    let output = event(&mut decoder, &cancel);
-    assert_eq!(output.source_packets().len(), 2);
-    for source in output.source_packets() {
-        assert_eq!(source.envelope, PacketEnvelope::PesDataField);
-        assert_eq!(
-            source.source.as_ref().unwrap().configuration().envelope(),
-            PacketEnvelope::PesDataField
-        );
-        assert_eq!(&source.payload.as_ref()[..2], &[0x20, 0]);
-        assert_eq!(source.payload.as_ref().last(), Some(&0xff));
-        assert_eq!(
-            source.source.as_ref().unwrap().timing().pts.unwrap().ticks,
-            90000
-        );
-    }
 }

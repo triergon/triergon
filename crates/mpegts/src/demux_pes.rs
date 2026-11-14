@@ -6,11 +6,13 @@
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES};
 use crate::demux_clock::DemuxProfile;
 use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
+use crate::psi::ElementaryStream;
 use crate::{
     AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
     commit_range, limit, prepare_range,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
 };
@@ -22,9 +24,11 @@ const DEFAULT_PACKET_CAP: usize = 204_800;
 
 mod audio;
 mod compact;
+mod cutter;
 mod dvb;
 pub use audio::{PrivateAudioCarriage, PrivateAudioDescriptors};
 pub use compact::{CompactPayload, DemuxSpanView, DemuxSpanViews, PayloadCursor};
+pub use cutter::{CutPes, PesCutter, pcr_bounded_pts};
 pub use dvb::DvbSubtitlesDescriptors;
 
 /// Explicit single-program/single-PID profile from validated source signalling.
@@ -58,6 +62,47 @@ impl RegisteredCarriage {
             Self::AacAdts => (0x0f, 0xc0),
             Self::AacLatm => (0x11, 0xc0),
         }
+    }
+}
+
+/// Kind exposed by a selected PES view. DVB subtitling and teletext descriptors
+/// identify subtitle tracks. Other type 0x06 entries need an admitted observer.
+/// MPEG-1 video (0x01) stays unknown in this view. The private types 0x81 and
+/// 0x87 indicate audio and 0x90 indicates presentation graphics in this view.
+/// The caller supplies the observer for this active program map.
+pub fn selected_track_kind(
+    stream: &ElementaryStream,
+    observer: Option<&DemuxObserver>,
+) -> MediaKind {
+    if stream.stream_type == 0x01 {
+        return MediaKind::Unknown;
+    }
+    if matches!(stream.stream_type, 0x81 | 0x87) {
+        return MediaKind::Audio;
+    }
+    if stream.stream_type == 0x90 {
+        return MediaKind::Subtitle;
+    }
+    if stream.stream_type != 0x06 {
+        return stream.kind();
+    }
+    if matches!(
+        stream.codec(),
+        Some(CodecId::DvbSubtitle | CodecId::DvbTeletext)
+    ) {
+        return MediaKind::Subtitle;
+    }
+    let Some(observer) = observer.filter(|observer| {
+        observer.scope.pid == stream.pid && observer.scope.stream_type == stream.stream_type
+    }) else {
+        return MediaKind::Unknown;
+    };
+    if observer.private_audio.is_some() {
+        MediaKind::Audio
+    } else if observer.payload_format == PayloadFormat::Dvb {
+        MediaKind::Subtitle
+    } else {
+        MediaKind::Unknown
     }
 }
 
@@ -207,8 +252,33 @@ pub enum ReadyContinuation {
 }
 
 #[derive(Debug)]
+struct CarrierLayout {
+    source_offset: u64,
+    payload_source_offset: u64,
+    prefix_bytes: usize,
+    continuity_counter: u8,
+    payload_unit_start: bool,
+    discontinuity: bool,
+}
+
+impl From<&TransportPacket> for CarrierLayout {
+    fn from(packet: &TransportPacket) -> Self {
+        Self {
+            source_offset: packet.source_offset,
+            payload_source_offset: packet.payload_source_offset,
+            prefix_bytes: packet.prefix.as_ref().map_or(0, Bytes::len),
+            continuity_counter: packet.continuity_counter,
+            payload_unit_start: packet.payload_unit_start,
+            discontinuity: packet.discontinuity_indicator(),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Pending {
-    packet: TransportPacket,
+    carrier: CarrierLayout,
+    source: Bytes,
+    payload: Option<Bytes>,
     context: SourceContext,
     position: usize,
     counter_checked: bool,
@@ -520,7 +590,12 @@ impl DemuxObserver {
             && !self.ended
             && self.fault.is_none()
     }
-    #[cfg(feature = "reference-trace")]
+    pub(crate) fn recovery_pristine(&self) -> bool {
+        self.recovery_idle() && self.last_input.is_none()
+    }
+    pub(crate) fn recovery_budget(&self) -> &Budget {
+        &self.budget
+    }
     pub(crate) fn note_recovered(&mut self, counter: u8, offset: u64, ordinal: u64) {
         self.previous_counter = Some(counter);
         self.last_input = Some((ordinal, offset));
@@ -621,7 +696,26 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, false, None)
     }
-    #[cfg(feature = "reference-trace")]
+
+    /// Admit a carrier while the caller keeps the original transport event.
+    /// The observer retains only the storage and fields used to assemble PES.
+    pub fn push_borrowed(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<()> {
+        if let Some(error) = self.input_error(packet, context, false, input, false) {
+            return Err(error);
+        }
+        self.retain_carrier(
+            CarrierLayout::from(packet),
+            packet.source.clone(),
+            packet.payload.clone(),
+            context,
+        );
+        Ok(())
+    }
     #[allow(
         clippy::result_large_err,
         reason = "return original charged transport input inline"
@@ -633,9 +727,12 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, true, None)
     }
-    #[cfg(feature = "reference-trace")]
-    pub(crate) fn commit_clock_epoch(&mut self, epochs: SourceEpochs) {
-        self.scope.epochs = epochs;
+    pub(crate) fn commit_clock_epoch(&mut self, context: SourceContext) {
+        self.scope.epochs = context.epochs;
+        // The Timeline consumes an ordinal, not another physical carrier.
+        if let Some((ordinal, _)) = self.last_input.as_mut() {
+            *ordinal = (*ordinal).max(context.source_event_ordinal);
+        }
     }
     /// A drained codec-map commit. Returned old packets keep their original
     /// headers/storage. Retire only the idle internal header alias; preserve wire
@@ -646,9 +743,78 @@ impl DemuxObserver {
         self.header = None;
         self.origin = None;
     }
-    #[cfg(feature = "reference-trace")]
     pub(crate) fn recovery_counter(&self) -> Option<u8> {
         self.previous_counter
+    }
+    pub(crate) fn transport_fault_input(
+        &self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<&Budget> {
+        if let Some(error) = self.input_error(packet, context, false, input, true) {
+            return Err(error);
+        }
+        if !self.recovery_idle() {
+            return Err(Error::Invalid("selected diagnostic input not drained"));
+        }
+        if self.scope.stream_type != 0x1b
+            || self.scope.stream_id != 0xe0
+            || context.byte_run_epoch.is_some()
+        {
+            return Err(Error::Unsupported(
+                "selected diagnostic source context unobserved",
+            ));
+        }
+        Ok(&self.budget)
+    }
+    /// Idle assembly retains arena capacity, but all payload storage moved to
+    /// the emitted packet. External retained outputs are releasable pressure.
+    pub(crate) fn recovery_storage_bytes(&self) -> Result<usize> {
+        debug_assert!(self.recovery_idle());
+        debug_assert!(self.spans.is_empty());
+        self.header_ranges
+            .capacity()
+            .checked_add(self.output_header.capacity())
+            .and_then(|count| count.checked_mul(size_of::<SourceRange>()))
+            .and_then(|bytes| {
+                self.spans
+                    .capacity()
+                    .checked_mul(size_of::<DemuxSpan>())
+                    .and_then(|spans| bytes.checked_add(spans))
+            })
+            .ok_or(Error::Overflow)
+    }
+    pub(crate) fn rejected_fault_input(
+        &self,
+        packet: &crate::RejectedTransport,
+        context: SourceContext,
+    ) -> Result<&Budget> {
+        self.validate_input(None)?;
+        if !packet.bytes().belongs_to(&self.budget) {
+            return Err(Error::ForeignPool);
+        }
+        if !self.recovery_idle() {
+            return Err(Error::Invalid("selected diagnostic input not drained"));
+        }
+        if self.scope.stream_type != 0x1b
+            || self.scope.stream_id != 0xe0
+            || packet.source_id() != Some(self.scope.entity)
+            || context.epochs != self.scope.epochs
+            || context.byte_run_epoch.is_some()
+        {
+            return Err(Error::Unsupported(
+                "selected diagnostic source context unobserved",
+            ));
+        }
+        if !self.follows_input(context, packet.source_offset()) {
+            return Err(Error::Invalid("native PES source event order"));
+        }
+        packet
+            .source_offset()
+            .checked_add(u64::try_from(packet.bytes().len()).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        Ok(&self.budget)
     }
     #[allow(
         clippy::result_large_err,
@@ -661,23 +827,40 @@ impl DemuxObserver {
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        if let Some(error) = self.input_error(&packet, context, selected_boundary, input) {
+        if let Some(error) = self.input_error(&packet, context, selected_boundary, input, false) {
             return Err(PushError {
                 error,
                 value: packet,
             });
         }
-        self.last_input = Some((context.source_event_ordinal, packet.source_offset));
+        self.retain_carrier(
+            CarrierLayout::from(&packet),
+            packet.source,
+            packet.payload,
+            context,
+        );
+        Ok(())
+    }
+
+    fn retain_carrier(
+        &mut self,
+        carrier: CarrierLayout,
+        source: Bytes,
+        payload: Option<Bytes>,
+        context: SourceContext,
+    ) {
+        self.last_input = Some((context.source_event_ordinal, carrier.source_offset));
         self.entity_first = false;
         self.pending = Some(Pending {
-            packet,
+            carrier,
+            source,
+            payload,
             context,
             position: 0,
             counter_checked: false,
             started: false,
             body_drained: false,
         });
-        Ok(())
     }
 
     fn input_error(
@@ -686,6 +869,7 @@ impl DemuxObserver {
         context: SourceContext,
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
+        transport_fault: bool,
     ) -> Option<Error> {
         if let Err(error) = self.validate_input(input) {
             Some(error)
@@ -706,7 +890,7 @@ impl DemuxObserver {
             Some(Error::Unsupported(
                 "native PES source context transition unobserved",
             ))
-        } else if packet.transport_error || packet.scrambling != 0 {
+        } else if !transport_fault && (packet.transport_error || packet.scrambling != 0) {
             Some(Error::Unsupported(
                 "native PES damaged/opaque transport unobserved",
             ))
@@ -773,8 +957,48 @@ impl DemuxObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ReadyContinuation> {
-        let Some(payload) = packet.payload.as_ref() else {
+        let Some(next) = self.ready_continuation(packet, context, None, work, cancel)? else {
             return Ok(ReadyContinuation::Unhandled);
+        };
+        let bytes = packet
+            .payload
+            .take()
+            .ok_or(Error::Invalid("native PES payload missing"))?;
+        self.append_carrier_payload(packet, context, bytes, next)
+    }
+
+    /// Append from a carrier whose full transport event is still needed.
+    /// The payload keeps its original charge and the event remains intact.
+    pub fn append_ready_borrowed_continuation(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: &triergon_core::InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ReadyContinuation> {
+        let Some(next) = self.ready_continuation(packet, context, Some(input), work, cancel)?
+        else {
+            return Ok(ReadyContinuation::Unhandled);
+        };
+        let bytes = packet
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("native PES payload missing"))?
+            .clone();
+        self.append_carrier_payload(packet, context, bytes, next)
+    }
+
+    fn ready_continuation(
+        &self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<usize>> {
+        let Some(payload) = packet.payload.as_ref() else {
+            return Ok(None);
         };
         let count = payload.len();
         let next = self
@@ -783,19 +1007,28 @@ impl DemuxObserver {
             .ok_or(Error::Overflow)?;
         if packet.payload_unit_start
             || packet.discontinuity_indicator()
-            || packet.prefix.is_some()
+            || (packet.prefix.is_some() && (input.is_none() || self.demux_input.is_none()))
             || count == 0
             || !self.ready_body(packet.continuity_counter, next)
-            || self.input_error(packet, context, false, None).is_some()
+            || self
+                .input_error(packet, context, false, input, false)
+                .is_some()
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
         {
-            return Ok(ReadyContinuation::Unhandled);
+            return Ok(None);
         }
-        let bytes = packet
-            .payload
-            .take()
-            .ok_or(Error::Invalid("native PES payload missing"))?;
+        Ok(Some(next))
+    }
+
+    fn append_carrier_payload(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        bytes: Bytes,
+        next: usize,
+    ) -> Result<ReadyContinuation> {
+        let count = bytes.len();
         self.append_ready_span(
             DemuxSpan {
                 bytes,
@@ -1083,10 +1316,16 @@ impl DemuxObserver {
                 .payload_source_offset
                 .checked_add(payload.len() as u64)
                 .ok_or(Error::Overflow)?;
-            if payload.len() > 184
-                || !payload.shares_storage_with(&packet.source)
-                || packet.payload_source_offset < start
-                || payload_end > end
+            if payload.len() > 184 || packet.payload_source_offset < start || payload_end > end {
+                return Err(Error::Invalid("native TS payload bounds"));
+            }
+            let relative = usize::try_from(packet.payload_source_offset - packet.source_offset)
+                .map_err(|_| Error::Overflow)?;
+            if !packet
+                .source
+                .as_ref()
+                .get(relative..relative + payload.len())
+                .is_some_and(|span| std::ptr::eq(span, payload.as_ref()))
             {
                 return Err(Error::Invalid("native TS payload bounds"));
             }
@@ -1278,14 +1517,18 @@ impl DemuxObserver {
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let local_position = if let Some(context) = &self.demux_input {
-            context.position(&pending.packet)?
+            context.position(
+                self.scope.entity,
+                pending.carrier.source_offset,
+                pending.source.len(),
+                pending.carrier.prefix_bytes,
+            )?
         } else {
-            let prefix = pending.packet.prefix.as_ref().map_or(0, Bytes::len);
             i64::try_from(
                 pending
-                    .packet
+                    .carrier
                     .source_offset
-                    .checked_add(prefix as u64)
+                    .checked_add(pending.carrier.prefix_bytes as u64)
                     .ok_or(Error::Overflow)?,
             )
             .map_err(|_| Error::Overflow)?
@@ -1294,7 +1537,7 @@ impl DemuxObserver {
             self.media_position(u64::try_from(local_position).map_err(|_| Error::Overflow)?)?;
         self.origin = Some(SourceLocation {
             source: self.scope.entity,
-            offset: pending.packet.source_offset,
+            offset: pending.carrier.source_offset,
         });
         self.active = true;
         self.raw_header = [0; HEADER_MAX];
@@ -1436,7 +1679,7 @@ impl DemuxObserver {
     }
 
     fn finish_header(&mut self) -> Result<()> {
-        let header = parse_header(&self.raw_header, self.header_used)?;
+        let header = parse_header(&self.budget, &self.raw_header[..self.header_used])?;
         if header.stream_id != self.scope.stream_id {
             return Err(Error::Unsupported(
                 "native PES stream-id context unobserved",
@@ -1466,7 +1709,6 @@ impl DemuxObserver {
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let payload = pending
-            .packet
             .payload
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?;
@@ -1484,7 +1726,7 @@ impl DemuxObserver {
         let extent = SourceRange {
             entity: self.scope.entity,
             offset: pending
-                .packet
+                .carrier
                 .payload_source_offset
                 .checked_add(pending.position as u64)
                 .ok_or(Error::Overflow)?,
@@ -1575,7 +1817,6 @@ impl DemuxObserver {
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let payload = pending
-            .packet
             .payload
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?;
@@ -1586,7 +1827,7 @@ impl DemuxObserver {
         let extent = SourceRange {
             entity: self.scope.entity,
             offset: pending
-                .packet
+                .carrier
                 .payload_source_offset
                 .checked_add(pending.position as u64)
                 .ok_or(Error::Overflow)?,
@@ -1606,7 +1847,6 @@ impl DemuxObserver {
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let payload = pending
-            .packet
             .payload
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?
@@ -1640,7 +1880,6 @@ impl DemuxObserver {
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let has_payload = pending
-            .packet
             .payload
             .as_ref()
             .is_some_and(|bytes| !bytes.is_empty());
@@ -1649,7 +1888,7 @@ impl DemuxObserver {
                 return Ok(false);
             }
             let gap = self.previous_counter.is_some_and(|previous| {
-                pending.packet.continuity_counter != ((previous + u8::from(has_payload)) & 15)
+                pending.carrier.continuity_counter != ((previous + u8::from(has_payload)) & 15)
             });
             if gap && self.finite_private() {
                 return Err(self.finite_private_error(
@@ -1657,8 +1896,7 @@ impl DemuxObserver {
                     "native DVB counter damage unobserved",
                 ));
             }
-            if gap && !pending.packet.payload_unit_start && pending.packet.discontinuity_indicator()
-            {
+            if gap && !pending.carrier.payload_unit_start && pending.carrier.discontinuity {
                 return Err(Error::Unsupported(
                     "native signalled counter break unobserved",
                 ));
@@ -1670,10 +1908,10 @@ impl DemuxObserver {
             }
             // The observed reference marks the active byte buffer before a
             // possible pre-append overflow flush. A new PUSI then starts clean.
-            if gap && !pending.packet.payload_unit_start && self.active {
+            if gap && !pending.carrier.payload_unit_start && self.active {
                 self.corrupt = true;
             }
-            self.previous_counter = Some(pending.packet.continuity_counter);
+            self.previous_counter = Some(pending.carrier.continuity_counter);
             self.pending
                 .as_mut()
                 .ok_or(Error::Invalid("native PES input missing"))?
@@ -1687,7 +1925,7 @@ impl DemuxObserver {
             .pending
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?
-            .packet
+            .carrier
             .payload_unit_start;
         if start && self.active {
             self.schedule(DemuxBoundary::NextPesStart, false, false)?;
@@ -1718,7 +1956,6 @@ impl DemuxObserver {
             return Ok(true);
         }
         let payload = pending
-            .packet
             .payload
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?;
@@ -1739,7 +1976,7 @@ impl DemuxObserver {
                         "native DVB finite overrun unobserved",
                     ));
                 }
-                if pending.packet.payload_unit_start {
+                if pending.carrier.payload_unit_start {
                     // Observed finite-overlong PUSI: bound this admission to its
                     // declared PES bytes. The original raw carrier is unchanged.
                     count = remaining;
@@ -1768,7 +2005,6 @@ impl DemuxObserver {
             .as_mut()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let payload = pending
-            .packet
             .payload
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?;
@@ -1781,7 +2017,7 @@ impl DemuxObserver {
         let source = SourceRange {
             entity: self.scope.entity,
             offset: pending
-                .packet
+                .carrier
                 .payload_source_offset
                 .checked_add(start as u64)
                 .ok_or(Error::Overflow)?,
@@ -1789,8 +2025,8 @@ impl DemuxObserver {
         };
         let transport = SourceRange {
             entity: self.scope.entity,
-            offset: pending.packet.source_offset,
-            bytes: pending.packet.source.len(),
+            offset: pending.carrier.source_offset,
+            bytes: pending.source.len(),
         };
         source.end()?;
         transport.end()?;
@@ -1807,7 +2043,6 @@ impl DemuxObserver {
         // pending carrier until the same poll boundary after moving its payload.
         let bytes = if complete {
             pending
-                .packet
                 .payload
                 .take()
                 .ok_or(Error::Invalid("native PES payload missing"))?
@@ -1849,7 +2084,6 @@ impl DemuxObserver {
                 if self.pending.as_ref().is_some_and(|pending| {
                     pending.body_drained
                         || pending
-                            .packet
                             .payload
                             .as_ref()
                             .is_some_and(|payload| pending.position == payload.len())
@@ -1894,6 +2128,36 @@ impl DemuxObserver {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn neighboring_payload_in_the_same_window_has_the_wrong_extent() {
+        let pool = Budget::new(4096).unwrap();
+        let width = crate::PacketFormat::Ts188.bytes();
+        let mut data = vec![0x42; 2 * width];
+        for carrier in data.chunks_exact_mut(width) {
+            carrier[..4].copy_from_slice(&[0x47, 0, 7, 0x10]);
+        }
+        let backing = Bytes::copy_from_slice(&pool, &data).unwrap();
+        let mut packet = crate::parse_transport(
+            backing.slice(0..width).unwrap(),
+            crate::PacketFormat::Ts188,
+            0,
+        )
+        .unwrap();
+        DemuxObserver::transport_bounds(&packet).unwrap();
+        packet.payload = Some(backing.slice(width + 4..2 * width).unwrap());
+        assert!(
+            packet
+                .payload
+                .as_ref()
+                .unwrap()
+                .shares_storage_with(&packet.source)
+        );
+        assert_eq!(
+            DemuxObserver::transport_bounds(&packet),
+            Err(Error::Invalid("native TS payload bounds"))
+        );
+    }
 
     #[test]
     fn compact_accounting_keeps_the_charged_observer_layout() {
@@ -2064,7 +2328,6 @@ mod tests {
                             .pending
                             .as_ref()
                             .unwrap()
-                            .packet
                             .source
                             .shares_storage_with(&original)
                     );
@@ -2227,7 +2490,7 @@ mod tests {
 
     fn assert_body_not_moved(observer: &DemuxObserver, expected: &Bytes) {
         let pending = observer.pending.as_ref().unwrap();
-        let payload = pending.packet.payload.as_ref().unwrap();
+        let payload = pending.payload.as_ref().unwrap();
         assert!(payload.shares_storage_with(expected));
         assert_eq!(payload.as_ref().as_ptr(), expected.as_ref().as_ptr());
         assert_eq!(payload.as_ref(), expected.as_ref());
@@ -2257,10 +2520,10 @@ mod tests {
         assert_eq!(work.spent(), 1);
         let pending = observer.pending.as_ref().unwrap();
         assert!(pending.body_drained);
-        assert!(pending.packet.payload.is_none());
+        assert!(pending.payload.is_none());
         assert_eq!(pending.position, payload.len());
         assert_eq!(
-            &pending.packet.source.as_ref()[TS_PAYLOAD_START..],
+            &pending.source.as_ref()[TS_PAYLOAD_START..],
             payload.as_ref()
         );
         let [span] = observer.spans.as_slice() else {
@@ -2359,7 +2622,7 @@ mod tests {
                     )
                     .unwrap()
             );
-            let packet = &mut observer.pending.as_mut().unwrap().packet;
+            let packet = &mut observer.pending.as_mut().unwrap().carrier;
             match fault {
                 0 => {}
                 1 => packet.payload_source_offset = u64::MAX - 8,
@@ -2395,10 +2658,10 @@ mod tests {
             assert_eq!(work.spent(), 1);
             let pending = observer.pending.as_ref().unwrap();
             assert_eq!(pending.body_drained, moved);
-            assert_eq!(pending.packet.payload.is_none(), moved);
+            assert_eq!(pending.payload.is_none(), moved);
             assert_eq!(pending.position, payload.len());
             assert_eq!(
-                &pending.packet.source.as_ref()[TS_PAYLOAD_START..],
+                &pending.source.as_ref()[TS_PAYLOAD_START..],
                 payload.as_ref()
             );
             assert!(matches!(

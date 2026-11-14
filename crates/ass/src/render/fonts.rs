@@ -2,13 +2,14 @@
 //! provider: the attached and embedded fonts are matched by name, weight and
 //! slant (`ass_font_select`), then the default family, then the default font
 //! file; each requested font keeps the faces it was given and adds one for a
-//! character none of them maps (`ass_font_get_index`).
+//! character none of them maps (`ass_font_get_index`), and each of its faces
+//! keeps the charmap the last such lookup left it on.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Bytes, Reservation, Result, WorkBudget};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Request, select};
+use triergon_font::{Charmap, FaceInfo, Font, GlyphId, Limits, Request, select};
 
 use crate::{EmbeddedFont, FontDesc, charge};
 
@@ -34,10 +35,59 @@ pub struct Fonts {
 
 /// A face a requested font draws with, and libass's identity of it: a font
 /// holds each face once.
+///
+/// libass opens a face anew for each font that adds it and looks characters
+/// up through the charmap the face has selected, which a lookup can change
+/// (`ass_font_get_index`), so each font's copy keeps its own.
 #[derive(Clone, Debug)]
 pub(super) struct Face {
     pub(super) font: Arc<Font>,
     pub(super) uid: u32,
+    /// The selected charmap's index in [`Font::charmaps`]: the one libass
+    /// selects on opening the face (`ass_charmap_magic`) until a lookup
+    /// leaves it on another.
+    charmap: Option<usize>,
+}
+
+impl Face {
+    fn new(font: Font, uid: u32) -> Self {
+        let charmap = font.text_charmap_index();
+        Self {
+            font: Arc::new(font),
+            uid,
+            charmap,
+        }
+    }
+
+    /// The charmap the face has selected.
+    pub(super) fn charmap(&self) -> Option<Charmap<'_>> {
+        self.font.charmap(self.charmap?)
+    }
+
+    /// The glyph `symbol` maps to through the selected charmap, as libass
+    /// looks it up (`ass_font_index_magic`, then `FT_Get_Char_Index`).
+    fn glyph(&self, symbol: u32) -> Result<Option<GlyphId>> {
+        match self.charmap() {
+            Some(charmap) => Ok(self.font.text_lookup(charmap)?.glyph(symbol)),
+            None => Ok(None),
+        }
+    }
+
+    /// libass's last resort for a face selected for `symbol` that does not
+    /// map it ("broken font? Trying all charmaps", `ass_font.c:681-692`):
+    /// each charmap is selected in turn, in FreeType's order, and `symbol`
+    /// looked up through it. The face keeps the one that maps it, or the
+    /// last one. A charmap is charged to `work` as it is tried.
+    fn try_every_charmap(&mut self, symbol: u32, work: &mut WorkBudget) -> Result<Option<GlyphId>> {
+        for (index, charmap) in self.font.charmaps().enumerate() {
+            charge(work, 1)?;
+            self.charmap = Some(index);
+            if let Some(glyph) = self.font.text_lookup(charmap)?.glyph(symbol) {
+                return Ok(Some(glyph));
+            }
+        }
+        Ok(None)
+    }
 }
 
 /// One requested font (libass's `ASS_Font`): its description and the faces
@@ -212,10 +262,7 @@ impl Library {
             if !FaceInfo::new(&font).has_family_name() {
                 continue;
             }
-            let face = Face {
-                font: Arc::new(font),
-                uid: self.next_uid(),
-            };
+            let face = Face::new(font, self.next_uid());
             self.faces.try_push(face).map_err(|e| e.error)?;
             self.charge_entries()?;
         }
@@ -340,8 +387,16 @@ impl Library {
     }
 
     /// The face and glyph of `symbol` in font `id` (`ass_font_get_index`):
-    /// the first face that maps it, else a face selected for it and added to
-    /// the font, else glyph 0 of that face or of the first.
+    /// the first face that maps it through the charmap it has selected, else
+    /// a face selected for it and added to the font (or found there), which
+    /// is tried through each of its charmaps if it does not, else glyph 0 of
+    /// that face or of the first.
+    ///
+    /// # Errors
+    ///
+    /// `Unsupported` where libass would look `symbol` up in a way this crate
+    /// does not: through a charmap whose codes libass converts
+    /// ([`Font::text_lookup`]).
     pub(super) fn glyph(
         &mut self,
         id: FontId,
@@ -354,13 +409,10 @@ impl Library {
         let font = &self.fonts[&id];
         // Each face the font has gathered is tried.
         charge(work, font.faces.len())?;
-        if let Some(found) = font
-            .faces()
-            .iter()
-            .enumerate()
-            .find_map(|(index, face)| Some((index, lookup(&face.font, symbol)?)))
-        {
-            return Ok(found);
+        for (index, face) in font.faces().iter().enumerate() {
+            if let Some(glyph) = face.glyph(symbol)? {
+                return Ok((index, glyph));
+            }
         }
         if font.faces.len() == MAX_FACES {
             return Ok((0, GlyphId(0)));
@@ -378,8 +430,12 @@ impl Library {
             font.faces.try_push(face).map_err(|e| e.error)?;
             font.faces.len() - 1
         };
-        let glyph = lookup(&font.faces()[index].font, symbol).unwrap_or(GlyphId(0));
-        Ok((index, glyph))
+        let face = &mut font.faces[index];
+        let glyph = match face.glyph(symbol)? {
+            Some(glyph) => Some(glyph),
+            None => face.try_every_charmap(symbol, work)?,
+        };
+        Ok((index, glyph.unwrap_or(GlyphId(0))))
     }
 
     /// `ass_font_select` for `font` and `code` (any face for 0): the face to
@@ -388,7 +444,7 @@ impl Library {
         // The requested and the default family are each matched against
         // every registered face.
         charge(work, self.faces.len().saturating_mul(2))?;
-        Ok(match self.select(key, code)? {
+        Ok(match self.select(key, code) {
             Some(Choice::Registered(index)) => Some(self.faces.as_slice()[index].clone()),
             Some(Choice::Default) => self.default_face(),
             None => None,
@@ -397,14 +453,8 @@ impl Library {
 
     /// The requested family, then the default family, each for a face that
     /// maps `code`, then the default font file.
-    fn select(&self, key: &Key, code: u32) -> Result<Option<Choice>> {
-        let character = match code {
-            0 => None,
-            code => match char::from_u32(code) {
-                Some(c) => Some(c),
-                None => return Ok(None),
-            },
-        };
+    fn select(&self, key: &Key, code: u32) -> Option<Choice> {
+        let character = (code != 0).then_some(code);
         // What matching reads of a face is three fields of the parsed font, so
         // each search reads them as it reaches the face, without storage.
         let infos = || self.faces.iter().map(|face| FaceInfo::new(&face.font));
@@ -425,9 +475,9 @@ impl Library {
             self.default_font,
             DefaultFont::Unopened(_) | DefaultFont::Opened(_)
         );
-        Ok(requested
+        requested
             .or_else(|| self.default_family.as_deref().and_then(by_family))
-            .or_else(|| default.then_some(Choice::Default)))
+            .or_else(|| default.then_some(Choice::Default))
     }
 
     /// The default font file's first face, opened once; `None` when it does
@@ -435,10 +485,7 @@ impl Library {
     fn default_face(&mut self) -> Option<Face> {
         if let DefaultFont::Unopened(file) = &self.default_font {
             self.default_font = match Font::new(file.clone(), 0, &self.budget, self.limits) {
-                Ok(font) => DefaultFont::Opened(Face {
-                    font: Arc::new(font),
-                    uid: self.next_uid(),
-                }),
+                Ok(font) => DefaultFont::Opened(Face::new(font, self.next_uid())),
                 Err(_) => DefaultFont::None,
             };
         }
@@ -447,15 +494,6 @@ impl Library {
             _ => None,
         }
     }
-}
-
-/// The glyph `symbol` maps to in `font`, as libass looks it up through the
-/// charmap it selects (a Symbol charmap at `0xF000 | symbol`); `None` for
-/// glyph 0.
-pub(super) fn lookup(font: &Font, symbol: u32) -> Option<GlyphId> {
-    char::from_u32(symbol)
-        .and_then(|c| font.glyph_index(c))
-        .filter(|g| g.0 != 0)
 }
 
 #[cfg(test)]

@@ -1,0 +1,1251 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "teletext-basic-text",
+      "profile": "teletext-basic",
+      "file": "teletext/basic.ts",
+      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 750,
+        "digest": 1486490153964364149
+      }
+    },
+    {
+      "id": "teletext-basic-text-duration",
+      "profile": "teletext-basic",
+      "file": "teletext/basic.ts",
+      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_duration=3000"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 750,
+        "digest": 3680825587141264935
+      }
+    },
+    {
+      "id": "teletext-basic-text-raw",
+      "profile": "teletext-basic",
+      "file": "teletext/basic.ts",
+      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_chop_spaces=0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 6884,
+        "digest": 12872820708256714042
+      }
+    },
+    {
+      "id": "teletext-basic-ass",
+      "profile": "teletext-basic",
+      "file": "teletext/basic.ts",
+      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1018,
+        "digest": 10630720066979969414
+      }
+    },
+    {
+      "id": "teletext-basic-ass-duration",
+      "profile": "teletext-basic",
+      "file": "teletext/basic.ts",
+      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_duration=3000"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1018,
+        "digest": 16484613218327859750
+      }
+    },
+    {
+      "id": "teletext-basic-ass-raw",
+      "profile": "teletext-basic",
+      "file": "teletext/basic.ts",
+      "sha256": "6beb3af3849df22437f9356b1dcae781fe0e4bb44224f65628549429630b538d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_chop_spaces=0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1018,
+        "digest": 10630720066979969414
+      }
+    },
+    {
+      "id": "teletext-layout-text",
+      "profile": "teletext-layout",
+      "file": "teletext/layout.ts",
+      "sha256": "92a91dcd9b97053b959fef640334f31d37c7b399fc7d131adfe143b02fe7c16b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 857,
+        "digest": 13255424258289447532
+      }
+    },
+    {
+      "id": "teletext-layout-ass",
+      "profile": "teletext-layout",
+      "file": "teletext/layout.ts",
+      "sha256": "92a91dcd9b97053b959fef640334f31d37c7b399fc7d131adfe143b02fe7c16b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1231,
+        "digest": 4965305013032480939
+      }
+    },
+    {
+      "id": "teletext-colours-text",
+      "profile": "teletext-colours",
+      "file": "teletext/colours.ts",
+      "sha256": "55ddc5edfd4ecadae3e7ab87ab3b05bcd28367463ca225f99445ddbdaf1a71d3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 820,
+        "digest": 5063447589072269722
+      }
+    },
+    {
+      "id": "teletext-colours-ass",
+      "profile": "teletext-colours",
+      "file": "teletext/colours.ts",
+      "sha256": "55ddc5edfd4ecadae3e7ab87ab3b05bcd28367463ca225f99445ddbdaf1a71d3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1282,
+        "digest": 11842978133114074742
+      }
+    },
+    {
+      "id": "teletext-sizes-text",
+      "profile": "teletext-sizes",
+      "file": "teletext/sizes.ts",
+      "sha256": "ef0ce83c9043b92112cf41d5e8982ef5c7bb17d1b02f6b2c146ca999a05d2cb6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 761,
+        "digest": 2362846742916204510
+      }
+    },
+    {
+      "id": "teletext-sizes-ass",
+      "profile": "teletext-sizes",
+      "file": "teletext/sizes.ts",
+      "sha256": "ef0ce83c9043b92112cf41d5e8982ef5c7bb17d1b02f6b2c146ca999a05d2cb6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1089,
+        "digest": 10535225788131432778
+      }
+    },
+    {
+      "id": "teletext-national-text",
+      "profile": "teletext-national",
+      "file": "teletext/national.ts",
+      "sha256": "c56a139f4a67f8ee1beb2c67b5726e42bb96568983b0fa6867ad2a733b65d985",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1233,
+        "digest": 2412690791390188549
+      }
+    },
+    {
+      "id": "teletext-national-text-polish",
+      "profile": "teletext-national",
+      "file": "teletext/national.ts",
+      "sha256": "c56a139f4a67f8ee1beb2c67b5726e42bb96568983b0fa6867ad2a733b65d985",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_default_region=8"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1224,
+        "digest": 15162375451840581173
+      }
+    },
+    {
+      "id": "teletext-national-text-cyrillic",
+      "profile": "teletext-national",
+      "file": "teletext/national.ts",
+      "sha256": "c56a139f4a67f8ee1beb2c67b5726e42bb96568983b0fa6867ad2a733b65d985",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_default_region=36"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1291,
+        "digest": 5177043368898476300
+      }
+    },
+    {
+      "id": "teletext-national-ass",
+      "profile": "teletext-national",
+      "file": "teletext/national.ts",
+      "sha256": "c56a139f4a67f8ee1beb2c67b5726e42bb96568983b0fa6867ad2a733b65d985",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1571,
+        "digest": 15504591854738509544
+      }
+    },
+    {
+      "id": "teletext-national-ass-polish",
+      "profile": "teletext-national",
+      "file": "teletext/national.ts",
+      "sha256": "c56a139f4a67f8ee1beb2c67b5726e42bb96568983b0fa6867ad2a733b65d985",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_default_region=8"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1538,
+        "digest": 4674947223255541422
+      }
+    },
+    {
+      "id": "teletext-national-ass-cyrillic",
+      "profile": "teletext-national",
+      "file": "teletext/national.ts",
+      "sha256": "c56a139f4a67f8ee1beb2c67b5726e42bb96568983b0fa6867ad2a733b65d985",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_default_region=36"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1607,
+        "digest": 4150027880538646463
+      }
+    },
+    {
+      "id": "teletext-x26-text",
+      "profile": "teletext-x26",
+      "file": "teletext/x26.ts",
+      "sha256": "6c438875f88dcaa852132ce97b90e6b63edb4cb40bc5081f91b36cbf596da0df",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 666,
+        "digest": 18365286295974704012
+      }
+    },
+    {
+      "id": "teletext-x26-ass",
+      "profile": "teletext-x26",
+      "file": "teletext/x26.ts",
+      "sha256": "6c438875f88dcaa852132ce97b90e6b63edb4cb40bc5081f91b36cbf596da0df",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 2930,
+        "digest": 596682365967256238
+      }
+    },
+    {
+      "id": "teletext-erase-update-text",
+      "profile": "teletext-erase-update",
+      "file": "teletext/erase-update.ts",
+      "sha256": "d973da04131b062b8f3d895ebf11da6e185dd19c97e217272b5b922ff6c644bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 851,
+        "digest": 16748724244257396487
+      }
+    },
+    {
+      "id": "teletext-erase-update-ass",
+      "profile": "teletext-erase-update",
+      "file": "teletext/erase-update.ts",
+      "sha256": "d973da04131b062b8f3d895ebf11da6e185dd19c97e217272b5b922ff6c644bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1102,
+        "digest": 12964862842216024060
+      }
+    },
+    {
+      "id": "teletext-page-changes-text",
+      "profile": "teletext-page-changes",
+      "file": "teletext/page-changes.ts",
+      "sha256": "75ebc030cf833d6ca39c48af801fef3a642d3762e084c6cda1fc3347536bfd6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 860,
+        "digest": 1755965451495966930
+      }
+    },
+    {
+      "id": "teletext-page-changes-text-889",
+      "profile": "teletext-page-changes",
+      "file": "teletext/page-changes.ts",
+      "sha256": "75ebc030cf833d6ca39c48af801fef3a642d3762e084c6cda1fc3347536bfd6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_page=889"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 720,
+        "digest": 14783614987351074988
+      }
+    },
+    {
+      "id": "teletext-page-changes-text-subtitles",
+      "profile": "teletext-page-changes",
+      "file": "teletext/page-changes.ts",
+      "sha256": "75ebc030cf833d6ca39c48af801fef3a642d3762e084c6cda1fc3347536bfd6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_page=subtitle"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 860,
+        "digest": 1755965451495966930
+      }
+    },
+    {
+      "id": "teletext-page-changes-ass",
+      "profile": "teletext-page-changes",
+      "file": "teletext/page-changes.ts",
+      "sha256": "75ebc030cf833d6ca39c48af801fef3a642d3762e084c6cda1fc3347536bfd6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1171,
+        "digest": 7652925978796595628
+      }
+    },
+    {
+      "id": "teletext-page-changes-ass-889",
+      "profile": "teletext-page-changes",
+      "file": "teletext/page-changes.ts",
+      "sha256": "75ebc030cf833d6ca39c48af801fef3a642d3762e084c6cda1fc3347536bfd6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_page=889"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 969,
+        "digest": 2804644040362199996
+      }
+    },
+    {
+      "id": "teletext-page-changes-ass-subtitles",
+      "profile": "teletext-page-changes",
+      "file": "teletext/page-changes.ts",
+      "sha256": "75ebc030cf833d6ca39c48af801fef3a642d3762e084c6cda1fc3347536bfd6d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_page=subtitle"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1171,
+        "digest": 7652925978796595628
+      }
+    },
+    {
+      "id": "teletext-magazines-text",
+      "profile": "teletext-magazines",
+      "file": "teletext/magazines.ts",
+      "sha256": "0821279d99fe6bb1f3cd1d37a9419524a84d4c35f7cee46204df27acc3aeb79d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 1034,
+        "digest": 9471653298563710767
+      }
+    },
+    {
+      "id": "teletext-magazines-text-100",
+      "profile": "teletext-magazines",
+      "file": "teletext/magazines.ts",
+      "sha256": "0821279d99fe6bb1f3cd1d37a9419524a84d4c35f7cee46204df27acc3aeb79d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_page=100"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 708,
+        "digest": 7883259373641180603
+      }
+    },
+    {
+      "id": "teletext-magazines-ass",
+      "profile": "teletext-magazines",
+      "file": "teletext/magazines.ts",
+      "sha256": "0821279d99fe6bb1f3cd1d37a9419524a84d4c35f7cee46204df27acc3aeb79d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 17557,
+        "digest": 10017327309255051601
+      }
+    },
+    {
+      "id": "teletext-magazines-ass-100",
+      "profile": "teletext-magazines",
+      "file": "teletext/magazines.ts",
+      "sha256": "0821279d99fe6bb1f3cd1d37a9419524a84d4c35f7cee46204df27acc3aeb79d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_page=100"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 8971,
+        "digest": 1379857008635821735
+      }
+    },
+    {
+      "id": "teletext-serial-text",
+      "profile": "teletext-serial",
+      "file": "teletext/serial.ts",
+      "sha256": "b9968d42fe06a524ac4f699d4b73cca6258fea405f1de44055fdd73b5ac0ba10",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 792,
+        "digest": 16033763252242897276
+      }
+    },
+    {
+      "id": "teletext-serial-ass",
+      "profile": "teletext-serial",
+      "file": "teletext/serial.ts",
+      "sha256": "b9968d42fe06a524ac4f699d4b73cca6258fea405f1de44055fdd73b5ac0ba10",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 9159,
+        "digest": 13959136361266568558
+      }
+    },
+    {
+      "id": "teletext-normal-pages-text",
+      "profile": "teletext-normal-pages",
+      "file": "teletext/normal-pages.ts",
+      "sha256": "1b82aed73910ad1a47e39dc4ec52dc0613f5e9921a78347868207ebd8af8f23b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1225,
+        "digest": 1911306309989370252
+      }
+    },
+    {
+      "id": "teletext-normal-pages-text-header",
+      "profile": "teletext-normal-pages",
+      "file": "teletext/normal-pages.ts",
+      "sha256": "1b82aed73910ad1a47e39dc4ec52dc0613f5e9921a78347868207ebd8af8f23b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_chop_top=0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1327,
+        "digest": 2254337010152783615
+      }
+    },
+    {
+      "id": "teletext-normal-pages-ass",
+      "profile": "teletext-normal-pages",
+      "file": "teletext/normal-pages.ts",
+      "sha256": "1b82aed73910ad1a47e39dc4ec52dc0613f5e9921a78347868207ebd8af8f23b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 13430,
+        "digest": 7282168527006698356
+      }
+    },
+    {
+      "id": "teletext-normal-pages-ass-header",
+      "profile": "teletext-normal-pages",
+      "file": "teletext/normal-pages.ts",
+      "sha256": "1b82aed73910ad1a47e39dc4ec52dc0613f5e9921a78347868207ebd8af8f23b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_chop_top=0"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 13727,
+        "digest": 9918443881012967456
+      }
+    },
+    {
+      "id": "teletext-header-only-text",
+      "profile": "teletext-header-only",
+      "file": "teletext/header-only.ts",
+      "sha256": "2eb6e376b1973bd85d8e64540f9b0b9c0637dc33a7653aa017fd0f967efae7bf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 605,
+        "digest": 8968556567566577561
+      }
+    },
+    {
+      "id": "teletext-header-only-ass",
+      "profile": "teletext-header-only",
+      "file": "teletext/header-only.ts",
+      "sha256": "2eb6e376b1973bd85d8e64540f9b0b9c0637dc33a7653aa017fd0f967efae7bf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 805,
+        "digest": 8602647623850229827
+      }
+    },
+    {
+      "id": "teletext-timing-text",
+      "profile": "teletext-timing",
+      "file": "teletext/timing.ts",
+      "sha256": "3cbd84e94d77d643402fe3feb3b05ac1a4c9691b4ad7878a7e7b9e227a56c498",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 804,
+        "digest": 8380900706305165865
+      }
+    },
+    {
+      "id": "teletext-timing-ass",
+      "profile": "teletext-timing",
+      "file": "teletext/timing.ts",
+      "sha256": "3cbd84e94d77d643402fe3feb3b05ac1a4c9691b4ad7878a7e7b9e227a56c498",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 1083,
+        "digest": 5784923242422539115
+      }
+    },
+    {
+      "id": "teletext-two-streams-text",
+      "profile": "teletext-two-streams",
+      "file": "teletext/two-streams.ts",
+      "sha256": "0189f62f2db7c8b0117b0c8a0ccd4a6fef9fa31075659bf7b04552cbead3967c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 828,
+        "digest": 16598920257486474681
+      }
+    },
+    {
+      "id": "teletext-two-streams-text-second",
+      "profile": "teletext-two-streams",
+      "file": "teletext/two-streams.ts",
+      "sha256": "0189f62f2db7c8b0117b0c8a0ccd4a6fef9fa31075659bf7b04552cbead3967c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "stream=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 696,
+        "digest": 14161994628736691711
+      }
+    },
+    {
+      "id": "teletext-two-streams-ass",
+      "profile": "teletext-two-streams",
+      "file": "teletext/two-streams.ts",
+      "sha256": "0189f62f2db7c8b0117b0c8a0ccd4a6fef9fa31075659bf7b04552cbead3967c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1131,
+        "digest": 17575299711672689569
+      }
+    },
+    {
+      "id": "teletext-two-streams-ass-second",
+      "profile": "teletext-two-streams",
+      "file": "teletext/two-streams.ts",
+      "sha256": "0189f62f2db7c8b0117b0c8a0ccd4a6fef9fa31075659bf7b04552cbead3967c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "stream=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 939,
+        "digest": 5730294198442576259
+      }
+    },
+    {
+      "id": "teletext-queue-text",
+      "profile": "teletext-queue",
+      "file": "teletext/queue.ts",
+      "sha256": "30547c8d7d080701af3ae8ef55d7dc06de90774ea2121adbf14da17aaa646461",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 1260,
+        "digest": 9705820338145607674
+      }
+    },
+    {
+      "id": "teletext-queue-ass",
+      "profile": "teletext-queue",
+      "file": "teletext/queue.ts",
+      "sha256": "30547c8d7d080701af3ae8ef55d7dc06de90774ea2121adbf14da17aaa646461",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 52167,
+        "digest": 7179691461072454642
+      }
+    },
+    {
+      "id": "teletext-malformed-text",
+      "profile": "teletext-malformed",
+      "file": "teletext/malformed.ts",
+      "sha256": "f2b58937da7dbff6d0b6a0cbab20b222f49b689c2583c2c00db681268cae79a7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 727,
+        "digest": 741062119214609818
+      }
+    },
+    {
+      "id": "teletext-malformed-ass",
+      "profile": "teletext-malformed",
+      "file": "teletext/malformed.ts",
+      "sha256": "f2b58937da7dbff6d0b6a0cbab20b222f49b689c2583c2c00db681268cae79a7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 993,
+        "digest": 10929408464465313245
+      }
+    },
+    {
+      "id": "teletext-subtitle-alignment-text",
+      "profile": "teletext-subtitle-alignment",
+      "file": "teletext/subtitle-alignment.ts",
+      "sha256": "684da4ca19ec18ae32e52ee71261ed2700bfbea66e0dc3e37cc1ddb2b23bdbf4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 831,
+        "digest": 1474679951095551425
+      }
+    },
+    {
+      "id": "teletext-subtitle-alignment-ass",
+      "profile": "teletext-subtitle-alignment",
+      "file": "teletext/subtitle-alignment.ts",
+      "sha256": "684da4ca19ec18ae32e52ee71261ed2700bfbea66e0dc3e37cc1ddb2b23bdbf4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1102,
+        "digest": 3122368316190823330
+      }
+    },
+    {
+      "id": "teletext-extra-column-text",
+      "profile": "teletext-extra-column",
+      "file": "teletext/extra-column.ts",
+      "sha256": "a16ff989bf439dbd9001b6ec3802dd18c56e713684a610db7b378c677ef55042",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1116,
+        "digest": 477697850920646366
+      }
+    },
+    {
+      "id": "teletext-extra-column-text-header",
+      "profile": "teletext-extra-column",
+      "file": "teletext/extra-column.ts",
+      "sha256": "a16ff989bf439dbd9001b6ec3802dd18c56e713684a610db7b378c677ef55042",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_chop_top=0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1149,
+        "digest": 17384847781483550028
+      }
+    },
+    {
+      "id": "teletext-extra-column-ass",
+      "profile": "teletext-extra-column",
+      "file": "teletext/extra-column.ts",
+      "sha256": "a16ff989bf439dbd9001b6ec3802dd18c56e713684a610db7b378c677ef55042",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5133,
+        "digest": 16549495087587469745
+      }
+    },
+    {
+      "id": "teletext-extra-column-ass-header",
+      "profile": "teletext-extra-column",
+      "file": "teletext/extra-column.ts",
+      "sha256": "a16ff989bf439dbd9001b6ec3802dd18c56e713684a610db7b378c677ef55042",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_chop_top=0"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5356,
+        "digest": 4597589803279262031
+      }
+    },
+    {
+      "id": "teletext-subtitle-restart-text",
+      "profile": "teletext-subtitle-restart",
+      "file": "teletext/subtitle-restart.ts",
+      "sha256": "39c927bed1f22514665e22998dd987f1e562caf3529be57e9e744f07ecc26d6f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 747,
+        "digest": 5184378969703858646
+      }
+    },
+    {
+      "id": "teletext-subtitle-restart-ass",
+      "profile": "teletext-subtitle-restart",
+      "file": "teletext/subtitle-restart.ts",
+      "sha256": "39c927bed1f22514665e22998dd987f1e562caf3529be57e9e744f07ecc26d6f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 3172,
+        "digest": 16742776327924334845
+      }
+    },
+    {
+      "id": "teletext-subcodes-text",
+      "profile": "teletext-subcodes",
+      "file": "teletext/subcodes.ts",
+      "sha256": "4f03e22e291ba829073a8156379fd22529f22e74fa5af9366162c72377eb879e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 851,
+        "digest": 14098652960943344661
+      }
+    },
+    {
+      "id": "teletext-subcodes-ass",
+      "profile": "teletext-subcodes",
+      "file": "teletext/subcodes.ts",
+      "sha256": "4f03e22e291ba829073a8156379fd22529f22e74fa5af9366162c72377eb879e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1154,
+        "digest": 17631423320107484370
+      }
+    },
+    {
+      "id": "teletext-level25-text",
+      "profile": "teletext-level25",
+      "file": "teletext/level25.ts",
+      "sha256": "6e201fb092e493df5e01ccd487983386a8c3db94e2547e8a1ca6c790eaf8bca2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 813,
+        "digest": 12539205488124422228
+      }
+    },
+    {
+      "id": "teletext-level25-text-header",
+      "profile": "teletext-level25",
+      "file": "teletext/level25.ts",
+      "sha256": "6e201fb092e493df5e01ccd487983386a8c3db94e2547e8a1ca6c790eaf8bca2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text",
+        "opt:txt_chop_top=0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 871,
+        "digest": 17793915228391679863
+      }
+    },
+    {
+      "id": "teletext-level25-ass",
+      "profile": "teletext-level25",
+      "file": "teletext/level25.ts",
+      "sha256": "6e201fb092e493df5e01ccd487983386a8c3db94e2547e8a1ca6c790eaf8bca2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9315,
+        "digest": 12256766776627420101
+      }
+    },
+    {
+      "id": "teletext-level25-ass-header",
+      "profile": "teletext-level25",
+      "file": "teletext/level25.ts",
+      "sha256": "6e201fb092e493df5e01ccd487983386a8c3db94e2547e8a1ca6c790eaf8bca2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass",
+        "opt:txt_chop_top=0"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 9617,
+        "digest": 7321594951461656139
+      }
+    },
+    {
+      "id": "teletext-colour-tables-text",
+      "profile": "teletext-colour-tables",
+      "file": "teletext/colour-tables.ts",
+      "sha256": "c0393d89c1e7ce3d9c8f9eced0fa2c75ac040521bf1010f8222492974a1a88c2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1660,
+        "digest": 7818345567667157289
+      }
+    },
+    {
+      "id": "teletext-colour-tables-ass",
+      "profile": "teletext-colour-tables",
+      "file": "teletext/colour-tables.ts",
+      "sha256": "c0393d89c1e7ce3d9c8f9eced0fa2c75ac040521bf1010f8222492974a1a88c2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 18845,
+        "digest": 14170535282869450829
+      }
+    },
+    {
+      "id": "teletext-chop-text",
+      "profile": "teletext-chop",
+      "file": "teletext/chop.ts",
+      "sha256": "174719379936fe7a0b992f9fcca5a951cb7dce9a1c9235e931a65e9e670e9887",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 1316,
+        "digest": 12104724012399615582
+      }
+    },
+    {
+      "id": "teletext-chop-ass",
+      "profile": "teletext-chop",
+      "file": "teletext/chop.ts",
+      "sha256": "174719379936fe7a0b992f9fcca5a951cb7dce9a1c9235e931a65e9e670e9887",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 826,
+        "digest": 16246044546555376300
+      }
+    },
+    {
+      "id": "teletext-random-1-text",
+      "profile": "teletext-random-1",
+      "file": "teletext/random-1.ts",
+      "sha256": "27afb6a3e236398e6f1673d20a92b76125dca7487b35583a39f9b7cef484b1b7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 47,
+        "bytes": 4364,
+        "digest": 1928967359461337277
+      }
+    },
+    {
+      "id": "teletext-random-1-ass",
+      "profile": "teletext-random-1",
+      "file": "teletext/random-1.ts",
+      "sha256": "27afb6a3e236398e6f1673d20a92b76125dca7487b35583a39f9b7cef484b1b7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 47,
+        "bytes": 60145,
+        "digest": 17106769808141169334
+      }
+    },
+    {
+      "id": "teletext-random-2-text",
+      "profile": "teletext-random-2",
+      "file": "teletext/random-2.ts",
+      "sha256": "b4a3eb3b27d19e73437027c08c77956007eaba4d8ff50cb4b7ff6fd6264d195c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=text"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 3781,
+        "digest": 2396156315150872087
+      }
+    },
+    {
+      "id": "teletext-random-2-ass",
+      "profile": "teletext-random-2",
+      "file": "teletext/random-2.ts",
+      "sha256": "b4a3eb3b27d19e73437027c08c77956007eaba4d8ff50cb4b7ff6fd6264d195c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/teletext_streams.py",
+      "arguments": [
+        "teletext",
+        "opt:txt_format=ass"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 43539,
+        "digest": 7430507486024272635
+      }
+    }
+  ]
+}

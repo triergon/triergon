@@ -27,9 +27,14 @@
  *                emboldened, slanted, and both (libass's order);
  *     advances   every glyph's default-load (FT_LOAD_DEFAULT) advance, which
  *                libass's HarfBuzz callbacks report.
+ *     vertical   every glyph's vertical advances, which libass uses for the glyphs
+ *                of an `@` font it draws rotated: linearVertAdvance and
+ *                metrics.vertAdvance of the unhinted load libass draws
+ *                (FT_LOAD_NO_HINTING), then metrics.vertAdvance of the default load
+ *                its HarfBuzz callbacks report.
  *
  * Each group of values starts with a tag and folds as crates/font-worker/src/
- * record.rs folds it; `packets` counts outlines (or hinted advances) and `bytes`
+ * record.rs folds it; `packets` counts outlines (or glyphs' advances) and `bytes`
  * outline points. The file is read before the operation and the FreeType library
  * is created once, outside it. Kerning pairs: those of the `kern` subtables
  * FreeType uses, sorted and unique; nonzero values are folded. `-dump` prints the same values as lines, identical
@@ -76,12 +81,20 @@ enum {
     FONT_SCALED_GLYPH,
     FONT_STYLED,
     FONT_HINTED,
+    FONT_VERTICAL,
+    FONT_DEFAULT,
 };
 
-typedef enum { FONT_FACES, FONT_SCALED, FONT_HINTED_ADVANCES } FontOperation;
+typedef enum {
+    FONT_FACES,
+    FONT_SCALED,
+    FONT_HINTED_ADVANCES,
+    FONT_VERTICAL_ADVANCES,
+    FONT_DEFAULT_LOAD
+} FontOperation;
 
-static const char *const font_operation_names[] = {"font-outlines", "font-sized-outlines",
-                                                   "font-sized-advances"};
+static const char *const font_operation_names[] = {"font-outlines", "font-sized-outlines", "font-sized-advances",
+                                                   "font-sized-vertical", "font-sized-default"};
 
 typedef struct {
     uint64_t packets, bytes, digest;
@@ -160,11 +173,12 @@ static void font_outline(FontWork *w, const FT_Outline *o) {
     w->bytes += (uint64_t)o->n_points;
 }
 
-static int font_supported(FT_CharMap charmap) {
-    switch (FT_Get_CMap_Format(charmap)) {
-    case 0: case 4: case 6: case 10: case 12: case 13: return 1;
-    default: return 0;
-    }
+/* Every charmap FreeType lists but the variation-sequence subtables of formats
+ * 14 and 15, which FT_Set_Charmap refuses: the `cmap` subtables and the
+ * glyph-name and encoding charmaps of CFF faces (format -1). */
+static int font_listed(FT_CharMap charmap) {
+    FT_Long format = FT_Get_CMap_Format(charmap);
+    return format != 14 && format != 15;
 }
 
 /* The charmap libass 0.17.5 selects for text when it opens a face
@@ -315,7 +329,7 @@ static void font_face(FT_Face face, long index, FontWork *w) {
     FT_CharMap textmap = font_text_charmap(face);
     for (int i = 0; i < face->num_charmaps; i++) {
         FT_CharMap c = face->charmaps[i];
-        if (!font_supported(c)) continue;
+        if (!font_listed(c)) continue;
         font_charmap(w, FONT_CHARMAP, "charmap", c);
         FT_Set_Charmap(face, c);
         FT_UInt glyph;
@@ -534,6 +548,78 @@ static void font_hinted(FT_Face face, FontWork *w) {
     }
 }
 
+static void font_vertical(FT_Face face, FontWork *w) {
+    for (long g = 0; g < face->num_glyphs; g++) {
+        /* What libass draws an @ font's rotated glyph with: the unhinted load's
+         * linear and scaled vertical advances, */
+        int unhinted = FT_Load_Glyph(face, (FT_UInt)g, font_libass_flags | FT_LOAD_NO_HINTING) == 0;
+        long linear = unhinted ? face->glyph->linearVertAdvance : 0;
+        long advance = unhinted ? face->glyph->metrics.vertAdvance : 0;
+        /* and the default load's, which HarfBuzz receives as its advance. */
+        int hinted = FT_Load_Glyph(face, (FT_UInt)g, FT_LOAD_DEFAULT | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH |
+                                                         FT_LOAD_IGNORE_TRANSFORM) == 0;
+        long hinted_advance = hinted ? face->glyph->metrics.vertAdvance : 0;
+        if (w->dump) {
+            fprintf(w->dump, "vertical %ld", g);
+            if (unhinted)
+                fprintf(w->dump, " %ld %ld", linear, advance);
+            else
+                fprintf(w->dump, " error");
+            if (hinted)
+                fprintf(w->dump, " %ld\n", hinted_advance);
+            else
+                fprintf(w->dump, " error\n");
+        } else {
+            font_fold(w, FONT_VERTICAL);
+            font_fold(w, (uint64_t)g);
+            font_fold(w, unhinted ? font_signed(linear) : FONT_ABSENT);
+            font_fold(w, unhinted ? font_signed(advance) : FONT_ABSENT);
+            font_fold(w, hinted ? font_signed(hinted_advance) : FONT_ABSENT);
+            w->packets++;
+        }
+    }
+}
+
+static void font_default(FT_Face face, FontWork *w) {
+    for (long g = 0; g < face->num_glyphs; g++) {
+        /* What libass's shaper reads from the default load (ass_shaper.c): the
+         * metrics behind HarfBuzz's advances and extents, and the outline
+         * points behind its contour points. */
+        int error = FT_Load_Glyph(face, (FT_UInt)g, FT_LOAD_DEFAULT | FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH |
+                                                        FT_LOAD_IGNORE_TRANSFORM) != 0;
+        const FT_Glyph_Metrics *m = &face->glyph->metrics;
+        int outline = face->glyph->format == FT_GLYPH_FORMAT_OUTLINE;
+        if (w->dump) {
+            if (error) {
+                fprintf(w->dump, "default %ld error\n", g);
+                continue;
+            }
+            fprintf(w->dump, "default %ld %ld %ld %ld %ld %ld %ld ", g, m->horiAdvance, m->vertAdvance,
+                    m->horiBearingX, m->horiBearingY, m->width, m->height);
+            if (!outline) fprintf(w->dump, "not an outline\n");
+        } else {
+            font_fold(w, FONT_DEFAULT);
+            font_fold(w, (uint64_t)g);
+            if (error) {
+                font_fold(w, FONT_ABSENT);
+                w->packets++;
+                continue;
+            }
+            font_fold(w, font_signed(m->horiAdvance));
+            font_fold(w, font_signed(m->vertAdvance));
+            font_fold(w, font_signed(m->horiBearingX));
+            font_fold(w, font_signed(m->horiBearingY));
+            font_fold(w, font_signed(m->width));
+            font_fold(w, font_signed(m->height));
+            if (!outline) {
+                font_fold(w, FONT_ABSENT);
+                w->packets++;
+            }
+        }
+        if (outline) font_outline(w, &face->glyph->outline);
+    }
+}
+
 /* ---- One operation -------------------------------------------------------- */
 
 /* One operation over the font in memory; nonzero when FreeType opens no font. */
@@ -569,8 +655,12 @@ static int font_read(FT_Library library, const FT_Byte *data, FT_Long size, Font
                 font_error(w, FONT_SIZE_ERROR, "size", height);
             else if (operation == FONT_SCALED)
                 font_scaled(library, face, height, w);
-            else
+            else if (operation == FONT_HINTED_ADVANCES)
                 font_hinted(face, w);
+            else if (operation == FONT_VERTICAL_ADVANCES)
+                font_vertical(face, w);
+            else
+                font_default(face, w);
         }
         FT_Done_Face(face);
     }
@@ -581,7 +671,7 @@ int main(int argc, char **argv) {
     const char *usage = "usage: reference OPERATION-fold FILE [MODE HEIGHT]\n"
                         "       | OPERATION-bench FILE N [MODE HEIGHT]\n"
                         "       | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]\n"
-                        "  OPERATION: font, or font-sized with MODE outlines or advances\n";
+                        "  OPERATION: font, or font-sized with MODE outlines, advances, vertical or default\n";
     const char *mode = argc > 1 ? argv[1] : "";
     const char *action = strrchr(mode, '-');
     size_t prefix = action ? (size_t)(action - mode) : 0;
@@ -606,6 +696,10 @@ int main(int argc, char **argv) {
         operation = FONT_SCALED;
     else if (sized && !strcmp(argv[3 + bench], "advances"))
         operation = FONT_HINTED_ADVANCES;
+    else if (sized && !strcmp(argv[3 + bench], "vertical"))
+        operation = FONT_VERTICAL_ADVANCES;
+    else if (sized && !strcmp(argv[3 + bench], "default"))
+        operation = FONT_DEFAULT_LOAD;
     else if (sized) {
         fputs(usage, stderr);
         return 2;

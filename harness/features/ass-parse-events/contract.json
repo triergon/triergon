@@ -6,6 +6,7 @@
   "worker_operation": "ass-",
   "reference": "libass-ass-native",
   "gate": "required",
+  "compare_order": 2,
   "contract": [
     "one authored script or stream with ;@time directives, read as ass-parse-scripts and ass-parse-chunks read it before the operation, its play resolution set by ass_lazy_track_init; then every event walked at every time as libass 0.17.5's renderer starts one: init_render_context (with ass_apply_transition_effects and ass_reset_render_context) and the text loop of parse_events, which applies each override block with ass_parse_tags and reads text with ass_get_next_char, then every drawing glyph and the vector clip read with ass_drawing_parse and ass_process_karaoke_effects over synthetic positions (runs split where libass's style-run split puts them for karaoke alone, every glyph 10 pixels plus its index mod 3 wide, spaces invisible)",
     "recorded per walk: every glyph's symbol or drawing, its offset and the state libass copies into it (font family, weight and slant, size, colours, decorations, border style and widths, scales, spacing, \\be, \\blur, shadows, rotations, shears, encoding, fade, karaoke tag), every drawing's control box, point and segment counts and FNV-1a hash, the event state after the text (alignment, justification, wrap style, \\pos or \\move, \\org, clip rectangle, vector clip, scroll, collision and explicit flags, fade, drawing mode, the style in force), and every glyph's karaoke kind, boundary and colours; the walk is in script units, before the renderer's screen scaling, and finds no font (the reference renderer has no font provider)",
@@ -18,7 +19,7 @@
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",
-    "armv7-unknown-linux-gnueabihf"
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "iterations": 1,
   "minimum_pairs": 30,

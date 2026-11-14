@@ -417,8 +417,11 @@ impl<'g> Runner<'g> {
                 .as_ref()
                 .map_or(Vector::default(), GlyphBitmaps::origin);
             sink.values(&[origin.x.into(), origin.y.into()])?;
-            sink.bitmap(bitmaps.as_ref().and_then(|b| b.glyph()))?;
-            sink.bitmap(bitmaps.as_ref().and_then(|b| b.border()))?;
+            // Both bitmaps are recorded against the glyph's origin.
+            for placed in [GlyphBitmaps::fill, GlyphBitmaps::border] {
+                let placed = bitmaps.as_ref().and_then(placed);
+                sink.placed_bitmap(placed, origin)?;
+            }
             drawn.extend(bitmaps);
         }
         sink.value(run.leftmost_x().into())?;

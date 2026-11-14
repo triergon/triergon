@@ -2,7 +2,9 @@
 //! recorded outcome; a successful result is never synthesised.
 
 use std::ffi::OsString;
-use std::io::Read;
+use std::fs;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -41,6 +43,69 @@ pub fn arg(value: impl ToString) -> OsString {
     OsString::from(value.to_string())
 }
 
+struct WorkerImage {
+    bytes: Vec<u8>,
+    permissions: fs::Permissions,
+}
+
+impl WorkerImage {
+    fn read(path: &Path) -> std::io::Result<Self> {
+        let mut file = fs::File::open(path)?;
+        let permissions = file.metadata()?.permissions();
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Ok(Self { bytes, permissions })
+    }
+
+    fn write(&self, target: &Path) -> Result<(), String> {
+        let slot = target.parent().ok_or("worker path has no parent")?;
+        fs::create_dir_all(slot).map_err(|e| format!("{}: {e}", slot.display()))?;
+        let pending = slot.join(format!(".worker-{}", std::process::id()));
+        let mut file =
+            fs::File::create_new(&pending).map_err(|e| format!("{}: {e}", pending.display()))?;
+        let written = file
+            .write_all(&self.bytes)
+            .and_then(|()| file.set_permissions(self.permissions.clone()));
+        drop(file);
+        if let Err(error) = written.and_then(|()| fs::rename(&pending, target)) {
+            let _ = fs::remove_file(&pending);
+            return Err(format!("{}: {error}", target.display()));
+        }
+        Ok(())
+    }
+}
+
+pub(super) struct WorkerPair(WorkerImage, WorkerImage);
+
+impl WorkerPair {
+    pub fn read(candidate: &Path, reference: &Path) -> Result<Self, String> {
+        let read =
+            |path: &Path| WorkerImage::read(path).map_err(|e| format!("{}: {e}", path.display()));
+        Ok(Self(read(candidate)?, read(reference)?))
+    }
+
+    /// Name persistent copies by the exact bytes about to be written.
+    pub fn content_key(&self) -> String {
+        format!(
+            "{}-{}",
+            crate::sha256::hex(&self.0.bytes),
+            crate::sha256::hex(&self.1.bytes)
+        )
+    }
+
+    /// Give both workers fresh files with the same write pattern and path length.
+    pub fn write(&self, directory: &Path) -> Result<[PathBuf; 2], String> {
+        let paths = Self::paths(directory);
+        self.0.write(&paths[0])?;
+        self.1.write(&paths[1])?;
+        Ok(paths)
+    }
+
+    pub fn paths(directory: &Path) -> [PathBuf; 2] {
+        [directory.join("a/worker"), directory.join("b/worker")]
+    }
+}
+
 /// The exit code (negative signal number when killed), stdout and stderr of a
 /// finished process; `None` when it outlived `timeout` and was killed.
 pub struct Finished {
@@ -62,7 +127,7 @@ pub fn run(
 pub fn run_in(
     argv: &[OsString],
     env: &[(String, Option<String>)],
-    cwd: Option<&std::path::Path>,
+    cwd: Option<&Path>,
     timeout: Duration,
 ) -> Result<Option<Finished>, String> {
     let started = Instant::now();
@@ -121,13 +186,38 @@ pub fn run_in(
 
 /// Candidate invocations recorded for trace identities: the worker whose calls
 /// are recorded, and each call's arguments, exit code and stdout digest.
-static RECORDER: std::sync::Mutex<Option<(std::path::PathBuf, Vec<Value>)>> =
-    std::sync::Mutex::new(None);
+struct Recorder {
+    worker: PathBuf,
+    calls: Vec<Value>,
+    argument_aliases: Vec<(OsString, OsString)>,
+}
+
+static RECORDER: std::sync::Mutex<Option<Recorder>> = std::sync::Mutex::new(None);
 
 /// Record every later invocation of `worker` until [`stop_recording`].
-pub fn record_calls(worker: &std::path::Path) {
+pub fn record_calls(worker: &Path) {
     if let Ok(mut slot) = RECORDER.lock() {
-        *slot = Some((worker.to_path_buf(), Vec::new()));
+        *slot = Some(Recorder {
+            worker: worker.to_path_buf(),
+            calls: Vec::new(),
+            argument_aliases: Vec::new(),
+        });
+    }
+}
+
+/// Record the declared spelling of a resolved corpus argument for this case.
+pub(super) fn record_argument_aliases(actual: &[OsString], declared: &[OsString]) {
+    if let Ok(mut slot) = RECORDER.lock()
+        && let Some(recorder) = slot.as_mut()
+    {
+        recorder.argument_aliases.clear();
+        recorder.argument_aliases.extend(
+            actual
+                .iter()
+                .zip(declared)
+                .filter(|(actual, declared)| actual != declared)
+                .map(|(actual, declared)| (actual.clone(), declared.clone())),
+        );
     }
 }
 
@@ -136,15 +226,15 @@ pub fn stop_recording() -> Vec<Value> {
         .lock()
         .ok()
         .and_then(|mut slot| slot.take())
-        .map(|(_, calls)| calls)
+        .map(|recorder| recorder.calls)
         .unwrap_or_default()
 }
 
 /// A recorded candidate run: no timeout, and only status, exit code and output.
 fn recorded(argv: &[OsString]) -> Option<Value> {
     let mut slot = RECORDER.lock().ok()?;
-    let (worker, calls) = slot.as_mut()?;
-    if std::fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
+    let recorder = slot.as_mut()?;
+    if fs::canonicalize(&argv[0]).ok().as_deref() != Some(recorder.worker.as_path()) {
         return None;
     }
     let finished = match run(argv, &[], Duration::from_secs(u64::MAX / 4)) {
@@ -154,15 +244,21 @@ fn recorded(argv: &[OsString]) -> Option<Value> {
     };
     let shown = argv[1..].iter().enumerate().map(|(i, a)| {
         if i == 1 {
-            std::path::Path::new(a).file_name().map_or_else(
+            Path::new(a).file_name().map_or_else(
                 || a.to_string_lossy().into_owned(),
                 |n| n.to_string_lossy().into_owned(),
             )
         } else {
-            a.to_string_lossy().into_owned()
+            recorder
+                .argument_aliases
+                .iter()
+                .find(|(actual, _)| actual == a)
+                .map_or(a, |(_, declared)| declared)
+                .to_string_lossy()
+                .into_owned()
         }
     });
-    calls.push(Value::object([
+    recorder.calls.push(Value::object([
         ("argv", Value::strings(shown)),
         ("exit", Value::int(finished.code)),
         (
@@ -225,7 +321,7 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
     }
     let data = std::str::from_utf8(&finished.stdout)
         .ok()
-        .and_then(|text| json::parse(text).ok());
+        .and_then(|text| json::parse_observations(text).ok());
     match data {
         Some(data @ Value::Object(_)) => Value::object([
             ("status", Value::str("ok")),
@@ -235,7 +331,13 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
                 Value::int(started.elapsed().as_nanos() as i64),
             ),
         ]),
-        _ => Value::object([("status", Value::str("invalid-worker-output"))]),
+        _ => Value::object([
+            ("status", Value::str("invalid-worker-output")),
+            (
+                "stdout",
+                Value::str(String::from_utf8_lossy(&finished.stdout)),
+            ),
+        ]),
     }
 }
 
@@ -315,7 +417,9 @@ mod tests {
     fn classifies_outcomes() {
         let ok = execute(&sh("echo '{\"a\": 1.50}'"), DEFAULT_TIMEOUT);
         assert_eq!(status(&ok), "ok");
-        assert_eq!(data(&ok).get("a"), Some(&Value::float(1.5)));
+        let value = data(&ok).get("a").unwrap();
+        assert_eq!(value.as_f64(), Some(1.5));
+        assert_eq!(json::observations(value), "1.50");
         let failed = execute(&sh("echo bad >&2; exit 3"), DEFAULT_TIMEOUT);
         assert_eq!(failed.get("exit_code"), Some(&Value::int(3)));
         assert_eq!(failed.get("stderr").and_then(Value::as_str), Some("bad\n"));
@@ -332,6 +436,23 @@ mod tests {
         assert_eq!(
             slow.get("argv").and_then(Value::as_array).map(<[_]>::len),
             Some(3)
+        );
+    }
+
+    #[test]
+    fn duplicate_worker_fields_are_retained_as_failed_stdout() {
+        let output = execute(
+            &sh("echo '{\"elapsed_ns\": 1, \"elapsed_ns\": NaN}'"),
+            DEFAULT_TIMEOUT,
+        );
+        assert_eq!(status(&output), "invalid-worker-output");
+        assert_eq!(
+            output.get("stdout").and_then(Value::as_str),
+            Some("{\"elapsed_ns\": 1, \"elapsed_ns\": NaN}\n")
+        );
+        assert_eq!(
+            json::parse_observations(&json::observations(&output)),
+            Ok(output)
         );
     }
 }

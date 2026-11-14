@@ -1,0 +1,222 @@
+{
+  "license": "MIT OR Apache-2.0",
+  "vectors": [
+    {
+      "name": "aac-layout-1.mov",
+      "sha256": "599c3a06f3e75d9929273843cca356201feb16bb3605ba4a520db23ca872b92d",
+      "sample_rate": 48000,
+      "channels": 1,
+      "configuration": 1
+    },
+    {
+      "name": "aac-layout-2.mov",
+      "sha256": "6d2fc79bc208e041e9d42005b75b9afb9bd9001caad9bf8025d92c7cd842f11b",
+      "sample_rate": 48000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-layout-3.mov",
+      "sha256": "a0b0de807271a2985348b4a6f379be97dc968ce35d4d34c1478d99c315ed30cc",
+      "sample_rate": 48000,
+      "channels": 3,
+      "configuration": 3
+    },
+    {
+      "name": "aac-layout-4.mov",
+      "sha256": "830f6b1eed16c26d8f74b88e5b5cb0af098ff9807ecd2ac0edc64c7ee3d17685",
+      "sample_rate": 48000,
+      "channels": 4,
+      "configuration": 4
+    },
+    {
+      "name": "aac-layout-5.mov",
+      "sha256": "ea8bcaef0aba2bf86c4d03fd06ecdb9a1f5c261616b9a78e9e6143e84d3e907b",
+      "sample_rate": 48000,
+      "channels": 5,
+      "configuration": 5
+    },
+    {
+      "name": "aac-layout-6.mov",
+      "sha256": "e5b24ae8c8b2ef8509ec30107d2a2651098d3e0c5a230356a920602b1664a6ea",
+      "sample_rate": 48000,
+      "channels": 6,
+      "configuration": 6
+    },
+    {
+      "name": "aac-layout-7.mov",
+      "sha256": "9fa85980e3d79df6152b493d31ccb061c87219eb1fec9c953c41d5a8bd6b1612",
+      "sample_rate": 48000,
+      "channels": 8,
+      "configuration": 7
+    },
+    {
+      "name": "aac-layout-11.mov",
+      "sha256": "35e6ed206cea63964be4d88d0f12feaa500ec35cd1a7484b56b89797195ab382",
+      "sample_rate": 48000,
+      "channels": 7,
+      "configuration": 11
+    },
+    {
+      "name": "aac-layout-12.mov",
+      "sha256": "788a48d70a7cc0bb5eaa29140a7015e1e199775992b98b2766a7776b75a50827",
+      "sample_rate": 48000,
+      "channels": 8,
+      "configuration": 12
+    },
+    {
+      "name": "aac-layout-14.mov",
+      "sha256": "b62b199876c531e46cd10be18b6fbba8d2445dc079c25d1062220d0fbf55bcee",
+      "sample_rate": 48000,
+      "channels": 8,
+      "configuration": 14
+    },
+    {
+      "name": "aac-rate-7350.mov",
+      "sha256": "967585bae0b1e0a47166cc8c6c1e4b7904230a82e8b7e10f96ab54395151e583",
+      "sample_rate": 7350,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-8000.mov",
+      "sha256": "9aca79d539d71f2000fd1a187fb8838de64b85f35af492d7116e54d68ba01954",
+      "sample_rate": 8000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-11025.mov",
+      "sha256": "e39c83509079b428ad191da42f61c4f6945bce0e486267acd4f0ebffbba8661d",
+      "sample_rate": 11025,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-12000.mov",
+      "sha256": "f224aaec95e734955f3c565efd3bcdb0585850e06b1b33c788b4cf897eebec56",
+      "sample_rate": 12000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-16000.mov",
+      "sha256": "77031ec71de4057169a4325e22609c4b2a413e332654c3064d674191ddbb2e85",
+      "sample_rate": 16000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-22050.mov",
+      "sha256": "00e7552c09e04a6d783edff627caba8e37449547b48b6b9e5ae4f66148bdd0f8",
+      "sample_rate": 22050,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-24000.mov",
+      "sha256": "209c90ae1fe5b1803d24308e18c5495a159e8890be4137678ec83a848951f1ea",
+      "sample_rate": 24000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-32000.mov",
+      "sha256": "43e16912b66adf98be13d3ddf0d913fa8757da0e3d4d08ce1123bb02688a93b1",
+      "sample_rate": 32000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-44100.mov",
+      "sha256": "600760d37c218625843b4c0e41909cc570f02c30f1e5a6f59d658a1ebd1514ad",
+      "sample_rate": 44100,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-64000.mov",
+      "sha256": "0911ee5166a62c1631b4e94fbc9362167f8ff46f0c5792f006f9a03436409526",
+      "sample_rate": 64000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-88200.mov",
+      "sha256": "e029073328599fd0cbc316b8b3c368f0b29740635fa2bf40c31e9d3d7aef160d",
+      "sample_rate": 88200,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-rate-96000.mov",
+      "sha256": "211fab5702ef7e1b049bd36f676e9b0b20852c1fe5912ca45d0f6f5f645ac2a0",
+      "sample_rate": 96000,
+      "channels": 2,
+      "configuration": 2
+    },
+    {
+      "name": "aac-program-mono.mov",
+      "sha256": "fd3f05c51b4f830eb2f89783f42f1b5a3842f2a9762a0b6773396ac5fd4e7d1b",
+      "sample_rate": 48000,
+      "channels": 1,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-stereo.mov",
+      "sha256": "7b1082a8670447d67483bc4035ec011b5b55ac259ff25c57f6c6217fb3fc9067",
+      "sample_rate": 44100,
+      "channels": 2,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-three-front.mov",
+      "sha256": "0347cdced2d1231103b4f4f6bdc94b161fab667149442e48ee50e9030dce69ba",
+      "sample_rate": 48000,
+      "channels": 3,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-centre.mov",
+      "sha256": "1d0b389dc6b71c5c0983eeab1d6e8766aa8e29ffd8869ea27bb63ab2106e9401",
+      "sample_rate": 48000,
+      "channels": 4,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-pair.mov",
+      "sha256": "b4a679547aa2a6318feee97605508e1a23974088792b5a970b6f6a033ae34875",
+      "sample_rate": 48000,
+      "channels": 5,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-pair-lfe.mov",
+      "sha256": "76ab7d5d725549ea968ff755290ef2890f92284bdccc1c4ceae17adcc691c62e",
+      "sample_rate": 48000,
+      "channels": 6,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-back-three-lfe.mov",
+      "sha256": "5e821fd23f62c3d40a1fa367dd4362bebe1bec5164a692123b920481b5d9147e",
+      "sample_rate": 48000,
+      "channels": 7,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-surround.mov",
+      "sha256": "a6b8e645e0a3f23106cb6e9e045a47416a72cfbd2fd52431f7f57239ba5e6e58",
+      "sample_rate": 48000,
+      "channels": 8,
+      "configuration": 0
+    },
+    {
+      "name": "aac-program-wide-front.mov",
+      "sha256": "e2f137c7f7df307c8d07e2b78f66cceaa08b3ee49de4b480e669434617ca09ec",
+      "sample_rate": 96000,
+      "channels": 8,
+      "configuration": 0
+    }
+  ]
+}

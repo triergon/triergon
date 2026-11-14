@@ -1,0 +1,48 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 250 3000
+; What the caches tell apart and what they share. Every quarter second a
+; line of 96 characters at a size of its own adds new outlines, past the
+; contract's 1000 over the frames, so the outline cache is cut while the
+; other lines stay. Lines that differ only in \be, \blur, the shadow or the
+; \kf timing sit side by side, and a drawing is drawn as text and used as a
+; vector clip.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Small,Arimo,12,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,0,7,0,0,0,1
+Style: Line,Arimo,48,&H00FFFFFF,&H000000FF,&H00203040,&H80000000,0,0,0,0,100,100,0,0,1,2,0,7,0,0,0,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.25,Small,,0,0,0,,{\pos(20,40)\fs12}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:00.25,0:00:00.50,Small,,0,0,0,,{\pos(20,70)\fs13}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:00.50,0:00:00.75,Small,,0,0,0,,{\pos(20,100)\fs14}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:00.75,0:00:01.00,Small,,0,0,0,,{\pos(20,130)\fs15}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:01.00,0:00:01.25,Small,,0,0,0,,{\pos(20,160)\fs16}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:01.25,0:00:01.50,Small,,0,0,0,,{\pos(20,190)\fs17}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:01.50,0:00:01.75,Small,,0,0,0,,{\pos(20,40)\fs18}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:01.75,0:00:02.00,Small,,0,0,0,,{\pos(20,70)\fs19}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:02.00,0:00:02.25,Small,,0,0,0,,{\pos(20,100)\fs20}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:02.25,0:00:02.50,Small,,0,0,0,,{\pos(20,130)\fs21}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:02.50,0:00:02.75,Small,,0,0,0,,{\pos(20,160)\fs22}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:02.75,0:00:03.00,Small,,0,0,0,,{\pos(20,190)\fs23}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:03.00,0:00:03.25,Small,,0,0,0,,{\pos(20,40)\fs24}!"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz|~ÀÁÂÃÄ
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(60,300)\be1}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(760,300)\be2}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(60,390)\blur1}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(760,390)\blur3}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(60,480)\shad2}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(760,480)\shad3}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(60,570)\kf50}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(760,570)\kf150}Same text
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(1300,300)\p1}m 0 0 l 300 0 300 120 0 120 m 40 30 l 260 30 260 90 40 90
+Dialogue: 0,0:00:00.00,0:00:03.25,Line,,0,0,0,,{\pos(1300,300)\clip(m 0 0 l 300 0 300 120 0 120 m 40 30 l 260 30 260 90 40 90)}Clipped by it
+Dialogue: 0,0:00:01.00,0:00:03.25,Line,,0,0,0,,{\pos(1300,500)\iclip(m 0 0 l 300 0 300 120 0 120 m 40 30 l 260 30 260 90 40 90)}And outside it

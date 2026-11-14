@@ -1,80 +1,74 @@
-//! Reference-compatible policies.
+//! FFmpeg's subtitle receivers.
 //!
-//! The decoders in the format modules follow the specifications and keep every
-//! source byte, clock and palette fact. Where FFmpeg presents a subtitle
-//! differently and a consumer needs FFmpeg's result, the policies here reproduce
-//! FFmpeg's receiver for that input. They never rewrite the source output. Each
-//! module is one policy family; its documentation names the FFmpeg build it
+//! Each module reproduces one FFmpeg decoder, or the demuxer and decoder
+//! together, for every input it accepts, malformed ones included. The format
+//! modules carry what these receivers read: segments, packets and container
+//! configuration. Each module's documentation names the FFmpeg build it
 //! reproduces.
 //!
-//! Projections that exist only to compare traces with FFmpeg are not policies.
-//! They are compiled only with the `reference-trace` feature.
+//! Projections that exist only to compare traces with FFmpeg are not here;
+//! they are compiled only with the `reference-trace` feature.
 
 pub mod dvb {
-    //! The DVB receiver view.
+    //! The DVB receiver: FFmpeg's `dvbsub` decoder.
     //!
-    //! A [`dvb::Decoder`](crate::dvb::Decoder) built with
-    //! [`ReceiverView::Receiver`](crate::dvb::ReceiverView::Receiver) or
-    //! [`new_configured_with_geometry_policy`](crate::dvb::Decoder::new_configured_with_geometry_policy)
-    //! presents display sets as FFmpeg's `dvbsub` decoder does: its region order,
-    //! automatic palettes without a CDS, non-modifying-colour handling and
-    //! end-of-display tolerance. Each event then carries a [`Publication`]
-    //! (`DisplayEvent::receiver_publication`) and each region palette a receiver
-    //! [`Palette`] (`PaletteSnapshot::receiver`). [`GeometryPolicy::OmitUnrendered`]
-    //! omits regions without a raster and reports them as [`OmittedRegion`]s.
+    //! [`ReceiverDecoder`] decodes the codec packets of one stream and outputs
+    //! the subtitles FFmpeg's decoder outputs for them: when a display set is
+    //! presented, its rectangles in the receiver's order, their palettes
+    //! (including the [`AutomaticPalette`]) and index planes, and the
+    //! subtitle's clock. [`Options`] carries the decoder options that change
+    //! the output (`compute_edt`, `compute_clut`, `dvb_substream`).
     //!
-    //! [`PesParser`] cuts a selected service's PES packets into the codec packets
-    //! FFmpeg's demuxer hands its decoder; decode them with
-    //! [`Decoder::provide_pes`](crate::dvb::Decoder::provide_pes).
+    //! [`PesParser`] cuts a selected service's PES data fields into the codec
+    //! packets FFmpeg's demuxer hands its decoder.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::dvb::pes_parser::{PesFraming, PesPacket, PesParser, PesProgress};
-    pub use crate::dvb::receiver::{
-        GeometryPolicy, OmittedRegion, Palette, Publication, PublicationReason,
+    pub use crate::dvb::receiver_decoder::{
+        AutomaticPalette, Options, ReceiverDecoder, Rect, Status, Subtitle,
     };
 }
 
 pub mod pgs {
-    //! The PGS receiver.
+    //! The PGS receiver: FFmpeg's `pgssub` decoder.
     //!
-    //! [`RecoveryDecoder`] and [`IndexedRecoveryDecoder`] run the strict source
-    //! decoder and FFmpeg's `pgssub` receiver over the same packets and report
-    //! both, including the receiver's packet recovery. [`ReceiverDecoder`] runs
-    //! only the receiver, for a consumer of its events.
-    //!
-    //! The display sets of [`pgs::DisplayDecoder`](crate::pgs::DisplayDecoder)
-    //! also carry the receiver's ARGB words and clock beside the source facts:
-    //! [`ColourMatrix`] converts Y/Cr/Cb as the receiver does, [`ColourOrigin`]
-    //! and [`ClockSource`] say where a word or clock came from, and [`ArgbView`]
-    //! writes an object's receiver ARGB plane on demand.
+    //! [`ReceiverDecoder`] returns what the reference returns for every packet
+    //! it decodes, malformed ones included: the first display of each packet,
+    //! its presentation PTS, rectangles, palettes and pixels, forced flags and
+    //! the `forced_subs_only` palette. A packet the reference refuses carries a
+    //! [`Refusal`]; the receiver keeps the state its earlier segments left and
+    //! decodes the next packet.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::pgs::display_model::{ClockSource, ColourMatrix, ColourOrigin};
-    pub use crate::pgs::indexed_argb::ArgbView;
-    pub use crate::pgs::receiver_decoder::{ReceiverDecoder, ReceiverEof, ReceiverPacket};
-    pub use crate::pgs::recovery::{
-        EofBehavior, IndexedRecoveryDecoder, RecoveryDecoder, RecoveryEof,
-    };
+    pub use crate::pgs::receiver::{ReceiverDecoder, ReceiverEof, ReceiverPacket, Refusal};
 }
-
 pub mod dvd {
-    //! The DVD receiver's crop, palette and presentation.
+    //! FFmpeg's DVD subtitle receiver and the packets its demuxers deliver.
     //!
-    //! Selected with [`ControlPolicy::Receiver`](crate::dvd::ControlPolicy::Receiver)
-    //! for traditional subpictures and
-    //! [`HdPolicy::Receiver`](crate::dvd::HdPolicy::Receiver) for extended ones.
-    //! [`resolve_palette`] builds the receiver's four ARGB words from a supplied
-    //! palette, or its automatic greys without one. [`CropJob`] removes
-    //! transparent borders as FFmpeg's `dvdsub` decoder does and exposes the
-    //! result as a [`CroppedView`] that borrows the source rows. [`Presentation`]
-    //! places that view on the caller's packet timeline. [`hd_argb`] converts one
-    //! extended-subpicture Y/Cr/Cb triple and contrast byte.
+    //! [`Decoder`] is the `dvdsub` decoder over packets: reassembly, control
+    //! sequences, 2-bit and 8-bit pixels, colours carried between units,
+    //! transparent-border crop and `forced_subs_only`, configured by
+    //! [`Settings`] from the stream configuration and the `palette` and
+    //! `ifo_palette` options ([`ifo_palette`]). The configuration's `size:`
+    //! line sets the canvas the subpictures are placed on. Its packets come from
+    //! [`VobSubIndex`] (the `vobsub` demuxer's `.idx`/`.sub` reading), from
+    //! [`SubpictureParser`] over a program stream's subpicture packets (the
+    //! `mpegps` demuxer and DVD subtitle parser, streams numbered by
+    //! [`SubpictureStreams`]), or from Matroska and MP4 tracks, whose
+    //! colour table [`mp4_configuration`] turns into the configuration the MP4
+    //! demuxer hands the decoder. Y'CbCr colours convert as BT.601
+    //! ([`triergon_pixel::YcbcrMatrix`]): rounded to nearest from IFO palettes
+    //! and the colours a unit carries, half a step down from the MP4 demuxer's
+    //! palette text.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::dvd::hd::hd_argb;
-    pub use crate::dvd::projection::{Crop, CropJob, CropMode, CropSelection, CroppedView};
-    pub use crate::dvd::receiver_palette::{Palette, PaletteOrigin, resolve_palette};
-    pub use crate::dvd::traditional::Presentation;
+    pub use crate::dvd::demux::{
+        ParsedUnit, SubpictureParser, SubpictureStreams, VobSubEntry, VobSubIndex,
+        mp4_configuration,
+    };
+    pub use crate::dvd::receiver::{
+        Bitmap, Decoder, Limits, Settings, Status, Subtitle, ifo_palette,
+    };
 }
 
 pub mod charset {
@@ -94,6 +88,36 @@ pub mod charset {
     };
 }
 
+pub mod document {
+    //! FFmpeg's `srt` and `webvtt` demuxers.
+    //!
+    //! [`Reader`] reads one SubRip or WebVTT document ([`Syntax`]) into the
+    //! [`Cue`]s the demuxer returns as packets, in its order: each cue's start
+    //! and duration in milliseconds, its text bytes and the WebVTT identifier
+    //! and settings. The demuxers tolerate what the specifications refuse: cues
+    //! without numbers, unchecked field ranges, cues out of order, which they
+    //! sort.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+    pub use crate::text::demuxer::{Cue, Limits, Reader, Status, Syntax};
+}
+
+pub mod ass {
+    //! FFmpeg's `ass` decoder.
+    //!
+    //! [`Decoder`] opens with the codec configuration and an optional charset
+    //! label, refused when the receiver's repertoire lacks it, and decodes each
+    //! ASS packet to the [`Subtitle`] the decode call returns for it, if any:
+    //! none for an empty packet, a refused conversion or text that is not
+    //! UTF-8. The text is the packet up to its first NUL.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch, with
+    //! Linux/glibc `iconv`.
+    pub use crate::text::Limits;
+    pub use crate::text::ass_decoder::{Decoder, Options, Status};
+    pub use crate::text::decoded::{Clock, Subtitle};
+}
+
 pub mod mov_text {
     //! mov_text to ASS conversion.
     //!
@@ -104,4 +128,41 @@ pub mod mov_text {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::text::mov_text::{Clock, Decoder, Limits, Options, Output, Status, Subtitle};
+}
+
+pub mod cc {
+    //! FFmpeg's closed-caption receiver.
+    //!
+    //! [`Decoder`] turns `cc_data` packets into the ASS events and header of
+    //! FFmpeg's `cc_dec` decoder, with its `real_time`,
+    //! `real_time_latency_msec` and `data_field` [`Options`].
+    //! [`CaptionExtractor`] gives, packet by packet, the caption bytes FFmpeg's
+    //! MPEG-2, H.264 and HEVC decoders attach to their output frames, in its
+    //! order and with its times.
+    //! [`SccPackets`] reads a Scenarist SCC file into the packets FFmpeg's `scc`
+    //! demuxer produces.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+    pub use crate::cc::extraction::{
+        CaptionExtractor, CaptionFrame, RAW_MPEG2_TIME_BASE, VideoCoding, VideoPacket,
+    };
+    pub use crate::cc::receiver::{ASS_HEADER, Clock, DataField, Decoder, Options, Subtitle};
+    pub use crate::cc::scc::{SccPacket, SccPackets};
+}
+
+pub mod teletext {
+    //! FFmpeg's `libzvbi_teletextdec` decoder in its text and ASS formats.
+    //!
+    //! [`Decoder`] takes the PES payloads FFmpeg's demuxer hands its decoder
+    //! and returns at most one [`Subtitle`] per call, as the reference does:
+    //! pages are selected ([`PageSelection`]), laid out as libzvbi does (41
+    //! columns, its page number in the header row), written as plain text or
+    //! ASS ([`Format`]) and queued. The `bitmap` format, which renders libzvbi's
+    //! own font, is not provided.
+    //!
+    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch, with
+    //! libzvbi 0.2.46.
+    pub use crate::teletext::receiver::{
+        Decoded, Decoder, Format, Options, PageSelection, Refusal, Subtitle,
+    };
 }

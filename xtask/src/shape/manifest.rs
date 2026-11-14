@@ -3,13 +3,13 @@
 //! segment properties and features; bidi, simple and Unicode cases are generated
 //! text files (`.research/shape/texts`) with the settings of each feature. The
 //! work each case must fold is pinned in `harness/features/<id>/pins.json`: the
-//! HarfBuzz and FriBidi reference's folds (see [`crate::lanes`]).
+//! HarfBuzz and FriBidi reference's folds (see [`crate::generators`]).
 
 use std::path::Path;
 
 use super::texts::{self, ALPHABETS, Rng, SAMPLES};
+use crate::generators::Generator;
 use crate::json::Value;
-use crate::lanes::Lane;
 
 type R<T> = Result<T, String>;
 
@@ -184,6 +184,7 @@ const REQUIRED: &[(&str, &[&str])] = &[
     ("NotoEmoji-wght.ttf", &["Zyyy"]),
     ("authored-cmap-formats.ttf", &["Latn"]),
     ("authored-cff-features.otf", &["Latn"]),
+    ("authored-charmaps.otf", &["Latn"]),
 ];
 
 /// Random strings per script: in the required cases, and in the whole sweep.
@@ -212,21 +213,14 @@ enum Load {
     Unicode,
 }
 
-pub const FEATURES: [&str; 6] = [
-    "shape-text",
-    "shape-libass",
-    "shape-text-all",
-    "shape-bidi",
-    "shape-simple",
-    "shape-unicode",
-];
-
-pub const LANE: Lane = Lane {
+pub const GENERATOR: Generator = Generator {
     command: "shape",
     main: super::main,
-    features: &FEATURES,
-    reference: "harfbuzz-native",
-    pin_note: "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
+    candidate: "shape-worker",
+    pin_note: (
+        "harfbuzz-native",
+        "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
+    ),
     report_directory: ".research/shape-report",
     manifest_directory: ".research/shape/manifests",
     row_sources: &ROW_SOURCES,

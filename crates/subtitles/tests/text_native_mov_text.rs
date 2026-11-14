@@ -390,6 +390,9 @@ fn complete_u16_text_length_is_not_clamped_to_the_2048_recommendation() {
     assert_eq!(o.input.payload.as_ref(), bytes);
 }
 
+// The captured inputs; the reference's recorded outputs beside them are
+// checked by the subtitle worker's `subtitle-text` corpus.
+#[allow(dead_code)]
 #[path = "native-mov-text-fixtures/cases.rs"]
 mod captured;
 
@@ -551,514 +554,524 @@ fn cancellation_at_each_funded_emission_step_never_duplicates_style_output() {
     );
 }
 
-fn check_native_capture(c: &captured::Case) {
-    for q in [1, 7, 4096] {
-        println!("native-capture-start {} quantum={}", c.id, q);
-        let pool = Budget::new(32 * 1024 * 1024).unwrap();
-        let extra = c.config.map(|b| Bytes::copy_from_slice(&pool, b).unwrap());
-        let options = Options {
-            packet_timebase: c.timebase.map(|(n, d)| TimeBase::new(n, d).unwrap()),
-            frame_width: c.dimensions.0,
-            frame_height: c.dimensions.1,
-        };
-        let mut d = Decoder::new(&pool, extra.as_ref(), options, Limits::default(), 6).unwrap();
-        let cancel = AtomicBool::new(false);
-        loop {
-            match d.poll(&mut WorkBudget::new(q), &cancel).unwrap() {
-                Status::Pending => (),
-                Status::NeedInput => break,
-                s => panic!("{} opening {s:?}", c.id),
-            }
-        }
-        assert_eq!(
-            d.subtitle_header().unwrap().as_ref(),
-            c.header,
-            "{} header",
-            c.id
-        );
-        for op in c.ops {
-            match op {
-                captured::Op::Flush => d.reset(6, &cancel).unwrap(),
-                captured::Op::Packet {
-                    raw,
-                    returned,
-                    subtitle,
-                } => {
-                    let mut i = input(&pool, raw);
-                    i.codec_private.clone_from(&extra);
-                    let clock = Clock {
-                        pts: c.pts,
-                        dts: None,
-                        duration: c.duration,
-                    };
-                    d.provide(i, clock).unwrap();
-                    let out = finish(&mut d, q);
-                    assert_eq!(out.input.payload.as_ref(), *raw, "{} retained packet", c.id);
-                    assert_eq!(out.clock, clock, "{} raw native clock", c.id);
-                    assert_eq!(out.returned, *returned, "{} native return", c.id);
-                    match (out.subtitle, subtitle) {
-                        (None, None) => (),
-                        (Some(s), Some(e)) => {
-                            assert_eq!(s.ass.as_ref(), e.ass, "{} complete ASS", c.id);
-                            assert_eq!(
-                                s.pts_microseconds.unwrap_or(i64::MIN),
-                                e.pts,
-                                "{} pts",
-                                c.id
-                            );
-                            assert_eq!(
-                                (s.format(), s.start_display_ms, s.end_display_ms),
-                                (e.format, e.start, e.end),
-                                "{} subtitle",
-                                c.id
-                            );
-                            assert_eq!(
-                                (
-                                    s.rectangle_type(),
-                                    s.geometry(),
-                                    s.flags(),
-                                    s.palette_entries()
-                                ),
-                                (e.kind, e.xywh, e.flags, e.colors),
-                                "{} rectangle",
-                                c.id
-                            );
-                        }
-                        (actual, expected) => panic!(
-                            "{} output presence actual={actual:?} expected={expected:?}",
-                            c.id
-                        ),
-                    }
-                }
-            }
-        }
-        d.finish_input(&cancel).unwrap();
-        assert_eq!(
-            d.poll(&mut WorkBudget::new(q), &cancel).unwrap(),
-            Status::Finished
-        );
-        drop(d);
-        drop(extra);
-        assert_eq!(
-            pool.used(),
-            Budget::control_storage_bytes(),
-            "{} complete teardown",
-            c.id
-        );
-        println!(
-            "native-capture-pass {} quantum={} calls={}",
-            c.id,
-            q,
-            c.ops.len()
-        );
+// The override tags written where a style record or the highlight starts or
+// ends, each expectation the reference's output for the same session.
+
+/// A TS 26.245 StyleRecord: characters `start..end`, font ID, face flags (bold
+/// 1, italic 2, underline 4), size and RGBA text colour.
+#[derive(Clone, Copy)]
+struct Record {
+    start: u16,
+    end: u16,
+    font: u16,
+    face: u8,
+    size: u8,
+    rgb: [u8; 3],
+    alpha: u8,
+}
+/// The default style the sample descriptions below declare.
+const PLAIN: Record = Record {
+    start: 0,
+    end: 0,
+    font: 1,
+    face: 0,
+    size: 16,
+    rgb: [255; 3],
+    alpha: 255,
+};
+const RED: [u8; 3] = [0x11, 0x22, 0x33];
+const GREEN: [u8; 3] = [0x44, 0x55, 0x66];
+fn at(start: u16, end: u16) -> Record {
+    Record {
+        start,
+        end,
+        ..PLAIN
     }
 }
-#[test]
-fn captured_original177_tx3g_basic() {
-    check_native_capture(&captured::CASES[0]);
-}
-
-#[test]
-fn captured_original177_tx3g_byte_not_character_count() {
-    check_native_capture(&captured::CASES[1]);
-}
-
-#[test]
-fn captured_original177_tx3g_utf16be_bom() {
-    check_native_capture(&captured::CASES[2]);
-}
-
-#[test]
-fn captured_original177_tx3g_empty_sample() {
-    check_native_capture(&captured::CASES[3]);
-}
-
-#[test]
-fn captured_original177_tx3g_embedded_nul() {
-    check_native_capture(&captured::CASES[4]);
-}
-
-#[test]
-fn captured_original177_tx3g_line_codepoints_exact() {
-    check_native_capture(&captured::CASES[5]);
-}
-
-#[test]
-fn captured_original177_tx3g_style_highlight_raw() {
-    check_native_capture(&captured::CASES[6]);
-}
-
-#[test]
-fn captured_original177_tx3g_unknown_modifier() {
-    check_native_capture(&captured::CASES[7]);
-}
-
-#[test]
-fn captured_original177_tx3g_modifier_order() {
-    check_native_capture(&captured::CASES[8]);
-}
-
-#[test]
-fn captured_original177_tx3g_empty_with_modifier() {
-    check_native_capture(&captured::CASES[9]);
-}
-
-#[test]
-fn captured_original177_tx3g_u16_byte_count_boundary() {
-    check_native_capture(&captured::CASES[10]);
-}
-
-#[test]
-fn captured_original177_tx3g_missing_length() {
-    check_native_capture(&captured::CASES[11]);
-}
-
-#[test]
-fn captured_original177_tx3g_text_overrun() {
-    check_native_capture(&captured::CASES[12]);
-}
-
-#[test]
-fn captured_original177_tx3g_utf16_odd() {
-    check_native_capture(&captured::CASES[13]);
-}
-
-#[test]
-fn captured_original177_tx3g_lone_surrogate() {
-    check_native_capture(&captured::CASES[14]);
-}
-
-#[test]
-fn captured_original177_tx3g_short_box() {
-    check_native_capture(&captured::CASES[15]);
-}
-
-#[test]
-fn captured_original177_tx3g_box_overrun() {
-    check_native_capture(&captured::CASES[16]);
-}
-
-#[test]
-fn captured_original177_tx3g_extended_box_gap() {
-    check_native_capture(&captured::CASES[17]);
-}
-
-#[test]
-fn captured_unicode() {
-    check_native_capture(&captured::CASES[18]);
-}
-
-#[test]
-fn captured_bom() {
-    check_native_capture(&captured::CASES[19]);
-}
-
-#[test]
-fn captured_ffff() {
-    check_native_capture(&captured::CASES[20]);
-}
-
-#[test]
-fn captured_noncharacter_fffe() {
-    check_native_capture(&captured::CASES[21]);
-}
-
-#[test]
-fn captured_invalid_overlong() {
-    check_native_capture(&captured::CASES[22]);
-}
-
-#[test]
-fn captured_invalid_tail() {
-    check_native_capture(&captured::CASES[23]);
-}
-
-#[test]
-fn captured_nul_invalid_tail() {
-    check_native_capture(&captured::CASES[24]);
-}
-
-#[test]
-fn captured_cr_lf_markup() {
-    check_native_capture(&captured::CASES[25]);
-}
-
-#[test]
-fn captured_utf16be() {
-    check_native_capture(&captured::CASES[26]);
-}
-
-#[test]
-fn captured_utf16le() {
-    check_native_capture(&captured::CASES[27]);
-}
-
-#[test]
-fn captured_empty_physical() {
-    check_native_capture(&captured::CASES[28]);
-}
-
-#[test]
-fn captured_one_byte() {
-    check_native_capture(&captured::CASES[29]);
-}
-
-#[test]
-fn captured_clear() {
-    check_native_capture(&captured::CASES[30]);
-}
-
-#[test]
-fn captured_bad_two() {
-    check_native_capture(&captured::CASES[31]);
-}
-
-#[test]
-fn captured_empty_event() {
-    check_native_capture(&captured::CASES[32]);
-}
-
-#[test]
-fn captured_overstated() {
-    check_native_capture(&captured::CASES[33]);
-}
-
-#[test]
-fn captured_understated() {
-    check_native_capture(&captured::CASES[34]);
-}
-
-#[test]
-fn captured_style_all() {
-    check_native_capture(&captured::CASES[35]);
-}
-
-#[test]
-fn captured_style_unicode() {
-    check_native_capture(&captured::CASES[36]);
-}
-
-#[test]
-fn captured_style_empty() {
-    check_native_capture(&captured::CASES[37]);
-}
-
-#[test]
-fn captured_style_adjacent_equal() {
-    check_native_capture(&captured::CASES[38]);
-}
-
-#[test]
-fn captured_style_adjacent_different() {
-    check_native_capture(&captured::CASES[39]);
-}
-
-#[test]
-fn captured_style_overlap() {
-    check_native_capture(&captured::CASES[40]);
-}
-
-#[test]
-fn captured_style_reversed() {
-    check_native_capture(&captured::CASES[41]);
-}
-
-#[test]
-fn captured_style_outside() {
-    check_native_capture(&captured::CASES[42]);
-}
-
-#[test]
-fn captured_style_repeated() {
-    check_native_capture(&captured::CASES[43]);
-}
-
-#[test]
-fn captured_style_malformed_after_good() {
-    check_native_capture(&captured::CASES[44]);
-}
-
-#[test]
-fn captured_style_zero_after_good() {
-    check_native_capture(&captured::CASES[45]);
-}
-
-#[test]
-fn captured_highlight_inverse() {
-    check_native_capture(&captured::CASES[46]);
-}
-
-#[test]
-fn captured_highlight_color() {
-    check_native_capture(&captured::CASES[47]);
-}
-
-#[test]
-fn captured_highlight_empty() {
-    check_native_capture(&captured::CASES[48]);
-}
-
-#[test]
-fn captured_wrap_0() {
-    check_native_capture(&captured::CASES[49]);
-}
-
-#[test]
-fn captured_wrap_1() {
-    check_native_capture(&captured::CASES[50]);
-}
-
-#[test]
-fn captured_wrap_2() {
-    check_native_capture(&captured::CASES[51]);
-}
-
-#[test]
-fn captured_duplicate_wrap() {
-    check_native_capture(&captured::CASES[52]);
-}
-
-#[test]
-fn captured_unknown() {
-    check_native_capture(&captured::CASES[53]);
-}
-
-#[test]
-fn captured_extended_wrap() {
-    check_native_capture(&captured::CASES[54]);
-}
-
-#[test]
-fn captured_size0() {
-    check_native_capture(&captured::CASES[55]);
-}
-
-#[test]
-fn captured_short_box() {
-    check_native_capture(&captured::CASES[56]);
-}
-
-#[test]
-fn captured_overrun_box() {
-    check_native_capture(&captured::CASES[57]);
-}
-
-#[test]
-fn captured_short_body() {
-    check_native_capture(&captured::CASES[58]);
-}
-
-#[test]
-fn captured_extended_short() {
-    check_native_capture(&captured::CASES[59]);
-}
-
-#[test]
-fn captured_wrap_nul() {
-    check_native_capture(&captured::CASES[60]);
-}
-
-#[test]
-fn captured_configured_defaults() {
-    check_native_capture(&captured::CASES[61]);
-}
-
-#[test]
-fn captured_configured_style_font() {
-    check_native_capture(&captured::CASES[62]);
-}
-
-#[test]
-fn captured_duplicate_fonts() {
-    check_native_capture(&captured::CASES[63]);
-}
-
-#[test]
-fn captured_font_nul() {
-    check_native_capture(&captured::CASES[64]);
-}
-
-#[test]
-fn captured_font_utf16() {
-    check_native_capture(&captured::CASES[65]);
-}
-
-#[test]
-fn captured_config_too_short() {
-    check_native_capture(&captured::CASES[66]);
-}
-
-#[test]
-fn captured_config_valid_empty_fonts() {
-    check_native_capture(&captured::CASES[67]);
-}
-
-#[test]
-fn captured_config_invalid_font_size() {
-    check_native_capture(&captured::CASES[68]);
-}
-
-#[test]
-fn captured_config_one_dimension() {
-    check_native_capture(&captured::CASES[69]);
-}
-
-#[test]
-fn captured_unset_clock() {
-    check_native_capture(&captured::CASES[70]);
-}
-
-#[test]
-fn captured_unknown_clock() {
-    check_native_capture(&captured::CASES[71]);
-}
-
-#[test]
-fn captured_known_zero_duration() {
-    check_native_capture(&captured::CASES[72]);
-}
-
-#[test]
-fn captured_positive_half() {
-    check_native_capture(&captured::CASES[73]);
-}
-
-#[test]
-fn captured_negative_half() {
-    check_native_capture(&captured::CASES[74]);
-}
-
-#[test]
-fn captured_rational_clock() {
-    check_native_capture(&captured::CASES[75]);
-}
-
-#[test]
-fn captured_overflow_clock() {
-    check_native_capture(&captured::CASES[76]);
-}
-
-#[test]
-fn captured_two_packets() {
-    check_native_capture(&captured::CASES[77]);
-}
-
-#[test]
-fn captured_utf8_refusal_then_good() {
-    check_native_capture(&captured::CASES[78]);
-}
-
-#[test]
-fn captured_box_refusal_then_good() {
-    check_native_capture(&captured::CASES[79]);
-}
-
-#[test]
-fn captured_clear_then_good() {
-    check_native_capture(&captured::CASES[80]);
-}
-
-#[test]
-fn captured_flush_read_order() {
-    check_native_capture(&captured::CASES[81]);
+impl Record {
+    fn bytes(self) -> Vec<u8> {
+        let mut b: Vec<u8> = [self.start, self.end, self.font]
+            .iter()
+            .flat_map(|v| v.to_be_bytes())
+            .collect();
+        b.extend([self.face, self.size]);
+        b.extend(self.rgb);
+        b.push(self.alpha);
+        b
+    }
+}
+fn styl(records: &[Record]) -> Vec<u8> {
+    let mut body = u16::try_from(records.len()).unwrap().to_be_bytes().to_vec();
+    body.extend(records.iter().flat_map(|r| r.bytes()));
+    box_bytes(b"styl", &body)
+}
+fn hlit(start: u16, end: u16) -> Vec<u8> {
+    box_bytes(b"hlit", &[start.to_be_bytes(), end.to_be_bytes()].concat())
+}
+fn styled(text: &[u8], records: &[Record], boxes: &[Vec<u8>]) -> Vec<u8> {
+    let mut all = styl(records);
+    all.extend(boxes.concat());
+    sample(text, &all)
+}
+/// A TextSampleEntry body: display flags, justification, background, text
+/// box, the default style and the font table.
+fn description(default: Record, fonts: &[(u16, &[u8])]) -> Vec<u8> {
+    let mut b = vec![0, 0, 0, 0, 0, 0xff, 0, 0, 0, 0xff];
+    b.extend([0; 8]);
+    b.extend(default.bytes());
+    let mut table = u16::try_from(fonts.len()).unwrap().to_be_bytes().to_vec();
+    for (id, name) in fonts {
+        table.extend(id.to_be_bytes());
+        table.push(u8::try_from(name.len()).unwrap());
+        table.extend(*name);
+    }
+    b.extend(box_bytes(b"ftab", &table));
+    b
+}
+/// Decodes `samples` in one session at work quanta 1 and 4096, which must
+/// agree, and returns each call's ASS text after its prefix, which must carry
+/// the sample's index as its read order; `None` for a refusal.
+fn session(config: Option<&[u8]>, samples: &[Vec<u8>]) -> Vec<Option<String>> {
+    let decode = |quantum| {
+        let pool = Budget::new(1 << 20).unwrap();
+        let extra = config.map(|c| Bytes::copy_from_slice(&pool, c).unwrap());
+        let options = Options::default();
+        let mut d = Decoder::new(&pool, extra.as_ref(), options, Limits::default(), 6).unwrap();
+        let mut texts = Vec::new();
+        for (read, bytes) in samples.iter().enumerate() {
+            d.provide(input(&pool, bytes), Clock::default()).unwrap();
+            let out = finish(&mut d, quantum);
+            let refused = out.subtitle.is_none();
+            texts.push(out.subtitle.map(|s| {
+                let ass = String::from_utf8(s.ass.as_ref().to_vec()).unwrap();
+                let prefix = format!("{read},0,Default,,0,0,0,,");
+                ass.strip_prefix(&prefix).unwrap().to_owned()
+            }));
+            if refused {
+                assert_eq!(out.returned, -1094995529);
+            }
+        }
+        texts
+    };
+    let texts = decode(1);
+    assert_eq!(texts, decode(4096));
+    texts
+}
+fn expect(config: Option<&[u8]>, samples: &[Vec<u8>], expected: &[Option<&str>]) {
+    let expected: Vec<_> = expected.iter().map(|e| e.map(str::to_owned)).collect();
+    assert_eq!(session(config, samples), expected);
+}
+
+#[test]
+fn face_tags_are_written_for_each_flag_that_differs_from_the_default() {
+    let bold = description(Record { face: 1, ..PLAIN }, &[(1, b"Arial")]);
+    let mut samples: Vec<_> = [0, 2, 4, 6, 7]
+        .map(|face| styled(b"abcdef", &[Record { face, ..at(1, 3) }], &[]))
+        .to_vec();
+    samples.push(styled(
+        b"abcdef",
+        &[Record {
+            face: 1,
+            size: 20,
+            ..at(1, 3)
+        }],
+        &[],
+    ));
+    expect(
+        Some(&bold),
+        &samples,
+        &[
+            Some(r"a{\b0}bc{\r}def"),
+            Some(r"a{\b0}{\i1}bc{\r}def"),
+            Some(r"a{\b0}{\u1}bc{\r}def"),
+            Some(r"a{\b0}{\i1}{\u1}bc{\r}def"),
+            Some(r"a{\i1}{\u1}bc{\r}def"),
+            Some(r"a{\fs20}bc{\r}def"),
+        ],
+    );
+    let all = description(Record { face: 7, ..PLAIN }, &[(1, b"Arial")]);
+    let samples = [0, 3, 5].map(|face| styled(b"abcdef", &[Record { face, ..at(1, 3) }], &[]));
+    expect(
+        Some(&all),
+        &samples,
+        &[
+            Some(r"a{\b0}{\i0}{\u0}bc{\r}def"),
+            Some(r"a{\u0}bc{\r}def"),
+            Some(r"a{\i0}bc{\r}def"),
+        ],
+    );
+}
+
+#[test]
+fn size_colour_and_alpha_tags_follow_in_order_with_their_own_digits() {
+    let plain = description(PLAIN, &[(1, b"Arial"), (2, b"Two")]);
+    let records = [
+        Record {
+            size: 0,
+            ..at(1, 3)
+        },
+        Record {
+            rgb: [0x0a, 0, 0],
+            ..at(1, 3)
+        },
+        Record {
+            rgb: [0, 0, 0x0a],
+            ..at(1, 3)
+        },
+        Record {
+            alpha: 0xfe,
+            ..at(1, 3)
+        },
+        Record {
+            alpha: 0xf0,
+            ..at(1, 3)
+        },
+        Record {
+            font: 2,
+            face: 7,
+            size: 30,
+            rgb: RED,
+            alpha: 0x10,
+            ..at(1, 3)
+        },
+    ];
+    let samples = records.map(|r| styled(b"abcdef", &[r], &[]));
+    expect(
+        Some(&plain),
+        &samples,
+        &[
+            Some(r"a{\fs0}bc{\r}def"),
+            Some(r"a{\1c&HA&}bc{\r}def"),
+            Some(r"a{\1c&HA0000&}bc{\r}def"),
+            Some(r"a{\1a&H01&}bc{\r}def"),
+            Some(r"a{\1a&H0F&}bc{\r}def"),
+            Some(r"a{\b1}{\i1}{\u1}{\fs30}{\fnTwo}{\1c&H332211&}{\1a&HEF&}bc{\r}def"),
+        ],
+    );
+    // Without a sample description the default style is all zeros.
+    let record = Record {
+        font: 3,
+        face: 1,
+        ..at(1, 3)
+    };
+    expect(
+        None,
+        &[styled(b"abcdef", &[record], &[])],
+        &[Some(r"a{\b1}{\fs16}{\1c&HFFFFFF&}{\1a&H00&}bc{\r}def")],
+    );
+}
+
+#[test]
+fn font_tags_name_every_table_entry_with_the_id_and_refuse_names_that_are_not_text() {
+    let fonts: &[(u16, &[u8])] = &[
+        (1, b"Arial"),
+        (2, b"Two"),
+        (3, b""),
+        (2, b"Deux"),
+        (5, b"X\0Y"),
+        (6, b"\xff\xfe"),
+        (7, b"A\xef\xbf\xbe"),
+        (8, b"A\xef\xbf\xbf"),
+    ];
+    let config = description(PLAIN, fonts);
+    let font = |font| styled(b"abcdef", &[Record { font, ..at(1, 3) }], &[]);
+    let samples = [
+        font(2),
+        font(3),
+        font(5),
+        font(9),
+        font(6),
+        sample(b"abcdef", &[]),
+        font(7),
+        font(8),
+    ];
+    expect(
+        Some(&config),
+        &samples,
+        &[
+            Some(r"a{\fnTwo}{\fnDeux}bc{\r}def"),
+            Some(r"a{\fn}bc{\r}def"),
+            Some(r"a{\fnX}bc{\r}def"),
+            Some(r"abc{\r}def"),
+            None,
+            Some("abcdef"),
+            None,
+            Some("a{\\fnA\u{ffff}}bc{\\r}def"),
+        ],
+    );
+}
+
+#[test]
+fn font_lookups_cost_work_in_the_entries_written_not_the_table_size() {
+    // 16,384 entries in descending ID order, and 1,000 style starts, each
+    // with a font ID one entry has.
+    let names: Vec<(u16, &[u8])> = (2..=16_385u16).rev().map(|id| (id, &b"f"[..])).collect();
+    let mut fonts = vec![(1, &b"Arial"[..])];
+    fonts.extend(names);
+    let config = description(PLAIN, &fonts);
+    let records: Vec<_> = (0..1000u16)
+        .map(|i| Record {
+            font: 2 + 16 * i,
+            ..at(2 * i, 2 * i + 1)
+        })
+        .collect();
+    let bytes = styled(&[b'a'; 2000], &records, &[]);
+    let pool = Budget::new(4 << 20).unwrap();
+    let extra = Bytes::copy_from_slice(&pool, &config).unwrap();
+    let mut d = Decoder::new(
+        &pool,
+        Some(&extra),
+        Options::default(),
+        Limits::default(),
+        6,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    while d.poll(&mut WorkBudget::new(1 << 20), &cancel).unwrap() != Status::NeedInput {}
+    let configured = d.work_spent();
+    d.provide(input(&pool, &bytes), Clock::default()).unwrap();
+    let ass = finish(&mut d, 1 << 20).subtitle.unwrap().ass;
+    let text = String::from_utf8(ass.as_ref().to_vec()).unwrap();
+    assert_eq!(text.matches(r"{\fnf}").count(), 1000);
+    assert!(text.ends_with(r"{\fnf}a{\r}a"));
+    // Linear in the sample and its output: each style start finds its entry
+    // by binary search instead of examining all 16,384.
+    let spent = d.work_spent() - configured;
+    assert!(spent < 200_000, "{spent} units for the sample");
+}
+
+#[test]
+fn font_tags_longer_than_the_pending_buffer_are_written_in_stages() {
+    let names: Vec<_> = (0..24u8).map(|i| vec![b'A' + i; 200]).collect();
+    let mut fonts: Vec<(u16, &[u8])> = vec![(1, b"Arial")];
+    fonts.extend(names.iter().map(|n| (7, n.as_slice())));
+    let config = description(PLAIN, &fonts);
+    let texts = session(
+        Some(&config),
+        &[styled(
+            b"abcdef",
+            &[Record {
+                font: 7,
+                ..at(1, 3)
+            }],
+            &[],
+        )],
+    );
+    let tags: String = names
+        .iter()
+        .map(|n| format!("{{\\fn{}}}", String::from_utf8_lossy(n)))
+        .collect();
+    assert_eq!(texts, [Some(format!("a{tags}bc{{\\r}}def"))]);
+}
+
+#[test]
+fn a_highlight_end_restores_the_colour_of_the_style_in_effect() {
+    let plain = description(PLAIN, &[(1, b"Arial")]);
+    let colour = box_bytes(b"hclr", &[0xaa, 0xbb, 0xcc, 0xff]);
+    let red = |start, end| Record {
+        rgb: RED,
+        ..at(start, end)
+    };
+    let green = |start, end| Record {
+        rgb: GREEN,
+        ..at(start, end)
+    };
+    let samples = [
+        styled(b"abcd", &[red(0, 4)], &[hlit(1, 2)]),
+        styled(b"abcd", &[red(0, 4)], &[hlit(1, 2), colour.clone()]),
+        styled(b"abcd", &[red(0, 2)], &[hlit(1, 3)]),
+        styled(b"abcd", &[red(0, 2), green(2, 4)], &[hlit(1, 3)]),
+        sample(b"abcd", &[hlit(3, 1), colour].concat()),
+        sample(b"abcd", &hlit(3, 1)),
+    ];
+    expect(
+        Some(&plain),
+        &samples,
+        &[
+            Some(r"{\1c&H332211&}a{\1c&H000000&}{\2c&HFFFFFF&}b{\1c&H332211&}{\2c&HFFFFFF&}cd"),
+            Some(r"{\1c&H332211&}a{\2c&Hccbbaa&}b{\2c&HFFFFFF&}cd"),
+            Some(r"{\1c&H332211&}a{\1c&H000000&}{\2c&HFFFFFF&}b{\r}c{\1c&HFFFFFF&}{\2c&HFFFFFF&}d"),
+            Some(concat!(
+                r"{\1c&H332211&}a{\1c&H000000&}{\2c&HFFFFFF&}b{\r}",
+                r"{\1c&H665544&}c{\1c&H665544&}{\2c&HFFFFFF&}d"
+            )),
+            Some(r"a{\2c&HFFFFFF&}bc{\2c&Hccbbaa&}d"),
+            Some(r"a{\1c&HFFFFFF&}{\2c&HFFFFFF&}bc{\1c&H000000&}{\2c&HFFFFFF&}d"),
+        ],
+    );
+    // The colour restored is the default's, and a highlight colour keeps six
+    // digits.
+    let config = description(
+        Record {
+            rgb: RED,
+            alpha: 0x40,
+            ..PLAIN
+        },
+        &[(1, b"Arial")],
+    );
+    let samples = [
+        sample(b"abcd", &hlit(1, 2)),
+        sample(
+            b"abcd",
+            &[hlit(1, 2), box_bytes(b"hclr", &[1, 2, 3, 4])].concat(),
+        ),
+    ];
+    expect(
+        Some(&config),
+        &samples,
+        &[
+            Some(r"a{\1c&H000000&}{\2c&HFFFFFF&}b{\1c&H332211&}{\2c&H332211&}cd"),
+            Some(r"a{\2c&H030201&}b{\2c&H332211&}cd"),
+        ],
+    );
+}
+
+#[test]
+fn a_style_end_and_start_precede_the_highlight_start_and_end_at_one_character() {
+    let plain = description(PLAIN, &[(1, b"Arial")]);
+    let red = |start, end| Record {
+        rgb: RED,
+        ..at(start, end)
+    };
+    let samples = [
+        styled(
+            b"abcd",
+            &[Record {
+                face: 1,
+                ..red(1, 3)
+            }],
+            &[hlit(1, 3)],
+        ),
+        styled(b"abcd", &[red(2, 4)], &[hlit(0, 2)]),
+        styled(
+            b"abcd",
+            &[
+                red(0, 2),
+                Record {
+                    rgb: GREEN,
+                    ..at(2, 4)
+                },
+            ],
+            &[hlit(2, 3)],
+        ),
+        styled(
+            b"abcd",
+            &[Record {
+                face: 1,
+                ..at(1, 2)
+            }],
+            &[hlit(2, 2)],
+        ),
+    ];
+    expect(
+        Some(&plain),
+        &samples,
+        &[
+            Some(concat!(
+                r"a{\b1}{\1c&H332211&}{\1c&H000000&}{\2c&HFFFFFF&}bc{\r}",
+                r"{\1c&HFFFFFF&}{\2c&HFFFFFF&}d"
+            )),
+            Some(r"{\1c&H000000&}{\2c&HFFFFFF&}ab{\1c&H332211&}{\1c&H332211&}{\2c&HFFFFFF&}cd"),
+            Some(concat!(
+                r"{\1c&H332211&}ab{\r}{\1c&H665544&}{\1c&H000000&}{\2c&HFFFFFF&}c",
+                r"{\1c&H665544&}{\2c&HFFFFFF&}d"
+            )),
+            Some(r"a{\b1}b{\r}{\1c&H000000&}{\2c&HFFFFFF&}{\1c&HFFFFFF&}{\2c&HFFFFFF&}cd"),
+        ],
+    );
+}
+
+#[test]
+fn transitions_at_a_nul_are_written_and_those_at_the_end_of_the_text_are_not() {
+    let config = description(PLAIN, &[(1, b"Arial"), (6, b"\xff\xfe")]);
+    let bold = |start, end| Record {
+        face: 1,
+        ..at(start, end)
+    };
+    let invalid = Record {
+        font: 6,
+        ..at(2, 3)
+    };
+    let samples = [
+        styled(b"ab\0cd", &[bold(0, 2)], &[]),
+        styled(b"ab\0cd", &[bold(2, 3)], &[]),
+        sample(b"ab\0cd", &hlit(2, 2)),
+        styled(b"ab\0cd", &[bold(3, 4)], &[]),
+        styled(b"\0ab", &[bold(0, 2)], &[]),
+        styled(b"ab\0\xffd", &[bold(2, 3)], &[]),
+        styled(b"ab", &[bold(0, 2)], &[hlit(2, 2)]),
+        styled(b"ab", &[invalid], &[]),
+        styled(b"ab\0cd", &[invalid], &[]),
+    ];
+    expect(
+        Some(&config),
+        &samples,
+        &[
+            Some(r"{\b1}ab{\r}"),
+            Some(r"ab{\b1}"),
+            Some(r"ab{\1c&H000000&}{\2c&HFFFFFF&}{\1c&HFFFFFF&}{\2c&HFFFFFF&}"),
+            Some("ab"),
+            Some(r"{\b1}"),
+            Some(r"ab{\b1}"),
+            Some(r"{\b1}ab"),
+            Some("ab"),
+            None,
+        ],
+    );
+}
+
+#[test]
+fn record_order_overlap_and_ranges_beyond_the_text() {
+    let plain = description(PLAIN, &[(1, b"Arial")]);
+    let bold = |start, end| Record {
+        face: 1,
+        ..at(start, end)
+    };
+    let italic = |start, end| Record {
+        face: 2,
+        ..at(start, end)
+    };
+    let samples = [
+        styled(b"abcd", &[bold(2, 9)], &[]),
+        styled(b"abcd", &[bold(4, 6)], &[]),
+        styled(b"abcd", &[bold(0, 1), at(1, 2), bold(2, 3)], &[]),
+        styled(b"abcd", &[bold(0, 1), italic(1, 1), bold(1, 2)], &[]),
+        styled(b"abcd", &[bold(2, 3), italic(0, 1)], &[]),
+        styled(b"abcd", &[at(0, 3), bold(1, 2)], &[]),
+        styled(
+            b"abcd",
+            &[
+                bold(0, 2),
+                Record {
+                    size: 20,
+                    ..bold(2, 4)
+                },
+            ],
+            &[],
+        ),
+        styled(
+            b"abcd",
+            &[Record {
+                font: 9,
+                ..at(1, 3)
+            }],
+            &[],
+        ),
+        styled(b"a\nb\r\nc", &[bold(1, 4)], &[]),
+    ];
+    expect(
+        Some(&plain),
+        &samples,
+        &[
+            Some(r"ab{\b1}cd"),
+            Some("abcd"),
+            Some(r"{\b1}a{\r}b{\b1}c{\r}d"),
+            Some(r"{\b1}ab{\r}cd"),
+            Some("abcd"),
+            Some(r"a{\b1}b{\r}cd"),
+            Some(r"{\b1}ab{\r}{\b1}{\fs20}cd"),
+            Some(r"abc{\r}d"),
+            Some(r"a{\b1}\Nb{\r}\Nc"),
+        ],
+    );
 }

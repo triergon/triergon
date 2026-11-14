@@ -19,13 +19,17 @@ use super::diff::equal;
 use crate::json::{self, Value};
 use crate::sha256;
 
-pub const ALLOCATORS: [&str; 6] = [
+/// The entry points the observer hooks, in its receipts' `symbol_order`.
+/// Receipts of the v2 and v3 observers list the first six.
+pub const ALLOCATORS: [&str; 8] = [
     "malloc",
     "calloc",
     "realloc",
     "free",
-    "aligned_alloc",
     "posix_memalign",
+    "aligned_alloc",
+    "strdup",
+    "strndup",
 ];
 pub const GUARD_ORDER: [&str; 7] = [
     "mmap",
@@ -37,6 +41,12 @@ pub const GUARD_ORDER: [&str; 7] = [
     "dlclose",
 ];
 pub const GUARD_POLICY: &str = "invalidate-any-active-attempt-v1";
+/// The observer `build-workers` builds: eight hooks, and read-only file
+/// mappings admitted in the window. Receipts of the earlier v2 and v3 observers
+/// (six hooks, no mapping in the window) still validate when re-graded.
+pub const OBSERVER: &str = "linux-glibc-v4";
+/// The guarded observers whose calibration certifies the window guard.
+const GUARDED_OBSERVERS: [&str; 2] = ["linux-glibc-v3", OBSERVER];
 pub const SCOPE_ERROR_BIT: i128 = 1 << 12;
 pub const TLS_IMPORTS: [&str; 3] = [
     "_dl_allocate_tls",
@@ -58,6 +68,63 @@ pub const GUARD_CASES: [(&str, usize, bool); 12] = [
     ("guard-dlopen-failure", 4, false),
     ("guard-dlmopen-failure", 5, false),
 ];
+/// The v4 observer's further controls: the admitted read-only file mapping,
+/// then a writable file mapping, a read-only anonymous one and the in-window
+/// munmap of a file mapping made before the window, each still rejected.
+pub const FILE_MAPPING_CONTROL: &str = "file-mapping";
+pub const FILE_GUARD_CASES: [(&str, usize, bool); 3] = [
+    ("guard-file-writable", 0, true),
+    ("guard-anonymous-readonly", 0, true),
+    ("guard-file-munmap", 2, true),
+];
+/// The twenty operator new and delete forms libstdc++ exports, `{}` standing
+/// for the mangling of `size_t`: `m` on LP64, `j` on ILP32.
+const CXX_FORMS: [&str; 20] = [
+    "_Znw{}",
+    "_Zna{}",
+    "_Znw{}RKSt9nothrow_t",
+    "_Zna{}RKSt9nothrow_t",
+    "_Znw{}St11align_val_t",
+    "_Zna{}St11align_val_t",
+    "_Znw{}St11align_val_tRKSt9nothrow_t",
+    "_Zna{}St11align_val_tRKSt9nothrow_t",
+    "_ZdlPv",
+    "_ZdaPv",
+    "_ZdlPv{}",
+    "_ZdaPv{}",
+    "_ZdlPvRKSt9nothrow_t",
+    "_ZdaPvRKSt9nothrow_t",
+    "_ZdlPvSt11align_val_t",
+    "_ZdaPvSt11align_val_t",
+    "_ZdlPv{}St11align_val_t",
+    "_ZdaPv{}St11align_val_t",
+    "_ZdlPvSt11align_val_tRKSt9nothrow_t",
+    "_ZdaPvSt11align_val_tRKSt9nothrow_t",
+];
+
+pub fn cxx_forms(size: &str) -> BTreeSet<String> {
+    CXX_FORMS.iter().map(|f| f.replace("{}", size)).collect()
+}
+
+/// Positive and negative calibration controls of a guarded observer version.
+fn controls(observer: &str) -> (Vec<&'static str>, Vec<(&'static str, usize, bool)>) {
+    let mut positive = vec!["default", "scope-startup"];
+    let mut negative = GUARD_CASES.to_vec();
+    if observer == OBSERVER {
+        positive.push(FILE_MAPPING_CONTROL);
+        negative.extend(FILE_GUARD_CASES);
+    }
+    (positive, negative)
+}
+
+/// Every calibration case of the current observer, in the order it is run.
+pub fn calibration_cases() -> Vec<&'static str> {
+    let (positive, negative) = controls(OBSERVER);
+    positive
+        .into_iter()
+        .chain(negative.into_iter().map(|c| c.0))
+        .collect()
+}
 pub const KERNEL_RSS_BASIS: &str = "min-kernel-positive-deltas-lifetime-VmPeak";
 const KERNEL_RSS_ROLES: [&str; 8] = [
     "module_source",
@@ -139,6 +206,33 @@ fn allocation_name(name: &str) -> bool {
         || ["_Zn", "_ZN", "_Zd", "_ZD"]
             .iter()
             .any(|p| name.starts_with(p))
+}
+
+/// C++'s replaceable allocation functions: every form of operator new and
+/// delete (`_Znw`, `_Zna`, `_Zdl`, `_Zda`).
+fn replaceable(name: &str) -> bool {
+    ["_Znw", "_Zna", "_Zdl", "_Zda"]
+        .iter()
+        .any(|p| name.starts_with(p))
+}
+
+/// Names a GNU nm listing imports only as weak (`w` or `v`) references.
+fn weak_only(listing: &str) -> BTreeSet<String> {
+    let (mut weak, mut strong) = (BTreeSet::new(), BTreeSet::new());
+    for fields in listing
+        .lines()
+        .map(|l| l.split_whitespace().collect::<Vec<_>>())
+    {
+        if let [symbol, kind, ..] = fields[..] {
+            let name = symbol.split('@').next().unwrap_or_default().to_owned();
+            if matches!(kind, "w" | "v") {
+                weak.insert(name);
+            } else {
+                strong.insert(name);
+            }
+        }
+    }
+    weak.difference(&strong).cloned().collect()
 }
 
 /// Raw undefined symbols and the allocator entry points among them; a name not
@@ -258,6 +352,13 @@ fn run(program: &str, args: &[&str], path: &Path) -> R<String> {
         ));
     }
     String::from_utf8(output.stdout).map_err(|e| e.to_string())
+}
+
+/// Whether moving the executable can preserve its ELF loader search paths.
+pub(super) fn relocatable_worker(worker: &Path) -> bool {
+    let origin = |value: &str| value.contains("$ORIGIN") || value.contains("${ORIGIN}");
+    !std::env::var_os("LD_LIBRARY_PATH").is_some_and(|paths| origin(&paths.to_string_lossy()))
+        && run("readelf", &["--dynamic", "--wide"], worker).is_ok_and(|text| !origin(&text))
 }
 
 fn bracketed<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
@@ -725,10 +826,8 @@ pub fn resident_basis_valid(data: &Value, mode: &str) -> bool {
                         _ => false,
                     }));
     }
-    if mode != "rss"
-        || s(data, "observer") != Some("linux-glibc-v3")
-        || basis != Some(KERNEL_RSS_BASIS)
-    {
+    let observer = s(data, "observer").unwrap_or_default();
+    if mode != "rss" || !GUARDED_OBSERVERS.contains(&observer) || basis != Some(KERNEL_RSS_BASIS) {
         return false;
     }
     let keys = [
@@ -771,6 +870,12 @@ pub fn resident_basis_valid(data: &Value, mode: &str) -> bool {
         .and_then(Value::as_array)
         .is_some_and(|g| g.len() == 7 && py_int(g.get(3)) == Some(0));
     let virtual_end = py_int(data.get("virtual_peak_end")).unwrap_or(-1);
+    // v4 adds the whole length of every file mapping admitted in the window.
+    let mapped = if observer == OBSERVER {
+        py_int(data.get("file_mapped_bytes")).unwrap_or(-1)
+    } else {
+        0
+    };
     abi == 1
         && missed == 0
         && errors == 0
@@ -780,7 +885,8 @@ pub fn resident_basis_valid(data: &Value, mode: &str) -> bool {
         && upper == upper_bytes
         && (events > 0 || pages == 0)
         && guard_ok
-        && py_int(data.get("rss_peak_upper_bound_bytes")) == Some(upper.min(virtual_end))
+        && mapped >= 0
+        && py_int(data.get("rss_peak_upper_bound_bytes")) == Some((upper + mapped).min(virtual_end))
 }
 
 pub fn valid_receipt(data: &Value, mode: &str) -> bool {
@@ -789,6 +895,12 @@ pub fn valid_receipt(data: &Value, mode: &str) -> bool {
             return Some(false);
         }
         let observer = s(data, "observer")?;
+        // v4 hooks strdup and strndup; v2 and v3 receipts list the first six.
+        let hooks = if observer == OBSERVER {
+            ALLOCATORS.len()
+        } else {
+            6
+        };
         let fixed = [
             ("rss_source", "proc-self-smaps_rollup-Rss"),
             (
@@ -832,8 +944,8 @@ pub fn valid_receipt(data: &Value, mode: &str) -> bool {
         let ok = py_int(data.get("schema")) == Some(2)
             && s(data, "mode") == Some(mode)
             && s(data, "status") == Some("measured")
-            && matches!(observer, "linux-glibc-v2" | "linux-glibc-v3")
-            && (observer != "linux-glibc-v3" || guard_component_valid(data))
+            && (observer == "linux-glibc-v2" || GUARDED_OBSERVERS.contains(&observer))
+            && (observer == "linux-glibc-v2" || guard_component_valid(data))
             && matches!(mode, "heap" | "rss")
             && fixed.iter().all(|(k, v)| s(data, k) == Some(*v))
             && n("error_bits") == Some(0)
@@ -842,22 +954,16 @@ pub fn valid_receipt(data: &Value, mode: &str) -> bool {
             && n("recursive_calls") == Some(0)
             && n("selected_thread_scope") == Some(1)
             && data.get("glibc").is_some_and(Value::truthy)
-            && data.get("symbol_order").is_some_and(|o| {
-                equal(
-                    o,
-                    &Value::strings([
-                        "malloc",
-                        "calloc",
-                        "realloc",
-                        "free",
-                        "posix_memalign",
-                        "aligned_alloc",
-                    ]),
-                )
-            })
+            && data
+                .get("symbol_order")
+                .is_some_and(|o| equal(o, &Value::strings(ALLOCATORS[..hooks].iter().copied())))
             && ["symbol_attempts", "symbol_successes", "symbol_failures"]
                 .iter()
-                .all(|k| ints(data.get(k), 6).is_some_and(|v| v.iter().all(|x| *x >= 0)))
+                .all(|k| ints(data.get(k), hooks).is_some_and(|v| v.iter().all(|x| *x >= 0)))
+            && (observer != OBSERVER
+                || ["file_mappings", "file_mapped_bytes"]
+                    .iter()
+                    .all(|k| n(k).is_some_and(|v| v >= 0)))
             && numeric.iter().all(|k| n(k).is_some_and(|v| v >= 0));
         if !ok {
             return Some(false);
@@ -986,7 +1092,13 @@ pub fn symbol_versions(listing: &str) -> R<BTreeMap<String, BTreeSet<String>>> {
     Ok(result)
 }
 
-fn binding_facts(bindings: &Value, facts: &Value) -> R<Value> {
+/// The binding evidence's facts, and for the current observer the operator new
+/// and delete forms the probe imports, which must be all twenty.
+fn binding_facts(
+    bindings: &Value,
+    facts: &Value,
+    version: &str,
+) -> R<(Value, Option<BTreeSet<String>>)> {
     let defined_raw = match bindings.get("defined_objects") {
         Some(Value::Object(m)) => m.clone(),
         _ => return Err("'defined_objects'".into()),
@@ -1061,20 +1173,30 @@ fn binding_facts(bindings: &Value, facts: &Value) -> R<Value> {
             return Err("private TLS provider is not uniquely the sealed interpreter".into());
         }
     }
-    Ok(Value::object([
+    let forms = if version == OBSERVER {
+        let size = ["m", "j"]
+            .into_iter()
+            .find(|size| cxx_forms(size).iter().all(|f| tested.contains_key(f)))
+            .ok_or("the probe does not import every operator new and delete form")?;
+        Some(cxx_forms(size))
+    } else {
+        None
+    };
+    let facts = Value::object([
         (
             "tested_guard_versions",
             Value::object(GUARD_ORDER.map(|n| (n, strs(tested[n].iter().cloned())))),
         ),
         ("binding_evidence_sha256", Value::str(digest(bindings))),
-    ]))
+    ]);
+    Ok((facts, forms))
 }
 
 fn guard_fields(data: &Value) -> R<()> {
     let n = |k: &str| py_int(data.get(k));
     let profile = matches!(data, Value::Object(_))
         && n("schema") == Some(2)
-        && s(data, "observer") == Some("linux-glibc-v3")
+        && s(data, "observer").is_some_and(|o| GUARDED_OBSERVERS.contains(&o))
         && s(data, "guard_policy") == Some(GUARD_POLICY)
         && s(data, "guard_scope") == Some("observed-interposable-entrypoints")
         && data
@@ -1131,13 +1253,11 @@ pub fn guard_component_valid(data: &Value) -> bool {
     zero_active(data).is_ok()
 }
 
-fn expected_controls() -> Vec<(String, String)> {
+fn expected_controls(observer: &str) -> Vec<(String, String)> {
+    let (positive, negative) = controls(observer);
     let mut keys = Vec::new();
     for mode in ["heap", "rss"] {
-        for case in ["default", "scope-startup"]
-            .into_iter()
-            .chain(GUARD_CASES.iter().map(|c| c.0))
-        {
+        for case in positive.iter().copied().chain(negative.iter().map(|c| c.0)) {
             keys.push((mode.to_owned(), case.to_owned()));
         }
     }
@@ -1164,8 +1284,21 @@ pub fn certify(
     {
         return Err("guard export/probe transcript is not bound to the calibrated files".into());
     }
-    let bound = binding_facts(bindings, &facts)?;
-    let expected = expected_controls();
+    let receipt = |record: &Value| {
+        let observed = record.get("observed").unwrap_or(&Value::Null);
+        let data = observed.get("observer").or_else(|| observed.get("receipt"));
+        data.and_then(|d| s(d, "observer")).map(str::to_owned)
+    };
+    let observer = records.first().and_then(receipt).unwrap_or_default();
+    if records
+        .iter()
+        .any(|r| receipt(r).as_deref() != Some(observer.as_str()))
+    {
+        return Err("calibration records of more than one observer".into());
+    }
+    let (bound, forms) = binding_facts(bindings, &facts, &observer)?;
+    let expected = expected_controls(&observer);
+    let (positive, negative) = controls(&observer);
     let mut seen: Vec<(String, String)> = Vec::new();
     for record in records {
         let key = (
@@ -1194,7 +1327,7 @@ pub fn certify(
             return Err("wrong native probe control".into());
         }
         let n = |v: &Value, k: &str| py_int(v.get(k));
-        if case == "default" || case == "scope-startup" {
+        if positive.contains(&case) {
             if s(observed, "status") != Some("measured")
                 || !is_false(work.get("expect_guard_invalid"))
             {
@@ -1223,11 +1356,25 @@ pub fn certify(
             {
                 return Err("startup forwarding did not exercise every guard".into());
             }
+            let ran: Option<BTreeSet<String>> = work.get("cxx_forms").and_then(|f| {
+                f.as_array()?
+                    .iter()
+                    .map(|v| v.as_str().map(str::to_owned))
+                    .collect()
+            });
+            if case == "default" && forms.is_some() && ran != forms {
+                return Err("the probe did not run every operator new and delete form".into());
+            }
+            if case == FILE_MAPPING_CONTROL
+                && !(n(data, "file_mappings").is_some_and(|m| m > 0)
+                    && n(work, "expected_file_mapped_bytes").is_some_and(|b| b > 0)
+                    && n(data, "file_mapped_bytes") == n(work, "expected_file_mapped_bytes"))
+            {
+                return Err("the admitted file mapping was not reported".into());
+            }
         } else {
-            let (_, index, successful) = *GUARD_CASES
-                .iter()
-                .find(|c| c.0 == case)
-                .expect("guard case");
+            let (_, index, successful) =
+                *negative.iter().find(|c| c.0 == case).expect("guard case");
             let mut requested = vec![0i64; 7];
             requested[index] = 1;
             let (succeeded, failed) = if successful {
@@ -1318,17 +1465,116 @@ pub fn certificate_valid(
         .is_ok_and(|again| equal(&again, certificate))
 }
 
-/// Coverage of otherwise uncovered imports by the certified guard (public
-/// guarded entry points at tested versions) or by the sealed libc's private
-/// TLS imports.
-pub fn conditional_coverage(
-    parsed: &Value,
-    owner: &Value,
-    certificate: Option<&Value>,
-    linked: &Value,
-    observer_sha: Option<&str>,
-    probe_sha: Option<&str>,
-) -> Value {
+/// What a valid runtime guard certificate admits beyond the hooks, parsed once
+/// from its sealed evidence.
+pub struct Admission {
+    certificate: Value,
+    /// Tested public versions of each guarded entry point.
+    guards: BTreeMap<String, BTreeSet<String>>,
+    /// The sealed libc's real path and content hash.
+    libc: (Option<String>, Option<Value>),
+    /// Each sealed object's dynamic exports, by name and version.
+    exports: Vec<(String, BTreeMap<String, BTreeSet<String>>)>,
+    /// The one sealed object defining operator new and delete forms, if exactly
+    /// one does and it is not the observer, with the versions the probe ran.
+    cxx: Option<(String, BTreeMap<String, BTreeSet<String>>)>,
+}
+
+impl Admission {
+    /// `None` unless the certificate is valid for this closure, observer and probe.
+    pub fn new(
+        certificate: Option<&Value>,
+        linked: &Value,
+        observer_sha: Option<&str>,
+        probe_sha: Option<&str>,
+    ) -> Option<Self> {
+        if !certificate_valid(certificate, linked, observer_sha, probe_sha) {
+            return None;
+        }
+        let certificate = certificate?.clone();
+        let versions = |value: Option<&Value>| -> BTreeSet<String> {
+            value
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_owned))
+                .collect()
+        };
+        let tested = certificate
+            .get("binding_facts")
+            .and_then(|b| b.get("tested_guard_versions"));
+        let guards = GUARD_ORDER
+            .iter()
+            .map(|n| (n.to_string(), versions(tested.and_then(|t| t.get(n)))))
+            .collect();
+        let closure = certificate.get("closure").unwrap_or(&Value::Null);
+        let libc = s(closure, "libc").map(str::to_owned);
+        let libc_sha = libc
+            .as_deref()
+            .and_then(|l| closure.get("files").and_then(|f| f.get(l)).cloned());
+        let evidence = certificate.get("binding_evidence")?;
+        let Some(Value::Object(objects)) = evidence.get("defined_objects") else {
+            return None;
+        };
+        let exports: Vec<(String, BTreeMap<String, BTreeSet<String>>)> = objects
+            .iter()
+            .map(|(path, raw)| Some((path.clone(), symbol_versions(raw.as_str()?).ok()?)))
+            .collect::<Option<_>>()?;
+        let calibrated = symbol_versions(s(evidence, "probe_undefined")?).ok()?;
+        let observer = s(evidence, "observer_path")?;
+        // libstdc++ forwards one form to another through its own PLT, so a
+        // replacement of any form elsewhere would take an admitted form's
+        // allocations: one object must define the whole family.
+        let providers: Vec<&String> = exports
+            .iter()
+            .filter(|(_, symbols)| symbols.keys().any(|n| replaceable(n)))
+            .map(|(path, _)| path)
+            .collect();
+        let current = certificate
+            .get("native_calibration_records")
+            .and_then(Value::as_array)
+            .and_then(|r| r.first())
+            .and_then(|r| r.get("observed"))
+            .and_then(|o| o.get("observer"))
+            .and_then(|o| s(o, "observer"))
+            == Some(OBSERVER);
+        let cxx = match providers[..] {
+            [provider] if current && provider != observer => Some((
+                provider.clone(),
+                calibrated
+                    .into_iter()
+                    .filter(|(name, _)| replaceable(name))
+                    .collect(),
+            )),
+            _ => None,
+        };
+        Some(Admission {
+            certificate,
+            guards,
+            libc: (libc, libc_sha),
+            exports,
+            cxx,
+        })
+    }
+
+    fn defined(&self, name: &str) -> Option<&BTreeSet<String>> {
+        self.exports
+            .iter()
+            .find_map(|(_, symbols)| symbols.get(name))
+    }
+}
+
+/// Coverage of an object's otherwise uncovered imports under a certificate:
+/// - a guarded entry point at a tested public version;
+/// - the sealed libc's private TLS imports;
+/// - an operator new or delete form, when one sealed object, not the
+///   observer, defines every form and the probe ran this one at the imported
+///   versions (its exact peak shows each form reaches the hooks);
+/// - a weak import that no sealed object defines, which resolves to null.
+///   This assumes the closure is complete at the window: a lazily bound call
+///   could resolve against a library loaded with `dlopen` before it, which the
+///   guard only refuses inside the window.
+pub fn conditional_coverage(parsed: &Value, owner: &Value, admission: Option<&Admission>) -> Value {
     let uncovered: BTreeSet<String> = parsed
         .get("uncovered")
         .and_then(Value::as_array)
@@ -1337,43 +1583,25 @@ pub fn conditional_coverage(
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect();
     let mut covered: BTreeMap<String, Value> = BTreeMap::new();
-    if certificate_valid(certificate, linked, observer_sha, probe_sha) {
-        let certificate = certificate.unwrap();
-        let sha = certificate
+    if let Some(admission) = admission {
+        let sha = admission
+            .certificate
             .get("certificate_sha256")
             .cloned()
             .unwrap_or(Value::Null);
-        let versions =
-            symbol_versions(s(parsed, "raw_listing").unwrap_or_default()).unwrap_or_default();
-        let tested = certificate
-            .get("binding_facts")
-            .and_then(|b| b.get("tested_guard_versions"));
+        let listing = s(parsed, "raw_listing").unwrap_or_default();
+        let versions = symbol_versions(listing).unwrap_or_default();
+        let method = |name: &str| {
+            Value::object([("method", Value::str(name)), ("certificate", sha.clone())])
+        };
+        let imported = |name: &str| versions.get(name);
         for name in GUARD_ORDER.iter().filter(|n| uncovered.contains(**n)) {
-            let allowed: BTreeSet<String> = tested
-                .and_then(|t| t.get(name))
-                .and_then(Value::as_array)
-                .unwrap_or_default()
-                .iter()
-                .filter_map(|v| v.as_str().map(str::to_owned))
-                .collect();
-            if versions
-                .get(*name)
-                .is_some_and(|v| !v.is_empty() && v.is_subset(&allowed))
-            {
-                covered.insert(
-                    name.to_string(),
-                    Value::object([
-                        ("method", Value::str("tested-public-entry-window-guard")),
-                        ("certificate", sha.clone()),
-                    ]),
-                );
+            if imported(name).is_some_and(|v| v.is_subset(&admission.guards[*name])) {
+                covered.insert(name.to_string(), method("tested-public-entry-window-guard"));
             }
         }
-        let facts = certificate.get("closure").unwrap_or(&Value::Null);
-        let libc = s(facts, "libc");
-        if s(owner, "realpath") == libc
-            && owner.get("sha256") == libc.and_then(|l| facts.get("files").and_then(|f| f.get(l)))
-        {
+        let (libc, libc_sha) = &admission.libc;
+        if s(owner, "realpath") == libc.as_deref() && owner.get("sha256") == libc_sha.as_ref() {
             let raw: BTreeSet<&str> = parsed
                 .get("raw_undefined_symbols")
                 .and_then(Value::as_array)
@@ -1381,19 +1609,33 @@ pub fn conditional_coverage(
                 .iter()
                 .filter_map(Value::as_str)
                 .collect();
+            let private: BTreeSet<String> = ["GLIBC_PRIVATE".to_owned()].into();
             for name in TLS_IMPORTS.iter().filter(|n| uncovered.contains(**n)) {
-                let private: BTreeSet<String> = ["GLIBC_PRIVATE".to_owned()].into();
                 if raw.contains(format!("{name}@GLIBC_PRIVATE").as_str())
                     && versions.get(*name) == Some(&private)
                 {
-                    covered.insert(
-                        name.to_string(),
-                        Value::object([
-                            ("method", Value::str("sealed-libc-loader-startup-scope")),
-                            ("certificate", sha.clone()),
-                        ]),
-                    );
+                    covered.insert(name.to_string(), method("sealed-libc-loader-startup-scope"));
                 }
+            }
+        }
+        if let Some((provider, calibrated)) = &admission.cxx {
+            for name in uncovered.iter().filter(|n| replaceable(n)) {
+                if let (Some(wanted), Some(ran)) = (imported(name), calibrated.get(name))
+                    && wanted.is_subset(ran)
+                    && admission.defined(name).is_some_and(|d| ran.is_subset(d))
+                {
+                    let entry = Value::object([
+                        ("method", Value::str("calibrated-sole-provider")),
+                        ("provider", Value::str(provider)),
+                        ("certificate", sha.clone()),
+                    ]);
+                    covered.insert(name.clone(), entry);
+                }
+            }
+        }
+        for name in weak_only(listing).intersection(&uncovered) {
+            if !covered.contains_key(name) && admission.defined(name).is_none() {
+                covered.insert(name.clone(), method("unresolved-weak-import"));
             }
         }
     }
@@ -1710,6 +1952,34 @@ pub fn kernel_certificate_valid(
         .is_ok_and(|again| equal(&again, certificate))
 }
 
+fn artifact_current(link: &Value, expected: Option<&str>) -> bool {
+    let Some(artifact) = link.get("inspected_artifact") else {
+        return false;
+    };
+    let Some(path) = s(artifact, "path").map(Path::new) else {
+        return false;
+    };
+    path.is_absolute()
+        && expected.is_some()
+        && s(artifact, "sha256") == expected
+        && file_sha(path).ok().as_deref() == expected
+}
+
+/// The actual executables named by a memory certificate still match its digests.
+pub(super) fn measured_workers_current(certificate: &Value) -> bool {
+    let Some(linked) = certificate.get("linked_libraries") else {
+        return false;
+    };
+    let Some(hashes) = certificate.get("worker_hashes") else {
+        return false;
+    };
+    ["candidate", "reference"].into_iter().all(|role| {
+        linked
+            .get(role)
+            .is_some_and(|link| artifact_current(link, s(hashes, role)))
+    })
+}
+
 /// A Linux qualification certificate still describes the files on disk.
 pub fn certificate_current(root: &Path, certificate: &Value) -> bool {
     let linked = certificate
@@ -1755,16 +2025,7 @@ pub fn certificate_current(root: &Path, certificate: &Value) -> bool {
                 "observer" => observer,
                 _ => None,
             };
-            data.get("inspected_artifact")
-                .filter(|a| a.truthy())
-                .is_some_and(|a| {
-                    expected.is_some()
-                        && s(a, "sha256") == expected
-                        && file_sha(Path::new(s(a, "path").unwrap_or_default()))
-                            .ok()
-                            .as_deref()
-                            == expected
-                })
+            artifact_current(data, expected)
         });
         if !is_true(certificate.get("runtime_guard_required"))
             || !certificate_valid(

@@ -1,5 +1,6 @@
-/* Regular AVC/AAC playback through the public MOV demuxer API. */
+/* Seekable MP4 playback through the public MOV demuxer API. */
 #include <errno.h>
+#include "reference_mp4_roll.h"
 
 typedef struct {
     uint64_t packets;
@@ -8,7 +9,7 @@ typedef struct {
 } Mp4RangeWork;
 
 static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t target,
-                          Mp4RangeWork *work) {
+                          int recover, Mp4RangeWork *work) {
     Source source = {data, size, 0};
     AVFormatContext *format = avformat_alloc_context();
     AVIOContext *io = NULL;
@@ -33,36 +34,105 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
     int video = -1;
     int audio = -1;
     result = AVERROR_INVALIDDATA;
-    if (format->nb_streams != 2)
+    if (format->nb_streams < 1 || format->nb_streams > 64)
         goto done;
     for (unsigned i = 0; i < format->nb_streams; ++i) {
-        const AVCodecParameters *codec = format->streams[i]->codecpar;
-        if (codec->codec_type == AVMEDIA_TYPE_VIDEO && codec->codec_id == AV_CODEC_ID_H264)
+        AVStream *stream = format->streams[i];
+        const AVCodecParameters *codec = stream->codecpar;
+        if (codec->codec_type == AVMEDIA_TYPE_DATA) {
+            stream->discard = AVDISCARD_ALL;
+            continue;
+        }
+        const uint32_t tag = codec->codec_tag;
+        const int video_codec =
+            (codec->codec_id == AV_CODEC_ID_H264 && tag == MKTAG('a', 'v', 'c', '1')) ||
+            (codec->codec_id == AV_CODEC_ID_HEVC &&
+             (tag == MKTAG('d', 'v', 'h', '1') || tag == MKTAG('d', 'v', 'h', 'e'))) ||
+            /* The MOV demuxer can emit dav1 packets and configuration with no codec ID. */
+            (tag == MKTAG('d', 'a', 'v', '1') &&
+             (codec->codec_id == AV_CODEC_ID_AV1 || codec->codec_id == AV_CODEC_ID_NONE));
+        if (video < 0 && codec->codec_type == AVMEDIA_TYPE_VIDEO && video_codec)
             video = (int)i;
-        if (codec->codec_type == AVMEDIA_TYPE_AUDIO && codec->codec_id == AV_CODEC_ID_AAC)
+        else if (audio < 0 && codec->codec_type == AVMEDIA_TYPE_AUDIO &&
+                 (codec->codec_id == AV_CODEC_ID_AAC ||
+                  (codec->codec_id == AV_CODEC_ID_OPUS && tag == MKTAG('O', 'p', 'u', 's'))))
             audio = (int)i;
+        else if (codec->codec_type == AVMEDIA_TYPE_SUBTITLE &&
+                 ((codec->codec_id == AV_CODEC_ID_MOV_TEXT && tag == MKTAG('t', 'x', '3', 'g')) ||
+                  (codec->codec_id == AV_CODEC_ID_DVD_SUBTITLE && tag == MKTAG('m', 'p', '4', 's'))))
+            continue;
+        else
+            goto done;
     }
-    if (video < 0 || audio < 0)
+    if (video < 0)
         goto done;
+    const AVCodecParameters *codec = format->streams[video]->codecpar;
+    if (audio < 0 && codec->codec_tag != MKTAG('d', 'a', 'v', '1'))
+        goto done;
+    const AVDictionaryEntry *brand = av_dict_get(format->metadata, "major_brand", NULL, 0);
+    const int quicktime = brand && !strcmp(brand->value, "qt  ");
+    for (unsigned i = 0; i < format->nb_streams; ++i) {
+        const AVCodecParameters *config = format->streams[i]->codecpar;
+        const int compare_configuration = (int)i == video
+            ? config->codec_tag != MKTAG('a', 'v', 'c', '1')
+            : config->codec_id == AV_CODEC_ID_OPUS ||
+              (quicktime && config->codec_id == AV_CODEC_ID_AAC);
+        if (!compare_configuration)
+            continue;
+        if (config->extradata_size <= 0 || !config->extradata)
+            goto done;
+        fold(&work->digest, config->codec_tag);
+        fold(&work->digest, (uint64_t)config->extradata_size);
+        fold_bytes(&work->digest, config->extradata, (size_t)config->extradata_size);
+    }
     packet = av_packet_alloc();
     if (!packet) {
         result = AVERROR(ENOMEM);
         goto done;
     }
+    Mp4RollLanding landing = {0};
+    int waiting_video = recover;
+    int waiting_audio = recover;
     if (seek) {
         result = av_read_frame(format, packet);
         if (result < 0)
             goto done;
         av_packet_unref(packet);
-        result = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
-        if (result < 0)
-            goto done;
+        if (recover) {
+            result = mp4_seek_opus_roll(format, (Mp4View){data, size}, video, audio, target, &landing);
+            if (result < 0)
+                goto done;
+            fold(&work->digest, (uint64_t)landing.video_position);
+            fold(&work->digest, (uint64_t)landing.sync);
+            fold(&work->digest, (uint64_t)landing.first);
+            fold(&work->digest, (uint64_t)landing.lead);
+        } else {
+            result = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
+            if (result < 0)
+                goto done;
+        }
     }
     while ((result = av_read_frame(format, packet)) >= 0) {
-        if (packet->pos < 0 || packet->size < 0 ||
-            (packet->stream_index != video && packet->stream_index != audio)) {
+        if (packet->pos < 0 || packet->size < 0 || packet->stream_index < 0 ||
+            (unsigned)packet->stream_index >= format->nb_streams ||
+            (packet->stream_index != video && packet->stream_index != audio &&
+             format->streams[packet->stream_index]->codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE)) {
             result = AVERROR_INVALIDDATA;
             goto done;
+        }
+        if (waiting_video && packet->stream_index == video) {
+            if (packet->pos != landing.video_position || packet->pts != landing.video_pts) {
+                result = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            waiting_video = 0;
+        }
+        if (waiting_audio && packet->stream_index == audio) {
+            if (packet->pos != landing.audio_position) {
+                result = AVERROR_INVALIDDATA;
+                goto done;
+            }
+            waiting_audio = 0;
         }
         size_t skip_len = 0;
         const uint8_t *skip = av_packet_get_side_data(packet, AV_PKT_DATA_SKIP_SAMPLES, &skip_len);
@@ -87,7 +157,7 @@ static int mp4_range_read(const uint8_t *data, size_t size, int seek, int64_t ta
         av_packet_unref(packet);
     }
     if (result == AVERROR_EOF)
-        result = 0;
+        result = waiting_video || waiting_audio ? AVERROR_INVALIDDATA : 0;
 done:
     av_packet_free(&packet);
     avformat_close_input(&format);
@@ -116,11 +186,12 @@ static int mp4_range_main(int argc, char **argv, const uint8_t *data, size_t siz
         ++next;
     }
     int seek = argc > next;
+    int recover = argc == next + 2 && !strcmp(argv[next + 1], "opus-roll");
     int64_t target = 0;
     if (seek) {
         errno = 0;
         target = strtoll(argv[next], &end, 10);
-        if (argc != next + 1 || errno || end == argv[next] || *end)
+        if (argc != next + 1 + recover || errno || end == argv[next] || *end)
             return 2;
     }
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
@@ -129,7 +200,7 @@ static int mp4_range_main(int argc, char **argv, const uint8_t *data, size_t siz
     uint64_t start = now_ns();
     for (uint64_t i = 0; i < iterations; ++i) {
         Mp4RangeWork work = {0};
-        int result = mp4_range_read(data, size, seek, target, &work);
+        int result = mp4_range_read(data, size, seek, target, recover, &work);
         if (result < 0) {
             fprintf(stderr, "MP4 range playback: %s\n", av_err2str(result));
             return 1;

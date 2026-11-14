@@ -3,10 +3,15 @@ name = "triergon-ass"
 version = "0.0.0"
 description = "ASS and SSA subtitle scripts, Matroska packets, override tags, animation, karaoke and drawings as libass reads them"
 repository.workspace = true
-license.workspace = true
+license-file = "LICENSE"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+
+[features]
+# Development aid: `Renderer::work_spent`, for comparing renderer revisions
+# (`cargo xtask ass equivalence`); never needed in production.
+work-probe = []
 
 [lints]
 workspace = true

@@ -5,13 +5,13 @@ dependencies.
 
 Triergon reads Matroska/WebM, MP4/MOV, MPEG-TS, Ogg, native FLAC and raw MPEG audio,
 ADTS and AC-3 streams, frames H.264, HEVC, AV1, VP9, AAC, AC-3 and DTS packets for
-hardware or software decoders, decodes text and bitmap subtitles, reads OpenType and
-TrueType fonts, shapes text, rasterises glyphs and subtitle bitmaps, reads ASS scripts
-and their override tags, and includes software decoders for H.264, HEVC, AAC,
-AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis and MPEG audio Layer I, II and III. It is written
-from the published standards and measured case by case against a pinned reference:
-FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping, libass for
-rasterising and ASS parsing.
+hardware or software decoders, decodes text and bitmap subtitles, closed captions and
+teletext, reads OpenType and TrueType fonts, shapes text, rasterises glyphs and subtitle
+bitmaps, reads ASS scripts and their override tags, and includes software decoders for
+H.264, HEVC, AAC, AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis and MPEG audio Layer I, II and
+III. It is written from the published standards and measured case by case against a
+pinned reference: FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping,
+libass for rasterising and ASS parsing.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
 > crates.io yet. See [status](docs/status.md) for what is verified today.
@@ -47,7 +47,7 @@ rasterising and ASS parsing.
 | [`triergon-ogg`](crates/ogg) | Ogg with the FLAC, Opus and Vorbis mappings: chained and multiplexed streams, granule timing, trims, seeking |
 | [`triergon-elementary`](crates/elementary) | Native FLAC, MPEG audio (ID3, Xing/Info/VBRI, LAME gapless), ADTS and AC-3 streams |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
-| [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles |
+| [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles; CEA-608 closed captions; DVB teletext |
 | [`triergon-font`](crates/font) | OpenType and TrueType faces and collections: cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | [`triergon-shape`](crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
 | [`triergon-raster`](crates/raster) | Glyph outlines, border stroking, the tile rasteriser, blur, composition and clipping of subtitle bitmaps |
@@ -88,11 +88,24 @@ while let Some(packet) = reader.next_typed_packet(&cancel)? {
 Each crate README shows its entry points, and the `examples/` directories contain
 small programs.
 
+The published results assume this release profile in the program that uses the crates:
+
+```toml
+[profile.release]
+lto = "fat"
+codegen-units = 1
+```
+
+Cargo's default profile runs measurably slower, up to a quarter more instructions on
+32-bit ARM; `panic = "abort"` is safe to add and saves a little more. See
+[measuring performance](docs/quality.md#measuring-performance).
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract
 - [Quality](docs/quality.md): the reference gates, corpus, harness and measurement rules
 - [Status](docs/status.md): verified scope and current results per module
+- [Provenance](docs/provenance.md): licences of the modules derived from FreeType, HarfBuzz and libass
 - [Contributing](CONTRIBUTING.md)
 
 ## Licence
@@ -100,3 +113,12 @@ small programs.
 Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
 Test media and specification texts keep their own terms. Patent licensing for codecs
 is the responsibility of whoever ships them.
+
+`triergon-font`, `triergon-shape`, `triergon-ass` and `triergon-raster` contain modules
+translated from FreeType 2.15.0 (FreeType License), HarfBuzz 14.6.0 ("Old MIT") and
+libass 0.17.5 (ISC), which keep those licences too; each crate's `LICENSE` holds the
+notices, and [docs/provenance.md](docs/provenance.md) lists the modules. Software that
+includes `triergon-font` credits FreeType in its documentation:
+
+> Portions of this software are copyright © 2026 The FreeType Project
+> (<https://freetype.org>). All rights reserved.

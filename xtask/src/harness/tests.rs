@@ -924,7 +924,25 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
         (
             "mpegts-pes",
             "playback-ts-fold-v1",
-            Some("playback-worker"),
+            Some("transport-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
+        (
+            "subtitle-pgs-capsules",
+            "playback-pgs-fold-v1",
+            Some("subtitle-capsule-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
+        (
+            "subtitle-text",
+            "playback-subtitle-text-fold-v1",
+            Some("subtitle-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
+        (
+            "subtitle-text-host",
+            "playback-subtitle-text-fold-v1",
+            Some("subtitle-worker"),
             Some("ffmpeg-formats-native"),
         ),
     ] {
@@ -981,7 +999,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 416);
+    assert_eq!(checked, 1044);
     let mut contract = load("harness/features/matroska-zlib/contract.json");
     put(&mut contract, &[], "reference", Value::str("not-built"));
     assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());

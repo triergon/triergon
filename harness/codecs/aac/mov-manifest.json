@@ -1,0 +1,26 @@
+{
+ "schema": "triergon.codecs.correctness-manifest.v1",
+ "vectors": [
+  {
+   "lane": "aac-mov",
+   "name": "avc-aac-quicktime-surround.mov",
+   "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-surround.mov",
+   "bytes": 178289,
+   "sha256": "5f94b5c969cd70d5b98facc5e32cc587036591a39de4291b035edeb9a11762b5"
+  },
+  {
+   "lane": "aac-mov",
+   "name": "avc-aac-quicktime-reordered.mov",
+   "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-reordered.mov",
+   "bytes": 66458,
+   "sha256": "946ac59417d07672df8b151a4c24093d1cc241453c8a9835cafe5fdb1aa3ed0b"
+  },
+  {
+   "lane": "aac-mov",
+   "name": "avc-aac-quicktime-7-1.mov",
+   "path": "crates/playback/tests/fixtures/mp4/avc-aac-quicktime-7-1.mov",
+   "bytes": 97226,
+   "sha256": "005afe6563563ff5af1eee044f68759a188fe75079cf9e74745d43d5b2231c3c"
+  }
+ ]
+}

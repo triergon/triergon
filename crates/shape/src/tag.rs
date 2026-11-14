@@ -1,7 +1,6 @@
 //! Scripts, languages, directions and OpenType tags.
 
 use std::fmt;
-use triergon_core::{Error, Result};
 
 /// A four-byte OpenType tag, such as a feature (`liga`), script (`latn`) or
 /// language system (`ENG `) tag. Tags order as their big-endian numbers do.
@@ -198,154 +197,9 @@ impl Direction {
     }
 }
 
-/// A BCP 47 language and the OpenType language systems it selects.
-///
-/// HarfBuzz maps every registered language; this type knows the languages libass
-/// names for scripts (its `script_to_language`), the major European, Middle
-/// Eastern, South and East Asian languages, and `c`, the C locale's default,
-/// which selects no language system. Other languages are refused rather than
-/// mapped differently.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Language {
-    tags: [Tag; 3],
-    count: u8,
-}
-
-impl Language {
-    /// The language a BCP 47 string names; only the primary subtag is used.
-    ///
-    /// # Errors
-    ///
-    /// `Unsupported` for a language outside the table described on [`Language`].
-    pub fn new(code: &str) -> Result<Self> {
-        let primary = code
-            .split('-')
-            .next()
-            .unwrap_or_default()
-            .to_ascii_lowercase();
-        let tags: &[&[u8; 4]] = match primary.as_str() {
-            "c" | "nko" => &[],
-            "af" => &[b"AFK "],
-            "am" => &[b"AMH "],
-            "ar" => &[b"ARA "],
-            "az" => &[b"AZE "],
-            "be" => &[b"BEL "],
-            "bg" => &[b"BGR "],
-            "bku" => &[b"BKU "],
-            "bn" => &[b"BEN "],
-            "bo" => &[b"TIB "],
-            "bs" => &[b"BOS "],
-            "bug" => &[b"BUG "],
-            "ca" => &[b"CAT "],
-            "chr" => &[b"CHR "],
-            "cop" => &[b"COP "],
-            "cs" => &[b"CSY "],
-            "cy" => &[b"WEL "],
-            "da" => &[b"DAN "],
-            "de" => &[b"DEU "],
-            "dv" => &[b"DIV ", b"DHV "],
-            "el" => &[b"ELL "],
-            "en" => &[b"ENG "],
-            "eo" => &[b"NTO "],
-            "es" => &[b"ESP "],
-            "et" => &[b"ETI "],
-            "eu" => &[b"EUQ "],
-            "fa" => &[b"FAR "],
-            "fi" => &[b"FIN "],
-            "fr" => &[b"FRA "],
-            "ga" => &[b"IRI ", b"IRT "],
-            "gl" => &[b"GAL "],
-            "gu" => &[b"GUJ "],
-            "he" => &[b"IWR "],
-            "hi" => &[b"HIN "],
-            "hnn" => &[b"HNN "],
-            "hr" => &[b"HRV "],
-            "hu" => &[b"HUN "],
-            "hy" => &[b"HYE0", b"HYE "],
-            "id" => &[b"IND ", b"MLY "],
-            "is" => &[b"ISL "],
-            "it" => &[b"ITA "],
-            "iu" => &[b"INU ", b"INUK"],
-            "ja" => &[b"JAN "],
-            "ka" => &[b"KAT "],
-            "kk" => &[b"KAZ "],
-            "km" => &[b"KHM "],
-            "kn" => &[b"KAN "],
-            "ko" => &[b"KOR ", b"KOH "],
-            "ku" => &[b"KUR "],
-            "ky" => &[b"KIR "],
-            "la" => &[b"LAT "],
-            "lo" => &[b"LAO "],
-            "lt" => &[b"LTH "],
-            "lv" => &[b"LVI "],
-            "mk" => &[b"MKD "],
-            "ml" => &[b"MAL ", b"MLR "],
-            "mn" => &[b"MNG "],
-            "mr" => &[b"MAR "],
-            "ms" => &[b"MLY "],
-            "mt" => &[b"MTS "],
-            "my" => &[b"BRM "],
-            "nb" => &[b"NOR "],
-            "ne" => &[b"NEP "],
-            "nl" => &[b"NLD "],
-            "nn" => &[b"NYN "],
-            "no" => &[b"NOR "],
-            "or" => &[b"ORI "],
-            "pa" => &[b"PAN "],
-            "peo" => &[b"PEO "],
-            "pl" => &[b"PLK "],
-            "ps" => &[b"PAS "],
-            "pt" => &[b"PTG "],
-            "ro" => &[b"ROM "],
-            "ru" => &[b"RUS "],
-            "sa" => &[b"SAN "],
-            "si" => &[b"SNH "],
-            "sk" => &[b"SKY "],
-            "sl" => &[b"SLV "],
-            "sq" => &[b"SQI "],
-            "sr" => &[b"SRB "],
-            "sv" => &[b"SVE "],
-            "sw" => &[b"SWK "],
-            "syl" => &[b"SYL "],
-            "syr" => &[b"SYR "],
-            "ta" => &[b"TAM "],
-            "tbw" => &[b"TBW "],
-            "te" => &[b"TEL "],
-            "tg" => &[b"TAJ "],
-            "th" => &[b"THA "],
-            "tl" => &[b"TGL "],
-            "tr" => &[b"TRK "],
-            "uga" => &[b"UGA "],
-            "uk" => &[b"UKR "],
-            "ur" => &[b"URD "],
-            "uz" => &[b"UZB "],
-            "vi" => &[b"VIT "],
-            "xh" => &[b"XHS "],
-            "yi" => &[b"JII "],
-            "zh" => &[b"ZHS "],
-            "zu" => &[b"ZUL "],
-            _ => return Err(Error::Unsupported("language")),
-        };
-        let mut language = Self {
-            tags: [Tag(0); 3],
-            count: 0,
-        };
-        for tag in tags {
-            language.tags[usize::from(language.count)] = Tag::new(tag);
-            language.count += 1;
-        }
-        Ok(language)
-    }
-
-    /// The OpenType language system tags, in order of preference.
-    pub(crate) fn ot_tags(&self) -> &[Tag] {
-        &self.tags[..usize::from(self.count)]
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Direction, Language, Script, Tag};
+    use super::{Direction, Script, Tag};
 
     #[test]
     fn scripts_canonicalise_like_harfbuzz() {
@@ -364,15 +218,5 @@ mod tests {
         );
         let (tags, count) = Script(*b"Hira").ot_tags();
         assert_eq!(tags[..count], [Tag::new(b"kana")]);
-    }
-
-    #[test]
-    fn languages_select_systems_as_harfbuzz_does() {
-        assert_eq!(
-            Language::new("ko").unwrap().ot_tags(),
-            [Tag::new(b"KOR "), Tag::new(b"KOH ")]
-        );
-        assert!(Language::new("c").unwrap().ot_tags().is_empty());
-        assert!(Language::new("xx").is_err());
     }
 }

@@ -1,0 +1,3893 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "automatic-depth2-ts",
+      "profile": "automatic-depth2-ts",
+      "file": "dvb/automatic-depth2.ts",
+      "sha256": "c58171c5d85b316e044ffb187942bed26d21ba8e08c13bf342081d5e550f46d2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1271,
+        "digest": 960832017011729536
+      }
+    },
+    {
+      "id": "automatic-depth8-ts",
+      "profile": "automatic-depth8-ts",
+      "file": "dvb/automatic-depth8.ts",
+      "sha256": "4921764efef4a49efb7f03ee85fcdaba52ba93422beac1d922219574d5045582",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 7512,
+        "digest": 1871739053991426309
+      }
+    },
+    {
+      "id": "automatic-kept-entries-ts",
+      "profile": "automatic-kept-entries-ts",
+      "file": "dvb/automatic-kept-entries.ts",
+      "sha256": "e55d591a25a058f72cb41af207e234eedd27a4c4a15cb7ead99b2451cb3a9089",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 384,
+        "digest": 13843385384704387461
+      }
+    },
+    {
+      "id": "automatic-large-exposure-ts",
+      "profile": "automatic-large-exposure-ts",
+      "file": "dvb/automatic-large-exposure.ts",
+      "sha256": "f7ce8347c2c12bfdc56e60495b9762f9ff562d36a314007208ae45acf0e1457f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1310784,
+        "digest": 6557008487241126824
+      }
+    },
+    {
+      "id": "automatic-once-ts",
+      "profile": "automatic-once-ts",
+      "file": "dvb/automatic-once.ts",
+      "sha256": "b9f86f8952fe18d66ed7b9769bbc932b00253f367e60b97f64f4f7fa4bcf6501",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 504,
+        "digest": 11626220220379921382
+      }
+    },
+    {
+      "id": "automatic-ranks-ts",
+      "profile": "automatic-ranks-ts",
+      "file": "dvb/automatic-ranks.ts",
+      "sha256": "5217c29707f5b2386ba2d05671d709c8a12ceda0f59f701b76f86dcd61db39f1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1245,
+        "digest": 4580111887511454452
+      }
+    },
+    {
+      "id": "automatic-steps-ts",
+      "profile": "automatic-steps-ts",
+      "file": "dvb/automatic-steps.ts",
+      "sha256": "beea577fa8a92dcd63829917f3fb8da32d3c4d44b5d41e22ab82be0fde7c7bad",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 14519,
+        "digest": 18376568164846279220
+      }
+    },
+    {
+      "id": "clut-conversion-grid-ts",
+      "profile": "clut-conversion-grid-ts",
+      "file": "dvb/clut-conversion-grid.ts",
+      "sha256": "c9a247320b25814a942ad233488dd7f5417371f43998bc0eb2669ca03fd0ede8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 2560,
+        "digest": 15449176908862533309
+      }
+    },
+    {
+      "id": "clut-extremes-ts",
+      "profile": "clut-extremes-ts",
+      "file": "dvb/clut-extremes.ts",
+      "sha256": "a4961134d168ff1ce8c01b7c819bab65c7bc366b352f132511f1d792524263e7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1280,
+        "digest": 2944648755583957792
+      }
+    },
+    {
+      "id": "clut-final-reduced-ts",
+      "profile": "clut-final-reduced-ts",
+      "file": "dvb/clut-final-reduced.ts",
+      "sha256": "8108cdd212a896142e4e04c70baabd30a8471b9c101dc78d6c2db5e7dcd15621",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 8347639081652760245
+      }
+    },
+    {
+      "id": "clut-final-short-ts",
+      "profile": "clut-final-short-ts",
+      "file": "dvb/clut-final-short.ts",
+      "sha256": "71be8ddad820233f5bb893a93a3d8381137b490992436416a6fdf328ff260d34",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 13340875392572492225
+      }
+    },
+    {
+      "id": "clut-flags-1-ts",
+      "profile": "clut-flags-1-ts",
+      "file": "dvb/clut-flags-1.ts",
+      "sha256": "7656e246e000f80828f74f64a7b3810872f3b155b96169d90409ff3228c7940b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 16688148223784149003
+      }
+    },
+    {
+      "id": "clut-flags-2-ts",
+      "profile": "clut-flags-2-ts",
+      "file": "dvb/clut-flags-2.ts",
+      "sha256": "2d4d3322296a77d0508acd866fbbca85d40e55633615c63720396fca99a526a6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 4797319690756988241
+      }
+    },
+    {
+      "id": "clut-flags-3-ts",
+      "profile": "clut-flags-3-ts",
+      "file": "dvb/clut-flags-3.ts",
+      "sha256": "6d2a3e133d57ab70a923f6927c05969762ad53fdbaf55e0039adc0b2cbaf55f5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 340281739088073753
+      }
+    },
+    {
+      "id": "clut-flags-4-ts",
+      "profile": "clut-flags-4-ts",
+      "file": "dvb/clut-flags-4.ts",
+      "sha256": "2d1054f510340f1bfaf904f6e2bd8d970caa61d7c537b5c3b947485ea7942840",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 6408947674353212142
+      }
+    },
+    {
+      "id": "clut-flags-5-ts",
+      "profile": "clut-flags-5-ts",
+      "file": "dvb/clut-flags-5.ts",
+      "sha256": "021786ebc6a31f17e989e37498162a3d3a60c3f8673c54e4e8b482d6b45b8bf2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 10147526997366698316
+      }
+    },
+    {
+      "id": "clut-flags-6-ts",
+      "profile": "clut-flags-6-ts",
+      "file": "dvb/clut-flags-6.ts",
+      "sha256": "9fb0a60930552a1596c05032698f68d82eaee25b3c1c85941cb4c76f88f64346",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 18246968835530572952
+      }
+    },
+    {
+      "id": "clut-flags-7-ts",
+      "profile": "clut-flags-7-ts",
+      "file": "dvb/clut-flags-7.ts",
+      "sha256": "1a5c002c724534de9ae6745cbd2cc79a93bd71cb0e827e38c6fd8aef55529b82",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1128,
+        "digest": 13789930883861658464
+      }
+    },
+    {
+      "id": "clut-flags-ranges-ts",
+      "profile": "clut-flags-ranges-ts",
+      "file": "dvb/clut-flags-ranges.ts",
+      "sha256": "c2ee28e61a1eb408f244d3a53d2e14c3e4b276ec890ebe94ebcf2b82eaea4aaf",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8232,
+        "digest": 4168639407923317118
+      }
+    },
+    {
+      "id": "clut-multi-depth-ts",
+      "profile": "clut-multi-depth-ts",
+      "file": "dvb/clut-multi-depth.ts",
+      "sha256": "4a9cfe4309f647d6a49495ee5933884fd9f9afa6649ed2001f4bb397fdbf7d4c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1168,
+        "digest": 14073346054700307672
+      }
+    },
+    {
+      "id": "clut-partial-ts",
+      "profile": "clut-partial-ts",
+      "file": "dvb/clut-partial.ts",
+      "sha256": "d27096118abd5ffbe26023ad14adc08bfa8aa0988236b7a9d50e287578328c14",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 3511740966325037856
+      }
+    },
+    {
+      "id": "clut-reduced-ts",
+      "profile": "clut-reduced-ts",
+      "file": "dvb/clut-reduced.ts",
+      "sha256": "159ce2c1110c19bb89fefa58c8c785d75e2ae7690f1210da669ffbdfa3e6926e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 14770705313539405555
+      }
+    },
+    {
+      "id": "clut-versions-ts",
+      "profile": "clut-versions-ts",
+      "file": "dvb/clut-versions.ts",
+      "sha256": "4763edcb4a522753b48b957c1989e8e496a5c136b518bd6be51ca094125c976b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 6426014173497836495
+      }
+    },
+    {
+      "id": "clut-y-zero-ts",
+      "profile": "clut-y-zero-ts",
+      "file": "dvb/clut-y-zero.ts",
+      "sha256": "a88b5aa1be5fe122458537910620ea45ea3bd477a1edeffa13b880ba3807b514",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 11232794095724644803
+      }
+    },
+    {
+      "id": "dds-change-ts",
+      "profile": "dds-change-ts",
+      "file": "dvb/dds-change.ts",
+      "sha256": "c697a66056fb612726f1c514637ea51b5a18cd17cc18a977df23a3e11e061242",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 768,
+        "digest": 15876896307964135034
+      }
+    },
+    {
+      "id": "dds-hd-ts",
+      "profile": "dds-hd-ts",
+      "file": "dvb/dds-hd.ts",
+      "sha256": "cd742179d70031527022ec92e0400178c39b0a8c473f5383fab1c67dd2e9324f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 17966443059418073999
+      }
+    },
+    {
+      "id": "dds-sequence-ts",
+      "profile": "dds-sequence-ts",
+      "file": "dvb/dds-sequence.ts",
+      "sha256": "321dd858ba267c9ba8d213b403b4b75993b32465f1a2df17c98f52d4afdf12bd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 512,
+        "digest": 15057745200688979497
+      }
+    },
+    {
+      "id": "dds-small-ts",
+      "profile": "dds-small-ts",
+      "file": "dvb/dds-small.ts",
+      "sha256": "2118cef483c2cd731199493a8e82582996405165e3ac7766c0d1a4de473a075b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 4903616800233918591
+      }
+    },
+    {
+      "id": "dds-window-ts",
+      "profile": "dds-window-ts",
+      "file": "dvb/dds-window.ts",
+      "sha256": "55347dbde3630ecff6885bf91a6163f2a0ef3da31edeb864558111a2c151a528",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 14244342939574641979
+      }
+    },
+    {
+      "id": "dds-window-mkv",
+      "profile": "dds-window-mkv",
+      "file": "dvb/dds-window.mkv",
+      "sha256": "093a0859b4d064d67e0ead7a1bc980d87872a1981bbdbd99cd84817d4246464e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 14244342939574641979
+      }
+    },
+    {
+      "id": "dds-window-sd-ts",
+      "profile": "dds-window-sd-ts",
+      "file": "dvb/dds-window-sd.ts",
+      "sha256": "b4c12f00087965933471aaade45bf35f8dc2e9fd7461232369aaa645c22bc5ea",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 256,
+        "digest": 6614818941497725803
+      }
+    },
+    {
+      "id": "default-clut-one-colour-ts",
+      "profile": "default-clut-one-colour-ts",
+      "file": "dvb/default-clut-one-colour.ts",
+      "sha256": "ce0dcdc2832a9ab135a400e54243521b512656bfba827c6d06c0134f9fa2533e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 128,
+        "digest": 1159344151092570236
+      }
+    },
+    {
+      "id": "default-clut-two-colours-ts",
+      "profile": "default-clut-two-colours-ts",
+      "file": "dvb/default-clut-two-colours.ts",
+      "sha256": "1392fc354b6d8fbb055ec988644c7acbc31c4f9d99690baf9f667e1e0f5acb73",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 128,
+        "digest": 15256515271934967547
+      }
+    },
+    {
+      "id": "default-clut2-ts",
+      "profile": "default-clut2-ts",
+      "file": "dvb/default-clut2.ts",
+      "sha256": "9a4f270a0dce81932daf842f6de77bf02e6cac35905bebecbdb974b4c60753f7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 496,
+        "digest": 4077041979096954006
+      }
+    },
+    {
+      "id": "default-clut2-text-ts",
+      "profile": "default-clut2-text-ts",
+      "file": "dvb/default-clut2-text.ts",
+      "sha256": "2c71f9593285b9cfcfce0b2e5b34a8de8cd2dc9c0df3cb4bc3bf450c4f1070e5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 856,
+        "digest": 16555486762866551316
+      }
+    },
+    {
+      "id": "default-clut4-ts",
+      "profile": "default-clut4-ts",
+      "file": "dvb/default-clut4.ts",
+      "sha256": "1fb23b7e592b4fc3971fe9e2357b791c17639fedbc7721a10b64974edfac0cc0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 544,
+        "digest": 18289641193419087294
+      }
+    },
+    {
+      "id": "default-clut4-text-ts",
+      "profile": "default-clut4-text-ts",
+      "file": "dvb/default-clut4-text.ts",
+      "sha256": "09f04ebe5513a5afbd9963cf62bf4c225c728d85a78d1a035548e23df48addcd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 904,
+        "digest": 14563481518543297938
+      }
+    },
+    {
+      "id": "default-clut4-text-mkv",
+      "profile": "default-clut4-text-mkv",
+      "file": "dvb/default-clut4-text.mkv",
+      "sha256": "26813cf1f61202c0da10a38f3673af4b273fb53f09cc917dfe1c5236a0fa1f94",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 904,
+        "digest": 14563481518543297938
+      }
+    },
+    {
+      "id": "default-clut8-ts",
+      "profile": "default-clut8-ts",
+      "file": "dvb/default-clut8.ts",
+      "sha256": "40450486668deb629edd86c04140907e6527db03846e209ef6094bbdee53d556",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1504,
+        "digest": 1274921207109989725
+      }
+    },
+    {
+      "id": "default-clut8-text-ts",
+      "profile": "default-clut8-text-ts",
+      "file": "dvb/default-clut8-text.ts",
+      "sha256": "0830690d1ec868745b08ba3f0bf7143b54c25876b7418dc8b799b0b6b46357cd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1864,
+        "digest": 15536491657199972002
+      }
+    },
+    {
+      "id": "depth-reduced-unfilled-ts",
+      "profile": "depth-reduced-unfilled-ts",
+      "file": "dvb/depth-reduced-unfilled.ts",
+      "sha256": "87fdebf0ba9e73574f287a34b65b1ecf4b8a214e4f82055eabf8e3f7bf5bdb49",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1424,
+        "digest": 11983761461453049534
+      }
+    },
+    {
+      "id": "depth2-literals-ts",
+      "profile": "depth2-literals-ts",
+      "file": "dvb/depth2-literals.ts",
+      "sha256": "4092c76e19136e629cfd7b7f885e373fc6d7c55c13347305a8df477fbc522f28",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 784,
+        "digest": 951476406802937348
+      }
+    },
+    {
+      "id": "depth2-long-runs-ts",
+      "profile": "depth2-long-runs-ts",
+      "file": "dvb/depth2-long-runs.ts",
+      "sha256": "53f10d643596932273da3e29b74e9af7d815871ae3d6ca06051ee945042117ca",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4230,
+        "digest": 10948319505244131674
+      }
+    },
+    {
+      "id": "depth2-runs-ts",
+      "profile": "depth2-runs-ts",
+      "file": "dvb/depth2-runs.ts",
+      "sha256": "e894535f12f7cdee196c2d149b273c29cca430e37cf389bec01a38bb0e2d5b0a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 784,
+        "digest": 951476406802937348
+      }
+    },
+    {
+      "id": "depth4-literals-ts",
+      "profile": "depth4-literals-ts",
+      "file": "dvb/depth4-literals.ts",
+      "sha256": "96f38198ff0f2d8b2135556219de86840803245e536854add7c75d5a3542b372",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 832,
+        "digest": 8931033757244403434
+      }
+    },
+    {
+      "id": "depth4-long-runs-ts",
+      "profile": "depth4-long-runs-ts",
+      "file": "dvb/depth4-long-runs.ts",
+      "sha256": "712c83a9a4460d9bc64892048910fbb0ce4aee46ea58671982b129b300748ac8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4278,
+        "digest": 2620104744138686774
+      }
+    },
+    {
+      "id": "depth4-runs-ts",
+      "profile": "depth4-runs-ts",
+      "file": "dvb/depth4-runs.ts",
+      "sha256": "59a825d993d19d1a774d6c81bcf1bf7c43a323ee39f9ba770eeba7a4e37524d9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 832,
+        "digest": 8931033757244403434
+      }
+    },
+    {
+      "id": "depth4-runs-mkv",
+      "profile": "depth4-runs-mkv",
+      "file": "dvb/depth4-runs.mkv",
+      "sha256": "c245daeeda6ef2fc4155cd53cd43c6f56cfc1fa9111059276e3c3157cd56ee27",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 832,
+        "digest": 8931033757244403434
+      }
+    },
+    {
+      "id": "depth8-literals-ts",
+      "profile": "depth8-literals-ts",
+      "file": "dvb/depth8-literals.ts",
+      "sha256": "e914c985ccc7eb7c3938919fae87f56737e1c3f1cb245d7bf8dbfd0792c5d426",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1792,
+        "digest": 12152249012637892338
+      }
+    },
+    {
+      "id": "depth8-long-runs-ts",
+      "profile": "depth8-long-runs-ts",
+      "file": "dvb/depth8-long-runs.ts",
+      "sha256": "3828bc31b871c20696c9820ad9b57fb7209aec0c6bf518b06077926149abed23",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5238,
+        "digest": 638783371722115976
+      }
+    },
+    {
+      "id": "depth8-runs-ts",
+      "profile": "depth8-runs-ts",
+      "file": "dvb/depth8-runs.ts",
+      "sha256": "abbe0680ce14772a42943029353a56d683ef1327131fe273c42b2c16cad1b888",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1792,
+        "digest": 12152249012637892338
+      }
+    },
+    {
+      "id": "edt-sequence-ts",
+      "profile": "edt-sequence-ts",
+      "file": "dvb/edt-sequence.ts",
+      "sha256": "8302b0c4ea50ac801d3a9718610a6489c775c538f1c525010a0302ab5b4f7c92",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 320,
+        "digest": 10916564787240408746
+      }
+    },
+    {
+      "id": "end-of-display-repeat-ts",
+      "profile": "end-of-display-repeat-ts",
+      "file": "dvb/end-of-display-repeat.ts",
+      "sha256": "9151ad0b5f0e78d0d3ee2fc614a8d9250d044627ccef48c8b43b8b7f9e1138bb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 6949696753008914062
+      }
+    },
+    {
+      "id": "field-repeat-ts",
+      "profile": "field-repeat-ts",
+      "file": "dvb/field-repeat.ts",
+      "sha256": "d33ea33c04ff733c177239c1acac16ddf5f33976d43708ad1cdc4ffb191bfc6f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 204,
+        "digest": 12394510612712522742
+      }
+    },
+    {
+      "id": "field-short-bottom-ts",
+      "profile": "field-short-bottom-ts",
+      "file": "dvb/field-short-bottom.ts",
+      "sha256": "0315931ce73185ffc0d86552467bdbf9ff94341ea51630ef05fb1c79d32f6482",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 224,
+        "digest": 76789786979961
+      }
+    },
+    {
+      "id": "field-sub-blocks-0-ts",
+      "profile": "field-sub-blocks-0-ts",
+      "file": "dvb/field-sub-blocks-0.ts",
+      "sha256": "5bd007670642f49b85c28d2e8b0453b21f48fa000d59ce7faa512e189c14268e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 4042938426349143685
+      }
+    },
+    {
+      "id": "field-sub-blocks-1-ts",
+      "profile": "field-sub-blocks-1-ts",
+      "file": "dvb/field-sub-blocks-1.ts",
+      "sha256": "f276cbdb20d37965439aaf1c0c2a9ec35758f2eee1034cfbed9484ae106c7a51",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 14453925860766947971
+      }
+    },
+    {
+      "id": "fill-after-draw-ts",
+      "profile": "fill-after-draw-ts",
+      "file": "dvb/fill-after-draw.ts",
+      "sha256": "05da6769b01bad665af0ba409afd5c6bf63dbf2f1b19fa0419a7abc53787e26e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 3743547239539767033
+      }
+    },
+    {
+      "id": "fill-depth2-ts",
+      "profile": "fill-depth2-ts",
+      "file": "dvb/fill-depth2.ts",
+      "sha256": "db8d4bbf65c186841e204269cc0dc9e6ec909cac4dcda183953b73ad2615087a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 17724668395652894791
+      }
+    },
+    {
+      "id": "fill-depth4-ts",
+      "profile": "fill-depth4-ts",
+      "file": "dvb/fill-depth4.ts",
+      "sha256": "fdcc1a7458d6b87275247f6c0ad23e746d61a7a073ba7a80fc0a3125f468e71c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 681241044182477848
+      }
+    },
+    {
+      "id": "fill-depth8-ts",
+      "profile": "fill-depth8-ts",
+      "file": "dvb/fill-depth8.ts",
+      "sha256": "3451aa9f428e8f0e88eab470584acf4b14868924df2657b0e1a0bc686a10b70f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1120,
+        "digest": 5482245082329352908
+      }
+    },
+    {
+      "id": "junk-after-segments-ts",
+      "profile": "junk-after-segments-ts",
+      "file": "dvb/junk-after-segments.ts",
+      "sha256": "277f4517f91bbc53d8cc3c6dab6fb0e01ffdeb67174192b07c1a181d8ae32b7b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 15534064970188810991
+      }
+    },
+    {
+      "id": "large-depth8-ts",
+      "profile": "large-depth8-ts",
+      "file": "dvb/large-depth8.ts",
+      "sha256": "fb7155d16184198c7634cae7b07a903c109b404d4b0e0a85fdb506e713deaf68",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 87424,
+        "digest": 15939187802914202002
+      }
+    },
+    {
+      "id": "large-regions-ts",
+      "profile": "large-regions-ts",
+      "file": "dvb/large-regions.ts",
+      "sha256": "5bb778400ba1b71b3ee34034873d544203c2c98a5a57e96b2683edfc62d8fad6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 346704,
+        "digest": 7061479598755744204
+      }
+    },
+    {
+      "id": "long-default-clut-ts",
+      "profile": "long-default-clut-ts",
+      "file": "dvb/long-default-clut.ts",
+      "sha256": "8eb13515adbcdc0a33a1e12f950cb87a028df94a411c17c4e9e1446d95350597",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 1202560,
+        "digest": 7951431730556780308
+      }
+    },
+    {
+      "id": "long-text-ts",
+      "profile": "long-text-ts",
+      "file": "dvb/long-text.ts",
+      "sha256": "6019fc3b9e584c5ead7ac0bd17e22b562f0f5014880e00629402214cf953fcd4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 120,
+        "bytes": 3076800,
+        "digest": 13207807703018741360
+      }
+    },
+    {
+      "id": "long-text-mkv",
+      "profile": "long-text-mkv",
+      "file": "dvb/long-text.mkv",
+      "sha256": "4efef0211ef1f14d68e5a7e12aa7590ad1f2d57d644f9ba43b7ec92858ef8417",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 120,
+        "bytes": 3076800,
+        "digest": 6145453808102009340
+      }
+    },
+    {
+      "id": "map-table-change-ts",
+      "profile": "map-table-change-ts",
+      "file": "dvb/map-table-change.ts",
+      "sha256": "10630d3128fb271bc2ac0323e1efb46bca922ca6f857f8b79412ffc81a9f75d1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 128,
+        "digest": 18232274282956771627
+      }
+    },
+    {
+      "id": "map2to4-ts",
+      "profile": "map2to4-ts",
+      "file": "dvb/map2to4.ts",
+      "sha256": "cd3496c4fe750955984f3ad9b3389e6f61beda9888d76e589631b8c7c112989f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 384,
+        "digest": 1821800807954483164
+      }
+    },
+    {
+      "id": "map2to4-table-ts",
+      "profile": "map2to4-table-ts",
+      "file": "dvb/map2to4-table.ts",
+      "sha256": "2cdfbb44b300a5d232699c17e5166a19f116ed5c954a1cfbeb8ca79376287923",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 384,
+        "digest": 16490643945102763008
+      }
+    },
+    {
+      "id": "map2to8-ts",
+      "profile": "map2to8-ts",
+      "file": "dvb/map2to8.ts",
+      "sha256": "4c96c1f85f8cde83257ab14fc7da7d52fe825a74436cc9350ebf4d73ecdc22e3",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1344,
+        "digest": 2848605514752240094
+      }
+    },
+    {
+      "id": "map2to8-table-ts",
+      "profile": "map2to8-table-ts",
+      "file": "dvb/map2to8-table.ts",
+      "sha256": "838595fa948c21f8ea52cdb759b046f4d792153cbb87bb414f3c56b50c646525",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1344,
+        "digest": 265111341841131045
+      }
+    },
+    {
+      "id": "map4to8-ts",
+      "profile": "map4to8-ts",
+      "file": "dvb/map4to8.ts",
+      "sha256": "6580fec6eb056acccca648b7f27692cc80fb30574073cf26ef2862ab6b219e9a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1344,
+        "digest": 6755082815380969024
+      }
+    },
+    {
+      "id": "map4to8-table-ts",
+      "profile": "map4to8-table-ts",
+      "file": "dvb/map4to8-table.ts",
+      "sha256": "c13162266198155259aea473b93c34a3714f05856341736f3263da740cc6f59d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1344,
+        "digest": 16404709322424340879
+      }
+    },
+    {
+      "id": "no-end-of-display-ts",
+      "profile": "no-end-of-display-ts",
+      "file": "dvb/no-end-of-display.ts",
+      "sha256": "690a8f0ea2eb6afe312e90de3f6744ac782f1e9fd6ea14370d38ff1d92b74da6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 4963633602720683063
+      }
+    },
+    {
+      "id": "no-pts-between-ts",
+      "profile": "no-pts-between-ts",
+      "file": "dvb/no-pts-between.ts",
+      "sha256": "9b9d7678d4a76d124d7daa2312cc91d95a58dfdec47e522c05f41aa7176fa86c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 640,
+        "digest": 4853949453498874176
+      }
+    },
+    {
+      "id": "no-pts-first-ts",
+      "profile": "no-pts-first-ts",
+      "file": "dvb/no-pts-first.ts",
+      "sha256": "7cf35d01afaf2b110d11f5c64cd1a0c92bd16f9fa04516bc50ad96b0daeeb37d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 17791208421385472179
+      }
+    },
+    {
+      "id": "no-pts-palette-then-fill-ts",
+      "profile": "no-pts-palette-then-fill-ts",
+      "file": "dvb/no-pts-palette-then-fill.ts",
+      "sha256": "01ebf4cb5deae25d3646d55e5b3bc1910963a28ca542e2b5fca9ed0baeb3f44f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 800,
+        "digest": 7033019029509415948
+      }
+    },
+    {
+      "id": "nonmodifying-depth2-0-ts",
+      "profile": "nonmodifying-depth2-0-ts",
+      "file": "dvb/nonmodifying-depth2-0.ts",
+      "sha256": "152a1c8b019c11eb97b686de2283df64de1f376cc244ff6c1e3cb5cf23da0e19",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 13338433893168073695
+      }
+    },
+    {
+      "id": "nonmodifying-depth2-1-ts",
+      "profile": "nonmodifying-depth2-1-ts",
+      "file": "dvb/nonmodifying-depth2-1.ts",
+      "sha256": "4417a99f093abf3542d9de1235177b083ec361b7d829d1dbae5ce048e06d6313",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 11291846382037194433
+      }
+    },
+    {
+      "id": "nonmodifying-depth4-0-ts",
+      "profile": "nonmodifying-depth4-0-ts",
+      "file": "dvb/nonmodifying-depth4-0.ts",
+      "sha256": "49a9254014c2b28e9c7a41de23be282b60e76dc00c406c844c675ac21e4b7677",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 208,
+        "digest": 9412217284803377875
+      }
+    },
+    {
+      "id": "nonmodifying-depth4-1-ts",
+      "profile": "nonmodifying-depth4-1-ts",
+      "file": "dvb/nonmodifying-depth4-1.ts",
+      "sha256": "dcc84e6304869b82f67dbceee006472c409b7705c7a6769628f51232e2ec7ed8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 208,
+        "digest": 15340099831263677215
+      }
+    },
+    {
+      "id": "nonmodifying-depth8-0-ts",
+      "profile": "nonmodifying-depth8-0-ts",
+      "file": "dvb/nonmodifying-depth8-0.ts",
+      "sha256": "d62232cfb9fd181acc534966ded481311c3fa34185166af7ddad4a13a8546130",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1168,
+        "digest": 10815837378487352968
+      }
+    },
+    {
+      "id": "nonmodifying-depth8-1-ts",
+      "profile": "nonmodifying-depth8-1-ts",
+      "file": "dvb/nonmodifying-depth8-1.ts",
+      "sha256": "91ba5011f25f974280eac01a7aef60109d58a2ab77e79907421224b40d8e01f7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1168,
+        "digest": 1377957430738379116
+      }
+    },
+    {
+      "id": "object-character-ts",
+      "profile": "object-character-ts",
+      "file": "dvb/object-character.ts",
+      "sha256": "fa7beb80e7812935825853725981d017a39b22f542cff549f6a60a7d6886683e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "object-malformed-ts",
+      "profile": "object-malformed-ts",
+      "file": "dvb/object-malformed.ts",
+      "sha256": "902b943c8ac6a3fc4f50c1af1e58eecbdc0edab8c8b364294b3d57ac20dbe71c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 9955365484710086736
+      }
+    },
+    {
+      "id": "object-order-ts",
+      "profile": "object-order-ts",
+      "file": "dvb/object-order.ts",
+      "sha256": "d31bec7ea3dfa7476bb8007fb74064cfd95dbc5813fa676545099a794c20b53b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "object-placed-twice-ts",
+      "profile": "object-placed-twice-ts",
+      "file": "dvb/object-placed-twice.ts",
+      "sha256": "3eee540d90fb51aa5ee878f4edd36e6f7d13e6d6df28831a68c37a683d934ff0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 448,
+        "digest": 5333810402248914922
+      }
+    },
+    {
+      "id": "object-progressive-ts",
+      "profile": "object-progressive-ts",
+      "file": "dvb/object-progressive.ts",
+      "sha256": "744b255fba822451140bcea6be22ba42c29635fc71bd3ee1a4444c41b5c4f50b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "object-provider-rom-ts",
+      "profile": "object-provider-rom-ts",
+      "file": "dvb/object-provider-rom.ts",
+      "sha256": "a6b80fa9477c2231d67a0e859c838fa38cc8cc77770accb15ea82019d318a327",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 192,
+        "digest": 6699784594123847741
+      }
+    },
+    {
+      "id": "object-type-composite-ts",
+      "profile": "object-type-composite-ts",
+      "file": "dvb/object-type-composite.ts",
+      "sha256": "b236dd2381e7d688cee85b762574971a4aaac737ce0446f545fa386c13110043",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 192,
+        "digest": 6699784594123847741
+      }
+    },
+    {
+      "id": "objects-overlap-clip-ts",
+      "profile": "objects-overlap-clip-ts",
+      "file": "dvb/objects-overlap-clip.ts",
+      "sha256": "715039b8e7d5f5c4f484af47a7eb3e3401d7421b1e49cd352392427d359cf457",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "packets-refused-ts",
+      "profile": "packets-refused-ts",
+      "file": "dvb/packets-refused.ts",
+      "sha256": "9cb9fcc856ad9788141dff012f5306389fdb39564caed21cf82d39d68e0b7066",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 3769088815703685812
+      }
+    },
+    {
+      "id": "page-acquisition-ts",
+      "profile": "page-acquisition-ts",
+      "file": "dvb/page-acquisition.ts",
+      "sha256": "9625f75b221bab4619c3a46c05ba335ddd7502b060b18f0c2bfbda6a1906b154",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 320,
+        "digest": 14753087161717138022
+      }
+    },
+    {
+      "id": "page-mode-change-ts",
+      "profile": "page-mode-change-ts",
+      "file": "dvb/page-mode-change.ts",
+      "sha256": "ef824b1f2daa23f559ad86db7f410b2c2250bc056bdbed6a2ff00686533d6a7f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 320,
+        "digest": 14753087161717138022
+      }
+    },
+    {
+      "id": "page-timeouts-clear-ts",
+      "profile": "page-timeouts-clear-ts",
+      "file": "dvb/page-timeouts-clear.ts",
+      "sha256": "60632db4f363c9f4b67862288e4351791d6907efbbafe7c254028e0af0646952",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 480,
+        "digest": 12647883032242709717
+      }
+    },
+    {
+      "id": "page-timeouts-clear-mkv",
+      "profile": "page-timeouts-clear-mkv",
+      "file": "dvb/page-timeouts-clear.mkv",
+      "sha256": "bc1d7ec5524f3a3e5f448c1ac33b5fb371b38b88d0a26b000974d242781a38b7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 480,
+        "digest": 12647883032242709717
+      }
+    },
+    {
+      "id": "page-update-ts",
+      "profile": "page-update-ts",
+      "file": "dvb/page-update.ts",
+      "sha256": "0b7f2d32e9119957353a3f3f37eb06d6da44e90f12f5a82e9559bc308573e3c7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 960,
+        "digest": 4518184684633161342
+      }
+    },
+    {
+      "id": "pages-ancillary-ts",
+      "profile": "pages-ancillary-ts",
+      "file": "dvb/pages-ancillary.ts",
+      "sha256": "b2c5379a8f790c35a51a02b0e3df305349d0216ea96f0aa9ccb969ccf38ac349",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pages-ancillary-mkv",
+      "profile": "pages-ancillary-mkv",
+      "file": "dvb/pages-ancillary.mkv",
+      "sha256": "c5ad240ebf66963e887eacae5b5b5a4b2891c962ab3550397775f06723c4d94f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pages-ancillary-after-ts",
+      "profile": "pages-ancillary-after-ts",
+      "file": "dvb/pages-ancillary-after.ts",
+      "sha256": "96a18454acdbae7a6dbb0640fb0a822706e816b7b72e2a8f745b955207ef02db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 923525805000
+      }
+    },
+    {
+      "id": "pages-other-first-ts",
+      "profile": "pages-other-first-ts",
+      "file": "dvb/pages-other-first.ts",
+      "sha256": "00aaebf1b3256a52a9fc8ce71034cbe84b912e0ccfac7376a848a87ced22ec7b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 923525805000
+      }
+    },
+    {
+      "id": "pages-same-id-ts",
+      "profile": "pages-same-id-ts",
+      "file": "dvb/pages-same-id.ts",
+      "sha256": "6bac3467e8dfa4827feb0e6bc93a584da58aac0b7f83bbe1c6395c441c1f165c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 8038746146724174932
+      }
+    },
+    {
+      "id": "pages-unsignalled-ts",
+      "profile": "pages-unsignalled-ts",
+      "file": "dvb/pages-unsignalled.ts",
+      "sha256": "42b1c4e7f805e8c92d115756c730c321a4343da6c75044f3921f1c1c15ba8854",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 8038746146724174932
+      }
+    },
+    {
+      "id": "pes-no-end-marker-ts",
+      "profile": "pes-no-end-marker-ts",
+      "file": "dvb/pes-no-end-marker.ts",
+      "sha256": "42a889cb2a42e19cefd57a3f8acd358d5704c83eaf3f86556a660fe2b89cf75b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 15534064970188810991
+      }
+    },
+    {
+      "id": "pes-no-identifier-ts",
+      "profile": "pes-no-identifier-ts",
+      "file": "dvb/pes-no-identifier.ts",
+      "sha256": "c28cff422b0cc13dc20713d346cda39a9fb6fd77d976510c9ddc5a42da33e7a6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 15534064970188810991
+      }
+    },
+    {
+      "id": "pes-no-pts-ts",
+      "profile": "pes-no-pts-ts",
+      "file": "dvb/pes-no-pts.ts",
+      "sha256": "c811bda3352abcfed096431b4c0fb50c8d96048269229d08a9e3ce162d857303",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 160,
+        "digest": 8733855541951903450
+      }
+    },
+    {
+      "id": "pes-stuffing-ts",
+      "profile": "pes-stuffing-ts",
+      "file": "dvb/pes-stuffing.ts",
+      "sha256": "3a798f15ddfe1710e51580cae3f88d785995087058347cc1b40ebc41f2367ffb",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 15534064970188810991
+      }
+    },
+    {
+      "id": "pes-unbounded-ts",
+      "profile": "pes-unbounded-ts",
+      "file": "dvb/pes-unbounded.ts",
+      "sha256": "66ed63793d03950be54140abf8d4428f3c54a2c58048f9b4c8cff50106786c15",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 15534064970188810991
+      }
+    },
+    {
+      "id": "pts-wrap-ts",
+      "profile": "pts-wrap-ts",
+      "file": "dvb/pts-wrap.ts",
+      "sha256": "bd73305cd44ab64b4e4dece4b060fc8757f6f172d28425bc54334f2c591ff952",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 320,
+        "digest": 17411368669484291497
+      }
+    },
+    {
+      "id": "recorded-dvb-ancillary-pages--matroska-segments-ts",
+      "profile": "recorded-dvb-ancillary-pages--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-ancillary-pages--matroska-segments.ts",
+      "sha256": "ca5e9512374681cf6f8b6f1e3c7a06efb741b8ee947c1f0d8f8b175eb5b77349",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 13167109967512154794
+      }
+    },
+    {
+      "id": "recorded-dvb-ancillary-pages--pes-data-field-ts",
+      "profile": "recorded-dvb-ancillary-pages--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-ancillary-pages--pes-data-field.ts",
+      "sha256": "ca5e9512374681cf6f8b6f1e3c7a06efb741b8ee947c1f0d8f8b175eb5b77349",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 13167109967512154794
+      }
+    },
+    {
+      "id": "recorded-dvb-geometry-window--matroska-segments-ts",
+      "profile": "recorded-dvb-geometry-window--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-geometry-window--matroska-segments.ts",
+      "sha256": "5a6e376fef0938bcc83824f3d7eec4cd6b2c87fce6863394021e31cb27b37d5a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 8495362033549393257
+      }
+    },
+    {
+      "id": "recorded-dvb-geometry-window--pes-data-field-ts",
+      "profile": "recorded-dvb-geometry-window--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-geometry-window--pes-data-field.ts",
+      "sha256": "5a6e376fef0938bcc83824f3d7eec4cd6b2c87fce6863394021e31cb27b37d5a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 8495362033549393257
+      }
+    },
+    {
+      "id": "recorded-dvb-map2to4--matroska-segments-ts",
+      "profile": "recorded-dvb-map2to4--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-map2to4--matroska-segments.ts",
+      "sha256": "700132bacac6827dd2be6ef70b419ee431467ba868576d3fb363429f85305948",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 72,
+        "digest": 17130530403228482559
+      }
+    },
+    {
+      "id": "recorded-dvb-map2to4--pes-data-field-ts",
+      "profile": "recorded-dvb-map2to4--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-map2to4--pes-data-field.ts",
+      "sha256": "700132bacac6827dd2be6ef70b419ee431467ba868576d3fb363429f85305948",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 72,
+        "digest": 17130530403228482559
+      }
+    },
+    {
+      "id": "recorded-dvb-map2to8--matroska-segments-ts",
+      "profile": "recorded-dvb-map2to8--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-map2to8--matroska-segments.ts",
+      "sha256": "96242f863b04c6c09cf0d496d7366ba3cfc29f8ae93d141ae215177eee49bc45",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 11269723397772065251
+      }
+    },
+    {
+      "id": "recorded-dvb-map2to8--pes-data-field-ts",
+      "profile": "recorded-dvb-map2to8--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-map2to8--pes-data-field.ts",
+      "sha256": "96242f863b04c6c09cf0d496d7366ba3cfc29f8ae93d141ae215177eee49bc45",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1032,
+        "digest": 11269723397772065251
+      }
+    },
+    {
+      "id": "recorded-dvb-map4to8--matroska-segments-ts",
+      "profile": "recorded-dvb-map4to8--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-map4to8--matroska-segments.ts",
+      "sha256": "56b0ef96af1af81465d66664d85a9f0a741461df6c93e6535eef8d16138645fe",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1040,
+        "digest": 6077907341203163999
+      }
+    },
+    {
+      "id": "recorded-dvb-map4to8--pes-data-field-ts",
+      "profile": "recorded-dvb-map4to8--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-map4to8--pes-data-field.ts",
+      "sha256": "56b0ef96af1af81465d66664d85a9f0a741461df6c93e6535eef8d16138645fe",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1040,
+        "digest": 6077907341203163999
+      }
+    },
+    {
+      "id": "recorded-dvb-nonmodifying--matroska-segments-ts",
+      "profile": "recorded-dvb-nonmodifying--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-nonmodifying--matroska-segments.ts",
+      "sha256": "b44dcf4ab32c872852ab432c8af30b58a7b9a900b4f332f680e7007018be07c8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 13826533552773561834
+      }
+    },
+    {
+      "id": "recorded-dvb-nonmodifying--pes-data-field-ts",
+      "profile": "recorded-dvb-nonmodifying--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-nonmodifying--pes-data-field.ts",
+      "sha256": "b44dcf4ab32c872852ab432c8af30b58a7b9a900b4f332f680e7007018be07c8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 13826533552773561834
+      }
+    },
+    {
+      "id": "recorded-dvb-palette-update-clear--matroska-segments-ts",
+      "profile": "recorded-dvb-palette-update-clear--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-palette-update-clear--matroska-segments.ts",
+      "sha256": "fe1ac0b06097c47535e22450a0d350e9892636b6c4651c4d784dd25a3971abe5",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 48,
+        "digest": 2763977928802437352
+      }
+    },
+    {
+      "id": "recorded-dvb-partial-alpha-projection--matroska-segments-ts",
+      "profile": "recorded-dvb-partial-alpha-projection--matroska-segments-ts",
+      "file": "dvb/recorded-dvb-partial-alpha-projection--matroska-segments.ts",
+      "sha256": "1c0e748d2a9d752b47e1c9487ec19d5d62dd231f3de1603a3ff2d04c91618233",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 7802634354677846762
+      }
+    },
+    {
+      "id": "recorded-dvb-partial-alpha-projection--pes-data-field-ts",
+      "profile": "recorded-dvb-partial-alpha-projection--pes-data-field-ts",
+      "file": "dvb/recorded-dvb-partial-alpha-projection--pes-data-field.ts",
+      "sha256": "1c0e748d2a9d752b47e1c9487ec19d5d62dd231f3de1603a3ff2d04c91618233",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 7802634354677846762
+      }
+    },
+    {
+      "id": "recorded-dvb2-literals-fields--matroska-segments-ts",
+      "profile": "recorded-dvb2-literals-fields--matroska-segments-ts",
+      "file": "dvb/recorded-dvb2-literals-fields--matroska-segments.ts",
+      "sha256": "c1f23d98834827a41321d11f5b05961907675e333038a65a05d322baa53fb72f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 9575438342713166504
+      }
+    },
+    {
+      "id": "recorded-dvb2-literals-fields--pes-data-field-ts",
+      "profile": "recorded-dvb2-literals-fields--pes-data-field-ts",
+      "file": "dvb/recorded-dvb2-literals-fields--pes-data-field.ts",
+      "sha256": "c1f23d98834827a41321d11f5b05961907675e333038a65a05d322baa53fb72f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 9575438342713166504
+      }
+    },
+    {
+      "id": "recorded-dvb2-repeat-top--matroska-segments-ts",
+      "profile": "recorded-dvb2-repeat-top--matroska-segments-ts",
+      "file": "dvb/recorded-dvb2-repeat-top--matroska-segments.ts",
+      "sha256": "c77904374186452d44b0c981cf520fdf6ff9e73a6a43a4b3db0037698234e456",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 32,
+        "digest": 5859439295120181292
+      }
+    },
+    {
+      "id": "recorded-dvb2-repeat-top--pes-data-field-ts",
+      "profile": "recorded-dvb2-repeat-top--pes-data-field-ts",
+      "file": "dvb/recorded-dvb2-repeat-top--pes-data-field.ts",
+      "sha256": "c77904374186452d44b0c981cf520fdf6ff9e73a6a43a4b3db0037698234e456",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 32,
+        "digest": 5859439295120181292
+      }
+    },
+    {
+      "id": "recorded-dvb2-run-branches--matroska-segments-ts",
+      "profile": "recorded-dvb2-run-branches--matroska-segments-ts",
+      "file": "dvb/recorded-dvb2-run-branches--matroska-segments.ts",
+      "sha256": "8768a95bacfaab987dd96eb159e4cf78ada831127ab8ccb207595bcec663f853",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 752,
+        "digest": 13644926489399893502
+      }
+    },
+    {
+      "id": "recorded-dvb2-run-branches--pes-data-field-ts",
+      "profile": "recorded-dvb2-run-branches--pes-data-field-ts",
+      "file": "dvb/recorded-dvb2-run-branches--pes-data-field.ts",
+      "sha256": "8768a95bacfaab987dd96eb159e4cf78ada831127ab8ccb207595bcec663f853",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 752,
+        "digest": 13644926489399893502
+      }
+    },
+    {
+      "id": "recorded-dvb4-literals-fields--matroska-segments-ts",
+      "profile": "recorded-dvb4-literals-fields--matroska-segments-ts",
+      "file": "dvb/recorded-dvb4-literals-fields--matroska-segments.ts",
+      "sha256": "bb92d974a24e33e0828fadef6bc765284f05c33f6dd56456206e5dfd6a0cee89",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 76,
+        "digest": 1063780596325307322
+      }
+    },
+    {
+      "id": "recorded-dvb4-literals-fields--pes-data-field-ts",
+      "profile": "recorded-dvb4-literals-fields--pes-data-field-ts",
+      "file": "dvb/recorded-dvb4-literals-fields--pes-data-field.ts",
+      "sha256": "bb92d974a24e33e0828fadef6bc765284f05c33f6dd56456206e5dfd6a0cee89",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 76,
+        "digest": 1063780596325307322
+      }
+    },
+    {
+      "id": "recorded-dvb4-run-branches--matroska-segments-ts",
+      "profile": "recorded-dvb4-run-branches--matroska-segments-ts",
+      "file": "dvb/recorded-dvb4-run-branches--matroska-segments.ts",
+      "sha256": "00004b5c1ef2bf6454309d05d5daa834895a5f16604a2a99f13eff68af852b94",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 792,
+        "digest": 16690472425628788283
+      }
+    },
+    {
+      "id": "recorded-dvb4-run-branches--pes-data-field-ts",
+      "profile": "recorded-dvb4-run-branches--pes-data-field-ts",
+      "file": "dvb/recorded-dvb4-run-branches--pes-data-field.ts",
+      "sha256": "00004b5c1ef2bf6454309d05d5daa834895a5f16604a2a99f13eff68af852b94",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 792,
+        "digest": 16690472425628788283
+      }
+    },
+    {
+      "id": "recorded-dvb8-literals-fields--matroska-segments-ts",
+      "profile": "recorded-dvb8-literals-fields--matroska-segments-ts",
+      "file": "dvb/recorded-dvb8-literals-fields--matroska-segments.ts",
+      "sha256": "7ca438f036c6660fbf1877f27b4e05d3680f7bc2cf6c90926ccb0b9a65245d43",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1036,
+        "digest": 11762677253250151585
+      }
+    },
+    {
+      "id": "recorded-dvb8-literals-fields--pes-data-field-ts",
+      "profile": "recorded-dvb8-literals-fields--pes-data-field-ts",
+      "file": "dvb/recorded-dvb8-literals-fields--pes-data-field.ts",
+      "sha256": "7ca438f036c6660fbf1877f27b4e05d3680f7bc2cf6c90926ccb0b9a65245d43",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1036,
+        "digest": 11762677253250151585
+      }
+    },
+    {
+      "id": "recorded-dvb8-run-branches--matroska-segments-ts",
+      "profile": "recorded-dvb8-run-branches--matroska-segments-ts",
+      "file": "dvb/recorded-dvb8-run-branches--matroska-segments.ts",
+      "sha256": "86ac02eb96f203c2eab6174fa392e7f02fd3df76f8de9228b0edff9fea26b7db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1542,
+        "digest": 7435284612947403844
+      }
+    },
+    {
+      "id": "recorded-dvb8-run-branches--pes-data-field-ts",
+      "profile": "recorded-dvb8-run-branches--pes-data-field-ts",
+      "file": "dvb/recorded-dvb8-run-branches--pes-data-field.ts",
+      "sha256": "86ac02eb96f203c2eab6174fa392e7f02fd3df76f8de9228b0edff9fea26b7db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1542,
+        "digest": 7435284612947403844
+      }
+    },
+    {
+      "id": "recorded-full-alpha-ts",
+      "profile": "recorded-full-alpha-ts",
+      "file": "dvb/recorded-full-alpha.ts",
+      "sha256": "d9621b2f19b5452de5d6f1b7a78f32b77fb64f0019dc3332dff4bbe37c56f606",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1536,
+        "digest": 11300672686202664479
+      }
+    },
+    {
+      "id": "recorded-full-depth2-ts",
+      "profile": "recorded-full-depth2-ts",
+      "file": "dvb/recorded-full-depth2.ts",
+      "sha256": "e83603766fc9cf17d90a85c9826117d1b23ce24c8969618de88fbcb021aafb7c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 7664796259043657732
+      }
+    },
+    {
+      "id": "recorded-full-depth4-ts",
+      "profile": "recorded-full-depth4-ts",
+      "file": "dvb/recorded-full-depth4.ts",
+      "sha256": "05265caf89cfc6dac2b90d6c6d1caadc24abe126b11a503550823c100a9bec52",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 96,
+        "digest": 12104227431818118313
+      }
+    },
+    {
+      "id": "recorded-full-rgb-ts",
+      "profile": "recorded-full-rgb-ts",
+      "file": "dvb/recorded-full-rgb.ts",
+      "sha256": "c6cb0923ece7fbb333f6eec949d8d5ff9ba8953260e5ca5272194f76829fbd14",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1536,
+        "digest": 13551251350693888911
+      }
+    },
+    {
+      "id": "recorded-reduced-final-fresh-ts",
+      "profile": "recorded-reduced-final-fresh-ts",
+      "file": "dvb/recorded-reduced-final-fresh.ts",
+      "sha256": "1bfbf2156df49fad9cce4b0cf557d030c1ad3827d9310ec0dd1411b5841f8c98",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1536,
+        "digest": 6744987428649685233
+      }
+    },
+    {
+      "id": "recorded-reduced-nonfinal-ts",
+      "profile": "recorded-reduced-nonfinal-ts",
+      "file": "dvb/recorded-reduced-nonfinal.ts",
+      "sha256": "6f1414c7b8b7ef7ed0f62714a05b000741038c6a71eded29efe7777ab9160741",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1536,
+        "digest": 4920031112739889584
+      }
+    },
+    {
+      "id": "recorded-reduced-tail2-ts",
+      "profile": "recorded-reduced-tail2-ts",
+      "file": "dvb/recorded-reduced-tail2.ts",
+      "sha256": "a2a7be50e329384178f0004ebfc896083d06c2aa2633c5694b96935557a7fe52",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 72,
+        "digest": 11033980048574089851
+      }
+    },
+    {
+      "id": "recorded-reduced-tail4-ts",
+      "profile": "recorded-reduced-tail4-ts",
+      "file": "dvb/recorded-reduced-tail4.ts",
+      "sha256": "9f3c739d5a8b007d85adfa704eb38b88c109a2458e7f47d9212e629163d3c869",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 288,
+        "digest": 15309314344737503151
+      }
+    },
+    {
+      "id": "recorded-reduced-tail8-ts",
+      "profile": "recorded-reduced-tail8-ts",
+      "file": "dvb/recorded-reduced-tail8.ts",
+      "sha256": "18aed4746a484c1e59d30142f4297a37422fc7ae1d6ed3c47914820e1c21b737",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 4608,
+        "digest": 8683917044927939519
+      }
+    },
+    {
+      "id": "recorded-transparent-companions-ts",
+      "profile": "recorded-transparent-companions-ts",
+      "file": "dvb/recorded-transparent-companions.ts",
+      "sha256": "d0f62b29a6a34bfa73cf79e65ef22d8964220343a4f01a135478e03c0f0c622a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1536,
+        "digest": 9563438396096945309
+      }
+    },
+    {
+      "id": "recorded-unused-full-ts",
+      "profile": "recorded-unused-full-ts",
+      "file": "dvb/recorded-unused-full.ts",
+      "sha256": "4483178138ae15a463681b0ef8bcb4ac061415ba76b5081806258119bfb28246",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1536,
+        "digest": 1908939296624522173
+      }
+    },
+    {
+      "id": "region-compat-level-ts",
+      "profile": "region-compat-level-ts",
+      "file": "dvb/region-compat-level.ts",
+      "sha256": "013d1f78fac8dc3bfbfb4c5d0a7d2809f4ceaa6c24ce7b033043d07cf3c0b5a6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1088,
+        "digest": 5083127044718894309
+      }
+    },
+    {
+      "id": "region-depth-invalid-ts",
+      "profile": "region-depth-invalid-ts",
+      "file": "dvb/region-depth-invalid.ts",
+      "sha256": "0c1d0d43584ba54170e45f22e2ad8548324e6c5010af882cfae1c9b668680b97",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 128,
+        "digest": 8149411814559509113
+      }
+    },
+    {
+      "id": "region-empty-ts",
+      "profile": "region-empty-ts",
+      "file": "dvb/region-empty.ts",
+      "sha256": "c5b1962f6ba312d12286a10d96bdf240e4d16394cf591b3ffba69f5d96c042cc",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 923525805000
+      }
+    },
+    {
+      "id": "region-order-ts",
+      "profile": "region-order-ts",
+      "file": "dvb/region-order.ts",
+      "sha256": "92222b1033c04f797e55264a500ff771fa4da3a6952ecf918c4a548949cb5c76",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 432,
+        "digest": 2336549488457264574
+      }
+    },
+    {
+      "id": "region-resize-partial-ts",
+      "profile": "region-resize-partial-ts",
+      "file": "dvb/region-resize-partial.ts",
+      "sha256": "1c33e14dbb10fd08181d24a54af796e750516264d5ef28d0aee2d0728ed19796",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 1804,
+        "digest": 3862670400390015719
+      }
+    },
+    {
+      "id": "region-versions-ts",
+      "profile": "region-versions-ts",
+      "file": "dvb/region-versions.ts",
+      "sha256": "0bc12f2f2dbb7dbe96a248653a829fe2f34bb180dc1302f35791d1e1011bbbbd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 4224,
+        "digest": 11274704453667670994
+      }
+    },
+    {
+      "id": "regions-objects-ts",
+      "profile": "regions-objects-ts",
+      "file": "dvb/regions-objects.ts",
+      "sha256": "a66e298ff00f1c35212d98f8c5d7442f67d1c193e4ae875464d7a417dda59b00",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4124,
+        "digest": 10419179021452950917
+      }
+    },
+    {
+      "id": "regions-objects-mkv",
+      "profile": "regions-objects-mkv",
+      "file": "dvb/regions-objects.mkv",
+      "sha256": "d7978e7d988f1d09563c7ec3cdd0034c95b2af0e0ec48ddc11cd9cf06887f036",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4124,
+        "digest": 10419179021452950917
+      }
+    },
+    {
+      "id": "row-split-overflow-ts",
+      "profile": "row-split-overflow-ts",
+      "file": "dvb/row-split-overflow.ts",
+      "sha256": "dc38adb9ac861a630778af790a2b0498b4a38f14c5b30dc4742492c30e2bbfb8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 184,
+        "digest": 17065137756950143260
+      }
+    },
+    {
+      "id": "rows-past-bottom-ts",
+      "profile": "rows-past-bottom-ts",
+      "file": "dvb/rows-past-bottom.ts",
+      "sha256": "e723ae1de45125586f418e52325b2edbe213d5987f951d47c996eeb9d6fde3e0",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 7041840824944167165
+      }
+    },
+    {
+      "id": "segment-length-overrun-ts",
+      "profile": "segment-length-overrun-ts",
+      "file": "dvb/segment-length-overrun.ts",
+      "sha256": "f4445b02aacb16f2a44f6a345e6bf6fdeac38e46a051aef72a692a466e5a4e84",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "sequence-ts",
+      "profile": "sequence-ts",
+      "file": "dvb/sequence.ts",
+      "sha256": "6faac3f885bcad3363f31aae9a7b9bfc5b287f43c1689ac8ded9a4f421db7b61",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 1920,
+        "digest": 2526905614536532176
+      }
+    },
+    {
+      "id": "sequence-mkv",
+      "profile": "sequence-mkv",
+      "file": "dvb/sequence.mkv",
+      "sha256": "83e9f1ee5a234266a8da6b19804e651a76823eb35107d8345dc0452fdf9d0f15",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 1920,
+        "digest": 7763093233811104166
+      }
+    },
+    {
+      "id": "services-two-ts",
+      "profile": "services-two-ts",
+      "file": "dvb/services-two.ts",
+      "sha256": "52f13b5840224f50475ab65853d48cea1103a4bd79da9685356b0be17d4538d7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "services-two-ordered-ts",
+      "profile": "services-two-ordered-ts",
+      "file": "dvb/services-two-ordered.ts",
+      "sha256": "c11b39f9956893002f65788e1a3c750a3fbf7d8e15383781c46887edb0262834",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 12671976528885075895
+      }
+    },
+    {
+      "id": "set-split-pes-ts",
+      "profile": "set-split-pes-ts",
+      "file": "dvb/set-split-pes.ts",
+      "sha256": "80253a27b542decacd9a3580b9c1b05dca9ace0fe887763068555c323e3a6441",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 1396097753638465231
+      }
+    },
+    {
+      "id": "set-split-pes-new-pts-ts",
+      "profile": "set-split-pes-new-pts-ts",
+      "file": "dvb/set-split-pes-new-pts.ts",
+      "sha256": "8cc9829ab19b778f7084896de264284147715ccd3c56af9bc58435af6d225d0a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "short-segments-ts",
+      "profile": "short-segments-ts",
+      "file": "dvb/short-segments.ts",
+      "sha256": "2871dd3ff34b0e185c00b1c0691dbd24e6a331f3a7f0b80014a966f2559b7721",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 160,
+        "digest": 1620255760620023408
+      }
+    },
+    {
+      "id": "streams-two-ts",
+      "profile": "streams-two-ts",
+      "file": "dvb/streams-two.ts",
+      "sha256": "281a47cdbe0fb390723584ca4503f50998e3316eb824672f4ff610f13a583a4a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "string4-in-region2-ts",
+      "profile": "string4-in-region2-ts",
+      "file": "dvb/string4-in-region2.ts",
+      "sha256": "48f78e3e245b6a40b2ff9d0270b8e647cca3d9158110b18eb8840a23070fcad8",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 10737031442685222191
+      }
+    },
+    {
+      "id": "string8-in-region2-ts",
+      "profile": "string8-in-region2-ts",
+      "file": "dvb/string8-in-region2.ts",
+      "sha256": "7d3545666647fa31b3b9b2fabae3be8cfcfc77d61afcfdbda7136a8c2488c81e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 10737031442685222191
+      }
+    },
+    {
+      "id": "string8-in-region4-ts",
+      "profile": "string8-in-region4-ts",
+      "file": "dvb/string8-in-region4.ts",
+      "sha256": "bb89decef2efccf31d2b59ac40b4ce939e9efd38cc967951006d2e8803edee15",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 14835069831994260003
+      }
+    },
+    {
+      "id": "truncated-segment-ts",
+      "profile": "truncated-segment-ts",
+      "file": "dvb/truncated-segment.ts",
+      "sha256": "e7c0c50cb3b70603c4c8ccbc911a5cc27eaf12d07b37a139569269025a6e2c61",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 16161863205859090883
+      }
+    },
+    {
+      "id": "two-sets-one-pes-ts",
+      "profile": "two-sets-one-pes-ts",
+      "file": "dvb/two-sets-one-pes.ts",
+      "sha256": "97f4ebf643cb8e60195ec2a548dec2ba63f637c4b4e11c56cf3317e1517f88e2",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 8038746146724174932
+      }
+    },
+    {
+      "id": "unknown-segments-ts",
+      "profile": "unknown-segments-ts",
+      "file": "dvb/unknown-segments.ts",
+      "sha256": "4a177086520ebe7a1feade2e29e795da85d1fa0bb3b4696ee435c027132e9627",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 192,
+        "digest": 6699784594123847741
+      }
+    },
+    {
+      "id": "versions-repeated-ts",
+      "profile": "versions-repeated-ts",
+      "file": "dvb/versions-repeated.ts",
+      "sha256": "959cfc4b87db33c5208b934eb9c74a7ad2cddfef98378d40509a7087d987e0aa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 640,
+        "digest": 1875905751460982760
+      }
+    },
+    {
+      "id": "sequence--compute_edt-1",
+      "profile": "sequence--compute_edt-1",
+      "file": "dvb/sequence.ts",
+      "sha256": "6faac3f885bcad3363f31aae9a7b9bfc5b287f43c1689ac8ded9a4f421db7b61",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 15,
+        "bytes": 1920,
+        "digest": 15727815180867281118
+      }
+    },
+    {
+      "id": "page-timeouts-clear--compute_edt-1",
+      "profile": "page-timeouts-clear--compute_edt-1",
+      "file": "dvb/page-timeouts-clear.ts",
+      "sha256": "60632db4f363c9f4b67862288e4351791d6907efbbafe7c254028e0af0646952",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 320,
+        "digest": 11142245921796273618
+      }
+    },
+    {
+      "id": "long-text--compute_edt-1",
+      "profile": "long-text--compute_edt-1",
+      "file": "dvb/long-text.ts",
+      "sha256": "6019fc3b9e584c5ead7ac0bd17e22b562f0f5014880e00629402214cf953fcd4",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 119,
+        "bytes": 3076800,
+        "digest": 3650696883213752609
+      }
+    },
+    {
+      "id": "no-end-of-display--compute_edt-1",
+      "profile": "no-end-of-display--compute_edt-1",
+      "file": "dvb/no-end-of-display.ts",
+      "sha256": "690a8f0ea2eb6afe312e90de3f6744ac782f1e9fd6ea14370d38ff1d92b74da6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 12470883913074957303
+      }
+    },
+    {
+      "id": "pes-no-pts--compute_edt-1",
+      "profile": "pes-no-pts--compute_edt-1",
+      "file": "dvb/pes-no-pts.ts",
+      "sha256": "c811bda3352abcfed096431b4c0fb50c8d96048269229d08a9e3ce162d857303",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 11789128705205370927
+      }
+    },
+    {
+      "id": "no-pts-between--compute_edt-1",
+      "profile": "no-pts-between--compute_edt-1",
+      "file": "dvb/no-pts-between.ts",
+      "sha256": "9b9d7678d4a76d124d7daa2312cc91d95a58dfdec47e522c05f41aa7176fa86c",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 320,
+        "digest": 14416092885836362024
+      }
+    },
+    {
+      "id": "no-pts-first--compute_edt-1",
+      "profile": "no-pts-first--compute_edt-1",
+      "file": "dvb/no-pts-first.ts",
+      "sha256": "7cf35d01afaf2b110d11f5c64cd1a0c92bd16f9fa04516bc50ad96b0daeeb37d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 14845499066633325269
+      }
+    },
+    {
+      "id": "no-pts-palette-then-fill--compute_edt-1",
+      "profile": "no-pts-palette-then-fill--compute_edt-1",
+      "file": "dvb/no-pts-palette-then-fill.ts",
+      "sha256": "01ebf4cb5deae25d3646d55e5b3bc1910963a28ca542e2b5fca9ed0baeb3f44f",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 1590957681747795616
+      }
+    },
+    {
+      "id": "edt-sequence--compute_edt-1",
+      "profile": "edt-sequence--compute_edt-1",
+      "file": "dvb/edt-sequence.ts",
+      "sha256": "8302b0c4ea50ac801d3a9718610a6489c775c538f1c525010a0302ab5b4f7c92",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 160,
+        "digest": 16063546320871988673
+      }
+    },
+    {
+      "id": "edt-sequence--compute_edt-1-compute_clut-1",
+      "profile": "edt-sequence--compute_edt-1-compute_clut-1",
+      "file": "dvb/edt-sequence.ts",
+      "sha256": "8302b0c4ea50ac801d3a9718610a6489c775c538f1c525010a0302ab5b4f7c92",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_edt=1",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 160,
+        "digest": 17075175375483786418
+      }
+    },
+    {
+      "id": "region-resize-partial--compute_clut-1",
+      "profile": "region-resize-partial--compute_clut-1",
+      "file": "dvb/region-resize-partial.ts",
+      "sha256": "1c33e14dbb10fd08181d24a54af796e750516264d5ef28d0aee2d0728ed19796",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 1804,
+        "digest": 11588302090794142041
+      }
+    },
+    {
+      "id": "depth-reduced-unfilled--compute_clut-1",
+      "profile": "depth-reduced-unfilled--compute_clut-1",
+      "file": "dvb/depth-reduced-unfilled.ts",
+      "sha256": "87fdebf0ba9e73574f287a34b65b1ecf4b8a214e4f82055eabf8e3f7bf5bdb49",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1424,
+        "digest": 4206325999465978571
+      }
+    },
+    {
+      "id": "fill-after-draw--compute_clut-1",
+      "profile": "fill-after-draw--compute_clut-1",
+      "file": "dvb/fill-after-draw.ts",
+      "sha256": "05da6769b01bad665af0ba409afd5c6bf63dbf2f1b19fa0419a7abc53787e26e",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 480,
+        "digest": 3743547239539767033
+      }
+    },
+    {
+      "id": "pages-ancillary-after--dvb_substream-0",
+      "profile": "pages-ancillary-after--dvb_substream-0",
+      "file": "dvb/pages-ancillary-after.ts",
+      "sha256": "96a18454acdbae7a6dbb0640fb0a822706e816b7b72e2a8f745b955207ef02db",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:dvb_substream=0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 8038746146724174932
+      }
+    },
+    {
+      "id": "pages-other-first--dvb_substream-0",
+      "profile": "pages-other-first--dvb_substream-0",
+      "file": "dvb/pages-other-first.ts",
+      "sha256": "00aaebf1b3256a52a9fc8ce71034cbe84b912e0ccfac7376a848a87ced22ec7b",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:dvb_substream=0"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "pages-unsignalled--dvb_substream-0",
+      "profile": "pages-unsignalled--dvb_substream-0",
+      "file": "dvb/pages-unsignalled.ts",
+      "sha256": "42b1c4e7f805e8c92d115756c730c321a4343da6c75044f3921f1c1c15ba8854",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:dvb_substream=0"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "versions-repeated--compute_clut-1",
+      "profile": "versions-repeated--compute_clut-1",
+      "file": "dvb/versions-repeated.ts",
+      "sha256": "959cfc4b87db33c5208b934eb9c74a7ad2cddfef98378d40509a7087d987e0aa",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 640,
+        "digest": 16484387680285578376
+      }
+    },
+    {
+      "id": "large-regions--compute_clut-1",
+      "profile": "large-regions--compute_clut-1",
+      "file": "dvb/large-regions.ts",
+      "sha256": "5bb778400ba1b71b3ee34034873d544203c2c98a5a57e96b2683edfc62d8fad6",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 346704,
+        "digest": 8618878508514228762
+      }
+    },
+    {
+      "id": "default-clut4-text--compute_clut-0",
+      "profile": "default-clut4-text--compute_clut-0",
+      "file": "dvb/default-clut4-text.ts",
+      "sha256": "09f04ebe5513a5afbd9963cf62bf4c225c728d85a78d1a035548e23df48addcd",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 904,
+        "digest": 11636110616621823124
+      }
+    },
+    {
+      "id": "default-clut8--compute_clut-0",
+      "profile": "default-clut8--compute_clut-0",
+      "file": "dvb/default-clut8.ts",
+      "sha256": "40450486668deb629edd86c04140907e6527db03846e209ef6094bbdee53d556",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1504,
+        "digest": 7876913598062267721
+      }
+    },
+    {
+      "id": "default-clut2--compute_clut--2",
+      "profile": "default-clut2--compute_clut--2",
+      "file": "dvb/default-clut2.ts",
+      "sha256": "9a4f270a0dce81932daf842f6de77bf02e6cac35905bebecbdb974b4c60753f7",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=-2"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 496,
+        "digest": 4077041979096954006
+      }
+    },
+    {
+      "id": "depth4-runs--compute_clut-1",
+      "profile": "depth4-runs--compute_clut-1",
+      "file": "dvb/depth4-runs.ts",
+      "sha256": "59a825d993d19d1a774d6c81bcf1bf7c43a323ee39f9ba770eeba7a4e37524d9",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 832,
+        "digest": 6771922026578898541
+      }
+    },
+    {
+      "id": "depth8-runs--compute_clut-1",
+      "profile": "depth8-runs--compute_clut-1",
+      "file": "dvb/depth8-runs.ts",
+      "sha256": "abbe0680ce14772a42943029353a56d683ef1327131fe273c42b2c16cad1b888",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1792,
+        "digest": 17436670662205814970
+      }
+    },
+    {
+      "id": "regions-objects--compute_clut-1",
+      "profile": "regions-objects--compute_clut-1",
+      "file": "dvb/regions-objects.ts",
+      "sha256": "a66e298ff00f1c35212d98f8c5d7442f67d1c193e4ae875464d7a417dda59b00",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4124,
+        "digest": 5275056806737200144
+      }
+    },
+    {
+      "id": "page-acquisition--compute_clut--1",
+      "profile": "page-acquisition--compute_clut--1",
+      "file": "dvb/page-acquisition.ts",
+      "sha256": "9625f75b221bab4619c3a46c05ba335ddd7502b060b18f0c2bfbda6a1906b154",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=-1"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 320,
+        "digest": 14753087161717138022
+      }
+    },
+    {
+      "id": "services-two-ordered--dvb_substream-1",
+      "profile": "services-two-ordered--dvb_substream-1",
+      "file": "dvb/services-two-ordered.ts",
+      "sha256": "c11b39f9956893002f65788e1a3c750a3fbf7d8e15383781c46887edb0262834",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:dvb_substream=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 7641316920662942155
+      }
+    },
+    {
+      "id": "services-two-ordered--dvb_substream-0",
+      "profile": "services-two-ordered--dvb_substream-0",
+      "file": "dvb/services-two-ordered.ts",
+      "sha256": "c11b39f9956893002f65788e1a3c750a3fbf7d8e15383781c46887edb0262834",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:dvb_substream=0"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 160,
+        "digest": 8038746146724174932
+      }
+    },
+    {
+      "id": "streams-two--stream-1",
+      "profile": "streams-two--stream-1",
+      "file": "dvb/streams-two.ts",
+      "sha256": "281a47cdbe0fb390723584ca4503f50998e3316eb824672f4ff610f13a583a4a",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "stream=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 112,
+        "digest": 9830373384832299677
+      }
+    },
+    {
+      "id": "automatic-ranks--compute_clut-1",
+      "profile": "automatic-ranks--compute_clut-1",
+      "file": "dvb/automatic-ranks.ts",
+      "sha256": "5217c29707f5b2386ba2d05671d709c8a12ceda0f59f701b76f86dcd61db39f1",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1245,
+        "digest": 4580111887511454452
+      }
+    },
+    {
+      "id": "automatic-kept-entries--compute_clut-1",
+      "profile": "automatic-kept-entries--compute_clut-1",
+      "file": "dvb/automatic-kept-entries.ts",
+      "sha256": "e55d591a25a058f72cb41af207e234eedd27a4c4a15cb7ead99b2451cb3a9089",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=1"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 384,
+        "digest": 13843385384704387461
+      }
+    },
+    {
+      "id": "automatic-once--compute_clut--2",
+      "profile": "automatic-once--compute_clut--2",
+      "file": "dvb/automatic-once.ts",
+      "sha256": "b9f86f8952fe18d66ed7b9769bbc932b00253f367e60b97f64f4f7fa4bcf6501",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/dvb_streams.py",
+      "arguments": [
+        "dvb",
+        "opt:compute_clut=-2"
+      ],
+      "expected": {
+        "packets": 6,
+        "bytes": 504,
+        "digest": 10461879788027714957
+      }
+    },
+    {
+      "id": "authored-dvb-ancillary-pages",
+      "profile": "authored-dvb-ancillary-pages",
+      "file": "dvb/authored/dvb-ancillary-pages.ts",
+      "sha256": "dbe9d479ebcf72c93cb43b6c0725ed1f1726e66593d6d82bb49815bd1979b322",
+      "rights": "authored-synthetic",
+      "source": "crates/mpegts/tests/data/dvb/dvb-ancillary-pages.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 13167109967512154794
+      }
+    },
+    {
+      "id": "authored-dvb-default-clut2",
+      "profile": "authored-dvb-default-clut2",
+      "file": "dvb/authored/dvb-default-clut2.ts",
+      "sha256": "7d82959a676f689a99d6253c1673204cd1fb88c2976d3b8b005283fec05d05cb",
+      "rights": "authored-synthetic",
+      "source": "crates/mpegts/tests/data/dvb/dvb-default-clut2.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 807179126870295661
+      }
+    },
+    {
+      "id": "authored-dvb-nonmodifying",
+      "profile": "authored-dvb-nonmodifying",
+      "file": "dvb/authored/dvb-nonmodifying.ts",
+      "sha256": "6df991cb002b7da3594af097b103588b67500ce8bd94b31c0ae3450ba6e9b79e",
+      "rights": "authored-synthetic",
+      "source": "crates/mpegts/tests/data/dvb/dvb-nonmodifying.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 13826533552773561834
+      }
+    },
+    {
+      "id": "authored-dvb-partial-alpha-projection",
+      "profile": "authored-dvb-partial-alpha-projection",
+      "file": "dvb/authored/dvb-partial-alpha-projection.ts",
+      "sha256": "560b9318d72a610406418ac38add69e20e4aff506e44e2d7c565f475a08b2d72",
+      "rights": "authored-synthetic",
+      "source": "crates/mpegts/tests/data/dvb/dvb-partial-alpha-projection.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 7802634354677846762
+      }
+    },
+    {
+      "id": "authored-dvb-truncated-segment",
+      "profile": "authored-dvb-truncated-segment",
+      "file": "dvb/authored/dvb-truncated-segment.ts",
+      "sha256": "0636ec9bca068be600d2981d6d24c51c8c5674830554ec84b3e59ccdbda60cdd",
+      "rights": "authored-synthetic",
+      "source": "crates/mpegts/tests/data/dvb/dvb-truncated-segment.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 24,
+        "digest": 13167109967512154794
+      }
+    },
+    {
+      "id": "authored-dvb2-literals-fields",
+      "profile": "authored-dvb2-literals-fields",
+      "file": "dvb/authored/dvb2-literals-fields.ts",
+      "sha256": "00aa0dab57c50532c438eacac22e0b6a9dc055d29853680070eefcf7a8512da0",
+      "rights": "authored-synthetic",
+      "source": "crates/mpegts/tests/data/dvb/dvb2-literals-fields.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 9575438342713166504
+      }
+    },
+    {
+      "id": "research-dvb-ancillary-eod-native-v1-observed--ancillary-end-nonempty",
+      "profile": "research-dvb-ancillary-eod-native-v1-observed--ancillary-end-nonempty",
+      "file": "dvb/research/dvb-ancillary-eod-native-v1-observed--ancillary-end-nonempty.mkv",
+      "sha256": "c5620ab16511ca27ceec57e83ee6c835b13789a78eb16b1f3a43bf0eb7bc7bb1",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-ancillary-eod-native-v1-observed/inputs/ancillary-end-nonempty.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-ancillary-eod-native-v1-observed--composition-end-control",
+      "profile": "research-dvb-ancillary-eod-native-v1-observed--composition-end-control",
+      "file": "dvb/research/dvb-ancillary-eod-native-v1-observed--composition-end-control.mkv",
+      "sha256": "ac86a3f4bc475c4341d154b06104c4348c2c8545ef38a8c6df2a6ad2bf3a6288",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-ancillary-eod-native-v1-observed/inputs/composition-end-control.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
+      "profile": "research-dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control",
+      "file": "dvb/research/dvb-ancillary-eod-native-v1-observed--foreign-end-filter-control.mkv",
+      "sha256": "589d4fa02e83b1e54cce83d5dab158cec696c12793c90a3a9875af7eaab916f7",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-ancillary-eod-native-v1-observed/inputs/foreign-end-filter-control.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
+      "profile": "research-dvb-ancillary-eod-native-v1-observed--shared-ancillary-end",
+      "file": "dvb/research/dvb-ancillary-eod-native-v1-observed--shared-ancillary-end.mkv",
+      "sha256": "d5a646101b8a21238c7ca899ed42b231b135b288e118f8e203c1e9c6f1c3f82e",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-ancillary-eod-native-v1-observed/inputs/shared-ancillary-end.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
+      "profile": "research-dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat",
+      "file": "dvb/research/dvb-ancillary-eod-native-v1-observed--shared-composition-end-compat.mkv",
+      "sha256": "91395684807eedccf03d781d19170742c4cc9e868580d540e994bcce40b10d73",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-ancillary-eod-native-v1-observed/inputs/shared-composition-end-compat.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb2-literal-flag0",
+      "profile": "research-dvb-nonmodifying-observed--dvb2-literal-flag0",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb2-literal-flag0.mkv",
+      "sha256": "ac86a3f4bc475c4341d154b06104c4348c2c8545ef38a8c6df2a6ad2bf3a6288",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb2-literal-flag0.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb2-literal-flag1",
+      "profile": "research-dvb-nonmodifying-observed--dvb2-literal-flag1",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb2-literal-flag1.mkv",
+      "sha256": "83ccb4c2b5e2bf9458b86233d2d817d340445406376acdfcbed61bb0308959b4",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb2-literal-flag1.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6243198395285277033
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb2-run-flag0",
+      "profile": "research-dvb-nonmodifying-observed--dvb2-run-flag0",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb2-run-flag0.mkv",
+      "sha256": "5e9f077548557f0923a6df8e3a6278b9d4a013ab6e9f45a61eec19801ba76208",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb2-run-flag0.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6216096048329230697
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb2-run-flag1",
+      "profile": "research-dvb-nonmodifying-observed--dvb2-run-flag1",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb2-run-flag1.mkv",
+      "sha256": "0dd4e090a955e8ef3dd4bf578217fb342838f40552342b2df20260e6b81c96ab",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb2-run-flag1.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 26,
+        "digest": 6243198395285277033
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb4-literal-flag0",
+      "profile": "research-dvb-nonmodifying-observed--dvb4-literal-flag0",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb4-literal-flag0.mkv",
+      "sha256": "b9f9cd5d0dffec66301f08dacb9b1b559cfaf98a6d73ff3158a306219547a5bd",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb4-literal-flag0.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 74,
+        "digest": 9179062403856047965
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb4-literal-flag1",
+      "profile": "research-dvb-nonmodifying-observed--dvb4-literal-flag1",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb4-literal-flag1.mkv",
+      "sha256": "b24748c3bbff3a502dcfa6a911a6e57e0f2460fbdeb4bb4ee2e5caf8c3af8bc8",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb4-literal-flag1.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 74,
+        "digest": 9206164750812094301
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb4-run-flag0",
+      "profile": "research-dvb-nonmodifying-observed--dvb4-run-flag0",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb4-run-flag0.mkv",
+      "sha256": "22a516a557669300a3788fd314515e0e9f59d94e2606a91c3781da2ebd208236",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb4-run-flag0.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 74,
+        "digest": 9179062403856047965
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb4-run-flag1",
+      "profile": "research-dvb-nonmodifying-observed--dvb4-run-flag1",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb4-run-flag1.mkv",
+      "sha256": "7d5b558f385050fe7ec72c215bc6f333a72c4db9fc7c9e97c094ca38a38976e9",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb4-run-flag1.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 74,
+        "digest": 9206164750812094301
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb8-literal-flag0",
+      "profile": "research-dvb-nonmodifying-observed--dvb8-literal-flag0",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb8-literal-flag0.mkv",
+      "sha256": "ecb99fd6d1dbecd36785a0982c4e1d3b970305313a0e6d9a94e385902994bcaa",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb8-literal-flag0.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1034,
+        "digest": 14979745331462987373
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb8-literal-flag1",
+      "profile": "research-dvb-nonmodifying-observed--dvb8-literal-flag1",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb8-literal-flag1.mkv",
+      "sha256": "dbd7c282eab40e44970ebeac6f707a4af4e19565b24dc5f9476aad81b831c99a",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb8-literal-flag1.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1034,
+        "digest": 15006847678419033709
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb8-run-flag0",
+      "profile": "research-dvb-nonmodifying-observed--dvb8-run-flag0",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb8-run-flag0.mkv",
+      "sha256": "3ee14970322c284031dc7af79ffb8ed75e2bef8e9ff1a3fc61ac4ade549307c4",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb8-run-flag0.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1034,
+        "digest": 14979745331462987373
+      }
+    },
+    {
+      "id": "research-dvb-nonmodifying-observed--dvb8-run-flag1",
+      "profile": "research-dvb-nonmodifying-observed--dvb8-run-flag1",
+      "file": "dvb/research/dvb-nonmodifying-observed--dvb8-run-flag1.mkv",
+      "sha256": "54a0fb09d4233603ac6172e88827dfa86679d514585395ac8f586b683bbef3a5",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-nonmodifying-observed/inputs/dvb8-run-flag1.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1034,
+        "digest": 15006847678419033709
+      }
+    },
+    {
+      "id": "research-dvb-pes-continuation-v1--segment-cut4-missing",
+      "profile": "research-dvb-pes-continuation-v1--segment-cut4-missing",
+      "file": "dvb/research/dvb-pes-continuation-v1--segment-cut4-missing.ts",
+      "sha256": "c4e5a77561d06a8cead87e3505903df9ae5a8297c3418d6aa2a5967fc47f8dfa",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-continuation-v1/segment-cut4-missing.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 6609022294991693929
+      }
+    },
+    {
+      "id": "research-dvb-pes-continuation-v1--segment-cut4-repeated",
+      "profile": "research-dvb-pes-continuation-v1--segment-cut4-repeated",
+      "file": "dvb/research/dvb-pes-continuation-v1--segment-cut4-repeated.ts",
+      "sha256": "2f291d33beaee097155468bffb707606dac5699f55b0a7acae3c8a5a035601ae",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-continuation-v1/segment-cut4-repeated.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 6609022294991693929
+      }
+    },
+    {
+      "id": "research-dvb-pes-continuation-v1--segment-cut25-missing",
+      "profile": "research-dvb-pes-continuation-v1--segment-cut25-missing",
+      "file": "dvb/research/dvb-pes-continuation-v1--segment-cut25-missing.ts",
+      "sha256": "1979a4aceb748ad5a60696ba82e588ee64937ae8bf46183b017d21e588d44ef7",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-continuation-v1/segment-cut25-missing.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 6609022294991693929
+      }
+    },
+    {
+      "id": "research-dvb-pes-continuation-v1--segment-cut25-repeated",
+      "profile": "research-dvb-pes-continuation-v1--segment-cut25-repeated",
+      "file": "dvb/research/dvb-pes-continuation-v1--segment-cut25-repeated.ts",
+      "sha256": "6cc37f9eaa1262f5fcc12e67b499d530447e2a54decb1e998a0f3e29218aec73",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-continuation-v1/segment-cut25-repeated.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 6609022294991693929
+      }
+    },
+    {
+      "id": "research-dvb-pes-continuation-v1--segment-cut99-missing",
+      "profile": "research-dvb-pes-continuation-v1--segment-cut99-missing",
+      "file": "dvb/research/dvb-pes-continuation-v1--segment-cut99-missing.ts",
+      "sha256": "4c9ebafe5ee482d903d540ba7f04e80e59805af9c0dcb5c3ebd6806a5255b981",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-continuation-v1/segment-cut99-missing.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 6609022294991693929
+      }
+    },
+    {
+      "id": "research-dvb-pes-continuation-v1--segment-cut99-repeated",
+      "profile": "research-dvb-pes-continuation-v1--segment-cut99-repeated",
+      "file": "dvb/research/dvb-pes-continuation-v1--segment-cut99-repeated.ts",
+      "sha256": "dd1cc1aad1d97a6a31597a882c332c4b440b7d10aa00139125ee8d4ee5efef4c",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-continuation-v1/segment-cut99-repeated.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 6609022294991693929
+      }
+    },
+    {
+      "id": "research-dvb-pes-parser-boundary-v1--no-pts",
+      "profile": "research-dvb-pes-parser-boundary-v1--no-pts",
+      "file": "dvb/research/dvb-pes-parser-boundary-v1--no-pts.ts",
+      "sha256": "78fde68effaa310ab32a5d56cdf86996f076b6176b485d8419e5da304e001601",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-parser-boundary-v1/authored/no-pts.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 0
+      }
+    },
+    {
+      "id": "research-dvb-pes-parser-boundary-v1--repeat-pts",
+      "profile": "research-dvb-pes-parser-boundary-v1--repeat-pts",
+      "file": "dvb/research/dvb-pes-parser-boundary-v1--repeat-pts.ts",
+      "sha256": "30e0cb49f16b90dc54aceecc1ff99456f9d7ff83ebfd75b73e798e71d1bffbb7",
+      "rights": "authored-synthetic",
+      "source": ".research/dvb-pes-parser-boundary-v1/authored/repeat-pts.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 48,
+        "digest": 9575438342713166504
+      }
+    },
+    {
+      "id": "research-mkv-bitmap-dvb-v1--carrier",
+      "profile": "research-mkv-bitmap-dvb-v1--carrier",
+      "file": "dvb/research/mkv-bitmap-dvb-v1--carrier.mkv",
+      "sha256": "50d22150a7fcf0bc274e057ec22e978900b1a57b914eed7a9fc2ee8ef5fa05da",
+      "rights": "authored-synthetic",
+      "source": ".research/mkv-bitmap-dvb-v1/carrier.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 96,
+        "digest": 17363903475940452809
+      }
+    },
+    {
+      "id": "research-mkv-bitmap-dvb-v1--valid-video-carrier",
+      "profile": "research-mkv-bitmap-dvb-v1--valid-video-carrier",
+      "file": "dvb/research/mkv-bitmap-dvb-v1--valid-video-carrier.mkv",
+      "sha256": "0824fe96a98e1c771086610eae24a01a6a515f0b067d785e8c3b1b7e4fa8260e",
+      "rights": "authored-synthetic",
+      "source": ".research/mkv-bitmap-dvb-v1/valid-video-carrier.mkv",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 96,
+        "digest": 17363903475940452809
+      }
+    },
+    {
+      "id": "fate-dvbsubtest_filter",
+      "profile": "fate-dvbsubtest_filter",
+      "file": "fate/sub/dvbsubtest_filter.ts",
+      "sha256": "93ad6d0be649bb29697275ff522a983d475a1e58ab070271f912b86799e04a86",
+      "rights": "fetched-not-redistributed",
+      "source": "fate-suite/sub/dvbsubtest_filter.ts",
+      "arguments": [
+        "dvb"
+      ],
+      "expected": {
+        "packets": 46,
+        "bytes": 1714944,
+        "digest": 5167161527884782263
+      }
+    }
+  ]
+}

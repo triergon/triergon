@@ -17,10 +17,10 @@ mod fetch;
 mod fonts;
 mod framing_bench;
 mod fuzz;
+mod generators;
 mod harness;
 mod isobmff_bench;
 mod json;
-mod lanes;
 mod numpy;
 mod playback_golds;
 mod prepare;
@@ -33,6 +33,7 @@ mod sha256;
 mod shape;
 mod stats;
 mod toml;
+mod transport_fixtures;
 mod walk;
 mod worker_tests;
 mod zlib;
@@ -45,19 +46,22 @@ const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
-  check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
+  check-simd     clippy and tests of the opt-in HEVC SIMD path on the pinned nightly
   prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz, FriBidi and
                  libass references, the fixtures, the required vectors, the font corpus and
                  the workers (built with the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
+  check-revisions
+                 every commit docs/status.md cites is reachable from HEAD (needs the
+                 full history)
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
-                 matroska (default), formats, video (git revision on the 9.0 branch);
+                 matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
@@ -65,7 +69,7 @@ commands:
                  [--baseline-worker W]
                  qualify the mandatory external metadata vector through the same gates
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
-  trace-identities --output F [--compare F] [--candidate W]
+  trace-identities --output F [--compare F] [--candidate W] [--corpus FEATURE=DIR]...
                  record the digest of every candidate trace over all recorded cases: the
                  Matroska cases for media-worker, every case of each feature that runs W
                  through a worker operation prefix otherwise
@@ -118,13 +122,15 @@ commands:
                  under REPORTS/<contract>, against the quick-check tolerances
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
-  codecs         manifest|grade|summarize|time|equivalence   codec crates against the
+  codecs         aac-access-units|manifest|grade|summarize|time|equivalence
+                 codec crates against the
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
-  fonts          prepare|fetch|manifest|compare   the pinned FreeType reference, the font
-                 corpus and the font features' manifests; compare reports the required
-                 font features, --all every one (see `cargo xtask fonts --help`)
+  fonts          prepare|fetch|manifest|compare|assemble|probe   the pinned FreeType
+                 reference, the font corpus and the font features' manifests; compare
+                 reports the required font features, --all every one; probe compares
+                 assembled TrueType probe faces (see `cargo xtask fonts --help`)
   shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
                  HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
   raster         prepare|manifest|compare   triergon-raster against the pinned libass
@@ -138,8 +144,8 @@ fn main() -> ExitCode {
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
-    if let Some(lane) = args.first().and_then(|command| lanes::lane_named(command)) {
-        return lane_main(&root, lane, &args[1..]);
+    if let Some(generator) = args.first().and_then(|command| generators::named(command)) {
+        return generator_main(&root, generator, &args[1..]);
     }
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
@@ -157,6 +163,7 @@ fn main() -> ExitCode {
         Some("check-links") => check_links(&root),
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
+        Some("check-revisions") => check_revisions(&root),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
@@ -230,10 +237,8 @@ fn main() -> ExitCode {
             }
             _ => Err(USAGE.to_owned()),
         },
-        Some("fetch-vectors") => {
-            fetch::required_vectors(&root, &fetch::Network, fetch::VECTOR_LIMIT)
-                .map(|verified| println!("Verified required vectors: {}", verified.join(", ")))
-        }
+        Some("fetch-vectors") => fetch::vectors(&root, &fetch::Network, fetch::VECTOR_LIMIT)
+            .map(|verified| println!("Verified required vectors: {}", verified.join(", "))),
         Some("-h" | "--help" | "help") => {
             println!("{USAGE}");
             Ok(())
@@ -354,6 +359,12 @@ fn check_design(root: &Path) -> Task {
     Ok(())
 }
 
+fn check_revisions(root: &Path) -> Task {
+    let summary = checks::revisions(root).map_err(|errors| errors.join("\n"))?;
+    println!("{summary}");
+    Ok(())
+}
+
 fn check_safety(root: &Path) -> Task {
     println!("{}", checks::safety(root)?);
     Ok(())
@@ -467,16 +478,28 @@ fn fate_run(root: &Path, args: &[String]) -> ExitCode {
 }
 
 fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
-    let (mut output, mut compare, mut candidate) =
-        (None, None, root.join("target/release/media-worker"));
+    let (mut output, mut compare, mut candidate) = (None, None, None);
+    let mut corpora = std::collections::BTreeMap::new();
     let mut rest = args.iter();
     let parsed = (|| -> Task {
         while let Some(flag) = rest.next() {
-            let value = PathBuf::from(rest.next().ok_or_else(|| format!("{flag} needs a value"))?);
+            let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
             match flag.as_str() {
-                "--output" => output = Some(value),
-                "--compare" => compare = Some(value),
-                "--candidate" => candidate = value,
+                "--output" => output = Some(PathBuf::from(value)),
+                "--compare" => compare = Some(PathBuf::from(value)),
+                "--candidate" => candidate = Some(PathBuf::from(value)),
+                "--corpus" => {
+                    let (feature, directory) = value
+                        .split_once('=')
+                        .filter(|(feature, directory)| !feature.is_empty() && !directory.is_empty())
+                        .ok_or("--corpus needs FEATURE=DIR")?;
+                    if corpora
+                        .insert(feature.to_owned(), root.join(directory))
+                        .is_some()
+                    {
+                        return Err(format!("corpus specified twice for {feature}"));
+                    }
+                }
                 _ => return Err(USAGE.to_owned()),
             }
         }
@@ -484,7 +507,13 @@ fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
     })();
     exit(parsed.and_then(|()| {
         let output = output.ok_or("--output is required")?;
-        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref())
+        let candidate = match candidate {
+            Some(candidate) => candidate,
+            None => root
+                .join(harness::gate_build::release_dir()?)
+                .join("media-worker"),
+        };
+        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref(), &corpora)
     }))
 }
 
@@ -734,6 +763,8 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
 const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --output FILE
 
 families and options:
+  transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
+           regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
   header   [--scope N] [--lace] [--aac]
   colour   --mastering-width 4|8 --values V0,...,V9   (empty Colour with one MasteringMetadata)";
@@ -741,6 +772,9 @@ families and options:
 /// One corpus variant, for harness tests that need cases beyond the manifests.
 fn fixture(root: &Path, args: &[String]) -> Task {
     let family = args.first().map(String::as_str).ok_or(FIXTURE_USAGE)?;
+    if family == "transport-access-units" {
+        return transport_fixtures::main(root, &args[1..]);
+    }
     let mut options = std::collections::BTreeMap::new();
     let mut rest = args[1..].iter();
     while let Some(flag) = rest.next() {
@@ -827,6 +861,23 @@ fn cargo(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
         .current_dir(root))
 }
 
+/// `cargo SUBCOMMAND ARGS` compiled for the worker target, for the steps that build or
+/// test what the workers run. The target follows the subcommand, ahead of any `--`.
+fn cargo_for_workers(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {
+    let target = harness::gate_build::target_args()?;
+    cargo(root, toolchain, &with_target(args, &target))
+}
+
+fn with_target<'a>(args: &[&'a str], target: &'a [String]) -> Vec<&'a str> {
+    let (subcommand, rest) = args.split_at(args.len().min(1));
+    subcommand
+        .iter()
+        .copied()
+        .chain(target.iter().map(String::as_str))
+        .chain(rest.iter().copied())
+        .collect()
+}
+
 /// Run with the pinned FFmpeg reference first on `PATH`, as the harness expects.
 fn run(command: &mut Command) -> Task {
     let reference = root().join(".research/reference/install/bin");
@@ -848,7 +899,7 @@ fn run(command: &mut Command) -> Task {
     }
 }
 
-/// The nightly toolchain of the opt-in HEVC `std::simd` lane, pinned so that lints
+/// The nightly toolchain of the opt-in HEVC `std::simd` path, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
 const NIGHTLY: &str = "nightly-2026-10-17";
 
@@ -859,6 +910,7 @@ fn prepare_check() -> Task {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     for step in [
         &["prepare-ffmpeg"][..],
+        &["prepare-ffmpeg", "--profile", "formats"],
         &["fixtures"],
         &["fetch-vectors"],
         &["fonts", "prepare"],
@@ -872,18 +924,20 @@ fn prepare_check() -> Task {
     Ok(())
 }
 
-/// The opt-in nightly `std::simd` lane of the HEVC decoder must decode exactly as
+/// The opt-in nightly `std::simd` path of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).
 fn check_simd(root: &Path) -> Task {
-    run(Command::new("rustup").args([
-        "toolchain",
-        "install",
-        NIGHTLY,
-        "--profile",
-        "minimal",
-        "--component",
-        "clippy",
-    ]))?;
+    run(Command::new("rustup")
+        .args([
+            "toolchain",
+            "install",
+            NIGHTLY,
+            "--profile",
+            "minimal",
+            "--component",
+            "clippy",
+        ])
+        .args(harness::gate_build::target_args()?))?;
     let toolchain = format!("+{NIGHTLY}");
     let features = "triergon-codec-hevc/simd,codec-worker/simd";
     cargo(
@@ -904,7 +958,7 @@ fn check_simd(root: &Path) -> Task {
             "warnings",
         ],
     )?;
-    cargo(
+    cargo_for_workers(
         root,
         Some(&toolchain),
         &[
@@ -928,20 +982,20 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-subtitles",
 ];
 
-/// `cargo xtask COMMAND ARGS` for a lane: `compare` runs the reports of the
-/// features it selects, anything else is the lane's own subcommand.
-fn lane_main(root: &Path, lane: &lanes::Lane, args: &[String]) -> ExitCode {
+/// `cargo xtask COMMAND ARGS` for a generator: `compare` runs the reports of the
+/// features it selects, anything else is the generator's own subcommand.
+fn generator_main(root: &Path, generator: &generators::Generator, args: &[String]) -> ExitCode {
     let result = match args {
         [command, rest @ ..] if command == "compare" => {
-            match lane
+            match generator
                 .reports(root, rest)
-                .and_then(|reports| (lane.write_inputs)(root).map(|()| reports))
+                .and_then(|reports| (generator.write_inputs)(root).map(|()| reports))
             {
-                Ok(reports) => return lane_compare(root, &reports),
+                Ok(reports) => return run_reports(root, &reports),
                 Err(error) => Err(error),
             }
         }
-        _ => (lane.main)(root, args),
+        _ => (generator.main)(root, args),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -954,7 +1008,7 @@ fn lane_main(root: &Path, lane: &lanes::Lane, args: &[String]) -> ExitCode {
 
 /// The reports `COMMAND compare` stands for; exits with the first failing one's
 /// code.
-fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
+fn run_reports(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     let mut result = ExitCode::SUCCESS;
     for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
@@ -966,15 +1020,76 @@ fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     result
 }
 
-/// A lane's generated inputs, `COMMAND compare` on its required features, then
-/// one round of mutations of each feature's smoke cases.
-fn lane_check(root: &Path, lane: &lanes::Lane) -> Task {
-    (lane.write_inputs)(root)?;
-    let reports = lane.reports(root, &[])?;
-    if lane_compare(root, &reports) != ExitCode::SUCCESS {
-        return Err(format!("cargo xtask {} compare failed", lane.command));
+/// Prepare generated inputs and run the contracts required by the workspace check.
+fn check_features(root: &Path) -> Task {
+    let contracts = harness::features::required(root)?;
+    if contracts.is_empty() {
+        return Err("no required feature contracts".into());
     }
-    smoke_campaigns(root, lane.smoke.iter().copied())
+    for generator in generators::GENERATORS {
+        if contracts.iter().any(|contract| {
+            contract.generated() && contract.candidate() == Some(generator.candidate)
+        }) {
+            (generator.write_inputs)(root)?;
+        }
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_nanos();
+    let output = root
+        .join(".research/feature-reports")
+        .join(format!("check-{}-{stamp}", std::process::id()));
+    harness::report::create_output(&output)?;
+    let reports = contracts
+        .iter()
+        .map(|contract| {
+            let manifest = contract.manifest();
+            let (document, _) = harness::manifest::read(root, &manifest)?;
+            harness::manifest::validate_required(&contract.document, &document)
+                .map_err(|error| format!("{}: {error}", contract.id))?;
+            Ok(vec![
+                "--contract".to_owned(),
+                contract.path.display().to_string(),
+                "--manifest".to_owned(),
+                manifest.display().to_string(),
+                "--output".to_owned(),
+                output.join(&contract.id).display().to_string(),
+            ])
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    if run_reports(root, &reports) != ExitCode::SUCCESS {
+        return Err(format!(
+            "required feature comparison failed; reports in {}",
+            output.display()
+        ));
+    }
+    let passed = contracts.iter().all(|contract| {
+        checks::read_json(&output.join(&contract.id).join("report.json"))
+            .ok()
+            .and_then(|report| {
+                report
+                    .get("cases")
+                    .and_then(json::Value::as_array)
+                    .map(|cases| {
+                        !cases.is_empty() && cases.iter().all(harness::acceptance::parity_passes)
+                    })
+            })
+            == Some(true)
+    });
+    if passed {
+        std::fs::remove_dir_all(&output)
+            .map_err(|error| format!("{}: {error}", output.display()))?;
+    } else {
+        println!(
+            "Feature reports with unresolved parity in {}",
+            output.display()
+        );
+    }
+    for generator in generators::GENERATORS {
+        smoke_campaigns(root, generator.smoke.iter().copied())?;
+    }
+    Ok(())
 }
 
 /// One fuzz round over the given cases of each feature through the release and
@@ -1011,9 +1126,9 @@ fn smoke_campaigns<'a>(
 
 fn check(root: &Path) -> Task {
     cargo(root, None, &["fmt", "--all", "--check"])?;
-    cargo(root, None, &["test", "--workspace", "--locked"])?;
+    cargo_for_workers(root, None, &["test", "--workspace", "--locked"])?;
     for package in REFERENCE_TRACE_CRATES {
-        cargo(
+        cargo_for_workers(
             root,
             None,
             &[
@@ -1049,10 +1164,19 @@ fn check(root: &Path) -> Task {
         .env("CARGO_INCREMENTAL", "0")
         .env("RUSTDOCFLAGS", "-D warnings")
         .current_dir(root))?;
-    cargo(
+    // Workspace feature unification can change the prepared worker binaries.
+    // Keep this build separate from the workers checked against their identities.
+    cargo_for_workers(
         root,
         None,
-        &["build", "--workspace", "--release", "--locked"],
+        &[
+            "build",
+            "--workspace",
+            "--release",
+            "--locked",
+            "--target-dir",
+            "target/check-release",
+        ],
     )?;
     for package in REFERENCE_TRACE_CRATES {
         cargo(
@@ -1088,26 +1212,48 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    lane_check(root, &fonts::LANE)?;
-    // The Unicode tables are what their generator writes.
+    // The Unicode and glyph-name tables are what their generators write.
     println!("$ cargo xtask shape ucd --check");
     shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
-    lane_check(root, &shape::LANE)?;
-    lane_check(root, &raster::LANE)?;
-    lane_check(root, &ass::LANE)?;
+    println!("$ cargo xtask fonts tables --check");
+    fonts::main(root, &["tables".to_owned(), "--check".to_owned()])?;
+    check_features(root)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;
-    run(Command::new("python3")
-        .arg("tools/test-core-time.py")
-        .current_dir(root))
+    check_revisions(root)?;
+    let mut core_time = Command::new("python3");
+    core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
+    let target = harness::gate_build::worker_target()?;
+    if target != harness::gate_build::host()? {
+        core_time.args(["--target", target]);
+    }
+    run(core_time.current_dir(root))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::shell_library_path;
+    use super::{shell_library_path, with_target};
     use std::ffi::OsStr;
     use std::path::Path;
+
+    #[test]
+    fn the_worker_target_follows_the_subcommand() {
+        let target = ["--target".to_owned(), "t".to_owned()];
+        assert_eq!(
+            with_target(&["clippy", "--workspace", "--", "-D", "warnings"], &target),
+            [
+                "clippy",
+                "--target",
+                "t",
+                "--workspace",
+                "--",
+                "-D",
+                "warnings"
+            ]
+        );
+        assert_eq!(with_target(&["test"], &[]), ["test"]);
+    }
 
     #[test]
     fn cargo_library_entries_are_dropped_and_others_kept() {

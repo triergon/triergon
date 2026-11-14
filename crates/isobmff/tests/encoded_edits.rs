@@ -2,7 +2,8 @@ mod common;
 use common::{child, children, roots, table};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
-    Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
+    Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Time, TimeBase,
+    WorkBudget,
 };
 use triergon_isobmff::{
     BuildStatus, ConfigurationLimits, EditList, Limits, MovieHeader, SampleTable, TrackHeader,
@@ -18,7 +19,7 @@ use triergon_isobmff::{
             EncodedStreamJob, EncodedStreamProfile,
         },
         packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
-        seek::{GlobalSeekJob, IndexCursor, IndexLimits},
+        seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
 };
 const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
@@ -279,6 +280,222 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 }
 
 #[test]
+fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
+    let seed = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov");
+    let mut raw = seed.to_vec();
+    replace_atom_word(&mut raw, b"stss", 12, 1, 2);
+
+    let source = Source::new(&raw, b"vide");
+    let plan = range_plan(&source, *b"qt  ").unwrap();
+    let packets = rows(&source, plan.clone());
+    assert_eq!(packets.len(), 6);
+    let (first, skip) = &packets[0];
+    assert_eq!(first.source.ordinal, 1);
+    assert_eq!(first.demux.flags, 0);
+    assert_eq!((first.demux.pts, first.demux.dts), (Some(0), Some(-1024)));
+    assert_eq!(*skip, None);
+    assert_eq!(packets[1].0.demux.flags, 1);
+
+    let tracks = [source.track()];
+    let plans = [Some(plan)];
+    let seek = |timestamp| {
+        GlobalSeekJob::new_encoded_regular_rescaled(
+            &source.pool,
+            &tracks,
+            &source.media,
+            (tracks[0].track_id, timestamp),
+            SeekLimits::default(),
+            &plans,
+        )
+        .unwrap()
+    };
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        seek(-513).poll(&mut WorkBudget::new(4096), &cancel),
+        Err(Error::Unsupported("native seek no observed key fallback"))
+    ));
+    let mut at_sync = seek(-512);
+    assert_eq!(
+        at_sync.poll(&mut WorkBudget::new(4096), &cancel).unwrap(),
+        BuildStatus::Ready
+    );
+    let seek = at_sync.finish().unwrap();
+    let landing = &seek.landing().selected.occurrence;
+    assert_eq!(landing.source.ordinal, 2);
+    assert_eq!(landing.demux.flags, 1);
+
+    let mut cursor = PacketCursor::new_encoded_regular(
+        &source.pool,
+        &tracks,
+        &source.media,
+        PacketLimits::default(),
+        &plans,
+        EncodedEditProfile,
+    )
+    .unwrap();
+    cursor.enable_range_seek_checkpoints();
+    let mut work = WorkBudget::new(4096);
+    for _ in 0..packets.len() {
+        assert_eq!(
+            cursor.poll(&mut work, &cancel).unwrap(),
+            CursorStatus::Ready
+        );
+        cursor.take_occurrence().unwrap();
+    }
+    assert_eq!(cursor.poll(&mut work, &cancel).unwrap(), CursorStatus::End);
+    cursor.rewind_at_end().unwrap();
+
+    let mut before_sync = cursor
+        .prepare_checked_range_seek(tracks[0].track_id, -513, SeekLimits::default())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        before_sync.poll(&mut work, &cancel),
+        Err(Error::Unsupported("native seek no observed key fallback"))
+    ));
+    let mut at_sync = cursor
+        .prepare_checked_range_seek(tracks[0].track_id, -512, SeekLimits::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        at_sync.poll(&mut work, &cancel).unwrap(),
+        BuildStatus::Ready
+    );
+    let (_, checked_landing) = at_sync.finish().unwrap();
+    let checked = &checked_landing.selected.occurrence;
+    assert_eq!(checked.source.ordinal, landing.source.ordinal);
+    assert_eq!(checked.source.range, landing.source.range);
+    assert_eq!(checked.demux.dts, landing.demux.dts);
+    assert_eq!(checked.demux.flags, landing.demux.flags);
+
+    let primary = Source::in_pool(seed, b"vide", source.pool.clone());
+    let mut secondary = source.track();
+    secondary.track_id = primary.header.track_id + 1;
+    let tracks = [primary.track(), secondary];
+    let plans = [
+        Some(range_plan(&primary, *b"qt  ").unwrap()),
+        plans[0].clone(),
+    ];
+    let mut seek = GlobalSeekJob::new_encoded_regular_rescaled(
+        &source.pool,
+        &tracks,
+        &source.media,
+        (tracks[0].track_id, -1024),
+        SeekLimits::default(),
+        &plans,
+    )
+    .unwrap();
+    assert_eq!(
+        seek.poll(&mut WorkBudget::new(4096), &cancel).unwrap(),
+        BuildStatus::Ready
+    );
+    let seek = seek.finish().unwrap();
+    assert_eq!(seek.anchors()[1].track_id, secondary.track_id);
+    assert_eq!(seek.anchors()[1].occurrence, 0);
+
+    let mut reordered = raw.clone();
+    replace_atom_word(&mut reordered, b"ctts", 24, 1536, 511);
+    let reordered = Source::new(&reordered, b"vide");
+    assert!(matches!(
+        range_plan(&reordered, *b"qt  "),
+        Err(Error::Unsupported("encoded edit initial source/key origin"))
+    ));
+
+    replace_atom_word(&mut raw, b"elst", 16, 1024, 1025);
+    let cropped = Source::new(&raw, b"vide");
+    assert!(matches!(
+        range_plan(&cropped, *b"qt  "),
+        Err(Error::Unsupported("encoded edit initial source/key origin"))
+    ));
+}
+
+#[test]
+fn range_playback_keeps_only_established_reordered_video_tails() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov").to_vec();
+    replace_atom_word(&mut raw, b"mvhd", 16, 1000, 12800);
+    replace_atom_word(&mut raw, b"elst", 12, 240, 3072);
+    replace_atom_word(&mut raw, b"elst", 16, 1024, 0);
+    replace_atom_word(&mut raw, b"ctts", 16, 1024, 0);
+    let source = Source::new(&raw, b"vide");
+    let packets = rows(&source, range_plan(&source, *b"qt  ").unwrap());
+    assert_eq!(packets.len(), 6);
+    assert!(
+        packets[4..]
+            .iter()
+            .all(|(packet, _)| packet.demux.flags == 4)
+    );
+
+    replace_atom_word(&mut raw, b"stss", 16, 4, 5);
+    let tail_sync = Source::new(&raw, b"vide");
+    assert!(matches!(
+        range_plan(&tail_sync, *b"qt  "),
+        Err(Error::Unsupported(
+            "encoded video tail selection not established"
+        ))
+    ));
+}
+
+fn replace_atom_word(raw: &mut [u8], kind: &[u8; 4], offset: usize, from: u32, to: u32) {
+    let start = raw.windows(4).position(|bytes| bytes == kind).unwrap() + offset;
+    let word = &mut raw[start..start + 4];
+    assert_eq!(word, from.to_be_bytes());
+    word.copy_from_slice(&to.to_be_bytes());
+}
+
+#[test]
+fn range_playback_uses_the_coded_frame_clock_for_aac_programs() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/aac-program-edit.mov");
+    let source = Source::new(raw, b"soun");
+    let mut input = source.input();
+    let configs = [range_config(
+        &source,
+        *b"qt  ",
+        &mut input,
+        ConfigurationLimits::default(),
+    )
+    .unwrap()];
+    let context = || EncodedEditContext {
+        table: &source.table,
+        edits: &source.edits,
+        stream: &configs[0],
+        media_base: source.header.time_base().unwrap(),
+        movie_base: source.movie_base,
+    };
+    let pressure = source.pool.reserve(source.pool.available()).unwrap();
+    assert!(matches!(
+        EncodedEditJob::new_range_playback(
+            context(),
+            &configs,
+            &input,
+            EncodedEditLimits::default()
+        ),
+        Err(Error::Backpressure { .. })
+    ));
+    drop(pressure);
+    let mut job = EncodedEditJob::new_range_playback(
+        context(),
+        &configs,
+        &input,
+        EncodedEditLimits::default(),
+    )
+    .unwrap();
+    let plan = complete(&mut job, &mut input, 1).unwrap();
+    let packets = rows(&source, plan);
+    let ranges = [36, 173, 395, 531, 712, 854, 974, 1156, 1332, 1468];
+    assert_eq!(packets.len(), ranges.len() - 1);
+    for (index, ((packet, skip), range)) in packets.into_iter().zip(ranges.windows(2)).enumerate() {
+        let stamp = (index as i64 - 1) * 1024;
+        assert_eq!(packet.source.range, range[0]..range[1]);
+        assert_eq!(
+            (packet.demux.pts, packet.demux.dts),
+            (Some(stamp), Some(stamp))
+        );
+        assert_eq!(packet.demux.duration, 1024);
+        assert_eq!(skip, (index == 0).then_some([0, 4, 0, 0, 0, 0, 0, 0, 0, 0]));
+    }
+}
+
+#[test]
 fn range_playback_preserves_long_aac_sample_durations_and_coded_trim() {
     let original = Source::new(ORIGINAL, b"soun");
     let stts = child(original.table.raw(), b"stts").unwrap();
@@ -430,6 +647,293 @@ fn dts_fixture(
         raw[at..at + 4].copy_from_slice(&word.to_be_bytes());
     }
     raw
+}
+
+const OPUS_DURATIONS: [u32; 6] = [960, 480, 1920, 480, 960, 240];
+
+fn opus_fixture(config: &[u8], edit_start: i32, edit_duration: u32) -> Vec<u8> {
+    let mut raw = dts_fixture(
+        b"Opus",
+        0,
+        &atom(b"dOps", config),
+        48_000,
+        960,
+        240,
+        &[(edit_duration, edit_start)],
+    );
+    let entry = fixture_payload(&raw, b"Opus");
+    raw[entry + 16..entry + 20].copy_from_slice(&[0, 2, 0, 16]);
+    raw[entry + 24..entry + 28].copy_from_slice(&(48_000u32 << 16).to_be_bytes());
+    let mut stts = vec![0, 0, 0, 0, 0, 0, 0, 6];
+    for duration in OPUS_DURATIONS {
+        stts.extend_from_slice(&1u32.to_be_bytes());
+        stts.extend_from_slice(&duration.to_be_bytes());
+    }
+    replace_fixture_body(
+        &mut raw,
+        b"stts",
+        &[b"stbl", b"minf", b"mdia", b"trak", b"moov"],
+        &stts,
+    );
+    let duration = fixture_payload(&raw, b"mdhd") + 16;
+    raw[duration..duration + 4].copy_from_slice(&OPUS_DURATIONS.iter().sum::<u32>().to_be_bytes());
+    raw
+}
+
+#[test]
+fn range_playback_uses_the_opus_edit_and_keeps_variable_packet_durations() {
+    let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
+    let raw = opus_fixture(&dops, 720, 4320);
+    let source = Source::new(&raw, b"soun");
+    let config = range_config(
+        &source,
+        *b"isom",
+        &mut source.input(),
+        ConfigurationLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(config.kind(), EncodedEntryKind::Opus);
+    assert_eq!(config.configuration_box().payload(), dops);
+    assert_eq!(
+        config.demux().extradata.as_ref(),
+        b"OpusHead\x01\x02\x38\x01\x80\xbb\x00\x00\x00\x00\x00"
+    );
+    let plan = range_plan(&source, *b"isom").unwrap();
+    assert_eq!(plan.anchor_ticks(), 720);
+    assert_eq!(plan.selected_end_ticks(), 5040);
+    let packets = rows(&source, plan);
+    assert_eq!(packets.len(), OPUS_DURATIONS.len());
+    for (i, ((packet, skip), (duration, pts))) in packets
+        .iter()
+        .zip(
+            OPUS_DURATIONS
+                .into_iter()
+                .zip([-720, 240, 720, 2640, 3120, 4080]),
+        )
+        .enumerate()
+    {
+        assert_eq!(packet.demux.pts, Some(pts));
+        assert_eq!(packet.demux.dts, Some(pts));
+        assert_eq!(packet.demux.duration, i64::from(duration));
+        assert_eq!(packet.demux.flags, 1);
+        assert_eq!(*skip, (i == 0).then_some([208, 2, 0, 0, 0, 0, 0, 0, 0, 0]));
+    }
+}
+
+#[test]
+fn range_playback_keeps_opus_preroll_and_stops_at_the_edit_end() {
+    let dops = [0, 2, 1, 56, 0, 0, 187, 128, 0, 0, 0];
+    let raw = opus_fixture(&dops, 1440, 2300);
+    let source = Source::new(&raw, b"soun");
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    assert_eq!(
+        packets
+            .iter()
+            .map(|(packet, _)| (packet.demux.pts, packet.demux.flags))
+            .collect::<Vec<_>>(),
+        [
+            (Some(-1440), 5),
+            (Some(-480), 5),
+            (Some(0), 1),
+            (Some(1920), 1)
+        ]
+    );
+    assert_eq!(packets[0].1, Some([160, 5, 0, 0, 0, 0, 0, 0, 0, 0]));
+    assert_eq!(packets[3].1, Some([0, 0, 0, 0, 100, 0, 0, 0, 0, 0]));
+    let after_end = opus_fixture(&dops, 5040, 100);
+    assert_eq!(
+        range_plan(&Source::new(&after_end, b"soun"), *b"isom").unwrap_err(),
+        Error::Invalid("Opus edit starts after the last sample")
+    );
+}
+
+#[test]
+fn cropped_opus_keeps_source_and_edit_ordinals_distinct() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4").to_vec();
+    for (at, value) in [
+        (1508, 2050_u32),
+        (1512, 52_800),
+        (1552, 154_896),
+        (1780, 20),
+        (1788, 140),
+    ] {
+        raw[at..at + 4].copy_from_slice(&value.to_be_bytes());
+    }
+    let source = Source::new(&raw, b"soun");
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    let (first, _) = &packets[0];
+    assert_eq!((first.source.ordinal, first.edit.unwrap().sequence), (5, 1));
+    let (retained, _) = &packets[16];
+    assert_eq!(
+        (retained.source.ordinal, retained.edit.unwrap().sequence),
+        (21, 17)
+    );
+    assert_eq!(retained.source.duration_ticks, 960);
+    assert_eq!(retained.demux.duration, 1008);
+}
+
+#[test]
+fn opus_global_seek_aligns_audio_without_the_range_checkpoints() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4");
+    let video = Source::new(raw, b"vide");
+    let audio = Source::in_pool(raw, b"soun", video.pool.clone());
+    let plans = [
+        Some(range_plan(&video, *b"isom").unwrap()),
+        Some(range_plan(&audio, *b"isom").unwrap()),
+    ];
+    let recovery = plans[1]
+        .as_ref()
+        .unwrap()
+        .recovery_observation()
+        .unwrap()
+        .source_result()
+        .unwrap()
+        .source_scope(triergon_isobmff::RecoveryKind::Roll);
+    assert!(recovery.track_descriptions.is_some());
+    assert!(recovery.mappings.is_some());
+    let tracks = [video.track(), audio.track()];
+    let cancel = AtomicBool::new(false);
+    let mut seek = GlobalSeekJob::new_encoded_regular_rescaled(
+        &video.pool,
+        &tracks,
+        &video.media,
+        (video.header.track_id, 32000),
+        SeekLimits::default(),
+        &plans,
+    )
+    .unwrap();
+    while seek.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+    let seek = seek.finish().unwrap();
+    assert_eq!(seek.landing().selected.timestamp, 32000);
+    let mut cursor = seek.cursor().unwrap();
+    while cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Yield {}
+    let first = cursor.take_occurrence().unwrap();
+    assert_eq!(first.track_id, audio.header.track_id);
+    assert_eq!(first.demux.pts, Some(94752));
+    assert_eq!(first.source.range.start, 42991);
+}
+
+#[test]
+fn opus_decoder_recovery_agrees_with_and_without_range_checkpoints() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4");
+    let video = Source::new(raw, b"vide");
+    let audio = Source::in_pool(raw, b"soun", video.pool.clone());
+    let plans = [
+        Some(range_plan(&video, *b"isom").unwrap()),
+        Some(range_plan(&audio, *b"isom").unwrap()),
+    ];
+    let tracks = [video.track(), audio.track()];
+    let cancel = AtomicBool::new(false);
+    let mut cursor = PacketCursor::new_encoded_regular(
+        &video.pool,
+        &tracks,
+        &video.media,
+        PacketLimits::default(),
+        &plans,
+        EncodedEditProfile,
+    )
+    .unwrap();
+    cursor.enable_range_seek_checkpoints();
+    loop {
+        match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+            CursorStatus::Yield => {}
+            CursorStatus::Ready => {
+                cursor.take_occurrence().unwrap();
+            }
+            CursorStatus::End => break,
+        }
+    }
+    cursor.rewind_at_end().unwrap();
+    let video_id = video.header.track_id;
+    let audio_id = audio.header.track_id;
+    for (timestamp, sync, start, lead, first_pts) in [
+        (0, 1, 1, Time::new(0, 1).unwrap(), -336),
+        (32000, 101, 97, Time::new(2, 25).unwrap(), 91872),
+    ] {
+        let mut checked = cursor
+            .prepare_checked_range_seek(video_id, timestamp, SeekLimits::default())
+            .unwrap()
+            .unwrap()
+            .with_opus_recovery(audio_id)
+            .unwrap();
+        assert_eq!(
+            checked.poll(&mut WorkBudget::new(0), &cancel),
+            Ok(BuildStatus::Yield)
+        );
+        while checked.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+        let (sparse, landing) = checked.finish().unwrap();
+
+        let mut global = GlobalSeekJob::new_encoded_regular_rescaled(
+            &video.pool,
+            &tracks,
+            &video.media,
+            (video_id, timestamp),
+            SeekLimits::default(),
+            &plans,
+        )
+        .unwrap()
+        .with_opus_recovery(audio_id)
+        .unwrap();
+        while global.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+        let global = global.finish().unwrap();
+        assert_eq!(landing.selected.timestamp, timestamp);
+        assert_eq!(
+            global.landing().selected.position,
+            landing.selected.position
+        );
+        assert_eq!(global.landing().opus_recovery, landing.opus_recovery);
+        let recovery = landing.opus_recovery.unwrap();
+        assert_eq!(
+            (
+                recovery.track_id,
+                recovery.sync_sample,
+                recovery.first_sample,
+                recovery.preroll
+            ),
+            (audio_id, sync, start, lead)
+        );
+        for mut packets in [sparse, global.cursor().unwrap()] {
+            while packets.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Yield {}
+            let first = packets.take_occurrence().unwrap();
+            assert_eq!(
+                (first.track_id, first.source.ordinal, first.demux.pts),
+                (audio_id, start, Some(first_pts))
+            );
+        }
+    }
+}
+
+#[test]
+fn opus_recovery_refuses_a_roll_that_does_not_cover_decoder_warmup() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/avc-opus-edit.mp4").to_vec();
+    let distance = fixture_payload(&raw, b"sgpd") + 16;
+    assert_eq!(&raw[distance..distance + 2], &(-4i16).to_be_bytes());
+    raw[distance..distance + 2].copy_from_slice(&(-3i16).to_be_bytes());
+    let video = Source::new(&raw, b"vide");
+    let audio = Source::in_pool(&raw, b"soun", video.pool.clone());
+    let plans = [
+        Some(range_plan(&video, *b"isom").unwrap()),
+        Some(range_plan(&audio, *b"isom").unwrap()),
+    ];
+    let mut global = GlobalSeekJob::new_encoded_regular_rescaled(
+        &video.pool,
+        &[video.track(), audio.track()],
+        &video.media,
+        (video.header.track_id, 32000),
+        SeekLimits::default(),
+        &plans,
+    )
+    .unwrap()
+    .with_opus_recovery(audio.header.track_id)
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    while let Ok(BuildStatus::Yield) = global.poll(&mut WorkBudget::new(1), &cancel) {}
+    assert_eq!(
+        global.poll(&mut WorkBudget::new(1), &cancel),
+        Err(Error::Unsupported(
+            "Opus roll provides less than 80 ms of preroll"
+        ))
+    );
 }
 
 #[test]
@@ -727,11 +1231,7 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
     cursor.rewind_at_end().unwrap();
     let request = (source.header.track_id, 1750);
     let mut checked = cursor
-        .prepare_checked_range_seek(
-            request.0,
-            request.1,
-            triergon_isobmff::compat::mov::seek::SeekLimits::default(),
-        )
+        .prepare_checked_range_seek(request.0, request.1, SeekLimits::default())
         .unwrap()
         .unwrap();
     while checked.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
@@ -752,7 +1252,7 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
         &tracks,
         &source.media,
         request,
-        triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+        SeekLimits::default(),
         &plans,
     )
     .unwrap();

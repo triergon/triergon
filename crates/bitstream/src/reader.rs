@@ -119,6 +119,14 @@ pub struct Reader<'a, W> {
 pub type BitReader<'a> = Reader<'a, Direct>;
 
 /// The reader for variable-length codes.
+///
+/// The DVB and DVD subtitle pixel decoders keep private readers: a 64-bit cache that
+/// each code shifts, refilled 32 bits at a time. On this reader their loops ran up to 11%
+/// (DVB) and 5% (DVD) more instructions (`instructions:u`, linux-arm64). A shared reader
+/// of the private shape cost 2.0 to 2.9% on their heaviest workloads at best. The
+/// two loops need different end-of-slice paths to keep their state in registers: an
+/// inline zero-filled copy for DVB (+1.0 to 1.5% shared, +11% for DVD), a cold in-place
+/// byte fill for DVD.
 pub type CachedBitReader<'a> = Reader<'a, Cached>;
 
 impl<'a, W: Window> Reader<'a, W> {

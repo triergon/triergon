@@ -241,12 +241,12 @@
     "authored-cff-features-otf": {
       "packets": 8,
       "bytes": 83,
-      "digest": 13306317305592165626
+      "digest": 13679340128310490922
     },
     "authored-cff-matrix-otf": {
       "packets": 2,
       "bytes": 4,
-      "digest": 7798923689045368348
+      "digest": 13946605403423604264
     },
     "authored-cmap-formats-ttf": {
       "packets": 4,
@@ -257,6 +257,16 @@
       "packets": 24,
       "bytes": 84,
       "digest": 16144614645674543551
+    },
+    "authored-vertical-ttc": {
+      "packets": 20,
+      "bytes": 72,
+      "digest": 12342570846314127857
+    },
+    "authored-charmaps-otf": {
+      "packets": 10,
+      "bytes": 36,
+      "digest": 143174272632481219
     }
   }
 }

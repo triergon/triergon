@@ -42,6 +42,7 @@ fn audio_suffixes(lane: &str) -> Option<&'static [&'static str]> {
         "ac3" => Some(&[".ac3"]),
         "eac3" => Some(&[".eac3"]),
         "aac" => Some(&[".adts"]),
+        "aac-mov" => Some(&[".mov", ".mp4", ".m4a"]),
         "dts" => Some(&[".core.dts"]),
         "flac" => Some(&[".flac"]),
         "mp3" => Some(&[".bit", ".mp3"]),
@@ -60,6 +61,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
         "ac3" => Some("ac3"),
         "eac3" => Some("eac3"),
         "aac" => Some("aac"),
+        "aac-mov" => Some("mov"),
         "dts" => Some("dts"),
         "flac" => Some("flac"),
         "mp3" | "mp2" | "mp1" => Some("mp3"),
@@ -74,6 +76,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
 /// defaults are fixed point with 16-bit output.
 fn reference_decoder(lane: &str) -> Option<&'static str> {
     Some(match lane {
+        "aac-mov" => "aac",
         "flac" => "flac",
         "mp3" => "mp3float",
         "mp2" => "mp2float",
@@ -92,7 +95,7 @@ fn example(lane: &str) -> Option<&'static str> {
         "aac" => "codec-aac-decode",
         "dts" => "codec-dca-decode",
         // File-format lanes decode through a container reader, as a player does.
-        "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
+        "aac-mov" | "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
         _ => return None,
     })
 }
@@ -512,7 +515,7 @@ fn f32_samples(bytes: &[u8]) -> Result<Vec<f32>, String> {
 type ChannelStats = (Vec<f64>, Vec<f64>);
 
 /// Per-channel RMS and max |candidate - reference| of interleaved f32 audio,
-/// reduced in numpy's order; `None` when the layouts cannot be compared.
+/// reduced in numpy's order. `None` indicates incompatible lengths or non-finite samples.
 pub fn channel_stats(
     candidate: &[u8],
     reference: &[u8],
@@ -521,6 +524,9 @@ pub fn channel_stats(
     let c = f32_samples(candidate)?;
     let r = f32_samples(reference)?;
     if channels <= 0 || c.len() != r.len() || c.len() % channels as usize != 0 {
+        return Ok(None);
+    }
+    if c.iter().chain(&r).any(|sample| !sample.is_finite()) {
         return Ok(None);
     }
     let channels = channels as usize;
@@ -585,10 +591,25 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
     if let Some(decoder) = reference_decoder(lane) {
         reference_argv.extend(["-c:a".to_owned(), decoder.to_owned()]);
     }
+    if lane == "aac-mov" {
+        // Compare the complete decoder packets from the neutral MOV view.
+        reference_argv.extend(
+            [
+                "-xerror",
+                "-flags2",
+                "+skip_manual",
+                "-ignore_editlist",
+                "1",
+            ]
+            .map(String::from),
+        );
+    }
+    reference_argv.extend(["-i", path].map(String::from));
+    if lane == "aac-mov" {
+        reference_argv.extend(["-map", "0:a:0"].map(String::from));
+    }
     reference_argv.extend(
         [
-            "-i",
-            path,
             "-f",
             "f32le",
             "-c:a",
@@ -691,9 +712,33 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
         (Some(v), Some(n)) => python::equals_int(v, n),
         _ => false,
     };
+    let ours_layout = info.get("layout").and_then(Value::as_str);
+    let reference_layout = stream
+        .as_ref()
+        .and_then(|s| s.get("channel_layout"))
+        .and_then(Value::as_str);
+    // Fixed AAC configurations 5 and 6 each have one surround pair in
+    // Table 1.19. FFmpeg labels those planes as back in MOV.
+    let surround_pair_labels = lane == "aac-mov"
+        && matches!(
+            (reference_layout, ours_layout),
+            (Some("5.0"), Some("5.0(side)")) | (Some("5.1"), Some("5.1(side)"))
+        );
+    if lane == "aac-mov" {
+        row.push((
+            "surround_pair_labels".into(),
+            Value::Bool(surround_pair_labels),
+        ));
+    }
     let exact = same(ours_channels, reference_channels)
         && same(ours_rate, reference_rate)
-        && candidate.len() == reference.len();
+        && candidate.len() == reference.len()
+        && (lane != "aac-mov"
+            || (ours_run.code == 0
+                && reference_run.code == 0
+                && info.get("errors").and_then(python::int) == Some(0)
+                && (surround_pair_labels
+                    || ours_layout.is_some() && ours_layout == reference_layout)));
     let stats = if exact {
         let channels = reference_channels.ok_or_else(|| {
             Stop::Fatal("'<=' not supported between instances of 'NoneType' and 'int'".into())
@@ -865,14 +910,37 @@ fn timeout_row(argv: Vec<String>) -> Value {
     ])
 }
 
+/// The vector names a manifest lists in `open_cases`: vectors that fail today and
+/// that `summarize` requires to keep failing. Every name must be a vector of it.
+fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>, String> {
+    let mut open = Vec::new();
+    for case in manifest
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let name = case.as_str().ok_or("an open case is a vector name")?;
+        if !vectors
+            .iter()
+            .any(|v| v.get("name").and_then(Value::as_str) == Some(name))
+        {
+            return Err(format!("open case {name}: not a vector of the manifest"));
+        }
+        open.push(name);
+    }
+    Ok(open)
+}
+
 /// Grade every manifest vector (or those `--only` selects), appending one JSON
-/// row per vector to `--out` and printing one line per vector.
+/// row per vector to `--out` and printing one line per vector. A row of a
+/// vector the manifest lists in `open_cases` carries `"open_case": true`.
 pub fn grade(a: &Grade) -> Result<(), String> {
     let manifest = crate::checks::read_json(&a.manifest)?;
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)
         .ok_or("manifest has no vectors")?;
+    let open = open_cases(&manifest, vectors)?;
     let only: Option<Vec<&str>> = a.only.as_deref().map(|o| o.split(',').collect());
     let mut out = fs::OpenOptions::new()
         .create(true)
@@ -905,6 +973,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 v.get("sha256").cloned().unwrap_or(Value::Null),
             ),
         ];
+        if open.contains(&name.as_str()) {
+            row.push(("open_case".into(), Value::Bool(true)));
+        }
         if Some(file_sha(Path::new(&path))?.as_str()) != v.get("sha256").and_then(Value::as_str) {
             row.push(("status".into(), Value::str("input-hash-mismatch")));
         } else {
@@ -922,16 +993,18 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                     Err(Stop::Fatal(message)) => return Err(message),
                 },
             ));
-            let output_dir = tmp.0.join("o");
-            fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
-            row.push((
-                "output".into(),
-                match output_path(a, &lane, &path, &output_dir) {
-                    Ok(value) => value,
-                    Err(Stop::Timeout(argv)) => timeout_row(argv),
-                    Err(Stop::Fatal(message)) => return Err(message),
-                },
-            ));
+            if lane != "aac-mov" {
+                let output_dir = tmp.0.join("o");
+                fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
+                row.push((
+                    "output".into(),
+                    match output_path(a, &lane, &path, &output_dir) {
+                        Ok(value) => value,
+                        Err(Stop::Timeout(argv)) => timeout_row(argv),
+                        Err(Stop::Fatal(message)) => return Err(message),
+                    },
+                ));
+            }
         }
         let row = Value::Object(row);
         writeln!(out, "{}", json::to_python(&row, None))
@@ -971,6 +1044,13 @@ mod tests {
         assert_eq!(abs, [1.0013580322265625e-05, 0.0004999999655410647]);
         assert_eq!(channel_stats(&c, &r, 4).unwrap(), None);
         assert!(channel_stats(&c[..5], &r[..5], 1).is_err());
+        let non_finite: Vec<u8> = [0.0_f32, f32::NAN]
+            .into_iter()
+            .flat_map(f32::to_le_bytes)
+            .collect();
+        let finite = [0_u8; 8];
+        assert_eq!(channel_stats(&non_finite, &finite, 2).unwrap(), None);
+        assert_eq!(channel_stats(&finite, &non_finite, 2).unwrap(), None);
     }
 
     #[test]

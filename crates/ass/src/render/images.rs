@@ -7,9 +7,10 @@
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, GlyphBitmaps, Limits, Rect};
+use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
-use super::bitmaps::{Combined, RunKey};
+use super::bitmaps::{Combined, Composited, SharedBitmap};
+use super::cache::Kept;
 use crate::{Karaoke, Rgba};
 
 /// What an image draws.
@@ -63,13 +64,14 @@ enum Part {
     Shadow,
 }
 
-/// Where an image's pixels come from: a composited run, which libass's
-/// composite cache gives the same bitmap for an equal key, or pixels made
-/// for this image alone.
+/// Where an image's pixels come from: a part of a composited run, which
+/// the composite cache gives for an equal key as long as anything holds
+/// it, or pixels made for this image alone, which `blend_vector_clip`
+/// makes for every clipped image.
 #[derive(Clone, Debug)]
 enum Source {
-    Run(Arc<RunKey>, Part),
-    Own,
+    Run(Kept<Composited>, Part),
+    Own(Arc<Bitmap>),
 }
 
 /// One image of a frame: an alpha bitmap to blend in one colour at a frame
@@ -87,7 +89,6 @@ pub struct Image {
     pub colour: Rgba,
     width: usize,
     height: usize,
-    bitmap: Arc<Bitmap>,
     column: usize,
     row: usize,
     /// libass's row stride, 0 for an image a vector clip emptied.
@@ -97,14 +98,13 @@ pub struct Image {
 
 impl Image {
     /// `ass_image_compare`: other content when the size, stride, colour or
-    /// bitmap differ, else other positions when the place differs.
+    /// bitmap differ, else other positions when the place differs. libass
+    /// compares the bitmap's address: the same pixels of the same cached
+    /// composite (`ass_render.c:3286-3306`).
     fn compare(&self, other: &Self) -> Change {
         let same_pixels = match (&self.source, &other.source) {
             (Source::Run(a, p), Source::Run(b, q)) => {
-                p == q
-                    && self.column == other.column
-                    && self.row == other.row
-                    && (Arc::ptr_eq(a, b) || **a == **b)
+                Kept::ptr_eq(a, b) && p == q && self.column == other.column && self.row == other.row
             }
             _ => false,
         };
@@ -122,6 +122,18 @@ impl Image {
         }
     }
 
+    /// The bitmap the image shows a window of.
+    fn pixels(&self) -> Option<&Bitmap> {
+        match &self.source {
+            Source::Run(composite, part) => match part {
+                Part::Fill => composite.fill.as_ref(),
+                Part::Border => composite.border.as_ref(),
+                Part::Shadow => composite.shadow.as_ref(),
+            },
+            Source::Own(bitmap) => Some(bitmap),
+        }
+    }
+
     /// The width in pixels.
     pub const fn width(&self) -> usize {
         self.width
@@ -135,8 +147,9 @@ impl Image {
     /// The alpha rows, top to bottom, each [`Image::width`] bytes: 255 is
     /// fully covered.
     pub fn rows(&self) -> impl ExactSizeIterator<Item = &[u8]> + '_ {
-        let stride = self.bitmap.stride();
-        let data = self.bitmap.data();
+        let (stride, data) = self
+            .pixels()
+            .map_or((0, &[][..]), |b| (b.stride(), b.data()));
         (0..self.height).map(move |y| {
             let start = (self.row + y) * stride + self.column;
             &data[start..start + self.width]
@@ -176,10 +189,11 @@ pub(super) struct Clipping {
     pub frame: ClipFrame,
 }
 
-/// A vector clip drawn in the frame: its drawing's fill.
+/// A vector clip drawn in the frame: its drawing's fill, held in the bitmap
+/// cache while it clips.
 #[derive(Debug)]
 pub(super) struct ClipMask {
-    pub bitmaps: GlyphBitmaps,
+    pub bitmap: PlacedBitmap<SharedBitmap>,
     pub inverse: bool,
 }
 
@@ -196,7 +210,7 @@ pub(super) fn render_text(
     let start = out.len();
     let mut emit = |run: &Combined,
                     which: Part,
-                    bitmap: &Arc<Bitmap>,
+                    bitmap: &Bitmap,
                     colours: [Rgba; 2],
                     split: i32,
                     kind: ImageKind|
@@ -215,11 +229,10 @@ pub(super) fn render_text(
                 },
                 width: part.width,
                 height: part.height,
-                bitmap: Arc::clone(bitmap),
                 column: part.source_x,
                 row: part.source_y,
                 stride: bitmap.stride(),
-                source: Source::Run(Arc::clone(&run.key), which),
+                source: Source::Run(run.composite.clone(), which),
             })
             .map_err(|e| e.error)?;
         }
@@ -228,7 +241,7 @@ pub(super) fn render_text(
     const WHOLE: i32 = 1_000_000;
     if with_shadows {
         for run in runs {
-            if let Some(shadow) = &run.shadow {
+            if let Some(shadow) = &run.composite.shadow {
                 emit(
                     run,
                     Part::Shadow,
@@ -241,7 +254,7 @@ pub(super) fn render_text(
         }
     }
     for run in runs {
-        if let Some(border) = &run.border
+        if let Some(border) = &run.composite.border
             && !(run.effect == Some(Karaoke::Outline) && run.effect_timing <= 0)
         {
             emit(
@@ -255,7 +268,9 @@ pub(super) fn render_text(
         }
     }
     for run in runs {
-        let Some(fill) = &run.fill else { continue };
+        let Some(fill) = &run.composite.fill else {
+            continue;
+        };
         let (colours, split) = match run.effect {
             Some(Karaoke::Switch | Karaoke::Outline) => {
                 let colour = if run.effect_timing > 0 {
@@ -284,11 +299,8 @@ pub(super) fn render_text(
 fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Result<()> {
     let (ax, ay) = (image.x, image.y);
     let (aw, ah) = (image.width as i32, image.height as i32);
-    // `Raster::draw` returns the fill whenever it draws anything.
-    let Some(clip) = mask.bitmaps.glyph() else {
-        return Ok(());
-    };
-    let origin = mask.bitmaps.origin();
+    let clip = &*mask.bitmap.bitmap;
+    let origin = mask.bitmap.origin;
     let bx = origin.x.wrapping_add(clip.position.x);
     let by = origin.y.wrapping_add(clip.position.y);
     let (bw, bh) = (clip.width() as i32, clip.height() as i32);
@@ -304,9 +316,8 @@ fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Res
         }
         let mut pixels = copy(image, 0, 0, image.width, image.height, budget)?;
         pixels.multiply_inverse(clip, bx - ax, by - ay);
-        image.bitmap = Arc::new(pixels);
+        image.source = Source::Own(Arc::new(pixels));
         (image.column, image.row) = (0, 0);
-        image.source = Source::Own;
     } else {
         if disjoint {
             image.width = 0;
@@ -317,14 +328,14 @@ fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Res
         let (aleft, atop) = ((left - ax) as usize, (top - ay) as usize);
         let mut pixels = copy(image, aleft, atop, w as usize, h as usize, budget)?;
         pixels.multiply(clip, bx - left, by - top);
-        image.bitmap = Arc::new(pixels);
+        let stride = pixels.stride();
+        image.source = Source::Own(Arc::new(pixels));
         (image.column, image.row) = (0, 0);
         image.x = left;
         image.y = top;
         image.width = w as usize;
         image.height = h as usize;
-        image.stride = image.bitmap.stride();
-        image.source = Source::Own;
+        image.stride = stride;
     }
     Ok(())
 }
@@ -375,10 +386,9 @@ pub(super) fn background(
         width: w as usize,
         height: h as usize,
         stride: bitmap.stride(),
-        bitmap: Arc::new(bitmap),
         column: 0,
         row: 0,
-        source: Source::Own,
+        source: Source::Own(Arc::new(bitmap)),
     }))
 }
 

@@ -11,6 +11,9 @@ I/O of its own, decodes no codec, and does not apply edits to presentation.
 works in generic code and inside `triergon::AnyReader`. The parts below stay
 available for finer control.
 
+`media_kind(&handler)` classifies an `hdlr` handler code without allocating,
+using the same mapping as `TrackInfo::kind`. Unknown handlers stay unknown.
+
 The crate exposes two views of the same file:
 
 - **Source view** (`BoxReader`, `SampleTable`, `FragmentIndex`, `SampleReader`,
@@ -41,10 +44,16 @@ flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 in an existing shared input window. The view retains the window's budget charge.
 Random access can reuse bytes already supplied in the same generation. Samples
 split across windows use a bounded packet buffer.
-Complete indexed sources can check all packet projections by track before
-rewinding for merged playback.
+Complete indexed sources can check all packet projections and find the latest
+presentation end by track before rewinding for merged playback. Rewinding
+reuses the existing edit cursors.
+Optional seek restarts are allocated after the required cursors.
 Short regular tracks can keep extra seek restart points in the existing
 checkpoint allocation.
+Complete fragment-only tracks can also retain a restart for backward seek
+when their projected decode times increase. Non-sync run starts can retain
+restarts at fragment boundaries. A small number of additional restarts at
+short intervals and fragment boundaries reduce replay work for nearby seeks.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -138,7 +147,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Task | Entry points |
 | --- | --- |
 | Box framing | `BoxReader`, `BoxView::children`, `BoxChildren` |
-| Movie/track headers | `MovieHeader::parse`, `TrackHeader::parse`, `SampleDescription` |
+| Movie/track headers | `MovieHeader::parse`, `MovieHeader::declared_duration_ticks`, `TrackHeader::parse`, `SampleDescription` |
 | Regular sample tables | `SampleTableBuilder` → `SampleTable::{cursor, locate, previous_sync}` |
 | Fragments (`moof`/`traf`) | `Trex::parse`, `FragmentBuilder` → `FragmentIndex`, `OwnedFragmentCursor` |
 | One track, regular + fragments | `SourceTrack`, `TrackSampleCursor` |
@@ -148,7 +157,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
 | Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
-| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `check_dts_core_description`, `QtSoundDescriptionV0` |
+| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `ObjectTypeScan`, `check_dts_core_description`, `QtSoundDescriptionV0` |
 | Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
 | Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
@@ -176,6 +185,11 @@ and shares a sample's window where the whole sample fits in one.
 | `random_access` | `stss` or fragment sample flags |
 | `Event::Other` | `ReaderEvent::Box` for each root box, `ReaderEvent::Movie` once tracks are available |
 
+Dolby Vision sample entries `dvh1` and `dvhe` report HEVC and `dav1` reports AV1.
+The reader and range playback keep the source entry code and expose the base
+`hvcC` or `av1C` configuration. Dolby Vision boxes remain available through
+`SampleDescription::extensions`. See the [registered sample entries](https://mp4ra.org/registered-types/codecs).
+
 `request_seek` finds the latest stated sync sample presented at or before the target
 on the track's media clock, or the first one if none is, without reading media. It
 reports `SeekMethod::Index`. Other tracks resume at their first sample at or after
@@ -200,7 +214,7 @@ What the reader does not do:
 - **A fragment without `tfdt`** has `None` times, and a seek cannot land on it.
 - **Times beyond `i64`** fail the read with `Error::Overflow`.
 - **Encrypted entries** report their outer code (`encv`, `enca`) as `CodecId::Other`.
-- **A QuickTime `mp4a` entry** whose version 1 or `wave` layout cannot be walked
+- **A QuickTime `mp4a` entry** whose sound description or `wave` layout cannot be walked
   stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
@@ -215,10 +229,17 @@ model establishes EOF. The source trace keeps the original fields and
 strict validation.
 
 `AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
-description, including the supported QuickTime `wave` layout. It returns
-the source offset and shared bytes under `ConfigurationLimits` and a
-`WorkBudget`. The descriptor identifies MPEG-4 Audio. Callers validate
-the bytes and determine the audio object type separately.
+description, including QuickTime version 1 and version 2 sound descriptions
+with `wave` extensions. For version 2, it checks the declared extension offset
+and reads the descriptor inside `wave`. It returns the source offset and shared
+bytes under `ConfigurationLimits` and a `WorkBudget`. The descriptor identifies
+MPEG-4 Audio. Callers validate the bytes and determine the audio object type separately.
+`ObjectTypeScan` reads any `mp4a` or `mp4s` description's stated object
+type and decoder-specific information the same way.
+
+Range playback accepts edit lists for indexed AAC-LC with 1024 core samples and
+an explicit Program Configuration Element of up to eight channels. The edit plan
+keeps the sample durations in `stts` and uses the coded frame length for trims.
 
 `BoxReader::with_media_data_policy` can preserve a terminal `mdat`'s
 declared extent when the source length is known and the media ends early.
@@ -291,8 +312,40 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  A front-metadata cursor can project checked encoded edits for regular tracks
+  within one finite media extent. The forward playback index checks the
+  projected byte order before delivering any packet.
+  `SampleTable::has_composition_offsets` reports a regular table's `ctts`
+  presence before reading its samples.
+  A regular video edit starting on the first decoded sample's presentation
+  tick keeps the initial non-sync samples with their original flags when
+  there is no sync sample at or before that tick. A
+  backward seek on that track requires a preceding sync sample. Secondary
+  tracks can replay their verified prefix when the primary lands earlier.
+  A zero-origin edit covering the decode span can retain reordered non-sync
+  packets past its presentation end and marks them for discard.
   Range playback preserves AAC sample durations from `stts`, including
   durations longer than one coded frame. Trim counts use the coded frame length.
+  The regular range view also establishes a 1024-sample clock for indexed AAC-LC
+  configurations 11, 12 and 14 when the media timescale matches the core rate.
+  The compatible view of a fragmented file supports one open-ended rate-one
+  media edit after an optional leading empty edit. The empty edit
+  delays packet clocks by its duration, rounded to the track time base.
+  A front movie with fragment defaults establishes the same edit before the
+  track's first fragment, even when that fragment follows other media.
+  Backward seek queries subtract the media start. AAC leading trim for
+  a single initialization edit uses the declared AAC object type and
+  configured audio sample rate.
+  Regular Opus range playback retains the `dOps` record and exposes its canonical
+  identification header. The MOV policy projects leading and trailing edit trim
+  and retains up to one second of history plus the preceding sample for a long
+  leading crop. Source packet durations stay available alongside the projected
+  durations. A secondary Opus seek keeps an exact match or searches 10 ms earlier
+  when the target falls between samples. The optional `with_opus_recovery` policy
+  starts from the Opus track's source `roll` group at the video presentation
+  landing. It reports the first source sample and available preroll, including
+  when recovery starts at the beginning of the track. It refuses a landing at
+  or past the end of the Opus presentation window.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder

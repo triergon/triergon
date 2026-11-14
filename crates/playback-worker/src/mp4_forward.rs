@@ -1,25 +1,28 @@
-//! MP4 or MOV forward playback through the playback engine: open a preloaded
-//! input with `Mp4Open`, index it with `Mp4IndexJob` in the native MOV view
-//! (`Mp4View::PinnedMov9NoParseNoFillin`), play every track forward through the
-//! end of the source and fold every native packet.
+//! Open and index an MP4 or MOV input, then fold every track's native packets
+//! through the end of the source.
 //!
-//! A `regular` input is seekable and plays through `Engine::mp4`. A `progressive`
+//! A `regular` input is seekable and plays through the checked range index. A `progressive`
 //! input is a forward-only front-`moov` file: its native front plan
 //! (`Mp4IndexJob::new_native_terminal_v1`) plays through
 //! `Engine::mp4_native_terminal_v1`, the progressive engine with native MOV
 //! attachment, which continues through later `moof`/`mdat` pairs and ends only at
 //! the source's actual end. Times are in the track's media time base; the flags are
 //! the native packet flags.
+//! The progressive-edited operation also folds source offsets, time bases and sample trim.
 
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget,
+};
 use triergon_playback::{
-    ByteSource, Engine, Format, Mp4Event, Player, PlayerPolicy, Progress, RawEvent, Selection,
+    ByteSource, Engine, Format, Mp4Event, Mp4RangeOpen, Output, Player, PlayerPolicy, Progress,
+    RawEvent, Selection,
+    compat::mov,
     io::{SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenLimits, OpenProgress},
-    mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
+    mp4_open::{Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
+    mp4_plan::{Mp4IndexJob, PlanLimits},
     progressive::ProgressiveLimits,
 };
 
@@ -33,10 +36,16 @@ const MAX_PACKET: usize = 1 << 20;
 enum Layout {
     Regular,
     Progressive,
+    ProgressiveEdited,
+    ProgressiveEditedRecovery,
 }
 
-fn player(pool: &Budget, raw: &Bytes, layout: Layout) -> Result<Player<ByteSource>> {
-    let cancel = AtomicBool::new(false);
+fn open(
+    pool: &Budget,
+    raw: &Bytes,
+    layout: Layout,
+    cancel: &AtomicBool,
+) -> Result<OpenedMp4<ByteSource>> {
     let id = SourceId(44);
     let selected = SelectedInput {
         input: InputCursor::new(
@@ -51,97 +60,171 @@ fn player(pool: &Budget, raw: &Bytes, layout: Layout) -> Result<Player<ByteSourc
         source: SourceOwner::new(ByteSource::new(id, raw.clone(), WINDOW)?),
         format: Format::Mp4,
     };
-    let mut open = Mp4Open::new(selected, OpenLimits::default())?;
+    let limits = OpenLimits::default();
+    let mut open = if layout == Layout::ProgressiveEditedRecovery {
+        Mp4Open::new_recovery(selected, limits)?
+    } else {
+        Mp4Open::new(selected, limits)?
+    };
     while !matches!(
-        open.advance(&mut WorkBudget::new(WORK), &cancel)?,
+        open.advance(&mut WorkBudget::new(WORK), cancel)?,
         OpenProgress::Ready
     ) {}
-    let opened = open.finish()?;
-    let mut index = match layout {
-        Layout::Regular => Mp4IndexJob::new(
-            &opened.movie,
-            Mp4View::PinnedMov9NoParseNoFillin,
-            PlanLimits::default(),
-        )?,
-        Layout::Progressive => {
-            Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default())?
-        }
-    };
-    while !index.poll(&mut WorkBudget::new(WORK), &cancel)? {}
-    let plan = index.finish()?;
-    let engine = match layout {
-        Layout::Regular => Engine::mp4(opened.input, plan, MAX_PACKET)?,
-        Layout::Progressive => Engine::mp4_native_terminal_v1(
-            opened.input,
-            plan,
-            MAX_PACKET,
-            ProgressiveLimits::default(),
-        )?,
-    };
-    Ok(Player::new(
-        engine,
-        opened.source,
-        Selection::All,
-        PlayerPolicy::default(),
-    )?)
+    Ok(open.finish()?)
 }
 
-fn fold(work: &mut Work, event: &Mp4Event) -> Result<()> {
-    let (track, demux, payload) = match event {
+fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<()> {
+    let (native, payload, skip) = match event {
         Mp4Event::Packet(packet) => {
             let native = packet
                 .native
                 .as_ref()
                 .ok_or("source packet without a native occurrence")?;
             (
-                native.track_id,
-                &native.demux,
+                native,
                 packet.source.payload.as_ref(),
+                packet.encoded_skip_samples,
             )
         }
         Mp4Event::NativeShortPacket(short) => (
-            short.native.track_id,
-            &short.native.demux,
+            &short.native,
             short.prefix.payload.as_ref(),
+            short.encoded_skip_samples,
         ),
         Mp4Event::NativeEmptyPacket(_) | Mp4Event::NativeMissingSample(_) => {
             return Err("native packet without a track".into());
         }
         Mp4Event::Configuration(_) => return Ok(()),
     };
+    let demux = &native.demux;
     work.packet(Packet {
-        track: u64::from(track),
+        track: u64::from(native.track_id),
         pts: demux.pts,
         dts: demux.dts,
         duration: u64::try_from(demux.duration).unwrap_or(0),
         flags: u64::from(demux.flags),
         size: payload.len(),
         payload: [payload],
-    })
+    })?;
+    if INCLUDE_TRIM {
+        work.location(native.source.range.start, native.media_clock.demux_base);
+        work.skip_samples(skip);
+    }
+    Ok(())
 }
 
-fn operation(pool: &Budget, raw: &Bytes, layout: Layout, mut work: Work) -> Result<Work> {
-    let cancel = AtomicBool::new(false);
-    let mut player = player(pool, raw, layout)?;
+fn collect<const INCLUDE_TRIM: bool>(
+    mut work: Work,
+    mut read: impl FnMut(&mut Option<Output>) -> triergon_core::Result<Progress>,
+) -> Result<Work> {
     let mut pending = None;
     loop {
-        let progress = player.read_output(&mut pending, &mut WorkBudget::new(WORK), &cancel)?;
+        let progress = read(&mut pending)?;
         if let Some(output) = pending.take()
             && let RawEvent::Mp4(event) = output.event()
         {
-            fold(&mut work, event)?;
+            fold::<INCLUDE_TRIM>(&mut work, event)?;
         }
         match progress {
-            Progress::Ended => break,
+            Progress::Ended => return Ok(work),
             Progress::NeedInput(_) | Progress::Yield | Progress::Queued => {}
             other => return Err(format!("unexpected player progress: {other:?}").into()),
         }
     }
-    Ok(work)
+}
+
+fn operation(pool: &Budget, raw: &Bytes, layout: Layout, work: Work) -> Result<Work> {
+    let cancel = AtomicBool::new(false);
+    let mut opened = open(pool, raw, layout, &cancel)?;
+    let movie = &opened.movie;
+    match layout {
+        Layout::Regular => {
+            let edits = if movie.tracks().iter().any(|track| {
+                track.edits().is_some()
+                    && track.table().has_composition_offsets()
+                    && track.fragments().is_empty()
+            }) {
+                let mut plans = BudgetVec::new(pool);
+                plans.try_reserve_exact(movie.tracks().len())?;
+                for track in movie.tracks() {
+                    let plan = crate::mp4_range::prepare_edit(
+                        movie,
+                        track,
+                        &mut opened.input,
+                        WORK,
+                        &cancel,
+                    )?;
+                    plans.try_push(plan).map_err(|error| error.error)?;
+                }
+                Some(plans)
+            } else {
+                None
+            };
+            let mut index = Mp4RangeOpen::new(
+                movie,
+                edits.as_ref().map(BudgetVec::as_slice),
+                PlanLimits::default(),
+            )?;
+            while !index.poll(&mut WorkBudget::new(WORK), &cancel)? {}
+            let mut player = index.finish(
+                opened.input,
+                opened.source,
+                MAX_PACKET,
+                Selection::All,
+                PlayerPolicy::default(),
+            )?;
+            collect::<false>(work, |pending| {
+                player.read_output(pending, &mut WorkBudget::new(WORK), &cancel)
+            })
+        }
+        Layout::Progressive | Layout::ProgressiveEdited | Layout::ProgressiveEditedRecovery => {
+            let include_trim = layout != Layout::Progressive;
+            let mut plans = BudgetVec::new(pool);
+            let limits = PlanLimits::default();
+            let mut index = if include_trim && movie.trex().is_empty() {
+                plans.try_reserve_exact(movie.tracks().len())?;
+                for track in movie.tracks() {
+                    let plan = crate::mp4_range::prepare_edit(
+                        movie,
+                        track,
+                        &mut opened.input,
+                        WORK,
+                        &cancel,
+                    )?;
+                    plans.try_push(plan).map_err(|error| error.error)?;
+                }
+                mov::forward_encoded_edits(movie, plans.as_slice(), limits)?
+            } else {
+                Mp4IndexJob::new_native_terminal_v1(movie, limits)?
+            };
+            while !index.poll(&mut WorkBudget::new(WORK), &cancel)? {}
+            let engine = Engine::mp4_native_terminal_v1(
+                opened.input,
+                index.finish()?,
+                MAX_PACKET,
+                ProgressiveLimits::default(),
+            )?;
+            let mut player = Player::new_direct(
+                engine,
+                opened.source,
+                Selection::All,
+                PlayerPolicy::default(),
+            )?;
+            let read = |pending: &mut Option<Output>| {
+                player.read_output(pending, &mut WorkBudget::new(WORK), &cancel)
+            };
+            if include_trim {
+                collect::<true>(work, read)
+            } else {
+                collect::<false>(work, read)
+            }
+        }
+    }
 }
 
 /// `mp4-forward-fold FILE LAYOUT`, `mp4-forward-bench FILE ITERATIONS LAYOUT` or
-/// `mp4-forward-memory FILE LAYOUT`; LAYOUT is `regular` or `progressive`.
+/// `mp4-forward-memory FILE LAYOUT`; LAYOUT is `regular`, `progressive`,
+/// `progressive-edited` or `progressive-edited-recovery`.
 pub fn run(args: &[String]) -> Result<()> {
     drive(args, PREFIX, OPERATION, operate)
 }
@@ -151,7 +234,9 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, work: Work) -> Result
     let layout = match argument {
         "regular" => Layout::Regular,
         "progressive" => Layout::Progressive,
-        _ => return Err("expected regular or progressive".into()),
+        "progressive-edited" => Layout::ProgressiveEdited,
+        "progressive-edited-recovery" => Layout::ProgressiveEditedRecovery,
+        _ => return Err("expected regular, progressive or progressive-edited".into()),
     };
     operation(pool, raw, layout, work)
 }

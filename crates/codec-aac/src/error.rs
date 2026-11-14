@@ -12,10 +12,14 @@ pub enum Feature {
     ObjectType(u8),
     /// 960-sample frames (not expressible in ADTS).
     FrameLength960,
+    /// An in-band SBR payload in a raw access unit configured for AAC-LC.
+    RawSbr,
     /// Coupling channel element whose targets cannot be resolved.
     CouplingTarget,
     /// Channel layouts that need more channels than the decoder supports.
     TooManyChannels,
+    /// A raw AAC program whose speaker positions cannot be represented unambiguously.
+    RawProgramLayout,
     /// Reserved / escape sampling frequency index.
     SampleRateIndex(u8),
 }

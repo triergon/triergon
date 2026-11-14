@@ -6,7 +6,9 @@
 //!
 //! Prints one JSON line to stderr: sample rate, channels, layout, frames, samples.
 use std::io::Write;
-use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
+use triergon::{
+    AnyPacket, AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, open_blocking,
+};
 use triergon_codec::{AudioFrame, ChannelLayout};
 use triergon_session::TrackDecoder;
 
@@ -53,7 +55,7 @@ fn decode(file: std::fs::File, out: &mut impl Write, summary: &mut Summary) -> R
     let pool = Budget::new(256 << 20).map_err(|e| e.to_string())?;
     let mut source =
         open_blocking(std::io::BufReader::new(file), &pool).map_err(|e| e.to_string())?;
-    let mut decoder: Option<(triergon::TrackId, TrackDecoder)> = None;
+    let mut decoder: Option<(triergon::TrackId, TrackDecoder, bool)> = None;
     let mut frame = AudioFrame::default();
     let mut bytes = Vec::new();
     while let Some(packet) = source.next_packet().map_err(|e| format!("read: {e}"))? {
@@ -63,18 +65,31 @@ fn decode(file: std::fs::File, out: &mut impl Write, summary: &mut Summary) -> R
                 .filter_map(|index| reader.track(index))
                 .find(|track| track.kind() == MediaKind::Audio)
                 .ok_or("no audio track")?;
-            decoder = Some((track.id(), TrackDecoder::new(track).map_err(|e| e.0)?));
+            let raw_aac = matches!(reader, AnyReader::Isobmff(_)) && track.codec() == CodecId::Aac;
+            let selected = if raw_aac {
+                TrackDecoder::aac_access_units_in(track.configuration(), &pool)
+            } else {
+                TrackDecoder::new(track)
+            };
+            decoder = Some((track.id(), selected.map_err(|e| e.0)?, raw_aac));
         }
-        let Some((track, decoder)) = decoder.as_mut() else {
+        let Some((track, decoder, raw_aac)) = decoder.as_mut() else {
             continue;
         };
         if packet.track() != *track {
             continue;
         }
+        // The neutral track publishes the first description. The example
+        // cannot decode another description with those configuration bytes.
+        if *raw_aac
+            && !matches!(&packet, AnyPacket::Isobmff(p) if p.sample().description_index == 1)
+        {
+            return Err("AAC sample description changed".into());
+        }
         let decoded = decoder.decode(&packet, &mut frame);
         summary.write(decoded, &frame, &mut bytes, out)?;
     }
-    if let Some((_, decoder)) = decoder.as_mut() {
+    if let Some((_, decoder, _)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame);
         summary.write(flushed, &frame, &mut bytes, out)?;
     }

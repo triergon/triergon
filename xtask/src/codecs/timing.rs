@@ -1,37 +1,31 @@
 //! Paired codec timing collection.
 //!
-//! The shared timing primitives (worker execution, CPU snapshots, competing
-//! build detection, the benchmark lock, the kernel-module guard and the
-//! bootstrap ratio interval) with 30 randomised pairs and seed 280. Equal work
-//! for decoders means equal output picture/block counts and byte counts; the
-//! output digest is recorded for both sides (equal only where the outputs are
-//! bit-exact, which the correctness grading checks separately). Each claim key
-//! is measured once; results stay first-clean, apart from the declared
-//! once-only recollection of contaminated claims on seed 281.
+//! Each workload is one session of the shared paired runner, graded by its
+//! validator ([`crate::harness::timing::measure`]: 30 randomised pairs on seed
+//! 280, retried on 281 and 282, the benchmark lock, recorded warmups, the
+//! contamination watch and the kernel-module guard). Equal work for decoders means
+//! equal output picture/block counts and byte counts; each worker's output
+//! digest must stay the same across its runs, and whether the two digests agree
+//! is recorded (they agree only where the outputs are bit-exact, which the
+//! correctness grading checks separately). Each claim key is measured once.
 
-use std::ffi::OsString;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use crate::harness::acceptance::active_cpu;
 use crate::harness::gate_build;
 use crate::harness::policy;
-use crate::harness::timing::{
-    TimedWorkers, competing_builds, cpu_snapshot, lock, timing_module_state,
-};
-use crate::harness::worker::{self, data, status};
+use crate::harness::timing::{self, GATE_PAIRS, Operation, Work};
+use crate::harness::worker::data;
 use crate::json::{self, Value};
-use crate::pyrandom::PyRandom;
-use crate::{python, sha256, stats};
+use crate::{python, sha256};
 
-const PAIRS: usize = 30;
-const SEED: u64 = 280;
-const RESAMPLES: usize = 4000;
+/// The session's seed; its retries take the next two.
+pub const SEED: u64 = 280;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(600);
-/// `kind` of a claim key; keys of ledgers written before the Rust runner
-/// differ.
-const KIND: &str = "codec-time";
+/// Separate claims for records collected with the shared timing session.
+const KIND: &str = "codec-time-session";
 
 /// The arguments of `codecs time`.
 pub struct Options {
@@ -45,7 +39,6 @@ pub struct Options {
     pub out: PathBuf,
     pub label: String,
     pub only: Option<String>,
-    pub recollect_contaminated: Option<String>,
 }
 
 fn sha(path: &Path) -> Result<String, String> {
@@ -67,52 +60,83 @@ fn set(object: &mut Value, key: &str, value: Value) {
     }
 }
 
-fn write_ledger(path: &Path, ledger: &Value) -> Result<(), String> {
+fn write_claims(path: &Path, claims: &Value) -> Result<(), String> {
+    let pending = path.with_extension(format!("{}.part", std::process::id()));
     write(
-        path,
-        json::to_python(&python::sort_keys(ledger), Some(1)) + "\n",
-    )
+        &pending,
+        json::to_python(&python::sort_keys(claims), Some(1)) + "\n",
+    )?;
+    fs::rename(&pending, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn get_str<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
-/// The four work counts of one pair: candidate packets and bytes, reference
-/// packets and bytes.
-fn work(sample: &Value) -> Result<[Value; 4], String> {
-    let field = |side: &str, key: &str| {
-        data(sample.get(side).unwrap_or(&Value::Null))
-            .get(key)
-            .cloned()
-            .ok_or_else(|| format!("{side} result without {key}"))
-    };
-    Ok([
-        field("candidate", "packets")?,
-        field("candidate", "bytes")?,
-        field("reference", "packets")?,
-        field("reference", "bytes")?,
-    ])
+/// The timed operation of a workload: `OP-bench FILE ITERATIONS`, whose digest
+/// is each worker's own.
+fn operation(name: &str) -> Operation {
+    Operation {
+        prefix: format!("{name}-"),
+        arguments: vec![],
+        candidate_options: vec![],
+        work: Work {
+            fields: vec![],
+            own: vec!["digest".to_owned()],
+        },
+        timeout: WORKER_TIMEOUT,
+    }
 }
 
-fn equal(a: &Value, b: &Value) -> bool {
-    crate::harness::diff::equal(a, b)
+/// Whether both workers printed the same output digest in every pair.
+fn digests_equal(timing: &Value) -> bool {
+    timing
+        .get("samples")
+        .and_then(Value::as_array)
+        .is_some_and(|samples| {
+            samples.iter().all(|sample| {
+                let digest =
+                    |role: &str| sample.get(role).map(|outcome| data(outcome).get("digest"));
+                digest("candidate") == digest("reference")
+            })
+        })
+}
+
+fn iterations(workload: &Value) -> Result<u32, String> {
+    let count = match workload.get("iterations") {
+        Some(Value::Number(number)) => number.as_i128(),
+        _ => None,
+    };
+    count
+        .and_then(|count| u32::try_from(count).ok())
+        .filter(|count| *count > 0)
+        .ok_or_else(|| "workload iterations must be a positive integer".into())
 }
 
 pub fn run(options: &Options) -> Result<(), String> {
-    let workloads = crate::checks::read_json(&options.workloads)
+    let manifest = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
-    let workloads = workloads
+    let workloads = manifest
         .get("workloads")
         .and_then(Value::as_array)
         .ok_or("workloads file without workloads")?
         .to_vec();
-    let mut ledger = if options.ledger.exists() {
+    let parity = super::aac_access_units::measurement_parity(
+        &options.repository,
+        &options.candidate,
+        &options.reference,
+        &options.workloads,
+        &options.root,
+        &manifest,
+    )?;
+    let timing_lock = timing::lock()?;
+    let claims_path = &options.ledger;
+    let mut claims = if claims_path.exists() {
         python::loads(
-            &fs::read_to_string(&options.ledger)
-                .map_err(|e| format!("{}: {e}", options.ledger.display()))?,
+            &fs::read_to_string(claims_path)
+                .map_err(|e| format!("{}: {e}", claims_path.display()))?,
         )
-        .ok_or_else(|| format!("{}: not JSON", options.ledger.display()))?
+        .ok_or_else(|| format!("{}: not JSON", claims_path.display()))?
     } else {
         Value::Object(Vec::new())
     };
@@ -127,16 +151,6 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("candidate", Value::str(sha(&options.candidate)?)),
         ("reference", Value::str(sha(&options.reference)?)),
     ]);
-    let module = timing_module_state();
-    if !matches!(
-        get_str(&module, "status"),
-        Some("module-absent" | "not-applicable")
-    ) {
-        return Err(format!(
-            "the RSS kernel module must be absent while timing: {}",
-            json::to_python(&module, None)
-        ));
-    }
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
     for w in &workloads {
         let id = get_str(w, "id").ok_or("workload without id")?.to_owned();
@@ -150,237 +164,129 @@ pub fn run(options: &Options) -> Result<(), String> {
         if input_sha.as_str() != Some(sha(&path)?.as_str()) {
             return Err(format!("input hash differs from the workload: {id}"));
         }
-        let operation = w.get("operation").cloned().unwrap_or(Value::Null);
-        let iterations = w.get("iterations").cloned().unwrap_or(Value::Null);
+        let name = get_str(w, "operation").ok_or("workload without operation")?;
+        let iterations = iterations(w).map_err(|error| format!("{id}: {error}"))?;
         let claim = Value::object([
             ("workers", hashes.clone()),
             ("input", input_sha.clone()),
-            ("operation", operation.clone()),
-            ("iterations", iterations.clone()),
+            ("operation", Value::str(name)),
+            ("iterations", Value::int(iterations)),
             ("kind", Value::str(KIND)),
         ]);
         let key = sha256::hex(json::to_python(&python::sort_keys(&claim), None).as_bytes());
-        let (mut previous, mut seed) = (None, SEED);
-        if let Some(old) = ledger.get(&key) {
-            let recollect = options
-                .recollect_contaminated
-                .as_deref()
-                .is_some_and(|label| {
-                    get_str(old, "label") == Some(label)
-                        && get_str(old, "status") == Some("contaminated")
-                        && old.get("contaminated_previous").is_none()
-                });
-            if !recollect {
-                println!("SKIP {id}");
-                continue;
+        if let Some(previous) = claims.get(&key) {
+            if get_str(previous, "status") == Some("claimed") {
+                return Err(format!("{id}: prior timing attempt did not finish"));
             }
-            previous = Some(old.clone());
-            seed = SEED + 1;
+            println!("SKIP {id}");
+            continue;
+        }
+        let raw = options.out.join(format!("{}.json", id.replace('/', "__")));
+        if raw
+            .try_exists()
+            .map_err(|e| format!("{}: {e}", raw.display()))?
+        {
+            return Err(format!("{} exists", raw.display()));
         }
         let mut entry = Value::object([
             ("label", Value::str(options.label.as_str())),
             ("id", Value::str(id.as_str())),
             ("status", Value::str("claimed")),
-            ("seed", Value::int(seed)),
+            ("seed", Value::int(SEED)),
             ("utc", Value::str(python::utc_now())),
         ]);
-        if let Some(previous) = previous {
-            set(&mut entry, "contaminated_previous", previous);
-        }
-        set(&mut ledger, &key, entry);
-        write_ledger(&options.ledger, &ledger)?;
-        let mut rng = PyRandom::new(seed);
-        let mut samples = Vec::new();
-        let mut state = "measured".to_owned();
-        let operation_name = format!("{}-bench", operation.as_str().unwrap_or_default());
-        let argv = |worker: &str| -> Vec<OsString> {
-            vec![
-                worker.into(),
-                operation_name.as_str().into(),
-                python::path(&path).into(),
-                python::str(&iterations).into(),
-            ]
+        let mut result_file = None;
+        let graded = timing_lock.measure(
+            &options.candidate,
+            &options.reference,
+            &path,
+            GATE_PAIRS,
+            iterations,
+            SEED,
+            &operation(name),
+            || {
+                let file = fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&raw)
+                    .map_err(|e| format!("{}: {e}", raw.display()))?;
+                set(&mut claims, &key, entry.clone());
+                if let Err(error) = write_claims(claims_path, &claims) {
+                    drop(file);
+                    fs::remove_file(&raw)
+                        .map_err(|e| format!("{error}. {}: {e}", raw.display()))?;
+                    return Err(error);
+                }
+                result_file = Some(file);
+                Ok(())
+            },
+        );
+        let Some(mut result_file) = result_file else {
+            return Err(format!(
+                "{id}: timing setup failed: {}",
+                json::to_python(&graded?.record, None)
+            ));
         };
-        {
-            let timed = TimedWorkers::new(&options.candidate, &options.reference)?;
-            let workers = [
-                ("candidate", python::path(&timed.candidate)),
-                ("reference", python::path(&timed.reference)),
-            ];
-            let _lock = lock()?;
-            if !competing_builds()?.is_empty() {
-                state = "contaminated".into();
-            } else {
-                for (name, worker) in &workers {
-                    let warm = worker::execute(&argv(worker), WORKER_TIMEOUT);
-                    if status(&warm) != "ok" {
-                        state = format!("warmup-failed:{name}");
-                    }
-                }
-                let pairs = if state == "measured" { PAIRS } else { 0 };
-                for index in 0..pairs {
-                    let mut order = [0usize, 1];
-                    rng.shuffle(&mut order);
-                    let before = cpu_snapshot()?;
-                    let mut row = vec![
-                        ("pair".to_owned(), Value::int(index as i64)),
-                        (
-                            "order".to_owned(),
-                            Value::strings(order.map(|i| workers[i].0)),
-                        ),
-                        ("cpu_before".to_owned(), before.clone()),
-                    ];
-                    for i in order {
-                        let (name, worker) = &workers[i];
-                        row.push((
-                            (*name).to_owned(),
-                            worker::execute(&argv(worker), WORKER_TIMEOUT),
-                        ));
-                    }
-                    let after = cpu_snapshot()?;
-                    row.push(("cpu_after".to_owned(), after.clone()));
-                    samples.push(Value::Object(row));
-                    if !active_cpu(&before, &after, false).is_empty()
-                        || get_str(&timing_module_state(), "status") == Some("module-loaded")
-                    {
-                        state = "contaminated".into();
-                        break;
-                    }
-                }
-            }
-        }
+        let graded = graded?;
+        let parity_matches = parity.as_ref().is_none_or(|parity| {
+            parity.matches(
+                graded.record.get("worker_hashes"),
+                &graded.record,
+                Some(&input_sha),
+            )
+        });
+        let state = graded.status().to_owned();
+        // The seed of the attempt the session kept.
+        let seed = graded
+            .record
+            .get("seed")
+            .cloned()
+            .unwrap_or(Value::int(SEED));
+        set(&mut entry, "seed", seed.clone());
         let mut result = vec![
             ("id".to_owned(), Value::str(id.as_str())),
             ("key".to_owned(), Value::str(key.as_str())),
             ("label".to_owned(), Value::str(options.label.as_str())),
-            ("seed".to_owned(), Value::int(seed)),
+            ("operation".to_owned(), Value::str(name)),
             ("workers".to_owned(), hashes.clone()),
-            ("input_sha256".to_owned(), input_sha.clone()),
-            ("operation".to_owned(), operation.clone()),
-            ("iterations".to_owned(), iterations.clone()),
-            ("status".to_owned(), Value::str(state.as_str())),
-            ("samples".to_owned(), Value::Array(samples.clone())),
+            ("input_sha256".to_owned(), input_sha),
+            ("iterations".to_owned(), Value::int(iterations)),
+            ("seed".to_owned(), seed),
             (
                 "build_refusals".to_owned(),
                 Value::strings(refusals.clone()),
             ),
             ("cpus".to_owned(), gate_build::cpus()),
         ];
-        let mut ratio = None;
-        let (mut delivery, mut digest_equal) = (None, None);
-        if state == "measured" {
-            let failed = samples.iter().any(|r| {
-                ["candidate", "reference"]
-                    .iter()
-                    .any(|name| status(r.get(name).unwrap_or(&Value::Null)) != "ok")
-            });
-            if failed {
-                state = "worker-failure".into();
-            } else {
-                // The set of work tuples, in Python's set iteration order:
-                // the recorded `work` is the first tuple it yields.
-                let tuples = samples.iter().map(work).collect::<Result<Vec<_>, _>>()?;
-                let integers: Option<Vec<[i128; 4]>> = tuples
-                    .iter()
-                    .map(|t| {
-                        let mut out = [0; 4];
-                        for (slot, v) in out.iter_mut().zip(t) {
-                            *slot = match v {
-                                Value::Number(n) => n.as_i128()?,
-                                _ => return None,
-                            };
-                        }
-                        Some(out)
-                    })
-                    .collect();
-                let seen: Vec<[Value; 4]> = if let Some(integers) = integers {
-                    python::set_order(&integers, |t| python::hash_tuple(t))
-                        .into_iter()
-                        .map(|t| t.map(Value::int))
-                        .collect()
-                } else {
-                    let mut seen: Vec<[Value; 4]> = Vec::new();
-                    for tuple in tuples {
-                        if !seen
-                            .iter()
-                            .any(|s| s.iter().zip(&tuple).all(|(a, b)| equal(a, b)))
-                        {
-                            seen.push(tuple);
-                        }
-                    }
-                    seen
-                };
-                let [c_pk, c_by, r_pk, r_by] = seen[0].clone();
-                let equal_work = seen.len() == 1 && equal(&c_pk, &r_pk) && equal(&c_by, &r_by);
-                let digests_equal = samples.iter().all(|r| {
-                    let digest = |side: &str| {
-                        data(r.get(side).unwrap_or(&Value::Null))
-                            .get("digest")
-                            .cloned()
-                            .unwrap_or(Value::Null)
-                    };
-                    equal(&digest("candidate"), &digest("reference"))
-                });
-                digest_equal = Some(digests_equal);
-                result.push(("equal_work".into(), Value::Bool(equal_work)));
-                result.push(("digest_equal".into(), Value::Bool(digests_equal)));
-                result.push((
-                    "work".into(),
-                    Value::object([
-                        ("candidate", Value::Array(vec![c_pk, c_by])),
-                        ("reference", Value::Array(vec![r_pk, r_by])),
-                    ]),
-                ));
-                if equal_work {
-                    let elapsed = |r: &Value, side: &str| {
-                        data(r.get(side).unwrap_or(&Value::Null))
-                            .get("elapsed_ns")
-                            .and_then(Value::as_f64)
-                            .ok_or_else(|| format!("{side} result without elapsed_ns"))
-                    };
-                    let pairs = samples
-                        .iter()
-                        .map(|r| Ok((elapsed(r, "candidate")?, elapsed(r, "reference")?)))
-                        .collect::<Result<Vec<_>, String>>()?;
-                    let interval = stats::ratio_interval(&pairs, seed, RESAMPLES)?;
-                    let value = interval_value(&interval);
-                    result.push(("ratio".into(), value.clone()));
-                    let gate_build = refusals.is_empty();
-                    let passes = gate_build && interval.upper_95 <= gate.ceiling;
-                    result.push(("delivery".into(), Value::Bool(passes)));
-                    result.push((
-                        "optimization".into(),
-                        Value::Bool(gate_build && interval.upper_95 <= gate.target),
-                    ));
-                    ratio = Some((value, interval.upper_95));
-                    delivery = Some(passes);
-                } else {
-                    state = "unequal-work".into();
-                }
-            }
-            set_field(&mut result, "status", Value::str(state.as_str()));
+        if let Some(parity) = &parity {
+            result.push(("parity_sha256".to_owned(), Value::str(&parity.sha256)));
+            result.push(("parity_matches".to_owned(), Value::Bool(parity_matches)));
         }
-        let name = format!(
-            "{}{}.json",
-            id.replace('/', "__"),
-            if seed == SEED {
-                String::new()
-            } else {
-                format!("-seed{seed}")
-            }
-        );
-        let raw = options.out.join(name);
-        if raw.exists() {
-            return Err(format!("{} exists", raw.display()));
+        let (mut ratio, mut delivery, mut digest_equal) = (None, None, None);
+        if let Ok(interval) = &graded.interval {
+            let equal = digests_equal(&graded.record);
+            let gate_build = refusals.is_empty() && parity_matches;
+            let passes = gate_build && interval.upper_95 <= gate.ceiling;
+            result.extend([
+                ("digest_equal".to_owned(), Value::Bool(equal)),
+                ("delivery".to_owned(), Value::Bool(passes)),
+                (
+                    "optimization".to_owned(),
+                    Value::Bool(gate_build && interval.upper_95 <= gate.target),
+                ),
+            ]);
+            ratio = Some((timing::interval_value(interval), interval.upper_95));
+            delivery = Some(passes);
+            digest_equal = Some(equal);
         }
-        write(
-            &raw,
-            json::to_python(&Value::Object(result), Some(1)) + "\n",
-        )?;
-        let raw_text = python::path(&raw);
-        let mut entry = ledger.get(&key).cloned().unwrap_or(Value::Null);
+        result.extend(graded.into_fields());
+        let result = json::to_python(&Value::Object(result), Some(1)) + "\n";
+        result_file
+            .write_all(result.as_bytes())
+            .and_then(|()| result_file.sync_data())
+            .map_err(|e| format!("{}: {e}", raw.display()))?;
         set(&mut entry, "status", Value::str(state.as_str()));
-        set(&mut entry, "raw", Value::str(raw_text));
+        set(&mut entry, "raw", Value::str(python::path(&raw)));
         set(&mut entry, "raw_sha256", Value::str(sha(&raw)?));
         set(
             &mut entry,
@@ -397,8 +303,8 @@ pub fn run(options: &Options) -> Result<(), String> {
             "digest_equal",
             digest_equal.map_or(Value::Null, Value::Bool),
         );
-        set(&mut ledger, &key, entry);
-        write_ledger(&options.ledger, &ledger)?;
+        set(&mut claims, &key, entry);
+        write_claims(claims_path, &claims)?;
         println!(
             "CODECTIME {id} {state} {} {} {}",
             ratio
@@ -416,17 +322,17 @@ pub fn run(options: &Options) -> Result<(), String> {
     Ok(())
 }
 
-fn set_field(fields: &mut [(String, Value)], key: &str, value: Value) {
-    if let Some(slot) = fields.iter_mut().find(|(k, _)| k == key) {
-        slot.1 = value;
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-/// A ratio interval as the records store it.
-pub fn interval_value(interval: &stats::Interval) -> Value {
-    Value::object([
-        ("median", Value::float(interval.median)),
-        ("lower_95", Value::float(interval.lower_95)),
-        ("upper_95", Value::float(interval.upper_95)),
-    ])
+    #[test]
+    fn workload_iterations_require_a_positive_integer() {
+        for count in ["0", "-1", "8.5", "8.0", "\"8\"", "4294967296"] {
+            let workload = python::loads(&format!("{{\"iterations\":{count}}}")).unwrap();
+            assert!(iterations(&workload).is_err(), "accepted {count}");
+        }
+        let workload = Value::object([("iterations", Value::int(8))]);
+        assert_eq!(iterations(&workload), Ok(8));
+    }
 }

@@ -1,10 +1,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{ColourMatrix, RecoveryDecoder};
-use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayDecoder, DisplayLimits, DisplayStatus, Envelope, PacketClock,
-    RecoveredPacket, RecoveryStatus,
-};
+use triergon_pixel::{ChannelRounding, YcbcrMatrix};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket, Refusal};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
 
 fn stamp() -> PacketClock {
     PacketClock {
@@ -66,7 +64,7 @@ fn packet_with(data: &[u8], flags: u8, declared: u8, end: &[u8], crop: bool) -> 
     ]
     .concat()
 }
-fn ready(decoder: &mut RecoveryDecoder, quantum: u64) -> RecoveredPacket {
+fn ready(decoder: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
         let mut work = WorkBudget::new(quantum);
@@ -78,46 +76,21 @@ fn ready(decoder: &mut RecoveryDecoder, quantum: u64) -> RecoveredPacket {
     }
     panic!("bounded receiver did not finish");
 }
-fn run(raw: &[u8], quantum: u64) -> RecoveredPacket {
+fn run(raw: &[u8], quantum: u64) -> ReceiverPacket {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut bytes = Some(Bytes::copy_from_slice(&b, raw).unwrap());
     d.push(&mut bytes, stamp(), &AtomicBool::new(false))
         .unwrap();
     assert!(bytes.is_none());
     ready(&mut d, quantum)
 }
-fn strict_error(raw: &[u8]) -> Error {
-    let b = Budget::new(4 * 1024 * 1024).unwrap();
-    let c = AtomicBool::new(false);
-    let mut d =
-        DisplayDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
-    d.push(
-        Bytes::copy_from_slice(&b, raw).unwrap(),
-        stamp(),
-        Envelope::Packet,
-        &c,
-    )
-    .unwrap();
-    loop {
-        match d.poll(&mut WorkBudget::new(4096), &c) {
-            Err(e) => return e,
-            Ok(DisplayStatus::NeedPacket) => panic!("strict unexpectedly accepted"),
-            Ok(DisplayStatus::OutputReady) => {
-                d.take_output(&c).unwrap();
-            }
-            _ => {}
-        }
-    }
-}
 
 #[test]
-fn receiver_end_payload_is_explicit_and_strict_error_and_raw_survive() {
+fn an_end_segment_payload_is_ignored_and_the_raw_packet_kept() {
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
-    let error = strict_error(&raw);
     let out = run(&raw, 1);
-    assert_eq!(out.source_error(), Some(error));
     assert_eq!(out.raw_packet().as_ref(), raw);
     assert_eq!(
         out.receiver_output().unwrap().rectangles()[0]
@@ -127,11 +100,9 @@ fn receiver_end_payload_is_explicit_and_strict_error_and_raw_survive() {
     );
 }
 #[test]
-fn receiver_end_without_presentation_is_not_an_invented_source_clear() {
+fn an_end_without_a_presentation_presents_no_clear() {
     let raw = segment(0x80, &[]);
     let out = run(&raw, 1);
-    assert!(out.source_sets().is_empty());
-    assert!(out.source_error().is_some());
     assert_eq!(out.context_canvas, [0, 0]);
     let event = out.receiver_output().unwrap();
     assert_eq!(event.pts_microseconds, Some(0));
@@ -140,9 +111,7 @@ fn receiver_end_without_presentation_is_not_an_invented_source_clear() {
 #[test]
 fn receiver_uses_actual_complete_assembly_without_requiring_last_marker() {
     let raw = packet_with(&[1, 2], 0x80, 6, &[], false);
-    let e = strict_error(&raw);
     let out = run(&raw, 1);
-    assert_eq!(out.source_error(), Some(e));
     assert_eq!(
         out.receiver_output().unwrap().rectangles()[0]
             .pixels()
@@ -160,9 +129,7 @@ fn receiver_fragment_version_tolerance_keeps_original_version_bytes() {
         segment(0x80, &[]),
     ]
     .concat();
-    let e = strict_error(&raw);
     let out = run(&raw, 1);
-    assert_eq!(out.source_error(), Some(e));
     assert_eq!(out.raw_packet().as_ref(), raw);
     assert_eq!(
         out.receiver_output().unwrap().rectangles()[0]
@@ -172,20 +139,16 @@ fn receiver_fragment_version_tolerance_keeps_original_version_bytes() {
     );
 }
 #[test]
-fn receiver_crop_is_separate_from_the_strict_outside_crop_error() {
+fn a_crop_outside_the_object_is_ignored() {
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], true);
-    let e = strict_error(&raw);
     let out = run(&raw, 1);
-    assert_eq!(out.source_error(), Some(e));
     let rect = &out.receiver_output().unwrap().rectangles()[0];
     assert_eq!((rect.width, rect.height, rect.x, rect.y), (2, 1, 1, 2));
 }
 #[test]
 fn receiver_completed_raster_ignores_encoded_tail_without_rewriting_raw() {
     let raw = packet_with(&[1, 2, 0, 0, 7], 0xc0, 9, &[], false);
-    let e = strict_error(&raw);
     let out = run(&raw, 1);
-    assert_eq!(out.source_error(), Some(e));
     assert_eq!(out.raw_packet().as_ref(), raw);
     assert_eq!(
         out.receiver_output().unwrap().rectangles()[0]
@@ -203,9 +166,7 @@ fn invalid_receiver_rle_is_an_empty_rectangle_with_actual_allocated_stride() {
         &[0, 0x80, 7][..],
     ] {
         let raw = packet_with(bytes, 0xc0, 4 + bytes.len() as u8, &[], false);
-        let e = strict_error(&raw);
         let out = run(&raw, 1);
-        assert_eq!(out.source_error(), Some(e));
         let rect = &out.receiver_output().unwrap().rectangles()[0];
         assert_eq!((rect.width, rect.height, rect.stride), (0, 0, 2));
         assert!(rect.pixels().is_empty());
@@ -218,12 +179,11 @@ fn incomplete_physical_segment_is_retained_and_has_no_fabricated_end() {
         let raw = &full[..length];
         let out = run(raw, 1);
         assert_eq!(out.raw_packet().as_ref(), raw);
-        assert!(out.source_error().is_some());
         assert!(out.receiver_output().is_none());
     }
 }
 #[test]
-fn partial_receiver_palette_reads_physical_following_bytes_without_source_colour_claim() {
+fn a_partial_palette_reads_the_following_bytes() {
     let raw = [
         pcs(0x80, false),
         segment(0x14, &[0, 0, 1]),
@@ -231,19 +191,20 @@ fn partial_receiver_palette_reads_physical_following_bytes_without_source_colour
     ]
     .concat();
     let out = run(&raw, 1);
-    assert!(out.source_sets().is_empty());
-    assert!(out.source_error().is_some());
     let rect = &out.receiver_output().unwrap().rectangles()[0];
-    assert_eq!(rect.palette()[1], ColourMatrix::Sd601.argb(128, 0, 0, 0));
+    assert_eq!(
+        rect.palette()[1],
+        YcbcrMatrix::BT601.argb(128, 0, 0, 0, ChannelRounding::Nearest)
+    );
     assert_eq!((rect.width, rect.height), (0, 0));
     assert_eq!(out.raw_packet().as_ref(), raw);
 }
 #[test]
-fn reset_missing_definitions_suppresses_receiver_event_but_retains_strict_failure() {
+fn an_epoch_start_without_definitions_presents_nothing() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let first = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
     let mut bytes = Some(Bytes::copy_from_slice(&b, &first).unwrap());
     d.push(&mut bytes, stamp(), &c).unwrap();
@@ -252,7 +213,6 @@ fn reset_missing_definitions_suppresses_receiver_event_but_retains_strict_failur
     let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
     d.push(&mut bytes, stamp(), &c).unwrap();
     let out = ready(&mut d, 1);
-    assert!(out.source_error().is_some());
     assert!(out.receiver_output().is_none());
     assert_eq!(
         old.receiver_output().unwrap().rectangles()[0]
@@ -262,30 +222,12 @@ fn reset_missing_definitions_suppresses_receiver_event_but_retains_strict_failur
     );
 }
 #[test]
-fn valid_source_pixels_colour_knownness_and_native_rows_are_retained() {
-    let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
-    for q in [1, 2, 3, 7, 4096] {
-        let out = run(&raw, q);
-        assert_eq!(out.source_error(), None);
-        let source = &out.source_sets()[0].objects()[0];
-        assert_eq!(source.pixels().as_ref(), [1, 2]);
-        assert!(source.palette().source(1).is_some());
-        assert!(source.palette().source(3).is_none());
-        assert_eq!(
-            out.receiver_output().unwrap().rectangles()[0]
-                .pixels()
-                .as_ref(),
-            source.pixels().as_ref()
-        );
-    }
-}
-#[test]
 fn cancellation_is_sticky_and_busy_foreign_rejections_preserve_owners() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let foreign = Budget::new(4096).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut wrong = Some(Bytes::copy_from_slice(&foreign, &[0x80, 0, 0]).unwrap());
     assert_eq!(d.push(&mut wrong, stamp(), &c), Err(Error::ForeignPool));
     assert!(wrong.is_some());
@@ -308,7 +250,7 @@ fn work_zero_preserves_every_observed_allocation_boundary_for_valid_and_recovery
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+            ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let mut bytes = Some(
             Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false)).unwrap(),
         );
@@ -330,11 +272,11 @@ fn work_zero_preserves_every_observed_allocation_boundary_for_valid_and_recovery
     }
 }
 #[test]
-fn allocation_pressure_retry_retains_paid_work_and_complete_source_owners() {
+fn allocation_pressure_retry_keeps_paid_work_and_owners() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
     let owner = Bytes::copy_from_slice(&b, &raw).unwrap();
     let ptr = owner.as_ptr();
@@ -388,7 +330,7 @@ fn cancellation_before_during_and_after_ready_releases_private_graph_and_is_stic
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+            ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
         let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
         d.push(&mut bytes, stamp(), &c).unwrap();
@@ -408,7 +350,7 @@ fn cancellation_before_during_and_after_ready_releases_private_graph_and_is_stic
     }
 }
 #[test]
-fn receiver_limits_are_never_reclassified_as_recoverable_source_syntax() {
+fn exceeded_limits_are_errors_not_refusals() {
     for limits in [
         DisplayLimits {
             max_object_pixels: 1,
@@ -425,7 +367,7 @@ fn receiver_limits_are_never_reclassified_as_recoverable_source_syntax() {
     ] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
-        let mut d = RecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
+        let mut d = ReceiverDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
         let mut bytes = Some(
             Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false)).unwrap(),
         );
@@ -446,7 +388,7 @@ fn receiver_limits_are_never_reclassified_as_recoverable_source_syntax() {
 fn packet_byte_limits_and_empty_input_reject_without_consuming_the_callers_owner() {
     let b = Budget::new(4096).unwrap();
     let c = AtomicBool::new(false);
-    let mut d = RecoveryDecoder::new(
+    let mut d = ReceiverDecoder::new(
         &b,
         DisplayLimits {
             max_packet_bytes: 2,
@@ -473,48 +415,38 @@ fn packet_byte_limits_and_empty_input_reject_without_consuming_the_callers_owner
     assert!(empty.is_some());
 }
 #[test]
-fn one_and_two_byte_physical_headers_are_receiver_errors_not_successful_empty_packets() {
-    for raw in [&[0x16][..], &[0x16, 0][..]] {
-        let b = Budget::new(4 * 1024 * 1024).unwrap();
-        let c = AtomicBool::new(false);
-        let mut d =
-            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
-        let retained = Bytes::copy_from_slice(&b, raw).unwrap();
-        let mut bytes = Some(retained.clone());
-        d.push(&mut bytes, stamp(), &c).unwrap();
-        let error = loop {
-            match d.poll(&mut WorkBudget::new(4096), &c) {
-                Err(e) => break e,
-                Ok(RecoveryStatus::Yield) => {}
-                other => panic!("short header hidden {other:?}"),
-            }
-        };
-        assert_eq!(error, Error::Truncated);
-        assert_eq!(retained.as_ref(), raw);
-        assert_eq!(
-            b.used(),
-            Budget::control_storage_bytes() + retained.retained_storage_bytes()
-        );
-    }
-}
-#[test]
-fn retained_source_pixels_raw_palette_and_receiver_output_survive_decoder_teardown() {
+fn one_and_two_byte_packets_are_refused_and_decoding_continues() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+    for raw in [&[0x16][..], &[0x16, 0][..]] {
+        let mut bytes = Some(Bytes::copy_from_slice(&b, raw).unwrap());
+        d.push(&mut bytes, stamp(), &c).unwrap();
+        let out = ready(&mut d, 1);
+        assert_eq!(out.raw_packet().as_ref(), raw);
+        assert_eq!(out.refusal(), Some(Refusal::ShortPacket));
+        assert!(out.receiver_output().is_none());
+    }
+    let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
+    let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
+    d.push(&mut bytes, stamp(), &c).unwrap();
+    let out = ready(&mut d, 7);
+    assert_eq!(out.refusal(), None);
+    let rect = &out.receiver_output().unwrap().rectangles()[0];
+    assert_eq!(rect.pixels().as_ref(), [1, 2]);
+}
+#[test]
+fn receiver_output_survives_decoder_teardown() {
+    let b = Budget::new(4 * 1024 * 1024).unwrap();
+    let c = AtomicBool::new(false);
+    let mut d =
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut bytes =
         Some(Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap());
     d.push(&mut bytes, stamp(), &c).unwrap();
     let out = ready(&mut d, 1);
     drop(d);
-    assert_eq!(out.source_sets()[0].objects()[0].pixels().as_ref(), [1, 2]);
-    assert!(
-        out.source_sets()[0].objects()[0]
-            .palette()
-            .source(3)
-            .is_none()
-    );
     assert_eq!(
         out.receiver_output().unwrap().rectangles()[0]
             .pixels()
@@ -526,34 +458,11 @@ fn retained_source_pixels_raw_palette_and_receiver_output_survive_decoder_teardo
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 #[test]
-fn explicit_eof_reports_source_truncation_without_fabricating_a_receiver_display() {
+fn hard_reset_keeps_old_outputs() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
-    let mut bytes = Some(Bytes::copy_from_slice(&b, &pcs(0x80, false)).unwrap());
-    d.push(&mut bytes, stamp(), &c).unwrap();
-    assert!(ready(&mut d, 1).receiver_output().is_none());
-    d.finish_input(&c).unwrap();
-    let before = b.used();
-    d.poll(&mut WorkBudget::new(0), &c).unwrap();
-    assert_eq!(b.used(), before);
-    for _ in 0..10000 {
-        if d.poll(&mut WorkBudget::new(1), &c).unwrap() == RecoveryStatus::Ended {
-            break;
-        }
-    }
-    let eof = d.eof_report().unwrap();
-    assert_eq!(eof.source_error, Some(Error::Truncated));
-    assert_eq!(eof.receiver_error, None);
-    assert!(d.take_output(&c).is_err());
-}
-#[test]
-fn hard_reset_preserves_actual_strict_generation_and_old_outputs() {
-    let b = Budget::new(4 * 1024 * 1024).unwrap();
-    let c = AtomicBool::new(false);
-    let mut d =
-        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut retained = Vec::new();
     for generation in 0..3 {
         if generation != 0 {
@@ -564,7 +473,6 @@ fn hard_reset_preserves_actual_strict_generation_and_old_outputs() {
         );
         d.push(&mut bytes, stamp(), &c).unwrap();
         let out = ready(&mut d, 1);
-        assert_eq!(out.source_sets()[0].generation, generation);
         retained.push(out);
     }
     for out in retained {
@@ -577,12 +485,12 @@ fn hard_reset_preserves_actual_strict_generation_and_old_outputs() {
     }
 }
 #[test]
-fn raw_unknown_and_native_sentinel_source_clocks_are_never_relabelled_known_zero() {
+fn unknown_and_sentinel_clocks_are_never_relabelled_known_zero() {
     for pts in [None, Some(i64::MIN), Some(-90_000)] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+            ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let mut bytes = Some(
             Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap(),
         );
@@ -590,12 +498,7 @@ fn raw_unknown_and_native_sentinel_source_clocks_are_never_relabelled_known_zero
         d.push(&mut bytes, clock, &c).unwrap();
         let out = ready(&mut d, 1);
         assert_eq!(out.clock, clock);
-        assert_eq!(
-            out.source_sets()[0].presentation.stamp.packet_clock.pts,
-            pts
-        );
         if pts == Some(i64::MIN) {
-            assert!(out.source_sets()[0].receiver_time_error.is_some());
             assert_eq!(out.receiver_output().unwrap().pts_microseconds, None);
         }
     }
@@ -607,14 +510,12 @@ fn receiver_read_ahead_and_api_zero_padding_are_explicit_and_never_added_to_raw_
     assert_eq!(out.raw_packet().as_ref(), raw);
     assert_eq!(out.receiver_observations.palette_cross_segment_bytes, 4);
     assert_eq!(out.receiver_observations.palette_zero_padding_bytes, 4);
-    assert!(out.source_error().is_some());
 }
 
 #[test]
 fn missing_receiver_object_has_zero_position_but_preserves_the_original_pcs_reference() {
     let raw = [pcs(0x80, false), palette(), segment(0x80, &[])].concat();
     let out = run(&raw, 1);
-    assert!(out.source_error().is_some());
     let rect = &out.receiver_output().unwrap().rectangles()[0];
     assert_eq!(
         (rect.x, rect.y, rect.width, rect.height, rect.stride),
@@ -627,7 +528,7 @@ fn missing_receiver_object_has_zero_position_but_preserves_the_original_pcs_refe
     assert_eq!(out.raw_packet().as_ref(), raw);
 }
 #[test]
-fn shorter_than_declared_rle_can_fill_a_receiver_picture_without_validating_source_length() {
+fn rle_shorter_than_declared_can_fill_the_picture() {
     let raw = [
         pcs(0x80, false),
         palette(),
@@ -635,9 +536,7 @@ fn shorter_than_declared_rle_can_fill_a_receiver_picture_without_validating_sour
         segment(0x80, &[]),
     ]
     .concat();
-    let e = strict_error(&raw);
     let out = run(&raw, 1);
-    assert_eq!(out.source_error(), Some(e));
     let rect = &out.receiver_output().unwrap().rectangles()[0];
     assert_eq!((rect.width, rect.height, rect.stride), (1, 1, 1));
     assert_eq!(rect.pixels().as_ref(), [1]);
@@ -650,7 +549,7 @@ fn combined_work_and_outputs_are_invariant_across_quanta_for_valid_and_recovered
             let b = Budget::new(4 * 1024 * 1024).unwrap();
             let c = AtomicBool::new(false);
             let mut d =
-                RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
+                ReceiverDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
                     .unwrap();
             let mut bytes = Some(
                 Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false))
@@ -672,7 +571,7 @@ fn combined_work_and_outputs_are_invariant_across_quanta_for_valid_and_recovered
     }
 }
 #[test]
-fn source_refusal_does_not_disable_subsequent_receiver_pixel_reference_or_fragment_limits() {
+fn limits_still_apply_after_a_packet_without_a_display() {
     for limits in [
         DisplayLimits {
             max_object_pixels: 1,
@@ -693,11 +592,10 @@ fn source_refusal_does_not_disable_subsequent_receiver_pixel_reference_or_fragme
     ] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
-        let mut d = RecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
+        let mut d = ReceiverDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
         let mut bytes = Some(Bytes::copy_from_slice(&b, &segment(0x80, &[])).unwrap());
         d.push(&mut bytes, stamp(), &c).unwrap();
         let first = ready(&mut d, 1);
-        assert!(first.source_error().is_some());
         drop(first);
         let raw = [
             pcs(0x80, false),

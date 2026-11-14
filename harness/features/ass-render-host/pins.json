@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "reference": "libass-ass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask ass manifest --record`; never edited by hand.",
+  "pins": {
+    "border-x-overflow-ass-1080p": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 10,
+        "bytes": 566316,
+        "digest": 10000755184021622676
+      },
+      "thumbv7neon-unknown-linux-gnueabihf": {
+        "packets": 12,
+        "bytes": 824574,
+        "digest": 15556589770949922040
+      }
+    },
+    "border-x-overflow-ass-720p": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 10,
+        "bytes": 286940,
+        "digest": 1142840902756481492
+      },
+      "thumbv7neon-unknown-linux-gnueabihf": {
+        "packets": 12,
+        "bytes": 444346,
+        "digest": 15769740010669764714
+      }
+    },
+    "collision-far-tops-ass-1080p": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 46,
+        "bytes": 1349868,
+        "digest": 349006746010181931
+      },
+      "thumbv7neon-unknown-linux-gnueabihf": {
+        "packets": 46,
+        "bytes": 452054,
+        "digest": 15076022156322760864
+      }
+    },
+    "collision-far-tops-ass-720p": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 46,
+        "bytes": 953212,
+        "digest": 15015489568524185511
+      },
+      "thumbv7neon-unknown-linux-gnueabihf": {
+        "packets": 46,
+        "bytes": 313098,
+        "digest": 5310458554196760776
+      }
+    }
+  }
+}

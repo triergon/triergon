@@ -19,9 +19,17 @@
  * positive known-allocation window with zero window guard calls. Heap peak
  * assertions apply only to admitted positive modes, not rejected private-TLS
  * guard windows. All original eleven mode definitions are preserved.
+ * v4 adds file-mapping, which maps one page of this executable read-only in
+ * the window, reads it and unmaps it, and must stay measured with the page in
+ * file_mapped_bytes; and guard-file-writable, guard-anonymous-readonly and
+ * guard-file-munmap (a mapping made before BEGIN), which must invalidate.
+ * Every mode reports the operator new and delete forms it ran in cxx_forms.
  * Positive heap cases: default/writev/failures/zero/transient. Check exact
- * expected_peak_bytes, window_allocation_calls, nonzero hits for all six
- * selected symbols in default, and live_end == live_start. Allocation sizes
+ * expected_peak_bytes, window_allocation_calls, nonzero hits for all eight
+ * selected symbols in default, and live_end == live_start. On Linux every mode
+ * also allocates through all eight C++ operator new forms and releases through
+ * all twelve operator delete forms, held live together, so each one's bytes
+ * must be in the exact peak: the calibration that admits them unhooked. Allocation sizes
  * use the native diagnostic API, not allocator rounding guesses. This probe
  * computes the caller-visible simultaneous live peak independently of the
  * observer's table. It never writes diagnostic usable-size slack.
@@ -76,6 +84,61 @@ static size_t usable(void *pointer) { return pointer ? malloc_usable_size(pointe
 #error "memory-check needs a reviewed native usable-size diagnostic API"
 #endif
 
+#if defined(__linux__)
+/* libstdc++'s replaceable allocation functions by their mangled names (Itanium
+ * ABI: a reference is a pointer, std::align_val_t a size_t, and size_t is 'm'
+ * on LP64 and 'j' on ILP32). The probe links libstdc++ for them. */
+#if SIZE_MAX == UINT64_MAX
+#define CXX_SIZE "m"
+#else
+#define CXX_SIZE "j"
+#endif
+#define FORM_NEW "_Znw" CXX_SIZE
+#define FORM_NEW_ARRAY "_Zna" CXX_SIZE
+#define FORM_NEW_NOTHROW FORM_NEW "RKSt9nothrow_t"
+#define FORM_NEW_ARRAY_NOTHROW FORM_NEW_ARRAY "RKSt9nothrow_t"
+#define FORM_NEW_ALIGNED FORM_NEW "St11align_val_t"
+#define FORM_NEW_ARRAY_ALIGNED FORM_NEW_ARRAY "St11align_val_t"
+#define FORM_NEW_ALIGNED_NOTHROW FORM_NEW_ALIGNED "RKSt9nothrow_t"
+#define FORM_NEW_ARRAY_ALIGNED_NOTHROW FORM_NEW_ARRAY_ALIGNED "RKSt9nothrow_t"
+#define FORM_DELETE "_ZdlPv"
+#define FORM_DELETE_ARRAY "_ZdaPv"
+#define FORM_DELETE_SIZED FORM_DELETE CXX_SIZE
+#define FORM_DELETE_ARRAY_SIZED FORM_DELETE_ARRAY CXX_SIZE
+#define FORM_DELETE_NOTHROW FORM_DELETE "RKSt9nothrow_t"
+#define FORM_DELETE_ARRAY_NOTHROW FORM_DELETE_ARRAY "RKSt9nothrow_t"
+#define FORM_DELETE_ALIGNED FORM_DELETE "St11align_val_t"
+#define FORM_DELETE_ARRAY_ALIGNED FORM_DELETE_ARRAY "St11align_val_t"
+#define FORM_DELETE_SIZED_ALIGNED FORM_DELETE_SIZED "St11align_val_t"
+#define FORM_DELETE_ARRAY_SIZED_ALIGNED FORM_DELETE_ARRAY_SIZED "St11align_val_t"
+#define FORM_DELETE_ALIGNED_NOTHROW FORM_DELETE_ALIGNED "RKSt9nothrow_t"
+#define FORM_DELETE_ARRAY_ALIGNED_NOTHROW FORM_DELETE_ARRAY_ALIGNED "RKSt9nothrow_t"
+typedef struct { char unused; } NoThrow;
+extern const NoThrow cxx_nothrow __asm__("_ZSt7nothrow");
+void *cxx_new(size_t) __asm__(FORM_NEW);
+void *cxx_new_array(size_t) __asm__(FORM_NEW_ARRAY);
+void *cxx_new_nothrow(size_t, const NoThrow *) __asm__(FORM_NEW_NOTHROW);
+void *cxx_new_array_nothrow(size_t, const NoThrow *) __asm__(FORM_NEW_ARRAY_NOTHROW);
+void *cxx_new_aligned(size_t, size_t) __asm__(FORM_NEW_ALIGNED);
+void *cxx_new_array_aligned(size_t, size_t) __asm__(FORM_NEW_ARRAY_ALIGNED);
+void *cxx_new_aligned_nothrow(size_t, size_t, const NoThrow *) __asm__(FORM_NEW_ALIGNED_NOTHROW);
+void *cxx_new_array_aligned_nothrow(size_t, size_t, const NoThrow *)
+    __asm__(FORM_NEW_ARRAY_ALIGNED_NOTHROW);
+void cxx_delete(void *) __asm__(FORM_DELETE);
+void cxx_delete_array(void *) __asm__(FORM_DELETE_ARRAY);
+void cxx_delete_sized(void *, size_t) __asm__(FORM_DELETE_SIZED);
+void cxx_delete_array_sized(void *, size_t) __asm__(FORM_DELETE_ARRAY_SIZED);
+void cxx_delete_nothrow(void *, const NoThrow *) __asm__(FORM_DELETE_NOTHROW);
+void cxx_delete_array_nothrow(void *, const NoThrow *) __asm__(FORM_DELETE_ARRAY_NOTHROW);
+void cxx_delete_aligned(void *, size_t) __asm__(FORM_DELETE_ALIGNED);
+void cxx_delete_array_aligned(void *, size_t) __asm__(FORM_DELETE_ARRAY_ALIGNED);
+void cxx_delete_sized_aligned(void *, size_t, size_t) __asm__(FORM_DELETE_SIZED_ALIGNED);
+void cxx_delete_array_sized_aligned(void *, size_t, size_t) __asm__(FORM_DELETE_ARRAY_SIZED_ALIGNED);
+void cxx_delete_aligned_nothrow(void *, size_t, const NoThrow *) __asm__(FORM_DELETE_ALIGNED_NOTHROW);
+void cxx_delete_array_aligned_nothrow(void *, size_t, const NoThrow *)
+    __asm__(FORM_DELETE_ARRAY_ALIGNED_NOTHROW);
+#endif
+
 static uint64_t peak, live, allocation_calls;
 static unsigned char *limited[65537];
 
@@ -83,13 +146,20 @@ enum {
     MODE_MMAP = 11, MODE_MMAP64, MODE_MUNMAP, MODE_MMAP_FAILURE,
     MODE_MMAP64_FAILURE, MODE_MUNMAP_FAILURE, MODE_PTHREAD_CREATE,
     MODE_DLOPEN, MODE_DLMOPEN, MODE_DLCLOSE, MODE_DLOPEN_FAILURE,
-    MODE_DLMOPEN_FAILURE, MODE_SCOPE_STARTUP
+    MODE_DLMOPEN_FAILURE, MODE_SCOPE_STARTUP, MODE_FILE_MAPPING,
+    MODE_FILE_WRITABLE, MODE_ANONYMOUS_READONLY, MODE_FILE_MUNMAP
 };
+
+/* Modes whose window makes a guarded call, which must invalidate the receipt. */
+static int guarded(unsigned mode) {
+    return (mode >= MODE_MMAP && mode < MODE_SCOPE_STARTUP) || mode > MODE_FILE_MAPPING;
+}
 
 typedef struct {
     void *mapping;
     void *handle;
-    size_t page;
+    size_t page, file_mapped;
+    int file, has_file;
     unsigned calls[7], successes[7], failures[7];
 } GuardControl;
 
@@ -109,6 +179,15 @@ static int guard_prepare(unsigned mode, GuardControl *control) {
     if (mode == MODE_DLCLOSE) {
         control->handle = dlopen(NULL, RTLD_NOW | RTLD_LOCAL);
         if (!control->handle) return 0;
+    }
+    if (mode == MODE_FILE_MAPPING || mode == MODE_FILE_WRITABLE || mode == MODE_FILE_MUNMAP) {
+        control->file = open("/proc/self/exe", O_RDONLY | O_CLOEXEC);
+        if (control->file < 0) return 0;
+        control->has_file = 1;
+    }
+    if (mode == MODE_FILE_MUNMAP) {
+        control->mapping = mmap(NULL, control->page, PROT_READ, MAP_PRIVATE, control->file, 0);
+        if (control->mapping == MAP_FAILED) { control->mapping = NULL; return 0; }
     }
     return 1;
 }
@@ -172,6 +251,30 @@ static int guard_operation(unsigned mode, GuardControl *control) {
         control->handle = NULL;
         return 1;
     }
+    if (mode == MODE_FILE_MAPPING) {
+        /* Admitted: a read-only file page, read, then unmapped in the window. */
+        void *out = mmap(NULL, control->page, PROT_READ, MAP_PRIVATE, control->file, 0);
+        if (out == MAP_FAILED || ((volatile unsigned char *)out)[1] != 'E') return 0;
+        control->file_mapped = control->page;
+        return munmap(out, control->page) == 0;
+    }
+    if (mode == MODE_FILE_WRITABLE || mode == MODE_ANONYMOUS_READONLY) {
+        int file = mode == MODE_FILE_WRITABLE;
+        void *out = mmap(NULL, control->page, file ? PROT_READ | PROT_WRITE : PROT_READ,
+                         file ? MAP_PRIVATE : MAP_PRIVATE | MAP_ANONYMOUS,
+                         file ? control->file : -1, 0);
+        expected_guard(control, 0, out != MAP_FAILED);
+        if (out == MAP_FAILED) return 0;
+        control->mapping = out;
+        return 1;
+    }
+    if (mode == MODE_FILE_MUNMAP) {
+        int result = munmap(control->mapping, control->page);
+        expected_guard(control, 2, result == 0);
+        if (result) return 0;
+        control->mapping = NULL;
+        return 1;
+    }
     if (mode == MODE_DLOPEN_FAILURE || mode == MODE_DLMOPEN_FAILURE) {
         (void)dlerror();
         void *out = mode == MODE_DLOPEN_FAILURE ?
@@ -188,7 +291,9 @@ static int guard_operation(unsigned mode, GuardControl *control) {
 static int guard_cleanup(GuardControl *control) {
     if (control->mapping && munmap(control->mapping, control->page)) return 0;
     if (control->handle && dlclose(control->handle)) return 0;
+    if (control->has_file && close(control->file)) return 0;
     control->mapping = control->handle = NULL;
+    control->has_file = 0;
     return 1;
 }
 
@@ -246,10 +351,14 @@ static void add(void *pointer, size_t requested) {
     for (size_t n = 0; n < requested; ++n) bytes[n] = 1;
 }
 
-static void drop(void *pointer) {
+static void forget(void *pointer) {
     size_t size = usable(pointer);
     if (size > live) exit(3);
     live -= size;
+}
+
+static void drop(void *pointer) {
+    forget(pointer);
 #if defined(__linux__)
     int saved = errno;
 #endif
@@ -257,6 +366,94 @@ static void drop(void *pointer) {
 #if defined(__linux__)
     if (errno != saved) exit(5);
 #endif
+}
+
+/* strdup and strndup, hooked allocations with their own counters, and on
+ * Linux every operator new form. All are held live through the window's peak
+ * and released before END, the C++ ones through every operator delete form:
+ * an uncounted allocation lowers the observed peak and its release is an
+ * unknown pointer, so each must be counted for the receipt to match. */
+enum { BYTES = 4000, ALIGNMENT = 64 };
+static char *copy, *prefix;
+#if defined(__linux__)
+static void *cxx[16];
+/* The forms run, each once, in the order first run: the work report. */
+static const char *ran[20];
+static unsigned ran_count;
+
+static void run(const char *form) {
+    for (unsigned n = 0; n < ran_count; ++n) if (!strcmp(ran[n], form)) return;
+    if (ran_count == 20) exit(5);
+    ran[ran_count++] = form;
+}
+#endif
+
+static void hold_other_forms(void) {
+    copy = strdup("triergon");
+    prefix = strndup("triergon", 3);
+    if (!copy || !prefix || strcmp(copy, "triergon") || strcmp(prefix, "tri")) exit(5);
+    add(copy, 9);
+    add(prefix, 4);
+#if defined(__linux__)
+    for (int n = 0; n < 3; ++n) {
+        cxx[n] = cxx_new(BYTES);
+        cxx[4 + n] = cxx_new_array(BYTES);
+        cxx[8 + n] = cxx_new_aligned(BYTES, ALIGNMENT);
+        cxx[12 + n] = cxx_new_array_aligned(BYTES, ALIGNMENT);
+    }
+    run(FORM_NEW);
+    run(FORM_NEW_ARRAY);
+    run(FORM_NEW_ALIGNED);
+    run(FORM_NEW_ARRAY_ALIGNED);
+    cxx[3] = cxx_new_nothrow(BYTES, &cxx_nothrow);
+    run(FORM_NEW_NOTHROW);
+    cxx[7] = cxx_new_array_nothrow(BYTES, &cxx_nothrow);
+    run(FORM_NEW_ARRAY_NOTHROW);
+    cxx[11] = cxx_new_aligned_nothrow(BYTES, ALIGNMENT, &cxx_nothrow);
+    run(FORM_NEW_ALIGNED_NOTHROW);
+    cxx[15] = cxx_new_array_aligned_nothrow(BYTES, ALIGNMENT, &cxx_nothrow);
+    run(FORM_NEW_ARRAY_ALIGNED_NOTHROW);
+    for (int n = 0; n < 16; ++n) {
+        if (n >= 8 && (uintptr_t)cxx[n] % ALIGNMENT) exit(5);
+        add(cxx[n], BYTES);
+    }
+#endif
+}
+
+static void release_other_forms(void) {
+#if defined(__linux__)
+    for (int n = 0; n < 16; ++n) forget(cxx[n]);
+    cxx_delete(cxx[0]);
+    run(FORM_DELETE);
+    cxx_delete_sized(cxx[1], BYTES);
+    run(FORM_DELETE_SIZED);
+    cxx_delete_nothrow(cxx[2], &cxx_nothrow);
+    run(FORM_DELETE_NOTHROW);
+    cxx_delete(cxx[3]);
+    cxx_delete_array(cxx[4]);
+    run(FORM_DELETE_ARRAY);
+    cxx_delete_array_sized(cxx[5], BYTES);
+    run(FORM_DELETE_ARRAY_SIZED);
+    cxx_delete_array_nothrow(cxx[6], &cxx_nothrow);
+    run(FORM_DELETE_ARRAY_NOTHROW);
+    cxx_delete_array(cxx[7]);
+    cxx_delete_aligned(cxx[8], ALIGNMENT);
+    run(FORM_DELETE_ALIGNED);
+    cxx_delete_sized_aligned(cxx[9], BYTES, ALIGNMENT);
+    run(FORM_DELETE_SIZED_ALIGNED);
+    cxx_delete_aligned_nothrow(cxx[10], ALIGNMENT, &cxx_nothrow);
+    run(FORM_DELETE_ALIGNED_NOTHROW);
+    cxx_delete_aligned(cxx[11], ALIGNMENT);
+    cxx_delete_array_aligned(cxx[12], ALIGNMENT);
+    run(FORM_DELETE_ARRAY_ALIGNED);
+    cxx_delete_array_sized_aligned(cxx[13], BYTES, ALIGNMENT);
+    run(FORM_DELETE_ARRAY_SIZED_ALIGNED);
+    cxx_delete_array_aligned_nothrow(cxx[14], ALIGNMENT, &cxx_nothrow);
+    run(FORM_DELETE_ARRAY_ALIGNED_NOTHROW);
+    cxx_delete_array_aligned(cxx[15], ALIGNMENT);
+#endif
+    drop(prefix);
+    drop(copy);
 }
 
 static int raw_write(const void *buffer, size_t count) {
@@ -327,7 +524,8 @@ int main(int argc, char **argv) {
         "guard-mmap", "guard-mmap64", "guard-munmap", "guard-mmap-failure",
         "guard-mmap64-failure", "guard-munmap-failure", "guard-pthread-create",
         "guard-dlopen", "guard-dlmopen", "guard-dlclose", "guard-dlopen-failure",
-        "guard-dlmopen-failure", "scope-startup"
+        "guard-dlmopen-failure", "scope-startup", "file-mapping", "guard-file-writable",
+        "guard-anonymous-readonly", "guard-file-munmap"
     };
     unsigned selected = (unsigned)(sizeof(modes) / sizeof(modes[0]));
     for (unsigned n = 0; n < sizeof(modes) / sizeof(modes[0]); ++n)
@@ -373,6 +571,7 @@ int main(int argc, char **argv) {
     void *d = aligned_alloc(256, 131072);
     if ((uintptr_t)d % 256) return 3;
     add(d, 131072);
+    hold_other_forms();
 
     size_t temporary_size = selected == 4 ? 32u * 1024u * 1024u : 4u * 1024u * 1024u;
     void *temporary = malloc(temporary_size);
@@ -404,9 +603,10 @@ int main(int argc, char **argv) {
         for (size_t n = 0; n < sizeof(limited) / sizeof(limited[0]); ++n) drop(limited[n]);
     }
 #if defined(__linux__)
-    if (selected >= MODE_MMAP && selected < MODE_SCOPE_STARTUP &&
+    if (selected >= MODE_MMAP && selected != MODE_SCOPE_STARTUP &&
         !guard_operation(selected, &scope_control)) return 5;
 #endif
+    release_other_forms();
     drop(d);
     drop(c);
     drop(b);
@@ -428,10 +628,11 @@ int main(int argc, char **argv) {
            "\"guard_oracle_scope\":\"authored-top-level-request-minima\","
            "\"required_guard_window_calls\":[%u,%u,%u,%u,%u,%u,%u],"
            "\"required_guard_window_successes\":[%u,%u,%u,%u,%u,%u,%u],"
-           "\"required_guard_window_failures\":[%u,%u,%u,%u,%u,%u,%u]}\n",
+           "\"required_guard_window_failures\":[%u,%u,%u,%u,%u,%u,%u],"
+           "\"expected_file_mapped_bytes\":%zu,\"cxx_forms\":[",
            peak - initial_live, at_end - initial_live, initial_live, at_end,
            allocation_calls, selected == 5 ? "false" : "true", temporary_size, which,
-           selected >= MODE_MMAP && selected < MODE_SCOPE_STARTUP ? "true" : "false",
+           guarded(selected) ? "true" : "false",
            scope_control.calls[0], scope_control.calls[1], scope_control.calls[2],
            scope_control.calls[3], scope_control.calls[4], scope_control.calls[5], scope_control.calls[6],
            scope_control.successes[0], scope_control.successes[1], scope_control.successes[2],
@@ -439,6 +640,10 @@ int main(int argc, char **argv) {
            scope_control.successes[6],
            scope_control.failures[0], scope_control.failures[1], scope_control.failures[2],
            scope_control.failures[3], scope_control.failures[4], scope_control.failures[5],
-           scope_control.failures[6]);
+           scope_control.failures[6], scope_control.file_mapped);
+#if defined(__linux__)
+    for (unsigned n = 0; n < ran_count; ++n) printf("%s\"%s\"", n ? "," : "", ran[n]);
+#endif
+    printf("]}\n");
     return live ? 4 : 0;
 }

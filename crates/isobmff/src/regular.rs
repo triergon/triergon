@@ -94,10 +94,18 @@ impl SampleTable {
     pub(crate) fn has_dependency_table(&self) -> bool {
         self.dependency.is_some()
     }
+    /// Whether the regular sample table declares composition offsets.
+    pub fn has_composition_offsets(&self) -> bool {
+        self.ctts.is_some()
+    }
+
     /// Borrow compact validated wire runs for the separate demux observation
     /// view. Their source version, raw bytes and per-sample meaning stay intact.
     pub(crate) fn composition_runs(&self) -> Option<&Words> {
         self.ctts.as_ref()
+    }
+    pub(crate) fn decode_runs(&self) -> &Words {
+        &self.stts
     }
     pub fn cursor(&self) -> SampleCursor<'_> {
         SampleCursor {

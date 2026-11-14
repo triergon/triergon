@@ -3,10 +3,11 @@ use crate::{
     Format, Result, SeekIntent, TrackKey, TrackKind,
     io::provide,
     mp4_native_replay::{NativeMp4Replay, NativeMp4ReplayStep},
-    mp4_open::{PendingMedia, RETAINED_MEDIA_BYTES},
+    mp4_open::PendingMedia,
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::container::{MediaKind, TrackInfo};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputRequest, SourceCapabilities, SourceId,
     SourceLocation, Step, Time, TimeBase, WorkBudget,
@@ -30,7 +31,7 @@ use triergon_mpegts::{
 use ts::compat::pes::{
     CompactDemuxPacket, DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope,
     DemuxTimeView, DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors,
-    ReadyContinuation, RegisteredCarriage, SourceContext,
+    ReadyContinuation, RegisteredCarriage, SourceContext, selected_track_kind,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
 #[derive(Clone, Debug)]
@@ -64,6 +65,8 @@ pub struct Mp4NativeShortPacket {
     pub prefix: ShortSample,
     pub configuration: Mp4Configuration,
     pub native: PacketOccurrence,
+    /// Decoder trim attached to the recovered occurrence.
+    pub encoded_skip_samples: Option<[u8; 10]>,
 }
 /// The first native read has a positive declaration starting at or beyond the
 /// confirmed physical end. The view ends without emitting a packet.
@@ -145,6 +148,16 @@ pub(crate) struct TrackFact {
     pub kind: TrackKind,
     pub enabled: bool,
 }
+
+fn track_kind(kind: MediaKind) -> TrackKind {
+    match kind {
+        MediaKind::Video => TrackKind::Video,
+        MediaKind::Audio => TrackKind::Audio,
+        MediaKind::Subtitle => TrackKind::Subtitle,
+        MediaKind::Data | MediaKind::Unknown => TrackKind::Other,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct CachedDescription {
     track: u32,
@@ -330,6 +343,10 @@ pub(crate) enum NativePacket {
 }
 
 #[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "return original transport events without a heap allocation"
+)]
 pub(crate) enum TsPayloadStep {
     Event(TsEvent),
     Configuration(TsNativeConfiguration),
@@ -374,6 +391,7 @@ trait TsStepProjection: Sized {
 }
 
 impl TsStepProjection for BackendStep {
+    #[inline(always)]
     fn project(step: TsPayloadStep) -> Result<Self> {
         Ok(match step {
             TsPayloadStep::Event(event) => Self::Event(RawEvent::Ts(event)),
@@ -407,6 +425,7 @@ impl TsStepProjection for BackendStep {
 }
 
 impl TsStepProjection for TsPayloadStep {
+    #[inline]
     fn project(step: Self) -> Result<Self> {
         Ok(step)
     }
@@ -529,7 +548,10 @@ impl Engine {
             maximum_packet,
         };
         if engine.plan.replay_native_order {
-            engine.begin_media_replay()?;
+            engine.replay_media = Some(crate::progressive::prepare_media_replay(
+                &engine.input,
+                &mut engine.plan,
+            )?);
         }
         Ok(Self::Mp4(engine))
     }
@@ -961,12 +983,7 @@ impl Engine {
                 for t in r.tracks() {
                     out.try_push(TrackFact {
                         key: TrackKey::Matroska(t.number),
-                        kind: match t.kind {
-                            1 => TrackKind::Video,
-                            2 => TrackKind::Audio,
-                            17 => TrackKind::Subtitle,
-                            _ => TrackKind::Other,
-                        },
+                        kind: track_kind(t.kind()),
                         enabled: t.enabled,
                     })
                     .map_err(|e| e.error)?;
@@ -977,12 +994,7 @@ impl Engine {
                     let h = &t.snapshot;
                     out.try_push(TrackFact {
                         key: TrackKey::Mp4(h.track_id),
-                        kind: match &h.handler {
-                            b"vide" => TrackKind::Video,
-                            b"soun" => TrackKind::Audio,
-                            b"text" | b"subt" | b"sbtl" => TrackKind::Subtitle,
-                            _ => TrackKind::Other,
-                        },
+                        kind: track_kind(triergon_isobmff::media_kind(&h.handler)),
                         enabled: h.enabled,
                     })
                     .map_err(|e| e.error)?;
@@ -1149,55 +1161,32 @@ impl Mp4Engine {
             && self.input.capabilities().random_access
     }
 
-    pub(crate) fn stage_native_empty_run(
-        &mut self,
-        boundary: FrontReadBoundary,
-        time_base: TimeBase,
-        duration: i64,
-        remaining: u32,
-    ) {
-        self.native_empty_run = Some((
-            Mp4NativeEmptyPacket {
-                boundary,
-                time_base,
-                handler: *b"vide",
-                pts: 0,
-                dts: 0,
-                duration,
-                position: 0,
-                flags: 0,
-            },
-            remaining,
-        ));
-    }
-
-    pub(crate) fn begin_media_replay(&mut self) -> Result<()> {
-        let [extent] = self.plan.media.as_slice() else {
-            return Err(Error::Unsupported(
-                "native replay needs a finite media extent",
-            ));
-        };
-        if self.input.position() != extent.start || self.input.capabilities().random_access {
-            return Err(Error::Invalid("native replay source position"));
-        }
-        let length = extent.end - extent.start;
-        if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
-            return Err(Error::Unsupported(
-                "native replay exceeds media cache bound",
-            ));
-        }
-        let pending = PendingMedia::new(extent.start, length as usize, self.input.budget())?;
-        self.plan.media_cache.try_reserve_exact(1)?;
-        self.replay_media = Some(pending);
-        self.plan.replay_native_order = true;
-        Ok(())
-    }
-
     fn packet_config(&self, at_track: usize, description: u32) -> Result<Mp4Configuration> {
         let revision = self.configs[at_track]
             .ok_or(Error::Invalid("configuration missing"))?
             .revision;
         self.plan.tracks.as_slice()[at_track].configuration(description, revision)
+    }
+
+    fn skip_samples(
+        &self,
+        at_track: usize,
+        occurrence: &PacketOccurrence,
+    ) -> Result<Option<[u8; 10]>> {
+        if occurrence.source.fragment_flags.is_some() && occurrence.source.ordinal == 1 {
+            let samples = self.plan.tracks.as_slice()[at_track].fragment_aac_trim;
+            return Ok((samples != 0).then(|| {
+                let mut trim = [0; 10];
+                trim[..4].copy_from_slice(&samples.to_le_bytes());
+                trim
+            }));
+        }
+        match &self.plan.encoded_edits {
+            Some(plans) => plans.as_slice()[at_track]
+                .as_ref()
+                .map_or(Ok(None), |plan| plan.skip_samples(&occurrence.source)),
+            None => Ok(None),
+        }
     }
 
     fn emit_packet(
@@ -1211,14 +1200,9 @@ impl Mp4Engine {
             Some(cursor) => Some(cursor.take_occurrence()?),
             None => self.plan.native(self.row).cloned(),
         };
-        let encoded_skip_samples =
-            if let (Some(occurrence), Some(plans)) = (&native, &self.plan.encoded_edits) {
-                plans.as_slice()[at_track]
-                    .as_ref()
-                    .map_or(Ok(None), |plan| plan.skip_samples(&occurrence.source))?
-            } else {
-                None
-            };
+        let encoded_skip_samples = native.as_ref().map_or(Ok(None), |occurrence| {
+            self.skip_samples(at_track, occurrence)
+        })?;
         if native.is_some() && source.sample.range.is_empty() {
             self.native_boundary_observed =
                 self.plan
@@ -1246,12 +1230,17 @@ impl Mp4Engine {
     }
 
     fn poll_progressive(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
-        if let Some(mut state) = self.progressive.take() {
-            let result = state.poll(self, w, c);
-            self.progressive = Some(state);
-            return result;
-        }
-        Ok(BackendStep::End)
+        let Some(state) = self.progressive.as_mut() else {
+            return Ok(BackendStep::End);
+        };
+        let mut continuation = crate::progressive::Continuation {
+            input: &mut self.input,
+            plan: &mut self.plan,
+            row: &mut self.row,
+            replay_media: &mut self.replay_media,
+            native_empty_run: &mut self.native_empty_run,
+        };
+        state.poll(&mut continuation, w, c)
     }
 
     fn poll_unavailable_first(
@@ -1346,6 +1335,7 @@ impl Mp4Engine {
                     .ok_or(Error::Invalid("short packet needs native occurrence"))?
                     .clone();
                 native.demux.flags |= 2;
+                let encoded_skip_samples = self.skip_samples(at_track, &native)?;
                 self.packet = None;
                 self.native_recovery_end = true;
                 Ok(BackendStep::Event(RawEvent::Mp4(
@@ -1353,6 +1343,7 @@ impl Mp4Engine {
                         prefix,
                         configuration,
                         native,
+                        encoded_skip_samples,
                     }),
                 )))
             }
@@ -1876,19 +1867,18 @@ impl TsEngine {
         index: usize,
         mut packet: ts::TransportPacket,
         context: SourceContext,
-        ready: Option<(&mut WorkBudget, &AtomicBool)>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            if let Some((work, cancel)) = ready {
-                match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
-                    ReadyContinuation::Buffered => return Ok(true),
-                    ReadyContinuation::Complete => {
-                        self.native_active = Some(index);
-                        return Ok(false);
-                    }
-                    ReadyContinuation::Unhandled => {}
+            match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
+                ReadyContinuation::Buffered => return Ok(true),
+                ReadyContinuation::Complete => {
+                    self.native_active = Some(index);
+                    return Ok(false);
                 }
+                ReadyContinuation::Unhandled => {}
             }
             let pushed = if self.native_context.is_some() {
                 observer.push_with_input(packet, context, &self.input)
@@ -2078,13 +2068,15 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
-                        if matches!(
-                            self.segment_discovery,
-                            Some(
-                                SegmentDiscovery::Progressive
-                                    | SegmentDiscovery::CompactProgressive
+                        if self.segment_discovery.is_none()
+                            || matches!(
+                                self.segment_discovery,
+                                Some(
+                                    SegmentDiscovery::Progressive
+                                        | SegmentDiscovery::CompactProgressive
+                                )
                             )
-                        ) {
+                        {
                             return self.project_pending_packet(w, c);
                         }
                         return T::project(TsPayloadStep::Yield);
@@ -2244,22 +2236,11 @@ impl TsEngine {
                     .try_reserve_exact(map.streams.len().saturating_sub(self.facts.len()))?;
                 self.facts.clear();
                 for e in map.streams.as_slice() {
-                    let kind = match e.stream_type {
-                        0x1b | 0x24 | 0x02 => TrackKind::Video,
-                        0x0f | 0x11 | 0x03 | 0x04 | 0x81 | 0x87 => TrackKind::Audio,
-                        0x06 => self
-                            .native_tracks
-                            .index(e.pid)
-                            .map(|i| &self.native_tracks.as_slice()[i])
-                            .filter(|track| track.observer.is_some())
-                            .map_or(TrackKind::Other, |track| match track.selection.carriage {
-                                TsNativeCarriage::PrivateAudio(_)
-                                | TsNativeCarriage::AudioFromPmt => TrackKind::Audio,
-                                TsNativeCarriage::DvbSubtitles => TrackKind::Subtitle,
-                                TsNativeCarriage::Registered(_) => TrackKind::Other,
-                            }),
-                        _ => TrackKind::Other,
-                    };
+                    let observer = self
+                        .native_tracks
+                        .index(e.pid)
+                        .and_then(|i| self.native_tracks.as_slice()[i].observer.as_ref());
+                    let kind = track_kind(selected_track_kind(e, observer));
                     self.facts
                         .try_push(TrackFact {
                             key: TrackKey::Ts {
@@ -2314,8 +2295,7 @@ impl TsEngine {
                     TraceEvent::Transport(packet) => {
                         if let Some(index) = self.native_tracks.index(packet.pid) {
                             let context = self.native_source_context();
-                            drained =
-                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
+                            drained = self.offer_native_transport(index, packet, context, w, c)?;
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
@@ -2375,7 +2355,36 @@ impl TsEngine {
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
                 let context = self.native_source_context();
-                self.offer_native_transport(index, packet.clone(), context, None)?;
+                let track = &mut self.native_tracks.as_mut_slice()[index];
+                if let Some(observer) = track.observer.as_mut() {
+                    // Keep one unit for delivery of the original source event.
+                    let ready = if w.remaining() >= 3 {
+                        observer.append_ready_borrowed_continuation(
+                            packet,
+                            context,
+                            &self.input,
+                            w,
+                            c,
+                        )?
+                    } else {
+                        ReadyContinuation::Unhandled
+                    };
+                    match ready {
+                        ReadyContinuation::Buffered => {}
+                        ReadyContinuation::Complete => self.native_active = Some(index),
+                        ReadyContinuation::Unhandled => match observer.push_borrowed(
+                            packet,
+                            context,
+                            self.native_context.as_ref().map(|_| &self.input),
+                        ) {
+                            Ok(()) => self.native_active = Some(index),
+                            Err(error) => {
+                                track.refuse(error);
+                                self.native_update_at = Some(index);
+                            }
+                        },
+                    }
+                }
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {
@@ -2462,6 +2471,7 @@ impl RawEvent {
             _ => Ok(None),
         }
     }
+    #[inline]
     pub fn payload_bytes(&self) -> usize {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,

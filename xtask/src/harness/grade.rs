@@ -4,13 +4,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
-use super::timing::validate_module_absence as timing_module_absent;
+use super::timing::{self, GATE_PAIRS};
 use super::validation::{
     self, array, external_contract, field, hash, members, put, require_same, selected_operation,
     text,
@@ -119,9 +118,10 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
 
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let value =
-        json::parse(std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+    let value = json::parse_observations(
+        std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?,
+    )
+    .map_err(|e| format!("{}: {e}", path.display()))?;
     members(&value).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok((value, sha256::hex(&bytes)))
 }
@@ -384,6 +384,11 @@ fn membership<'a>(expected: &[Value], actual: &'a [Value]) -> R<BTreeMap<&'a str
             return Err(format!("{id}: input hash mismatch"));
         }
         require_same(field(actual, "profile")?, field(row, "profile")?, "profile")?;
+        match (row.get("entities"), actual.get("input_entities")) {
+            (Some(expected), Some(reported)) => require_same(reported, expected, "input entities")?,
+            (None, None) => {}
+            _ => return Err(format!("{id}: input entities mismatch")),
+        }
     }
     Ok(found)
 }
@@ -447,6 +452,9 @@ fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -
         &reference_summary(&resolved.reference),
         "reference",
     )?;
+    if row.get("measurement_worker").and_then(Value::as_str) != resolved.measurement_worker {
+        return Err("measurement reference differs from the contract".into());
+    }
     if row.get("candidate_worker").and_then(Value::as_str) != resolved.candidate_worker {
         return Err("candidate worker differs from the contract".into());
     }
@@ -492,7 +500,7 @@ fn samples(measurement: &Value, minimum: i128, failed_memory: bool) -> R<&[Value
     } else {
         integer(measurement, "pairs")?
     };
-    if pairs < minimum.max(30) || pairs != raw.len() as i128 {
+    if pairs < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
@@ -587,7 +595,6 @@ fn join_case(
         require_same(previous, clock, "retained timing measurement")?;
     }
     let minimum = integer(contract, "minimum_pairs")?;
-    let timed_raw = samples(clock, minimum, false)?;
     let memory_raw = samples(memory, minimum, text(memory, "status")? != "qualified")?;
     if text(clock, "status")? != "measured" || integer(clock, "iterations")? < 1 {
         return Err("timing is not measured".into());
@@ -595,7 +602,6 @@ fn join_case(
     if !validation::iterations_valid(contract, field(clock, "iterations")?) {
         return Err("iterations do not match the contract".into());
     }
-    require_same(field(clock, "worker_hashes")?, &workers, "timing workers")?;
     for measurement in [clock, memory] {
         require_same(
             field(measurement, "input_sha256")?,
@@ -609,18 +615,27 @@ fn join_case(
             .and_then(|h| h.get("system"))
             .and_then(Value::as_str)
             == Some("Linux");
-    timing_module_absent(clock, timed_raw, linux)?;
+    timing::validate(
+        clock,
+        &timing::Expected {
+            worker_hashes: &workers,
+            input_sha256: Some(field(timed, "input_sha256")?),
+            minimum_pairs: minimum.max(GATE_PAIRS as i128),
+            work: &timing::Work {
+                fields: fields.clone(),
+                own: vec![],
+            },
+            require_linux: linux,
+            module_absence: true,
+        },
+    )
+    .map_err(|error| format!("timing: {error}"))?;
     memory_binding(memory, identity, &workers, linux)?;
-    let timed_output = work(field(field(&timed_raw[0], "reference")?, "data")?, &fields)?;
-    for sample in timed_raw {
-        for role in ["candidate", "reference"] {
-            require_same(
-                &work(field(field(sample, role)?, "data")?, &fields)?,
-                &timed_output,
-                "timed output",
-            )?;
-        }
-    }
+    // The validator has shown both workers do this work in every pair.
+    let timed_output = work(
+        field(field(&array(clock, "samples")?[0], "reference")?, "data")?,
+        &fields,
+    )?;
     let output = work(
         field(field(&memory_raw[0], "reference_heap")?, "work")?,
         &fields,
@@ -754,6 +769,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         return Ok(0);
     }
     let options = Options::parse(root, args)?;
+    super::report::create_output(&options.output)?;
     let (timed, timing_sha) = document(&options.timing)?;
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
@@ -881,25 +897,16 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     ] {
         put(&mut report, key, value)?;
     }
-    // Refuse replacement so an earlier failed grade and its inputs stay intact.
-    fs::create_dir_all(&options.output)
-        .map_err(|e| format!("{}: {e}", options.output.display()))?;
     let destination = options.output.join("report.json");
     match kind {
-        Shape::Corpus => super::report::write_case_report(
+        Shape::Corpus => super::report::write_observed_case_report(
             &options.output,
             &report,
             expected.iter().map(combine),
         )?,
         Shape::External => {
             put(&mut report, "case", combine(&expected[0])?)?;
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&destination)
-                .map_err(|e| format!("{}: {e}", destination.display()))?;
-            file.write_all(json::to_python(&report, Some(2)).as_bytes())
-                .map_err(|e| format!("{}: {e}", destination.display()))?;
+            super::report::publish_json(&destination, &json::to_python(&report, Some(2)))?;
         }
     }
     let mut code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
@@ -920,7 +927,24 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
-    use crate::harness::timing;
+
+    #[test]
+    fn grading_cannot_reuse_a_collection_directory() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let args = [
+            "unused-timing.json",
+            "unused-memory.json",
+            "--contract",
+            "unused-contract.json",
+            "--manifest",
+            "unused-manifest.json",
+            "--output",
+            "harness/features/progressive-ts188",
+        ]
+        .map(str::to_owned);
+        let error = main(root, &args).unwrap_err();
+        assert!(error.contains("use a new output directory"));
+    }
 
     #[test]
     fn ordinary_contracts_do_not_require_functional_control_reports() {
@@ -1058,6 +1082,17 @@ mod tests {
                 observe(format!("before-warmup:{role}"));
                 observe(format!("after-warmup:{role}"));
             }
+            // An idle host's CPU record, valid whether or not Linux evidence is required.
+            let cpu = object(&[(
+                super::super::acceptance::LINUX_CPU_KEY,
+                object(&[
+                    ("status", Value::str("recorded")),
+                    ("boot_id", Value::str("boot")),
+                    ("cpus", Value::strings(["cpu0"])),
+                    ("ticks_per_second", Value::int(100)),
+                    ("counters", Value::Array(vec![Value::int(0); 8])),
+                ]),
+            )]);
             let mut timed_raw = Vec::new();
             for pair in 0..30 {
                 let mut data = output.clone();
@@ -1072,8 +1107,8 @@ mod tests {
                     ("order", Value::strings(["candidate", "reference"])),
                     ("candidate", worker.clone()),
                     ("reference", worker),
-                    ("cpu_before", object(&[("raw", Value::str("before"))])),
-                    ("cpu_after", object(&[("raw", Value::str("after"))])),
+                    ("cpu_before", cpu.clone()),
+                    ("cpu_after", cpu.clone()),
                 ]));
                 for role in ["candidate", "reference"] {
                     observe(format!("before-pair:{pair}:{role}"));
@@ -1116,10 +1151,30 @@ mod tests {
                     ("status", Value::str("measured")),
                     ("pairs", Value::int(30)),
                     ("iterations", Value::int(200)),
+                    ("seed", Value::int(0)),
+                    (
+                        "ratio",
+                        timing::interval_value(
+                            &crate::stats::ratio_interval(&[(100.0, 100.0); 30], 0, 4000).unwrap(),
+                        ),
+                    ),
                     ("input_sha256", Value::str(digest('e'))),
                     (
                         "worker_hashes",
                         field(&identity, "binaries").unwrap().clone(),
+                    ),
+                    (
+                        "warmups",
+                        Value::Array(
+                            ["candidate", "reference"]
+                                .map(|role| {
+                                    object(&[
+                                        ("worker", Value::str(role)),
+                                        ("result", field(&timed_raw[0], role).unwrap().clone()),
+                                    ])
+                                })
+                                .into(),
+                        ),
                     ),
                     ("samples", Value::Array(timed_raw)),
                     ("timing_module_policy", Value::str(timing::MODULE_POLICY)),
@@ -1301,14 +1356,24 @@ mod tests {
             ("hls-segments", 71),
             ("packet-framing", 125),
             ("isobmff-open-index", 1020),
-            ("font-outlines", 51),
-            ("font-hinting-none", 102),
-            ("font-hinting-modes", 918),
+            ("font-outlines", 53),
+            ("font-hinting-none", 159),
+            ("font-hinting-default", 53),
+            ("font-hinting-modes", 954),
             ("matroska-audio-clocks", 10),
-            ("mp4-forward", 38),
+            ("mp4-forward", 46),
             ("ts-program", 35),
-            ("raw-annex-b", 6),
+            ("raw-annex-b", 7),
             ("mpegts-pes", 97),
+            ("subtitle-pgs", 319),
+            ("subtitle-dvb", 241),
+            ("subtitle-dvd", 228),
+            ("subtitle-dvd-host", 5),
+            ("subtitle-cc", 205),
+            ("subtitle-teletext", 72),
+            ("subtitle-pgs-capsules", 229),
+            ("subtitle-text", 367),
+            ("subtitle-text-host", 23),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,
@@ -1329,11 +1394,15 @@ mod tests {
                 .iter()
                 .rev()
                 .map(|row| {
-                    object(&[
+                    let mut report = object(&[
                         ("id", row.get("id").unwrap().clone()),
                         ("profile", row.get("profile").unwrap().clone()),
                         ("input_sha256", row.get("sha256").unwrap().clone()),
-                    ])
+                    ]);
+                    if let Some(entities) = row.get("entities") {
+                        put(&mut report, "input_entities", entities.clone()).unwrap();
+                    }
+                    report
                 })
                 .collect();
             assert_eq!(
@@ -1342,6 +1411,14 @@ mod tests {
                 "{feature}"
             );
             assert!(membership(expected, &actual[1..]).is_err(), "{feature}");
+            if let Some(index) = actual
+                .iter()
+                .position(|row| row.get("input_entities").is_some())
+            {
+                let mut changed = actual.clone();
+                put(&mut changed[index], "input_entities", Value::Array(vec![])).unwrap();
+                assert!(membership(expected, &changed).is_err(), "{feature}");
+            }
             let mut pilot = manifest.clone();
             put(&mut pilot, "cases", Value::Array(expected[1..].to_vec())).unwrap();
             let pilot_sha = sha256::hex(json::to_python(&pilot, Some(2)).as_bytes());
@@ -1754,6 +1831,18 @@ mod tests {
             }
             change(row, &[section], "samples", Value::Array(samples));
         }
+        let mut warmups = array(field(&fixture.timed, "timing").unwrap(), "warmups")
+            .unwrap()
+            .to_vec();
+        for warmup in &mut warmups {
+            change(warmup, &["result", "data"], "digest_b", Value::int(17));
+        }
+        change(
+            &mut fixture.timed,
+            &["timing"],
+            "warmups",
+            Value::Array(warmups),
+        );
         put(
             &mut fixture.expected,
             "expected",
@@ -1911,7 +2000,7 @@ mod tests {
             Value::Array(observations.clone()),
         )
         .unwrap();
-        timing_module_absent(&clock, &raw, true).unwrap();
+        timing::validate_module_absence(&clock, &raw, true).unwrap();
         change(
             &mut observations[64],
             &["state"],
@@ -1924,7 +2013,7 @@ mod tests {
             Value::Array(observations.clone()),
         )
         .unwrap();
-        assert!(timing_module_absent(&clock, &raw, true).is_err());
+        assert!(timing::validate_module_absence(&clock, &raw, true).is_err());
         observations.pop();
         put(
             &mut clock,
@@ -1933,7 +2022,7 @@ mod tests {
         )
         .unwrap();
         assert!(
-            timing_module_absent(&clock, &raw, true)
+            timing::validate_module_absence(&clock, &raw, true)
                 .unwrap_err()
                 .contains("incomplete")
         );
@@ -2191,6 +2280,20 @@ mod tests {
             ("cases", Value::Array(vec![fixture.timed])),
         ]);
         assert!(binding.headers(&header, &header).is_ok());
+        let coverage = |observation| Value::Array(vec![object(&[("observation", observation)])]);
+        let mut timed = header.clone();
+        let mut memory = header.clone();
+        put(
+            &mut timed,
+            "fate_coverage",
+            coverage(json::parse_observations("1.0e-9223372036854775808").unwrap()),
+        )
+        .unwrap();
+        put(&mut memory, "fate_coverage", coverage(Value::float(1.0))).unwrap();
+        assert!(matches!(
+            binding.headers(&timed, &memory),
+            Err(error) if error == "fate_coverage mismatch"
+        ));
         for (key, value) in [
             ("collection_status", Value::str("partial")),
             ("contract_sha256", Value::str(digest('c'))),

@@ -1,12 +1,12 @@
 //! Incremental native-view box selection and forward ASS emission.
 use super::{
     Clock, Funding, Limits, Options, Output, Subtitle,
-    config::{Configuration, Style},
-    write::Writer,
+    config::{Configuration, Style, until_nul},
+    write::{Fixed, Writer},
 };
 use crate::text::{Input, unicode::cancelled};
 use std::{fmt::Write, sync::atomic::AtomicBool};
-use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 const INVALID_DATA: i32 = -1094995529;
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +27,19 @@ enum Phase {
     Render,
     Freeze,
     Ready,
+}
+/// The emission stages at a character where a style or the highlight starts or
+/// ends, in the order the reference writes them; each is one unit of work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Stage {
+    /// The end of the selected style; also the stage between characters.
+    Reset,
+    Face,
+    Size,
+    Font,
+    Colour,
+    Highlight,
+    Text,
 }
 
 #[derive(Debug)]
@@ -51,7 +64,7 @@ pub(super) struct PacketJob {
     text_at: usize,
     character: usize,
     selected: usize,
-    stage: u8,
+    stage: Stage,
     font_at: usize,
     color: u32,
     writer: Writer,
@@ -79,7 +92,7 @@ impl PacketJob {
             text_at: 2,
             character: 0,
             selected: 0,
-            stage: 0,
+            stage: Stage::Reset,
             font_at: 0,
             color: 0,
             writer: Writer::new(pool),
@@ -320,35 +333,18 @@ impl PacketJob {
                     funding.commit();
                 }
                 Phase::Validate => {
-                    if self.at == self.text_end {
-                        self.advance = true;
-                        self.phase = Phase::Prefix;
-                        continue;
-                    }
-                    if self.bytes()[self.at] == 0 {
-                        if !funding.pay(self.text_end - self.at, caller)? {
-                            return Ok(false);
-                        }
-                        self.visible_end = self.at;
-                        self.advance = true;
-                        self.phase = Phase::Prefix;
-                        funding.commit();
-                        continue;
-                    }
-                    let n = utf8_width(self.bytes()[self.at]);
-                    if !funding.pay(n, caller)? {
+                    // The visible text runs to the first NUL; it must be UTF-8
+                    // without U+FFFE.
+                    if !funding.pay((self.text_end - self.at).max(1), caller)? {
                         return Ok(false);
                     }
-                    let valid = self
-                        .bytes()
-                        .get(self.at..self.at + n)
-                        .filter(|_| self.at + n <= self.text_end)
-                        .and_then(|b| std::str::from_utf8(b).ok())
-                        .and_then(|s| s.chars().next())
-                        .is_some_and(|ch| ch != '\u{fffe}');
                     funding.commit();
-                    if valid {
-                        self.at += n;
+                    let text = &self.bytes()[self.at..self.text_end];
+                    let visible = until_nul(text);
+                    if is_valid_text(visible) {
+                        self.visible_end = self.at + visible.len();
+                        self.advance = true;
+                        self.phase = Phase::Prefix;
                     } else {
                         self.refuse(true);
                     }
@@ -369,6 +365,11 @@ impl PacketJob {
                         })?;
                     }
                     self.color = config.style.color;
+                    // The prefix and the text, as most events are; tags and
+                    // line breaks grow it further.
+                    self.writer.reserve(
+                        64 + (self.visible_end - self.text_at).min(limits.maximum_ass_bytes),
+                    )?;
                     self.phase = Phase::Render;
                     funding.commit();
                 }
@@ -379,11 +380,21 @@ impl PacketJob {
                     {
                         return Ok(false);
                     }
-                    if self.text_at == self.visible_end {
+                    let boundary = self.next_boundary();
+                    let transition = self.stage != Stage::Reset || boundary == self.character;
+                    // A NUL ends the visible text after the transitions at
+                    // it; the end of the text has none.
+                    if self.text_at == self.visible_end
+                        && !(transition && self.visible_end < self.text_end)
+                    {
                         self.phase = Phase::Freeze;
                         continue;
                     }
-                    if !self.render_transition(config, funding, caller)? {
+                    if transition {
+                        if !self.render_transition(config, limits, funding, caller)? {
+                            return Ok(false);
+                        }
+                    } else if !self.render_run(boundary, limits, funding, caller)? {
                         return Ok(false);
                     }
                 }
@@ -396,6 +407,66 @@ impl PacketJob {
             }
         }
     }
+    /// The first character from the current one at which a style or the
+    /// highlight starts or ends.
+    fn next_boundary(&self) -> usize {
+        let style = self
+            .styles
+            .as_slice()
+            .get(self.selected)
+            .map(|s| [s.start, s.end]);
+        let highlight = self.highlight.map(|(start, end)| [start, end]);
+        style
+            .into_iter()
+            .chain(highlight)
+            .flatten()
+            .map(usize::from)
+            .filter(|&at| at >= self.character)
+            .min()
+            .unwrap_or(usize::MAX)
+    }
+    /// Writes the characters before `boundary`, where no tag changes: one
+    /// unit for each emission stage and output byte of every character. A
+    /// line break is one step; the characters between line breaks are copied
+    /// as they are, up to [`RUN_BYTES`] bytes a step.
+    fn render_run(
+        &mut self,
+        boundary: usize,
+        limits: Limits,
+        funding: &mut Funding,
+        caller: &mut WorkBudget,
+    ) -> Result<bool> {
+        let bytes = self.input.payload.as_ref();
+        while self.character < boundary && self.text_at < self.visible_end {
+            let rest = &bytes[self.text_at..self.visible_end];
+            let (output, length, count) = if let Some(output) = line_break(rest[0]) {
+                (output, 1, 1)
+            } else {
+                let most = boundary - self.character;
+                let (mut length, mut count) = (0, 0);
+                for &b in rest {
+                    // Each character ends the step at its first byte; the
+                    // visible text is UTF-8, so none is split.
+                    if b & 0xc0 != 0x80 {
+                        if count == most || line_break(b).is_some() || length >= RUN_BYTES {
+                            break;
+                        }
+                        count += 1;
+                    }
+                    length += 1;
+                }
+                (&rest[..length], length, count)
+            };
+            if !funding.pay(7 * count + output.len(), caller)? {
+                return Ok(false);
+            }
+            self.writer.push(output, limits.maximum_ass_bytes)?;
+            funding.commit();
+            self.text_at += length;
+            self.character += count;
+        }
+        Ok(true)
+    }
     fn at_start(&self) -> Option<Style> {
         self.styles
             .as_slice()
@@ -403,165 +474,191 @@ impl PacketJob {
             .filter(|s| usize::from(s.start) == self.character)
             .map(|s| s.style)
     }
+    /// Writes the [`Stage`]s at a character where a style or the highlight
+    /// starts or ends, in this order, each tag in its own braces, then the
+    /// character:
+    ///
+    /// - `{\r}` where the selected style ends. The colour a highlight end
+    ///   restores returns to the default's.
+    /// - Where a style starts, a tag for each property that differs from the
+    ///   default style (the sample description's, or all zeros without one):
+    ///   `{\b1}` or `{\b0}`, then `{\i…}` and `{\u…}`, for each face flag that
+    ///   differs; `{\fs22}`; `{\fnName}` for every font table entry with the
+    ///   style's font ID, in table order (`{\fnC}{\fnD}` for two entries with
+    ///   one ID, `{\fn}` for an empty name, nothing for an ID the table lacks,
+    ///   the name's bytes up to a NUL, unescaped); `{\1c&H563412&}` for RGB
+    ///   12 34 56, BGR in uppercase hex without leading zeros (`&HA&`,
+    ///   `&H0&`); `{\1a&H87&}` for alpha 0x78, 255 − alpha in two uppercase
+    ///   digits (`&H00&`, `&H0F&`).
+    /// - Where the highlight starts, `{\2c&Hccbbaa&}` for a highlight colour
+    ///   AA BB CC (BGR in six lowercase digits, its alpha unused), or else
+    ///   `{\1c&H000000&}{\2c&HFFFFFF&}`. Where it ends, `{\2c&HFFFFFF&}` with
+    ///   the default colour, or else `{\1c&H332211&}{\2c&HFFFFFF&}` with the
+    ///   colour of the style in effect and the default colour, both as `\1c`
+    ///   writes them. An inverted range ends at its end offset and starts at
+    ///   its start offset; an empty one starts and ends at the same character.
+    /// - The character itself, unless it is the NUL that ends the visible
+    ///   text, where the rendering ends.
+    ///
+    /// A font name that is not UTF-8 or holds U+FFFE refuses the sample with
+    /// -1094995529, as such text does; the call still takes a read order.
+    /// U+FFFF is written. Each stage, and each font table entry it writes, is
+    /// funded on its own: one unit and one per byte it writes.
     fn render_transition(
         &mut self,
         config: &Configuration,
+        limits: Limits,
         funding: &mut Funding,
         caller: &mut WorkBudget,
     ) -> Result<bool> {
-        if !funding.pay(1, caller)? {
-            return Ok(false);
-        }
-        match self.stage {
-            0 => {
-                if self
-                    .styles
-                    .as_slice()
-                    .get(self.selected)
-                    .is_some_and(|s| usize::from(s.end) == self.character)
-                {
-                    self.writer.pending.append(b"{\\r}")?;
-                    self.color = config.style.color;
-                    self.selected += 1;
+        let default = config.style;
+        let mut tags = Fixed::<64>::new();
+        loop {
+            let starting = self.at_start();
+            let ends = self
+                .styles
+                .as_slice()
+                .get(self.selected)
+                .is_some_and(|span| usize::from(span.end) == self.character);
+            tags.clear();
+            // In the font stage, the name of the next entry with the starting
+            // style's font ID.
+            let mut name = None;
+            let mut width = 0;
+            match self.stage {
+                Stage::Reset => {
+                    if ends {
+                        tags.append(b"{\\r}")?;
+                    }
                 }
-                self.stage = 1;
-            }
-            1 => {
-                if let Some(s) = self.at_start() {
-                    for (bit, tag) in [(1, "b"), (2, "i"), (4, "u")] {
-                        if (s.face ^ config.style.face) & bit != 0 {
-                            write!(
-                                self.writer.pending,
-                                "{{\\{}{}}}",
-                                tag,
-                                u8::from(s.face & bit != 0)
-                            )
-                            .map_err(|_| Error::Overflow)?;
+                Stage::Face => {
+                    if let Some(style) = starting {
+                        for (flag, tag) in [(1, b'b'), (2, b'i'), (4, b'u')] {
+                            if (style.face ^ default.face) & flag != 0 {
+                                let on = b'0' + u8::from(style.face & flag != 0);
+                                tags.append(&[b'{', b'\\', tag, on, b'}'])?;
+                            }
                         }
                     }
-                    if s.size != config.style.size {
-                        write!(self.writer.pending, "{{\\fs{}}}", s.size)
-                            .map_err(|_| Error::Overflow)?;
+                }
+                Stage::Size => {
+                    if let Some(style) = starting.filter(|style| style.size != default.size) {
+                        tags.append(b"{\\fs")?;
+                        decimal(&mut tags, style.size)?;
+                        tags.append(b"}")?;
                     }
                 }
-                self.font_at = 0;
-                self.stage = 2;
-            }
-            2 => {
-                if let Some(s) = self.at_start().filter(|s| s.font != config.style.font) {
-                    if self.font_at < config.fonts.len() {
-                        if config.fonts.as_slice()[self.font_at].id == s.font {
-                            self.writer.pending.append(b"{\\fn")?;
-                            self.writer
-                                .pending
-                                .append(config.font_name(self.font_at)?)?;
-                            self.writer.pending.append(b"}")?;
+                Stage::Font => {
+                    let next = config.fonts.as_slice().get(self.font_at);
+                    if starting.is_some_and(|style| {
+                        style.font != default.font && next.is_some_and(|font| font.id == style.font)
+                    }) {
+                        name = Some(config.font_name(self.font_at)?);
+                    }
+                }
+                Stage::Colour => {
+                    if let Some(style) = starting {
+                        if style.color != default.color {
+                            hex_tag(&mut tags, b"{\\1c&H", style.color, 1, UPPER)?;
                         }
-                        self.font_at += 1;
+                        if style.alpha != default.alpha {
+                            let alpha = u32::from(255 - style.alpha);
+                            hex_tag(&mut tags, b"{\\1a&H", alpha, 2, UPPER)?;
+                        }
+                    }
+                }
+                Stage::Highlight => {
+                    if let Some((start, end)) = self.highlight {
+                        if usize::from(start) == self.character {
+                            match self.highlight_color {
+                                Some([r, g, b, _]) => {
+                                    let bgr = u32::from_le_bytes([r, g, b, 0]);
+                                    hex_tag(&mut tags, b"{\\2c&H", bgr, 6, LOWER)?;
+                                }
+                                None => tags.append(b"{\\1c&H000000&}{\\2c&HFFFFFF&}")?,
+                            }
+                        }
+                        if usize::from(end) == self.character {
+                            if self.highlight_color.is_none() {
+                                hex_tag(&mut tags, b"{\\1c&H", self.color, 1, UPPER)?;
+                            }
+                            hex_tag(&mut tags, b"{\\2c&H", default.color, 1, UPPER)?;
+                        }
+                    }
+                }
+                Stage::Text => {
+                    if self.text_at < self.visible_end {
+                        let output;
+                        (output, width) = written(self.input.payload.as_ref(), self.text_at);
+                        tags.append(output)?;
+                    }
+                }
+            }
+            let parts: [&[u8]; 4] = match name {
+                Some(name) => [tags.as_bytes(), b"{\\fn", name, b"}"],
+                None => [tags.as_bytes(), &[], &[], &[]],
+            };
+            let size = parts.iter().map(|part| part.len()).sum::<usize>();
+            if !funding.pay(1 + size, caller)? {
+                return Ok(false);
+            }
+            if name.is_some_and(|name| !is_valid_text(name)) {
+                funding.commit();
+                self.refuse(true);
+                return Ok(true);
+            }
+            self.writer.push_parts(&parts, limits.maximum_ass_bytes)?;
+            self.stage = match self.stage {
+                Stage::Reset => {
+                    if ends {
+                        self.color = default.color;
+                        self.selected += 1;
+                    }
+                    Stage::Face
+                }
+                Stage::Face => Stage::Size,
+                Stage::Size => {
+                    if let Some(style) = starting {
+                        self.font_at = config.first_font(style.font);
+                    }
+                    Stage::Font
+                }
+                Stage::Font if name.is_some() => {
+                    self.font_at += 1;
+                    Stage::Font
+                }
+                Stage::Font => Stage::Colour,
+                Stage::Colour => {
+                    if let Some(style) = starting {
+                        self.color = style.color;
+                    }
+                    Stage::Highlight
+                }
+                Stage::Highlight => Stage::Text,
+                Stage::Text => {
+                    if self.text_at == self.visible_end {
+                        self.phase = Phase::Freeze;
                     } else {
-                        self.stage = 3;
+                        self.text_at += width;
+                        self.character += 1;
                     }
-                } else {
-                    self.stage = 3;
+                    Stage::Reset
                 }
+            };
+            funding.commit();
+            if self.stage == Stage::Reset {
+                return Ok(true);
             }
-            3 => {
-                if let Some(s) = self.at_start() {
-                    if s.color != config.style.color {
-                        self.color = s.color;
-                        write!(self.writer.pending, "{{\\1c&H{:X}&}}", s.color)
-                            .map_err(|_| Error::Overflow)?;
-                    }
-                    if s.alpha != config.style.alpha {
-                        write!(self.writer.pending, "{{\\1a&H{:02X}&}}", 255 - s.alpha)
-                            .map_err(|_| Error::Overflow)?;
-                    }
-                }
-                self.stage = 4;
-            }
-            4 => {
-                if self
-                    .highlight
-                    .is_some_and(|(start, _)| usize::from(start) == self.character)
-                {
-                    if let Some([c_0, c_1, c_2, ..]) = self.highlight_color {
-                        write!(
-                            self.writer.pending,
-                            "{{\\2c&H{c_2:02x}{c_1:02x}{c_0:02x}&}}"
-                        )
-                        .map_err(|_| Error::Overflow)?;
-                    } else {
-                        self.writer
-                            .pending
-                            .append(b"{\\1c&H000000&}{\\2c&HFFFFFF&}")?;
-                    }
-                }
-                self.stage = 5;
-            }
-            5 => {
-                if self
-                    .highlight
-                    .is_some_and(|(_, end)| usize::from(end) == self.character)
-                {
-                    if self.highlight_color.is_some() {
-                        write!(self.writer.pending, "{{\\2c&H{:X}&}}", config.style.color)
-                            .map_err(|_| Error::Overflow)?;
-                    } else {
-                        write!(
-                            self.writer.pending,
-                            "{{\\1c&H{:X}&}}{{\\2c&H{:X}&}}",
-                            self.color, config.style.color
-                        )
-                        .map_err(|_| Error::Overflow)?;
-                    }
-                }
-                self.stage = 6;
-            }
-            6 => {
-                let b = self.bytes()[self.text_at];
-                let n = utf8_width(b);
-                if b == b'\n' {
-                    self.writer.pending.append(b"\\N")?;
-                } else if b != b'\r' {
-                    let mut bytes = [0; 4];
-                    bytes[..n].copy_from_slice(&self.bytes()[self.text_at..self.text_at + n]);
-                    self.writer.pending.append(&bytes[..n])?;
-                }
-                self.text_at += n;
-                self.character += 1;
-                self.stage = 0;
-            }
-            _ => return Err(Error::Invalid("native ASS emission stage")),
         }
-        funding.commit();
-        Ok(true)
     }
     pub(super) fn take_output(mut self, options: Options) -> Result<Output> {
         let subtitle = if self.returned > 0 && self.advance {
-            let pts = self
-                .clock
-                .pts
-                .filter(|&p| p != i64::MIN)
-                .and_then(|pts| options.packet_timebase.map(|b| rescale(pts, b, 1_000_000)))
-                .filter(|&p| p != i64::MIN);
-            let duration = self
-                .clock
-                .duration
-                .filter(|&d| d != 0)
-                .and_then(|d| options.packet_timebase.map(|b| rescale(d, b, 1000)))
-                .unwrap_or(0);
-            let end = u32::try_from((duration as u64) & u64::from(u32::MAX))
-                .map_err(|_| Error::Overflow)?;
-            Some(Subtitle {
-                pts_microseconds: pts,
-                start_display_ms: 0,
-                end_display_ms: end,
-                ass: self
-                    .writer
-                    .frozen
-                    .take()
-                    .ok_or(Error::Invalid("native ASS missing owner"))?,
-            })
+            let ass = self
+                .writer
+                .frozen
+                .take()
+                .ok_or(Error::Invalid("native ASS missing owner"))?;
+            Some(Subtitle::at(ass, self.clock, options.packet_timebase)?)
         } else {
             None
         };
@@ -573,6 +670,57 @@ impl PacketJob {
         })
     }
 }
+/// The most text bytes [`PacketJob::render_run`] copies in one funded step.
+const RUN_BYTES: usize = 4096;
+const UPPER: &[u8; 16] = b"0123456789ABCDEF";
+const LOWER: &[u8; 16] = b"0123456789abcdef";
+/// Appends `prefix`, `value` in hexadecimal with at least `width` digits, and
+/// `&}`.
+fn hex_tag(
+    tags: &mut Fixed<64>,
+    prefix: &[u8],
+    value: u32,
+    width: u32,
+    digits: &[u8; 16],
+) -> Result<()> {
+    tags.append(prefix)?;
+    let count = (u32::BITS - value.leading_zeros()).div_ceil(4).max(width);
+    for shift in (0..count).rev() {
+        tags.append(&[digits[(value >> (4 * shift) & 0xf) as usize]])?;
+    }
+    tags.append(b"&}")
+}
+/// Appends `value` in decimal.
+fn decimal(tags: &mut Fixed<64>, value: u8) -> Result<()> {
+    if value >= 100 {
+        tags.append(&[b'0' + value / 100])?;
+    }
+    if value >= 10 {
+        tags.append(&[b'0' + value / 10 % 10])?;
+    }
+    tags.append(&[b'0' + value % 10])
+}
+/// Whether text the reference writes is accepted: UTF-8 without U+FFFE.
+fn is_valid_text(bytes: &[u8]) -> bool {
+    bytes.is_ascii() || std::str::from_utf8(bytes).is_ok_and(|text| !text.contains('\u{fffe}'))
+}
+/// What a line break writes: `\N` for a line feed and nothing for a carriage
+/// return; `None` for any other byte.
+fn line_break(b: u8) -> Option<&'static [u8]> {
+    match b {
+        b'\n' => Some(b"\\N"),
+        b'\r' => Some(b""),
+        _ => None,
+    }
+}
+/// The output of the character at `at` and its width in bytes.
+fn written(bytes: &[u8], at: usize) -> (&[u8], usize) {
+    let width = utf8_width(bytes[at]);
+    (
+        line_break(bytes[at]).unwrap_or(&bytes[at..at + width]),
+        width,
+    )
+}
 fn utf8_width(b: u8) -> usize {
     match b {
         0..=0x7f => 1,
@@ -581,9 +729,4 @@ fn utf8_width(b: u8) -> usize {
         0xf0..=0xf4 => 4,
         _ => 1,
     }
-}
-fn rescale(ticks: i64, base: TimeBase, denominator: u64) -> i64 {
-    TimeBase::new(1, denominator)
-        .and_then(|to| base.rescale(ticks, to, Rounding::NearestAway))
-        .unwrap_or(i64::MIN)
 }
