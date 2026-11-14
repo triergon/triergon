@@ -20737,9 +20737,9 @@
   {
    "name": "framing-full-0ce0e738-aarch64",
    "path": "framing-full-0ce0e738-aarch64",
-   "retention": "90 days",
+   "retention": "retained",
    "reason": "AArch64 packet framing timing and kernel-bound memory on all 131 cases",
-   "key": "qualification/framing-full-0ce0e738-aarch64/d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a.tar.zst",
+   "key": "evidence/framing-full-0ce0e738-aarch64/d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a.tar.zst",
    "sha256": "d1e3847099af7fe73b3208ec2f928b0c9d67686d725358d3f4a953f9ffa4783a",
    "bytes": 26848727,
    "results": [
