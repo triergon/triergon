@@ -71,6 +71,10 @@ pub const SAMPLES: &[Sample] = &[
         "a\u{301}\u{323} a\u{323}\u{301} q\u{307}\u{323} e\u{302}\u{301} o\u{31B}\u{303} \
          x\u{334}\u{335}\u{336} a\u{328}\u{301}\u{316}\u{300} u\u{308}\u{304}",
     ),
+    // Marks HarfBuzz places by hinted contour points (DejaVu Sans' GPOS anchor
+    // for U+0308) and, in a face without GPOS, by hinted extents.
+    sample("latin-anchor-point", "Latn", "c\u{308} C\u{308}"),
+    sample("latin-fallback-mark", "Latn", "x\u{301} o\u{301} X\u{301}"),
     sample(
         "latin-mark-order",
         "Latn",
