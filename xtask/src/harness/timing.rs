@@ -519,9 +519,9 @@ impl Operation {
 pub struct Pairs {
     /// The pairs it runs unless it stops early.
     pub planned: usize,
-    /// The runtime ceiling of a gate comparison. The session ends at an early
-    /// look ([`stats::EARLY_LOOKS`]) whose bound is below it; without one it
-    /// always runs every planned pair.
+    /// The runtime ceiling of a gate comparison. The session ends after
+    /// [`stats::EARLY_LOOK`] pairs when they settle below it
+    /// ([`stats::settled_below`]); without one it always runs every planned pair.
     pub stop_below: Option<f64>,
 }
 
