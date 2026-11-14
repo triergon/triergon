@@ -371,18 +371,15 @@ impl Glyf {
         let contours = header.contours;
         let mut metrics = Metrics::of(glyph, header);
         if contours > 0 {
-            let (base, ends) = (outline.len(), outline.contour_ends().len());
-            let instructions = simple(&mut r, contours.unsigned_abs(), scale, outline, work, hint)?;
-            if H::ACTIVE {
-                let loaded = Loaded {
-                    metrics,
-                    composite: false,
-                    base,
-                    ends,
-                    instructions,
-                };
-                hint.glyph(loaded, outline, work)?;
-            }
+            simple(
+                &mut r,
+                contours.unsigned_abs(),
+                scale,
+                outline,
+                work,
+                hint,
+                metrics,
+            )?;
         } else {
             // FreeType reads every negative count as a composite.
             if depth >= MAX_COMPONENT_DEPTH {
@@ -391,34 +388,18 @@ impl Glyf {
             if depth >= cx.limits.depth {
                 return Err(Error::Policy("glyph nesting depth"));
             }
-            let (base, ends) = (outline.len(), outline.contour_ends().len());
-            let (own, instructed) =
-                self.composite(cx, &mut r, scale, outline, work, hint, depth)?;
-            if let Some(own) = own {
+            if let Some(own) =
+                self.composite(cx, &mut r, scale, outline, work, hint, depth, metrics)?
+            {
                 metrics = own;
-            }
-            if H::ACTIVE {
-                let instructions = if instructed {
-                    let len = usize::from(r.u16()?);
-                    r.take(len)?
-                } else {
-                    &[]
-                };
-                let loaded = Loaded {
-                    metrics,
-                    composite: true,
-                    base,
-                    ends,
-                    instructions,
-                };
-                hint.glyph(loaded, outline, work)?;
             }
         }
         Ok(metrics)
     }
 
-    /// Appends the components; returns the metrics of the last `USE_MY_METRICS`
-    /// component, and whether instructions follow the components.
+    /// Appends the components, then runs the composite's program with
+    /// `hint`; returns the metrics of the last `USE_MY_METRICS` component.
+    /// `own` are the composite's own metrics.
     #[allow(clippy::too_many_arguments, reason = "the recursion carries the load")]
     fn composite<H: Hint>(
         &self,
@@ -429,9 +410,11 @@ impl Glyf {
         work: &mut WorkBudget,
         hint: &mut H,
         depth: u32,
-    ) -> Result<(Option<Metrics>, bool)> {
+        own: Metrics,
+    ) -> Result<Option<Metrics>> {
         let mut metrics = None;
         let first = outline.len();
+        let ends = outline.contour_ends().len();
         loop {
             charge(work, 1)?;
             let c = component(r)?;
@@ -446,7 +429,25 @@ impl Glyf {
                 place(&c, scale, outline, first, base, fitted)?;
             }
             if c.flags & MORE_COMPONENTS == 0 {
-                return Ok((metrics, c.flags & WE_HAVE_INSTRUCTIONS != 0));
+                if H::ACTIVE {
+                    // The last component says whether the composite has a
+                    // program.
+                    let instructions = if c.flags & WE_HAVE_INSTRUCTIONS != 0 {
+                        let len = usize::from(r.u16()?);
+                        r.take(len)?
+                    } else {
+                        &[]
+                    };
+                    let loaded = Loaded {
+                        metrics: metrics.unwrap_or(own),
+                        composite: true,
+                        base: first,
+                        ends,
+                        instructions,
+                    };
+                    hint.glyph(loaded, outline, work)?;
+                }
+                return Ok(metrics);
             }
         }
     }
@@ -537,15 +538,16 @@ fn component(r: &mut Reader<'_>) -> Result<Component> {
 }
 
 /// Appends a simple glyph's contours, recording their font-unit points with
-/// `hint`; returns the glyph's instructions.
-fn simple<'d, H: Hint>(
-    r: &mut Reader<'d>,
+/// `hint`, then runs its program with `hint`; `metrics` are the glyph's.
+fn simple<H: Hint>(
+    r: &mut Reader<'_>,
     contours: u16,
     scale: Scale,
     outline: &mut Outline,
     work: &mut WorkBudget,
     hint: &mut H,
-) -> Result<&'d [u8]> {
+    metrics: Metrics,
+) -> Result<()> {
     let ends = r.take(2 * usize::from(contours))?;
     let mut count = 0_usize;
     for end in ends.chunks_exact(2) {
@@ -556,8 +558,13 @@ fn simple<'d, H: Hint>(
         count = end + 1;
     }
     charge(work, count)?;
-    let instructions = usize::from(r.u16()?);
-    let instructions = r.take(instructions)?;
+    let len = usize::from(r.u16()?);
+    let instructions = if H::ACTIVE {
+        r.take(len)?
+    } else {
+        r.skip(len)?;
+        &[]
+    };
     // First pass: the flags, to find where the x and y coordinates start.
     let flags_at = *r;
     let mut flags = Flags::new(r, count);
@@ -589,9 +596,20 @@ fn simple<'d, H: Hint>(
     let ends = ends
         .chunks_exact(2)
         .map(|end| u32::from(u16::from_be_bytes([end[0], end[1]])) + 1);
+    let first_end = outline.contour_ends().len();
     outline.extend_ends(ends, base)?;
     *r = ys;
-    Ok(instructions)
+    if H::ACTIVE {
+        let loaded = Loaded {
+            metrics,
+            composite: false,
+            base: base as usize,
+            ends: first_end,
+            instructions,
+        };
+        hint.glyph(loaded, outline, work)?;
+    }
+    Ok(())
 }
 
 /// Point flags with their repeat counts expanded.

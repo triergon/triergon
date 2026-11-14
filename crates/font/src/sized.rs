@@ -453,6 +453,9 @@ impl<'f> SizedFont<'f> {
     /// The default load of a glyph of a face with TrueType programs: its
     /// points loaded at the hinted scale, each glyph's program run on them
     /// as it loads, and the metrics fitted to the grid.
+    // Out of line: inlined into `load`, it makes every other default load
+    // dearer.
+    #[inline(never)]
     fn load_instructed(
         &self,
         table: &Glyf,
