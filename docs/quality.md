@@ -610,47 +610,62 @@ Never time while memory, a build or anything else runs on the host.
 #### Early stop
 
 A gate timing session (`report`, `isobmff-bench`, `external-vector`, `codecs time`,
-`capture qualify`) may end at an early look: after 10 pairs, when all 10 ratios
-`T_triergon / T_reference` lie strictly below the ceiling, or after 20, when 18 of them
-do. A gate memory collection uses the same looks on two ratios at once: it stops only
-when every peak heap ratio and every total resident ratio of the 10, or the 18th of each
-of the 20, lies strictly below 1. Otherwise either runs all 30 pairs and is graded by the
-paired bootstrap as before. A session that stops records the rule (`early_stop`) and,
-as its interval, the median of its ratios bounded by the order statistics the look used:
-the largest of 10, or the 18th of 20. The validator and the memory evaluator replay the
-rule on the recorded pairs, so a session that stopped where the rule does not, or ran on
-where it stops, does not count, and grading holds the planned pairs to the contract's
-minimum. A stopped session prints where it stopped, and its record labels its
-interval `order statistics of the look`. Comparisons with another build
+`capture qualify`) may end after 20 of its 30 pairs, taken as two blocks of ten: when
+every ratio `T_triergon / T_reference` of the second block and at least eight of the
+first lie strictly below the ceiling, and the lag-1 autocorrelation of the 20 ratios is
+at most 0.42. A gate memory collection stops only when its peak heap ratios and its
+total resident ratios each meet the same three conditions under 1. Otherwise either
+runs all 30 pairs and is graded by the paired bootstrap as before. A session that stops
+records the rule (`early_stop`) and, as its interval, the median of its 20 ratios
+bounded by their 3rd and 18th smallest. The validator and the memory evaluator replay
+the rule on the recorded pairs, so a session that stopped where the rule does not, or
+ran on where it stops, does not count; the record must name exactly the ceiling of
+[`harness/policy.json`](../harness/policy.json), and grading holds its planned pairs to
+the contract's minimum. A stopped session prints where it stopped, and its record
+labels its interval `order statistics of the look`. Comparisons with another build
 (`--baseline-worker`, quick checks) always run every pair, and `--no-early-stop` makes
 any gate command do the same.
 
-The bound is a sign test. For independent pairs, the `k`-th smallest of `n` ratios lies
-below the true median ratio only if at least `k` of the `n` ratios do, which, whatever
-their distribution, happens with probability at most `P(Binomial(n, ½) ≥ k)`: 2⁻¹⁰ =
-0.098% at the first look and 211/2²⁰ = 0.020% at the second. A case whose true median
-ratio is at or above its ceiling therefore stops early as a pass with probability at most
-0.118%, in addition to the unchanged error of the 30-pair bound, which the early looks do
-not touch: the design spends its alpha at fixed looks rather than peeking at the
-bootstrap bound. A case close to its ceiling rarely has every early ratio below it, so it
-runs on to 30 pairs.
+The bound is a sign test. When every ratio of the second block lies below the ceiling,
+so does the 18th smallest of all 20. For independent pairs whose true median ratio is
+at the ceiling, each ratio lies below it with probability at most ½, so the second block
+qualifies with probability at most 2⁻¹⁰, and with eight of the first block, at most
+2⁻¹⁰ · 56/2¹⁰ = 0.005%, whatever their distribution. Because the second block alone
+bounds it by 2⁻¹⁰ = 0.098%, a warm-up or drift confined to the first pairs cannot stop a
+case the second block would not. The autocorrelation limit, the 99th percentile of 20
+independent ratios, refuses sessions whose pairs are visibly not independent. This adds
+to the unchanged error of the 30-pair bound and keeps the one-sided 5% false-pass
+guarantee of a 95% bound.
 
-Replayed on the archived ARMv7 run at `3df7ae6d` (`armv7-thumb2-3df7ae6d-linux-armv7`;
-the replay, simulation and scripts are evidence set `gate-early-stop-analysis`):
-of its 3,037 distinct 30-pair timing sessions, 3,011 would stop at 10 pairs and 4 at
-20, none of them one whose 30-pair bound is above the ceiling, and all 22 that fail at 30
-pairs run on to 30; timing runs 34% of the pairs it did. Of its 5,945 memory
-collections, 5,585 would stop early, none of them failing at 30 pairs, and all 318 that
-fail run on; memory runs 38% of its pairs. Simulated by drawing pairs from those
-sessions' own ratios, scaled so the true median is exactly at the ceiling: timing passes
-3.09% of 128,000 sessions with 30 pairs always and 3.15% with the early looks (0.10%
-early), and memory 2.50% and 2.56% of 60,000 (0.12% early). A true median beyond the
-ceiling (4% for timing, 2% for memory) passes at under 0.011% either way, and one inside
-it (4% for timing, 2% for memory) passes as often with the early looks as without:
-93.60% against 93.59%, and 79.50% against 79.45%. The early looks thus keep the one-sided
-5% false-pass guarantee of a 95% bound: they add at most 0.118% to the error at the
-ceiling, where the simulated pass rate moves from 3.09% to 3.15% for timing and from
-2.50% to 2.56% for memory.
+The guarantee assumes independent pairs. In the archived 30-pair sessions
+(`armv7-thumb2-3df7ae6d-linux-armv7` on ARMv7; `runners-gate-build-linux-arm64` and
+`mpegts-pes-gate-build-linux-arm64` on AArch64) the paired ratios behave as independent
+draws: against each session's own shuffled ratios, the share of sessions whose lag-1
+autocorrelation exceeds the shuffled 95th percentile is 4.5% to 5.3% of memory
+collections and 3.0% to 6.0% of timing sessions (5% for independent pairs), and the mean
+of pairs 1 to 10 against pairs 11 to 30 differs by −0.04 to +0.04 standard deviations on
+average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts. Simulated with the true
+median exactly at the ceiling, the rule stops a session early with probability 0.007%
+for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2, 0.27% at 0.5, and
+0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3 standard
+deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
+
+Replayed on those sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, the rule
+stops 1,597 of 1,663 AArch64 and 2,980 of 3,037 ARMv7 timing sessions and 1,337 of 1,663
+AArch64 and 2,956 of 3,335 ARMv7 memory collections, and no session it stops failed at
+30 pairs (a collection refused for contamination is refused either way). Drawing pairs
+from the ARMv7 timing sessions' own ratios rescaled to a median exactly at the ceiling,
+0.006% of 128,000 simulated sessions stop early, and the share that passes, 3.22%, is
+the 30-pair bound's; from the ARMv7 memory collections' total resident ratios at a
+median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against fresh
+30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every session
+that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux` memory cases,
+whose total resident bounds lie between 0.978 and 1.011, ran every pair on both sides
+and changed verdict between the two runs, as two 30-pair bounds that close to the
+ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
+instead of 19.2 on ARMv7, and its memory 13.5 instead of 19.2 and 10.7 instead of 15.0.
+The replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
+`gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`.
 
 #### Memory in parallel
 
