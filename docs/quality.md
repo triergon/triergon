@@ -79,7 +79,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   default-load metrics and hinted outline there), which `cargo xtask check`
   requires, and `font-hinting-modes` (the nine other heights libass requests when
   hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
-  reports the required three, with `--all` all four.
+  reports the required three, with `--all` all four. Behaviour of TrueType
+  programs that no specification settles is established by probes:
+  `harness/fonts/probes/*.probe` describe small faces and their programs,
+  `cargo xtask fonts probe` assembles them and loads them through both font
+  workers, and each `.dump` beside a probe records the reference's default load
+  on 32-bit ARMv7 (`--record`).
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
