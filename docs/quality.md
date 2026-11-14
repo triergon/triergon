@@ -483,16 +483,17 @@ may override that count for diagnostic comparisons.
   GNU/Linux each side links the support libraries of its language runtime from their
   static archives, and libc and third-party libraries, such as zlib, stay shared on
   both. Today that is libgcc's unwinder (`libgcc_eh`) and libm for the Rust workers, and
-  libm, libstdc++ and libgcc for the C and C++ references. Total RSS then compares the code
-  and data each process's libraries use: a shared runtime support library is mapped
-  whether or not that code calls it, and the two toolchains load different ones. The
-  Rust standard library loads `libgcc_s` and runs its initialisation in every program,
-  one that never unwinds included; FFmpeg loads `libm`, and HarfBuzz `libstdc++`. On
-  ARMv7, `libgcc_s` holds 18 resident pages of the framing worker, and `libm` 18 and 58
-  of the framing and ISO BMFF references. Elsewhere both link as their toolchains do.
-  `build-workers` records the policy in `identity.json`, and `report` and `grade`
-  refuse a build that records another policy or none, so results from differently
-  linked builds are never compared or reused together.
+  libm, libstdc++ and libgcc for the C and C++ references; libm stays shared on both
+  sides on x86, where glibc's `libm.a` links only into a static program. Total RSS then
+  compares the code and data each process's libraries use: a shared runtime support
+  library is mapped whether or not that code calls it, and the two toolchains load
+  different ones. The Rust standard library loads `libgcc_s` and runs its initialisation
+  in every program, one that never unwinds included; FFmpeg loads `libm`, and HarfBuzz
+  `libstdc++`. On ARMv7, `libgcc_s` holds 18 resident pages of the framing worker, and
+  `libm` 18 and 58 of the framing and ISO BMFF references. Elsewhere both link as their
+  toolchains do. `build-workers` records the policy in `identity.json`, and `report` and
+  `grade` refuse a build that records another policy or none, so results from
+  differently linked builds are never compared or reused together.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
   with the same two settings in its own release profile. On ARMv7, building the

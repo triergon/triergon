@@ -127,14 +127,24 @@ pub fn release_dir() -> Result<String, String> {
 /// How workers and references link the support libraries of their language runtimes.
 /// On a GNU/Linux target both sides take every runtime support library from its static
 /// archive: the Rust workers libgcc's unwinder (`libgcc_eh`) and libm, the C and C++
-/// references libm, libstdc++ and libgcc. A process then maps only the support code its own
-/// libraries use. libc and third-party libraries stay shared on both sides. Elsewhere
-/// both link as their toolchains do.
+/// references libm, libstdc++ and libgcc. A process then maps only the support code its
+/// own libraries use. libc and third-party libraries stay shared on both sides, and so
+/// does libm on x86, where glibc's `libm.a` selects its implementations through the
+/// static libc and links only into a static program. Elsewhere both sides link as their
+/// toolchains do.
 pub const LINK_POLICY: &str = "static-runtime-support-v1";
 
 /// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
 fn static_runtime(target: &str) -> bool {
     target.contains("-linux-gnu")
+}
+
+/// Whether glibc's `libm.a` links into a program that uses the shared libc on `target`.
+fn static_libm(target: &str) -> bool {
+    static_runtime(target)
+        && !["x86_64-", "i586-", "i686-"]
+            .iter()
+            .any(|x86| target.starts_with(x86))
 }
 
 /// The arguments `cargo rustc` passes to a worker's own compile, after `--`, to link
@@ -146,14 +156,17 @@ pub fn worker_link_arguments() -> Result<Vec<String>, String> {
 }
 
 fn worker_link_flags(target: &str) -> Vec<String> {
+    let mut libraries = Vec::new();
     if static_runtime(target) {
-        ["gcc_eh", "m"]
-            .into_iter()
-            .flat_map(|library| ["-l".to_owned(), format!("static:-bundle={library}")])
-            .collect()
-    } else {
-        Vec::new()
+        libraries.push("gcc_eh");
     }
+    if static_libm(target) {
+        libraries.push("m");
+    }
+    libraries
+        .into_iter()
+        .flat_map(|library| ["-l".to_owned(), format!("static:-bundle={library}")])
+        .collect()
 }
 
 /// A reference's link flags under [`LINK_POLICY`]: libm and libstdc++ from their
@@ -166,10 +179,11 @@ fn reference_flags(target: &str, flags: Vec<String>) -> Vec<String> {
     if !static_runtime(target) {
         return flags;
     }
+    let libm = static_libm(target);
     let mut linked: Vec<String> = flags
         .into_iter()
         .map(|flag| match flag.as_str() {
-            "-lm" => "-l:libm.a".to_owned(),
+            "-lm" if libm => "-l:libm.a".to_owned(),
             "-lstdc++" => "-l:libstdc++.a".to_owned(),
             _ => flag,
         })
@@ -594,18 +608,15 @@ mod tests {
 
     #[test]
     fn gnu_linux_workers_and_references_take_runtime_support_from_static_archives() {
-        for target in [
-            ARM32_TARGET,
-            "aarch64-unknown-linux-gnu",
-            "x86_64-unknown-linux-gnu",
-        ] {
+        let flags = ["-L/p", "-lharfbuzz", "-lstdc++", "-lm", "-lz", "-latomic"];
+        let flags = || flags.map(String::from).to_vec();
+        for target in [ARM32_TARGET, "aarch64-unknown-linux-gnu"] {
             assert_eq!(
                 worker_link_flags(target),
                 ["-l", "static:-bundle=gcc_eh", "-l", "static:-bundle=m"]
             );
-            let flags = ["-L/p", "-lharfbuzz", "-lstdc++", "-lm", "-lz", "-latomic"];
             assert_eq!(
-                reference_flags(target, flags.map(String::from).to_vec()),
+                reference_flags(target, flags()),
                 [
                     "-L/p",
                     "-lharfbuzz",
@@ -617,10 +628,26 @@ mod tests {
                 ]
             );
         }
+        // glibc's libm.a on x86 links only into a static program: libm stays shared.
+        assert_eq!(
+            worker_link_flags("x86_64-unknown-linux-gnu"),
+            ["-l", "static:-bundle=gcc_eh"]
+        );
+        assert_eq!(
+            reference_flags("x86_64-unknown-linux-gnu", flags()),
+            [
+                "-L/p",
+                "-lharfbuzz",
+                "-l:libstdc++.a",
+                "-lm",
+                "-lz",
+                "-latomic",
+                "-static-libgcc"
+            ]
+        );
         for target in ["aarch64-apple-darwin", "aarch64-unknown-linux-musl"] {
             assert!(worker_link_flags(target).is_empty());
-            let flags = vec!["-lstdc++".to_owned(), "-lm".to_owned()];
-            assert_eq!(reference_flags(target, flags.clone()), flags);
+            assert_eq!(reference_flags(target, flags()), flags());
         }
     }
 
