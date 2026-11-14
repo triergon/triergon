@@ -192,7 +192,12 @@ static int bound_release(struct inode *inode, struct file *file)
     struct session *s = file->private_data;
     (void)inode;
     if (s) {
-        if (s->running) stop_machine(end_stopped, s, NULL);
+        /* A session that cannot be disarmed stays armed: the probes may still
+         * reach it, so it is never freed and its slot never reused. */
+        if (s->running && stop_machine(end_stopped, s, NULL)) {
+            pr_warn_once("triergon_rss_bound: a session could not be disarmed and is kept\n");
+            return 0;
+        }
         dismiss(s);
     }
     return 0;
