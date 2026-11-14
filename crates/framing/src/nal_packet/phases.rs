@@ -373,23 +373,26 @@ impl PacketPlan {
         }
         self.nal = Some(kind);
         self.nals += 1;
-        if self.nals == 1 {
-            let injected = if inject.is_some() || (codec == Codec::Hevc && self.has_irap) {
+        if codec == Codec::Hevc && self.nals == 1 {
+            // Lookahead counted all packet NALs. IRAP packets inject the full
+            // configuration once, including duplicates in the packet.
+            let injected = if self.has_irap {
                 state.config().config_nal_count()
             } else {
                 0
             };
-            if codec == Codec::Hevc && self.look_nals > 0 {
-                // Lookahead rejected empty/truncated NALs and counted every
-                // packet NAL. Arrays were admitted before that walk; an IRAP
-                // packet injects every configuration NAL exactly once, including
-                // duplicates already present in the packet.
-                self.segment_hint = Some(self.look_nals + injected);
-            } else if end == source.bytes.len() {
-                // AVC may inject SPS only, PPS only, or omit sequence extensions.
-                // The complete configuration count is therefore only a bound.
-                self.segment_hint = Some(1 + injected);
-            }
+            self.segment_hint = Some(self.look_nals + injected);
+        } else if codec == Codec::Avc
+            && end == source.bytes.len()
+            && inject.is_some()
+            && !matches!(state.segments, Some(PacketSegmentStorage::Heap(_)))
+        {
+            // The final source NAL and its inserted configuration may cross
+            // the inline boundary together. Size the first allocation for
+            // both. The count bounds an AVC injection that selects only SPS,
+            // PPS or non-extension NALs.
+            let preceding = state.segments.as_ref().map_or(0, PacketSegmentStorage::len);
+            self.segment_hint = Some(preceding + 1 + state.config().config_nal_count());
         }
         if let Some(i) = inject {
             self.injection = Some((i, 0));
