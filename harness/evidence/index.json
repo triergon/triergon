@@ -20435,6 +20435,19 @@
    }
   },
   {
+   "name": "fonts-truetype-compatibility-dc792ea4",
+   "path": "fonts-truetype-compatibility-dc792ea4",
+   "retention": "retained",
+   "reason": "The shaping cases that need the TrueType interpreter (Bitstream Vera 1.10 in the corpus, the DejaVu Sans and Vera Latin cases, the c + U+0308 and x + U+0301 samples) at dc792ea4, with their recorded shaping pins, against main at 51977aba on a c6g.4xlarge, natively on Linux AArch64 and on the ARMv7 Thumb-2 target: the font, shaping and ASS compare reports of both trees on both targets, the parity differences, the instruction counts of every shape-libass and ass-render case against main and of main against itself, the pin recording logs, the scripts, and the kernel, CPU and compiler",
+   "key": "evidence/fonts-truetype-compatibility-dc792ea4/45aee0c0f9681c334a2eb2e495f83e60ee60df6701b7c8961d2b961e845817bf.tar.gz",
+   "sha256": "45aee0c0f9681c334a2eb2e495f83e60ee60df6701b7c8961d2b961e845817bf",
+   "bytes": 53029348,
+   "source_revisions": {
+    "candidate": "dc792ea4b25af0e64db6b73b47ce66dc89b6e045",
+    "baseline": "51977abacdfe2e8086c124e37c0ad303168423f3"
+   }
+  },
+  {
    "name": "isobmff-upstream-catalogue-464fb140-aarch64",
    "path": "isobmff-upstream-catalogue-464fb140-aarch64",
    "retention": "retained",

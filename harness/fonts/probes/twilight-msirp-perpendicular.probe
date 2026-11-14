@@ -1,0 +1,31 @@
+# MSIRP of twilight point 2 from glyph rp0 0 after point 0 moved from 1600
+# to 960 in y (26.6): with projection y and freedom x, perpendicular, by 320
+# and by 0; then with both vectors y, by 320. The twilight point's current x
+# and y and original x and y are copied to the y of points 10 to 13.
+# Observed: the twilight point starts at rp0's original position moved by
+# the distance along the freedom vector (not moved where the vectors are
+# perpendicular), as its original position too; its current position then
+# moves to the distance from rp0's current position.
+heights 16384
+maxp twilight 16
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[0]; PUSH 0 960; SCFS; SPVTCA[0]; SFVTCA[1]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 2 320; MSIRP[0]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[0]; PUSH 0 960; SCFS; SPVTCA[0]; SFVTCA[1]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 2 0; MSIRP[0]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[0]; PUSH 0 960; SCFS; SVTCA[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 2 320; MSIRP[0]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
