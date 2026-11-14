@@ -114,7 +114,8 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
     }
 }
 
-#[inline]
+// Both live and retained packet observations use the same fold.
+#[inline(never)]
 fn packet_digest(hash: &mut Digest, kind: u64, input: i64, ordinal: u64, packet: &NalPacketOutput) {
     hash.word(kind);
     hash.signed(input);

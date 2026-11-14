@@ -78,7 +78,11 @@ pub fn main(mut args: ArgsOs) -> Result<(), Box<dyn std::error::Error>> {
     }
     let start = timing.then(Instant::now);
     let total = execute(&case, iterations)?;
-    let elapsed = start.map_or(0, |start| start.elapsed().as_nanos());
+    let elapsed = if let Some(start) = start {
+        u64::try_from(start.elapsed().as_nanos())?
+    } else {
+        0
+    };
     if memory {
         output.write_all(b"TRIERGON_END_V1\n")?;
         output.flush()?;
