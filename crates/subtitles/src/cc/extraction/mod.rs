@@ -199,9 +199,9 @@ impl CaptionExtractor {
     ///
     /// # Errors
     ///
-    /// When the pool cannot hold the remaining frames while it compacts them;
-    /// they are then kept as they were.
+    /// None: taking a frame allocates nothing (the bytes of the frames taken
+    /// are dropped when frames are next added).
     pub fn pop(&mut self) -> Result<Option<CaptionFrame<'_>>> {
-        self.output.pop_front()
+        Ok(self.output.pop_front())
     }
 }

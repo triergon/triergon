@@ -441,11 +441,11 @@ struct Progress {
     timing: RateEstimate,
     /// The duration estimate, once settled.
     estimate: Option<i64>,
-    /// Frames wait in `unsettled` until the duration estimate is settled
+    /// Frames are kept in the output until the duration estimate is settled
     /// (when one of them needs it) and the start choice is made.
     holding: bool,
     needs_estimate: bool,
-    /// The frame kept in `unsettled` that the start choice dropped.
+    /// The frame kept that the start choice dropped, by its place among them.
     skip: Option<usize>,
 }
 
@@ -479,8 +479,6 @@ pub(super) struct NalDecode {
     references: BudgetVec<Reference>,
     leaving: BudgetVec<(i32, Held)>,
     sei: BudgetVec<u8>,
-    /// Frames kept until the duration estimate is settled.
-    unsettled: FrameQueue,
 }
 
 /// What an access unit holds.
@@ -539,7 +537,6 @@ impl NalDecode {
             references: BudgetVec::new(pool),
             leaving: BudgetVec::new(pool),
             sei: BudgetVec::new(pool),
-            unsettled: FrameQueue::new(pool),
         }
     }
 
@@ -603,9 +600,8 @@ impl NalDecode {
 
     /// Reserves all the memory the rest of a step can need, `bytes` being the
     /// caption bytes of its access unit: room for two more pictures (the
-    /// fields of a frame) and for every picture to leave, and for the frames
-    /// they make, in `unsettled` when it may keep them and in `out` with those
-    /// it keeps already.
+    /// fields of a frame), for every picture to leave and for the frames they
+    /// make.
     fn reserve(&mut self, bytes: usize, out: &mut FrameQueue) -> Result<()> {
         let frames = self.pictures.len() + 2;
         let bytes = bytes
@@ -616,23 +612,7 @@ impl NalDecode {
                 .sum::<usize>();
         self.pictures.try_reserve(2)?;
         self.leaving.try_reserve(frames)?;
-        if self.may_keep() {
-            self.unsettled.reserve(frames, bytes)?;
-        }
-        out.reserve(
-            frames + self.unsettled.len(),
-            bytes + self.unsettled.bytes_len(),
-        )
-    }
-
-    /// Whether this step may keep frames in `unsettled`: some are kept, the
-    /// duration estimate is not settled, or the H.264 start choice may still
-    /// be made.
-    fn may_keep(&self) -> bool {
-        let progress = &self.progress;
-        progress.holding
-            || !progress.timing.settled()
-            || self.codec == Codec::H264 && progress.avc.b_window == BWindow::Open
+        out.reserve(frames, bytes)
     }
 
     /// Puts back the parameter sets of a failed step, last replaced first.
@@ -1437,8 +1417,8 @@ impl NalDecode {
         self.leaving.clear();
     }
 
-    /// Outputs a frame, or keeps it (and those after it) until the duration
-    /// estimate it may need is settled.
+    /// Outputs a frame, or keeps it (and those after it) in the output until
+    /// the duration estimate it may need is settled and the start choice made.
     fn output(&mut self, held: Held, out: &mut FrameQueue) {
         let bytes = &self.captions.bytes.as_bytes()[held.start..held.end];
         let progress = &mut self.progress;
@@ -1449,14 +1429,14 @@ impl NalDecode {
             if let Some(choice) = &mut progress.avc.choice
                 && !bytes.is_empty()
             {
-                let at = Some(self.unsettled.len());
+                let at = Some(out.kept());
                 if held.first_key {
                     choice.key = at;
                 } else if held.above == 1 {
                     choice.above = at;
                 }
             }
-            self.unsettled.push_reserved(held.pts, held.duration, bytes);
+            out.push_kept(held.pts, held.duration, bytes);
             return;
         }
         let duration = held.duration.or_else(|| estimate(progress, self.time_base));
@@ -1478,17 +1458,7 @@ impl NalDecode {
         } else {
             None
         };
-        let skip = self.progress.skip;
-        for (at, entry) in self.unsettled.entries().iter().enumerate() {
-            if skip != Some(at) {
-                out.push_reserved(
-                    entry.pts,
-                    entry.duration.or(estimate),
-                    self.unsettled.bytes(entry),
-                );
-            }
-        }
-        self.unsettled.clear();
+        out.release(estimate, self.progress.skip);
         self.progress.holding = false;
         self.progress.needs_estimate = false;
         self.progress.skip = None;
