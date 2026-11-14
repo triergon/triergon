@@ -641,6 +641,16 @@ fn join_case(
     )
     .map_err(|error| format!("timing: {error}"))?;
     memory_binding(memory, identity, &workers, linux)?;
+    if let Some(outputs) = expected.get("expected_time_outputs")
+        && !super::acceptance::timing_outputs_match(clock, outputs)
+    {
+        return Err("measurements do not match expected_time_outputs".into());
+    }
+    if let Some(outputs) = expected.get("expected_memory_outputs")
+        && !super::acceptance::memory_outputs_match(memory, outputs)
+    {
+        return Err("measurements do not match expected_memory_outputs".into());
+    }
     // The validator has shown both workers do this work in every pair.
     let timed_output = work(
         field(field(&array(clock, "samples")?[0], "reference")?, "data")?,
@@ -1874,6 +1884,47 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn joining_checks_role_specific_outputs_beyond_the_work_fold() {
+        for (key, section, sample_role, output_key) in [
+            ("expected_time_outputs", "timing", "candidate", "data"),
+            (
+                "expected_memory_outputs",
+                "memory",
+                "candidate_heap",
+                "work",
+            ),
+        ] {
+            let mut fixture = Fixture::new();
+            let row = if section == "timing" {
+                &fixture.timed
+            } else {
+                &fixture.measured
+            };
+            let sample = &array(field(row, section).unwrap(), "samples").unwrap()[0];
+            let output = field(field(sample, sample_role).unwrap(), output_key).unwrap();
+            let roles = object(&[("candidate", output.clone()), ("reference", output.clone())]);
+            for row in [
+                &mut fixture.expected,
+                &mut fixture.timed,
+                &mut fixture.measured,
+            ] {
+                put(row, key, roles.clone()).unwrap();
+            }
+            assert!(fixture.join().is_ok());
+            let mut altered = roles;
+            change(&mut altered, &["reference"], "input_bytes", Value::int(747));
+            for row in [
+                &mut fixture.expected,
+                &mut fixture.timed,
+                &mut fixture.measured,
+            ] {
+                put(row, key, altered.clone()).unwrap();
+            }
+            assert!(fixture.join().unwrap_err().contains(key));
+        }
     }
 
     #[test]
