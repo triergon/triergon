@@ -238,6 +238,7 @@ impl InputCursor {
         self.check_cancel(cancel)?;
         Ok(Some(self.request()))
     }
+    #[inline]
     fn verify(&self, source: SourceId, token: &InputToken) -> Result<()> {
         if self.pool.identity() != token.pool {
             return Err(Error::ForeignPool);
@@ -259,6 +260,7 @@ impl InputCursor {
         }
         Ok(())
     }
+    #[inline]
     fn healthy(&self) -> Result<()> {
         self.failure.map_or(Ok(()), |stopped| Err(stopped.into()))
     }
