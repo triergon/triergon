@@ -1560,33 +1560,53 @@ fn run_step(
     Ok(code)
 }
 
-/// The cases of a timing or memory step's report (`--output DIR`/report.json) that
-/// it did not measure: a timing that is not `measured`, a memory collection that is
-/// not `qualified`. Steps without such a report check their own collections.
+/// The xtask commands whose timing or memory steps check their own collections and
+/// fail on a workload or case they did not measure, writing no `report.json`.
+const SELF_CHECKING: [&str; 2] = ["codecs", "capture"];
+
+/// What a timing or memory step did not measure: the cases of its report
+/// (`--output DIR`/report.json) whose timing is not `measured` or whose memory
+/// collection is not `qualified`, or the report itself when it is missing, does
+/// not read or says its collection is incomplete. A command in [`SELF_CHECKING`]
+/// checks itself.
 fn unmeasured_cases(step: &Step) -> Vec<String> {
     let (key, measured) = match step.placement {
         Placement::Timed => ("timing", "measured"),
         Placement::Memory => ("memory", "qualified"),
         _ => return Vec::new(),
     };
+    if step
+        .command
+        .get(1)
+        .is_some_and(|command| SELF_CHECKING.contains(&command.as_str()))
+    {
+        return Vec::new();
+    }
     let Some(output) = step
         .command
         .windows(2)
         .find(|pair| pair[0] == "--output")
         .map(|pair| PathBuf::from(&pair[1]))
     else {
-        return Vec::new();
+        return vec!["the step names no --output".into()];
     };
-    let Ok(report) = crate::checks::read_json(&output.join("report.json")) else {
-        return Vec::new();
-    };
-    unmeasured_in(&report, key, measured)
+    let path = output.join("report.json");
+    match crate::checks::read_json(&path) {
+        Ok(report) => unmeasured_in(&report, key, measured),
+        Err(error) => vec![format!("no report: {error}")],
+    }
 }
 
 /// The ids of `report`'s cases whose `key` collection has a status other than
-/// `measured`.
+/// `measured`, and the report when it says its collection is incomplete. A case
+/// whose collection is null or absent is not this report's to measure: an ISO BMFF
+/// part leaves the cases of the other parts null.
 fn unmeasured_in(report: &Value, key: &str, measured: &str) -> Vec<String> {
-    report
+    let incomplete = report
+        .get("collection_status")
+        .and_then(Value::as_str)
+        .is_some_and(|status| status != "complete");
+    let cases = report
         .get("cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
@@ -1603,8 +1623,12 @@ fn unmeasured_in(report: &Value, key: &str, measured: &str) -> Vec<String> {
                 .and_then(Value::as_str)
                 .unwrap_or("case")
                 .to_owned()
-        })
-        .collect()
+        });
+    let mut unmeasured: Vec<String> = cases.collect();
+    if incomplete {
+        unmeasured.insert(0, "the report's collection is incomplete".into());
+    }
+    unmeasured
 }
 
 fn git(root: &Path, args: &[&str]) -> R<String> {
@@ -2245,6 +2269,26 @@ mod tests {
             crate::json::parse(r#"{"cases": [{"id": "a", "timing": {"status": "measured"}}]}"#)
                 .unwrap();
         assert!(unmeasured_in(&all, "timing", "measured").is_empty());
+        let partial = crate::json::parse(
+            r#"{"collection_status": "partial", "cases": [{"id": "a", "timing": {"status": "measured"}}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            unmeasured_in(&partial, "timing", "measured"),
+            vec!["the report's collection is incomplete"]
+        );
+        // A step with nothing to read fails; a self-checking command checks itself.
+        let mut timed = step(
+            "benchmark-x",
+            Stage::Timing,
+            Placement::Timed,
+            xtask(&["report"]),
+        );
+        assert_eq!(unmeasured_cases(&timed), vec!["the step names no --output"]);
+        timed.command = xtask(&["report", "--output", "/nonexistent-gate-output"]);
+        assert!(unmeasured_cases(&timed)[0].starts_with("no report: "));
+        timed.command = xtask(&["codecs", "time", "--out", "/nonexistent-gate-output"]);
+        assert!(unmeasured_cases(&timed).is_empty());
     }
 
     #[test]
