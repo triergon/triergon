@@ -171,15 +171,6 @@ memory from a separate collection under the kernel RSS bound; both are in the ra
 samples. `cargo xtask grade` cannot join them, because FFmpeg's log lines carry heap
 addresses that differ between runs.
 
-Packet framing with five inline segments and the short AVC configuration receiver
-was measured separately with static runtime support at
-`1cea5f7b4a6a74660beb2a7f7423871cd5bbae67` on a c8g.large pinned to CPU 1.
-All 131 cases match and use less peak heap and total peak RSS, with upper bounds
-of 0.9233 and 0.9811. Runtime passes on 128 of 131 cases. The remaining cases are
-`avc-multi_idr` (1.2495), `hevc-inband_both` (1.2256) and `non-vps-irap` (1.2046).
-The comparison used 30 timing pairs of 50 complete operations and 30 memory pairs
-under the kernel RSS bound.
-
 The MP4 forward and range results use the gate build at
 `f5453ef9d88712777aa5b6383250875456e9f334` on a c8g.large pinned to CPU 1, with
 30 timing pairs of 50 complete operations and 30 memory pairs per case.
@@ -403,7 +394,6 @@ than main's; the sums are 5.3% lower for `shape-bidi`, 18.3% for `shape-simple` 
 | MPEG-TS program playback, earlier comparison | `3125c1e61d73a575419f7b653a1dae44a3269dae` | `beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a` |
 | HLS segments, earlier comparison | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
-| Packet framing with five inline segments, short AVC extensions and static runtime support | `1cea5f7b4a6a74660beb2a7f7423871cd5bbae67` | `f03c4596acc0a9c56e063cd744e75872d2a630941580e0fe578987f52b7d8df5` |
 | MP4 range playback with an initial non-sync prefix | `e35e3584f748a9dd6a4bc41e8de826b682c688e0` | `35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063` |
 | MP4 range playback with fragmented subtitles | `766961a481106e878705bcb43a438c24725869e0` | `7b6e9c9b7f078554882d60869a07068fcec65ce1e4271f69db3f15e9de147bcf` |
 | MP4 range playback earlier fragmented subtitle comparison | `b42e33df742854373b2aba84decd086481aa8af6` | `5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5` |
