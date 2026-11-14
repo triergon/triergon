@@ -20715,6 +20715,24 @@
      "report_sha256": "ac99201fe52266d501afdb9330cb71c03667af24295e6cd80e9a8f3531db409b"
     }
    ]
+  },
+  {
+   "name": "framing-descriptor-extents-49e04e0f",
+   "path": "framing-descriptor-extents-49e04e0f",
+   "retention": "90 days",
+   "reason": "AArch64 comparison of checked descriptor extents",
+   "key": "qualification/framing-descriptor-extents-49e04e0f/01f0a922f7f5aaf9d210ad49d33a85db5444db3100ab17f5c5a33678e2d5e704.tar.gz",
+   "sha256": "01f0a922f7f5aaf9d210ad49d33a85db5444db3100ab17f5c5a33678e2d5e704",
+   "bytes": 308599819
+  },
+  {
+   "name": "framing-packed-avc-401fbcca",
+   "path": "framing-packed-avc-401fbcca",
+   "retention": "90 days",
+   "reason": "AArch64 comparison of packed AVC state",
+   "key": "qualification/framing-packed-avc-401fbcca/9b42701fd46439e7a405f89afb354af16595d73a6e869802db6fefb1166cfc9d.tar.gz",
+   "sha256": "9b42701fd46439e7a405f89afb354af16595d73a6e869802db6fefb1166cfc9d",
+   "bytes": 307481526
   }
  ]
 }
