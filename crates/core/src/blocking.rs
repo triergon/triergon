@@ -210,11 +210,6 @@ impl<S: Read + Seek> Feed<S> {
         })
     }
 
-    /// Borrow the source without invalidating the cached position.
-    pub fn source(&self) -> &S {
-        &self.source
-    }
-
     /// Access the source for mutation. The next request seeks explicitly and
     /// reads into a new window, because immutable backing can no longer be
     /// assumed. To switch entities, reset the input cursor and construct a
@@ -343,6 +338,11 @@ impl<S: Read + Seek> Feed<S> {
 }
 
 impl<'a> Feed<std::io::Cursor<&'a OwnedInputBytes>> {
+    /// The offset of the cursor within its immutable source.
+    pub fn position(&self) -> u64 {
+        self.source.position()
+    }
+
     /// Feed preloaded immutable bytes charged to the parser's budget.
     /// The backing allocation remains charged while any of its views live.
     pub fn from_owned(source: &'a OwnedInputBytes, pool: &Budget) -> Result<Self> {

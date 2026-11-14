@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
 use triergon_core::blocking::Feed;
@@ -37,18 +38,18 @@ fn drain<S: Read + Seek>(input: &mut InputCursor, feed: &mut Feed<S>) -> Vec<u8>
 }
 
 /// Counts the seeks it is asked for.
-struct Counting {
+struct Counting<'a> {
     inner: Cursor<Vec<u8>>,
-    seeks: usize,
+    seeks: &'a Cell<usize>,
 }
-impl Read for Counting {
+impl Read for Counting<'_> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buffer)
     }
 }
-impl Seek for Counting {
+impl Seek for Counting<'_> {
     fn seek(&mut self, to: SeekFrom) -> io::Result<u64> {
-        self.seeks += 1;
+        self.seeks.set(self.seeks.get() + 1);
         self.inner.seek(to)
     }
 }
@@ -70,18 +71,19 @@ fn the_source_is_seeked_only_when_a_request_does_not_continue() {
     let bytes: Vec<u8> = (0..64u8).collect();
     let pool = Budget::new(1 << 20).unwrap();
     let mut input = cursor(&pool, 64, 1);
+    let seeks = Cell::new(0);
     let source = Counting {
         inner: Cursor::new(bytes.clone()),
-        seeks: 0,
+        seeks: &seeks,
     };
     let mut feed = Feed::new(source, &pool).unwrap();
-    let rewinds = feed.source().seeks;
+    let rewinds = seeks.get();
     assert_eq!(drain(&mut input, &mut feed), bytes);
-    assert_eq!(feed.source().seeks, rewinds);
+    assert_eq!(seeks.get(), rewinds);
 
     let request = input.request_range(40).unwrap();
     feed.supply(&mut input, request).unwrap();
-    assert_eq!(feed.source().seeks, rewinds + 1);
+    assert_eq!(seeks.get(), rewinds + 1);
     assert_eq!(input.buffered(), &[40]);
 }
 
@@ -133,7 +135,7 @@ fn owned_feed_shares_large_windows_and_resumes_with_inline_bytes() {
     let retained = input.retained_window().unwrap();
     assert!(retained.shares_storage_with(storage.as_bytes()));
     assert_eq!(pool.used(), before);
-    assert_eq!(feed.source().position(), 32);
+    assert_eq!(feed.position(), 32);
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         input
