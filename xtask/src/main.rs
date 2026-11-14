@@ -66,7 +66,7 @@ commands:
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
-                 [--baseline-worker W]
+                 [--baseline-worker W] [--full]
                  qualify the mandatory external metadata vector through the same gates
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
   trace-identities --output F [--compare F] [--candidate W] [--corpus FEATURE=DIR]...
@@ -92,8 +92,12 @@ commands:
   isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
   framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
-                 [--additional-report F] [--require-slice-acceptance|--require-acceptance]
+                 [--additional-report F] [--require-slice-acceptance|--require-acceptance] [--full]
                  join complete reports, recompute runtime and memory bounds, then apply gates
+  preflight      [--feature ID]... [--corpus ID=DIR]... [--isobmff] [--codecs F]... [--review F]
+                 [--kernel]
+                 before a gate run measures: workers, references, inputs, RSS module review
+                 and state; see `cargo xtask preflight --help`
   build-workers  [--comparison-build] [--only WORKER] [--all-references]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
@@ -108,9 +112,10 @@ commands:
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
                  [--benchmark] [--memory] [--pairs N] [--memory-pairs N] [--iterations N] [--seed N]
-                 [--baseline-worker W]
+                 [--baseline-worker W] [--full]
                  correctness, paired runtime and memory report of the built workers for one contract;
-                 with a baseline worker of another build, timing and memory pair against it
+                 with a baseline worker of another build, timing and memory pair against it;
+                 a gate collection a kept evidence set holds is reused unless --full
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
@@ -215,6 +220,12 @@ fn main() -> ExitCode {
             playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
         }
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("preflight") => {
+            return failing(
+                harness::preflight::main(&root, &args[1..]),
+                harness::preflight::USAGE,
+            );
+        }
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
         Some("build-workers") => {
@@ -428,6 +439,7 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
         benchmark: false,
         memory: false,
         baseline_worker: None,
+        full: false,
     };
     let mut rest = args.iter();
     let parsed = (|| -> Task {
@@ -448,6 +460,7 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
                 }
                 "--benchmark" => options.benchmark = true,
                 "--memory" => options.memory = true,
+                "--full" => options.full = true,
                 "--baseline-worker" => options.baseline_worker = Some(PathBuf::from(value()?)),
                 _ => return Err(USAGE.to_owned()),
             }
@@ -615,6 +628,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 "--require-slice-acceptance" => options.require_slice_acceptance = true,
                 "--benchmark" => options.benchmark = true,
                 "--memory" => options.memory = true,
+                "--full" => options.full = true,
                 "--pairs" | "--memory-pairs" | "--iterations" | "--seed" => {
                     let text = value()?.display().to_string();
                     let number: u64 = text

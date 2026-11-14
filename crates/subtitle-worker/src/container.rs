@@ -106,17 +106,15 @@ pub fn read_file_track(file: &Path, codec: CodecId<'_>, ordinal: usize) -> Resul
     }
 }
 
-/// The `ordinal`th video track (from 0, whatever its codec) of a Matroska, ISO
-/// BMFF or transport stream file, on the clock [`read_file_track`] reads it
-/// with (an ISO BMFF video track's edit list is not applied), with its codec
-/// when it is H.264 or HEVC, or in a transport stream MPEG-2 video.
+/// The `ordinal`th video track (from 0, whatever its codec) of a Matroska or
+/// ISO BMFF file, on the clock [`read_file_track`] reads it with (an ISO BMFF
+/// video track's edit list is not applied), with its codec when it is H.264 or
+/// HEVC. A transport stream's video is read packet by packet with
+/// [`ts::for_each_packet`].
 pub fn read_file_video_track(
     file: &Path,
     ordinal: usize,
 ) -> Result<(Track, Option<CodecId<'static>>)> {
-    if let Some(format) = PacketFormat::detect(&head(file)?) {
-        return ts::read(file, format, Selection::Video, ordinal);
-    }
     let (track, scale, codec) = read(File::open(file)?, Selection::Video, ordinal)?;
     let track = match scale {
         Some(scale) => matroska_clock(track, scale)?,
