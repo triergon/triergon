@@ -131,6 +131,8 @@ const FEATURES: [(&str, Option<&str>, u32); 23] = [
     ("subtitle-teletext", Some(SUBTITLE_CORPUS), 10),
 ];
 const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
+/// The capture cases, which the capture items split between them.
+const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
 const FFMPEG_BIN: &str = ".research/reference-decode/install/bin";
 
@@ -277,7 +279,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         name: "external-vector".into(),
         weight: 1,
         steps,
-        preflight: Vec::new(),
+        preflight: owned(&["--external-vector"]),
     });
 
     items.push(Item {
@@ -464,7 +466,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             name,
             weight: 100,
             steps: vec![qualify],
-            preflight: Vec::new(),
+            preflight: owned(&["--capture", CAPTURE_CASES]),
         });
     }
 
@@ -553,11 +555,11 @@ pub fn shards(items: Vec<Item>, count: usize) -> Vec<Vec<Item>> {
 
 /// The capture case ids, in the order of `harness/capture/cases.json`.
 fn capture_cases(root: &Path) -> R<Vec<String>> {
-    let cases = crate::checks::read_json(&root.join("harness/capture/cases.json"))?;
+    let cases = crate::checks::read_json(&root.join(CAPTURE_CASES))?;
     Ok(cases
         .get("cases")
         .and_then(Value::as_array)
-        .ok_or("harness/capture/cases.json without cases")?
+        .ok_or_else(|| format!("{CAPTURE_CASES} without cases"))?
         .iter()
         .filter_map(|case| case.get("id").and_then(Value::as_str).map(str::to_owned))
         .collect())
