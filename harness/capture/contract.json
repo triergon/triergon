@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "capture contract v1",
   "frozen_utc": "2026-11-02",
-  "status": "frozen v1 contract with encoder comparison rule v2 (see comparison_rules.encoder_revision_reason). Native Linux ARM64 re-observation (run v2, pinned FFmpeg 9.0.2 gating build): conversion within ±1 with the same exact-match fractions as the macOS exploration, PAT bytes equal, PMT equal apart from the stream_type decision, SDT apart from the SDT decision, per-frame PTS/DTS/PCR and table cadence as stated, and the reference's one-frame output delay (89 reference pictures for 90 inputs) in all 15 cases.",
+  "status": "frozen v1 contract with encoder comparison rule v2 (see comparison_rules.encoder_revision_reason). The reference is the pinned FFmpeg 9.0.2 gating build; its conversion follows the target it is built for (conversion.reference_target): on ARMv7 the candidate's conversion is byte-identical in all 15 cases, and the AArch64 build's conversion of the 15 cases is listed in open_cases. Mux, encoder and timing observations: PAT bytes equal, PMT equal apart from the stream_type decision, SDT apart from the SDT decision, per-frame PTS/DTS/PCR and table cadence as stated, and the reference's one-frame output delay (89 reference pictures for 90 inputs) in all 15 cases.",
   "operation_source": "The capture call sequence of an application that streams its interface as MPEG-1 video in MPEG-TS: RGBA converted to NV12 by swscale (SWS_BILINEAR, negative stride for bottom-up rows), NV12 split into YUV420P planes, mpeg1video with time base 1/30, GOP 30, no B-pictures and fastint DCT, frame pts 0, 1, 2, ..., mpegts muxed through a 32,768-byte custom AVIO, av_write_frame and avio_flush per frame, no trailer. A rate byte times 100 kbps selects the bit rate (0 selects 2.5 Mbps); a width of at least 720 (or 0) selects 960x540, otherwise 480x270. harness/reference_capture.h reproduces this sequence.",
   "reference": {
     "ffmpeg_release": "9.0.2",
@@ -25,11 +25,12 @@
     "output": "YUV 4:2:0 planar (Y w*h, U and V (w/2)*(h/2)), as handed to the encoder",
     "matrix": "ITU-R BT.601 (Kr 0.299, Kb 0.114)",
     "range": "limited: Y 16-235, Cb/Cr 16-240 (swscale default; no sws_setColorspaceDetails call)",
-    "chroma_horizontal": "mean of the two horizontally co-located RGBA pixels (observed swscale chrSrcHSubSample path)",
-    "chroma_vertical": "center-sited 2:1 decimation, taps 1/8,3/8,3/8,1/8 on source rows 2k-1..2k+2, edge rows replicated (observed SWS_BILINEAR kernel)",
-    "rounding": "not specified normatively; comparison rule bounds the difference",
-    "observed_on": "macOS ARM64 Homebrew FFmpeg 9.0.2 (exploratory); to be re-observed on pinned Linux ARM64",
-    "known_platform_divergence": "A 32-bit ARM build selects swscale's arm rgbx_to_nv12 NEON converter, whose chroma/rounding may differ from the AArch64 general path. The Linux ARM64 qualification reference is the general path; 32-bit ARM equivalence is not covered here."
+    "reference_target": "FFmpeg 9.0.2 built for 32-bit ARMv7 (thumbv7neon-unknown-linux-gnueabihf user space), whose result depends on the width; the candidate follows it on every target",
+    "block_path": "widths of at least 16 that are a multiple of 4 (both capture geometries): luma (66R + 129G + 25B + 4224) >> 8; chroma from the 2x2 block each sample covers, every channel averaged as (sum + 2) >> 2, then Cb = (-19R - 37G + 56B + 16448) >> 7 and Cr = (56R - 47G - 9B + 16448) >> 7. Observed exactly over all 2^24 colours (luma per pixel, chroma per uniform block), on random and near-tie blocks, at widths 16 to 4092, heights 2 to 540, both orientations",
+    "filtered_path": "widths below 16: chroma is the mean of each horizontal pixel pair, decimated vertically with centre-sited taps 1/8, 3/8, 3/8, 1/8 over rows 2k-1..2k+2, edge rows replicated (the AArch64 build's result at every width). Widths of 2 modulo 4 from 18 up: the ARMv7 build faults (SIGBUS) and gives no result; the candidate follows the AArch64 build there",
+    "rounding": "block path exact; filtered path not specified normatively, the comparison rule bounds the difference",
+    "observed_on": "Linux ARMv7 user space on Graviton2 and Linux AArch64, pinned FFmpeg 9.0.2 gating build, black-box probes of the reference worker's convert mode",
+    "known_platform_divergence": "FFmpeg 9.0.2 built for AArch64 takes the filtered path at every width: up to 36 from the block path on noise. Its conversion of the required cases is an open case on aarch64-unknown-linux-gnu (open_cases)"
   },
   "encoder": {
     "standard": "ISO/IEC 11172-2 (MPEG-1 video); normative syntax evidence from freely available ITU-T H.262 (MPEG-1 compatibility) plus public descriptions; no specification purchased",
@@ -101,6 +102,113 @@
     "encoder_revision_reason": "Exploratory local runs showed FFmpeg's short-session rate control lands far from the requested rate in both directions (content-limited UI pictures at qmin underspend; motion at 0.1-1 Mbps overspends up to 1.2x; noise exceeds the VBV by 26 Mbit), so v1's fixed '<= 1.03x reference bytes' made quality comparisons at unequal rates. v2 compares at equal bits where the reference overspent and permits spending within the client's requested budget where the reference underspent; clause (b) is a policy choice, approved under decisions, and results under it are labelled 'within-requested-budget'."
   },
   "required_cases": "harness/capture/cases.json",
+  "open_cases": [
+    {
+      "id": "c01-ui-static-960",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c02-ui-scroll-960",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c03-ui-transition-960",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c04-motion-960",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c05-noise-960",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c06-ui-scroll-960-bottomup",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c07-ui-static-480-bottomup",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c08-ui-scroll-480-bottomup",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c09-motion-480-bottomup",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c10-ui-transition-480-topdown",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c11-motion-960-rate1",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c12-motion-960-1m",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c13-motion-960-6m",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c14-motion-960-rate255",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    },
+    {
+      "id": "c15-noise-480-bottomup",
+      "requirement": "conversion: FFmpeg 9.0.2 built for AArch64 decimates chroma with vertical taps; the converter follows the ARMv7 build's 2x2 block mean",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
+    }
+  ],
   "decisions": {
     "date_utc": "2026-11-02",
     "status": "approved",

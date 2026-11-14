@@ -11,7 +11,7 @@
 #       replacing the earlier ones and their snapshots. INPUT is a media inputs
 #       archive (.tar.gz, repository-relative paths): a local file or s3:KEY in
 #       the evidence archive
-#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full]
+#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full] [--items NAME,...]
 #       the full gate of REVISION on SHARDS hosts from the target's image, in
 #       parallel: each takes the references of REVISION from its image or the
 #       archive, gets ready, and runs its shard (tools/gate-host.sh); the
@@ -19,16 +19,19 @@
 #       and records copied to OUT, and joined by `cargo xtask gate summary`
 #       into OUT/summary.json. Each host is terminated as soon as its shard's
 #       outputs are archived and checked. It launches nothing unless this
-#       checkout is REVISION, unchanged, and `cargo xtask gate check --shards
-#       SHARDS` passes in it. The RSS module review is the one REVISION commits
-#       for its module source and the image's kernel
+#       checkout is REVISION, unchanged, and `cargo xtask gate check` passes in it
+#       for SHARDS shards of the target. The RSS module review is the one REVISION commits
+#       for its module source and the image's kernel. --items runs those items of
+#       the plan alone
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
-# start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to;
+# start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to, which must be
+# this workstation's current public address or nothing is launched;
 # TRIERGON_EVIDENCE_ARCHIVE, the s3:// evidence archive; optionally
 # TRIERGON_BASE_IMAGE (default: the current Ubuntu 24.04 arm64 image) and
-# TRIERGON_VOLUME_GB (default 200). Hosts are c6g.4xlarge: Graviton2, which runs
-# 32-bit user spaces, with the 32 GiB kernel-bound memory is qualified on. Every
+# TRIERGON_VOLUME_GB (default 200). Hosts are c6g.4xlarge, the class the gates
+# qualify on for both targets: Graviton2, which runs 32-bit user spaces, with the
+# 32 GiB kernel-bound memory needs. Every
 # resource is tagged Project=triergon; hosts terminate when they shut down, and a
 # timer on disk shuts each down 72 hours after it boots, whatever happens. Each
 # command removes its hosts, security group and key pair when it ends, and exits
@@ -171,18 +174,66 @@ reachable() {
     done
 }
 
+# This workstation's public address, as AWS sees it; empty when it cannot be read.
+workstation() { curl -fsS --max-time 10 https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]'; }
+
+# Refuse to launch unless TRIERGON_SSH_CIDR is this workstation's current address
+# as a /32: the hosts must be reachable from here, and from nowhere else.
+require_address() {
+    local address
+    address=$(workstation)
+    echo "workstation address ${address:-unknown}, TRIERGON_SSH_CIDR $TRIERGON_SSH_CIDR"
+    if [ -z "$address" ] || [ "$address/32" != "$TRIERGON_SSH_CIDR" ]; then
+        echo "TRIERGON_SSH_CIDR must be this workstation's address as a /32: launching nothing" >&2
+        return 2
+    fi
+}
+
+# Whether the session's security group lets ADDRESS reach the hosts by SSH: prints
+# yes, no, or unknown when the group cannot be read (expired credentials, say).
+admitted() {
+    local ranges
+    ranges=$(aws ec2 describe-security-groups --group-ids "$SG" \
+        --query 'SecurityGroups[0].IpPermissions[].IpRanges[].CidrIp' --output text \
+        < /dev/null 2>/dev/null) || { echo unknown; return; }
+    if tr '\t' '\n' <<< "$ranges" | grep -qx "$1/32"; then echo yes; else echo no; fi
+}
+# How long polls wait for the security group to admit a new address, in seconds.
+ADDRESS_WAIT=1800
+
 # Run tools/gate-host.sh ARGS on host I, detached, and wait until its log records
-# MARKER; give up after five failed polls in a row.
+# MARKER; give up after five failed polls in a row. A poll that fails because this
+# workstation's address left the security group's one /32 is not a failure: the
+# hosts work on, so it says so once and waits, for up to ADDRESS_WAIT, until the
+# group admits the new address, which it never changes itself. A group it cannot
+# read is a credential failure, reported as one.
 detached() {
     local i=$1 marker=$2; shift 2
     on "$i" "setsid nohup env $(printf '%q ' "${ENVIRONMENT[@]}") bash ~/gate-host.sh $* > ~/gate-host.out 2>&1 < /dev/null &"
-    local failures=0 state
+    local failures=0 state moved='' waited=0
     while sleep "$POLL"; do
         if state=$(on "$i" "taskset -c 0 tail -1 ~/gate-host.log; taskset -c 0 pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
             failures=0
             case $state in *"$marker"*) return 0;; esac
             case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
         else
+            local address verdict=yes
+            address=$(workstation)
+            [ -z "$address" ] || verdict=$(admitted "$address")
+            if [ "$verdict" = unknown ]; then
+                say "host $i: unreachable, and $SG cannot be read: the AWS credentials \
+may have expired"
+            elif [ "$verdict" = no ]; then
+                [ "$address" = "${moved:-}" ] || say "host $i: unreachable, because this \
+workstation's address is now $address and $SG admits SSH from another; polls resume \
+once $SG admits $address/32"
+                moved=$address failures=0 waited=$((waited + POLL))
+                if [ "$waited" -ge "$ADDRESS_WAIT" ]; then
+                    say "host $i: $SG still does not admit $address after $((waited / 60)) min"
+                    return 1
+                fi
+                continue
+            fi
             failures=$((failures + 1))
             [ "$failures" -lt 5 ] || { say "host $i: no answer to five polls"; return 1; }
         fi
@@ -229,6 +280,7 @@ repository_path() { if [ "$1" = armv7 ]; then echo /srv/armhf/home/ubuntu/trierg
 
 image() {
     local target=$1 revision=$2; shift 2
+    require_address
     local base=${TRIERGON_BASE_IMAGE:-$(aws ssm get-parameter --name \
         /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id \
         --query Parameter.Value --output text)}
@@ -304,7 +356,9 @@ image() {
 shard() {
     local i=$1 count=$2 target=$3 revision=$4 out=$5 full=$6
     mkdir -p "$out/shard-$i"
-    trap 'collect "$i" "$target" "$revision" "$out"; release "$i" "$count" "$out"' EXIT
+    # The values now: the trap can run after this function's locals are gone.
+    # shellcheck disable=SC2064
+    trap "$(printf 'collect %q %q %q %q; release %q %q %q' "$i" "$target" "$revision" "$out" "$i" "$count" "$out")" EXIT
     reachable "$i"
     copy "$i" "$HERE/gate-host.sh" gate-host.sh
     on "$i" "bash ~/gate-host.sh checkout $revision" | tail -n +2 |
@@ -393,17 +447,36 @@ summarise() {
 }
 
 run() {
-    local target=$1 count=$2 revision=$3 out=$4 full=${5:-}
+    local target=$1 count=$2 revision=$3 out=$4 full="" items=""
+    shift 4
+    while [ $# -gt 0 ]; do
+        case $1 in
+        --full) full=--full ;;
+        --items) items=$2; shift ;;
+        *) echo "unknown option $1" >&2; return 2 ;;
+        esac
+        shift
+    done
+    [ -z "$items" ] || ENVIRONMENT+=("ITEMS=$items")
+    require_address
     local name="triergon-gate-$target" ami stamp checkout
     # Before any host: every input each shard's preflight reads is one a prepared
     # host has. The check reads this checkout, so it must be REVISION, unchanged.
     checkout=$(cd "$HERE/.." && pwd)
-    if [ "$(git -C "$checkout" rev-parse "$revision^{commit}")" != "$(git -C "$checkout" rev-parse HEAD)" ] ||
+    # Hosts fetch the revision by its full name.
+    revision=$(git -C "$checkout" rev-parse "$revision^{commit}")
+    if [ "$revision" != "$(git -C "$checkout" rev-parse HEAD)" ] ||
         ! git -C "$checkout" diff --quiet HEAD; then
         echo "check out $revision here, unchanged: the gate check reads this checkout" >&2
         return 2
     fi
-    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask gate check --shards "$count") ||
+    local triple
+    case $target in
+    aarch64) triple=aarch64-unknown-linux-gnu ;;
+    armv7) triple=thumbv7neon-unknown-linux-gnueabihf ;;
+    *) echo "unknown target $target" >&2; return 2 ;;
+    esac
+    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask gate check --shards "$count" --target "$triple" ${items:+--items "$items"}) ||
         { echo "the gate check fails: no host launched" >&2; return 1; }
     stamp=$(date -u +%Y%m%d-%H%M%S)
     ami=$(aws ec2 describe-images --owners self \
@@ -438,6 +511,7 @@ run() {
             "$(grep DONE "$out/shard-$i/gate-host.log" 2>/dev/null | tail -1)"
     done | tee "$out/hosts.txt"
     say "outputs archived under $RUN_OBJECT/"
+    [ -z "$items" ] || say "a partial run, not the full gate: $items"
     return "$failed"
 }
 

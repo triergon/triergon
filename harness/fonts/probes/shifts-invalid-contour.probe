@@ -1,0 +1,51 @@
+# SHC, SHP and SHZ given a contour, point or zone the glyph does not have,
+# each followed by a move of point 2: SHC on contour 5, -1 and 2 (of two),
+# SHC on contour 0, SHP on point 99, SHZ on zone 2.
+# Observed: none of them ends the program; SHC on a missing contour does
+# nothing.
+heights 16384
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 5; SHC[1]; PUSH 2 640; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH -1; SHC[1]; PUSH 2 640; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 2; SHC[1]; PUSH 2 640; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 0; SHC[1]; PUSH 2 640; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 99; SHP[1]; PUSH 2 640; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    SVTCA[0]; PUSH 7; MDAP[1]; PUSH 7; SRP1; PUSH 2; SHZ[1]; PUSH 2 640; SCFS
+  end
+end

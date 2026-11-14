@@ -190,12 +190,15 @@ prove() { # OUT: build, load and prove the module, leaving it loaded
     fi
 }
 
+# The gate items of a run of part of the gate: $ITEMS, comma-separated, as --items.
+selection() { [ -z "${ITEMS:-}" ] || echo "--items $ITEMS"; }
+
 ready() {
     local shard=$1
     prepare
     # The grades run from a release build of xtask; build it before anything is timed.
     step xtask-release inside "cargo build --release --locked -p xtask"
-    step preflight inside "cargo xtask gate preflight --shard $shard"
+    step preflight inside "cargo xtask gate preflight --shard $shard $(selection)"
     step prove-scratch prove .research/rss-bound-scratch
     sudo rmmod triergon_rss_bound
     log READY
@@ -205,11 +208,11 @@ run() {
     local shard=$1 out=$2 full=${3:-}
     local proof=.research/rss-bound
     [ ! -e /sys/module/triergon_rss_bound ] || sudo rmmod triergon_rss_bound
-    step "timing $shard" inside "cargo xtask gate run --stage timing --shard $shard --output $out $full" || true
+    step "timing $shard" inside "cargo xtask gate run --stage timing --shard $shard --output $out $full $(selection)" || true
     step prove prove "$proof"
     step build-workers-kernel inside "TRIERGON_RSS_KERNEL_PROOF=$proof/RSS-PROOF.json cargo xtask build-workers --all-references"
-    step preflight-kernel inside "cargo xtask gate preflight --shard $shard --kernel"
-    step "memory $shard" inside "cargo xtask gate run --stage memory --shard $shard --output $out $full" || true
+    step preflight-kernel inside "cargo xtask gate preflight --shard $shard --kernel $(selection)"
+    step "memory $shard" inside "cargo xtask gate run --stage memory --shard $shard --output $out $full $(selection)" || true
     sudo rmmod triergon_rss_bound
     log DONE
 }

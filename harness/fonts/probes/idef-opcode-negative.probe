@@ -1,0 +1,30 @@
+# IDEF given -110 (0xFF92 as a word) and opcode 0x93 itself: glyphs run
+# opcode 0x93, opcode 0x92, then 0x92 followed by a move of point 3.
+# Observed: the definition of -110 is an error, which fails every hinted
+# load.
+heights 16384
+maxp instruction-defs 8
+fpgm
+  PUSH 147; IDEF; SVTCA[0]; PUSH 2 640; SCFS; ENDF; PUSH -110; IDEF; SVTCA[0]; PUSH 1 640; SCFS; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    BYTES 0x93
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    BYTES 0x92
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    BYTES 0x92; SVTCA[0]; PUSH 3 960; SCFS
+  end
+end

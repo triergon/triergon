@@ -117,6 +117,15 @@ pub struct Encoder {
     coarse_ref: BudgetVec<u8>,
     /// Luma of the previous source picture, for scene-change detection.
     previous_luma: BudgetVec<u8>,
+    /// Chroma (Cb, then Cr) of the previous source picture: with the luma, it
+    /// tells a repeated picture.
+    previous_chroma: BudgetVec<u8>,
+    /// Per macroblock, the quantiser at which the previous picture skipped it
+    /// after its residual quantised to zero; 0 where it did not.
+    skipped_at: BudgetVec<u8>,
+    /// Macroblocks skipped again from `skipped_at` without coding a residual.
+    #[cfg(test)]
+    reused_skips: usize,
     /// Macroblocks identical to the previous source (scene-score scratch).
     unchanged: BudgetVec<u32>,
     /// Per-block quantised levels of the macroblock being coded; entries are
@@ -128,6 +137,19 @@ pub struct Encoder {
     output_charge: Reservation,
     /// Most bytes one picture can take.
     picture_bound: usize,
+}
+
+/// How `inter_mb` codes one macroblock of a P picture.
+#[derive(Clone, Copy)]
+struct Inter {
+    mv: Mv,
+    f_code: u32,
+    /// First or last macroblock of the slice, which is never skipped.
+    edge: bool,
+    /// Under the VBV guard: no coefficients.
+    tight: bool,
+    /// The source picture equals the previous one in every plane.
+    repeated: bool,
 }
 
 /// Per-slice state reset at every slice start. Each picture is one slice
@@ -186,6 +208,14 @@ impl Encoder {
                 0,
                 g.luma_stride() * g.macroblock_height() * 16,
             )?,
+            previous_chroma: BudgetVec::try_filled(
+                budget,
+                0,
+                2 * g.chroma_stride() * g.macroblock_height() * 8,
+            )?,
+            skipped_at: BudgetVec::try_filled(budget, 0, mbs)?,
+            #[cfg(test)]
+            reused_skips: 0,
             unchanged: BudgetVec::try_filled(budget, 0, mbs)?,
             levels: [[0; 64]; 6],
             index: 0,
@@ -230,6 +260,8 @@ impl Encoder {
         // restarts the GOP (the reference's default scene-change rule).
         let mut key = self.index == 0 || self.index - self.gop_start >= self.cfg.gop as u64;
         let same_source_luma = !key && input.y() == &self.previous_luma[..];
+        let (previous_cb, previous_cr) = self.previous_chroma.split_at(input.cb().len());
+        let repeated = same_source_luma && input.cb() == previous_cb && input.cr() == previous_cr;
         let mut f_code = 0;
         if !key {
             let g = self.cfg.geometry;
@@ -245,6 +277,7 @@ impl Encoder {
         let kind = if key { Kind::Intra } else { Kind::Predicted };
         if key {
             self.gop_start = self.index;
+            self.skipped_at.fill(0);
             self.intra_analysis(input);
             if self.rc.needs_intra_probe()
                 && let Some(scratch) = self.probe.take()
@@ -299,8 +332,15 @@ impl Encoder {
                 }
             });
             s.target_q = q;
+            let picture = Inter {
+                mv: Mv::ZERO,
+                f_code,
+                edge: false,
+                tight: false,
+                repeated,
+            };
             censored |=
-                self.encode_row(input, mb_y, &mut s, kind, f_code, economy, plan.hard_limit);
+                self.encode_row(input, mb_y, &mut s, kind, picture, economy, plan.hard_limit);
             slice = Some(s);
             activity_done += self.row_activity[mb_y];
         }
@@ -310,6 +350,11 @@ impl Encoder {
         let bits = out.len() * 8;
         if !same_source_luma {
             self.previous_luma.copy_from_slice(input.y());
+        }
+        if !repeated {
+            let (cb, cr) = self.previous_chroma.split_at_mut(input.cb().len());
+            cb.copy_from_slice(input.cb());
+            cr.copy_from_slice(input.cr());
         }
         let mean_q = q_sum as f64 / total;
         if censored {
@@ -444,7 +489,20 @@ impl Encoder {
                 } else {
                     u32::MAX
                 };
-                let (mv, sad) = search.run(&candidates, &coarse, mb_x, mb_y, neighbour);
+                // The source did not move: its zero vector is its motion. A
+                // search would only fit the reference's quantisation noise.
+                let (mv, sad) = if same_source_luma {
+                    let origin = y * stride + x;
+                    let zero = motion::sad16(
+                        &input.y()[origin..],
+                        stride,
+                        &self.reference.y()[origin..],
+                        stride,
+                    );
+                    (Mv::ZERO, zero)
+                } else {
+                    search.run(&candidates, &coarse, mb_x, mb_y, neighbour)
+                };
                 // Intra only pays off when prediction is poor; skip the
                 // deviation pass otherwise.
                 let deviation = if sad > INTRA_MARGIN {
@@ -563,6 +621,8 @@ impl Encoder {
         Ok(())
     }
 
+    /// Code one macroblock row. `picture` carries the picture's `f_code` and
+    /// whether it repeats the previous source; each macroblock sets the rest.
     #[allow(clippy::too_many_arguments)]
     fn encode_row(
         &mut self,
@@ -570,7 +630,7 @@ impl Encoder {
         mb_y: usize,
         s: &mut SliceState,
         kind: Kind,
-        f_code: u32,
+        picture: Inter,
         economy: bool,
         hard_limit: f64,
     ) -> bool {
@@ -589,10 +649,17 @@ impl Encoder {
                 Kind::Predicted => {
                     let a = self.analysis[address];
                     if a.intra && !tight {
+                        self.skipped_at[address] = 0;
                         self.intra_mb(input, mb_x, mb_y, address, s, Kind::Predicted, false);
                     } else {
                         let mv = if a.intra { Mv::ZERO } else { a.mv };
-                        self.inter_mb(input, mb_x, mb_y, address, s, mv, f_code, edge, tight);
+                        let inter = Inter {
+                            mv,
+                            edge,
+                            tight,
+                            ..picture
+                        };
+                        self.inter_mb(input, mb_x, mb_y, address, s, inter);
                     }
                 }
             }
@@ -682,7 +749,6 @@ impl Encoder {
         s.pmv = Mv::ZERO;
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn inter_mb(
         &mut self,
         input: &Picture,
@@ -690,11 +756,30 @@ impl Encoder {
         mb_y: usize,
         address: usize,
         s: &mut SliceState,
-        mv: Mv,
-        f_code: u32,
-        edge: bool,
-        tight: bool,
+        inter: Inter,
     ) {
+        let Inter {
+            mv,
+            f_code,
+            edge,
+            tight,
+            repeated,
+        } = inter;
+        let zero = mv == Mv::ZERO;
+        let skipped_at = u32::from(self.skipped_at[address]);
+        if repeated && zero && !edge && skipped_at != 0 && s.target_q >= skipped_at {
+            // The previous picture skipped this macroblock and the picture is
+            // repeated, so its residual is the one that quantised to zero
+            // there, at a quantiser no coarser than this one: skip again.
+            #[cfg(test)]
+            {
+                self.reused_skips += 1;
+            }
+            s.skipped += 1;
+            s.pmv = Mv::ZERO;
+            self.copy_reference(mb_x, mb_y);
+            return;
+        }
         let g = self.cfg.geometry;
         let mut pred = [[0u8; 64]; 6];
         let ls = g.luma_stride();
@@ -739,18 +824,21 @@ impl Encoder {
                     1 => &input.cb(),
                     _ => &input.cr(),
                 };
-                let mut magnitude = 0u32;
+                // Residuals and their per-column magnitudes in 16-bit lanes
+                // (a column sums at most 8 × 255).
+                let mut columns = [0u16; 8];
                 for r in 0..8 {
                     let row: &[u8; 8] = src[(y + r) * stride + x..(y + r) * stride + x + 8]
                         .try_into()
                         .unwrap();
                     let p: &[u8; 8] = pred[b][r * 8..r * 8 + 8].try_into().unwrap();
                     for c in 0..8 {
-                        let d = row[c] as i32 - p[c] as i32;
-                        coeffs[r * 8 + c] = d;
-                        magnitude += d.unsigned_abs();
+                        let d = i16::from(row[c]) - i16::from(p[c]);
+                        coeffs[r * 8 + c] = i32::from(d);
+                        columns[c] += d.unsigned_abs();
                     }
                 }
+                let magnitude: u32 = columns.iter().map(|&m| u32::from(m)).sum();
                 if self.quant.inter_is_zero(magnitude, s.target_q) {
                     continue;
                 }
@@ -762,14 +850,16 @@ impl Encoder {
             }
         }
 
-        let zero = mv == Mv::ZERO;
         if cbp == 0 && zero && !edge {
             // Skipped: zero vector, prediction copied, predictors reset.
             s.skipped += 1;
             s.pmv = Mv::ZERO;
+            // A skip forced by the VBV guard proves nothing about the residual.
+            self.skipped_at[address] = if tight { 0 } else { s.target_q as u8 };
             self.store_prediction(mb_x, mb_y, &pred);
             return;
         }
+        self.skipped_at[address] = 0;
         self.write_address(s);
         let requant = cbp != 0 && s.target_q != s.q;
         match (cbp != 0, zero) {
@@ -829,6 +919,24 @@ impl Encoder {
             write_mv_component(&mut self.writer, v - p, f_code);
         }
         s.pmv = mv;
+    }
+
+    /// Reconstruct a macroblock as the reference's co-sited samples.
+    fn copy_reference(&mut self, mb_x: usize, mb_y: usize) {
+        let g = self.cfg.geometry;
+        for b in [0, 4, 5] {
+            let (plane, stride, x, y, _) = block_origin(g, b, mb_x, mb_y);
+            let size = if plane == 0 { 16 } else { 8 };
+            let (src, dst) = match plane {
+                0 => (self.reference.y(), self.recon.y_mut()),
+                1 => (self.reference.cb(), self.recon.cb_mut()),
+                _ => (self.reference.cr(), self.recon.cr_mut()),
+            };
+            for r in 0..size {
+                let at = (y + r) * stride + x;
+                dst[at..at + size].copy_from_slice(&src[at..at + size]);
+            }
+        }
     }
 
     fn store_prediction(&mut self, mb_x: usize, mb_y: usize, blocks: &[[u8; 64]; 6]) {
@@ -899,15 +1007,19 @@ fn block_origin(
 
 /// Σx² − (Σx)²/256 over a 16×16 block: 256 × its variance.
 fn variance256(block: &[u8], stride: usize) -> u32 {
-    let (mut sum, mut squares) = ([0u32; 16], [0u32; 16]);
+    // Per lane: at most 16 × 255 in the sum, 16 × 255² in the squares, each
+    // square formed in 16 bits.
+    let (mut sum, mut squares) = ([0u16; 16], [0u32; 16]);
     for r in 0..16 {
         let row: &[u8; 16] = block[r * stride..r * stride + 16].try_into().unwrap();
         for i in 0..16 {
-            sum[i] += row[i] as u32;
-            squares[i] += row[i] as u32 * row[i] as u32;
+            let v = u16::from(row[i]);
+            sum[i] += v;
+            squares[i] += u32::from(v * v);
         }
     }
-    let (sum, squares): (u32, u32) = (sum.iter().sum(), squares.iter().sum());
+    let sum: u32 = sum.iter().map(|&v| u32::from(v)).sum();
+    let squares: u32 = squares.iter().sum();
     squares - (sum * sum) / 256
 }
 

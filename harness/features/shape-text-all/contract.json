@@ -52,5 +52,6 @@
       "id": "authored-cff-features-otf-latn-libass",
       "requirement": "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
     }
-  ]
+  ],
+  "parity_timeout_seconds": 120
 }

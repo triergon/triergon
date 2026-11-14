@@ -252,7 +252,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   parity, timing and memory runs), `external-vector`, `trace-identities` and `fuzz
   --contract` (unless `--timeout-seconds` is given) honour it, and `cargo xtask
   check-design` fails on any other value. `raster-sweep` sets 120 for its heaviest
-  cases on 32-bit ARMv7.
+  cases on 32-bit ARMv7. `parity_timeout_seconds`, within the same bounds, limits the
+  worker runs of `report`'s parity comparison alone: a parity run is not timed and
+  both folds must still be equal, so a reference slow on one target can have more time
+  there while timing and memory keep `timeout_seconds`. The font, shaping and ASS
+  contracts set 120: on 32-bit ARMv7 FreeType folds the NotoSansCJK collection's
+  outlines at 16384 in up to 29.78 s, and 120 is four times that, rounded up.
   A contract with `"pinned_per_target": true` pins each case per target triple:
   `pins.json` maps each case to a fold for each of the contract's
   `required_targets`, except the targets `unpinned_targets` lists for a case
@@ -608,18 +613,52 @@ may override that count for diagnostic comparisons.
   and instruction counts is placement. A screen never replaces a recorded result.
 - Qualification runs natively: on AArch64 Linux, and on 32-bit ARMv7 Linux in an armhf
   user space (below). Results on one platform do not establish another.
+- The gates qualify on one host class for both targets: the AWS c6g.4xlarge
+  (Graviton2, 16 vCPUs, 32 GiB), which runs 32-bit user spaces and has the memory
+  kernel-bound memory needs. Runtime from another class is not comparable, because
+  another core moves the candidate/reference ratio of the same instructions: on 13
+  Linux AArch64 rows measured first on c8g (Graviton4) and again on a c6g.4xlarge at
+  `79e0ae13`, each candidate's user-mode instruction count stayed within -0.4% to +0.3%
+  of the earlier build's (one row's code got 9% cheaper) while the runtime upper bounds
+  moved by -0.31 to +0.18 (`cargo xtask count`, below). Every row of
+  [status](status.md) names the class it was measured on.
 
 ### Running the gates
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
 measurements, the packet-framing and progressive TS suites, the codecs' parity, a codec
-workload list's timing and memory, a capture case, the checked or the release tests, and
-the font, shaping, rasterising and ASS comparisons. Every registered feature is either
-one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated (an
-on-demand or diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on
-any other. `cargo xtask gate plan --shards N` splits the items into N shards of about
-equal planning weight, each for its own host.
+workload list's timing, a part of its memory (`codecs memory --part I/N`, every Nth
+workload), a capture case, the checked or the release tests, and the font, shaping,
+rasterising and ASS comparisons. Every registered feature is either one of them or
+named, in `xtask/src/gate.rs`, with the reason it is not gated (an on-demand or
+diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
+target leaves out an item that cannot measure there, with the reason `gate plan
+--target TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback
+worker runs its numeric modes only on native Linux AArch64. `cargo xtask gate plan
+--shards N` splits the items into N shards of about equal planning weight, each for
+its own host; the weights are the minutes each item took on a c6g.4xlarge, the more of
+the two targets. `--items NAME,...`, given to every gate command of a run, narrows the
+plan to those items, for a run of part of the gate; the shards record it, and `gate
+summary` checks them against the same narrowed plan, prints that the run is partial and
+writes `"partial": true` with the selection at the top of its result. A result cited as
+the full gate is a summary whose `partial` is false; a partial one is cited only for the
+items it ran.
+
+A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
+timing step whose report holds a case not `measured`, or a memory step one not
+`qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
+they did not measure, after writing every record. Where the codec gates apply (native
+Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
+does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
+are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
+diagnostics, which they print as such and fail nothing. So no feature measures nothing in
+silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
+run limit per target triple (30 s when absent), and every memory observation records how
+long its run took (`process_elapsed_ns`). Each list sets four times its slowest observed
+run on each target, rounded up, from a run at `8154812e`: `workloads.json` 221 s on Linux
+AArch64 and 208 s on 32-bit ARMv7 (`hevc-main10-2160p`, 55.16 s and 51.97 s), and
+`file-workloads.json` 170 s and 134 s (`flac-24-96k-5.1`, 42.44 s and 33.48 s).
 
 `cargo xtask gate check --shards N` runs on any machine in a second, before a host
 exists: it resolves the preflight of every shard as the shard resolves it, and fails,
@@ -834,7 +873,9 @@ target and is reused the same way. Its key holds the profile and adds every trac
 file as the working tree holds it and the untracked files git does not ignore, but the
 evidence index (which a promotion changes) and `docs/`, and the test inputs the crate
 tests read when present (`.research/fate-samples`, `.research/flac-generated`,
-`.research/flac-test-files`). The gate runs each profile once. The `checked` profile
+`.research/flac-test-files`). The few tests that read the evidence index skip the reused
+run and run on every `gate test`, so a failing index is never reused as a pass. The gate
+runs each profile once. The `checked` profile
 is the release optimisation with every overflow check and every `debug_assert!` and
 `#[cfg(debug_assertions)]` item of a debug build, so the same 4,429 tests run; it loses
 only the unoptimised build's larger stack frames, which bring stack depth problems out
@@ -943,7 +984,16 @@ archived stays until the command ends. OUT/hosts.txt records when each host was
 launched, ready, done and terminated. The command exits non-zero when a shard did not
 finish or the summary fails. Every host is a c6g.4xlarge, the class kernel-bound memory is qualified
 on, SSH is open to one address (`TRIERGON_SSH_CIDR`, a /32), and a timer on the host's
-disk powers it off, and so terminates it, 72 hours after it boots.
+disk powers it off, and so terminates it, 72 hours after it boots. Both
+commands refuse to launch anything unless `TRIERGON_SSH_CIDR` is the workstation's
+current public address as a /32, which they read from `https://checkip.amazonaws.com`
+and print beside it; they never widen it. When a poll fails because the workstation's
+public address is no longer the one the session's security group admits, the run says so
+and waits, polling on, instead of giving up on hosts that are still working: open the
+group to the new address (one /32) within 30 minutes and it carries on; after that the
+shard fails and the session's teardown removes its host. It never changes the group
+itself. A group it cannot read is reported as a credential failure, and counts as a
+failed poll.
 
 ## Robustness
 

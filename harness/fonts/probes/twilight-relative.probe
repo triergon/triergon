@@ -1,0 +1,71 @@
+# MIRP and MSIRP with zp1 in the twilight zone and rp0 a glyph point (point
+# 0, at 100 200): each glyph moves its own twilight point (2 on) by control
+# value 0 (300 units) or 320 (5 pixels at 16384), then copies the point's
+# current x and y and original x and y to the y of points 10 to 13. The
+# vectors: both y; projection y and freedom x; both x; projection y and
+# freedom along points 0 to 1; projection along points 0 to 1 and freedom y;
+# then MIRP rounding, and MSIRP with three of them.
+# Observed: MIRP places the twilight point at rp0's original position plus
+# the control value along the freedom vector, then moves it in y only;
+# MSIRP moves it from rp0 along the freedom vector, x included, and gives it
+# that original position too.
+heights 16384 1000
+maxp twilight 16
+cvt 300
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 2 0; MIRP[00000]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 2; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 2; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SPVTCA[0]; SFVTCA[1]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 3 0; MIRP[00000]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 3; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 3; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 3; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 3; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[1]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 4 0; MIRP[00000]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 4; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 4; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 4; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 4; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SPVTCA[0]; PUSH 0 1; SFVTL[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 5 0; MIRP[00000]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 5; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 5; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 5; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 5; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SFVTCA[0]; PUSH 0 1; SPVTL[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 6 0; MIRP[00000]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 6; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 6; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 6; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 6; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 7 0; MIRP[00100]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 7; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 7; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 7; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 7; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 8 320; MSIRP[0]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 8; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 8; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 8; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 8; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SPVTCA[0]; SFVTCA[1]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 9 320; MSIRP[0]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 9; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 9; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 9; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 9; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
+glyph advance 600
+  contour 100 200, 300 400, 80 0, 120 0, 160 0, 200 0, 240 0, 280 0, 320 0, 360 0, 400 0, 440 0, 480 0, 520 0, 560 0, 600 0
+  program
+    SPVTCA[0]; PUSH 0 1; SFVTL[0]; PUSH 0; SRP0; PUSH 0; SZP1; PUSH 10 320; MSIRP[0]; PUSH 1; SZP1; PUSH 0; SZP2; SVTCA[1]; PUSH 10 10; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 11 10; GC[0]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[1]; PUSH 12 10; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS; PUSH 0; SZP2; SVTCA[0]; PUSH 13 10; GC[1]; PUSH 1; SZP2; SVTCA[0]; SCFS
+  end
+end
