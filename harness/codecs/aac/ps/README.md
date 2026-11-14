@@ -58,8 +58,8 @@ probes alone ("probes"); the probes establish every value. Publications: H. Purn
 Par, A. Kohlrausch, E. Schuijers, "Parametric coding of stereo audio", EURASIP JASP
 2005:9; 3GPP TS 26.405 V19.0.0. Probe ids: d, h, m and t are the probes of the `dec`,
 `hyb`, `mix` and `time` parts, which the stages of `signal/*/recover_*.py` name and
-repeat; e are probes of the syntax pass, p probes of the decoder's interface and of the
-open cases, duck-p those of the transient ducking (below). The probe scripts and their
+repeat; e are probes of the syntax pass, p probes of the decoder's interface, o those of
+`signal/open` (below), duck-p those of the transient ducking (below). The probe scripts and their
 outputs are in the evidence set
 `codec-aac-parametric-stereo-560f2225` (`cargo xtask evidence fetch
 codec-aac-parametric-stereo-560f2225`).
@@ -80,6 +80,9 @@ codec-aac-parametric-stereo-560f2225`).
 | IPD/OPD smoothing arg(u₀ + u₁/2 + u₂/4) | probes | none | m07, m27, m28, m30, m31 |
 | Envelope ramps | paper | Purnhagen §3.3; Breebaart §7 | t02, t03, t07, t09, t21, t23; m20, m26 |
 | Behaviour over frames (first frame, repeats, error frames, start index, 20 ↔ 34 changes) | probes | none | t01–t33, v_rust |
+| Decorrelator state lines (91, kept over the stream), lattice section state, stale lines; cleared at a registered change only | probes | Purnhagen §4.1 gives the sections' transfer function | o01, o04, o05, o05c, o09–o13 |
+| IPD/OPD history: reset at a registered change, kept at a corner; phases and history advance only in the layout's IPD bands | probes | none | o20–o22 |
+| A frame without its SBR element: PS output above QMF 32 zero; the previous frame's high band dropped | probes | none | o00, o31, o32 |
 
 ## Transient ducking
 
@@ -138,21 +141,52 @@ fits started from a = 0.9, c = 0.5, γ = 1 and random starts. The memory may hav
 form on the candidate list. The form rests on the probes: they reject every other
 candidate, and this form fits every probe to the float floor.
 
+## Layout changes while off, IPD/OPD across changes, frames without SBR (`signal/open`)
+
+The o probes in `signal/open` (shared pieces in `olib.py`) recover three paths the
+composed model of `time` did not cover. Each rule fits the reference to the float floor
+on its stream and on fresh random streams of the same path. A *corner* is a frame that
+runs in another layout than the last frame that ran without a registered change: the
+change was registered while PS was off, by a header-less frame read after an error or by
+a frame that overran its extension.
+
+- **Decorrelator state over the stream.** The decorrelator keeps its state in 91 fixed
+  lines, one per band of a layout: the 34-band split bands in sub-band order (QMF 0
+  m = 0..11, QMF 1 m = 0..7, QMF 2..4 m = 0..3), the 20-band ones with QMF band 0's bands
+  by frequency (sub-bands 6, 7, 0, 1, 2+5, 3+4) then QMF 1 (1+2), (0+3) and QMF 2 (0+3),
+  (1+2), then the QMF bands. A line holds the last 14 inputs, which the plain delays and
+  the lead delay read whatever band wrote them, and the three sections' lattice state
+  s = u + a y with y = Q s[t - d] - a u, which only all-pass bands write. The ducking keeps
+  34 parameter bands. A registered change clears everything, a corner nothing; a frame
+  reads and writes its layout's lines and leaves the rest stale. o01 (a corner restarts
+  nothing: 1.3e-2 to 1.6e-2 under a restart), o04 (state by line, QMF >= 24), o05 and
+  o05c (the lattice form; direct forms I and II, transposed II and the lattice with Q
+  stored leave 1e-7 to 6e-6), o09 to o12 (QMF band 0's 20-band lines: a joint regression
+  gives one source per band with coefficient 1.000), o13 (the model `olib.PersistComposer`
+  against the reference, whole streams: 1.4e-8 at most; section state written by every
+  band, cleared stale lines and a registered change clearing only the new layout's lines
+  are rejected at 1.5e-3 to 5.4e-3, 4.7e-3 and 2.8e-5).
+- **IPD/OPD smoothing history across changes.** A registered change resets the history
+  to index 0 (also when a frame without PS repeats it); a corner reads it as stored, by
+  parameter band. Only the IPD bands of the frame's layout (11 of 20, 17 of 34) take a
+  phase, real parts included, and only they advance the history; the rows above keep
+  their values for a later layout with more IPD bands. o20 (the 34 -> 20 stream: 5.2e-3
+  as before, 1.5e-8 with the reset), o21 (ten crafted streams, corners included: at most
+  2.0e-8; the history kept, converted or zeroed is rejected at 2.2e-3 to 1.2e-2), o22
+  (random streams of registered changes and corners: 1.3e-8).
+- **A frame without its SBR element.** PS runs as in a frame without PS data; its output
+  in QMF bands 32..63 is zero in both channels, the decorrelated signal of earlier frames
+  included, and the decorrelator advances on the zero input. The previous frame's high
+  band that reaches into such a frame (an envelope ending after the frame border) is
+  dropped as well, with and without PS. o00 (the stream: 8.4e-5 to 8.9e-9), o31 (ICC 4
+  and 7 at 1.1e-8; FIXVAR before the frame, v1 and v2), o32 (random streams). Only
+  kx = 32 is probed.
+
+The crafted streams of these paths are vectors of the aac lane
+([../correctness-manifest.json](../../correctness-manifest.json), files in `vectors/`).
+
 ## Not recovered
 
-- A change between 20 and 34 bands registered while PS is off after an error (by a
-  header-less frame read then, or a frame that overran its extension), followed by a
-  frame that runs: no tested rule fits. The reference differs from the model in the low
-  hybrid bands by 8e-5 to 5e-3 rms in the next frames. The decoder converts the start
-  matrices and restarts the decorrelator only when a frame's configuration differs from
-  that of the frame read before it.
-- IPD/OPD across a change from 34 to 20 bands after IID last ran 34 bands: the steady
-  frames are recovered (p07, p08: the 17 coded values map onto 20 bands as the truncated
-  means of the `CONV_34_20` rows; p12: bands above the 11 IPD bands keep their stored
-  imaginary part), the change frame and the three after it are not (up to 3.9e-2).
-- A PS frame without its SBR element: the difference from the reference output lies in QMF
-  bands 31..35 of that frame (up to 5.2e-4); an HE-AAC v1 stream with the same frame
-  matches.
 - A header without the PS extension after an error frame, while IPD/OPD was on
   (`ps-open-noext-after-error`): 8.9e-3 rms in that frame and more in the next. The
   decoder keeps the last extension's enable bit and its IPD/OPD values. The reference's
@@ -176,8 +210,8 @@ candidate, and this form fits every probe to the float floor.
   this shape is checked.
 - SBR, with and without PS: the frame after a missing SBR element, when the frame before
   the missing one had an envelope ending after the frame border (FIXVAR, 3 time slots), in
-  `ps-open-sbr-after-missing` (HE-AAC v1). The missing frame itself misses by 2.3e-4 because
-  the reference drops the overlapping high band there. The next frame misses by 2.8e-4, and
+  `ps-open-sbr-after-missing` (HE-AAC v1). The missing frame itself matches since the
+  decoder drops the overlapping high band there too (o31). The next frame misses by 2.8e-4, and
   about 1.6e-7 persists in later frames (o31, o40). That level is about the lowest noise
   floor. The cause is not probed; candidates are SBR state carried over the missing frame:
   the noise and sinusoid indices, or the high-frequency generator's history.
@@ -186,6 +220,9 @@ candidate, and this form fits every probe to the float floor.
   outputs the frame. This decoder refuses the access unit, so its output is one frame short
   from there, which accounts for the 2.4e-2 rms and more. What the reference outputs in that
   frame is not probed. The same holds without PS (o31 trunc).
+- IPD/OPD in frames without the PS extension mixed with multi-envelope frames and mode
+  changes (o22 with `PSW=0`, up to 8.5e-3). The first case above is
+  one shape of it; the others are not reduced.
 
 The crafted streams of these cases are the open cases of
 [../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`).

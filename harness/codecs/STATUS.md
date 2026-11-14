@@ -13,7 +13,7 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 | Path | Content |
 |---|---|
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
-| `correctness-manifest.json` | The 775 correctness vectors: 454 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
+| `correctness-manifest.json` | The 778 correctness vectors: 457 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
 | `reader-manifest.json`, `reader-seeks.json`, `reader-rules.json`, `reader-differences.json` | The 316 reader comparison inputs and the 26 Ogg seek cases; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
 | `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 20 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
@@ -69,7 +69,9 @@ The vectors are the FATE suite's `aac`, `ac3`, `eac3`, `dts`, `h264-conformance`
 derived from them with the decode profile's `ffmpeg` (manifest paths under `target/`):
 ADTS from the MP4 and 3GP vectors (`-map 0:a:0 -c:a copy -f adts`), DTS cores
 (`-map 0:a:0 -c:a copy -bsf:a dca_core -f dts`) and AC-3 streams copied out of their
-containers (`-map 0:a:N -c:a copy -f ac3`). The file-format lanes add FATE's `vorbis`,
+containers (`-map 0:a:N -c:a copy -f ac3`). The aac lane adds three crafted HE-AAC v2
+streams of Parametric Stereo paths no FATE vector takes, in `aac/ps/vectors`
+([aac/ps/README.md](aac/ps/README.md)). The file-format lanes add FATE's `vorbis`,
 `opus` and `mp3-conformance` directories, the IETF CELLAR FLAC test files (`subset`,
 `uncommon`; CC0), the FLAC streams `harness/codecs/flac/flac_vectors.py FFMPEG FLAC
 .research/flac-generated` encodes, the MPEG audio streams
@@ -80,7 +82,7 @@ in `.research/opus-generated`. `cargo xtask codecs manifest` rehashes them:
 ```sh
 cargo xtask codecs manifest --out harness/codecs/correctness-manifest.json \
   h264=.research/fate-samples/h264-conformance hevc=.research/fate-samples/hevc-conformance \
-  ac3=target/agent-ac3/es eac3=target/agent-ac3/es aac=target/agent-aac/vec \
+  ac3=target/agent-ac3/es eac3=target/agent-ac3/es aac=target/agent-aac/vec,harness/codecs/aac/ps/vectors \
   dts=target/agent-dca/vec \
   flac=.research/flac-test-files/subset,.research/flac-test-files/uncommon,.research/flac-generated \
   mp3=.research/fate-samples/mp3-conformance,.research/mp3/vectors mp2=.research/mp3/vectors \
@@ -184,7 +186,3 @@ observation per workload and `summary.json`.
   `CORRECTNESS-MANIFEST-AC3-NODITHER.json` is the dither-stripped comparison set.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).
-- `ps-open-*.adts` ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open
-  Parametric Stereo cases, the manifest's `open_cases`: crafted streams of paths the
-  probes did not recover, which `summarize` requires to keep failing; their
-  numbers are in the known differences of [crates/codec-aac](../../crates/codec-aac/README.md).

@@ -60,15 +60,6 @@ fn disposition(key: &str) -> Option<&'static str> {
         "aac-sce-in-stereo.adts" => {
             "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/aac/STATUS.md)"
         }
-        "ps-open-change-while-off.adts" => {
-            "a 20/34-band change registered while Parametric Stereo is off after an error, then a frame that runs; not recovered (harness/codecs/aac/ps/README.md)"
-        }
-        "ps-open-no-sbr-element.adts" => {
-            "a Parametric Stereo frame without its SBR element; the difference from FFmpeg's output lies in QMF bands 31..35 of that frame (harness/codecs/aac/ps/README.md)"
-        }
-        "ps-open-ipd-after-iid34.adts" => {
-            "IPD/OPD in the frames that change from 34 to 20 bands after IID last ran 34 bands; steady frames match (harness/codecs/aac/ps/README.md)"
-        }
         "ps-open-noext-after-error.adts" => {
             "a Parametric Stereo header without the extension after an error frame while IPD/OPD was on; FFmpeg's output equals IPD/OPD indices 0 there (harness/codecs/aac/ps/README.md)"
         }
@@ -431,7 +422,7 @@ mod tests {
         let out = dir.join("summary.json");
         let line = |status: &str| {
             format!(
-                r#"{{"lane": "aac", "name": "ps-open-no-sbr-element.adts", "open_case": true, "decoder": {{"status": "{status}"}}, "output": {{"status": "pass"}}}}"#
+                r#"{{"lane": "aac", "name": "aac-sce-in-stereo.adts", "open_case": true, "decoder": {{"status": "{status}"}}, "output": {{"status": "pass"}}}}"#
             )
         };
         fs::write(&run, line("fail") + "\n").unwrap();

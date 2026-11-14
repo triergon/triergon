@@ -13,7 +13,7 @@ from olib import *
 out = sys.argv[1]
 os.makedirs(out, exist_ok=True)
 BINS = sys.argv[2:] or [DECODE]
-OPEN = os.path.join(ROOT, 'harness', 'codecs', 'aac', 'ps', 'open')
+VECTORS = os.path.join(ROOT, 'harness', 'codecs', 'aac', 'ps', 'vectors')
 
 IPD = [1, 2, 3, 4, 5, 6, 7, 1, 2, 3, 4, 5, 6, 7, 1, 2, 3]
 OPD = [2, 1, 0, 7, 6, 5, 4, 3, 2, 1, 0, 7, 6, 5, 4, 3, 2]
@@ -53,6 +53,6 @@ if __name__ == '__main__':
     p = os.path.join(out, 'ipd_after_iid34.aac')
     open_stream(p)
     same = hashlib.sha256(open(p, 'rb').read()).hexdigest() == hashlib.sha256(
-        open(os.path.join(OPEN, 'ps-open-ipd-after-iid34.adts'), 'rb').read()).hexdigest()
+        open(os.path.join(VECTORS, 'ps-ipd-after-iid34.adts'), 'rb').read()).hexdigest()
     print('open stream rebuilt identical:', same)
     compare(p, 'open stream')
