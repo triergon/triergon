@@ -47,6 +47,8 @@ pub struct Options {
     pub baseline_worker: Option<PathBuf>,
     /// Measure even when a cited evidence set holds this collection's result.
     pub full: bool,
+    /// Let a gate session stop at an early look; `--no-early-stop` runs every pair.
+    pub early_stop: bool,
 }
 
 impl Options {
@@ -68,6 +70,7 @@ impl Options {
             iterations: None,
             seed: 280,
             full: false,
+            early_stop: true,
         }
     }
 
@@ -974,6 +977,7 @@ pub(crate) fn gate_key(
             Value::Bool(options.require_slice_acceptance),
         ),
         ("fate_cache", Value::Bool(options.fate_cache.is_some())),
+        ("early_stop", Value::Bool(options.early_stop)),
         (
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
@@ -1126,8 +1130,8 @@ pub(crate) fn collect(
     let planned_memory = options.memory_pairs.unwrap_or(options.pairs);
     let (timing_pairs, memory_pairs) = match options.baseline_worker {
         None => (
-            Pairs::gate(options.pairs, Runtime::load(root)?.ceiling),
-            Pairs::gate(planned_memory, super::memory::CEILING),
+            Pairs::gate(options.pairs, Runtime::load(root)?.ceiling).early_stop(options.early_stop),
+            Pairs::gate(planned_memory, super::memory::CEILING).early_stop(options.early_stop),
         ),
         Some(_) => (Pairs::fixed(options.pairs), Pairs::fixed(planned_memory)),
     };

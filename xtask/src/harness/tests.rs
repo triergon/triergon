@@ -163,6 +163,50 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
 }
 
 #[test]
+fn an_early_stopped_memory_collection_is_valid_only_under_its_rule() {
+    let (contract, rows, identity) = matched_gate_fixture();
+    let original = rows[0].get("memory").unwrap();
+    let certificate = original.get("certificate").unwrap();
+    let samples = original.get("samples").unwrap().as_array().unwrap()[..10].to_vec();
+    let gate = super::timing::Pairs::gate(30, super::memory::CEILING);
+    let memory = super::memory::evaluate(root(), &samples, gate, 0, certificate, None);
+    assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
+    assert_eq!(memory.get("pairs"), Some(&Value::int(10)));
+    let selected = identity.get("binaries").unwrap();
+    let valid = |memory: &Value| {
+        super::memory::evidence_valid(
+            root(),
+            &rows[0],
+            memory,
+            &contract,
+            &identity,
+            selected,
+            false,
+        )
+    };
+    assert!(valid(&memory));
+    // Another ceiling, fewer planned pairs than the contract's minimum, or a
+    // collection that ran on past its stop does not count.
+    let mut looser = memory.clone();
+    put(&mut looser, &["early_stop"], "ceiling", Value::float(1.5));
+    assert!(!valid(&looser));
+    let mut short = memory.clone();
+    put(&mut short, &["early_stop"], "planned_pairs", Value::int(20));
+    assert!(!valid(&short));
+    let all = original
+        .get("samples")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .to_vec();
+    let ran_on = super::memory::evaluate(root(), &all, gate, 0, certificate, None);
+    assert_eq!(
+        ran_on.get("status"),
+        Some(&Value::str("memory-pairs-off-rule"))
+    );
+}
+
+#[test]
 fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
     let (contract, rows, identity) = matched_gate_fixture();
     let original = rows[0].get("memory").unwrap();

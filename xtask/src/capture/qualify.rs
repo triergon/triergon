@@ -63,6 +63,8 @@ pub struct Options {
     pub iterations: usize,
     pub memory_pairs: usize,
     pub seed: u64,
+    /// Let a gate session stop at an early look (`--no-early-stop` clears it).
+    pub early_stop: bool,
 }
 
 /// The key of a qualification run as a gate step: its settings, the cases and
@@ -74,6 +76,7 @@ pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, 
         ("iterations", Value::int(a.iterations as i64)),
         ("memory_pairs", Value::int(a.memory_pairs as i64)),
         ("seed", Value::int(a.seed)),
+        ("early_stop", Value::Bool(a.early_stop)),
         (
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
@@ -431,7 +434,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             &a.reference,
             case,
             &path,
-            Pairs::gate(a.pairs, gate.ceiling),
+            Pairs::gate(a.pairs, gate.ceiling).early_stop(a.early_stop),
             iterations,
             a.seed,
             outputs,
@@ -481,7 +484,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     candidate,
                     reference,
                     &path,
-                    Pairs::gate(a.memory_pairs, memory::CEILING),
+                    Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop),
                     a.seed + MEMORY_SEED,
                     &args,
                     outputs,

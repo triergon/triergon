@@ -620,8 +620,10 @@ as its interval, the median of its ratios bounded by the order statistics the lo
 the largest of 10, or the 18th of 20. The validator and the memory evaluator replay the
 rule on the recorded pairs, so a session that stopped where the rule does not, or ran on
 where it stops, does not count, and grading holds the planned pairs to the contract's
-minimum. Comparisons with another build (`--baseline-worker`, quick checks) always run
-every pair.
+minimum. A stopped session prints where it stopped, and its record labels its
+interval `order statistics of the look`. Comparisons with another build
+(`--baseline-worker`, quick checks) always run every pair, and `--no-early-stop` makes
+any gate command do the same.
 
 The bound is a sign test. For independent pairs, the `k`-th smallest of `n` ratios lies
 below the true median ratio only if at least `k` of the `n` ratios do, which, whatever
@@ -645,9 +647,10 @@ sessions' own ratios, scaled so the true median is exactly at the ceiling: timin
 early), and memory 2.50% and 2.56% of 60,000 (0.12% early). A true median beyond the
 ceiling (4% for timing, 2% for memory) passes at under 0.011% either way, and one inside
 it (4% for timing, 2% for memory) passes as often with the early looks as without:
-93.60% against 93.59%, and 79.50% against 79.45%. The early looks thus keep the 95%
-guarantee: at most 0.118% added to the error at the ceiling, where the simulated pass
-rate moves from 3.09% to 3.15% for timing and from 2.50% to 2.56% for memory.
+93.60% against 93.59%, and 79.50% against 79.45%. The early looks thus keep the one-sided
+5% false-pass guarantee of a 95% bound: they add at most 0.118% to the error at the
+ceiling, where the simulated pass rate moves from 3.09% to 3.15% for timing and from
+2.50% to 2.56% for memory.
 
 #### Memory in parallel
 
@@ -659,11 +662,7 @@ run, so one slot's eviction never touches an executable another slot runs. Input
 not evicted: they stay in the page cache as in a serial run, and cases that read a
 common file (the input, an ordered entity or a companion) run in the same slot one
 after another. Workers measured from their own paths are such a file, so their cases
-run one at a time. Pinned to one CPU, collection runs exactly as before. The reference's
-memory is measured afresh in every pair, not reused from earlier runs: on a second host
-of the same class it gives the same heaps and resident peaks within their spread
-(evidence set `gate-reference-memory-cross-host`), but caching it would save a few
-minutes and give up the interleaving of both workers within each pair.
+run one at a time. Pinned to one CPU, collection runs exactly as before.
 Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves

@@ -541,6 +541,16 @@ impl Pairs {
             stop_below: Some(ceiling),
         }
     }
+
+    /// These pairs, stopping early only when `allowed` (`--no-early-stop`
+    /// clears it).
+    pub fn early_stop(self, allowed: bool) -> Self {
+        if allowed {
+            self
+        } else {
+            Self::fixed(self.planned)
+        }
+    }
 }
 
 /// The stopping rule a timing record names when it may stop early.
@@ -947,7 +957,20 @@ fn benchmark_once(
             }
         }
         before = after;
-        if stopped.is_some() {
+        if let Some(interval) = &stopped {
+            println!(
+                "timing of {}: stopped after {} of {} pairs, the {} order statistic {:.4} below {}",
+                input.display(),
+                values.len(),
+                pairs.planned,
+                if values.len() == 10 {
+                    "largest"
+                } else {
+                    "18th"
+                },
+                interval.upper_95,
+                pairs.stop_below.unwrap_or_default()
+            );
             break;
         }
     }
@@ -1029,6 +1052,14 @@ fn benchmark_once(
                     "stopped_after",
                     stopped.map_or(Value::Null, |_| Value::int(values.len() as i64)),
                 ),
+                (
+                    "interval",
+                    Value::str(if stopped.is_some() {
+                        "order statistics of the look"
+                    } else {
+                        "bootstrap"
+                    }),
+                ),
             ]),
         ));
     }
@@ -1109,6 +1140,9 @@ pub struct Expected<'a> {
     /// Whether the record must prove the RSS kernel module absent; a record
     /// that names the policy is always held to it.
     pub module_absence: bool,
+    /// The runtime ceiling of `harness/policy.json`. A record that may stop
+    /// early must name exactly this ceiling; without one it cannot count.
+    pub ceiling: Option<f64>,
 }
 
 /// Grade a timing record written by [`benchmark`]: the declared pairs, the
@@ -1192,7 +1226,13 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
     }
     let seed = py_int(timing.get("seed")).unwrap_or(0);
     let interval = match timing.get("early_stop") {
-        Some(stop) => replay_early_stop(stop, &paired, planned, seed as u64)?,
+        Some(stop) => {
+            let named = stop.get("ceiling").and_then(Value::as_f64);
+            if expected.ceiling.is_none() || named != expected.ceiling {
+                return Err("early stop does not name the policy's runtime ceiling".into());
+            }
+            replay_early_stop(stop, &paired, planned, seed as u64)?
+        }
         None => stats::ratio_interval(&paired, seed as u64, 4000)?,
     };
     if !timing
@@ -1358,6 +1398,7 @@ impl Lock {
                         work: &operation.work,
                         require_linux: is_linux(),
                         module_absence: true,
+                        ceiling: pairs.stop_below,
                     },
                 )
             }
@@ -1583,6 +1624,7 @@ mod tests {
             work: &own,
             require_linux: false,
             module_absence: false,
+            ceiling: Some(1.2),
         };
         assert!(validate(&record(7), &expected).is_ok());
         assert_eq!(

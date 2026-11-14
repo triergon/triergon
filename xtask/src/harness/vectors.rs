@@ -76,6 +76,8 @@ pub struct ExternalOptions {
     pub baseline_worker: Option<PathBuf>,
     /// Measure even when a cited evidence set holds this run's result.
     pub full: bool,
+    /// Let a gate session stop at an early look.
+    pub early_stop: bool,
 }
 
 const CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
@@ -94,6 +96,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     let settings = Value::object([
         ("pairs", Value::int(options.pairs as i64)),
         ("iterations", Value::int(options.iterations)),
+        ("early_stop", Value::Bool(options.early_stop)),
         (
             "kernel_bound",
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
@@ -186,7 +189,8 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
                     comparison,
                     &path,
                     match options.baseline_worker {
-                        None => Pairs::gate(options.pairs, Runtime::load(root)?.ceiling),
+                        None => Pairs::gate(options.pairs, Runtime::load(root)?.ceiling)
+                            .early_stop(options.early_stop),
                         Some(_) => Pairs::fixed(options.pairs),
                     },
                     options.iterations,
@@ -203,7 +207,8 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
             };
             let job = super::memory::Job::new(&workers, [path.clone()], |slot| {
                 let pairs = match options.baseline_worker {
-                    None => Pairs::gate(options.pairs, super::memory::CEILING),
+                    None => Pairs::gate(options.pairs, super::memory::CEILING)
+                        .early_stop(options.early_stop),
                     Some(_) => Pairs::fixed(options.pairs),
                 };
                 super::memory::collect(slot, root, workers, &path, pairs, 280, &timed)

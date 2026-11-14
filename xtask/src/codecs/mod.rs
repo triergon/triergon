@@ -42,11 +42,11 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  difference lists of reader-differences.json; appends one row per input
                  and view, and writes the observed lists to OUT.differences.json
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
-       [--only ID,...] [--full]
+       [--only ID,...] [--full] [--no-early-stop]
                  paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282,
                  ending early once settled below the ceiling)
   memory --candidate W --reference W --workloads F --root R --out DIR
-         [--pairs N] [--seed S] [--only ID,...] [--full]
+         [--pairs N] [--seed S] [--only ID,...] [--full] [--no-early-stop]
                  paired peak heap and total resident peak RSS of the decoder workloads
                  under the shared observer (30 pairs, seed 283)
                  a result a kept evidence set holds is reused unless --full
@@ -264,7 +264,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "seed",
                     "only",
                 ],
-                &["full"],
+                &["full", "no-early-stop"],
             )?;
             let options = memory::Options {
                 repository: root.to_path_buf(),
@@ -276,6 +276,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 pairs: a.number("pairs")?.unwrap_or(memory::PAIRS),
                 seed: a.number("seed")?.map_or(memory::SEED, |s| s as u64),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                early_stop: a.get("no-early-stop").is_none(),
             };
             let settings = Value::object([
                 ("pairs", Value::int(options.pairs as i64)),
@@ -316,7 +317,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "label",
                     "only",
                 ],
-                &["full"],
+                &["full", "no-early-stop"],
             )?;
             let options = timing::Options {
                 repository: root.to_path_buf(),
@@ -328,6 +329,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 label: a.required("label")?.to_owned(),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                early_stop: a.get("no-early-stop").is_none(),
             };
             let settings = Value::object([
                 ("label", Value::str(&options.label)),

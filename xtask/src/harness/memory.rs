@@ -1108,6 +1108,14 @@ pub fn evaluate(
                     "stopped_after",
                     first_stop.map_or(Value::Null, |(n, _)| Value::int(n as i64)),
                 ),
+                (
+                    "interval",
+                    Value::str(if first_stop.is_some() {
+                        "order statistics of the look"
+                    } else {
+                        "bootstrap"
+                    }),
+                ),
             ]),
         ));
     }
@@ -1304,7 +1312,15 @@ fn measure(
             Some(pair) if usable => {
                 heaps.push((pair.heap.0 as f64, pair.heap.1 as f64));
                 totals.push((pair.total.0 as f64, pair.total.1 as f64));
-                if settled(&heaps, &totals, pairs).is_some() {
+                if let Some((heap, total)) = settled(&heaps, &totals, pairs) {
+                    println!(
+                        "memory of {}: stopped after {} of {} pairs, heap and total RSS order statistics {:.4} and {:.4} below 1",
+                        invocation.input.display(),
+                        heaps.len(),
+                        pairs.planned,
+                        heap.upper_95,
+                        total.upper_95
+                    );
                     break;
                 }
             }
@@ -1909,10 +1925,13 @@ pub fn evidence_valid_with_outputs(
             planned: usize::try_from(planned).ok()?,
             stop_below: match memory.get("early_stop") {
                 Some(stop) => {
-                    if s(stop, "rule") != Some(EARLY_STOP_RULE) {
+                    // A collection may stop early only under the memory gates' own ceiling.
+                    #[allow(clippy::float_cmp)] // The record must carry the constant exactly.
+                    let named = stop.get("ceiling")?.as_f64()? == CEILING;
+                    if s(stop, "rule") != Some(EARLY_STOP_RULE) || !named {
                         return Some(false);
                     }
-                    Some(stop.get("ceiling")?.as_f64()?)
+                    Some(CEILING)
                 }
                 None => None,
             },

@@ -39,6 +39,8 @@ pub struct Options {
     pub out: PathBuf,
     pub label: String,
     pub only: Option<String>,
+    /// Let a gate session stop at an early look (`--no-early-stop` clears it).
+    pub early_stop: bool,
 }
 
 fn sha(path: &Path) -> Result<String, String> {
@@ -200,7 +202,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             &options.candidate,
             &options.reference,
             &path,
-            Pairs::gate(GATE_PAIRS, gate.ceiling),
+            Pairs::gate(GATE_PAIRS, gate.ceiling).early_stop(options.early_stop),
             iterations,
             SEED,
             &operation(name),
