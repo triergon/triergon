@@ -626,7 +626,8 @@ not touch: the design spends its alpha at fixed looks rather than peeking at the
 bootstrap bound. A case close to its ceiling rarely has every early ratio below it, so it
 runs on to 30 pairs.
 
-Replayed on the archived ARMv7 run at `3df7ae6d` (`armv7-thumb2-3df7ae6d-linux-armv7`):
+Replayed on the archived ARMv7 run at `3df7ae6d` (`armv7-thumb2-3df7ae6d-linux-armv7`;
+the replay, simulation and scripts are evidence set `gate-early-stop-analysis`):
 of its 3,037 distinct 30-pair timing sessions, 3,011 would stop at 10 pairs and 4 at
 20, none of them one whose 30-pair bound is above the ceiling, and all 22 that fail at 30
 pairs run on to 30; timing runs 34% of the pairs it did. Of its 5,945 memory

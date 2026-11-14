@@ -20063,6 +20063,18 @@
     "aarch64": "8607afdd269b088c9875ecbe2f590eafe04ab5cb",
     "armv7": "247e856006ab368da20d068d74cf9e432bb69563"
    }
+  },
+  {
+   "name": "gate-early-stop-analysis",
+   "path": "gate-early-stop-analysis",
+   "retention": "retained",
+   "reason": "The early stop of timing and memory sessions replayed on every 30-pair session of evidence set armv7-thumb2-3df7ae6d-linux-armv7 and simulated by drawing pairs from those sessions' own ratios with the true median at, beyond and inside each ceiling; with the per-session replays, the simulation summaries, the heap variability of every memory collection, and the scripts",
+   "key": "evidence/gate-early-stop-analysis/aa24dbcb66d1dbc6362ef20ec30a21f0af0ac98f68d9324b387dca3d3571cd65.tar.gz",
+   "sha256": "aa24dbcb66d1dbc6362ef20ec30a21f0af0ac98f68d9324b387dca3d3571cd65",
+   "bytes": 4021064,
+   "source_revisions": {
+    "evidence": "3df7ae6d"
+   }
   }
  ]
 }
