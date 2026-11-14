@@ -11,13 +11,14 @@
 #       replacing the earlier ones and their snapshots. INPUT is a media inputs
 #       archive (.tar.gz, repository-relative paths): a local file or s3:KEY in
 #       the evidence archive
-#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION REVIEW OUT [--full]
+#   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full]
 #       the full gate of REVISION on SHARDS hosts from the target's image, in
 #       parallel: each takes the references of REVISION from its image or the
 #       archive, gets ready, and runs its shard (tools/gate-host.sh); the
 #       shards' outputs are archived under qualification/gate-runs/, their logs
 #       and records copied to OUT, and joined by `cargo xtask gate summary`
-#       into OUT/summary.json. REVIEW is the RSS module review (a local file)
+#       into OUT/summary.json. The RSS module review is the one REVISION commits
+#       for its module source and the image's kernel
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
 # start in; TRIERGON_SSH_CIDR, the only address range SSH is open to;
@@ -240,10 +241,9 @@ shard() {
     inside=$(inside_command "$target"); repository=$(repository_path "$target")
     reachable "$i"
     copy "$i" "$HERE/gate-host.sh" gate-host.sh
-    copy "$i" "$STATE/review" "$repository/.research/RSS-REVIEW.json"
     on "$i" "bash ~/gate-host.sh checkout $revision" | tail -n +2 | fetch_packs "$i" "$repository"
-    detached "$i" "READY" ready "$i/$count" .research/RSS-REVIEW.json
-    detached "$i" "DONE" run "$i/$count" .research/RSS-REVIEW.json "$run" "$full"
+    detached "$i" "READY" ready "$i/$count"
+    detached "$i" "DONE" run "$i/$count" "$run" "$full"
     mkdir -p "$out/shard-$i"
     on "$i" "cat ~/gate-host.log" > "$out/shard-$i/gate-host.log"
     on "$i" "cd $repository/$run && tar -cf - . | zstd -q -T0" |
@@ -258,7 +258,7 @@ shard() {
 }
 
 run() {
-    local target=$1 count=$2 revision=$3 review=$4 out=$5 full=${6:-}
+    local target=$1 count=$2 revision=$3 out=$4 full=${5:-}
     local name="triergon-gate-$target" ami stamp
     stamp=$(date -u +%Y%m%d-%H%M%S)
     ami=$(aws ec2 describe-images --owners self \
@@ -266,7 +266,6 @@ run() {
         --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
     session "triergon-gate-run-$target-$stamp"
     ARCHIVE_RUN="$ARCHIVE/qualification/gate-runs/$revision-$target-$stamp"
-    cp "$review" "$STATE/review"
     mkdir -p "$out"
     launch "$ami" "$count"
     say "$count hosts from $ami: ${INSTANCES[*]}"
