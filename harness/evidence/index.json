@@ -19795,6 +19795,15 @@
    "bytes": 62855498
   },
   {
+   "name": "code-size-thumb2-armv7",
+   "path": "code-size-thumb2-armv7",
+   "retention": "retained",
+   "reason": "Thumb-2 tables in #229's description",
+   "key": "evidence/code-size-thumb2-armv7/d131b6779028f1e99284c15a9052b527953e5237bc962788a8209bc6eabe298f.tar.zst",
+   "sha256": "d131b6779028f1e99284c15a9052b527953e5237bc962788a8209bc6eabe298f",
+   "bytes": 89496768
+  },
+  {
    "name": "codec-aac-parametric-stereo-560f2225",
    "path": "codec-aac-parametric-stereo-560f2225",
    "retention": "retained",
