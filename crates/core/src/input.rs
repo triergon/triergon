@@ -355,6 +355,40 @@ impl InputCursor {
         self.inline_len = bytes.len();
         Ok(())
     }
+    /// A blocking feed can fill a verified inline response directly. The
+    /// buffer does not become readable unless the source returns a prefix.
+    #[inline(always)]
+    pub(crate) fn fill_inline(
+        &mut self,
+        request: &InputRequest,
+        read: impl FnOnce(&mut [u8]) -> std::io::Result<usize>,
+    ) -> Result<usize> {
+        self.verify(request.source, &request.token)?;
+        self.healthy()?;
+        let maximum = request
+            .maximum
+            .min(self.maximum_window)
+            .min(Self::INLINE_CAPACITY);
+        let maximum = maximum.min(self.capabilities.length.map_or(usize::MAX, |end| {
+            usize::try_from(end.saturating_sub(self.position)).unwrap_or(usize::MAX)
+        }));
+        self.validate_window(request.offset, maximum, maximum)?;
+        let count = match read(&mut self.inline[..maximum]) {
+            Ok(count) if count <= maximum => count,
+            Ok(_) => return Err(Error::Invalid("read exceeds inline window")),
+            Err(error) => {
+                self.failure = Some(Stopped::Transport);
+                return Err(error.into());
+            }
+        };
+        if count == 0 {
+            self.finish(request.source, request.token.clone())?;
+        } else {
+            self.inline_len = count;
+        }
+        Ok(count)
+    }
+
     fn discard_window(&mut self) {
         self.window = None;
         self.inline_len = 0;
