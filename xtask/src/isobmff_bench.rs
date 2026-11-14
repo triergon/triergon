@@ -1,4 +1,4 @@
-//! ISO BMFF open and native-index comparisons over the complete authored corpus.
+//! ISO BMFF open and native-index comparisons over authored and upstream media.
 //!
 //! Every label gets its own ordered trace comparison. Only successful operations
 //! are measured; explicit aliases share measurements after their traces match.
@@ -29,8 +29,9 @@ pub const USAGE: &str = "usage: cargo xtask isobmff-bench [--benchmark] [--memor
     [--subset52] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
     [--require-acceptance] [--full] [--no-early-stop]
 
-Always compare all 1020 traces: 972 output labels and 48 explicit refusals.
-The full measurement set has 956 physical operations and 16 explicit aliases.
+Always compare all 1076 traces: 1028 output labels and 48 explicit refusals.
+Use `cargo xtask fetch-vectors` to prepare the upstream media.
+The full measurement set has 1012 physical operations and 16 explicit aliases.
 --subset52 measures the separate 52-operation manifest, retaining full parity.
 Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
@@ -41,15 +42,21 @@ pub const CANDIDATE: &str = "isobmff-worker";
 pub const REFERENCE: &str = "ffmpeg-isobmff-native";
 const FEATURE: &str = "harness/features/isobmff-open-index";
 const FIXTURES: &str = "harness/fixtures/isobmff-open-index";
-const CONTRACT_SHA: &str = "0419a8ea026d84e1aa98d4896faa79ec2c3f2261bd356a6b04a65e22b8d9b760";
-const CORPUS_SHA: &str = "03761df0849a8d60a3cc2222e35dd8fe02308c0fe774b3e442b6850d99704e58";
+const FATE_FIXTURES: &str = ".research/isobmff-open-index-fate";
+const FATE_REGISTRY: &str = "harness/fate/samples.json";
+const CONTRACT_SHA: &str = "962363c817f2d3548e42f8ee5357d3e7e71df2b6b6750206f738e6ae68928904";
+const CORPUS_SHA: &str = "81140ec8447dd18398999cc9451c72b0fcde4d899a087444d926270486753a18";
 const SUBSET_SHA: &str = "d5efa68f708ffe403018a8c34aaeb10aa693cb4e5abcf9a0b571339c69d40b61";
 const WORK_CONTRACT: &str = "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
 const ITERATIONS: u32 = 50;
-const PARITY_CHECKS: usize = 1020;
-const TIMABLE_OUTPUTS: usize = 972;
-const PHYSICAL_OPERATIONS: usize = 956;
+const PARITY_CHECKS: usize = 1076;
+const TIMABLE_OUTPUTS: usize = 1028;
+const PHYSICAL_OPERATIONS: usize = 1012;
 const EXPLICIT_REFUSALS: usize = 48;
+const INPUT_LABELS: usize = 269;
+const DISTINCT_INPUTS: usize = 265;
+const INPUT_BYTES: usize = 2_219_255;
+const MAX_INPUT_BYTES: usize = 1_164_141;
 const REFERENCE_REFUSAL: i128 = -1_094_995_529;
 
 fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
@@ -99,10 +106,10 @@ fn field(value: &mut Value, key: &str, data: Value) {
 
 fn counts() -> Value {
     Value::object([
-        ("input_labels", Value::int(255)),
-        ("distinct_inputs", Value::int(251)),
-        ("input_bytes", Value::int(254_641)),
-        ("maximum_input_bytes", Value::int(1859)),
+        ("input_labels", Value::int(INPUT_LABELS as i128)),
+        ("distinct_inputs", Value::int(DISTINCT_INPUTS as i128)),
+        ("input_bytes", Value::int(INPUT_BYTES as i128)),
+        ("maximum_input_bytes", Value::int(MAX_INPUT_BYTES as i128)),
         ("parity_checks", Value::int(PARITY_CHECKS as i128)),
         ("timable_outputs", Value::int(TIMABLE_OUTPUTS as i128)),
         (
@@ -132,6 +139,7 @@ struct Case {
     input: String,
     input_sha: String,
     input_bytes: usize,
+    fate: bool,
     refusal: bool,
     arguments: Vec<String>,
     candidate_options: Vec<String>,
@@ -140,7 +148,17 @@ struct Case {
     memory_outputs: Value,
 }
 
-fn compatibility_options(label: &str) -> Vec<String> {
+fn compatibility_options(label: &str, fate: bool) -> Vec<String> {
+    if fate {
+        return [
+            "--bounded-timing",
+            "--bounded-sync",
+            "--terminal-media-prefix",
+            "--complete-edit-rows",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+    }
     if matches!(
         label,
         "bad-zero-timescale" | "bad-stsc-description-zero" | "bad-chunk-offset-outside-source"
@@ -186,6 +204,7 @@ impl Case {
             input: text(input, "path")?.into(),
             input_sha: text(input, "sha256")?.into(),
             input_bytes: usize::try_from(number(input, "bytes")?).map_err(|e| e.to_string())?,
+            fate: value.get("source").is_some(),
             refusal,
             arguments: strings(value, "arguments")?,
             candidate_options: strings(value, "candidate_leading_arguments")?,
@@ -204,17 +223,29 @@ impl Case {
             "tiny" => ["1", "0", "memory", "3"],
             _ => return Err("unknown schedule".into()),
         };
+        let valid_input = if case.fate {
+            let mut parts = Path::new(&case.input).components();
+            matches!(
+                (parts.next(), parts.next(), parts.next()),
+                (Some(std::path::Component::Normal(dir)), Some(std::path::Component::Normal(_)), None)
+                    if dir == "mov"
+            ) && text(value, "source")? == format!("fate-suite/{}", case.input)
+                && text(value, "rights")? == "fetched-not-redistributed"
+                && !case.refusal
+        } else {
+            case.input == format!("{}.mov", case.input_sha) && case.input_bytes <= 1859
+        };
         if !matches!(case.mode.as_str(), "open" | "native-index")
             || case.arguments != expected_arguments
-            || case.candidate_options != compatibility_options(&case.label)
+            || case.candidate_options != compatibility_options(&case.label, case.fate)
             || case.input_sha.len() != 64
             || !case
                 .input_sha
                 .bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            || case.input != format!("{}.mov", case.input_sha)
+            || !valid_input
             || case.input_bytes == 0
-            || case.input_bytes > 1859
+            || case.input_bytes > MAX_INPUT_BYTES
         {
             return Err(format!("invalid operation at {index}"));
         }
@@ -303,7 +334,8 @@ impl Case {
     }
 
     fn path(&self, root: &Path) -> PathBuf {
-        root.join(FIXTURES).join(&self.input)
+        root.join(if self.fate { FATE_FIXTURES } else { FIXTURES })
+            .join(&self.input)
     }
 
     fn work(&self, candidate: bool, timed: bool) -> Value {
@@ -391,6 +423,25 @@ impl Suite {
             .enumerate()
             .map(|(i, v)| Case::parse(v, i))
             .collect::<R<_>>()?;
+        let registry = read_json(&root.join(FATE_REGISTRY))?;
+        let samples = registry
+            .get("samples")
+            .and_then(Value::as_array)
+            .ok_or("missing upstream sample registry")?;
+        for case in cases.iter().filter(|case| case.fate) {
+            let path = format!("fate/{}", case.input);
+            let url = format!("https://fate-suite.ffmpeg.org/{}", case.input);
+            if !samples.iter().any(|sample| {
+                text(sample, "path") == Ok(path.as_str())
+                    && text(sample, "sha256") == Ok(case.input_sha.as_str())
+                    && text(sample, "source") == Ok(url.as_str())
+            }) {
+                return Err(format!(
+                    "upstream input has no matching pin: {}",
+                    case.input
+                ));
+            }
+        }
         let subset = subset
             .get("indices")
             .and_then(Value::as_array)
@@ -487,9 +538,10 @@ impl Suite {
                     .iter()
                     .any(|c| c.input_sha != cases[0].input_sha || c.refusal != cases[0].refusal)
         }) || self.cases.len() != PARITY_CHECKS
-            || labels.len() != 255
-            || inputs.len() != 251
-            || inputs.values().sum::<usize>() != 254_641
+            || labels.len() != INPUT_LABELS
+            || inputs.len() != DISTINCT_INPUTS
+            || inputs.values().sum::<usize>() != INPUT_BYTES
+            || inputs.values().copied().max() != Some(MAX_INPUT_BYTES)
             || outputs != TIMABLE_OUTPUTS
             || refusals != EXPLICIT_REFUSALS
             || aliases != 16
@@ -525,6 +577,7 @@ pub fn source_inputs(root: &Path) -> R<Vec<String>> {
     let suite = Suite::load(root)?;
     let mut files: Vec<_> = [
         "xtask/src/isobmff_bench.rs",
+        FATE_REGISTRY,
         "xtask/src/harness/gate_build.rs",
         "xtask/src/stats.rs",
         "xtask/src/sha256.rs",
@@ -541,6 +594,7 @@ pub fn source_inputs(root: &Path) -> R<Vec<String>> {
         suite
             .cases
             .iter()
+            .filter(|case| !case.fate)
             .map(|case| format!("{FIXTURES}/{}", case.input)),
     );
     files.sort();
@@ -1236,10 +1290,19 @@ fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
             std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
         ),
     ]);
-    let inputs: Vec<PathBuf> = source_inputs(root)?
+    let mut inputs: Vec<PathBuf> = source_inputs(root)?
         .iter()
         .map(|file| root.join(file))
         .collect();
+    inputs.extend(
+        Suite::load(root)?
+            .cases
+            .iter()
+            .filter(|case| case.fate)
+            .map(|case| case.path(root)),
+    );
+    inputs.sort_unstable();
+    inputs.dedup();
     let files: Vec<&Path> = inputs.iter().map(PathBuf::as_path).collect();
     let workers = [
         ("candidate", build.candidate.as_path()),
@@ -1499,8 +1562,8 @@ mod tests {
     #[test]
     fn complete_membership_keeps_every_operation_and_refusal() {
         let suite = Suite::load(&root()).unwrap();
-        assert_eq!(suite.cases.len(), 1020);
-        assert_eq!(suite.selection(false).len(), 972);
+        assert_eq!(suite.cases.len(), 1076);
+        assert_eq!(suite.selection(false).len(), 1028);
         assert_eq!(suite.cases.iter().filter(|c| c.refusal).count(), 48);
         assert_eq!(
             suite
@@ -1508,7 +1571,7 @@ mod tests {
                 .iter()
                 .filter(|c| !c.refusal && c.alias.is_none())
                 .count(),
-            956
+            1012
         );
         let mut broken = suite;
         broken.cases.remove(100);
@@ -1531,7 +1594,7 @@ mod tests {
             .chain(360..364)
             .collect();
         assert_eq!(suite.selection(true), expected);
-        assert_eq!(suite.cases.len(), 1020);
+        assert_eq!(suite.cases.len(), 1076);
         for i in expected {
             assert!(!suite.cases[i].refusal);
             assert!(suite.cases[i].alias.is_none());
@@ -1577,7 +1640,7 @@ mod tests {
         let suite = Suite::load(&root).unwrap();
         let mut seen = BTreeSet::new();
         let mut bytes = 0;
-        for case in &suite.cases {
+        for case in suite.cases.iter().filter(|case| !case.fate) {
             if seen.insert(&case.input_sha) {
                 verify_input(&root, case).unwrap();
                 bytes += case.input_bytes;
@@ -1585,6 +1648,23 @@ mod tests {
         }
         assert_eq!(seen.len(), 251);
         assert_eq!(bytes, 254_641);
+    }
+
+    #[test]
+    fn upstream_inputs_add_both_operations_to_each_schedule() {
+        let root = root();
+        let suite = Suite::load(&root).unwrap();
+        let cases: Vec<_> = suite.cases.iter().filter(|case| case.fate).collect();
+        assert_eq!(cases.len(), 56);
+        assert!(cases.iter().all(|case| {
+            case.path(&root).starts_with(root.join(FATE_FIXTURES))
+                && case
+                    .candidate_options
+                    .iter()
+                    .any(|arg| arg == "--complete-edit-rows")
+                && !case.refusal
+                && case.alias.is_none()
+        }));
     }
 
     #[test]
@@ -1849,7 +1929,7 @@ mod tests {
             })
             .collect();
         let result = summary(&rows, &suite.selection(true), &options, true);
-        assert_eq!(result.get("parity_matches"), Some(&Value::int(1020)));
+        assert_eq!(result.get("parity_matches"), Some(&Value::int(1076)));
         assert!(result.get("qualified").is_none());
         let mut failed = rows;
         field(&mut failed[100], "match", Value::Bool(false));
@@ -2040,13 +2120,13 @@ mod tests {
                 .get("cases")
                 .is_some_and(|v| equal(v, &Value::Array(rows)))
         );
-        assert_eq!(report.get("cases").unwrap().as_array().unwrap().len(), 1020);
+        assert_eq!(report.get("cases").unwrap().as_array().unwrap().len(), 1076);
         fs::remove_dir_all(out).unwrap();
     }
 
     #[test]
     #[ignore = "requires the built ISO BMFF example and public-API reference"]
-    fn installed_workers_match_all_1020_traces() {
+    fn installed_workers_match_all_traces() {
         let root = root();
         let suite = Suite::load(&root).unwrap();
         let out = crate::walk::scratch("isobmff-parity");

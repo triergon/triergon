@@ -139,8 +139,8 @@ impl<'a> IndexCursor<'a> {
 
     fn starts_before_sync(track: DemuxTrack<'_>) -> bool {
         track.fragments.is_empty()
-            && track.edits.is_none()
-            && track.table.unused_sync_entries() != 0
+            && (track.table.has_avc_composition_offsets()
+                || (track.edits.is_none() && track.table.unused_sync_entries() != 0))
     }
 
     pub fn new_complete_source(
@@ -170,12 +170,12 @@ impl<'a> IndexCursor<'a> {
         track_id: u32,
         max_entries: u64,
     ) -> Result<Self> {
-        let (cursor, track) = checked.fork_index_track(track_id)?;
+        let (cursor, track, encoded_edit) = checked.fork_index_track(track_id)?;
         Ok(Self::from_cursor(
             cursor,
             max_entries,
-            Self::starts_before_sync(track),
-            false,
+            encoded_edit.is_some() || Self::starts_before_sync(track),
+            encoded_edit.is_some_and(crate::EncodedEditPlan::has_dependency_view),
         ))
     }
     pub fn new_encoded_regular(

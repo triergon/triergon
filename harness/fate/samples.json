@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "Upstream regression samples, and local remuxes of them, that subtitle corpora measure: fetched into the ignored corpus cache by these hashes and compared locally, never redistributed. Their redistribution rights are unreviewed.",
+  "note": "Upstream regression samples and local remuxes used by the corpus comparisons. Samples are fetched by these hashes into the ignored cache. Redistribution rights are unreviewed.",
   "samples": [
     {
       "path": "fate/filter/242_4.mkv",
@@ -61,6 +61,71 @@
       "path": "fate/mov/mp4-init-nonkeyframe.mp4",
       "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
       "source": "https://fate-suite.ffmpeg.org/mov/mp4-init-nonkeyframe.mp4"
+    },
+    {
+      "path": "fate/mov/aac-2048-priming.mov",
+      "sha256": "b163ddd5ea05b0986fe01723308bd296077f0548ad6b29db676d23ea8f4e4b35",
+      "source": "https://fate-suite.ffmpeg.org/mov/aac-2048-priming.mov"
+    },
+    {
+      "path": "fate/mov/extended_atom_size_probe",
+      "sha256": "d91cad9c403184b68e061b246f06408ca0d35151335a276cd58fac0456ec4679",
+      "source": "https://fate-suite.ffmpeg.org/mov/extended_atom_size_probe"
+    },
+    {
+      "path": "fate/mov/frag_overlap.mp4",
+      "sha256": "b176ed950fdf5553473346beac761b51d3bf48bfd70c8cdfc81a1968dde5a39e",
+      "source": "https://fate-suite.ffmpeg.org/mov/frag_overlap.mp4"
+    },
+    {
+      "path": "fate/mov/invalid_elst_entry_count.mov",
+      "sha256": "9caa4861a0c8cf32657c1e7a7938dc01a9c85d0699d90ede07decfc446955fd7",
+      "source": "https://fate-suite.ffmpeg.org/mov/invalid_elst_entry_count.mov"
+    },
+    {
+      "path": "fate/mov/mov-1elist-1ctts.mov",
+      "sha256": "6380ab6f91080f2b27d07b4234b9a85bcb8c007354712957be197ac4ec9fa7c2",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-1elist-1ctts.mov"
+    },
+    {
+      "path": "fate/mov/mov-1elist-ends-last-bframe.mov",
+      "sha256": "d60e3cf163efbf3cde1d7a1083bc599eb542a060b3eec3944a9cd98faa969e12",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-1elist-ends-last-bframe.mov"
+    },
+    {
+      "path": "fate/mov/mov-1elist-noctts.mov",
+      "sha256": "2d6fc6fe424774c9b0fd8fe64d32488014965038d9b9b45a299fa12a00a31182",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-1elist-noctts.mov"
+    },
+    {
+      "path": "fate/mov/mov-2elist-elist1-ends-bframe.mov",
+      "sha256": "ad72cca4c202df4e496903b6f43c18770431860d65b7cce9b8e53f6bbe188821",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-2elist-elist1-ends-bframe.mov"
+    },
+    {
+      "path": "fate/mov/mov-3elist-1ctts.mov",
+      "sha256": "2c2bdafe292c95b82d34583b6d775fcf25ea575e3550e72c0e030cdc1a1e092c",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-3elist-1ctts.mov"
+    },
+    {
+      "path": "fate/mov/mov-3elist.mov",
+      "sha256": "5c344e590a90ac126e490b298e1ee3ff12d82ef74933f3208aa08f0d5b72ee61",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-3elist.mov"
+    },
+    {
+      "path": "fate/mov/mov-elist-starts-ctts-2ndsample.mov",
+      "sha256": "6700ffc9ec871550d79ff1f9e1aacbdebbd4100e3adf0e110770fa4d0b8b1685",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov-elist-starts-ctts-2ndsample.mov"
+    },
+    {
+      "path": "fate/mov/mov_neg_first_pts_discard.mov",
+      "sha256": "166b9808452fe5068265cb428005c5adcb0590363b82ccf67f3e09f6308a77d8",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov_neg_first_pts_discard.mov"
+    },
+    {
+      "path": "fate/mov/mov_stream_shorter_than_movie.mov",
+      "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+      "source": "https://fate-suite.ffmpeg.org/mov/mov_stream_shorter_than_movie.mov"
     }
   ]
 }

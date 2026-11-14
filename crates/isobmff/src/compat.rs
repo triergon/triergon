@@ -106,6 +106,9 @@ pub mod mov {
         //! metadata, [`EncodedContextProfile`] the receiver's reading of a `wave` box.
         //! [`EncodedRecoveryProfile`] adds the `roll` and `prol` groups of the table.
         //!
+        //! [`EncodedStreamJob::new_demux_catalogue`] reads metadata from regular
+        //! and fragment initialization descriptions, including MPEG-4 Visual.
+        //!
         //! [`EncodedInitial`] and [`EncodedConfigSequence`] follow the configuration of a
         //! track with more than one description.
         pub use crate::encoded_configs::{
@@ -153,6 +156,16 @@ pub mod mov {
         //!   [`DescriptionEvent`] for each declaration, including those the demuxer
         //!   drops from its catalogue, and [`PhysicalReader`] reads an event's bytes at
         //!   the physical end of the file.
+        use crate::{BoxView, EditList, Limits};
+        use triergon_core::Result;
+
+        /// Count complete edit rows inside this box, as observed in the MOV
+        /// compatibility view. The raw box retains the declared count and any
+        /// trailing partial row.
+        pub fn complete_edit_rows(raw: BoxView, limits: Limits) -> Result<EditList> {
+            EditList::parse_with_extent(raw, limits, true)
+        }
+
         pub use crate::metadata::RecoveryTrackHeader;
         pub use crate::packet::{RecoverySampleExtent, RecoverySampleRead, ShortSample};
         pub use crate::physical_read::{

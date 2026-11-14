@@ -178,8 +178,8 @@ and shares a sample's window where the whole sample fits in one.
 | `TrackId` | `track_ID` |
 | `MediaKind` | `hdlr` handler; an unlisted handler is `MediaKind::Unknown` |
 | `codec_tag` | The first sample entry code |
-| `codec` | One mapping from handler and entry code, plus the object type `esds` states for `mp4a`. Anything else is `CodecId::Other` with the entry code |
-| `configuration` | The payload of `avcC`, `hvcC`, `av1C`, `vpcC`, `dac3`, `dec3` or `ddts`; AudioSpecificConfig for AAC; empty if the record is absent; the whole sample entry payload for any other entry |
+| `codec` | One mapping from handler and entry code, plus the `esds` object type for `mp4a`, `mp4v` and `mp4s`. Other entries report `CodecId::Other` with the entry code |
+| `configuration` | The payload of `avcC`, `hvcC`, `av1C`, `vpcC`, `dac3`, `dec3` or `ddts`; the decoder configuration from `esds` for recognized MPEG-4 entries; empty if the record is absent; the whole sample entry payload for other entries |
 | `language` | The ISO 639-2/T code in `mdhd`; `None` for a QuickTime language code |
 | `pts`, `dts`, `duration` | Ticks of the media timescale, from the sample tables or `trun` and `tfdt`; the duration is the decode delta |
 | `random_access` | `stss` or fragment sample flags |
@@ -259,7 +259,7 @@ rejects boxes extending past the source.
 | Seek and indexes | sync/preroll plans, movie-time and composition targets, `sidx`, `tfra`/`mfro`, `roll`/`prol` groups |
 | Codec configuration | AAC `AudioSpecificConfig` (incl. QuickTime `wave`), DTS core signalling, AC-3/E-AC-3, opaque `avcC`/`hvcC`/`av1C`/`vpcC` |
 | QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`QtPcmSampleReaderV0`) |
-| FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
+| FFmpeg-compatible view | AVC, HEVC, MPEG-4 Visual, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
 ## Behaviour and limits
 
@@ -312,6 +312,10 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  The recovery opener reads complete `elst` rows within the box extent.
+  `compat::mov::edits::EditCursor` can project repeated rate-one AVC edits from
+  nonnegative version-0 composition offsets. It uses source sync samples for
+  decode preroll and retains reordered packets needed at the end of an edit.
   A front-metadata cursor can project checked encoded edits for regular tracks
   within one finite media extent. The forward playback index checks the
   projected byte order before delivering any packet.
@@ -366,6 +370,8 @@ Specification basis:
   fragments, `tfra`/`mfro`).
 - ETSI TS 126 244 V18.0.0 §13.4 (`sidx`) and §13.5 (`tfdt`).
 - ISO/IEC 14496-14:2020 §6.7 (sample entries and elementary stream descriptors).
+- [MP4 Registration Authority object types](https://mp4ra.org/registered-types/object-types)
+  (`0x20` for MPEG-4 Visual, stream type `0x04`).
 - ISO/IEC 14496-12:2008/Amd1:2009 §§8.6.1.3.1–.3 (signed `ctts`);
   14496-12:2008/FDAmd2 §8.8.7.1 (moof-relative base).
 - MPEG m76694 Table 9 and FDAM3 draft text for `stz2`, signed `trun` and

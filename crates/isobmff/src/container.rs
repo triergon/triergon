@@ -35,7 +35,7 @@ use triergon_core::{
 };
 
 /// The one mapping from a track handler and sample entry code. `raw ` needs the
-/// handler, and `mp4a` and `mp4s` need their stated object type (ISO/IEC 14496-1
+/// handler, and `mp4a`, `mp4v` and `mp4s` need their stated object type (ISO/IEC 14496-1
 /// objectTypeIndication; 0xDD is the private value FFmpeg reads as Vorbis, 0xE0
 /// the one it reads as VobSub): without one they stay [`CodecId::Other`].
 fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>) -> CodecId<'a> {
@@ -45,6 +45,7 @@ fn codec_id<'a>(handler: &[u8; 4], format: &'a [u8; 4], object_type: Option<u8>)
         (b"vide", b"av01" | b"dav1") => CodecId::Av1,
         (b"vide", b"vp09") => CodecId::Vp9,
         (b"vide", b"raw ") => CodecId::RawVideo,
+        (b"vide", b"mp4v") if object_type == Some(0x20) => CodecId::Mpeg4Visual,
         (b"soun", b"mp4a") => match object_type {
             Some(0x40) => CodecId::Aac,
             // MPEG-2 audio (ISO/IEC 13818-3) and MPEG-1 audio (ISO/IEC 11172-3).
@@ -224,7 +225,7 @@ impl Track {
     pub fn edits(&self) -> Option<&EditList> {
         self.source.edits()
     }
-    /// The object type `esds` states for an `mp4a` entry.
+    /// The object type `esds` states for an MPEG-4 sample entry.
     pub fn object_type(&self) -> Option<u8> {
         self.object_type
     }
@@ -782,7 +783,7 @@ fn entry_scan(
 ) -> (Option<EntryScan>, Configuration) {
     if matches!(
         (&header.handler, &entry.format),
-        (b"soun", b"mp4a") | (b"subp", b"mp4s")
+        (b"vide", b"mp4v") | (b"soun", b"mp4a") | (b"subp", b"mp4s")
     ) {
         let scan = ObjectTypeScan::new(entry, limits.configuration).ok();
         return (scan.map(EntryScan::ObjectType), Configuration::Entry);
@@ -954,6 +955,7 @@ mod tests {
             (b"vide", b"dav1", None, CodecId::Av1),
             (b"vide", b"vp09", None, CodecId::Vp9),
             (b"vide", b"raw ", None, CodecId::RawVideo),
+            (b"vide", b"mp4v", Some(0x20), CodecId::Mpeg4Visual),
             (b"soun", b"mp4a", Some(0x40), CodecId::Aac),
             (b"soun", b"mp4a", Some(0x69), CodecId::MpegAudio),
             (b"soun", b"mp4a", Some(0x6b), CodecId::MpegAudio),
@@ -993,6 +995,8 @@ mod tests {
             (b"vide", b"Opus", None),
             (b"vide", b"mp4a", Some(0x40)),
             (b"soun", b"avc1", None),
+            (b"vide", b"mp4v", None),
+            (b"vide", b"mp4v", Some(0x21)),
             (b"meta", b"tx3g", None),
             (b"subp", b"mp4s", None),
             (b"subp", b"mp4s", Some(0x40)),

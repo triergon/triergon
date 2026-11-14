@@ -145,6 +145,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
                 policy.media_data = MediaDataPolicy::PreserveTerminalDeclaration;
             }
             Some("--recover-regular-tables") => policy.regular_recovery = true,
+            Some("--complete-edit-rows") => policy.edit_rows = true,
             _ => break,
         }
         args.remove(1);
@@ -156,6 +157,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
     if policy.regular_recovery {
         if policy.tables != SampleTablePolicy::default()
             || policy.media_data != MediaDataPolicy::Strict
+            || policy.edit_rows
         {
             return Err(Error::Invalid("regular table recovery is a standalone profile").into());
         }
@@ -342,6 +344,7 @@ mod tests {
             "--bounded-timing",
             "--bounded-sync",
             "--terminal-media-prefix",
+            "--complete-edit-rows",
         ] {
             let args = ["worker", flag, "--recover-regular-tables", "open-trace"];
             assert!(matches!(

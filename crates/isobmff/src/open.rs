@@ -811,8 +811,9 @@ impl MovieOpen {
         let edits = p
             .elst
             .clone()
-            .map(|b| EditList::parse(b, self.limits.format))
-            .transpose()?;
+            .map(|b| EditList::parse_with_extent(b, self.limits.format, self.native_recovery))
+            .transpose()?
+            .filter(|list| !self.native_recovery || !list.is_empty());
         self.tracks.try_reserve_exact(1)?;
         push(
             &mut self.tracks,

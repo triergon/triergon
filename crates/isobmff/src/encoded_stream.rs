@@ -35,6 +35,7 @@ impl Default for ConfigurationLimits {
 pub enum EncodedEntryKind {
     Avc,
     Hevc,
+    Mpeg4Visual,
     Av1,
     Vp9,
     Aac,
@@ -46,7 +47,10 @@ pub enum EncodedEntryKind {
 
 impl EncodedEntryKind {
     pub(crate) const fn is_video(self) -> bool {
-        matches!(self, Self::Avc | Self::Hevc | Self::Av1 | Self::Vp9)
+        matches!(
+            self,
+            Self::Avc | Self::Hevc | Self::Mpeg4Visual | Self::Av1 | Self::Vp9
+        )
     }
 
     pub(crate) fn require_regular_codec(self) -> Result<()> {
@@ -127,6 +131,7 @@ enum EsdsProfile {
     AacDescription,
     AudioDescription,
     RangeAudio,
+    Visual,
     ObjectType,
     /// Any object type of any stream type: an `mp4s` system stream entry.
     SystemStream,
@@ -280,21 +285,36 @@ impl EsdsWalk {
                             let allowed = match self.profile {
                                 EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
                                 EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
+                                EsdsProfile::Visual => b == 0x20,
                                 EsdsProfile::AudioDescription
                                 | EsdsProfile::ObjectType
                                 | EsdsProfile::SystemStream => true,
                             };
                             if !allowed {
                                 return Err(Error::Unsupported(
-                                    "encoded mp4a object-type is not selected AAC",
+                                    if matches!(self.profile, EsdsProfile::Visual) {
+                                        "MPEG-4 Visual object type"
+                                    } else {
+                                        "encoded mp4a object-type is not selected AAC"
+                                    },
                                 ));
                             }
                             self.object_type = Some(b);
                         }
+                        let stream_type = if matches!(self.profile, EsdsProfile::Visual) {
+                            4
+                        } else {
+                            5
+                        };
                         if index == 1
                             && !matches!(self.profile, EsdsProfile::SystemStream)
-                            && (b >> 2 != 5 || b & 1 == 0)
+                            && (b >> 2 != stream_type || b & 1 == 0)
                         {
+                            if matches!(self.profile, EsdsProfile::Visual) {
+                                return Err(Error::Unsupported(
+                                    "MPEG-4 Visual decoder stream type",
+                                ));
+                            }
                             return Err(Error::Unsupported(if self.object_type == Some(0x40) {
                                 "encoded AAC decoder stream-type"
                             } else {
@@ -544,6 +564,7 @@ impl EsdsDescriptionWalk {
         let (children, quicktime_extended_sound) = match &entry.format {
             // MPEG-4 system streams (DVD subpictures) have a plain sample entry.
             b"mp4s" => (entry.raw().children(8, child_limits)?, false),
+            b"mp4v" => (entry.extensions(EntryLayout::Visual, child_limits)?, false),
             b"mp4a" => match fields::u16_at(entry.raw().payload(), 8)? {
                 1 => {
                     crate::SoundV1Source::parse_contexts(entry)?;
@@ -558,9 +579,7 @@ impl EsdsDescriptionWalk {
                 _ => (entry.extensions(EntryLayout::AudioV0, child_limits)?, false),
             },
             _ => {
-                return Err(Error::Invalid(
-                    "AAC configuration requires an mp4a description",
-                ));
+                return Err(Error::Invalid("sample entry does not use an ES descriptor"));
             }
         };
         Ok(Self {
@@ -794,10 +813,15 @@ enum DescriptionView {
     Metadata,
     Contexts,
     RangePlayback,
+    DemuxCatalogue,
 }
 impl DescriptionView {
     fn observes_contexts(self) -> bool {
         self == Self::Contexts
+    }
+
+    fn extended_configurations(self) -> bool {
+        matches!(self, Self::RangePlayback | Self::DemuxCatalogue)
     }
 }
 
@@ -909,6 +933,24 @@ impl<'a> EncodedStreamJob<'a> {
             DescriptionView::RangePlayback,
         )
     }
+
+    /// Read an encoded stream's demux metadata and configuration. Also accepts
+    /// a description from an empty fragment initialization sample table.
+    pub fn new_demux_catalogue(
+        header: &'a TrackHeader,
+        table: &SampleTable,
+        input: &InputCursor,
+        selection: crate::EncodedSelection,
+    ) -> Result<Self> {
+        Self::new_description_inner(
+            header,
+            table,
+            input,
+            selection,
+            DescriptionView::DemuxCatalogue,
+        )
+    }
+
     fn new_description_inner(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -917,11 +959,14 @@ impl<'a> EncodedStreamJob<'a> {
         view: DescriptionView,
     ) -> Result<Self> {
         let crate::EncodedSelection {
-            major_brand: major,
+            major_brand,
             limits,
             description,
         } = selection;
         let metadata_receiver = view != DescriptionView::Regular;
+        let catalogue = view == DescriptionView::DemuxCatalogue;
+        // QuickTime movies may precede the definition of a file type atom.
+        let major = major_brand.or_else(|| catalogue.then_some(*b"qt  "));
         if !table.raw().bytes().belongs_to(input.budget())
             || [&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr]
                 .iter()
@@ -929,7 +974,8 @@ impl<'a> EncodedStreamJob<'a> {
         {
             return Err(Error::ForeignPool);
         }
-        if !matches!(major,Some(x) if x==*b"isom"||x==*b"iso2"||x==*b"mp41"||x==*b"mp42"||(metadata_receiver&&x==*b"qt  "))
+        if !catalogue
+            && !matches!(major,Some(x) if x==*b"isom"||x==*b"iso2"||x==*b"mp41"||x==*b"mp42"||(metadata_receiver&&x==*b"qt  "))
         {
             return Err(Error::Unsupported("encoded native major-brand profile"));
         }
@@ -944,7 +990,7 @@ impl<'a> EncodedStreamJob<'a> {
             .get(at)
             .ok_or(Error::Invalid("encoded initial sample description absent"))?
             .clone();
-        if table.sample_count() == 0 {
+        if table.sample_count() == 0 && !catalogue {
             return Err(Error::Unsupported(
                 "encoded nonempty regular source required",
             ));
@@ -955,22 +1001,25 @@ impl<'a> EncodedStreamJob<'a> {
         let (kind, config_kind, layout) = match (&header.handler, &entry.format) {
             (b"vide", b"avc1" | b"avc3") => (EncodedEntryKind::Avc, *b"avcC", EntryLayout::Visual),
             (b"vide", b"hvc1" | b"hev1") => (EncodedEntryKind::Hevc, *b"hvcC", EntryLayout::Visual),
-            (b"vide", b"dvh1" | b"dvhe") if view == DescriptionView::RangePlayback => {
+            (b"vide", b"mp4v") if catalogue => {
+                (EncodedEntryKind::Mpeg4Visual, *b"esds", EntryLayout::Visual)
+            }
+            (b"vide", b"dvh1" | b"dvhe") if view.extended_configurations() => {
                 (EncodedEntryKind::Hevc, *b"hvcC", EntryLayout::Visual)
             }
-            (b"vide", b"av01" | b"dav1") if view == DescriptionView::RangePlayback => {
+            (b"vide", b"av01" | b"dav1") if view.extended_configurations() => {
                 (EncodedEntryKind::Av1, *b"av1C", EntryLayout::Visual)
             }
-            (b"vide", b"vp09") if view == DescriptionView::RangePlayback => {
+            (b"vide", b"vp09") if view.extended_configurations() => {
                 (EncodedEntryKind::Vp9, *b"vpcC", EntryLayout::Visual)
             }
             (b"soun", b"mp4a") => (EncodedEntryKind::Aac, *b"esds", EntryLayout::AudioV0),
             (b"soun", b"ac-3") => (EncodedEntryKind::Ac3, *b"dac3", EntryLayout::AudioV0),
             (b"soun", b"ec-3") => (EncodedEntryKind::Eac3, *b"dec3", EntryLayout::AudioV0),
-            (b"soun", b"Opus") if view == DescriptionView::RangePlayback => {
+            (b"soun", b"Opus") if view.extended_configurations() => {
                 (EncodedEntryKind::Opus, *b"dOps", EntryLayout::AudioV0)
             }
-            (b"soun", b"dtsc" | b"dtsh" | b"dtsl") if view == DescriptionView::RangePlayback => {
+            (b"soun", b"dtsc" | b"dtsh" | b"dtsl") if view.extended_configurations() => {
                 (EncodedEntryKind::Dts, *b"ddts", EntryLayout::AudioV0)
             }
             _ => return Err(Error::Unsupported("encoded catalogue namespace/handler")),
@@ -987,9 +1036,9 @@ impl<'a> EncodedStreamJob<'a> {
         };
         let sound_source = if sound_version == 1 {
             Some(match view {
-                DescriptionView::Contexts | DescriptionView::RangePlayback => {
-                    crate::SoundV1Source::parse_contexts(&entry)?
-                }
+                DescriptionView::Contexts
+                | DescriptionView::RangePlayback
+                | DescriptionView::DemuxCatalogue => crate::SoundV1Source::parse_contexts(&entry)?,
                 _ => crate::SoundV1Source::parse(&entry)?,
             })
         } else {
@@ -997,12 +1046,16 @@ impl<'a> EncodedStreamJob<'a> {
         };
         let wave_offset = match sound_version {
             1 => Some(44),
-            2 if view == DescriptionView::RangePlayback => Some(quicktime_aac_extensions(&entry)?),
+            2 if view.extended_configurations() => Some(quicktime_aac_extensions(&entry)?),
             _ => None,
         };
         let quicktime_visual =
-            view == DescriptionView::RangePlayback && matches!(layout, EntryLayout::Visual);
-        if quicktime && wave_offset.is_none() && !quicktime_visual && kind != EncodedEntryKind::Dts
+            view.extended_configurations() && matches!(layout, EntryLayout::Visual);
+        if quicktime
+            && !catalogue
+            && wave_offset.is_none()
+            && !quicktime_visual
+            && kind != EncodedEntryKind::Dts
         {
             return Err(Error::Unsupported(
                 if view == DescriptionView::RangePlayback {
@@ -1343,7 +1396,7 @@ impl<'a> EncodedStreamJob<'a> {
                                 terminator: None,
                             });
                         } else if raw.header().kind == *b"wave"
-                            && self.view == DescriptionView::RangePlayback
+                            && self.view.extended_configurations()
                             && self.kind == EncodedEntryKind::Aac
                         {
                             return Err(Error::Unsupported(
@@ -1368,15 +1421,19 @@ impl<'a> EncodedStreamJob<'a> {
                         let cfg = self.configuration.as_ref().ok_or(Error::Unsupported(
                             "encoded configuration path or absence not established",
                         ))?;
-                        if self.kind == EncodedEntryKind::Aac && self.esds.is_none() {
+                        if matches!(
+                            self.kind,
+                            EncodedEntryKind::Aac | EncodedEntryKind::Mpeg4Visual
+                        ) && self.esds.is_none()
+                        {
                             let start = usize::from(cfg.header().header_size);
                             let bytes = cfg.bytes().slice(start..cfg.bytes().len())?;
-                            let profile = if self.view == DescriptionView::RangePlayback
-                                && !self.requires_wave
-                            {
-                                EsdsProfile::RangeAudio
-                            } else {
-                                EsdsProfile::Aac
+                            let profile = match self.kind {
+                                EncodedEntryKind::Mpeg4Visual => EsdsProfile::Visual,
+                                _ if self.view.extended_configurations() && !self.requires_wave => {
+                                    EsdsProfile::RangeAudio
+                                }
+                                _ => EsdsProfile::Aac,
                             };
                             self.esds = Some(EsdsWalk::with_profile(
                                 bytes,
@@ -1406,7 +1463,7 @@ impl<'a> EncodedStreamJob<'a> {
                     &self.entry,
                     self.configuration.as_ref(),
                 )?),
-                EncodedEntryKind::Aac if self.view == DescriptionView::RangePlayback => {
+                EncodedEntryKind::Aac if self.view.extended_configurations() => {
                     match self.esds.as_ref().and_then(|esds| esds.object_type) {
                         Some(oti) if dts_object_type(oti)? => {
                             self.kind = EncodedEntryKind::Dts;
@@ -1421,13 +1478,15 @@ impl<'a> EncodedStreamJob<'a> {
                 dts.media_clock(self.header.time_base()?)?;
             }
             let extradata = match self.kind {
-                EncodedEntryKind::Aac => self
+                EncodedEntryKind::Aac | EncodedEntryKind::Mpeg4Visual => self
                     .esds
                     .as_ref()
                     .and_then(|x| x.dsi.as_ref().map(|(_, bytes)| bytes.clone()))
-                    .ok_or(Error::Unsupported(
-                        "encoded AAC decoder-specific config absent",
-                    ))?,
+                    .ok_or(Error::Unsupported(if self.kind == EncodedEntryKind::Aac {
+                        "encoded AAC decoder-specific config absent"
+                    } else {
+                        "MPEG-4 Visual decoder-specific config absent"
+                    }))?,
                 EncodedEntryKind::Avc | EncodedEntryKind::Hevc | EncodedEntryKind::Av1 => cfg
                     .bytes()
                     .slice(usize::from(cfg.header().header_size)..cfg.bytes().len())?,
@@ -1547,7 +1606,7 @@ fn metadata(
             Ok(crate::EncodedSource {
                 language: crate::encoded_metadata::language(
                     header,
-                    view == DescriptionView::RangePlayback && major == Some(*b"qt  "),
+                    view.extended_configurations() && major == Some(*b"qt  "),
                 )?,
                 handler: crate::encoded_metadata::handler(header, major)?,
                 sound: None,
@@ -1629,6 +1688,7 @@ fn metadata(
     let codec = match kind {
         EncodedEntryKind::Avc => "h264",
         EncodedEntryKind::Hevc => "hevc",
+        EncodedEntryKind::Mpeg4Visual => "mpeg4",
         EncodedEntryKind::Av1 => "av1",
         EncodedEntryKind::Vp9 => "vp9",
         EncodedEntryKind::Aac => "aac",
@@ -1673,7 +1733,7 @@ fn opus_configuration(pool: &Budget, entry: &SampleDescription, config: &BoxView
     Bytes::copy_from_slice(pool, &packet[..len])
 }
 
-/// The object type and decoder-specific bytes an `mp4a` or `mp4s` description
+/// The object type and decoder-specific bytes an `mp4a`, `mp4v` or `mp4s` description
 /// states in its `esds` (ISO/IEC 14496-1 `DecoderConfigDescriptor`), read
 /// under a work budget.
 #[derive(Debug)]
@@ -1681,10 +1741,10 @@ pub struct ObjectTypeScan(EsdsDescriptionWalk);
 
 impl ObjectTypeScan {
     pub fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
-        let profile = if entry.format == *b"mp4s" {
-            EsdsProfile::SystemStream
-        } else {
-            EsdsProfile::ObjectType
+        let profile = match &entry.format {
+            b"mp4s" => EsdsProfile::SystemStream,
+            b"mp4v" => EsdsProfile::Visual,
+            _ => EsdsProfile::ObjectType,
         };
         EsdsDescriptionWalk::with_profile(entry, limits, profile).map(Self)
     }

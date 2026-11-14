@@ -1,5 +1,5 @@
-//! Reference MOV compatibility occurrence view for the observed strict,
-//! nonreordered, positive-delta, rate-one regular sample profile.
+//! MOV compatibility occurrence view for positive-delta, rate-one regular
+//! samples, including reordered AVC video.
 //!
 //! Apple/Adobe establish edit point mapping, gaps and repetition. Demux key-end
 //! postroll and expanded-index terminal duration are separate observation rules.
@@ -95,6 +95,9 @@ pub struct EditCursor<'a> {
     pending: Option<EditOccurrence>,
     ready: Option<EditOccurrence>,
     failed: Option<Error>,
+    reordered: bool,
+    presentation_anchor: Option<i128>,
+    end_key_seen: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -127,6 +130,7 @@ impl<'a> EditCursor<'a> {
             ));
         }
         let zero = Time::new(0, 1)?;
+        let reordered = table.has_avc_composition_offsets();
         Ok(Self {
             table,
             edits,
@@ -156,6 +160,9 @@ impl<'a> EditCursor<'a> {
             pending: None,
             ready: None,
             failed: None,
+            reordered,
+            presentation_anchor: None,
+            end_key_seen: false,
         })
     }
     pub fn take_occurrence(&mut self) -> Result<EditOccurrence> {
@@ -178,13 +185,19 @@ impl<'a> EditCursor<'a> {
         if let SampleStep::Sample(sample) = &step {
             self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
             count_limit(self.scanned, self.limits.max_scanned_samples)?;
-            if sample.composition_offset.is_some()
+            let supported_clock = if self.reordered {
+                sample.composition_offset.is_some_and(|offset| {
+                    offset.version() == 0 && offset.raw_bits() <= i32::MAX as u32
+                }) && sample.cts_ticks.is_some()
+            } else {
+                sample.composition_offset.is_none() && sample.dts_ticks == sample.cts_ticks
+            };
+            if !supported_clock
                 || sample.duration_ticks == 0
                 || sample.partial_sync
                 || sample.dependency.is_some()
                 || sample.access == Access::Unknown
                 || sample.dts_ticks.is_none()
-                || sample.dts_ticks != sample.cts_ticks
             {
                 return Err(Error::Unsupported(
                     "native edit reordered/zero-delta/recovery profile",
@@ -194,9 +207,17 @@ impl<'a> EditCursor<'a> {
         Ok(step)
     }
     fn begin_emit(&mut self) -> Result<()> {
-        self.first = self.preceding_sync.ok_or(Error::Unsupported(
-            "native edit has no preceding declared sync",
-        ))?;
+        self.first = if self.reordered {
+            let anchor = self.presentation_anchor.ok_or(Error::Unsupported(
+                "video edit starts beyond the last presentation timestamp",
+            ))?;
+            self.demux_source_start = Time::from_ticks(anchor, self.media_base)?;
+            self.preceding_sync.unwrap_or(1)
+        } else {
+            self.preceding_sync.ok_or(Error::Unsupported(
+                "native edit has no preceding declared sync",
+            ))?
+        };
         self.active_ticks = self.edit_ticks();
         self.scan = self.table.cursor();
         self.phase = Phase::Emit;
@@ -225,12 +246,45 @@ impl<'a> EditCursor<'a> {
             start: edit.entry.media_time,
             end: self
                 .source_end
-                .to_i64_ticks(self.media_base, Rounding::Ceil)
+                .to_i64_ticks(
+                    self.media_base,
+                    if self.reordered {
+                        Rounding::NearestAway
+                    } else {
+                        Rounding::Ceil
+                    },
+                )
                 .ok()?,
         })
     }
 
     fn project(&self, source: &Sample, edit: ProjectedEdit) -> Result<PacketView> {
+        if self.reordered {
+            let ticks = self.active_ticks.ok_or(Error::Overflow)?;
+            let dts = source
+                .dts_ticks
+                .ok_or(Error::Invalid("missing video DTS"))?;
+            let cts = source
+                .cts_ticks
+                .ok_or(Error::Invalid("missing video CTS"))?;
+            let shift = i128::from(ticks.shift);
+            let dts_field =
+                ClockField::from_exact_ticks(dts.checked_add(shift).ok_or(Error::Overflow)?)?;
+            let pts_field =
+                ClockField::from_exact_ticks(cts.checked_add(shift).ok_or(Error::Overflow)?)?;
+            let discard = cts < i128::from(ticks.start) || cts >= i128::from(ticks.end);
+            return Ok(PacketView {
+                source_ordinal: source.ordinal,
+                source_description: source.description_index,
+                source_range: source.range.clone(),
+                pts: pts_field.api_ticks(),
+                dts: dts_field.api_ticks(),
+                pts_field,
+                dts_field,
+                duration: i64::from(source.duration_ticks),
+                flags: u32::from(source.is_container_sync()) | (u32::from(discard) << 2),
+            });
+        }
         // scan_sample has already established equal, known DTS and CTS and
         // checked the edit's source flag profile.
         if let Some(ticks) = self.active_ticks
@@ -380,14 +434,17 @@ impl<'a> EditCursor<'a> {
                     self.scan = self.table.cursor();
                     self.last_source_end = None;
                     self.preceding_sync = None;
+                    self.presentation_anchor = None;
+                    self.end_key_seen = false;
                     self.phase = Phase::Find;
                 }
                 Phase::Find => match self.scan_sample(work)? {
                     SampleStep::Yield => return Ok(CursorStatus::Yield),
                     SampleStep::End => {
-                        if self
-                            .last_source_end
-                            .is_none_or(|end| self.source_start >= end)
+                        if !self.reordered
+                            && self
+                                .last_source_end
+                                .is_none_or(|end| self.source_start >= end)
                         {
                             return Err(Error::Unsupported(
                                 "native edit starts outside known source samples",
@@ -396,6 +453,26 @@ impl<'a> EditCursor<'a> {
                         self.begin_emit()?;
                     }
                     SampleStep::Sample(sample) => {
+                        if self.reordered {
+                            let cts = sample
+                                .cts_ticks
+                                .ok_or(Error::Invalid("missing video CTS"))?;
+                            let start = i128::from(
+                                self.active
+                                    .ok_or(Error::Invalid("missing active edit"))?
+                                    .entry
+                                    .media_time,
+                            );
+                            if cts <= start && sample.is_container_sync() {
+                                self.preceding_sync = Some(sample.ordinal);
+                            }
+                            if cts >= start {
+                                self.presentation_anchor = Some(
+                                    self.presentation_anchor.map_or(cts, |prior| prior.min(cts)),
+                                );
+                            }
+                            continue;
+                        }
                         let dts = Time::from_ticks(
                             sample
                                 .dts_ticks
@@ -430,17 +507,29 @@ impl<'a> EditCursor<'a> {
                             continue;
                         }
                         let active = self.active.ok_or(Error::Invalid("missing active edit"))?;
-                        let end_ticks = source
-                            .dts_ticks
-                            .ok_or(Error::Invalid("missing source DTS"))?
-                            .checked_add(i128::from(source.duration_ticks))
-                            .ok_or(Error::Overflow)?;
-                        self.after_emit =
-                            if source.is_container_sync() && self.reached_edit_end(end_ticks)? {
-                                Phase::Advance
-                            } else {
-                                Phase::Emit
-                            };
+                        let end_ticks = if self.reordered {
+                            source.cts_ticks
+                        } else {
+                            source.dts_ticks
+                        }
+                        .ok_or(Error::Invalid("missing edit sample time"))?
+                        .checked_add(i128::from(source.duration_ticks))
+                        .ok_or(Error::Overflow)?;
+                        self.after_emit = Phase::Emit;
+                        if source.is_container_sync() {
+                            // In the MOV comparison with composition offsets, retain
+                            // the sync sample after the one whose frame reaches the
+                            // edit end. Presentation bounds still mark each packet.
+                            if self.end_key_seen {
+                                self.after_emit = Phase::Advance;
+                            } else if self.reached_edit_end(end_ticks)? {
+                                if self.reordered {
+                                    self.end_key_seen = true;
+                                } else {
+                                    self.after_emit = Phase::Advance;
+                                }
+                            }
+                        }
                         let demux = self.project(&source, active)?;
                         self.staged_empty_endpoint = false;
                         self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;

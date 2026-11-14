@@ -1102,7 +1102,10 @@ impl<'a> PacketCursor<'a> {
         Ok(replay)
     }
 
-    pub(crate) fn fork_index_track(&self, track_id: u32) -> Result<(Self, DemuxTrack<'a>)> {
+    pub(crate) fn fork_index_track(
+        &self,
+        track_id: u32,
+    ) -> Result<(Self, DemuxTrack<'a>, Option<&'a crate::EncodedEditPlan>)> {
         if !matches!(self.phase, Phase::End)
             || self.failed.is_some()
             || !self.complete_source
@@ -1120,12 +1123,10 @@ impl<'a> PacketCursor<'a> {
             .iter()
             .find(|slot| slot.track.track_id == track_id)
             .ok_or(Error::Invalid("index replay track is absent"))?;
-        if slot.encoded_edit.is_some() {
-            return Err(Error::Invalid("index replay requires a source track"));
-        }
         Ok((
             self.fork_checked_slots(std::slice::from_ref(slot))?,
             slot.track,
+            slot.encoded_edit,
         ))
     }
 

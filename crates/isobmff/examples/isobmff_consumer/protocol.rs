@@ -4,13 +4,20 @@ use std::fmt::Write as _;
 use triergon_core::{Budget, BudgetVec, Bytes, Error};
 pub use triergon_harness_protocol::digest::{append_words, fold, fold_framed, signed};
 use triergon_harness_protocol::{push_hex, push_quoted};
-use triergon_isobmff::compat::mov::packets::{PacketView, StreamView};
+use triergon_isobmff::{
+    TrackHeader,
+    compat::mov::{
+        encoded::{EncodedCreationSource, EncodedMetadataProfile, EncodedStream, LanguageCause},
+        packets::{PacketView, StreamView},
+    },
+};
 
 pub const MAX_PACKETS: u64 = 1_000_000;
 pub const MAX_DELIVERED_BYTES: u64 = 256 * 1024 * 1024;
 pub const EOF: i64 = -541478725;
 pub const DOMAIN: u64 = 0x4d4f5633;
 pub const CORRUPT_PACKET: u32 = 2;
+const SKIP_SAMPLES: u32 = 11;
 
 pub fn raw_box(out: &mut String, raw: &triergon_isobmff::BoxView) {
     write!(out, "{{\"offset\":{},\"box_hex\":\"", raw.header().start).expect("String write");
@@ -189,6 +196,7 @@ pub struct Packet {
     pub position: i64,
     pub flags: u32,
     pub payload: Bytes,
+    pub skip_samples: Option<[u8; 10]>,
 }
 impl Packet {
     pub fn from_view(
@@ -209,6 +217,7 @@ impl Packet {
                 .map_err(|_| Error::Unsupported("native signed position projection"))?,
             flags: demux.flags,
             payload,
+            skip_samples: None,
         })
     }
     pub fn consume(&self, h: &mut u64) -> Result<(), Error> {
@@ -224,9 +233,11 @@ impl Packet {
         }
         fold(h, u64::from(self.flags));
         fold_framed(h, self.payload.as_ref());
-        // Current production demux view exposes no packet-side-data projection.
-        // Reference items remain fully consumed; any nonempty result mismatches.
-        fold(h, 0);
+        fold(h, u64::from(self.skip_samples.is_some()));
+        if let Some(skip) = &self.skip_samples {
+            fold(h, u64::from(SKIP_SAMPLES));
+            fold_framed(h, skip);
+        }
         Ok(())
     }
     pub fn trace(&self, out: &mut String) {
@@ -246,11 +257,102 @@ impl Packet {
         )
         .expect("String write");
         push_hex(out, self.payload.as_ref());
-        out.push_str("\",\"side_data\":[]}");
+        out.push_str("\",\"side_data\":[");
+        if let Some(skip) = &self.skip_samples {
+            write!(out, "{{\"type\":{SKIP_SAMPLES},\"data\":\"").expect("String write");
+            push_hex(out, skip);
+            out.push_str("\"}");
+        }
+        out.push_str("]}");
     }
 }
 
-pub fn consume_stream(h: &mut u64, index: usize, stream: &StreamView) -> Result<(), Error> {
+pub struct CatalogueStream {
+    view: StreamView,
+    creation_time: Option<[u8; 27]>,
+    language_present: bool,
+    handler_present: bool,
+    encoder: Option<Bytes>,
+}
+
+impl From<StreamView> for CatalogueStream {
+    fn from(view: StreamView) -> Self {
+        Self {
+            view,
+            creation_time: None,
+            language_present: true,
+            handler_present: true,
+            encoder: None,
+        }
+    }
+}
+
+impl CatalogueStream {
+    pub fn encoded(stream: &EncodedStream, header: &TrackHeader) -> Result<Self, Error> {
+        let source = stream
+            .receiver_source()
+            .ok_or(Error::Invalid("missing encoded catalogue metadata"))?;
+        let creation = EncodedCreationSource::from_source(header, EncodedMetadataProfile)?;
+        Ok(Self {
+            view: stream.demux().clone(),
+            creation_time: creation.demux().copied(),
+            language_present: source.language.cause != LanguageCause::QuickTimeUnspecified,
+            handler_present: source.handler.demux.is_some(),
+            encoder: stream.encoder_name().cloned(),
+        })
+    }
+
+    fn tags<'a>(&'a self, vendor: &'a mut [u8; 20]) -> [Option<(&'static [u8], &'a [u8])>; 5] {
+        [
+            self.creation_time
+                .as_ref()
+                .map(|time| (b"creation_time".as_slice(), time.as_slice())),
+            self.language_present
+                .then_some((b"language", self.view.language.as_slice())),
+            self.handler_present
+                .then_some((b"handler_name", self.view.handler_name.as_ref())),
+            self.view
+                .vendor_id
+                .map(|id| (b"vendor_id".as_slice(), vendor_text(id, vendor))),
+            self.encoder
+                .as_ref()
+                .map(|name| (b"encoder".as_slice(), name.as_ref())),
+        ]
+    }
+}
+
+// The MOV metadata API prints letters, digits, spaces, dots, dashes and
+// underscores literally. Other vendor bytes are represented in decimal brackets.
+fn vendor_text(id: [u8; 4], out: &mut [u8; 20]) -> &[u8] {
+    if id == [0; 4] {
+        return b"[0][0][0][0]";
+    }
+    let mut at = 0;
+    for byte in id {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'.' | b'-' | b'_') {
+            out[at] = byte;
+            at += 1;
+        } else {
+            out[at] = b'[';
+            at += 1;
+            if byte >= 100 {
+                out[at] = b'0' + byte / 100;
+                at += 1;
+            }
+            if byte >= 10 {
+                out[at] = b'0' + byte / 10 % 10;
+                at += 1;
+            }
+            out[at] = b'0' + byte % 10;
+            out[at + 1] = b']';
+            at += 2;
+        }
+    }
+    &out[..at]
+}
+
+pub fn consume_stream(h: &mut u64, index: usize, catalogue: &CatalogueStream) -> Result<(), Error> {
+    let stream = &catalogue.view;
     fold(h, 0x53);
     fold(h, u64::try_from(index).map_err(|_| Error::Overflow)?);
     fold(
@@ -264,21 +366,17 @@ pub fn consume_stream(h: &mut u64, index: usize, stream: &StreamView) -> Result<
     fold(h, stream.time_base.numerator());
     fold(h, stream.time_base.denominator());
     fold_framed(h, stream.extradata.as_ref());
-    fold(h, if stream.vendor_id.is_some() { 3 } else { 2 });
-    for (key, value) in [
-        (b"language".as_slice(), stream.language.as_slice()),
-        (b"handler_name".as_slice(), stream.handler_name.as_ref()),
-    ] {
+    let mut vendor = [0; 20];
+    let tags = catalogue.tags(&mut vendor);
+    fold(h, tags.iter().flatten().count() as u64);
+    for (key, value) in tags.into_iter().flatten() {
         fold_framed(h, key);
         fold_framed(h, value);
     }
-    if stream.vendor_id.is_some() {
-        fold_framed(h, b"vendor_id");
-        fold_framed(h, b"[0][0][0][0]");
-    }
     Ok(())
 }
-pub fn trace_stream(out: &mut String, index: usize, stream: &StreamView) {
+pub fn trace_stream(out: &mut String, index: usize, catalogue: &CatalogueStream) {
+    let stream = &catalogue.view;
     write!(
         out,
         "{{\"stream\":{index},\"pid\":{},\"codec\":",
@@ -296,12 +394,12 @@ pub fn trace_stream(out: &mut String, index: usize, stream: &StreamView) {
     .expect("String write");
     push_hex(out, stream.extradata.as_ref());
     out.push_str("\",\"tags\":[");
-    for (i, (key, value)) in [
-        (b"language".as_slice(), stream.language.as_slice()),
-        (b"handler_name".as_slice(), stream.handler_name.as_ref()),
-    ]
-    .into_iter()
-    .enumerate()
+    let mut vendor = [0; 20];
+    for (i, (key, value)) in catalogue
+        .tags(&mut vendor)
+        .into_iter()
+        .flatten()
+        .enumerate()
     {
         if i != 0 {
             out.push(',');
@@ -310,13 +408,6 @@ pub fn trace_stream(out: &mut String, index: usize, stream: &StreamView) {
         push_hex(out, key);
         out.push_str("\",\"value_hex\":\"");
         push_hex(out, value);
-        out.push_str("\"}");
-    }
-    if stream.vendor_id.is_some() {
-        out.push_str(",{\"key_hex\":\"");
-        push_hex(out, b"vendor_id");
-        out.push_str("\",\"value_hex\":\"");
-        push_hex(out, b"[0][0][0][0]");
         out.push_str("\"}");
     }
     out.push_str("]}");

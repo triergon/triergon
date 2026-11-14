@@ -324,8 +324,9 @@ cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --re
 
 Prepare the formats reference with `cargo xtask prepare-ffmpeg --profile formats`
 and rebuild workers before running the container and packet-framing commands.
-`cargo xtask isobmff-bench` compares all 1,020 open and index outcomes, including
-48 refusals. `--benchmark --memory` measures the 972 output labels, with 956
+`cargo xtask fetch-vectors` prepares the pinned upstream MOV inputs.
+`cargo xtask isobmff-bench` compares all 1,076 open and index outcomes, including
+48 refusals. `--benchmark --memory` measures the 1,028 output labels, with 1,012
 physical operations and 16 explicit aliases. `--subset52` selects the separate
 52-operation measurement set while retaining the full correctness comparison.
 `cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.

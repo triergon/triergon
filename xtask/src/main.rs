@@ -89,7 +89,7 @@ commands:
                  prefix: its release candidate and a dev build of it, with --reference also
                  its reference; the bound on input size is raised to the largest case
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
-  isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
+  isobmff-bench   compare all open/index traces; optionally measure all labels or --subset52
   framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance] [--full]

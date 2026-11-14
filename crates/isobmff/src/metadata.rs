@@ -222,6 +222,14 @@ pub struct EditList {
 }
 impl EditList {
     pub fn parse(raw: BoxView, limits: Limits) -> Result<Self> {
+        Self::parse_with_extent(raw, limits, false)
+    }
+
+    pub(crate) fn parse_with_extent(
+        raw: BoxView,
+        limits: Limits,
+        use_box_extent: bool,
+    ) -> Result<Self> {
         if raw.header().kind != *b"elst" {
             return Err(Error::Invalid("not elst"));
         }
@@ -229,8 +237,15 @@ impl EditList {
         if flags != 0 || version > 1 {
             return Err(Error::Unsupported("edit list version/flags"));
         }
-        let count = fields::u32_at(raw.payload(), 4)?;
-        fields::exact_rows(raw.payload(), 8, count, if version == 0 { 12 } else { 20 })?;
+        let declared = fields::u32_at(raw.payload(), 4)?;
+        let stride = if version == 0 { 12 } else { 20 };
+        let count = if use_box_extent {
+            // Reading the count above has already validated the eight-byte prefix.
+            u32::try_from((raw.payload().len() - 8) / stride).map_err(|_| Error::Overflow)?
+        } else {
+            fields::exact_rows(raw.payload(), 8, declared, stride)?;
+            declared
+        };
         policy(count, limits.max_records)?;
         Ok(Self {
             raw,
