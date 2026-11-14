@@ -173,18 +173,40 @@ reachable() {
     done
 }
 
+# This workstation's public address, as AWS sees it; empty when it cannot be read.
+workstation() { curl -fsS --max-time 10 https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]'; }
+
+# Whether the session's security group lets ADDRESS reach the hosts by SSH.
+admitted() {
+    aws ec2 describe-security-groups --group-ids "$SG" \
+        --query 'SecurityGroups[0].IpPermissions[].IpRanges[].CidrIp' --output text < /dev/null |
+        tr '\t' '\n' | grep -qx "$1/32"
+}
+
 # Run tools/gate-host.sh ARGS on host I, detached, and wait until its log records
-# MARKER; give up after five failed polls in a row.
+# MARKER; give up after five failed polls in a row. A poll that fails because this
+# workstation's address left the security group's one /32 is not a failure: the
+# hosts work on, so it says so once and waits until the group admits the new address,
+# which it never changes itself.
 detached() {
     local i=$1 marker=$2; shift 2
     on "$i" "setsid nohup env $(printf '%q ' "${ENVIRONMENT[@]}") bash ~/gate-host.sh $* > ~/gate-host.out 2>&1 < /dev/null &"
-    local failures=0 state
+    local failures=0 state moved=
     while sleep "$POLL"; do
         if state=$(on "$i" "taskset -c 0 tail -1 ~/gate-host.log; taskset -c 0 pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
             failures=0
             case $state in *"$marker"*) return 0;; esac
             case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
         else
+            local address
+            address=$(workstation)
+            if [ -n "$address" ] && ! admitted "$address"; then
+                [ "$address" = "${moved:-}" ] || say "host $i: unreachable, because this \
+workstation's address is now $address and $SG admits SSH from another; polls resume \
+once $SG admits $address/32"
+                moved=$address failures=0
+                continue
+            fi
             failures=$((failures + 1))
             [ "$failures" -lt 5 ] || { say "host $i: no answer to five polls"; return 1; }
         fi
