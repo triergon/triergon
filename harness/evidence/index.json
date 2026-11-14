@@ -20372,6 +20372,25 @@
    "key": "qualification/quicktime-preflight-f5b1559d/ece4f272af7eebc52f0da210c4e112bdba4fb4e1a14d237f4891f9f719ac01eb.tar.gz",
    "sha256": "ece4f272af7eebc52f0da210c4e112bdba4fb4e1a14d237f4891f9f719ac01eb",
    "bytes": 49917684
+  },
+  {
+   "name": "quicktime-full-aed664a1-aarch64",
+   "path": "quicktime-full-aed664a1-aarch64",
+   "retention": "90 days",
+   "reason": "Full ISO BMFF run with standard RSS bounds",
+   "key": "qualification/quicktime-full-aed664a1-aarch64/13aaaae0097f2bf13e7a07b63e151bb6a1d2dc6d02a4f67eb76bda561b70c6d3.tar.zst",
+   "sha256": "13aaaae0097f2bf13e7a07b63e151bb6a1d2dc6d02a4f67eb76bda561b70c6d3",
+   "bytes": 34372280,
+   "results": [
+    {
+     "path": "results/open-index/gate-result.json",
+     "command": "isobmff-bench --benchmark --memory",
+     "key": "d9cad248c347a33974765cb3cf2096879dfa09ae8956b9e534a7c1dcc8d77b06",
+     "status": 1,
+     "report_sha256": "b2990640bd50711f2bf4d95f090ddef28c2eb5e126d4336f47067530744ad029"
+    }
+   ],
+   "source_revision": "aed664a1644ca1b7b6623deb03c79e83cc399872"
   }
  ]
 }
