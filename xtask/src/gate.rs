@@ -185,8 +185,9 @@ fn collections(name: &str, timing: Vec<String>, memory: Vec<String>) -> [Step; 2
     ]
 }
 
-fn grade(name: &str, contract: &str, manifest: &str, out: &str) -> Step {
-    step(
+/// A grade of a collection pair; with `full` it grades even what a kept set holds.
+fn grade(name: &str, contract: &str, manifest: &str, out: &str, full: bool) -> Step {
+    let mut grade = step(
         format!("grade-{name}"),
         Stage::Memory,
         Placement::Grade,
@@ -201,7 +202,11 @@ fn grade(name: &str, contract: &str, manifest: &str, out: &str) -> Step {
             "--output",
             &format!("{out}/graded/{name}"),
         ]),
-    )
+    );
+    if full {
+        grade.command.push("--full".into());
+    }
+    grade
 }
 
 /// Every item of the gate, writing under `out`, with `full` passed to the
@@ -239,7 +244,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         };
         let mut steps: Vec<Step> =
             collections(feature, report("benchmark"), report("memory")).into();
-        steps.push(grade(feature, feature, &manifest, out));
+        steps.push(grade(feature, feature, &manifest, out, full));
         let mut preflight = owned(&["--feature", feature]);
         match corpus {
             None => {}
@@ -274,6 +279,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         "matroska-segment-metadata",
         "harness/features/matroska-segment-metadata/corpus.json",
         out,
+        full,
     ));
     items.push(Item {
         name: "external-vector".into(),
@@ -325,6 +331,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         "packet-framing",
         "harness/features/packet-framing/corpus.json",
         out,
+        full,
     ));
     items.push(Item {
         name: "framing".into(),
