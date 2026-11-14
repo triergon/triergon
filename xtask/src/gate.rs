@@ -587,22 +587,23 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     });
     // Each list's timing is one item and its memory is in parts, each part every
     // Nth workload: a list's memory took up to 108 minutes in one piece.
-    for (name, workloads, timing_weight, parts, part_weight) in [
+    // Each part's weight is its measured minutes, as for every other item.
+    let lists: [(&str, &str, u32, &[u32]); 2] = [
         (
             "codec-workloads",
             "harness/codecs/workloads.json",
             20,
-            5,
-            22,
+            &[36, 12, 20, 18, 31],
         ),
         (
             "codec-file-workloads",
             "harness/codecs/file-workloads.json",
             4,
-            3,
-            22,
+            &[16, 29, 20],
         ),
-    ] {
+    ];
+    for (name, workloads, timing_weight, part_weights) in lists {
+        let parts = part_weights.len();
         let codecs = |mode: &str, part: Option<usize>| {
             let mut args = xtask(&[
                 "codecs",
@@ -640,7 +641,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             steps: vec![timing],
             preflight: owned(&["--codecs", workloads]),
         });
-        for part in 1..=parts {
+        for (part, &part_weight) in (1..=parts).zip(part_weights) {
             let part_name = format!("{name}-{part}");
             let [_, memory] = collections(&part_name, Vec::new(), codecs("memory", Some(part)));
             items.push(Item {
