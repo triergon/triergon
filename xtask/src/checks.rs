@@ -159,7 +159,9 @@ fn contract_fields(root: &Path) -> Vec<String> {
                 .to_string();
             let errors = match read_json(&path) {
                 Ok(contract) => [
-                    crate::harness::worker::contract_timeout(&contract).err(),
+                    crate::harness::worker::contract_timeout(&contract)
+                        .and(crate::harness::worker::contract_parity_timeout(&contract))
+                        .err(),
                     crate::harness::build::measurement_reference_error(&contract),
                 ]
                 .into_iter()

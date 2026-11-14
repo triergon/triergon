@@ -202,5 +202,6 @@
       "id": "tinos-regular-ttf-default-16384",
       "requirement": "the TrueType interpreter, for the hinted outlines of instructed TrueType faces"
     }
-  ]
+  ],
+  "parity_timeout_seconds": 120
 }
