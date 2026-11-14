@@ -930,6 +930,9 @@ pub fn evaluate(
         return failed("observer-unqualified");
     }
     let n = |v: &Value, k: &str| py_int(v.get(k));
+    // The kernel certificate is the collection's, as the guard certificate is:
+    // verify it once, at the first sample that used the kernel bound.
+    let mut kernel_verified = None;
     let (mut rss, mut heaps, mut totals) = (Vec::new(), Vec::new(), Vec::new());
     for row in samples {
         let Value::Object(entries) = row else {
@@ -942,26 +945,32 @@ pub fn evaluate(
                 .filter_map(|(_, v)| v.get("observer"))
                 .collect();
             if kernel_used(certificate, std::slice::from_ref(row)) {
-                let ok = matches!(
-                    certificate.get("kernel_rss_required"),
-                    Some(Value::Bool(true))
-                ) && linux::kernel_certificate_valid(
-                    root,
-                    certificate.get("kernel_rss_certificate"),
-                    observer,
-                    probe,
-                ) && kernel_rows
-                    .iter()
-                    .all(|d| n(d, "kernel_rss_requested") == Some(1));
+                let verified = *kernel_verified.get_or_insert_with(|| {
+                    matches!(
+                        certificate.get("kernel_rss_required"),
+                        Some(Value::Bool(true))
+                    ) && linux::kernel_certificate_valid(
+                        root,
+                        certificate.get("kernel_rss_certificate"),
+                        observer,
+                        probe,
+                    )
+                });
+                let ok = verified
+                    && kernel_rows
+                        .iter()
+                        .all(|d| n(d, "kernel_rss_requested") == Some(1));
                 if !ok {
                     return failed("observer-unqualified");
                 }
             }
         }
+        // The guard certificate was verified above; each observation must still
+        // show a clean active window.
         if guarded
-            && entries.iter().any(|(_, v)| {
-                !linux::sample_valid(v.get("observer"), guard, &linked, observer, probe)
-            })
+            && entries
+                .iter()
+                .any(|(_, v)| !v.get("observer").is_some_and(linux::guard_component_valid))
         {
             return failed("invalid-memory-observation");
         }
