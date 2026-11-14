@@ -21,18 +21,20 @@ use crate::json::Value;
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
-       [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--external-vector]
-       [--capture CASES] [--reference NAME]... [--review FILE | --standard-memory] [--kernel]
+       [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--codecs WORKLOADS]...
+       [--external-vector] [--capture CASES] [--reference NAME]...
+       [--review FILE | --standard-memory] [--kernel]
 
 Check, before a gate run measures anything, that the build identity's workers and
 references are current and the gate build; that each --feature's cases name known
 references and have every input with its pinned hash (in --corpus, else the
 manifest's recorded directory, else .research/fixtures; --manifest replaces the
-contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with --codecs
-each workload list's inputs, with --external-vector the mandatory external vector
-and with --capture the capture cases, their input generator and its numpy Python;
-that each named reference was built and is current: those --isobmff, --codecs and
---capture measure against, and any --reference; that the RSS module review covers
+contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with
+--isobmff-seek the ISO BMFF seek suite's, with --codecs each workload list's inputs,
+with --external-vector the mandatory external vector and with --capture the capture
+cases, their input generator and its numpy Python; that each named reference was
+built and is current: those --isobmff, --isobmff-seek, --codecs and --capture
+measure against, and any --reference; that the RSS module review covers
 this module source and kernel (the committed review,
 harness/rss-bound/reviews/SOURCE-RELEASE.json, or --review FILE), unless the run's
 memory uses the standard bounds (--standard-memory); and that the RSS module is
@@ -49,6 +51,7 @@ struct Options {
     corpora: BTreeMap<String, PathBuf>,
     manifests: BTreeMap<String, PathBuf>,
     isobmff: bool,
+    isobmff_seek: bool,
     codecs: Vec<PathBuf>,
     external_vector: bool,
     capture: Option<PathBuf>,
@@ -83,6 +86,7 @@ impl Options {
                 "--corpus" => pair(&mut options.corpora, value()?)?,
                 "--manifest" => pair(&mut options.manifests, value()?)?,
                 "--isobmff" => options.isobmff = true,
+                "--isobmff-seek" => options.isobmff_seek = true,
                 "--codecs" => options.codecs.push(root.join(value()?)),
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
@@ -159,6 +163,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
     if options.isobmff {
         checks.check("isobmff inputs", crate::isobmff_bench::verify_inputs(root));
+    }
+    if options.isobmff_seek {
+        checks.check(
+            "isobmff seek inputs",
+            crate::isobmff_seek::verify_inputs(root),
+        );
     }
     for workloads in &options.codecs {
         checks.check(
@@ -251,7 +261,7 @@ impl Options {
     /// which name them by path rather than through a contract.
     fn measured_references(&self) -> Vec<String> {
         let mut names = Vec::new();
-        if self.isobmff {
+        if self.isobmff || self.isobmff_seek {
             names.push(crate::isobmff_bench::REFERENCE.to_owned());
         }
         if !self.codecs.is_empty() {
@@ -475,6 +485,11 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     if options.isobmff {
         for (path, pin) in crate::isobmff_bench::inputs(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    if options.isobmff_seek {
+        for (path, pin) in crate::isobmff_seek::inputs(root)? {
             add(path, Some(&pin));
         }
     }

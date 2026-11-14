@@ -384,6 +384,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let mut inputs = shared_inputs(root)?;
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
+        inputs.extend(crate::isobmff_seek::source_inputs(root)?);
     }
     if name == "transport-worker" {
         inputs.extend(crate::transport_fixtures::entity_inputs(root)?);

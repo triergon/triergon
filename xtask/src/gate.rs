@@ -2,9 +2,9 @@
 //! that can run on different hosts, and split into shards of about equal work.
 //!
 //! An item is the work for one measured thing: a feature's timing, memory and
-//! grade, a part of the ISO BMFF suite, the packet-framing or progressive suite,
-//! the codecs' parity, a codec workload list, a capture case, a test profile, the
-//! reference comparisons. Its steps run on one host, in stages:
+//! grade, a part of the ISO BMFF suite, the ISO BMFF seek, packet-framing or
+//! progressive suite, the codecs' parity, a codec workload list, a capture case, a
+//! test profile, the reference comparisons. Its steps run on one host, in stages:
 //! `timing` runs the parity and timing steps alone on CPU 1 with the RSS module
 //! unloaded; `memory`, after the host has proved the kernel bound and rebuilt the
 //! workers with the proof, runs the memory collections on every CPU but CPU 0 and
@@ -157,12 +157,13 @@ const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor in [`FEATURES`].
-const COVERED: [(&str, Coverage); 24] = [
+const COVERED: [(&str, Coverage); 25] = [
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
     ),
     ("isobmff-reader", Coverage::Item("codecs isobmff-reader")),
+    ("isobmff-seek", Coverage::Item("isobmff-seek")),
     ("packet-framing", Coverage::Item("framing")),
     ("progressive-ts188", Coverage::Item("progressive")),
     ("font-outlines", Coverage::Item("fonts compare")),
@@ -273,6 +274,11 @@ const CAPTURE_WEIGHT: u32 = 10;
 
 /// How many parts the ISO BMFF suite's measurements are split into.
 const ISOBMFF_PARTS: usize = 3;
+/// The ISO BMFF seek suite's planning weight, until a gate run measures it: its
+/// memory from a collection of six cases on four CPUs, its timing from the worker
+/// cycles of each operation with every pair run, and the ARMv7 share from the open
+/// and index suite's.
+const ISOBMFF_SEEK_WEIGHT: u32 = 14;
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
@@ -462,6 +468,27 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             preflight: owned(&["--isobmff"]),
         });
     }
+    let seek = |mode: &str, flag: &str| {
+        with_full(xtask(&[
+            "isobmff-seek",
+            &format!("--{mode}"),
+            flag,
+            &pairs,
+            "--output",
+            &format!("{out}/{mode}/isobmff-seek"),
+        ]))
+    };
+    items.push(Item {
+        name: "isobmff-seek".into(),
+        weight: ISOBMFF_SEEK_WEIGHT,
+        steps: collections(
+            "isobmff-seek",
+            seek("benchmark", "--pairs"),
+            seek("memory", "--memory-pairs"),
+        )
+        .into(),
+        preflight: owned(&["--isobmff-seek"]),
+    });
 
     let framing = |mode: &str| {
         with_full(xtask(&[

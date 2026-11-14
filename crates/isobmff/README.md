@@ -446,5 +446,38 @@ The grader checks the complete corpus, exact outputs for each role, refusal
 diagnostics and alias operations. It reads one case's raw observations at a time;
 the 52-operation selection cannot qualify the complete feature.
 
+`cargo xtask isobmff-seek` compares 476 seek and range-plan cases
+([contract](../../harness/features/isobmff-seek/contract.json)) over eight authored
+movies of up to 1,800 samples per track (`harness/fixtures/isobmff-seek`, written by
+`cargo xtask isobmff-seek fixtures --out DIR`) and 36 inputs of the open and index
+corpus:
+
+- 378 seeks: open, optionally read to the end, `GlobalSeekJob` backward on one
+  track and read up to 64 packets, against the reference's public backward seek
+  and packet reads. Traces must be byte-identical.
+- 94 range plans: `MovieSourceSeekPlanner` with published `roll` recovery and the
+  plan's samples read from its decode start through its target, against the
+  reference's backward seek reading as many packets. The source positions, sizes
+  and payloads must be identical in order.
+- 4 matching refusals of inputs whose open both workers refuse.
+
+`--benchmark --memory` times and measures the 472 successful cases and `--part I/N`
+every Nth of them; every case is compared in every run. The worker runs a range plan
+for a seek mode given `--range-plan`.
+
+Not compared yet: the compatibility seek refuses a global seek across tracks with
+unequal clocks, overlapping or null index clocks and regular table recovery as
+unsupported, and on 47 inputs of the open and index corpus its result differs from
+the reference's at some targets. Where decode times start below zero or below the
+first presentation time, the reference lands on the preceding sync sample for a
+target at or just after a later sync sample's decode time. Where an edit trims the
+last presented sample, the reference reports that sample's full duration after a
+seek and the seek keeps the trimmed one; where an edit starts inside the first
+sample, the seek lands one sample earlier. A range
+plan works in movie time with recovery groups and composition offsets, so it
+selects other samples than the reference's decode-time seek on inputs with
+composition offsets, edits that do not start at the media start, `roll` groups or
+more than one track; those plans are not compared.
+
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).

@@ -2,7 +2,9 @@
 //!
 //! Every label gets its own ordered trace comparison. Only successful operations
 //! are measured; explicit aliases share measurements after their traces match.
-//! The 52-operation selection changes measurement membership only.
+//! The 52-operation selection changes measurement membership only. The seek
+//! suite ([`crate::isobmff_seek`]) runs its cases through the same comparison and
+//! measurement.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
@@ -47,36 +49,37 @@ const FIXTURES: &str = "harness/fixtures/isobmff-open-index";
 const CONTRACT_SHA: &str = "0419a8ea026d84e1aa98d4896faa79ec2c3f2261bd356a6b04a65e22b8d9b760";
 const CORPUS_SHA: &str = "03761df0849a8d60a3cc2222e35dd8fe02308c0fe774b3e442b6850d99704e58";
 const SUBSET_SHA: &str = "d5efa68f708ffe403018a8c34aaeb10aa693cb4e5abcf9a0b571339c69d40b61";
-const WORK_CONTRACT: &str = "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
-const ITERATIONS: u32 = 50;
+pub(crate) const WORK_CONTRACT: &str =
+    "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
+pub(crate) const ITERATIONS: u32 = 50;
 const PARITY_CHECKS: usize = 1020;
 const TIMABLE_OUTPUTS: usize = 972;
 const PHYSICAL_OPERATIONS: usize = 956;
 const EXPLICIT_REFUSALS: usize = 48;
 const REFERENCE_REFUSAL: i128 = -1_094_995_529;
 
-fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
+pub(crate) fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
     value
         .get(key)
         .and_then(Value::as_str)
         .ok_or_else(|| format!("missing string {key}"))
 }
 
-fn integer(value: &Value) -> Option<i128> {
+pub(crate) fn integer(value: &Value) -> Option<i128> {
     match value {
         Value::Number(number) => number.as_i128(),
         _ => None,
     }
 }
 
-fn number(value: &Value, key: &str) -> R<i128> {
+pub(crate) fn number(value: &Value, key: &str) -> R<i128> {
     value
         .get(key)
         .and_then(integer)
         .ok_or_else(|| format!("missing integer {key}"))
 }
 
-fn strings(value: &Value, key: &str) -> R<Vec<String>> {
+pub(crate) fn strings(value: &Value, key: &str) -> R<Vec<String>> {
     value
         .get(key)
         .and_then(Value::as_array)
@@ -90,7 +93,7 @@ fn strings(value: &Value, key: &str) -> R<Vec<String>> {
         .collect()
 }
 
-fn field(value: &mut Value, key: &str, data: Value) {
+pub(crate) fn field(value: &mut Value, key: &str, data: Value) {
     if let Value::Object(fields) = value {
         if let Some((_, slot)) = fields.iter_mut().find(|(k, _)| k == key) {
             *slot = data;
@@ -127,20 +130,25 @@ fn document(root: &Path, name: &str, expected: &str) -> R<Value> {
 }
 
 #[derive(Clone)]
-struct Case {
-    index: usize,
-    label: String,
-    schedule: String,
-    mode: String,
-    input: String,
-    input_sha: String,
-    input_bytes: usize,
-    refusal: bool,
-    arguments: Vec<String>,
-    candidate_options: Vec<String>,
-    alias: Option<usize>,
-    time_outputs: Value,
-    memory_outputs: Value,
+pub(crate) struct Case {
+    pub(crate) index: usize,
+    pub(crate) label: String,
+    pub(crate) schedule: String,
+    pub(crate) mode: String,
+    /// The suite's operation name and comparison view, as its records give them.
+    pub(crate) operation_name: &'static str,
+    pub(crate) view: &'static str,
+    /// The input's directory, from the repository root, and its file name there.
+    pub(crate) directory: &'static str,
+    pub(crate) input: String,
+    pub(crate) input_sha: String,
+    pub(crate) input_bytes: usize,
+    pub(crate) refusal: bool,
+    pub(crate) arguments: Vec<String>,
+    pub(crate) candidate_options: Vec<String>,
+    pub(crate) alias: Option<usize>,
+    pub(crate) time_outputs: Value,
+    pub(crate) memory_outputs: Value,
 }
 
 fn compatibility_options(label: &str) -> Vec<String> {
@@ -186,6 +194,9 @@ impl Case {
             label: text(value, "case")?.into(),
             schedule: text(value, "schedule")?.into(),
             mode: text(value, "mode")?.into(),
+            operation_name: "isobmff-open-index",
+            view: "ordered-trace-and-packet-fold",
+            directory: FIXTURES,
             input: text(input, "path")?.into(),
             input_sha: text(input, "sha256")?.into(),
             input_bytes: usize::try_from(number(input, "bytes")?).map_err(|e| e.to_string())?,
@@ -288,14 +299,14 @@ impl Case {
         }
     }
 
-    fn id(&self) -> String {
+    pub(crate) fn id(&self) -> String {
         format!("{}-{}-{}", self.label, self.mode, self.schedule)
     }
 
-    fn operation_record(&self) -> Value {
+    pub(crate) fn operation_record(&self) -> Value {
         Value::object([
-            ("name", Value::str("isobmff-open-index")),
-            ("view", Value::str("ordered-trace-and-packet-fold")),
+            ("name", Value::str(self.operation_name)),
+            ("view", Value::str(self.view)),
             ("prefix", Value::str(format!("{}-", self.mode))),
             ("arguments", Value::strings(self.arguments.clone())),
             (
@@ -305,11 +316,11 @@ impl Case {
         ])
     }
 
-    fn path(&self, root: &Path) -> PathBuf {
-        root.join(FIXTURES).join(&self.input)
+    pub(crate) fn path(&self, root: &Path) -> PathBuf {
+        root.join(self.directory).join(&self.input)
     }
 
-    fn work(&self, candidate: bool, timed: bool) -> Value {
+    pub(crate) fn work(&self, candidate: bool, timed: bool) -> Value {
         let outputs = if timed {
             &self.time_outputs
         } else {
@@ -592,7 +603,7 @@ pub fn inputs(root: &Path) -> R<Vec<(PathBuf, String)>> {
     Ok(inputs)
 }
 
-fn verify_input(root: &Path, case: &Case) -> R<()> {
+pub(crate) fn verify_input(root: &Path, case: &Case) -> R<()> {
     let (_, actual) = provenance::file_identity(root, &case.path(root))?;
     let length = fs::metadata(case.path(root))
         .map_err(|e| e.to_string())?
@@ -613,7 +624,7 @@ fn write_new(path: &Path, bytes: &[u8]) -> R<()> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn write_json(path: &Path, value: &Value) -> R<String> {
+pub(crate) fn write_json(path: &Path, value: &Value) -> R<String> {
     let data = format!("{}\n", json::canonical(value));
     write_new(path, data.as_bytes())?;
     Ok(sha256::hex(data.as_bytes()))
@@ -637,7 +648,7 @@ fn refusal_matches(candidate: &Finished, reference: &Finished) -> bool {
         .any(|prefix| candidate.stderr.starts_with(prefix))
 }
 
-fn output_matches(case: &Case, candidate: &Finished, reference: &Finished) -> bool {
+pub(crate) fn output_matches(case: &Case, candidate: &Finished, reference: &Finished) -> bool {
     if candidate.code != 0
         || reference.code != 0
         || candidate.stdout.is_empty()
@@ -664,6 +675,19 @@ fn trace(
     reference: &Path,
     case: &Case,
     directory: &Path,
+) -> R<Value> {
+    trace_with(root, candidate, reference, case, directory, output_matches)
+}
+
+/// Runs both roles' traces of `case` and compares a successful pair with
+/// `matches`; a refusal pair must be the contract's matching refusal.
+pub(crate) fn trace_with(
+    root: &Path,
+    candidate: &Path,
+    reference: &Path,
+    case: &Case,
+    directory: &Path,
+    matches: fn(&Case, &Finished, &Finished) -> bool,
 ) -> R<Value> {
     let operation = case.operation();
     let input = case.path(root);
@@ -710,7 +734,7 @@ fn trace(
     }
     let matched = match (&results[0], &results[1]) {
         (Ok(Some(a)), Ok(Some(b))) if case.refusal => refusal_matches(a, b),
-        (Ok(Some(a)), Ok(Some(b))) => output_matches(case, a, b),
+        (Ok(Some(a)), Ok(Some(b))) => matches(case, a, b),
         _ => false,
     } && verify_input(root, case).is_ok();
     field(
@@ -740,7 +764,7 @@ fn trace(
     Ok(row)
 }
 
-fn native() -> bool {
+pub(crate) fn native() -> bool {
     cfg!(all(
         target_arch = "aarch64",
         target_os = "linux",
@@ -753,19 +777,19 @@ fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
         && number(raw, "seed").ok() == Some(i128::from(seed))
 }
 
-struct Options {
-    benchmark: bool,
-    memory: bool,
-    subset: bool,
-    require_acceptance: bool,
-    output: PathBuf,
-    pairs: usize,
-    memory_pairs: usize,
-    seed: u64,
-    full: bool,
+pub(crate) struct Options {
+    pub(crate) benchmark: bool,
+    pub(crate) memory: bool,
+    pub(crate) subset: bool,
+    pub(crate) require_acceptance: bool,
+    pub(crate) output: PathBuf,
+    pub(crate) pairs: usize,
+    pub(crate) memory_pairs: usize,
+    pub(crate) seed: u64,
+    pub(crate) full: bool,
     /// Which part of the measured set to measure, counted from 0, of how many.
-    part: Option<(usize, usize)>,
-    early_stop: bool,
+    pub(crate) part: Option<(usize, usize)>,
+    pub(crate) early_stop: bool,
 }
 
 impl Options {
@@ -845,16 +869,16 @@ impl Options {
     }
 }
 
-struct Build {
-    candidate: PathBuf,
-    reference: PathBuf,
-    workers: Value,
-    identity: Value,
-    graph: Value,
+pub(crate) struct Build {
+    pub(crate) candidate: PathBuf,
+    pub(crate) reference: PathBuf,
+    pub(crate) workers: Value,
+    pub(crate) identity: Value,
+    pub(crate) graph: Value,
 }
 
 impl Build {
-    fn load(root: &Path) -> R<Self> {
+    pub(crate) fn load(root: &Path) -> R<Self> {
         let identity = read_json(&root.join("target/harness/identity.json"))?;
         let candidate_record = identity
             .get("additional_candidates")
@@ -905,7 +929,7 @@ impl Build {
         })
     }
 
-    fn unchanged(&self, root: &Path) -> R<bool> {
+    pub(crate) fn unchanged(&self, root: &Path) -> R<bool> {
         Ok(Self::load(root).is_ok_and(|current| {
             current.workers == self.workers
                 && current.identity == self.identity
@@ -914,7 +938,7 @@ impl Build {
     }
 }
 
-fn case_directory(output: &Path, index: usize) -> PathBuf {
+pub(crate) fn case_directory(output: &Path, index: usize) -> PathBuf {
     output.join(format!("case-{index:04}"))
 }
 
@@ -925,7 +949,7 @@ fn measurement_error(error: String) -> Value {
     ])
 }
 
-fn measure_time(
+pub(crate) fn measure_time(
     root: &Path,
     build: &Build,
     case: &Case,
@@ -981,7 +1005,7 @@ fn measure_time(
     Ok(time)
 }
 
-fn measure_memory(
+pub(crate) fn measure_memory(
     slot: &memory::Slot,
     root: &Path,
     build: &Build,
@@ -1079,7 +1103,7 @@ fn alias_traces_match(output: &Path, case: usize, prior: usize) -> R<bool> {
     Ok(true)
 }
 
-fn passed(value: &Value) -> bool {
+pub(crate) fn passed(value: &Value) -> bool {
     value.get("pass") == Some(&Value::Bool(true))
 }
 
@@ -1185,13 +1209,13 @@ fn checkpoint(
 }
 
 /// Expand only this case, including explicit aliases, from its checked raw files.
-fn report_case(output: &Path, row: &Value) -> R<Value> {
+pub(crate) fn report_case(output: &Path, row: &Value) -> R<Value> {
     crate::harness::validation::expand_measurements(output, row)
 }
 
 /// Write canonical report JSON with at most one case's raw observations in memory.
 /// Publish only a complete document and never replace an existing report.
-fn final_report(
+pub(crate) fn final_report(
     output: &Path,
     base: &Value,
     rows: &[Value],
@@ -1256,7 +1280,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 }
 
 /// A part as `I/N`, counted from 1, or null for the whole set.
-fn part_value(part: Option<(usize, usize)>) -> Value {
+pub(crate) fn part_value(part: Option<(usize, usize)>) -> Value {
     part.map_or(Value::Null, |(i, n)| Value::str(format!("{}/{n}", i + 1)))
 }
 
