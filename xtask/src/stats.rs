@@ -68,6 +68,34 @@ pub fn nonnegative_ratio_interval(
     Ok(bootstrap_ratio_interval(pairs, seed, resamples))
 }
 
+/// The looks at which a timing session may end before its planned pairs, each
+/// with the order statistic that bounds the median ratio there: after `n` pairs,
+/// the `k`-th smallest ratio. A session stops at a look only when that ratio is
+/// below the runtime ceiling.
+pub const EARLY_LOOKS: [(usize, usize); 2] = [(10, 10), (20, 18)];
+
+/// Median of the paired ratios `a / b` with the order statistics `n + 1 - k` and
+/// `k` as its bounds. Whatever the ratios' distribution, the `k`-th smallest of
+/// `n` independent ratios lies below their median at most as often as `k` or
+/// more of `n` fair coin flips land heads, and likewise for the lower bound.
+pub fn order_interval(pairs: &[(f64, f64)], k: usize) -> Result<Interval, String> {
+    let n = pairs.len();
+    if !(n / 2 < k && k <= n)
+        || pairs
+            .iter()
+            .any(|&(a, b)| !a.is_finite() || !b.is_finite() || a <= 0.0 || b <= 0.0)
+    {
+        return Err("order bounds require positive finite pairs and k above half".into());
+    }
+    let mut ratios: Vec<f64> = pairs.iter().map(|&(a, b)| a / b).collect();
+    ratios.sort_by(f64::total_cmp);
+    Ok(Interval {
+        median: median(&ratios),
+        lower_95: ratios[n - k],
+        upper_95: ratios[k - 1],
+    })
+}
+
 fn bootstrap_ratio_interval(pairs: &[(f64, f64)], seed: u64, resamples: usize) -> Interval {
     let ratios: Vec<f64> = pairs.iter().map(|&(a, b)| a / b).collect();
     let mut rng = PyRandom::new(seed);
@@ -84,6 +112,21 @@ fn bootstrap_ratio_interval(pairs: &[(f64, f64)], seed: u64, resamples: usize) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// How often the `k`-th smallest of `n` independent ratios lies below the
+    /// population median, whatever their distribution: at most the chance that `k`
+    /// or more of `n` fair coin flips land heads, which this returns exactly.
+    fn order_statistic_error(n: usize, k: usize) -> f64 {
+        let mut binomial: u128 = 1;
+        let mut tail: u128 = 0;
+        for j in 0..=n {
+            if j >= k {
+                tail += binomial;
+            }
+            binomial = binomial * (n - j) as u128 / (j + 1) as u128;
+        }
+        tail as f64 / (1u128 << n) as f64
+    }
 
     #[test]
     fn bootstrap_matches_the_recorded_python_values() {
@@ -174,6 +217,35 @@ mod tests {
                 .map(f64::to_bits)
             );
         }
+    }
+
+    #[test]
+    fn early_looks_spend_little_error() {
+        assert_eq!(order_statistic_error(10, 10), 1.0 / 1024.0);
+        assert_eq!(order_statistic_error(20, 18), 211.0 / 1_048_576.0);
+        assert_eq!(order_statistic_error(4, 0), 1.0);
+        let spent: f64 = EARLY_LOOKS
+            .iter()
+            .map(|&(n, k)| order_statistic_error(n, k))
+            .sum();
+        assert!(spent < 0.0012, "{spent}");
+    }
+
+    #[test]
+    fn order_bounds_are_the_kth_ratios() {
+        let pairs: Vec<(f64, f64)> = (1..=10).map(|i| (f64::from(i), 10.0)).collect();
+        assert_eq!(
+            order_interval(&pairs, 10).unwrap(),
+            Interval {
+                median: 0.55,
+                lower_95: 0.1,
+                upper_95: 1.0
+            }
+        );
+        assert_eq!(order_interval(&pairs, 8).unwrap().upper_95, 0.8);
+        assert!(order_interval(&pairs, 5).is_err());
+        assert!(order_interval(&pairs, 11).is_err());
+        assert!(order_interval(&[(0.0, 1.0), (1.0, 1.0)], 2).is_err());
     }
 
     #[test]

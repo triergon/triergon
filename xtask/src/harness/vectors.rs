@@ -12,11 +12,12 @@ use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary};
 use super::gate_build;
 use super::parity::{self, Run};
+use super::policy::Runtime;
 use super::provenance::source_identity_error;
 use super::report::{
     PrefixFeature, case_arguments, expected_for, gate_target, resolved_case_arguments,
 };
-use super::timing::{Operation, Work, benchmark};
+use super::timing::{Operation, Pairs, Work, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::json::Value;
@@ -184,7 +185,10 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
                     &candidate,
                     comparison,
                     &path,
-                    options.pairs,
+                    match options.baseline_worker {
+                        None => Pairs::gate(options.pairs, Runtime::load(root)?.ceiling),
+                        Some(_) => Pairs::fixed(options.pairs),
+                    },
                     options.iterations,
                     280,
                     &timed,

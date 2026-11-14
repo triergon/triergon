@@ -514,6 +514,59 @@ impl Operation {
     }
 }
 
+/// How many pairs a session runs.
+#[derive(Clone, Copy, Debug)]
+pub struct Pairs {
+    /// The pairs it runs unless it stops early.
+    pub planned: usize,
+    /// The runtime ceiling of a gate comparison. The session ends at an early
+    /// look ([`stats::EARLY_LOOKS`]) whose bound is below it; without one it
+    /// always runs every planned pair.
+    pub stop_below: Option<f64>,
+}
+
+impl Pairs {
+    /// Every planned pair, as a comparison that is not a gate runs.
+    pub fn fixed(planned: usize) -> Self {
+        Self {
+            planned,
+            stop_below: None,
+        }
+    }
+
+    /// A gate comparison under `ceiling`.
+    pub fn gate(planned: usize, ceiling: f64) -> Self {
+        Self {
+            planned,
+            stop_below: Some(ceiling),
+        }
+    }
+}
+
+/// The stopping rule a timing record names when it may stop early.
+pub const EARLY_STOP_RULE: &str = "median-order-statistic-looks-v1";
+
+/// The pairs a session set out to run: its pairs, or the planned pairs of one
+/// that may stop early.
+pub fn planned_pairs(record: &Value) -> Option<i128> {
+    match record.get("early_stop") {
+        Some(stop) => py_int(stop.get("planned_pairs")),
+        None => py_int(record.get("pairs")),
+    }
+}
+
+/// The early look a session stops at after `values`, if any: the look's order
+/// statistic bound is below the ceiling and pairs remain.
+fn early_stop(values: &[(f64, f64)], pairs: Pairs) -> Option<stats::Interval> {
+    let ceiling = pairs.stop_below?;
+    let &(_, k) = stats::EARLY_LOOKS
+        .iter()
+        .find(|&&(n, _)| n == values.len() && n < pairs.planned)?;
+    stats::order_interval(values, k)
+        .ok()
+        .filter(|interval| interval.upper_95 < ceiling)
+}
+
 fn digest(path: &Path) -> Result<String, String> {
     Ok(crate::sha256::hex(
         &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
@@ -546,7 +599,7 @@ pub fn benchmark(
     candidate: &Path,
     reference: &Path,
     input: &Path,
-    pairs: usize,
+    pairs: Pairs,
     iterations: u32,
     seed: u64,
     operation: &Operation,
@@ -571,7 +624,7 @@ impl Lock {
         candidate: &Path,
         reference: &Path,
         input: &Path,
-        pairs: usize,
+        pairs: Pairs,
         iterations: u32,
         seed: u64,
         operation: &Operation,
@@ -700,13 +753,13 @@ fn benchmark_once(
     candidate: &Path,
     reference: &Path,
     input: &Path,
-    pairs: usize,
+    pairs: Pairs,
     iterations: u32,
     seed: u64,
     operation: &Operation,
     prepare: &mut Option<impl FnOnce() -> Result<(), String>>,
 ) -> Result<Value, String> {
-    if pairs < 2 || iterations < 1 {
+    if pairs.planned < 2 || iterations < 1 {
         return Err("need at least two pairs and one iteration".into());
     }
     let timed = TimedWorkers::new(candidate, reference)?;
@@ -835,7 +888,8 @@ fn benchmark_once(
     let mut before = observe!(cpu_snapshot());
     let mut watch = ContaminationWatch::new(before.clone());
     let mut values = Vec::new();
-    for index in 0..pairs {
+    let mut stopped = None;
+    for index in 0..pairs.planned {
         let mut order = [0usize, 1];
         rng.shuffle(&mut order);
         let mut row = vec![
@@ -866,7 +920,10 @@ fn benchmark_once(
         let pair = checked_pair(&row, &warm_work, iterations, operation, !busy.is_empty());
         *samples.last_mut().expect("row") = row;
         match pair {
-            Ok(pair) => values.push(pair),
+            Ok(pair) => {
+                values.push(pair);
+                stopped = early_stop(&values, pairs);
+            }
             Err(status) => {
                 return Ok(status_only(
                     status,
@@ -878,6 +935,9 @@ fn benchmark_once(
             }
         }
         before = after;
+        if stopped.is_some() {
+            break;
+        }
     }
     let busy = observe!(watch.close());
     if !busy.is_empty() {
@@ -916,7 +976,10 @@ fn benchmark_once(
             vec![],
         ));
     }
-    let summary = stats::ratio_interval(&values, seed, 4000)?;
+    let summary = match stopped {
+        Some(interval) => interval,
+        None => stats::ratio_interval(&values, seed, 4000)?,
+    };
     let per_iteration = |name: &str| {
         let times: Vec<f64> = samples
             .iter()
@@ -933,7 +996,7 @@ fn benchmark_once(
             ("p95", Value::float(stats::percentile(&times, 0.95))),
         ])
     };
-    Ok(Value::object([
+    let mut record = vec![
         ("status", Value::str("measured")),
         (
             "worker_hashes",
@@ -941,7 +1004,23 @@ fn benchmark_once(
         ),
         ("input_sha256", Value::str(input_sha)),
         ("iterations", Value::int(iterations)),
-        ("pairs", Value::int(pairs as i64)),
+        ("pairs", Value::int(values.len() as i64)),
+    ];
+    if let Some(ceiling) = pairs.stop_below {
+        record.push((
+            "early_stop",
+            Value::object([
+                ("rule", Value::str(EARLY_STOP_RULE)),
+                ("planned_pairs", Value::int(pairs.planned as i64)),
+                ("ceiling", Value::float(ceiling)),
+                (
+                    "stopped_after",
+                    stopped.map_or(Value::Null, |_| Value::int(values.len() as i64)),
+                ),
+            ]),
+        ));
+    }
+    record.extend([
         ("ratio", interval_value(&summary)),
         ("samples", Value::Array(samples.clone())),
         ("warmups", Value::Array(warmups)),
@@ -952,7 +1031,8 @@ fn benchmark_once(
             "per_iteration_ns",
             Value::object(workers.iter().map(|(n, _)| (*n, per_iteration(n)))),
         ),
-    ]))
+    ]);
+    Ok(Value::object(record))
 }
 
 /// Check a completed pair before its attempt can be retried for contamination.
@@ -1034,7 +1114,14 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
     ) else {
         return Err("timing without pairs or iterations".into());
     };
-    if raw.len() as i128 != pairs || (raw.len() as i128) < expected.minimum_pairs {
+    if timing
+        .get("early_stop")
+        .is_some_and(|stop| stop.get("rule").and_then(Value::as_str) != Some(EARLY_STOP_RULE))
+    {
+        return Err("timing names an unknown early stop rule".into());
+    }
+    let planned = planned_pairs(timing).ok_or("early stop without planned pairs")?;
+    if raw.len() as i128 != pairs || pairs > planned || planned < expected.minimum_pairs {
         return Err("timing pairs incomplete".into());
     }
     if !timing
@@ -1092,7 +1179,10 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
         paired.push((elapsed(candidate), elapsed(reference)));
     }
     let seed = py_int(timing.get("seed")).unwrap_or(0);
-    let interval = stats::ratio_interval(&paired, seed as u64, 4000)?;
+    let interval = match timing.get("early_stop") {
+        Some(stop) => replay_early_stop(stop, &paired, planned, seed as u64)?,
+        None => stats::ratio_interval(&paired, seed as u64, 4000)?,
+    };
     if !timing
         .get("ratio")
         .is_some_and(|ratio| equal(ratio, &interval_value(&interval)))
@@ -1100,6 +1190,35 @@ pub fn validate(timing: &Value, expected: &Expected<'_>) -> Result<stats::Interv
         return Err("recorded ratio differs from its samples".into());
     }
     Ok(interval)
+}
+
+/// Apply the stopping rule to the recorded pairs in order: the session must have
+/// stopped at the first look whose bound is below its ceiling, and run every
+/// planned pair when none is.
+fn replay_early_stop(
+    stop: &Value,
+    paired: &[(f64, f64)],
+    planned: i128,
+    seed: u64,
+) -> Result<stats::Interval, String> {
+    let ceiling = stop
+        .get("ceiling")
+        .and_then(Value::as_f64)
+        .ok_or("early stop without a ceiling")?;
+    let planned = usize::try_from(planned).map_err(|_| "planned pairs out of range")?;
+    let rule = Pairs::gate(planned, ceiling);
+    let stopped_after = match stop.get("stopped_after") {
+        Some(Value::Null) => None,
+        value => Some(py_int(value).ok_or("early stop without its last pair")?),
+    };
+    let first = (1..=paired.len()).find_map(|n| early_stop(&paired[..n], rule).map(|i| (n, i)));
+    match (first, stopped_after) {
+        (Some((n, interval)), Some(after)) if n as i128 == after && n == paired.len() => {
+            Ok(interval)
+        }
+        (None, None) if paired.len() == planned => stats::ratio_interval(paired, seed, 4000),
+        _ => Err("timing pairs do not follow the early stop rule".into()),
+    }
 }
 
 /// The fewest pairs a runtime gate result rests on.
@@ -1153,7 +1272,7 @@ pub fn measure(
     candidate: &Path,
     reference: &Path,
     input: &Path,
-    pairs: usize,
+    pairs: Pairs,
     iterations: u32,
     seed: u64,
     operation: &Operation,
@@ -1172,7 +1291,8 @@ pub fn measure(
 
 impl Lock {
     /// One session of `pairs` pairs, graded against the workers and input as
-    /// they are now: every pair the session was asked for must be there.
+    /// they are now: every planned pair must be there, unless the session
+    /// stopped early by rule.
     /// `prepare` runs once, immediately before the first worker. A session that
     /// fails once it has prepared is kept as a `timing-attempt-failed` record;
     /// one that fails before is an error.
@@ -1182,7 +1302,7 @@ impl Lock {
         candidate: &Path,
         reference: &Path,
         input: &Path,
-        pairs: usize,
+        pairs: Pairs,
         iterations: u32,
         seed: u64,
         operation: &Operation,
@@ -1222,7 +1342,7 @@ impl Lock {
                     &Expected {
                         worker_hashes: &hashes,
                         input_sha256: Some(&Value::str(digest(input)?)),
-                        minimum_pairs: pairs as i128,
+                        minimum_pairs: pairs.planned as i128,
                         work: &operation.work,
                         require_linux: is_linux(),
                         module_absence: true,
@@ -1238,6 +1358,50 @@ impl Lock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_gate_session_stops_at_the_first_look_bounded_below_the_ceiling() {
+        let pair = |milli: u32| (f64::from(milli), 1000.0);
+        let fast: Vec<_> = (800..830).map(pair).collect();
+        let gate = Pairs::gate(30, 1.2);
+        assert!((1..10).all(|n| early_stop(&fast[..n], gate).is_none()));
+        let stop = early_stop(&fast[..10], gate).unwrap();
+        assert_eq!(stop.upper_95, 0.809);
+        assert!(early_stop(&fast[..10], Pairs::fixed(30)).is_none());
+        assert!(early_stop(&fast[..10], Pairs::gate(10, 1.2)).is_none());
+        // One slow pair in the first ten defers the stop to the second look,
+        // where two of twenty may lie above the ceiling.
+        let mut mixed = fast.clone();
+        mixed[3] = pair(1250);
+        assert!(early_stop(&mixed[..10], gate).is_none());
+        mixed[14] = pair(1300);
+        assert_eq!(early_stop(&mixed[..20], gate).unwrap().upper_95, 0.819);
+        mixed[15] = pair(1210);
+        assert!(early_stop(&mixed[..20], gate).is_none());
+        let stop = Value::object([
+            ("rule", Value::str(EARLY_STOP_RULE)),
+            ("planned_pairs", Value::int(30)),
+            ("ceiling", Value::float(1.2)),
+            ("stopped_after", Value::int(10)),
+        ]);
+        assert_eq!(
+            replay_early_stop(&stop, &fast[..10], 30, 280)
+                .unwrap()
+                .upper_95,
+            0.809
+        );
+        // A session must stop where the rule stops, and only there.
+        assert!(replay_early_stop(&stop, &fast[..20], 30, 280).is_err());
+        assert!(replay_early_stop(&stop, &fast, 30, 280).is_err());
+        let mut ran = stop.clone();
+        crate::harness::validation::put(&mut ran, "stopped_after", Value::Null).unwrap();
+        assert!(replay_early_stop(&ran, &fast, 30, 280).is_err());
+        assert_eq!(
+            replay_early_stop(&ran, &mixed, 30, 280).unwrap(),
+            stats::ratio_interval(&mixed, 280, 4000).unwrap()
+        );
+        assert!(replay_early_stop(&ran, &mixed[..20], 30, 280).is_err());
+    }
 
     #[test]
     fn worker_failure_and_work_mismatch_precede_contamination() {

@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::checks::read_json;
 use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
+use crate::harness::policy::Runtime;
 use crate::harness::timing::{self, Operation};
 use crate::harness::worker::{self, Finished};
 use crate::harness::{
@@ -715,7 +716,7 @@ fn native() -> bool {
 }
 
 fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
-    number(raw, "pairs").ok() == Some(pairs as i128)
+    timing::planned_pairs(raw) == Some(pairs as i128)
         && number(raw, "seed").ok() == Some(i128::from(seed))
 }
 
@@ -896,7 +897,7 @@ fn measure_time(
             &build.candidate,
             &build.reference,
             &input,
-            options.pairs,
+            timing::Pairs::gate(options.pairs, Runtime::load(root)?.ceiling),
             ITERATIONS,
             options.seed,
             &operation,

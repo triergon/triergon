@@ -31,7 +31,7 @@ use crate::codecs::correctness::file_sha;
 use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::policy;
-use crate::harness::timing::{self, GATE_PAIRS, Operation, Work};
+use crate::harness::timing::{self, GATE_PAIRS, Operation, Pairs, Work};
 use crate::harness::worker::data;
 use crate::json::{self, Value};
 use crate::process::exit_code;
@@ -205,7 +205,7 @@ fn runtime(
     reference: &str,
     case: &Value,
     path: &Path,
-    pairs: usize,
+    pairs: Pairs,
     iterations: u32,
     seed: u64,
     expected_outputs: Option<&Value>,
@@ -223,7 +223,7 @@ fn runtime(
         && expected_outputs.is_none_or(|outputs| outputs_match(&graded.record, outputs));
     let passes = |bound: f64| {
         graded.interval.as_ref().is_ok_and(|interval| {
-            deterministic && pairs >= GATE_PAIRS && interval.upper_95 <= bound
+            deterministic && pairs.planned >= GATE_PAIRS && interval.upper_95 <= bound
         })
     };
     let (gate_pass, target_pass) = (passes(gate.ceiling), passes(gate.target));
@@ -436,7 +436,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             &a.reference,
             case,
             &path,
-            a.pairs,
+            Pairs::gate(a.pairs, gate.ceiling),
             iterations,
             a.seed,
             outputs,
@@ -462,7 +462,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     small,
                     case,
                     &path,
-                    10.max(a.pairs / 3),
+                    Pairs::fixed(10.max(a.pairs / 3)),
                     iterations,
                     a.seed + SMALL_CONFIG_SEED,
                     None,

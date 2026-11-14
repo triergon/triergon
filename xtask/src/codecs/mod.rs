@@ -43,7 +43,8 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  and view, and writes the observed lists to OUT.differences.json
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
        [--only ID,...] [--full]
-                 paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282)
+                 paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282,
+                 ending early once settled below the ceiling)
   memory --candidate W --reference W --workloads F --root R --out DIR
          [--pairs N] [--seed S] [--only ID,...] [--full]
                  paired peak heap and total resident peak RSS of the decoder workloads
