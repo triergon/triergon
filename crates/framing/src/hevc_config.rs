@@ -332,6 +332,7 @@ pub struct HvcConfigParser {
     width: Option<LengthSize>,
     total: usize,
     understood_end: usize,
+    first_unsupported_array: Option<(u8, u8)>,
     // Taken by the published output and dropped by a latched failure, so no
     // spare pool handle or empty replacement vectors are kept for either.
     arrays: Option<DescriptorStorage<HvcArrayDescriptor>>,
@@ -365,6 +366,7 @@ impl HvcConfigParser {
             width: None,
             total: 0,
             understood_end: 0,
+            first_unsupported_array: None,
             arrays: Some(DescriptorStorage::new(|_| HvcArrayDescriptor {
                 range: 0..0,
                 first_nal: 0,
@@ -464,6 +466,7 @@ impl HvcConfigParser {
                         .take()
                         .ok_or(Error::Invalid("missing hvcC descriptors"))?,
                     understood_end: self.understood_end,
+                    first_unsupported_array: self.first_unsupported_array,
                 }));
                 self.phase = Phase::Complete;
             }
@@ -530,6 +533,12 @@ impl HvcConfigParser {
                                 let total = first.checked_add(count).ok_or(Error::Overflow)?;
                                 check_limit(total, self.limits.maximum_nals)?;
                                 self.total = total;
+                                if !matches!(next.declared_type, 32 | 33 | 34 | 39 | 40)
+                                    && self.first_unsupported_array.is_none()
+                                {
+                                    self.first_unsupported_array =
+                                        Some((next.index, next.declared_type));
+                                }
                                 first
                             };
                             if filling || self.tables_fit_inline() {
@@ -744,6 +753,7 @@ pub struct HvcConfiguration {
     arrays: DescriptorStorage<HvcArrayDescriptor>,
     nals: DescriptorStorage<HvcNalDescriptor>,
     understood_end: usize,
+    first_unsupported_array: Option<(u8, u8)>,
 }
 impl HvcConfiguration {
     pub fn source_bytes(&self) -> &Bytes {
@@ -761,11 +771,21 @@ impl HvcConfiguration {
     pub const fn understood_end(&self) -> usize {
         self.understood_end
     }
+    /// First array the Annex B receiver declines, independently of wire validity.
+    pub(crate) const fn first_unsupported_array(&self) -> Option<(u8, u8)> {
+        self.first_unsupported_array
+    }
     pub fn nal_count(&self) -> usize {
         self.nals.len()
     }
     pub fn array_count(&self) -> usize {
         self.arrays.len()
+    }
+    pub(crate) fn annex_b_configuration_len(&self) -> Option<usize> {
+        // The validated extent includes the fixed record header and the
+        // three-byte header of every array. Replace the two-byte NAL lengths
+        // in the rest of the record with four-byte start codes.
+        (self.understood_end - (23 + 3 * self.array_count())).checked_add(2 * self.nal_count())
     }
     pub fn nal(&self, index: usize) -> Option<HvcConfigNal<'_>> {
         self.nals

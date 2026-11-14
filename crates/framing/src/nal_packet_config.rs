@@ -148,21 +148,27 @@ impl<'a> NalPacketConfigWriter<'a> {
                 return Err(Error::Cancelled);
             }
             match self.phase {
-                0 => {
-                    if let Some(declared) = self.config.hevc_array_type(self.array) {
-                        if !work.try_charge(1) {
-                            return Ok(BuildStep::Yield);
-                        }
-                        if !matches!(declared, 32 | 33 | 34 | 39 | 40) {
-                            self.rejected_array = Some(declared);
-                            return Err(Error::Unsupported("pinned HEVC decoder array type"));
-                        }
-                        self.array += 1;
+                0 => match self.config.admit_hevc_arrays(&mut self.array, work) {
+                    Ok(true) => self.phase = 1,
+                    Ok(false) => return Ok(BuildStep::Yield),
+                    Err(declared) => {
+                        self.rejected_array = Some(declared);
+                        return Err(Error::Unsupported("pinned HEVC decoder array type"));
+                    }
+                },
+                1 => {
+                    // A successful full sizing pass can use the validated extent.
+                    // Keep the incremental walk for short work budgets and to
+                    // report the first NAL that crosses the output limit.
+                    if self.index == 0
+                        && let Some((len, charge)) = self.config.annex_b_configuration_extent()
+                        && len <= self.maximum
+                        && work.try_charge(charge)
+                    {
+                        self.total = len;
+                        self.phase = 2;
                         continue;
                     }
-                    self.phase = 1;
-                }
-                1 => {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }

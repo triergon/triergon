@@ -610,14 +610,21 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
     let cfg = NalPacketConfiguration::Hevc(hevc(&p, true));
     let mut writer = NalPacketConfigWriter::new(&p, &cfg, 65536).unwrap();
     assert!(writer.take_receiver_rejection().is_none());
-    let error = loop {
-        match writer.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-            Err(e) => break e,
-            Ok(BuildStep::Yield) => (),
-            _ => panic!("unknown array published"),
-        }
-    };
-    assert_eq!(error, Error::Unsupported("pinned HEVC decoder array type"));
+    let cancel = AtomicBool::new(false);
+    let count = u64::from(hvcc(4, true)[22]);
+    let mut before = WorkBudget::new(count - 1);
+    assert!(matches!(
+        writer.step(&mut before, &cancel),
+        Ok(BuildStep::Yield)
+    ));
+    assert_eq!(before.remaining(), 0);
+    assert!(writer.take_receiver_rejection().is_none());
+    let mut refusal = WorkBudget::new(1);
+    assert!(matches!(
+        writer.step(&mut refusal, &cancel),
+        Err(Error::Unsupported("pinned HEVC decoder array type"))
+    ));
+    assert_eq!(refusal.remaining(), 0);
     let r = writer.take_receiver_rejection().unwrap();
     assert!(writer.take_receiver_rejection().is_none());
     drop(writer);

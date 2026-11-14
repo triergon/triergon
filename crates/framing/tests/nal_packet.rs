@@ -1156,8 +1156,19 @@ fn initialization_is_literal_cooperative_and_retained_after_session_drop() {
     let p = pool();
     let s = session(&p);
     let out = init(&s, &p, 1).unwrap();
+    let whole_step = init(&s, &p, 4096).unwrap();
     assert_eq!(out.bytes().as_ref(), conf());
+    assert_eq!(out.bytes().as_ref(), whole_step.bytes().as_ref());
     assert_eq!(out.source_bytes().as_ref(), avcc(128));
+    let cancel = AtomicBool::new(false);
+    let mut writer = NalPacketConfigWriter::new(&p, s.configuration(), 0).unwrap();
+    assert_eq!(
+        writer.step(&mut WorkBudget::new(4096), &cancel).err(),
+        Some(Error::Limit {
+            requested: 4 + SPS.len(),
+            maximum: 0,
+        })
+    );
     drop(s);
     assert_eq!(out.source_bytes().as_ref(), avcc(128));
     assert_eq!(out.bytes().as_ref(), conf());

@@ -134,6 +134,11 @@ descriptors inline. The validation pass fills both tables when they fit inline.
 When either exceeds its inline capacity, a second pass fills the tables with
 exact-capacity charged storage for the larger tables. Both paths keep the same
 work checkpoints and retain the original record.
+The HEVC record also retains the first array type the Annex B receiver
+refuses. Configuration and packet writers charge the array checks in order
+and report the refusal at its original work boundary.
+The configuration writer can size its contiguous Annex B output from the
+validated record extent when the available work covers the whole sizing pass.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
