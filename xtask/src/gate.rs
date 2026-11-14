@@ -2,14 +2,16 @@
 //! that can run on different hosts, and split into shards of about equal work.
 //!
 //! An item is the work for one measured thing: a feature's timing, memory and
-//! grade, the ISO BMFF or packet-framing suite, the codecs, half the capture cases,
-//! the tests, the reference comparisons. Its steps run on one host, in stages:
+//! grade, a part of the ISO BMFF suite, the packet-framing or progressive suite,
+//! the codecs' parity, a codec workload list, a capture case, a test profile, the
+//! reference comparisons. Its steps run on one host, in stages:
 //! `timing` runs the parity and timing steps alone on CPU 1 with the RSS module
 //! unloaded; `memory`, after the host has proved the kernel bound and rebuilt the
 //! workers with the proof, runs the memory collections on every CPU but CPU 0 and
 //! then grades, several grades at once. A shard is a set of items; `cargo xtask
-//! gate summary` joins the shards' outputs into one result and checks that every
-//! step of the plan ran once, on the same source and workers.
+//! gate summary` joins the shards' outputs into one result and checks that each
+//! shard ran the items the plan gives it, every step of the plan once, on the same
+//! source and workers.
 
 use std::fs;
 use std::path::{Path, PathBuf};
