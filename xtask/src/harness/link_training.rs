@@ -35,7 +35,7 @@ const ORDERS: &str = "harness/link-order";
 struct Operation {
     worker: String,
     arguments: Vec<String>,
-    /// The targets it runs on; every target when empty.
+    /// The gate targets it runs on; every gate target when empty.
     targets: Vec<String>,
 }
 
@@ -56,7 +56,11 @@ impl Operation {
     }
 
     fn runs_on(&self, target: &str) -> bool {
-        self.targets.is_empty() || self.targets.iter().any(|own| own == target)
+        if self.targets.is_empty() {
+            crate::gate::TARGETS.contains(&target)
+        } else {
+            self.targets.iter().any(|own| own == target)
+        }
     }
 }
 
@@ -617,6 +621,19 @@ mod tests {
             .find(|operation| operation.arguments[0] == "mp4-range-memory")
             .unwrap();
         assert_eq!(mp4_range.command_line()[1], "avc-aac.mp4");
+    }
+
+    #[test]
+    fn only_gate_targets_take_trained_orders() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let training = Training::load(root).unwrap();
+        assert!(training.orders("media-worker", "aarch64-unknown-linux-gnu"));
+        assert!(!training.orders("media-worker", "x86_64-unknown-linux-gnu"));
+        assert!(
+            super::trained_order(root, "x86_64-unknown-linux-gnu", "media-worker")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
