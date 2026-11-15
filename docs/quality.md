@@ -648,10 +648,30 @@ checks them against the same narrowed plan, prints that the run is partial and w
 full gate is a summary whose `partial` is false; a partial one is cited only for the
 items it ran.
 
+A change that reaches a few items gates them alone, one host per target, from a
+checkout at the change's head:
+
+```sh
+tools/gate-aws.sh run aarch64 1 HEAD .research/gate-aarch64 --items matroska-startup-seek,matroska-audio-clocks
+tools/gate-aws.sh run armv7 1 HEAD .research/gate-armv7 --items matroska-startup-seek,matroska-audio-clocks
+```
+
+`cargo xtask gate plan --target TARGET --items NAME,...` prints what the selection runs.
+A change reaches the items whose contract, corpus or inputs it changes, and those whose
+workers link a crate it changes (`cargo tree -i CRATE` lists the workers; a contract's
+`candidate` names its feature's worker). To let a later run take such a run's results,
+add each `OUT/shard-I/entry.json` to the index with its reason and promote it in the
+pull request that cites the run. A result is [reused](#reuse) only while its key
+holds: a change to `xtask/src`, to a worker the item runs or to any other input of the
+key measures it again.
+
 A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
 timing step whose report holds a case not `measured`, or a memory step one not
 `qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
-they did not measure, after writing every record. Where the codec gates apply (native
+they did not measure, after writing every record. `gate run` writes its verdict into the
+step's `gate-result.json` (its `status`, with `"cases_checked": true`), so a step that
+[reuses](#reuse) the result takes the verdict; a reused result that no gate run checked
+fails the step, which `--full` measures again. Where the codec gates apply (native
 Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
 does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
 are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
@@ -818,11 +838,11 @@ refusing them if the sources, workers, cases or host differ; without `--stage` o
 does both, its memory after all its timing. Collecting side by side, it gives each
 case its own copy of its generated input, checked against the hash its timing recorded
 and removed when the run ends, so cases of one input no longer share a file; on one CPU
-they read the input itself. Pinned to one CPU, collection runs exactly as before. The reference's memory is measured afresh in every pair, not reused from
-earlier runs: on a second host
-of the same class it gives the same heaps and resident peaks within their spread
-(evidence set `gate-reference-memory-cross-host`), but caching it would save a few
-minutes and give up the interleaving of both workers within each pair.
+they read the input itself. Pinned to one CPU, collection runs exactly as before. The
+reference's memory is measured afresh in every pair, not reused from earlier runs: on a
+second host of the same class it gives the same heaps and resident peaks within their
+spread (evidence set `gate-reference-memory-cross-host`), but caching it would save a
+few minutes and give up the interleaving of both workers within each pair.
 Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
@@ -995,15 +1015,22 @@ is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
 
+`tools/gate-aws.sh` needs bash 4 or later and refuses to start under an older one,
+such as macOS's `/bin/bash` 3.2, where a shard's exit handler never runs and its
+outputs would be lost; on macOS run it with Homebrew's bash first on `PATH`, or as
+`/opt/homebrew/bin/bash tools/gate-aws.sh`.
+
 `tools/gate-aws.sh run TARGET N REVISION OUT`, in a checkout at REVISION without
 changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
 start when it fails. Then it launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
 archive's packs (building and uploading the others), gets each host ready and runs
 shard I of N on host I. When a shard ends, finished or not, its host's outputs are
-archived under `qualification/gate-runs/`, where they expire after 90 days unless
-promoted, and checked by downloading them back on the host; its logs and step records
-are copied to OUT, and the host is terminated. The last shard to end keeps its host
+archived under `qualification/gate-runs/RUN/shard-I/`, where they expire after 90 days
+unless promoted, and checked by downloading them back on the host;
+`OUT/shard-I/entry.json` holds the archive's index entry, which lists the [gate
+results](#reuse) it holds. Its logs and step records are copied to OUT, and the host is
+terminated. The last shard to end keeps its host
 for the summary when every shard finished, and a host whose outputs could not be
 archived stays until the command ends. OUT/hosts.txt records when each host was
 launched, ready, done and terminated. The command exits non-zero when a shard did not
