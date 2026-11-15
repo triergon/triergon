@@ -123,6 +123,22 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
+/// The fields of a case that its timing and memory reports must give alike: all
+/// but its timing and memory, and the elapsed time of its parity's reference run,
+/// which each report's run measures afresh.
+fn case_fields(row: &Value) -> R<Value> {
+    let mut fields = without(row, &["timing", "memory"])?;
+    if let Value::Object(members) = &mut fields
+        && let Some((_, parity @ Value::Object(_))) =
+            members.iter_mut().find(|(k, _)| k == "parity")
+        && let Some(run) = parity.get("reference_run").cloned()
+    {
+        let run = without(&run, &["elapsed_ns"])?;
+        put(parity, "reference_run", run)?;
+    }
+    Ok(fields)
+}
+
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let value = json::parse_observations(
@@ -552,8 +568,8 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &case_fields(timed)?,
+        &case_fields(measured)?,
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
@@ -576,8 +592,8 @@ fn join_case(
     ceiling: f64,
 ) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &case_fields(timed)?,
+        &case_fields(measured)?,
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
@@ -984,6 +1000,32 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
+
+    #[test]
+    fn reports_may_differ_in_the_reference_run_s_elapsed_time_only() {
+        let row = |elapsed: i64, status: &str| {
+            Value::object([
+                ("id", Value::str("case")),
+                ("timing", Value::int(elapsed)),
+                (
+                    "parity",
+                    Value::object([
+                        ("status", Value::str("pass")),
+                        (
+                            "reference_run",
+                            Value::object([
+                                ("status", Value::str(status)),
+                                ("elapsed_ns", Value::int(elapsed)),
+                            ]),
+                        ),
+                    ]),
+                ),
+            ])
+        };
+        let fields = |r| case_fields(&r).unwrap();
+        assert_eq!(fields(row(1, "ok")), fields(row(2, "ok")));
+        assert_ne!(fields(row(1, "ok")), fields(row(1, "timeout")));
+    }
 
     #[test]
     fn an_early_stopped_collection_counts_its_planned_pairs() {
