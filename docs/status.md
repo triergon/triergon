@@ -39,7 +39,7 @@ too ([measured revisions](#measured-revisions)).
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.8558 (35/35 pass) | heap ≤0.0877, total RSS ≤0.8450 (35/35 lower) | additional program and carriage profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0366 (3/3 pass) | heap ≤0.0151, total RSS ≤0.7059 (3/3 lower); not measured on [32-bit ARMv7](#32-bit-armv7) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7811 (71/71 pass) | heap ≤0.0207, total RSS ≤0.7890 (71/71 lower) | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.1721 (135/135 pass for AVC/HEVC) | heap ≤0.9367 (135/135 lower), total RSS fails at 1.0493 (0/135 lower) | total RSS on both targets, ARMv7 runtime, full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.1721 (135/135 pass for AVC/HEVC) at `f4f1c7ad` | heap ≤0.9367 (135/135 lower), total RSS fails at 1.0493 (0/135 lower) | total RSS on both targets, ARMv7 runtime, full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 0.9995 (367/367 pass; worst `charset-windows-1251-text`) | heap ≤0.3360, total RSS ≤0.8852 (367/367 lower) | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7903 (319/319 pass) | heap ≤0.9654, total RSS ≤0.9518 (319/319 lower) | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7930 (229/229 pass) | heap ≤0.5788, total RSS ≤0.7138 (229/229 lower) | — |
@@ -563,6 +563,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Packet framing, Linux ARMv7, current | `f4f1c7ad1a4f2572e676f48f81ad15aa4e9ebdc5` | `5e1acd8270982b81890ad34eb69bf300f3029b908d0279f236664475a87b8805` |
 | Earlier packet framing, Linux AArch64 | `f40c8eb009c15b812f131c935c6cfdfee1660df0` | `57b84793b0d187563123059018b30fd449c883f69dae1bdfde6e7ac60d074dd3` |
 | Earlier packet framing, Linux ARMv7 | `f40c8eb009c15b812f131c935c6cfdfee1660df0` | `3a49c9567e82e878e8e031c0a0252198db3f1ae98cee25e3eff3cb6a7df6c925` |
+| Earlier packet framing, Linux ARMv7 | `f71495ea154e95b30f8fa002637b4a6932cd32dd` | `260676ed9b8a1d39fa94ff22cb6f0f0467fbd92e7490017e943035578a424d4b` |
 | Packet framing reference-input mappings, Linux AArch64 and ARMv7 | `f40c8eb009c15b812f131c935c6cfdfee1660df0` | `68675427c442f834c2dc401ed1d336f11703144c36a3778c04f54643adf345fc` |
 | Earlier packet framing, Linux AArch64 | `62e1ad85011c85141ad58edfec275303a2d63b83` | `cb21eabf713fe7d55546a55ef264698436cbae0202058787890141100c824b8c` |
 | Earlier packet framing, Linux ARMv7 | `62e1ad85011c85141ad58edfec275303a2d63b83` | `b7d37c676319d2cd294639a8f2f51efb5dce9fde9dc948965850952c501bac3b` |
@@ -886,11 +887,21 @@ and 6638 ns per operation in Triergon versus medians of 3448 ns and
 5790 ns. The reference times in those pairs are close to its medians.
 The source of the variation is unresolved. The ARMv7 runtime bound for
 `hevc-update` fell from 1.2106 at `f40c8eb0` to 1.1359 at `f4f1c7ad`.
-From `f71495ea` to `f40c8eb0`, its median fell from 6139 to 5186 ns per
-operation in Triergon and from 6229 to 4472 ns in the reference. The matched
-fold and reuse of empty packet shells both changed in the timed reference
-adapter. The per-side medians are in
-`packet-framing-reference-residency-f40c8eb0`.
+
+Median ARMv7 time in ns per operation (Triergon / FFmpeg) on the same
+c6g.4xlarge class and image:
+
+| Case | Main `f71495ea` | `62e1ad85` | `f4f1c7ad` |
+|---|---:|---:|---:|
+| `hevc-type17` | 4313.33 / 4284.05 | 3449.96 / 3092.15 | 3447.57 / 3115.18 |
+| `hevc-irap_repeat` | 7364.49 / 7036.05 | 5902.78 / 4842.78 | 5789.83 / 4848.21 |
+| `hevc-update` | 6139.05 / 6228.57 | 5100.73 / 4440.64 | 5044.14 / 4477.17 |
+
+Triergon's medians fell in all three cases. The reference's fell by more
+after the timed adapter adopted the matched fold and reused empty packet
+shells. The library and filter calls are unchanged. The earlier reference
+run at `f71495ea` used 20 pairs for `hevc-type17` and `hevc-update` and
+30 pairs for `hevc-irap_repeat`. Both later runs used 30 pairs for each.
 
 Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
 bound of 1.2241. MP4 range is gated on

@@ -366,7 +366,7 @@ physical operations and 16 explicit aliases. `--subset52` selects the separate
 parts measure the set once between them.
 `cargo xtask isobmff-seek` compares all 476 seek and range-plan outcomes, including
 4 refusals, and `--benchmark --memory` measures the other 472.
-`cargo xtask framing --benchmark --memory` measures all 131 packet-framing scripts.
+`cargo xtask framing --benchmark --memory` measures all 135 packet-framing scripts.
 Their contracts and input manifests are in `harness/features/isobmff-open-index/`,
 `harness/features/isobmff-seek/` and `harness/features/packet-framing/`.
 

@@ -17033,6 +17033,17 @@
    }
   },
   {
+   "name": "packet-framing-f71495ea-armv7",
+   "retention": "retained",
+   "reason": "Earlier ARMv7 packet-framing comparison with per-side medians for the reference adapter comparison",
+   "key": "evidence/packet-framing-f71495ea-armv7/260676ed9b8a1d39fa94ff22cb6f0f0467fbd92e7490017e943035578a424d4b.tar.zst",
+   "sha256": "260676ed9b8a1d39fa94ff22cb6f0f0467fbd92e7490017e943035578a424d4b",
+   "bytes": 61416323,
+   "source_revisions": {
+    "candidate": "f71495ea154e95b30f8fa002637b4a6932cd32dd"
+   }
+  },
+  {
    "name": "packet-framing-reference-residency-f40c8eb0",
    "retention": "retained",
    "reason": "Packet-framing reference input residency on AArch64 and ARMv7, byte-identical reference rebuilds and the per-side timing cited in the status rows",
