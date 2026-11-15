@@ -1,10 +1,11 @@
 //! ISO/IEC14496-15:2010 / incorporated2006 FRExt record grammar.
 //! The private source manifest pins the primary clauses. NAL bodies, sample-entry
 //! rules and record/SPS consistency are not decoded or certified here.
+use crate::inline_storage::InlineStorage;
 use crate::{BuildStep, Codec, ConfigProgress, LengthSize, NalHeader};
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, Result, SourceId, WorkBudget};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AvcConfigSource {
@@ -302,8 +303,6 @@ pub struct AvcConfigParser {
     arrays: [ArrayDescriptor; 3],
     array_count: usize,
     total: usize,
-    // The three wire-counted arrays contain at most 541 NALs.
-    filled: u16,
     understood_end: usize,
     // Taken by the published output and dropped by a latched failure, so no
     // spare pool handle or empty replacement vector is kept for either.
@@ -343,9 +342,8 @@ impl AvcConfigParser {
             }),
             array_count: 0,
             total: 0,
-            filled: 0,
             understood_end: 0,
-            nals: Some(AvcNalStorage::empty()),
+            nals: Some(AvcNalStorage::new(|_| AvcNalDescriptor::EMPTY)),
             failure: None,
             receiver: false,
         })
@@ -537,10 +535,10 @@ impl AvcConfigParser {
                             if matches!(self.phase, Phase::Count) {
                                 let count = self.total.checked_add(1).ok_or(Error::Overflow)?;
                                 check_limit(count, self.limits.maximum_nals)?;
-                                if let Some(AvcNalStorage::Inline(data)) = &mut self.nals
-                                    && let Some(slot) = data.get_mut(self.total)
+                                if self.total < INLINE_NALS
+                                    && let Some(nals) = &mut self.nals
                                 {
-                                    *slot = AvcNalDescriptor::new(&payload, kind, header);
+                                    nals.try_push(AvcNalDescriptor::new(&payload, kind, header))?;
                                 }
                                 self.total = count;
                             } else {
@@ -548,8 +546,7 @@ impl AvcConfigParser {
                                 self.nals
                                     .as_mut()
                                     .ok_or(Error::Invalid("missing AVC descriptors"))?
-                                    .push_at(usize::from(self.filled), nal)?;
-                                self.filled += 1;
+                                    .try_push(nal)?;
                             }
                         }
                         Event::End(end) => {
@@ -575,13 +572,13 @@ impl AvcConfigParser {
                     // Charge the group, NAL and end events of the usual fill.
                     let fill_work = (2 * self.array_count + self.total + 1) as u64;
                     if work.remaining() >= fill_work && self.total <= INLINE_NALS {
-                        self.filled = self.total as u16;
                         work.take(fill_work);
                         if cancel.load(Ordering::Relaxed) {
                             return Err(Error::Cancelled);
                         }
                         return self.publication_ready(self.understood_end);
                     }
+                    nals.clear_inline();
                     *scan = Scan::new();
                     self.phase = Phase::Fill;
                 }
@@ -591,7 +588,9 @@ impl AvcConfigParser {
     }
 
     fn publication_ready(&self, end: usize) -> Result<ConfigProgress> {
-        if end != self.understood_end || usize::from(self.filled) != self.total {
+        if end != self.understood_end
+            || self.nals.as_ref().map_or(0, AvcNalStorage::len) != self.total
+        {
             return Err(Error::Invalid("AVC second walk"));
         }
         Ok(ConfigProgress::Ready)
@@ -648,73 +647,7 @@ impl AvcNalDescriptor {
 
 const INLINE_NALS: usize = 4;
 
-// The parser already needs these slots while validating a small record. Move
-// them into the result instead of allocating and copying another descriptor table.
-#[derive(Debug)]
-enum AvcNalStorage {
-    Inline([AvcNalDescriptor; INLINE_NALS]),
-    Heap(BudgetVec<AvcNalDescriptor>),
-}
-
-impl AvcNalStorage {
-    const fn empty() -> Self {
-        Self::Inline([AvcNalDescriptor::EMPTY; INLINE_NALS])
-    }
-
-    fn reserve(&mut self, pool: &Budget, count: usize) -> Result<()> {
-        if count > INLINE_NALS {
-            if !matches!(self, Self::Heap(_)) {
-                *self = Self::Heap(BudgetVec::new(pool));
-            }
-            if let Self::Heap(values) = self {
-                values.try_reserve_exact(count)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn push_at(&mut self, index: usize, value: AvcNalDescriptor) -> Result<()> {
-        match self {
-            Self::Inline(data) => {
-                *data
-                    .get_mut(index)
-                    .ok_or(Error::Invalid("AVC inline descriptor count"))? = value;
-                Ok(())
-            }
-            Self::Heap(values) => values.try_push(value).map_err(|e| e.error),
-        }
-    }
-
-    fn as_slice(&self, count: usize) -> &[AvcNalDescriptor] {
-        match self {
-            Self::Inline(data) => &data[..count],
-            Self::Heap(values) => values.as_slice(),
-        }
-    }
-
-    fn get(&self, index: usize) -> Option<&AvcNalDescriptor> {
-        match self {
-            // Scan refuses zero-length configuration NALs, so empty slots
-            // identify the end without another stored length.
-            Self::Inline(data) => data.get(index).filter(|nal| nal.length != 0),
-            Self::Heap(values) => values.as_slice().get(index),
-        }
-    }
-
-    fn heap_len(&self) -> usize {
-        match self {
-            Self::Inline(_) => 0,
-            Self::Heap(values) => values.len(),
-        }
-    }
-
-    fn heap_capacity(&self) -> usize {
-        match self {
-            Self::Inline(_) => 0,
-            Self::Heap(values) => values.capacity(),
-        }
-    }
-}
+type AvcNalStorage = InlineStorage<AvcNalDescriptor, INLINE_NALS>;
 
 /// Complete AVC configuration facts with one raw record handle and charged
 /// heap descriptors beyond four inline slots. Borrowed inspection creates no
@@ -745,8 +678,7 @@ impl AvcConfiguration {
         self.arrays[self.array_count() - 1].range.end as usize
     }
     pub fn nal_count(&self) -> usize {
-        let last = &self.arrays[self.array_count() - 1];
-        usize::from(last.first_nal) + usize::from(last.nal_count)
+        self.nals.len()
     }
     pub(crate) fn base_parameter_set_counts(&self) -> (usize, usize) {
         (
@@ -770,17 +702,20 @@ impl AvcConfiguration {
         }
     }
     pub fn nal(&self, index: usize) -> Option<AvcConfigNal<'_>> {
-        self.nals.get(index).map(|descriptor| AvcConfigNal {
-            raw: &self.raw,
-            source: self.source,
-            descriptor,
-        })
+        self.nals
+            .as_slice()
+            .get(index)
+            .map(|descriptor| AvcConfigNal {
+                raw: &self.raw,
+                source: self.source,
+                descriptor,
+            })
     }
     pub fn nals(
         &self,
     ) -> impl ExactSizeIterator<Item = AvcConfigNal<'_>> + DoubleEndedIterator + '_ {
         self.nals
-            .as_slice(self.nal_count())
+            .as_slice()
             .iter()
             .map(move |descriptor| AvcConfigNal {
                 raw: &self.raw,

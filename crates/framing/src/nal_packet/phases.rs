@@ -5,7 +5,7 @@ use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacket, NalPacketJob, NalPacketOutput,
     NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketInput,
     PacketPhase, PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment,
-    freeze_annex_b_output, reserve_annex_b_output,
+    empty_packet_segments, freeze_annex_b_output, reserve_annex_b_output,
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
@@ -862,7 +862,7 @@ impl PacketEmission {
             has_configuration_identity: configuration_identity.is_some(),
             configuration_source_refusal,
             packet_source_refusal: state.packet_source_refusal,
-            segments: std::mem::replace(&mut state.segments, PacketSegmentStorage::new()),
+            segments: std::mem::replace(&mut state.segments, empty_packet_segments()),
             receiver_epoch: state.epoch,
             forward_new_extradata,
         });

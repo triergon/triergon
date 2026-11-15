@@ -1,11 +1,12 @@
 //! Version1 hvcC source-wire facts.
 //! Raw syntax, fixed NAL headers and bounded extents; no RBSP/decoder certificate.
+use crate::inline_storage::InlineStorage;
 use crate::{BuildStep, Codec, ConfigProgress, LengthSize, NalHeader};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, Result, SourceId, WorkBudget};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HvcConfigSource {
     pub source: SourceId,
@@ -228,93 +229,7 @@ enum Phase {
 
 const INLINE_DESCRIPTORS: usize = 4;
 
-#[derive(Debug)]
-enum DescriptorStorage<T> {
-    Inline {
-        data: [T; INLINE_DESCRIPTORS],
-        len: u8,
-    },
-    Heap(BudgetVec<T>),
-}
-
-impl<T> DescriptorStorage<T> {
-    fn new(empty: impl FnMut(usize) -> T) -> Self {
-        Self::Inline {
-            data: std::array::from_fn(empty),
-            len: 0,
-        }
-    }
-
-    fn required_heap_bytes(count: usize) -> Result<usize> {
-        if count <= INLINE_DESCRIPTORS {
-            Ok(0)
-        } else {
-            count.checked_mul(size_of::<T>()).ok_or(Error::Overflow)
-        }
-    }
-
-    // Reservation precedes the fill walk. A failed heap reservation keeps the
-    // empty vector and its pool handle for the same checkpoint's next attempt.
-    fn reserve(&mut self, pool: &Budget, count: usize) -> Result<()> {
-        if count > INLINE_DESCRIPTORS {
-            if !matches!(self, Self::Heap(_)) {
-                *self = Self::Heap(BudgetVec::new(pool));
-            }
-            if let Self::Heap(values) = self {
-                values.try_reserve_exact(count)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn try_push(&mut self, value: T) -> Result<()> {
-        match self {
-            Self::Inline { data, len } => {
-                *data
-                    .get_mut(usize::from(*len))
-                    .ok_or(Error::Invalid("hvcC inline descriptor count"))? = value;
-                *len += 1;
-                Ok(())
-            }
-            Self::Heap(values) => values.try_push(value).map_err(|e| e.error),
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            Self::Inline { len, .. } => usize::from(*len),
-            Self::Heap(values) => values.len(),
-        }
-    }
-
-    fn as_slice(&self) -> &[T] {
-        match self {
-            Self::Inline { data, len } => &data[..usize::from(*len)],
-            Self::Heap(values) => values.as_slice(),
-        }
-    }
-
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        match self {
-            Self::Inline { data, len } => &mut data[..usize::from(*len)],
-            Self::Heap(values) => values.as_mut_slice(),
-        }
-    }
-
-    fn heap_len(&self) -> usize {
-        match self {
-            Self::Inline { .. } => 0,
-            Self::Heap(values) => values.len(),
-        }
-    }
-
-    fn heap_capacity(&self) -> usize {
-        match self {
-            Self::Inline { .. } => 0,
-            Self::Heap(values) => values.capacity(),
-        }
-    }
-}
+type DescriptorStorage<T> = InlineStorage<T, INLINE_DESCRIPTORS>;
 
 /// One externally framed, immutable, same-pool hvcC record without a box header.
 /// A resumable grammar walk validates the record and fills descriptors when both
@@ -623,12 +538,10 @@ impl HvcConfigParser {
                         .as_mut()
                         .ok_or(Error::Invalid("missing hvcC descriptors"))?;
                     arrays.reserve(raw.budget(), usize::from(self.scan.array_count))?;
-                    if self.total > INLINE_DESCRIPTORS
-                        && let DescriptorStorage::Inline { len, .. } = arrays
-                    {
-                        // Only NALs spill. The fill walk rebuilds any cached
-                        // array prefix, while NAL reservation replaces its cache.
-                        *len = 0;
+                    if self.total > INLINE_DESCRIPTORS {
+                        // Only NALs may spill. The fill walk rebuilds the
+                        // inline array prefix when the arrays still fit.
+                        arrays.clear_inline();
                     }
                     self.phase = Phase::ReserveNals;
                 }

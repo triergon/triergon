@@ -43,6 +43,7 @@ mod dts_source;
 mod eac3_bsi;
 mod flac_config;
 mod header;
+mod inline_storage;
 mod mpeg_audio;
 mod nal_syntax;
 mod nal_units;
