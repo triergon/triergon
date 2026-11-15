@@ -333,6 +333,7 @@ impl FragmentIndex {
             low: 0,
             high: self.runs.len(),
             target: ordinal,
+            passed_sync: None,
             done: false,
             failed: None,
         })
@@ -944,10 +945,35 @@ pub struct FragmentLocator<'a> {
     low: usize,
     high: usize,
     target: u64,
+    /// The last sync sample stepped past on the way to the target.
+    passed_sync: Option<u64>,
     done: bool,
     failed: Option<Error>,
 }
 impl FragmentLocator<'_> {
+    /// After the target, locate the sample that follows it in this index, by
+    /// continuing from it. `false` where that sample is not `ordinal` or the
+    /// index has no more.
+    pub(crate) fn continue_to(&mut self, ordinal: u64) -> bool {
+        let end = self.index.first_ordinal.saturating_add(self.index.count);
+        if !self.done
+            || self.failed.is_some()
+            || self.cursor.is_none()
+            || self.target.checked_add(1) != Some(ordinal)
+            || ordinal >= end
+        {
+            return false;
+        }
+        self.target = ordinal;
+        self.passed_sync = None;
+        self.done = false;
+        true
+    }
+    /// The last sync sample before the target in the target's run that locating
+    /// it stepped past, if it stepped past any.
+    pub(crate) fn passed_sync(&self) -> Option<u64> {
+        self.passed_sync
+    }
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -1023,12 +1049,38 @@ impl FragmentLocator<'_> {
                     decode,
                 });
             }
-            match self
+            let cursor = self
                 .cursor
                 .as_mut()
-                .ok_or(Error::Invalid("fragment locator cursor missing"))?
-                .poll(work)?
+                .ok_or(Error::Invalid("fragment locator cursor missing"))?;
+            // The samples before the target need only stepping past.
+            if self
+                .index
+                .runs
+                .as_slice()
+                .get(cursor.run)
+                .is_some_and(|run| {
+                    cursor.sample < run.wire.count
+                        && run
+                            .ordinal
+                            .checked_add(u64::from(cursor.sample))
+                            .is_some_and(|next| next < self.target)
+                })
             {
+                match cursor.skip(work)? {
+                    RunSkip::Sample(sample) => {
+                        if sample.sync {
+                            self.passed_sync = Some(sample.ordinal);
+                        }
+                        continue;
+                    }
+                    RunSkip::Yield => return Ok(SampleStep::Yield),
+                    RunSkip::End => {
+                        return Err(Error::Invalid("fragment locator exhausted unexpectedly"));
+                    }
+                }
+            }
+            match cursor.poll(work)? {
                 SampleStep::Sample(sample) if sample.ordinal == self.target => {
                     self.done = true;
                     return Ok(SampleStep::Sample(sample));

@@ -10,7 +10,7 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
-use triergon_core::{Error, Result, Time, TimeBase, WorkBudget};
+use triergon_core::{Error, Result, Rounding, Time, TimeBase, WorkBudget};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MovieSeekClocks {
@@ -213,6 +213,10 @@ pub struct SourceCompositionLookup<'a> {
     cursor: TrackSampleCursor<'a>,
     requested: Time,
     media_base: TimeBase,
+    /// The latest tick at or before the request where whole media ticks are
+    /// exact times, so that they compare as integers.
+    latest_tick: Option<i128>,
+    best_tick: Option<i128>,
     maximum: u64,
     scanned: u64,
     last_ordinal: Option<u64>,
@@ -235,6 +239,10 @@ impl<'a> SourceCompositionLookup<'a> {
             cursor: TrackSampleCursor::new(source),
             requested,
             media_base,
+            latest_tick: (media_base.numerator() == 1)
+                .then(|| requested.to_ticks(media_base, Rounding::Floor).ok())
+                .flatten(),
+            best_tick: None,
             maximum: max_samples,
             scanned: 0,
             last_ordinal: None,
@@ -285,6 +293,26 @@ impl<'a> SourceCompositionLookup<'a> {
                 }
                 continue;
             };
+            if let Some(latest) = self.latest_tick {
+                // Ticks of a unit-numerator base order as their times do.
+                if ticks > latest {
+                    continue;
+                }
+                match self.best_tick {
+                    Some(best) if ticks < best => {}
+                    Some(best) if ticks == best => {
+                        if self.tied.is_none() {
+                            self.tied = Some(sample.ordinal);
+                        }
+                    }
+                    _ => {
+                        self.best_tick = Some(ticks);
+                        self.best = Some(sample);
+                        self.tied = None;
+                    }
+                }
+                continue;
+            }
             let cts = Time::from_ticks(ticks, self.media_base)?;
             if cts > self.requested {
                 continue;
@@ -317,6 +345,9 @@ impl<'a> SourceCompositionLookup<'a> {
         let Some(sample) = self.best.take() else {
             return Ok(CompositionTarget::BeforeFirst);
         };
+        if let Some(ticks) = self.best_tick {
+            self.best_time = Some(Time::from_ticks(ticks, self.media_base)?);
+        }
         if let Some(second_ordinal) = self.tied {
             return Ok(CompositionTarget::Ambiguous {
                 first_ordinal: sample.ordinal,
