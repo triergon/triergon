@@ -17011,6 +17011,28 @@
    }
   },
   {
+   "name": "packet-framing-f4f1c7ad-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 parity, timing and kernel-bound memory for 135 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-f4f1c7ad-aarch64/27551dc9b06b8a5e022e946eca4752c11c1a96bbe821c4cd606e0d6cde451c22.tar.zst",
+   "sha256": "27551dc9b06b8a5e022e946eca4752c11c1a96bbe821c4cd606e0d6cde451c22",
+   "bytes": 19334027,
+   "source_revisions": {
+    "candidate": "f4f1c7ad1a4f2572e676f48f81ad15aa4e9ebdc5"
+   }
+  },
+  {
+   "name": "packet-framing-f4f1c7ad-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 parity, timing and kernel-bound memory for 135 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-f4f1c7ad-armv7/5e1acd8270982b81890ad34eb69bf300f3029b908d0279f236664475a87b8805.tar.zst",
+   "sha256": "5e1acd8270982b81890ad34eb69bf300f3029b908d0279f236664475a87b8805",
+   "bytes": 15312505,
+   "source_revisions": {
+    "candidate": "f4f1c7ad1a4f2572e676f48f81ad15aa4e9ebdc5"
+   }
+  },
+  {
    "name": "packet-framing-reference-residency-f40c8eb0",
    "retention": "retained",
    "reason": "Packet-framing reference input residency on AArch64 and ARMv7, byte-identical reference rebuilds and the per-side timing cited in the status rows",
