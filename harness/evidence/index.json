@@ -28553,6 +28553,101 @@
    "source_revisions": {
     "candidate": "8154812e05da374a0f7c173bfd01770d5bd0ca85"
    }
+  },
+  {
+   "name": "gate-fonts-shaping-ass-3e5e2233",
+   "path": "gate-fonts-shaping-ass-3e5e2233",
+   "retention": "retained",
+   "reason": "Partial gate run at 3e5e2233 (font-shape-raster-ass, ass-render, ass-render-host) under static-toolchain-runtime-v1 on one c6g.4xlarge host (Graviton2) per target, Linux AArch64 natively and 32-bit ARMv7 in the armhf user space: the font, shaping, rasterising and ASS comparisons, ass-render's and ass-render-host's timing, memory and grade, each shard's build identities, plan, step records and logs, each target's gate summary, and a bundle of the measured source; for the docs/status.md rows it measures",
+   "key": "evidence/gate-fonts-shaping-ass-3e5e2233/58e39ed25169ce59e3f6bc9520c1dc798c5f2f9423981e45d5fba32e9c538370.tar.zst",
+   "sha256": "58e39ed25169ce59e3f6bc9520c1dc798c5f2f9423981e45d5fba32e9c538370",
+   "bytes": 6787044,
+   "results": [
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/aarch64/shard-1/benchmark/ass-render-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "00812a6594ca9f1333f8f018eb3305c07011b01147d9658bed5dd67b516d4eb1",
+     "status": 0,
+     "report_sha256": "d04cf364bb418d93420331b7bafc3cff8aada4bdfdef3921a3aa5f4aecca0706"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/aarch64/shard-1/benchmark/ass-render/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9b315d33dbf6de07a12c0fa1096ae334102fa7d89d87e293b9159876dfebd095",
+     "status": 0,
+     "report_sha256": "c27a8f63871aef96b74e4f94df54a4dc3a10871039fe2b50c4e513b64b583218"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/aarch64/shard-1/graded/ass-render-host/gate-result.json",
+     "command": "grade",
+     "key": "2a002145696dd26dad7fc6da4d7807d04f15b9a306ab700e6320cfaa89d84e1a",
+     "status": 1,
+     "report_sha256": "c6d3c807a5736bc45c5084c0df9157ad049f76cf559cca12cb0942cfbdab73a3"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/aarch64/shard-1/graded/ass-render/gate-result.json",
+     "command": "grade",
+     "key": "8737e4a89c35cfdf3260cf30bf34a4fd93a31ec5e84081b0ebf76a95986dfa4c",
+     "status": 0,
+     "report_sha256": "da690ba47eb42bf4383f3baaa8beba0829b1b0c063f7eabb11a4d7119bb3fdac"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/aarch64/shard-1/memory/ass-render-host/gate-result.json",
+     "command": "report --memory",
+     "key": "13565bed3c5e469da1f07e1aacedc85195b04f088a9a665265e8d000ba4f71ea",
+     "status": 0,
+     "report_sha256": "84bed10a52109428f37b644f25a0bd76faa5f2d4d8b5ef89c61868f7826a6ce8"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/aarch64/shard-1/memory/ass-render/gate-result.json",
+     "command": "report --memory",
+     "key": "b1be7e16f6dd64c3c3eb3ef32e57f8dead5a41db77d9d91ad04ed24b190088f8",
+     "status": 0,
+     "report_sha256": "a2ab2423af309ea7c7d30473b0f61092016ca75a03412af234548f834e441417"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/armv7/shard-1/benchmark/ass-render-host/gate-result.json",
+     "command": "report --benchmark",
+     "key": "3467c015d0ed427ffb68569e3472994a0f06cada0961c11176bb0d8323147f6e",
+     "status": 0,
+     "report_sha256": "5af8d4bf2a40af526eae96738e3f40e3398e767960db56ddecdd67123db3310b"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/armv7/shard-1/benchmark/ass-render/gate-result.json",
+     "command": "report --benchmark",
+     "key": "bffdd7248719fbb1e088ef5ba07542f9edbdee1a386fba897f012f16778674ba",
+     "status": 0,
+     "report_sha256": "53b3586cf93a3f0e3aed3e39a8ec82480d485ef8cf1417bbe41da499adb32fb3"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/armv7/shard-1/graded/ass-render-host/gate-result.json",
+     "command": "grade",
+     "key": "dce29b8d73b9283bef680fd1ddf948d05dca2295f83534cddc8ce12dea391bbf",
+     "status": 0,
+     "report_sha256": "951525c7c4108f56416285c852e90a8139d68360e81dbbae46f381e80fb3d080"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/armv7/shard-1/graded/ass-render/gate-result.json",
+     "command": "grade",
+     "key": "8aa0085dade8e104506a6f158bb36159e5558c2aa92c482715f78550a1f9a903",
+     "status": 0,
+     "report_sha256": "2e9ef1dea38a1e92639eebbefa95d1e9686aebc990999acb0c783e97750f7066"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/armv7/shard-1/memory/ass-render-host/gate-result.json",
+     "command": "report --memory",
+     "key": "489f36ed5d52e5cba6ba848814fa516b19bb19ce130c3c0369eca1c580dfe032",
+     "status": 0,
+     "report_sha256": "a36dd3d8eb05564d3e74212aa6a389dbe30aacf19edd443c8026e16dd198fee0"
+    },
+    {
+     "path": "gate-fonts-shaping-ass-3e5e2233/armv7/shard-1/memory/ass-render/gate-result.json",
+     "command": "report --memory",
+     "key": "fa894f3b825a494f6902f42f46b28b087a48da8d70d1e64f91afb6111988af40",
+     "status": 0,
+     "report_sha256": "179566297c862cd0d616d41293d3d521f40ef9e1e7bc29b492640e809328535a"
+    }
+   ]
   }
  ]
 }

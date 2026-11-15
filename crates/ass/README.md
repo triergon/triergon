@@ -429,14 +429,18 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 36 scripts and 3 packet streams of
+- `ass-render` renders the 47 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 78 pass. The
+  glyphs and 24 MiB, which `cache-eviction.ass` overflows): all 100 pass,
+  among them underline and strike-out on TrueType, CFF and CFF2 faces, with
+  synthetic bold and oblique, borders, `@` fonts, scaling and several sizes, a glyph without
+  points and an outline whose orientation FreeType cannot tell
+  (`decorations-*.ass`). The
   box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised,
   is told by its own buffer, also after a collision shift has cut rows off its
   top, and compared as a kind of its own.
@@ -456,14 +460,14 @@ panics.
   the renderer slightly: in 12 cases libass opens the default font file inside
   its span, which the renderer reads before its own, and libass's side copies
   the script inside its span.
-- Measured at `79e0ae13` on c6g.4xlarge hosts, under the kernel RSS bound,
+- Measured at `3e5e2233` on c6g.4xlarge hosts, under the kernel RSS bound,
   every case is within the runtime ceiling of
   [docs/quality.md](../../docs/quality.md) and lower than libass in peak heap
-  and total RSS. On Linux AArch64 the 78 `ass-render` cases have a highest
-  upper bound of 1.0627, peak heap ≤0.8412 and total RSS ≤0.9025. On ARMv7
-  (`thumbv7neon-unknown-linux-gnueabihf`) the highest upper bound is 0.7985
-  for `ass-render` and 0.7320 for `ass-render-host`, with peak heap ≤0.9283
-  and total RSS ≤0.9578 over all 82 cases.
+  and total RSS. On Linux AArch64 the 100 `ass-render` cases have a highest
+  upper bound of 1.0676, peak heap ≤0.9485 and total RSS ≤0.9973. On ARMv7
+  (`thumbv7neon-unknown-linux-gnueabihf`) the highest upper bound is 0.7949
+  for `ass-render` and 0.7332 for `ass-render-host`, with peak heap ≤0.9754
+  and total RSS ≤0.9980 over all 104 cases.
   [docs/status.md](../../docs/status.md) names the evidence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
