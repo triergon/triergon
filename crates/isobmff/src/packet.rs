@@ -174,10 +174,12 @@ impl SampleReader {
             buffer.try_reserve_exact(length)?;
             SampleBuffer::Copying(buffer)
         };
-        // Internal I/O transaction only; core preserves parser generation.
-        if mode == ReadMode::SharedWindow && input.capabilities().random_access {
+        // Internal I/O transaction only; core preserves parser generation. Bytes
+        // the current window already holds from the sample's start are read from
+        // it rather than requested again.
+        if input.capabilities().random_access {
             input.request_range_reusing_window(sample.range.start)?;
-        } else if input.position() != sample.range.start || input.capabilities().random_access {
+        } else if input.position() != sample.range.start {
             input.request_range(sample.range.start)?;
         }
         Ok(Self {
