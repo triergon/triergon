@@ -537,32 +537,58 @@ may override that count for diagnostic comparisons.
   libatomic today: the FFmpeg references name it, and the linker leaves it out. glibc's
   static libm needs the static libc, so libm stays with libc. Elsewhere both sides link
   as their toolchains do.
-- On GNU/Linux the policy also links each Rust worker with its functions in module
-  order, with the pinned toolchain's own `lld`; the references link with their
-  toolchain's default linker as before. The code one operation runs is a fraction of a
-  worker's, and the kernel faults code in 64 KiB windows, so how much of a worker
-  becomes resident depends on how its functions lie among those windows. Module order
-  keeps each crate's, module's and type's functions together: `cargo xtask link-order
-  BINARY` lists the binary's functions sorted by the path of the item each belongs to
-  (a function by its own path, a method by its type's, a closure by its function's, drop
-  glue by the type it drops, generic arguments left out), then by name. The order comes
-  from the symbol names alone, never from profiles or from what a measurement runs.
-  `build-workers` links each worker once, writes its order to
-  `target/harness/link-order/WORKER.txt`, links it again with that file, and fails
-  unless the second link's order is the same file; `identity.json` records the order's
-  SHA-256 beside the command. The linker arguments, after the policy's own, are
+- On GNU/Linux the policy also links each Rust worker with its functions in a trained
+  order, then module order, with the pinned toolchain's own `lld`; the references link
+  with their toolchain's default linker as before. The code one operation runs is a
+  fraction of a worker's, and the kernel faults code in 64 KiB windows, so how much of
+  a worker becomes resident depends on how its functions lie among those windows.
+  - The trained order of a worker for a target, `harness/link-order/TARGET/WORKER.txt`,
+    lists by demangled name the functions a training corpus runs in the release
+    worker, in the order the operations first run them. `cargo xtask link-order train`
+    records it on a prepared gate host of the target after `build-workers`: it runs
+    each training operation under QEMU's user-mode emulator (`qemu-arm -cpu
+    cortex-a15` for ARMv7 in the armhf user space, `qemu-aarch64 -cpu neoverse-n1`;
+    package `qemu-user`) with `-d page,in_asm`, which logs every block of code when it
+    first runs, and maps those addresses to the worker's functions. The workers carry
+    no instrumentation. A worker with no training operations has a trained order
+    without functions.
+  - The training corpus is its own, apart from everything the gate reads.
+    `harness/link-order/training.json` lists its files by SHA-256 and the operations,
+    each a worker's command line with `@NAME` for a training file; the files are kept
+    as an evidence set and unpacked at `.research/link-order-training`. `cargo xtask
+    link-order corpus OUT` made them with `ffmpeg` and `ffprobe` from FFmpeg's own
+    video and audio generators (libx264, libx265 and FFmpeg's AAC, AC-3, E-AC-3 and
+    Opus encoders); the playback capsules, AAC access units and packet-framing scripts
+    are made from those files. `cargo xtask link-order separate`, which `train` runs
+    first, fails when a training file has the SHA-256 of a file any gate item reads on
+    either target or of a committed file, or when an operation runs a gate case's
+    operation family on inputs of the same content with the same other arguments. The
+    corpus never takes a gate input, case or corpus file or anything made from one.
+  - `cargo xtask link-order BINARY [OUT] --trained FILE` writes a binary's symbol
+    ordering file: the functions the trained order lists, in its order, then every
+    other function in module order, sorted by the path of the item it belongs to (a
+    function by its own path, a method by its type's, a closure by its function's,
+    drop glue by the type it drops, generic arguments left out), then by name. A name
+    the binary does not hold is skipped, so a stale trained order still links.
+  - `build-workers` links each worker once, writes its ordering file to
+    `target/harness/link-order/WORKER.txt`, links it again with that file, and fails
+    unless the second link's ordering file is the same; `identity.json` records its
+    SHA-256 beside the command. `cargo xtask check` runs `cargo xtask link-order check`:
+    every worker has a trained order for each gate target, each parses, and on
+    GNU/Linux each links the worker built for the checking host. The linker arguments,
+    after the policy's own, are
 
-  ```text
-  -C link-arg=-B$(rustc --print sysroot)/lib/rustlib/HOST/bin/gcc-ld
-  -C link-arg=-fuse-ld=lld
-  -C link-arg=-Wl,--symbol-ordering-file=ORDER
-  -C link-arg=-Wl,--no-warn-symbol-ordering
-  ```
+    ```text
+    -C link-arg=-B$(rustc --print sysroot)/lib/rustlib/HOST/bin/gcc-ld
+    -C link-arg=-fuse-ld=lld
+    -C link-arg=-Wl,--symbol-ordering-file=ORDER
+    -C link-arg=-Wl,--no-warn-symbol-ordering
+    ```
 
-  where `HOST` is the host triple of `rustc -vV` and the first link leaves out the
-  last two. `build-workers` records the policy in `identity.json`, and
-  `report` and `grade` refuse a build that records another policy or none, so results
-  from differently linked builds are never compared or reused together.
+    where `HOST` is the host triple of `rustc -vV` and the first link leaves out the
+    last two. `build-workers` records the policy in `identity.json`, and `report` and
+    `grade` refuse a build that records another policy or none, so results from
+    differently linked builds are never compared or reused together.
 - A gate run builds with `cargo xtask build-workers --all-references`, which fails when
   any profile reference's FFmpeg, FreeType, HarfBuzz or libass profile is not prepared.
   Without the flag, `build-workers` builds the references whose profiles are prepared
@@ -571,7 +597,8 @@ may override that count for diagnostic comparisons.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
   with the same two settings in its own release profile and, on GNU/Linux, linked in
-  module order as the workers are (the [README](../README.md#getting-started) gives the commands). Cargo's default profile has
+  the playback worker's trained order as the workers are (the
+  [README](../README.md#getting-started) gives the commands). Cargo's default profile has
   neither. On ARMv7, building the playback worker without fat LTO adds 12.6% user-mode
   instructions on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times
   as long; 16 codegen units add up to another 2.5%. `panic = "abort"` saves

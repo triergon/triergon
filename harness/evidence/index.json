@@ -29855,6 +29855,118 @@
    "source_revisions": {
     "candidate": "001597859a0faf2508d29773627116ee33689cda"
    }
+  },
+  {
+   "name": "link-order-training",
+   "path": "link-order-training",
+   "retention": "retained",
+   "reason": "The link-order training corpus of harness/link-order/training.json (.research/link-order-training), made by `cargo xtask link-order corpus` with Ubuntu 24.04's ffmpeg 6.1.1 and ffprobe from FFmpeg's own video and audio generators, apart from every gate input and committed file by SHA-256 (`cargo xtask link-order separate`), unpacked at the repository root of a host that records the workers' trained orders",
+   "key": "evidence/link-order-training/1c75a635620d089cecf5317cb06e579e61db7038db86f27914b2c836228190ff.tar.gz",
+   "sha256": "1c75a635620d089cecf5317cb06e579e61db7038db86f27914b2c836228190ff",
+   "bytes": 10956122,
+   "unpacked_at": "repository",
+   "files": [
+    {
+     "path": ".research/link-order-training/audio-6.ts",
+     "sha256": "498439ee33118eb995810af489720e9458b64f78ce95370dc50df2fbc7a87ff8"
+    },
+    {
+     "path": ".research/link-order-training/avc-aac-front.mp4",
+     "sha256": "dc0048747e053186d804c14f25c19a3a5c894512c270a82252f9646536b50801"
+    },
+    {
+     "path": ".research/link-order-training/avc-aac-text.mkv",
+     "sha256": "5a5eaca4806acb341948145d20791d0ac83ad151c43df5b32953d3ac7942a0a0"
+    },
+    {
+     "path": ".research/link-order-training/avc-aac.aac-access-units",
+     "sha256": "09c850cea59444b7d9017040d36dfd29f0c8915d82d475336dab0eebceda141d"
+    },
+    {
+     "path": ".research/link-order-training/avc-aac.mp4",
+     "sha256": "96911abbdb195738f18576649bb977d3c2033823f643c93ac7ed80b99b3b840c"
+    },
+    {
+     "path": ".research/link-order-training/avc-opus.mp4",
+     "sha256": "7c74a4a3439d5926f42331689faf731e0da1614dc344c0efda28b4b81a071398"
+    },
+    {
+     "path": ".research/link-order-training/avc-seek-discovery.case",
+     "sha256": "269da0846d80fe2ee8c6f369fdb0883fe91cd25b5b1ee94a9d70d01bd9a06343"
+    },
+    {
+     "path": ".research/link-order-training/avc-seek-end.case",
+     "sha256": "efdc45b644186bf61cc26fbb45725c1cf4a7190346775fed4a2a1e5827284428"
+    },
+    {
+     "path": ".research/link-order-training/avc-startup.case",
+     "sha256": "d3b7afd5933e03d2fd29c4cb2a7c72a5ae6644eae7c66a2261f4381e8153a53d"
+    },
+    {
+     "path": ".research/link-order-training/avc-three-audio.mkv",
+     "sha256": "2c7e5f1771985d5831675fe2832c59faa91091c571513332985b2e90f07a8873"
+    },
+    {
+     "path": ".research/link-order-training/avc.bsf",
+     "sha256": "1a1d7bfbcb8e2ac660c2c35517d5a688a6ce746f53e05213672b879fc17a571b"
+    },
+    {
+     "path": ".research/link-order-training/hevc-aac-fragmented.mp4",
+     "sha256": "67ed1e4ec8132a287cbe09a5f38324b2462affdec0de8513d2cf39fcdbbe0f73"
+    },
+    {
+     "path": ".research/link-order-training/hevc-opus.mkv",
+     "sha256": "8cd5508ecd10861c0f97470e543be392b156a0a756a37ab9b33f388e2d0623b2"
+    },
+    {
+     "path": ".research/link-order-training/hevc-seek-discovery.case",
+     "sha256": "56e12032f6801fba3722e8ca8a57a3010a2caf525a0e8ad617646492a2c48a84"
+    },
+    {
+     "path": ".research/link-order-training/hevc-seek-end.case",
+     "sha256": "a76704b59521ec61b9adac36ccb26c8916dac4fb269aa0f25d4d88179004047b"
+    },
+    {
+     "path": ".research/link-order-training/hevc-startup.case",
+     "sha256": "52b189de7898b6074e12250ac09f7573dc35c71b8f4e2e3e820cac97070ed070"
+    },
+    {
+     "path": ".research/link-order-training/hevc.bsf",
+     "sha256": "3ffff1bc2a6ba6933d6e64ef4ad1b4fb6116c07ffec2139dd5eea3d33a49fd5a"
+    },
+    {
+     "path": ".research/link-order-training/hls-avc-aac.ts",
+     "sha256": "913faa181cd2935b5add7f4c394b68ac4a357ee5d8cd6271c537e9e7fa54f723"
+    },
+    {
+     "path": ".research/link-order-training/hls-hevc-ac3.ts",
+     "sha256": "49d766e9f7734fd945decf055f2342dad17c7453a68691f22e17365813577aaa"
+    },
+    {
+     "path": ".research/link-order-training/program-hevc-ac3.ts",
+     "sha256": "e1068a525437c1eecdfef7804e45df8dc96f15de7194fe3ee2ce5a74d5fbd5e4"
+    },
+    {
+     "path": ".research/link-order-training/program.ts",
+     "sha256": "1bd367c6aefb7e379ff78a3a064981d688e38faae70185058f854cc8e7d9550a"
+    },
+    {
+     "path": ".research/link-order-training/service-5.ts",
+     "sha256": "99a39e3e79782d535b305eb685a7ee41da02324647247d640d4eff1b758be6c3"
+    },
+    {
+     "path": ".research/link-order-training/service-7.m2ts",
+     "sha256": "12be2f37eebfcefd39847db8d282dd688f69ee9c664ad16416cda74df9179c6c"
+    },
+    {
+     "path": ".research/link-order-training/video.h264",
+     "sha256": "da8e0952eabb69da053c2780a1622f42f69c8b5709e1cb57526116dc23a7a127"
+    },
+    {
+     "path": ".research/link-order-training/video.hevc",
+     "sha256": "2aafba59358c4ee5e836f6793b6e91674081761b0a7647810ef59de0c6765d56"
+    }
+   ]
   }
  ]
 }

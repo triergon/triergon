@@ -53,18 +53,35 @@ impl Operation {
         self.targets.is_empty() || self.targets.iter().any(|own| own == target)
     }
 
+    /// The mode word: the first argument that is not an option.
+    fn mode(&self) -> &str {
+        self.arguments
+            .iter()
+            .find(|argument| !argument.starts_with("--"))
+            .map_or("", String::as_str)
+    }
+
     /// The operation family: the mode word without its mode, as a gate contract
     /// names it (`mp4-range-` for `mp4-range-memory`), or the mode word itself.
     fn family(&self) -> &str {
-        let word = self
-            .arguments
-            .iter()
-            .find(|argument| !argument.starts_with("--"))
-            .map_or("", String::as_str);
+        let word = self.mode();
         ["fold", "bench", "memory", "trace"]
             .iter()
             .find_map(|mode| word.strip_suffix(mode))
             .unwrap_or(word)
+    }
+
+    /// Its arguments but the mode word and the training files, sorted.
+    fn others(&self) -> Vec<&str> {
+        let mode = self.mode();
+        let mut others: Vec<&str> = self
+            .arguments
+            .iter()
+            .map(String::as_str)
+            .filter(|argument| *argument != mode && !argument.starts_with('@'))
+            .collect();
+        others.sort_unstable();
+        others
     }
 }
 
@@ -194,14 +211,7 @@ pub fn separate(root: &Path, directory: Option<&Path>) -> R<()> {
             .map(|file| training.files[file].as_str())
             .collect();
         inputs.sort_unstable();
-        let mut others: Vec<&str> = operation
-            .arguments
-            .iter()
-            .skip(1)
-            .filter(|argument| !argument.starts_with('@'))
-            .map(String::as_str)
-            .collect();
-        others.sort_unstable();
+        let others = operation.others();
         if let Some(case) = cases.iter().find(|case| {
             case.family == operation.family() && case.inputs == inputs && case.others == others
         }) {
@@ -459,22 +469,19 @@ fn link(root: &Path, worker: &WorkerBuild, order: Option<&Path>) -> R<PathBuf> {
     })
 }
 
-/// The `ffmpeg` arguments common to every training file: quiet, bit-exact, and
-/// without metadata.
-const FFMPEG: [&str; 13] = [
-    "-hide_banner",
-    "-nostdin",
-    "-y",
-    "-v",
-    "error",
+/// The `ffmpeg` options before the inputs: quiet, overwriting.
+const FFMPEG: [&str; 5] = ["-hide_banner", "-nostdin", "-y", "-v", "error"];
+
+/// The output options of every training file: bit-exact, without metadata.
+const BITEXACT: [&str; 8] = [
+    "-map_metadata",
+    "-1",
     "-fflags",
     "+bitexact",
     "-flags:v",
     "+bitexact",
     "-flags:a",
     "+bitexact",
-    "-map_metadata",
-    "-1",
 ];
 
 /// Video and audio sources, from FFmpeg's own generators.
@@ -522,6 +529,7 @@ fn ffmpeg(out: &Path, inputs: &[(&str, &str)], options: &[&str], file: &str) -> 
         }
     }
     let status = command
+        .args(BITEXACT)
         .args(options)
         .arg(out.join(file))
         .status()

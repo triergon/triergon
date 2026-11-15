@@ -1,0 +1,601 @@
+{
+ "schema": 1,
+ "directory": ".research/link-order-training",
+ "files": [
+  {
+   "file": "audio-6.ts",
+   "sha256": "498439ee33118eb995810af489720e9458b64f78ce95370dc50df2fbc7a87ff8"
+  },
+  {
+   "file": "avc-aac-front.mp4",
+   "sha256": "dc0048747e053186d804c14f25c19a3a5c894512c270a82252f9646536b50801"
+  },
+  {
+   "file": "avc-aac-text.mkv",
+   "sha256": "5a5eaca4806acb341948145d20791d0ac83ad151c43df5b32953d3ac7942a0a0"
+  },
+  {
+   "file": "avc-aac.aac-access-units",
+   "sha256": "09c850cea59444b7d9017040d36dfd29f0c8915d82d475336dab0eebceda141d"
+  },
+  {
+   "file": "avc-aac.mp4",
+   "sha256": "96911abbdb195738f18576649bb977d3c2033823f643c93ac7ed80b99b3b840c"
+  },
+  {
+   "file": "avc-opus.mp4",
+   "sha256": "7c74a4a3439d5926f42331689faf731e0da1614dc344c0efda28b4b81a071398"
+  },
+  {
+   "file": "avc-seek-discovery.case",
+   "sha256": "269da0846d80fe2ee8c6f369fdb0883fe91cd25b5b1ee94a9d70d01bd9a06343"
+  },
+  {
+   "file": "avc-seek-end.case",
+   "sha256": "efdc45b644186bf61cc26fbb45725c1cf4a7190346775fed4a2a1e5827284428"
+  },
+  {
+   "file": "avc-startup.case",
+   "sha256": "d3b7afd5933e03d2fd29c4cb2a7c72a5ae6644eae7c66a2261f4381e8153a53d"
+  },
+  {
+   "file": "avc-three-audio.mkv",
+   "sha256": "2c7e5f1771985d5831675fe2832c59faa91091c571513332985b2e90f07a8873"
+  },
+  {
+   "file": "avc.bsf",
+   "sha256": "1a1d7bfbcb8e2ac660c2c35517d5a688a6ce746f53e05213672b879fc17a571b"
+  },
+  {
+   "file": "hevc-aac-fragmented.mp4",
+   "sha256": "67ed1e4ec8132a287cbe09a5f38324b2462affdec0de8513d2cf39fcdbbe0f73"
+  },
+  {
+   "file": "hevc-opus.mkv",
+   "sha256": "8cd5508ecd10861c0f97470e543be392b156a0a756a37ab9b33f388e2d0623b2"
+  },
+  {
+   "file": "hevc-seek-discovery.case",
+   "sha256": "56e12032f6801fba3722e8ca8a57a3010a2caf525a0e8ad617646492a2c48a84"
+  },
+  {
+   "file": "hevc-seek-end.case",
+   "sha256": "a76704b59521ec61b9adac36ccb26c8916dac4fb269aa0f25d4d88179004047b"
+  },
+  {
+   "file": "hevc-startup.case",
+   "sha256": "52b189de7898b6074e12250ac09f7573dc35c71b8f4e2e3e820cac97070ed070"
+  },
+  {
+   "file": "hevc.bsf",
+   "sha256": "3ffff1bc2a6ba6933d6e64ef4ad1b4fb6116c07ffec2139dd5eea3d33a49fd5a"
+  },
+  {
+   "file": "hls-avc-aac.ts",
+   "sha256": "913faa181cd2935b5add7f4c394b68ac4a357ee5d8cd6271c537e9e7fa54f723"
+  },
+  {
+   "file": "hls-hevc-ac3.ts",
+   "sha256": "49d766e9f7734fd945decf055f2342dad17c7453a68691f22e17365813577aaa"
+  },
+  {
+   "file": "program-hevc-ac3.ts",
+   "sha256": "e1068a525437c1eecdfef7804e45df8dc96f15de7194fe3ee2ce5a74d5fbd5e4"
+  },
+  {
+   "file": "program.ts",
+   "sha256": "1bd367c6aefb7e379ff78a3a064981d688e38faae70185058f854cc8e7d9550a"
+  },
+  {
+   "file": "service-5.ts",
+   "sha256": "99a39e3e79782d535b305eb685a7ee41da02324647247d640d4eff1b758be6c3"
+  },
+  {
+   "file": "service-7.m2ts",
+   "sha256": "12be2f37eebfcefd39847db8d282dd688f69ee9c664ad16416cda74df9179c6c"
+  },
+  {
+   "file": "video.h264",
+   "sha256": "da8e0952eabb69da053c2780a1622f42f69c8b5709e1cb57526116dc23a7a127"
+  },
+  {
+   "file": "video.hevc",
+   "sha256": "2aafba59358c4ee5e836f6793b6e91674081761b0a7647810ef59de0c6765d56"
+  }
+ ],
+ "operations": [
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-range-memory",
+    "@avc-aac.mp4"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-range-memory",
+    "@avc-aac.mp4",
+    "24320"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-range-memory",
+    "@hevc-aac-fragmented.mp4"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-range-memory",
+    "@hevc-aac-fragmented.mp4",
+    "37120"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-range-memory",
+    "@avc-opus.mp4",
+    "21760",
+    "opus-roll"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-forward-memory",
+    "@avc-aac.mp4",
+    "regular"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-forward-memory",
+    "@avc-aac-front.mp4",
+    "progressive"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mp4-forward-memory",
+    "@avc-aac-front.mp4",
+    "progressive-edited"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "ts-program-memory",
+    "@program.ts",
+    "ts188:481=avc,482=aac"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "ts-program-memory",
+    "@program-hevc-ac3.ts",
+    "ts188:768=hevc,769=ac3"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "hls-memory",
+    "@hls-avc-aac.ts",
+    "avc",
+    "aac"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "hls-memory",
+    "@hls-hevc-ac3.ts",
+    "hevc",
+    "ac3"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "raw-video-memory",
+    "@video.h264",
+    "avc"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "raw-video-memory",
+    "@video.hevc",
+    "hevc"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "feed-memory",
+    "@avc-startup.case"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "feed-memory",
+    "@avc-seek-discovery.case"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "feed-memory",
+    "@avc-seek-end.case"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "feed-memory",
+    "@hevc-startup.case"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "feed-memory",
+    "@hevc-seek-discovery.case"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "feed-memory",
+    "@hevc-seek-end.case"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-three-audio.mkv",
+    "all"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-three-audio.mkv",
+    "aac"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-three-audio.mkv",
+    "dolby"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-aac-text.mkv",
+    "aac"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "progressive-memory",
+    "@program.ts",
+    "pts-dts",
+    "before-eof"
+   ],
+   "targets": [
+    "aarch64-unknown-linux-gnu"
+   ]
+  },
+  {
+   "worker": "playback-worker",
+   "arguments": [
+    "progressive-memory",
+    "@service-5.ts",
+    "pts-only",
+    "at-eof"
+   ],
+   "targets": [
+    "aarch64-unknown-linux-gnu"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "feed-memory",
+    "@avc-startup.case"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "feed-memory",
+    "@avc-seek-discovery.case"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "feed-memory",
+    "@avc-seek-end.case"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "feed-memory",
+    "@hevc-startup.case"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "feed-memory",
+    "@hevc-seek-discovery.case"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "feed-memory",
+    "@hevc-seek-end.case"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-three-audio.mkv",
+    "all"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-three-audio.mkv",
+    "aac"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-three-audio.mkv",
+    "dolby"
+   ]
+  },
+  {
+   "worker": "playback-matroska-worker",
+   "arguments": [
+    "mkv-audio-memory",
+    "@avc-aac-text.mkv",
+    "aac"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "memory",
+    "@avc-aac-text.mkv"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "codec-memory",
+    "@avc-aac-text.mkv"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "metadata-memory",
+    "@avc-aac-text.mkv"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "catalogue-memory",
+    "@avc-aac-text.mkv"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "seek-memory",
+    "@avc-aac-text.mkv",
+    "1900000000"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "memory",
+    "@hevc-opus.mkv"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "seek-memory",
+    "@hevc-opus.mkv",
+    "2300000000"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "memory",
+    "@avc-three-audio.mkv"
+   ]
+  },
+  {
+   "worker": "media-worker",
+   "arguments": [
+    "codec-memory",
+    "@avc-three-audio.mkv"
+   ]
+  },
+  {
+   "worker": "transport-worker",
+   "arguments": [
+    "ts-au-memory",
+    "@service-5.ts",
+    "188",
+    "5"
+   ]
+  },
+  {
+   "worker": "transport-worker",
+   "arguments": [
+    "ts-au-memory",
+    "@service-7.m2ts",
+    "192",
+    "7"
+   ]
+  },
+  {
+   "worker": "transport-worker",
+   "arguments": [
+    "ts-memory",
+    "@audio-6.ts",
+    "188",
+    "6"
+   ]
+  },
+  {
+   "worker": "codec-worker",
+   "arguments": [
+    "audio-aac-access-units-memory",
+    "@avc-aac.aac-access-units"
+   ]
+  },
+  {
+   "worker": "codec-worker",
+   "arguments": [
+    "packets",
+    "mov",
+    "@avc-aac.mp4",
+    "1@1300000"
+   ]
+  },
+  {
+   "worker": "codec-worker",
+   "arguments": [
+    "packets",
+    "mov",
+    "@hevc-aac-fragmented.mp4"
+   ]
+  },
+  {
+   "worker": "isobmff-worker",
+   "arguments": [
+    "open-memory",
+    "@avc-aac.mp4",
+    "65536",
+    "0",
+    "memory",
+    "4096"
+   ]
+  },
+  {
+   "worker": "isobmff-worker",
+   "arguments": [
+    "native-index-memory",
+    "@avc-aac.mp4",
+    "65536",
+    "0",
+    "memory",
+    "4096"
+   ]
+  },
+  {
+   "worker": "isobmff-worker",
+   "arguments": [
+    "--bounded-timing",
+    "--bounded-sync",
+    "--terminal-media-prefix",
+    "open-memory",
+    "@avc-aac-front.mp4",
+    "65536",
+    "0",
+    "memory",
+    "4096"
+   ]
+  },
+  {
+   "worker": "isobmff-worker",
+   "arguments": [
+    "seek-memory",
+    "@avc-aac.mp4",
+    "1",
+    "24320",
+    "16",
+    "0",
+    "65536",
+    "0",
+    "memory",
+    "4096"
+   ]
+  },
+  {
+   "worker": "isobmff-worker",
+   "arguments": [
+    "--range-plan",
+    "seek-memory",
+    "@hevc-aac-fragmented.mp4",
+    "1",
+    "37120",
+    "16",
+    "1",
+    "65536",
+    "0",
+    "memory",
+    "4096"
+   ]
+  },
+  {
+   "worker": "isobmff-worker",
+   "arguments": [
+    "open-memory",
+    "@hevc-aac-fragmented.mp4",
+    "1",
+    "0",
+    "memory",
+    "3"
+   ]
+  },
+  {
+   "worker": "framing-worker",
+   "arguments": [
+    "nal-memory",
+    "@avc.bsf"
+   ]
+  },
+  {
+   "worker": "framing-worker",
+   "arguments": [
+    "nal-memory",
+    "@hevc.bsf"
+   ]
+  }
+ ]
+}
