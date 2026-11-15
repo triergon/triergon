@@ -2,7 +2,7 @@
 //! locator works over source run/chunk tables without a per-sample index allocation.
 use crate::{
     Access, BoxChildren, BoxStep, BoxView, BuildStatus, Limits, Sample, SampleDescription,
-    SampleStep, fields, policy,
+    SampleSpan, SampleStep, SpanStep, fields, policy,
     tables::{Offsets, Sizes, Words},
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
@@ -117,14 +117,18 @@ impl SampleTable {
             ctts_run: 0,
             ctts_left: 0,
             offset: 0,
-            chunk: 0,
-            chunk_left: 0,
-            stsc_run: 0,
-            description: 0,
-            byte: 0,
+            chunks: ChunkCursor::default(),
             dts: 0,
             sync_row: 0,
             partial_row: 0,
+        }
+    }
+    /// The byte ranges of its samples in order, without their clocks or access.
+    pub(crate) fn ranges(&self) -> SampleRanges<'_> {
+        SampleRanges {
+            table: self,
+            ordinal: 0,
+            chunks: ChunkCursor::default(),
         }
     }
     pub fn previous_sync(&self, ordinal: u64) -> Result<Option<u64>> {
@@ -799,14 +803,96 @@ pub struct SampleCursor<'a> {
     ctts_run: u32,
     ctts_left: u32,
     offset: u32,
+    chunks: ChunkCursor,
+    dts: i128,
+    sync_row: u32,
+    partial_row: u32,
+}
+
+/// The chunk holding a table's next sample: its samples left and the byte at
+/// which the next one starts.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct ChunkCursor {
     chunk: u32,
     chunk_left: u32,
     stsc_run: u32,
     description: u32,
     byte: u64,
-    dts: i128,
-    sync_row: u32,
-    partial_row: u32,
+}
+
+impl ChunkCursor {
+    /// Enter the next chunk once the current one has no samples left.
+    fn enter(&mut self, table: &SampleTable) -> Result<()> {
+        if self.chunk_left == 0 {
+            let chunk_number = u64::from(self.chunk) + 1;
+            if self.stsc_run + 1 < table.stsc.count
+                && u64::from(table.stsc.word(self.stsc_run + 1, 0)?) == chunk_number
+            {
+                self.stsc_run += 1;
+            }
+            self.chunk_left = table.stsc.word(self.stsc_run, 4)?;
+            self.description = table.stsc.word(self.stsc_run, 8)?;
+            self.byte = table.offsets.get(self.chunk)?;
+            self.chunk = self.chunk.checked_add(1).ok_or(Error::Overflow)?;
+        }
+        Ok(())
+    }
+    /// Step past the current sample, which ends at `end`.
+    fn consume(&mut self, end: u64) -> Result<()> {
+        self.byte = end;
+        self.chunk_left = self
+            .chunk_left
+            .checked_sub(1)
+            .ok_or(Error::Invalid("chunk exhausted"))?;
+        Ok(())
+    }
+}
+
+/// The byte ranges of a table's samples in order, from its chunk offsets and
+/// sizes alone: the ranges [`SampleCursor`] reports, with the same errors, a
+/// span of a chunk's consecutive samples at a time.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SampleRanges<'a> {
+    table: &'a SampleTable,
+    ordinal: u64,
+    chunks: ChunkCursor,
+}
+
+impl SampleRanges<'_> {
+    /// The next at most `maximum` samples, all in one chunk, charging a work
+    /// unit for each. A span stops before a sample whose end would overflow, and
+    /// the next step reports that sample's error.
+    pub(crate) fn next_span(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<SpanStep> {
+        let left = self.table.sample_count() - self.ordinal;
+        if left == 0 {
+            return Ok(SpanStep::End);
+        }
+        if !work.try_charge(1) {
+            return Ok(SpanStep::Yield);
+        }
+        self.chunks.enter(self.table)?;
+        let start = self.chunks.byte;
+        let wanted = left
+            .min(u64::from(self.chunks.chunk_left))
+            .min(maximum.saturating_sub(1).min(work.remaining()) + 1);
+        let (end, count) = self.table.sizes.extend(self.ordinal, wanted, start)?;
+        if count == 0 {
+            return Err(Error::Overflow);
+        }
+        work.take(count - 1);
+        self.chunks.byte = end;
+        // At most the chunk's samples left.
+        self.chunks.chunk_left -= u32::try_from(count).map_err(|_| Error::Overflow)?;
+        let first = self.ordinal + 1;
+        self.ordinal += count;
+        Ok(SpanStep::Span(SampleSpan {
+            first,
+            count,
+            range: start..end,
+            fragment: false,
+            offset_minimum: None,
+        }))
+    }
 }
 
 // Rows are strictly increasing, 1-based, and range-checked by the builder.
@@ -858,25 +944,14 @@ impl SampleCursor<'_> {
             self.offset = ctts.word(self.ctts_run, 4)?;
             self.ctts_run = self.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
         }
-        if self.chunk_left == 0 {
-            let chunk_number = u64::from(self.chunk) + 1;
-            if self.stsc_run + 1 < self.table.stsc.count
-                && u64::from(self.table.stsc.word(self.stsc_run + 1, 0)?) == chunk_number
-            {
-                self.stsc_run += 1;
-            }
-            self.chunk_left = self.table.stsc.word(self.stsc_run, 4)?;
-            self.description = self.table.stsc.word(self.stsc_run, 8)?;
-            self.byte = self.table.offsets.get(self.chunk)?;
-            self.chunk = self.chunk.checked_add(1).ok_or(Error::Overflow)?;
-        }
+        self.chunks.enter(self.table)?;
         let ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
         let table = self.table;
         let sample = table.sample_with_access(
             SamplePosition {
                 ordinal,
-                description: self.description,
-                byte: self.byte,
+                description: self.chunks.description,
+                byte: self.chunks.byte,
                 dts: self.dts,
                 delta: self.delta,
                 cto: self.offset,
@@ -893,7 +968,6 @@ impl SampleCursor<'_> {
                 Ok((sync, partial))
             },
         )?;
-        self.byte = sample.range.end;
         self.dts = self
             .dts
             .checked_add(i128::from(self.delta))
@@ -909,10 +983,7 @@ impl SampleCursor<'_> {
                 .checked_sub(1)
                 .ok_or(Error::Invalid("composition run exhausted"))?;
         }
-        self.chunk_left = self
-            .chunk_left
-            .checked_sub(1)
-            .ok_or(Error::Invalid("chunk exhausted"))?;
+        self.chunks.consume(sample.range.end)?;
         Ok(sample)
     }
 }
@@ -1393,11 +1464,7 @@ pub(crate) struct SampleCursorPosition {
     ctts_run: u32,
     ctts_left: u32,
     offset: u32,
-    chunk: u32,
-    chunk_left: u32,
-    stsc_run: u32,
-    description: u32,
-    byte: u64,
+    chunks: ChunkCursor,
     dts: i128,
     sync_row: u32,
     partial_row: u32,
@@ -1415,11 +1482,7 @@ impl SampleTable {
             ctts_run: position.ctts_run,
             ctts_left: position.ctts_left,
             offset: position.offset,
-            chunk: position.chunk,
-            chunk_left: position.chunk_left,
-            stsc_run: position.stsc_run,
-            description: position.description,
-            byte: position.byte,
+            chunks: position.chunks,
             dts: position.dts,
             sync_row: position.sync_row,
             partial_row: position.partial_row,
@@ -1437,11 +1500,7 @@ impl SampleCursor<'_> {
             ctts_run: self.ctts_run,
             ctts_left: self.ctts_left,
             offset: self.offset,
-            chunk: self.chunk,
-            chunk_left: self.chunk_left,
-            stsc_run: self.stsc_run,
-            description: self.description,
-            byte: self.byte,
+            chunks: self.chunks,
             dts: self.dts,
             sync_row: self.sync_row,
             partial_row: self.partial_row,

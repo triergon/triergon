@@ -5,7 +5,7 @@
 //! and MPEG m76694 table9 Original, experimentally. Final clauses/brands stay open.
 use crate::{
     Access, BoxChildren, BoxStep, BoxView, BuildStatus, FragmentDecodeTime, Limits, Sample,
-    SampleStep, add_offset, fields, policy,
+    SampleSpan, SampleStep, SpanStep, add_offset, fields, policy,
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -695,6 +695,76 @@ impl FragmentBuilder {
             implicit_safe: self.implicit_safe,
             decode_end: self.decode,
         })
+    }
+}
+
+/// Where a walk over a fragment index's sample ranges stands.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RunPosition {
+    run: usize,
+    sample: u32,
+    byte: u64,
+}
+
+impl FragmentIndex {
+    /// The ranges [`FragmentCursor`] reports from `position` on, with the same
+    /// errors: the next at most `maximum` samples of one run, charging a work
+    /// unit for each and for each run passed. A span stops before a sample whose
+    /// end would overflow, and the next step reports that sample's error.
+    pub(crate) fn next_span(
+        &self,
+        position: &mut RunPosition,
+        maximum: u64,
+        work: &mut WorkBudget,
+    ) -> Result<SpanStep> {
+        loop {
+            let Some(run) = self.runs.as_slice().get(position.run) else {
+                return Ok(SpanStep::End);
+            };
+            if !work.try_charge(1) {
+                return Ok(SpanStep::Yield);
+            }
+            if position.sample == run.wire.count {
+                position.run = position.run.checked_add(1).ok_or(Error::Overflow)?;
+                position.sample = 0;
+                continue;
+            }
+            let start = if position.sample == 0 {
+                run.byte
+            } else {
+                position.byte
+            };
+            let wanted = u64::from(run.wire.count - position.sample)
+                .min(maximum.saturating_sub(1).min(work.remaining()) + 1);
+            let (mut end, mut count, mut offset_minimum) = (start, 0u32, None::<i32>);
+            while u64::from(count) < wanted {
+                let values = run.wire.values(position.sample + count, self.defaults)?;
+                match end.checked_add(u64::from(values.size)) {
+                    Some(next) => end = next,
+                    None if count == 0 => return Err(Error::Overflow),
+                    None => break,
+                }
+                if let Some(offset) = values.cto {
+                    let signed = offset.raw_bits().cast_signed();
+                    offset_minimum = Some(offset_minimum.map_or(signed, |least| least.min(signed)));
+                }
+                count += 1;
+            }
+            work.take(u64::from(count) - 1);
+            let first = run
+                .ordinal
+                .checked_add(u64::from(position.sample))
+                .ok_or(Error::Overflow)?;
+            position.sample += count;
+            position.byte = end;
+            return Ok(SpanStep::Span(SampleSpan {
+                first,
+                count: u64::from(count),
+                range: start..end,
+                fragment: true,
+                offset_minimum,
+            }));
+        }
     }
 }
 

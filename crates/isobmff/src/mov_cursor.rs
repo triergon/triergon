@@ -10,7 +10,7 @@
 use crate::{
     CursorStatus, DurationBasis, EditCursor, EditLimits, EditList, FragmentIndex, MediaClock,
     PacketProjector, PacketView, Sample, SampleStep, SampleTable, SchedulingClock, SourceTrack,
-    TrackSampleCursor,
+    SpanStep, TrackSampleCursor, interleave::TrackSpans, require_range_within,
 };
 use std::{
     ops::Range,
@@ -527,7 +527,11 @@ pub struct PacketCursor<'a> {
     previous_ordinal: u64,
     validated: u64,
     generated: u64,
-    checking: Option<Sample>,
+    checking: Option<Range<u64>>,
+    /// The track whose sample extents are being checked.
+    spans: Option<TrackSpans<'a>>,
+    /// Samples left to check one at a time.
+    stepping: u64,
     low: usize,
     high: usize,
     best: Option<usize>,
@@ -729,6 +733,8 @@ impl<'a> PacketCursor<'a> {
             validated: 0,
             generated: 0,
             checking: None,
+            spans: None,
+            stepping: 0,
             low: 0,
             high: 0,
             best: None,
@@ -1334,9 +1340,15 @@ impl<'a> PacketCursor<'a> {
                         continue;
                     }
                     let slot = &mut self.slots.as_mut_slice()[self.at];
-                    match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(CursorStatus::Yield),
-                        SampleStep::End => {
+                    let spans = match &mut self.spans {
+                        Some(spans) => spans,
+                        None => self.spans.insert(TrackSpans::new(slot.source()?)),
+                    };
+                    let before = *spans;
+                    let maximum = if self.stepping == 0 { u64::MAX } else { 1 };
+                    let span = match spans.poll(maximum, work)? {
+                        SpanStep::Yield => return Ok(CursorStatus::Yield),
+                        SpanStep::End => {
                             if !work.try_charge(1) {
                                 return Ok(CursorStatus::Yield);
                             }
@@ -1348,72 +1360,99 @@ impl<'a> PacketCursor<'a> {
                             }
                             self.at += 1;
                             self.previous_ordinal = 0;
+                            self.spans = None;
+                            self.stepping = 0;
+                            continue;
                         }
-                        SampleStep::Sample(sample) => {
-                            self.validated =
-                                self.validated.checked_add(1).ok_or(Error::Overflow)?;
-                            count(self.validated, self.limits.max_source_samples)?;
-                            if sample.ordinal <= self.previous_ordinal {
-                                return Err(Error::Invalid("native source ordinal order"));
-                            }
-                            self.previous_ordinal = sample.ordinal;
-                            slot.saw_fragment |= sample.fragment_flags.is_some();
-                            if let Some(offset) = sample
-                                .composition_offset
-                                .filter(|_| sample.fragment_flags.is_some())
-                            {
-                                let signed = i32::from_be_bytes(offset.raw_bits().to_be_bytes());
-                                slot.fragment_cto_minimum =
-                                    slot.fragment_cto_minimum.min(i64::from(signed));
-                            }
-                            if let [extent] = self.media
-                                && self.terminal.is_none()
-                                && self.forward_regular.is_none()
-                                && work.try_charge(2)
-                            {
-                                // A single extent needs no search state. Charge the same
-                                // lookup and bounds check as the resumable path.
-                                if sample.range.start < extent.start {
-                                    return Err(Error::Invalid("native sample outside mdat"));
-                                }
-                                sample.require_within(extent.clone())?;
-                                continue;
-                            }
-                            if self.media.len() > 1
-                                && self.terminal.is_none()
-                                && self.forward_regular.is_none()
-                                && work.try_charge(u64::from(self.media.len().ilog2()) + 3)
-                            {
-                                // Reserve the full partition search and bounds check.
-                                // Small grants use the resumable search below.
-                                let end = self
-                                    .media
-                                    .partition_point(|extent| extent.start <= sample.range.start);
-                                let extent = end
-                                    .checked_sub(1)
-                                    .and_then(|at| self.media.get(at))
-                                    .ok_or(Error::Invalid("native sample outside mdat"))?;
-                                sample.require_within(extent.clone())?;
-                                continue;
-                            }
-                            self.checking = Some(sample);
-                            self.low = 0;
-                            self.high = self.media.len();
-                            self.phase = Phase::Bounds;
+                        SpanStep::Span(span) => span,
+                    };
+                    if self.stepping == 0 {
+                        // A span that lies in one extent passes every sample's
+                        // check at once. Any other is checked a sample at a time,
+                        // which reports the first failure.
+                        let fits = self.terminal.is_none()
+                            && self.forward_regular.is_none()
+                            && span.first > self.previous_ordinal
+                            && self
+                                .validated
+                                .checked_add(span.count)
+                                .is_some_and(|total| total <= self.limits.max_source_samples)
+                            && work.try_charge(u64::from(
+                                self.media.len().checked_ilog2().unwrap_or(0),
+                            ))
+                            && within_one_extent(self.media, &span.range);
+                        if !fits {
+                            *spans = before;
+                            self.stepping = span.count;
+                            continue;
                         }
                     }
+                    if span.fragment {
+                        slot.saw_fragment = true;
+                        if let Some(minimum) = span.offset_minimum {
+                            slot.fragment_cto_minimum =
+                                slot.fragment_cto_minimum.min(i64::from(minimum));
+                        }
+                    }
+                    if self.stepping == 0 {
+                        self.validated += span.count;
+                        self.previous_ordinal = span.first + (span.count - 1);
+                        continue;
+                    }
+                    self.stepping -= 1;
+                    let (ordinal, range) = (span.first, span.range);
+                    self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
+                    count(self.validated, self.limits.max_source_samples)?;
+                    if ordinal <= self.previous_ordinal {
+                        return Err(Error::Invalid("native source ordinal order"));
+                    }
+                    self.previous_ordinal = ordinal;
+                    if let [extent] = self.media
+                        && self.terminal.is_none()
+                        && self.forward_regular.is_none()
+                        && work.try_charge(2)
+                    {
+                        // A single extent needs no search state. Charge the same
+                        // lookup and bounds check as the resumable path.
+                        if range.start < extent.start {
+                            return Err(Error::Invalid("native sample outside mdat"));
+                        }
+                        require_range_within(&range, extent.clone())?;
+                        continue;
+                    }
+                    if self.media.len() > 1
+                        && self.terminal.is_none()
+                        && self.forward_regular.is_none()
+                        && work.try_charge(u64::from(self.media.len().ilog2()) + 3)
+                    {
+                        // Reserve the full partition search and bounds check.
+                        // Small grants use the resumable search below.
+                        let end = self
+                            .media
+                            .partition_point(|extent| extent.start <= range.start);
+                        let extent = end
+                            .checked_sub(1)
+                            .and_then(|at| self.media.get(at))
+                            .ok_or(Error::Invalid("native sample outside mdat"))?;
+                        require_range_within(&range, extent.clone())?;
+                        continue;
+                    }
+                    self.checking = Some(range);
+                    self.low = 0;
+                    self.high = self.media.len();
+                    self.phase = Phase::Bounds;
                 }
                 Phase::Bounds => {
                     if !work.try_charge(1) {
                         return Ok(CursorStatus::Yield);
                     }
-                    let sample = self
+                    let range = self
                         .checking
                         .as_ref()
                         .ok_or(Error::Invalid("native pending validation"))?;
                     if self.low < self.high {
                         let mid = self.low + (self.high - self.low) / 2;
-                        if self.media[mid].start <= sample.range.start {
+                        if self.media[mid].start <= range.start {
                             self.low = mid + 1;
                         } else {
                             self.high = mid;
@@ -1421,19 +1460,19 @@ impl<'a> PacketCursor<'a> {
                     } else {
                         if let Some(terminal) = self
                             .terminal
-                            .filter(|tail| sample.range.start >= tail.payload_start())
+                            .filter(|tail| range.start >= tail.payload_start())
                         {
-                            terminal.require_sample(sample)?;
+                            terminal.require_range(range)?;
                         } else if !self
                             .forward_regular
-                            .is_some_and(|bounds| bounds.can_defer(sample))
+                            .is_some_and(|bounds| bounds.can_defer(range))
                         {
                             let extent = self
                                 .low
                                 .checked_sub(1)
                                 .and_then(|at| self.media.get(at))
                                 .ok_or(Error::Invalid("native sample outside mdat"))?;
-                            sample.require_within(extent.clone())?;
+                            require_range_within(range, extent.clone())?;
                         }
                         self.checking = None;
                         self.phase = Phase::Validate;
@@ -1698,6 +1737,14 @@ impl<'a> PacketCursor<'a> {
             }
         }
     }
+}
+
+/// Whether `range` lies in the extent that holds its start.
+fn within_one_extent(media: &[Range<u64>], range: &Range<u64>) -> bool {
+    let end = media.partition_point(|extent| extent.start <= range.start);
+    end.checked_sub(1)
+        .and_then(|at| media.get(at))
+        .is_some_and(|extent| require_range_within(range, extent.clone()).is_ok())
 }
 
 fn record_duration(duration: &mut i64, packet: &PacketOccurrence) -> Result<()> {

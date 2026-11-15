@@ -66,7 +66,10 @@ impl TerminalMdat {
     /// Checks the source-declared lower bound. Actual sample bytes must still be
     /// read, and only a source-bound completion can establish the final endpoint.
     pub fn require_sample(self, sample: &Sample) -> Result<()> {
-        if sample.range.start > sample.range.end || sample.range.start < self.payload_start {
+        self.require_range(&sample.range)
+    }
+    pub(crate) fn require_range(self, range: &Range<u64>) -> Result<()> {
+        if range.start > range.end || range.start < self.payload_start {
             return Err(Error::Invalid("sample outside terminal MDAT declaration"));
         }
         Ok(())

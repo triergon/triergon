@@ -171,6 +171,34 @@ impl Sizes {
     }
 }
 
+impl Sizes {
+    /// Lays `count` samples from `first` out from byte `start`: the end of the
+    /// last one and how many fit, fewer only where the next end would overflow.
+    pub(crate) fn extend(&self, first: u64, count: u64, start: u64) -> Result<(u64, u64)> {
+        if self.constant != 0 {
+            let last = first
+                .checked_add(count)
+                .and_then(|end| end.checked_sub(1))
+                .ok_or(Error::Overflow)?;
+            if count != 0 && last >= u64::from(self.count) {
+                return Err(Error::Invalid("sample size index"));
+            }
+            let size = u64::from(self.constant);
+            let fit = count.min((u64::MAX - start) / size);
+            return Ok((start + fit * size, fit));
+        }
+        let mut end = start;
+        for at in 0..count {
+            let sample = first.checked_add(at).ok_or(Error::Overflow)?;
+            match end.checked_add(u64::from(self.get(sample)?)) {
+                Some(next) => end = next,
+                None => return Ok((end, at)),
+            }
+        }
+        Ok((end, count))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Offsets {
     pub table: Words,
