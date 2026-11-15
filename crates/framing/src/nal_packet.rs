@@ -1154,6 +1154,8 @@ impl PacketPlan {
         }
         Ok(())
     }
+    // Share storage accounting across the packet and configuration segments.
+    #[inline(never)]
     fn append<M>(
         &mut self,
         state: &mut PacketState<'_, M>,

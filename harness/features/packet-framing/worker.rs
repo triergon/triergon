@@ -113,6 +113,11 @@ fn write_report(
         b",\"digest_b\":",
         b",\"elapsed_ns\":",
     ];
+    // All fields and up to six 20-digit values fit in this record. Build it
+    // once so the report needs only one call to the buffered stdout writer.
+    const CAPACITY: usize = 256;
+    let mut encoded = [0; CAPACITY];
+    let mut remaining = &mut encoded[..];
     for (key, mut number) in KEYS.into_iter().zip([
         u64::from(iterations),
         total.packets,
@@ -131,10 +136,12 @@ fn write_report(
                 break;
             }
         }
-        output.write_all(key)?;
-        output.write_all(&digits[start..])?;
+        remaining.write_all(key)?;
+        remaining.write_all(&digits[start..])?;
     }
-    output.write_all(b",\"eof\":true}\n")
+    remaining.write_all(b",\"eof\":true}\n")?;
+    let length = CAPACITY - remaining.len();
+    output.write_all(&encoded[..length])
 }
 
 /// `nal-fold FILE`, `nal-bench FILE ITERATIONS`, `nal-memory FILE`, or `identity -`.

@@ -92,6 +92,8 @@ impl<'a> NalPacketConfigWriter<'a> {
             rejection_taken: false,
         })
     }
+    // Sizing and copying use the same checked view of the config record.
+    #[inline(never)]
     fn nal(
         config: &NalPacketConfiguration,
         length_prefixed: bool,
