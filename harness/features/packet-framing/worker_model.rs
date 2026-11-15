@@ -1,4 +1,5 @@
 //! Caller-owned, preloaded immutable input. Codec parsing remains in each operation.
+use std::ops::Range;
 use triergon_core::{Budget, Bytes, Error, Result};
 use triergon_framing::{Codec, NalPacketFields};
 
@@ -7,8 +8,8 @@ pub(super) const CAP: usize = 16 * 1024 * 1024;
 pub enum Event {
     Packet {
         fields: NalPacketFields,
-        bytes: Bytes,
-        extra: Option<Bytes>,
+        bytes: Range<usize>,
+        extra: Option<Range<usize>>,
         offset: u64,
         extra_offset: u64,
     },
@@ -20,6 +21,7 @@ pub struct Case {
     pub pool: Budget,
     pub codec: Codec,
     pub configuration: Bytes,
+    pub input: Bytes,
     pub config_offset: u64,
     pub events: Vec<Event>,
     pub baseline: usize,
@@ -29,8 +31,8 @@ struct Reader<'a> {
     raw: &'a [u8],
     at: usize,
 }
-impl Reader<'_> {
-    fn take(&mut self, n: usize) -> Result<&[u8]> {
+impl<'a> Reader<'a> {
+    fn take(&mut self, n: usize) -> Result<&'a [u8]> {
         let end = self.at.checked_add(n).ok_or(Error::Overflow)?;
         let part = self.raw.get(self.at..end).ok_or(Error::Truncated)?;
         self.at = end;
@@ -42,25 +44,27 @@ impl Reader<'_> {
     fn len32(&mut self) -> Result<usize> {
         usize::try_from(u32::from_be_bytes(self.fixed()?)).map_err(|_| Error::Overflow)
     }
-    fn blob(&mut self, pool: &Budget, n: usize) -> Result<Bytes> {
+    fn blob(&mut self, n: usize) -> Result<&'a [u8]> {
         if n > CAP {
             return Err(Error::Limit {
                 requested: n,
                 maximum: CAP,
             });
         }
-        // Same caller padding guarantee as the native input templates. The
-        // logical Bytes view excludes padding and retains the charged storage.
-        let source = self.take(n)?;
-        let mut padded = Vec::new();
-        padded
-            .try_reserve_exact(n.checked_add(64).ok_or(Error::Overflow)?)
-            .map_err(|_| Error::Allocation)?;
-        padded.extend_from_slice(source);
-        padded.resize(n + 64, 0);
-        let storage = Bytes::try_from_vec(pool, padded).map_err(|e| e.error())?;
-        storage.into_slice(0..n)
+        self.take(n)
     }
+}
+
+// Each view excludes the 64 zero bytes that follow its input. This keeps
+// the caller padding guarantee with one shared allocation for all views.
+const PADDING: usize = 64;
+
+fn append_blob(arena: &mut Vec<u8>, raw: &[u8]) -> Range<usize> {
+    let start = arena.len();
+    arena.extend_from_slice(raw);
+    let end = arena.len();
+    arena.resize(end + PADDING, 0);
+    start..end
 }
 
 impl Case {
@@ -83,7 +87,7 @@ impl Case {
         };
         let config_len = r.len32()?;
         let config_offset = r.at as u64;
-        let configuration = r.blob(&pool, config_len)?;
+        let config = r.blob(config_len)?;
         let count = r.len32()?;
         if count > 64 {
             return Err(Error::Limit {
@@ -91,6 +95,13 @@ impl Case {
                 maximum: 64,
             });
         }
+        let mut arena = Vec::new();
+        // Each action has at most two blobs, and their bytes are already in
+        // the bounded script. This reservation covers all padding up front.
+        arena
+            .try_reserve_exact(raw.len() + (1 + 2 * count) * PADDING)
+            .map_err(|_| Error::Allocation)?;
+        let configuration_range = append_blob(&mut arena, config);
         let mut events = Vec::new();
         events
             .try_reserve_exact(count)
@@ -111,13 +122,13 @@ impl Case {
                     let size = r.len32()?;
                     let extra_size = u32::from_be_bytes(r.fixed()?);
                     let offset = r.at as u64;
-                    let bytes = r.blob(&pool, size)?;
+                    let bytes = append_blob(&mut arena, r.blob(size)?);
                     let extra_offset = r.at as u64;
                     let extra = if extra_size == u32::MAX {
                         None
                     } else {
                         let length = usize::try_from(extra_size).map_err(|_| Error::Overflow)?;
-                        Some(r.blob(&pool, length)?)
+                        Some(append_blob(&mut arena, r.blob(length)?))
                     };
                     Event::Packet {
                         fields,
@@ -134,11 +145,14 @@ impl Case {
         if r.at != raw.len() {
             return Err(Error::Invalid("trailing case bytes"));
         }
+        let input = Bytes::try_from_vec(&pool, arena).map_err(|e| e.error())?;
+        let configuration = input.slice(configuration_range)?;
         let baseline = pool.used();
         Ok(Self {
             pool,
             codec,
             configuration,
+            input,
             config_offset,
             events,
             baseline,

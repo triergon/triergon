@@ -240,6 +240,10 @@ fn operation(case: &Case) -> Result<Outcome> {
             }
             continue;
         };
+        let extra = extra
+            .as_ref()
+            .map(|range| case.input.slice(range.clone()))
+            .transpose()?;
         let mut update = None;
         if case.codec == Codec::Avc
             && let Some(raw) = extra.as_ref().filter(|b| !b.is_empty())
@@ -254,14 +258,14 @@ fn operation(case: &Case) -> Result<Outcome> {
             }
         }
         let packet = NalPacket {
-            bytes: bytes.clone(),
+            bytes: case.input.slice(bytes.clone())?,
             fields: *fields,
             location: SourceLocation {
                 source: SourceId(1),
                 offset: *offset,
             },
             generation: 1,
-            new_extradata: extra.clone(),
+            new_extradata: extra,
         };
         let mut job = match session.receiver_packet(packet, update) {
             Ok(job) => job,
