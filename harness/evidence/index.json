@@ -31152,6 +31152,150 @@
     "candidate": "8d6f278949aed417290058f1212dee0fc2a97243",
     "baseline": "985bb4d4502743c06413812d7655d85ba15b452a"
    }
+  },
+  {
+   "name": "gate-run-aarch64-6d5145d7-20261115-071404-shard-2",
+   "path": "gate-run-aarch64-6d5145d7-20261115-071404-shard-2",
+   "retention": "retained",
+   "reason": "A partial gate run at 6d5145d7 on Linux AArch64, c6g.4xlarge, items subtitle-cc, tests and tests-release on two hosts, of which this shard ran subtitle-cc (with the worker tests and the core time test) from the gate image with evidence set subtitle-cc-inputs unpacked at the repository root before the host got ready: 461/461 caption cases pass timing, memory and the grade; its checked tests failed only on the manifest membership test's count of 449 caption cases, corrected in f9b3f138; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the closed caption row",
+   "key": "evidence/gate-runs/6d5145d7f31b002c72f9815130b522964d2abb64-aarch64-20261115-071404/shard-2/7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497.tar.zst",
+   "sha256": "7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497",
+   "bytes": 59347851,
+   "results": [
+    {
+     "path": "memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "cbccdf6d3ff2a9b2d7899cc85f2ac97384aadffad5d76d56105a84c81dd2f944",
+     "status": 0,
+     "report_sha256": "a9ab6b73961ab8656a18a0b2bb2474dfdc014d9c32fe4f4321f9dfc6eb9d564c",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "69a44be35ea8831b6e7fd5254b9477b258dff204d5e62d82fe64f7201242c514",
+     "status": 0,
+     "report_sha256": "a79186ef33b834257e4f1506d31233c6dc91dab6aa5784f70068c6ebe4fedf17",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "77cc6b387507201c794014abdb4d321834c2464920b1830d3ffd3fd901e9c3f4",
+     "status": 0,
+     "report_sha256": "8adb189196e38ca7889603f2982c748109f9c483e3a768440e3d4b0a7216573c"
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "ec64228d264919f4f588d567235178acae5a2139265a5c8abb280ceb8cfa4b3a",
+     "status": 101,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6d5145d7f31b002c72f9815130b522964d2abb64"
+   }
+  },
+  {
+   "name": "gate-run-armv7-6d5145d7-20261115-071435-shard-2",
+   "path": "gate-run-armv7-6d5145d7-20261115-071435-shard-2",
+   "retention": "retained",
+   "reason": "A partial gate run at 6d5145d7 on 32-bit ARMv7, c6g.4xlarge, items subtitle-cc, tests and tests-release on two hosts, of which this shard ran subtitle-cc (with the worker tests and the core time test) from the gate image with evidence set subtitle-cc-inputs unpacked at the repository root before the host got ready: 461/461 caption cases pass timing, memory and the grade; its checked tests failed only on the manifest membership test's count of 449 caption cases, corrected in f9b3f138; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the ARMv7 closed caption row",
+   "key": "evidence/gate-runs/6d5145d7f31b002c72f9815130b522964d2abb64-armv7-20261115-071435/shard-2/284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277.tar.zst",
+   "sha256": "284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277",
+   "bytes": 52379165,
+   "results": [
+    {
+     "path": "memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "44527cdbc6e2571f34e332fbe30d16985ab434698ab1795333118dcb077d2eb8",
+     "status": 0,
+     "report_sha256": "6206ec6eb9599c795b6db2ae072262a0ab28bac57eef7c0e6deb8e28c5fe8386",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "6cb9cb4a22d3c35d2eed4eb0aa03e26a7a2edd259ba2563309efde1edfa49695",
+     "status": 0,
+     "report_sha256": "a77479e64b5fd40b3ced17434cd6d97ed7ba1f6ec1a48eedd9eeb71b70c68e8d",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "3b4da85ec583166e3cd2971508fc4fdec0f313868289b5a8b006545b26b666da",
+     "status": 0,
+     "report_sha256": "0cd1f611418a3d46649d690b520bcc9c30e5334cdb5d0bc610a751e1e1d78347"
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "5252dc898d92aeb935244711ef9adaecb3a2730326a9604690b8864684a31570",
+     "status": 101,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6d5145d7f31b002c72f9815130b522964d2abb64"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-f9b3f138-20261115-075910-shard-1",
+   "path": "gate-run-aarch64-f9b3f138-20261115-075910-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at f9b3f138 on Linux AArch64, c6g.4xlarge, items tests and tests-release on one host from the gate image: the workspace tests, checked and release, pass; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the tests of the closed caption change",
+   "key": "evidence/gate-runs/f9b3f13839e31b8a1c97cb299902e9748acaf9ec-aarch64-20261115-075910/shard-1/07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479.tar.zst",
+   "sha256": "07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479",
+   "bytes": 6182289,
+   "results": [
+    {
+     "path": "tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "43faca389064aa1acddd0e175700ea36b816fbc9e8d880adf9bd9aec2908b352",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "f483b8780feaad991472ba4f31507ca60df981631035259f8855ae102b1904cd",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+   }
+  },
+  {
+   "name": "gate-run-armv7-f9b3f138-20261115-075939-shard-1",
+   "path": "gate-run-armv7-f9b3f138-20261115-075939-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at f9b3f138 on 32-bit ARMv7, c6g.4xlarge, items tests and tests-release on one host from the gate image: the workspace tests, checked and release, pass; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the tests of the closed caption change",
+   "key": "evidence/gate-runs/f9b3f13839e31b8a1c97cb299902e9748acaf9ec-armv7-20261115-075939/shard-1/78d171085e6d6e671d46fcd595877ffd7417ebedcb28f9b5f54d67eed52242d8.tar.zst",
+   "sha256": "78d171085e6d6e671d46fcd595877ffd7417ebedcb28f9b5f54d67eed52242d8",
+   "bytes": 6468673,
+   "results": [
+    {
+     "path": "tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "4c081eb9de88fbf57de39aac77735756f18277dae83386392f7a716502ed6562",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "7b1831d7c54e58d766dfd784842d374ff33cce4b7ec84e21bb3582234a26f1a5",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+   }
   }
  ]
 }
