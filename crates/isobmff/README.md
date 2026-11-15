@@ -483,13 +483,12 @@ corpus:
 every Nth of them; every case is compared in every run. The worker runs a range plan
 for a seek mode given `--range-plan`.
 
-Gate results (c6g.4xlarge, `00159785`): every case matches on both targets, and every
-open and index input passes runtime and memory. The eight authored movies do not:
-129 of their cases fail runtime (worst upper bound 6.32 on Linux AArch64, 10.70 on
-32-bit ARMv7), because the open walks each track's samples three times (the index
-build, the byte-range validation and the per-sample fill of the packet cursor), and
-`fragmented-1200` fails heap (worst 1.203), because the 64 KiB input window holds all
-of its 33,408 bytes while the open walks its fragments.
+Gate results (c6g.4xlarge, `e2d4a6a3`): every case matches, and all 472 timed cases
+pass runtime and memory on both targets (worst upper bound 0.8908 on Linux AArch64 and
+1.0130 on 32-bit ARMv7, peak heap at most 0.9032 of the reference's). Seeks read
+plain and single-edit regular tracks and fragment-only tracks from their sample tables,
+build only the occurrence they land on, start each track of a global seek where its own
+seek stopped, and check sample byte ranges a chunk or a fragment run at a time.
 
 Not compared yet: the compatibility seek refuses a global seek across tracks with
 unequal clocks, overlapping or null index clocks and regular table recovery as
