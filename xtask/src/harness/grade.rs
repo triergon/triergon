@@ -124,15 +124,23 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
 }
 
 /// The fields of a case row that its timing and memory collections must agree on:
-/// all but the measurements and the elapsed time of the reference's parity run,
-/// which each collection's own parity run records. The run's status is compared.
+/// Compare parity outputs and status, plus the presence of a valid duration.
+/// Its numeric value may differ because each collection runs its own probe.
 fn joined_fields(row: &Value) -> R<Value> {
     let mut fields = without(row, &["timing", "memory"])?;
     if let Some(parity) = row.get("parity")
         && let Some(run) = parity.get("reference_run")
     {
+        let elapsed = run.get("elapsed_ns").ok_or("missing elapsed_ns")?;
+        let has_duration = *elapsed != Value::Null;
+        if has_duration {
+            u64::try_from(integer(run, "elapsed_ns")?)
+                .map_err(|_| "reference process duration must fit u64")?;
+        }
         let mut parity = parity.clone();
-        put(&mut parity, "reference_run", without(run, &["elapsed_ns"])?)?;
+        let mut run = run.clone();
+        put(&mut run, "elapsed_ns", Value::Bool(has_duration))?;
+        put(&mut parity, "reference_run", run)?;
         put(&mut fields, "parity", parity)?;
     }
     Ok(fields)
@@ -1981,6 +1989,34 @@ mod tests {
             Value::Array(samples),
         );
         assert!(fixture.join().unwrap_err().contains("digest_b"));
+    }
+
+    #[test]
+    fn independent_framing_probes_may_take_different_time() {
+        let row = |status: &str, elapsed, digest| {
+            object(&[(
+                "parity",
+                object(&[
+                    ("reference", object(&[("digest", Value::int(digest))])),
+                    (
+                        "reference_run",
+                        object(&[("elapsed_ns", elapsed), ("status", Value::str(status))]),
+                    ),
+                ]),
+            )])
+        };
+        let timed = joined_fields(&row("ok", Value::int(100), 1)).unwrap();
+        let other = joined_fields(&row("ok", Value::int(200), 1)).unwrap();
+        assert!(require_same(&timed, &other, "case fields/parity").is_ok());
+        for different in [
+            row("timeout", Value::int(200), 1),
+            row("ok", Value::int(200), 2),
+            row("ok", Value::Null, 1),
+        ] {
+            let different = joined_fields(&different).unwrap();
+            assert!(require_same(&timed, &different, "case fields/parity").is_err());
+        }
+        assert!(joined_fields(&row("ok", Value::int(-1), 1)).is_err());
     }
 
     #[test]

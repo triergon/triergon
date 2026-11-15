@@ -502,6 +502,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             &format!("--{mode}"),
             "--pairs",
             &pairs,
+            "--no-early-stop",
             "--output",
             &format!("{out}/{mode}/framing"),
         ]))
