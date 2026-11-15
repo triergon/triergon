@@ -1032,6 +1032,57 @@ impl<'a> SampleCursor<'a> {
     }
 }
 
+/// The decode deltas of a table's samples in order, from its time runs alone:
+/// the durations [`SampleCursor`] reports for them.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DecodeDeltas<'a> {
+    table: &'a SampleTable,
+    ordinal: u64,
+    run: u32,
+    left: u32,
+    delta: u32,
+}
+
+/// One step of [`DecodeDeltas`].
+#[derive(Debug)]
+pub(crate) enum DeltaStep {
+    Delta(u32),
+    Yield,
+    End,
+}
+
+impl<'a> DecodeDeltas<'a> {
+    pub(crate) fn new(table: &'a SampleTable) -> Self {
+        Self {
+            table,
+            ordinal: 0,
+            run: 0,
+            left: 0,
+            delta: 0,
+        }
+    }
+    /// The next sample's decode delta, for a work unit.
+    pub(crate) fn poll(&mut self, work: &mut WorkBudget) -> Result<DeltaStep> {
+        if self.ordinal == self.table.sample_count() {
+            return Ok(DeltaStep::End);
+        }
+        if !work.try_charge(1) {
+            return Ok(DeltaStep::Yield);
+        }
+        if self.left == 0 {
+            self.left = self.table.stts.word(self.run, 0)?;
+            self.delta = self.table.stts.word(self.run, 4)?;
+            self.run = self.run.checked_add(1).ok_or(Error::Overflow)?;
+        }
+        self.left = self
+            .left
+            .checked_sub(1)
+            .ok_or(Error::Invalid("time run exhausted"))?;
+        self.ordinal += 1;
+        Ok(DeltaStep::Delta(self.delta))
+    }
+}
+
 /// A sample [`SampleCursor::skip`] stepped past.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SkippedSample {

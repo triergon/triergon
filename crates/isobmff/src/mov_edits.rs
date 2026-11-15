@@ -7,6 +7,7 @@
 use crate::{
     Access, ClockField, EditList, PacketProjector, PacketView, ProjectedEdit, Sample, SampleCursor,
     SampleStep, SampleTable,
+    regular::{DecodeDeltas, DeltaStep},
 };
 use triergon_core::{Error, Result, Rounding, Time, TimeBase, WorkBudget};
 
@@ -75,7 +76,7 @@ pub struct EditCursor<'a> {
     limits: EditLimits,
     phase: Phase,
     scan: SampleCursor<'a>,
-    duration_scan: SampleCursor<'a>,
+    duration_scan: DecodeDeltas<'a>,
     staging: Option<EditOccurrence>,
     after_emit: Phase,
     next_edit: u32,
@@ -136,7 +137,7 @@ impl<'a> EditCursor<'a> {
             limits,
             phase: Phase::Advance,
             scan: table.cursor(),
-            duration_scan: table.cursor(),
+            duration_scan: DecodeDeltas::new(table),
             staging: None,
             after_emit: Phase::Emit,
             next_edit: 0,
@@ -417,7 +418,18 @@ impl<'a> EditCursor<'a> {
                     }
                 },
                 Phase::Emit => {
-                    if self.staging.is_none() {
+                    let mut next = if let Some(staged) = self.staging.take() {
+                        staged
+                    } else {
+                        // Finding the edit checked the samples before its first.
+                        while self.scan.ordinal() + 1 < self.first {
+                            if !work.try_charge(1) {
+                                return Ok(CursorStatus::Yield);
+                            }
+                            self.scan.skip()?;
+                            self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
+                            count_limit(self.scanned, self.limits.max_scanned_samples)?;
+                        }
                         let source = match self.scan_sample(work)? {
                             SampleStep::Yield => return Ok(CursorStatus::Yield),
                             SampleStep::End => {
@@ -445,31 +457,30 @@ impl<'a> EditCursor<'a> {
                         self.staged_empty_endpoint = false;
                         self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                         count_limit(self.generated, self.limits.max_occurrences)?;
-                        self.staging = Some(EditOccurrence {
+                        EditOccurrence {
                             sequence: self.generated,
                             edit_ordinal: self.next_edit,
                             source,
                             demux,
                             duration_basis: DurationBasis::SourceDeltaAtTerminal,
-                        });
-                    }
+                        }
+                    };
                     // One original decode-table row per packet ordinal until
                     // exhausted. This cursor is independent of the repeated
                     // source occurrence scan; neither source samples nor runs
-                    // are expanded. Keep staging across a one-token work yield.
+                    // are expanded. Keep the occurrence across a one-token work yield.
                     let delta = match self.duration_scan.poll(work)? {
-                        SampleStep::Yield => return Ok(CursorStatus::Yield),
-                        SampleStep::Sample(sample) => {
+                        DeltaStep::Yield => {
+                            self.staging = Some(next);
+                            return Ok(CursorStatus::Yield);
+                        }
+                        DeltaStep::Delta(delta) => {
                             self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
                             count_limit(self.scanned, self.limits.max_scanned_samples)?;
-                            Some(sample.duration_ticks)
+                            Some(delta)
                         }
-                        SampleStep::End => None,
+                        DeltaStep::End => None,
                     };
-                    let mut next = self
-                        .staging
-                        .take()
-                        .ok_or(Error::Invalid("missing staged native occurrence"))?;
                     if let Some(delta) = delta {
                         next.demux.duration = i64::from(delta);
                         next.duration_basis = DurationBasis::OriginalDecodeTableOrdinal;
