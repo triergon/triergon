@@ -535,10 +535,11 @@ impl AvcConfigParser {
                             if matches!(self.phase, Phase::Count) {
                                 let count = self.total.checked_add(1).ok_or(Error::Overflow)?;
                                 check_limit(count, self.limits.maximum_nals)?;
-                                if self.total < INLINE_NALS
-                                    && let Some(nals) = &mut self.nals
+                                if let Some(AvcNalStorage::Inline { data, len }) = &mut self.nals
+                                    && let Some(slot) = data.get_mut(self.total)
                                 {
-                                    nals.try_push(AvcNalDescriptor::new(&payload, kind, header))?;
+                                    *slot = AvcNalDescriptor::new(&payload, kind, header);
+                                    *len = count as u8;
                                 }
                                 self.total = count;
                             } else {
