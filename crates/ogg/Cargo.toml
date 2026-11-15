@@ -1,7 +1,7 @@
 [package]
 name = "triergon-ogg"
 version = "0.0.0"
-description = "Ogg reader: pages, packets and the FLAC, Opus and Vorbis mappings"
+description = "Ogg reader: pages, packets and the FLAC, Opus, Vorbis, Theora and Speex mappings"
 repository.workspace = true
 license.workspace = true
 edition.workspace = true

@@ -175,6 +175,18 @@ pub fn measure_with(
     fields: &[(&str, u64)],
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
+    measure_dyn(invocation, name, held, fields, &mut operation)
+}
+
+/// [`measure_with`] with the operation behind a reference, so each worker binary
+/// holds one copy of the loop and of the result line.
+fn measure_dyn(
+    invocation: &Invocation<'_>,
+    name: &str,
+    held: Option<&Budget>,
+    fields: &[(&str, u64)],
+    operation: &mut dyn FnMut() -> Result<Totals>,
+) -> Result<()> {
     let retained = held.map(Budget::used);
     let memory = invocation.mode == Mode::Memory;
     let mut out = io::stdout().lock();

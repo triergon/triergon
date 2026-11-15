@@ -294,9 +294,17 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 12] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
     Candidate {
         name: "playback-worker",
+        package: "playback-worker",
+        example: None,
+        features: &[],
+    },
+    // A second binary of the playback-worker package with the Matroska runners
+    // alone, the runner families its reference build can demux.
+    Candidate {
+        name: "playback-matroska-worker",
         package: "playback-worker",
         example: None,
         features: &[],
@@ -384,6 +392,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let mut inputs = shared_inputs(root)?;
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
+        inputs.extend(crate::isobmff_seek::source_inputs(root)?);
     }
     if name == "transport-worker" {
         inputs.extend(crate::transport_fixtures::entity_inputs(root)?);
