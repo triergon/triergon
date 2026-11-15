@@ -21,6 +21,7 @@ mod gate;
 mod generators;
 mod harness;
 mod isobmff_bench;
+mod isobmff_seek;
 mod json;
 mod numpy;
 mod playback_golds;
@@ -96,6 +97,8 @@ commands:
                  its reference; the bound on input size is raised to the largest case
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
+  isobmff-seek    [fixtures --out DIR] compare every ISO BMFF seek and range-plan case;
+                 optionally time and measure them; use --help for options
   framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance] [--full]
@@ -220,6 +223,9 @@ fn main() -> ExitCode {
         }
         Some("isobmff-bench") => {
             return failing(isobmff_bench::main(&root, &args[1..]), isobmff_bench::USAGE);
+        }
+        Some("isobmff-seek") => {
+            return failing(isobmff_seek::main(&root, &args[1..]), isobmff_seek::USAGE);
         }
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),
@@ -347,8 +353,13 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             println!("{}", evidence::upload(set, Path::new(archive))?);
             Ok(())
         }
-        [command, set, archive] if command == "entry" => {
-            println!("{}", evidence::entry(set, Path::new(archive))?.1);
+        [command, set, archive, rest @ ..] if command == "entry" => {
+            let key = match rest {
+                [] => None,
+                [flag, key] if flag == "--key" => Some(key.as_str()),
+                _ => return Err("usage: evidence entry SET ARCHIVE [--key KEY]".into()),
+            };
+            println!("{}", evidence::entry(set, Path::new(archive), key)?.1);
             Ok(())
         }
         [command, set] if command == "promote" => {
@@ -357,7 +368,7 @@ fn evidence(root: &Path, args: &[String]) -> Task {
         }
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence entry SET ARCHIVE | evidence promote SET | evidence fetch SET [DIR]"
+                  | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR]"
                 .into(),
         ),
     }

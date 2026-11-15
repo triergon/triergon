@@ -217,6 +217,41 @@ What the reader does not do:
 - **A QuickTime `mp4a` entry** whose sound description or `wave` layout cannot be walked
   stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
+### Comparison with FFmpeg
+
+`cargo xtask codecs isobmff-reader` compares every packet `Reader` delivers with the
+formats reference's `ffprobe -show_packets`, read with `-f mov -fflags
++noparse+nofillin -ignore_editlist 1` so that FFmpeg, like the reader, fills nothing in
+and reports media times. Tracks pair with FFmpeg's streams by `track_ID`; per track,
+each packet's size, position, payload MD5, sync flag, pts, dts and duration are
+compared, and so are the order across tracks, the set of tracks and how reading ended.
+Seek cases call `request_seek` and read FFmpeg from the same time with
+`-read_intervals`. The contract, corpus, rules, reviewed dispositions and frozen
+difference lists are in
+[harness/features/isobmff-reader](../../harness/features/isobmff-reader).
+
+The 648 cases are 522 distinct inputs read through (the 251 authored open-index
+inputs, the committed ISO BMFF, playback and AAC fixtures, the MP4 range fixtures with
+FATE's `mp4-init-nonkeyframe.mp4`, and the subtitle corpus's MP4 files) and 126 seeks
+on 42 of them. 333 match exactly, 3 are refused by both, and 312 differ only by
+17 reviewed dispositions: 12 FFmpeg behaviours and 5 kinds of input the reader refuses
+under its documented policy (4 reads by two kinds):
+
+- **Refusals** (131 reads). The reader refuses media outside every `mdat`,
+  inconsistent sample tables, truncated files, a zero timescale and times beyond `i64`,
+  where FFmpeg reads what it can; FFmpeg fails to open 13 inputs the reader reads.
+- **Clock conventions** (58). FFmpeg moves decode times earlier by the most negative
+  `ctts` offset, and in fragments presentation times later; it reads version 0 offsets
+  of 2^31 or more as negative; it times fragments without `tfdt`, which the reader
+  leaves unknown; it reports no duration for a stated decode delta of 0; it marks the
+  first sample of an empty `stss` a keyframe.
+- **Packetisation and order** (55). FFmpeg delivers QuickTime PCM a chunk at a time and
+  interleaves tracks by time where the reader keeps byte order.
+- **Seeks** (72 seek cases). Both land the seek track on the same sync sample, except where a
+  reordered sync sample is decoded but not presented by the target: FFmpeg lands on it,
+  the reader on the one before. FFmpeg resumes the other tracks at their last sample at
+  or before the landing decode time, the reader at the first at or after the landing.
+
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
 comparison runs and needs the `reference-trace` feature.
 
@@ -411,6 +446,47 @@ cargo xtask grade TIMING/collection.json MEMORY/collection.json \
 The grader checks the complete corpus, exact outputs for each role, refusal
 diagnostics and alias operations. It reads one case's raw observations at a time;
 the 52-operation selection cannot qualify the complete feature.
+
+`cargo xtask isobmff-seek` compares 476 seek and range-plan cases
+([contract](../../harness/features/isobmff-seek/contract.json)) over eight authored
+movies of up to 1,800 samples per track (`harness/fixtures/isobmff-seek`, written by
+`cargo xtask isobmff-seek fixtures --out DIR`) and 36 inputs of the open and index
+corpus:
+
+- 378 seeks: open, optionally read to the end, `GlobalSeekJob` backward on one
+  track and read up to 64 packets, against the reference's public backward seek
+  and packet reads. Traces must be byte-identical.
+- 94 range plans: `MovieSourceSeekPlanner` with published `roll` recovery and the
+  plan's samples read from its decode start through its target, against the
+  reference's backward seek reading as many packets. The source positions, sizes
+  and payloads must be identical in order.
+- 4 matching refusals of inputs whose open both workers refuse.
+
+`--benchmark --memory` times and measures the 472 successful cases and `--part I/N`
+every Nth of them; every case is compared in every run. The worker runs a range plan
+for a seek mode given `--range-plan`.
+
+Gate results (c6g.4xlarge, `00159785`): every case matches on both targets, and every
+open and index input passes runtime and memory. The eight authored movies do not:
+129 of their cases fail runtime (worst upper bound 6.32 on Linux AArch64, 10.70 on
+32-bit ARMv7), because the open walks each track's samples three times (the index
+build, the byte-range validation and the per-sample fill of the packet cursor), and
+`fragmented-1200` fails heap (worst 1.203), because the 64 KiB input window holds all
+of its 33,408 bytes while the open walks its fragments.
+
+Not compared yet: the compatibility seek refuses a global seek across tracks with
+unequal clocks, overlapping or null index clocks and regular table recovery as
+unsupported, and on 47 inputs of the open and index corpus its result differs from
+the reference's at some targets. Where decode times start below zero or below the
+first presentation time, the reference lands on the preceding sync sample for a
+target at or just after a later sync sample's decode time. Where an edit trims the
+last presented sample, the reference reports that sample's full duration after a
+seek and the seek keeps the trimmed one; where an edit starts inside the first
+sample, the seek lands one sample earlier. A range
+plan works in movie time with recovery groups and composition offsets, so it
+selects other samples than the reference's decode-time seek on inputs with
+composition offsets, edits that do not start at the media start, `roll` groups or
+more than one track; those plans are not compared.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
