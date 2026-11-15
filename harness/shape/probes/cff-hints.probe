@@ -1,0 +1,90 @@
+# Stem hints, hint masks and counter masks. A mask is as many bytes as eight
+# stems take (rounded up); each probe's mask bytes are 0x15, an rmoveto
+# without operands, so a mask byte read as an operator fails the glyph, and a
+# byte too many swallows the first byte of the rmoveto after it.
+# Every glyph ends with `100 100 rmoveto 10 20 rlineto`.
+glyph
+  endchar
+end
+glyph # 1: hstem, even: no width
+  10 20 hstem 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 2: hstem, odd: the first is the width
+  5 10 20 hstem 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 3: vstem and hstem with odd operand counts after the first
+  10 20 hstem 1 2 3 vstem 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 4: 8 stems: one mask byte
+  0 1 2 1 4 1 6 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 5: 9 stems: two mask bytes
+  0 1 2 1 4 1 6 1 8 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 6: 9 stems, one mask byte: the next byte is read as part of the mask
+  0 1 2 1 4 1 6 1 8 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask bytes:15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 7: 8 stems, two mask bytes
+  0 1 2 1 4 1 6 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 8: implicit vstems: 8 hstems, 2 vstems on the stack before hintmask: two bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 0 1 2 1 hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 9: implicit vstems counted with an odd count: 8 hstems and 3 operands before hintmask
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 0 1 2 hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 10: a hintmask without stems: no mask bytes
+  hintmask 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 11: a hintmask without stems, one byte after it
+  hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 12: cntrmask with 9 stems: two bytes
+  0 1 2 1 4 1 6 1 8 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm cntrmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 13: a width before the first hstemhm, then a mask
+  7 0 1 2 1 4 1 6 1 hstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 14: stems after drawing count for a later mask: 4 + 5 = 9 stems
+  0 1 2 1 4 1 6 1 hstemhm 100 100 rmoveto 10 20 rlineto 0 1 2 1 4 1 6 1 8 1 vstemhm hintmask bytes:1515 10 20 rlineto endchar
+end
+glyph # 15: 120 stems in five operators: 15 mask bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 hstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 hstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 hstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 vstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 vstemhm
+  hintmask bytes:151515151515151515151515151515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 16: 96 stems: 12 mask bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 hstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 hstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 hstemhm
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 16 1 18 1 20 1 22 1 24 1 26 1 28 1 30 1 32 1 34 1 36 1 38 1 40 1 42 1 44 1 46 1 vstemhm
+  hintmask bytes:151515151515151515151515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 17: a mask at the end of the charstring, its bytes cut short
+  0 1 2 1 4 1 6 1 8 1 hstemhm 100 100 rmoveto 10 20 rlineto 0 1 2 1 4 1 6 1 vstemhm hintmask byte:0x15
+end
+glyph # 18: hintmask after the first moveto, stems before: hstem then hintmask
+  0 1 2 1 hstemhm 100 100 rmoveto hintmask byte:0x15 10 20 rlineto endchar
+end
+glyph # 19: 3 hstems, then 7 stems' operands before a hintmask after a moveto:
+# one mask byte unless they count as vstems
+  0 1 2 1 4 1 hstemhm 100 100 rmoveto 0 1 2 1 4 1 6 1 8 1 10 1 12 1 hintmask byte:0x15 10 20 rlineto endchar
+end
+glyph # 20: dotsection between drawing
+  100 100 rmoveto dotsection 10 20 rlineto endchar
+end
+glyph # 21: stems after the first mask: 8 stems, a 1-byte mask, 1 more stem, a 2-byte mask
+  0 1 2 1 4 1 6 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask byte:0x15 0 1 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 22: as 21, the second mask 1 byte
+  0 1 2 1 4 1 6 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask byte:0x15 0 1 vstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 23: 7 hstems, `0 1 cntrmask` (8 stems, 1 byte), then `0 1 hintmask` with 1 byte
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 hstemhm 0 1 cntrmask byte:0x15 0 1 hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 24: as 23, the hintmask 2 bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 hstemhm 0 1 cntrmask byte:0x15 0 1 hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end

@@ -2,7 +2,9 @@
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
-use triergon_font::{Band, Charmap, GlyphMetrics, Outline, PointKind, SizeMetrics, SizedFont};
+use triergon_font::{
+    Band, Charmap, GlyphMetrics, Orientation, Outline, PointKind, SizeMetrics, SizedFont,
+};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 
 /// What one size reports besides its glyphs.
@@ -108,16 +110,20 @@ pub enum Record<'a> {
     GlyphError(u16),
     /// A face of the scaled and hinted operations.
     SizedFace(u32),
+    /// The next of several heights a face is requested at in turn.
+    Request(i32),
     Size(&'a Size),
     /// A size the face cannot be loaded at.
     SizeError(i32),
+    /// An unhinted glyph, recorded with its outline's orientation.
     ScaledGlyph {
         index: u16,
         /// The unhinted advance in 26.6.
         advance: i32,
         outline: &'a Outline,
     },
-    /// A synthetic style of the last scaled glyph; `None` when it cannot be applied.
+    /// A synthetic style of the last scaled glyph, recorded with its outline's
+    /// orientation; `None` when it cannot be applied.
     Styled {
         style: Style,
         index: u16,
@@ -171,6 +177,7 @@ const STYLED: u64 = 24;
 const HINTED: u64 = 25;
 const VERTICAL: u64 = 26;
 const DEFAULT: u64 = 27;
+const REQUEST: u64 = 28;
 const ABSENT: u64 = u64::MAX;
 
 const fn point_tag(kind: PointKind) -> u8 {
@@ -178,6 +185,16 @@ const fn point_tag(kind: PointKind) -> u8 {
         PointKind::Quadratic => 0,
         PointKind::On => 1,
         PointKind::Cubic => 2,
+    }
+}
+
+/// An orientation's folded value and dump word, as the reference maps
+/// `FT_Outline_Get_Orientation`'s result.
+fn orientation(outline: &Outline) -> (u64, &'static str) {
+    match outline.orientation() {
+        Orientation::TrueType => (0, "truetype"),
+        Orientation::PostScript => (1, "postscript"),
+        Orientation::None => (2, "none"),
     }
 }
 
@@ -241,6 +258,12 @@ impl Work {
         }
         self.packets += 1;
         self.bytes += points.len() as u64;
+    }
+
+    /// The outline's orientation, then the outline.
+    fn oriented(&mut self, outline: &Outline) {
+        fold(&mut self.digest, orientation(outline).0);
+        self.outline(outline);
     }
 
     /// Adds the work of one operation, its digest folded as one value.
@@ -316,6 +339,7 @@ impl Sink for Work {
             }
             Record::GlyphError(index) => self.words(&[GLYPH_ERROR, index.into()]),
             Record::SizedFace(index) => self.words(&[SIZED_FACE, index.into()]),
+            Record::Request(height) => self.words(&[REQUEST, signed(height.into())]),
             Record::Size(size) => {
                 let m = &size.metrics;
                 self.words(&[
@@ -346,7 +370,7 @@ impl Sink for Work {
                 outline,
             } => {
                 self.words(&[SCALED_GLYPH, index.into(), signed(advance.into())]);
-                self.outline(outline);
+                self.oriented(outline);
             }
             Record::Styled {
                 style,
@@ -355,7 +379,7 @@ impl Sink for Work {
             } => {
                 self.words(&[STYLED, style as u64, index.into()]);
                 match outline {
-                    Some(outline) => self.outline(outline),
+                    Some(outline) => self.oriented(outline),
                     None => fold(&mut self.digest, ABSENT),
                 }
             }
@@ -418,6 +442,12 @@ impl<W: Write> Dump<W> {
             write!(out, " {x} {y} {tag}")?;
         }
         writeln!(out)
+    }
+
+    /// The outline's orientation, then the outline.
+    fn oriented(&mut self, outline: &Outline) -> io::Result<()> {
+        write!(self.0, "{} ", orientation(outline).1)?;
+        self.outline(outline)
     }
 
     fn band(&mut self, key: &str, band: Option<Band>) -> io::Result<()> {
@@ -493,6 +523,7 @@ impl<W: Write> Sink for Dump<W> {
             }
             Record::GlyphError(index) => writeln!(self.0, "glyph {index} error"),
             Record::SizedFace(index) => writeln!(self.0, "face {index}"),
+            Record::Request(height) => writeln!(self.0, "request {height}"),
             Record::Size(size) => {
                 let m = &size.metrics;
                 write!(
@@ -525,7 +556,7 @@ impl<W: Write> Sink for Dump<W> {
                 outline,
             } => {
                 write!(self.0, "glyph {index} {advance} ")?;
-                self.outline(outline)
+                self.oriented(outline)
             }
             Record::Styled {
                 style,
@@ -534,7 +565,7 @@ impl<W: Write> Sink for Dump<W> {
             } => match outline {
                 Some(outline) => {
                     write!(self.0, "{} {index} ", style.name())?;
-                    self.outline(outline)
+                    self.oriented(outline)
                 }
                 None => writeln!(self.0, "{} {index} error", style.name()),
             },

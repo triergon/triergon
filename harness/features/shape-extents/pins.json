@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "reference": "harfbuzz-native",
+  "note": "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
+  "pins": {
+    "notosans-regular-otf-extents": {
+      "packets": 3884,
+      "bytes": 0,
+      "digest": 5698533175615663135
+    },
+    "notosans-bolditalic-otf-extents": {
+      "packets": 3895,
+      "bytes": 0,
+      "digest": 9365416496292669367
+    },
+    "notosansjp-regular-otf-extents": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 3995752389141046498
+    },
+    "notosansjp-vf-otf-extents": {
+      "packets": 17936,
+      "bytes": 0,
+      "digest": 62890595458462100
+    },
+    "notosanscjk-regular-ttc-extents": {
+      "packets": 655350,
+      "bytes": 0,
+      "digest": 15993748042226663707
+    },
+    "authored-cff-features-otf-extents": {
+      "packets": 8,
+      "bytes": 0,
+      "digest": 6024847965896664409
+    },
+    "authored-cff-matrix-otf-extents": {
+      "packets": 2,
+      "bytes": 0,
+      "digest": 5892881997211172933
+    },
+    "authored-cmap-order-ttc-extents": {
+      "packets": 24,
+      "bytes": 0,
+      "digest": 10265612056157770535
+    },
+    "authored-charmaps-otf-extents": {
+      "packets": 10,
+      "bytes": 0,
+      "digest": 18246405761085731615
+    }
+  }
+}
