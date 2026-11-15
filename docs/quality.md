@@ -656,7 +656,10 @@ key measures it again.
 A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
 timing step whose report holds a case not `measured`, or a memory step one not
 `qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
-they did not measure, after writing every record. Where the codec gates apply (native
+they did not measure, after writing every record. `gate run` writes its verdict into the
+step's `gate-result.json` (its `status`, with `"cases_checked": true`), so a step that
+[reuses](#reuse) the result takes the verdict; a reused result that no gate run checked
+fails the step, which `--full` measures again. Where the codec gates apply (native
 Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
 does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
 are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
