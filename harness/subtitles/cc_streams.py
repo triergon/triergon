@@ -1915,11 +1915,11 @@ def hold_and_field_cases(written, carrier, fields, data):
     # frames before it, none waiting for its second field).
     field_case("h264-fields-packed", lambda n, au: field_unit(2 * n, n == 0, (1, 2)) + field_unit(2 * n + 1, False)
                if 2 * n + 1 < len(fields) else None)
-    # The H.264 stream of h264-hold-depth1 and the HEVC stream of hevc-a53 in
-    # Matroska and MP4 with their parameter sets only in the CodecPrivate or
-    # the avcC or hvcC box.
+    # H.264 and HEVC streams in Matroska and MP4 with their parameter sets
+    # only in the CodecPrivate or the avcC or hvcC box: h264-hold-depth1 in
+    # Matroska, the streams of h264-a53 and hevc-a53 in both.
     for source, name, kinds in (("h264-hold-depth1", "h264-config.mkv", "7|8"),
-                                ("h264-hold-depth1", "h264-config.mp4", "7|8"),
+                                ("h264-a53", "h264-config.mp4", "7|8"),
                                 ("hevc-a53", "hevc-config.mkv", "32|33|34"),
                                 ("hevc-a53", "hevc-config.mp4", "32|33|34")):
         target = os.path.join(OUT, name)

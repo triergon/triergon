@@ -29861,9 +29861,9 @@
    "path": "subtitle-cc-inputs",
    "retention": "retained",
    "reason": "The closed caption streams of harness/features/subtitle-cc/corpus.json that gate-media-inputs lacks (.research/subtitle-corpus/cc), authored by harness/subtitles/cc_streams.py, each matching its manifest SHA-256, unpacked at the repository root of a gate host; the gate images are built with it",
-   "key": "evidence/subtitle-cc-inputs/a6deea8c8d8c6609943f1437f47e69ce3e5125396dd9d724e380c0b507ba2b17.tar.gz",
-   "sha256": "a6deea8c8d8c6609943f1437f47e69ce3e5125396dd9d724e380c0b507ba2b17",
-   "bytes": 914639,
+   "key": "evidence/subtitle-cc-inputs/91c6bb1e3fa4a44f160550d9059b242cac4222262f6ebec6981060c8031dcfb9.tar.gz",
+   "sha256": "91c6bb1e3fa4a44f160550d9059b242cac4222262f6ebec6981060c8031dcfb9",
+   "bytes": 964483,
    "unpacked_at": "repository",
    "files": [
     {
@@ -29873,6 +29873,10 @@
     {
      "path": ".research/subtitle-corpus/cc/h264-config.mkv",
      "sha256": "569b5367354a91cd0c5b8665441af1c00a27d9f18f03b9086dfe24883d0e9a94"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-config.mp4",
+     "sha256": "2af83b900aa10fb985ed4900f0addefaa1078a6a993742b4255e6118634a0686"
     },
     {
      "path": ".research/subtitle-corpus/cc/h264-depth-grow.ts",
@@ -30089,6 +30093,14 @@
     {
      "path": ".research/subtitle-corpus/cc/h264-vui-fast.ts",
      "sha256": "c9787bf865ff15d90f61a4aaecdd7e49b0ac868fe2f7a198c414dd7940b6b9e4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-config.mkv",
+     "sha256": "29ed3e7ba69fdfa618af8eee30b4fc2b80f2e7adc39aa35f23c385c47b5946d9"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-config.mp4",
+     "sha256": "47efc2f1d5925b0b9538a1d73a1cf3f300920b528ab7ad37272a2b48dba11849"
     },
     {
      "path": ".research/subtitle-corpus/cc/hevc-dpb-raise.ts",
@@ -30340,7 +30352,7 @@
    "name": "gate-subtitle-cc-b6c36d3b",
    "path": "gate-subtitle-cc-b6c36d3b",
    "retention": "retained",
-   "reason": "Partial gate run of subtitle-cc at b6c36d3b under static-toolchain-runtime-v1, one c6g.4xlarge host (Graviton2) per target from the gate images with evidence set subtitle-cc-inputs unpacked, kernel 7.0.0-1014-aws, Linux AArch64 and 32-bit ARMv7: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grade, 449 of 449 cases on each target; the shard outputs, build identities, plan, step records and logs, the run summary and the workstation's logs; for the docs/status.md closed caption rows",
+   "reason": "Partial gate run of subtitle-cc at b6c36d3b under static-toolchain-runtime-v1, one c6g.4xlarge host (Graviton2) per target from the gate images, which lack evidence set subtitle-cc-inputs, with that set unpacked at the repository root of each host before it got ready, kernel 7.0.0-1014-aws, Linux AArch64 and 32-bit ARMv7: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grade, 449 of 449 cases on each target; the shard outputs, build identities, plan, step records and logs, the run summary and the workstation's logs; for the docs/status.md closed caption rows",
    "key": "evidence/gate-subtitle-cc-b6c36d3b/7052328cf69e4905a1b8146780340cabfe442aa9224e9c55af7da81e752c96a9.tar.zst",
    "sha256": "7052328cf69e4905a1b8146780340cabfe442aa9224e9c55af7da81e752c96a9",
    "bytes": 15820172,
