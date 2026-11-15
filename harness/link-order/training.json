@@ -449,6 +449,9 @@
     "@service-5.ts",
     "188",
     "5"
+   ],
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
    ]
   },
   {
@@ -459,6 +462,9 @@
     "188",
     "9",
     "--dvb"
+   ],
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
    ]
   },
   {
@@ -468,6 +474,9 @@
     "@program-hevc-aac.ts",
     "188",
     "1"
+   ],
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
    ]
   },
   {
@@ -477,6 +486,9 @@
     "@audio-6.ts",
     "188",
     "6"
+   ],
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
    ]
   },
   {

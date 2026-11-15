@@ -540,10 +540,12 @@ may override that count for diagnostic comparisons.
   as their toolchains do.
 - On GNU/Linux the policy also links each Rust worker that commits a trained order with
   its functions in that order, then module order, with the pinned toolchain's own
-  `lld`. These media workers do: `media-worker`, `playback-worker`,
-  `playback-matroska-worker` and `transport-worker`, and `framing-worker` on Linux
-  AArch64. The framing worker on ARMv7, whose packet framing cases kept their resident
-  peaks with a trained order, the ISO BMFF worker, whose operations read only the
+  `lld`. These media workers do: `media-worker`, `playback-worker` and
+  `playback-matroska-worker`, `framing-worker` on Linux AArch64 and `transport-worker` on
+  ARMv7. The framing worker on ARMv7, whose packet framing cases kept their resident
+  peaks with a trained order, the transport worker on Linux AArch64, whose malformed
+  PSI cases, which the corpus does not run, took one more 64 KiB window of code with
+  one, the ISO BMFF worker, whose operations read only the
   raw-video and timed-text movies of its comparison, the codec worker, whose decoder
   workloads took more resident memory with an order trained on the corpus's few codecs,
   the font, shaping, rasterising, ASS, subtitle and capture workers, and the references
