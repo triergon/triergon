@@ -163,6 +163,17 @@ and 30 kernel-bound memory pairs. The kept sets
 `packet-framing-6ce7109c-aarch64` and `packet-framing-6ce7109c-armv7`
 contain the per-case results.
 
+At `64fc1b08` the ARMv7 total RSS bound tied at 1.0000 for `hevc-type23`,
+with 124/125 cases strictly lower. The tie cleared at `b3d01267`. The
+cause of the change in that case is unknown. The earlier AArch64
+result at `79e0ae13` had a worst runtime of 1.1849 and lower total RSS
+in 77/125 cases. The change to `b3d01267` spans the move to the
+c6g.4xlarge gate host and updates from main.
+
+The measured revisions include the earlier extension comparisons at
+`83993880` and the framing run at `2b997c87`. At `2b997c87`, ARMv7
+total RSS was lower in 125/131 cases and the worst bound was 1.0087.
+
 The MPEG-TS PES, program playback, progressive playback and HLS rows used the
 375-case gate build at `21c9eef2f08a11bb7bd1c457997095326f2bb42d` on a c8g.large pinned to CPU 1.
 All 375 cases passed parity, runtime, peak heap and total RSS with 30 timing
@@ -780,7 +791,7 @@ diagnostics: no codec contract is gated on this target.
 | HLS segments | 71/71 | 0.5909 (71/71 pass) at `359a90b4` | heap ≤0.0196, total RSS ≤0.8712 (71/71 lower) at `359a90b4` |
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals); the neutral reader's 648 comparison cases, as on AArch64 | 0.9709 (972/972 pass) at `e2d4a6a3` | heap ≤0.2736, total RSS ≤0.8577 (972/972 lower) at `e2d4a6a3` |
 | ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0303 (472/472 pass) at `d7a6d8f7` | heap ≤0.8541, total RSS ≤0.8737 (472/472 lower) at `d7a6d8f7` |
-| Packet framing | 131/131 AVC/HEVC reference comparisons | 0.9325 (131/131 within the ceiling) | heap ≤0.8039 (131/131 lower), total RSS ≤0.9972 (131/131 lower) |
+| Packet framing | 131/131 AVC/HEVC reference comparisons | 0.9325 (131/131 within the ceiling) at `6ce7109c` | heap ≤0.8039 (131/131 lower), total RSS ≤0.9972 (131/131 lower) at `6ce7109c` |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision (on AArch64 at `4d31df88` the lane's 39 vectors, with the three crafted Parametric Stereo streams, pass 38/39; the lane was not run on this target there); the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: the six video workloads 0.6169 to 1.1439 at `8d6f2789` (6/6 within the ceiling); the 14 others at `4d31df88` (that run: 10/20 within the ceiling, worst 1.7584). At `8d6f2789` `dts-core-7.1-master` measured 2.0917, though the DTS decoder is the same there; the rise is not explained | diagnostic, not gated: the video workloads heap ≤0.9262, total RSS ≤0.8359 (6/6 lower) at `8d6f2789`; the others at `4d31df88` (that run: heap ≤0.9566, total RSS ≤0.8388, 20/20 lower) |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | diagnostic, not gated, at `4d31df88`: 1.7868 (7/10 within the ceiling) | diagnostic, not gated, at `4d31df88`: heap ≤0.8993, total RSS ≤0.7751 (10/10 lower) |
 | Capture | 15/15 at `dcf51398`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1536 at `dcf51398` (15/15 pass; worst `c13-motion-960-6m`, then `c14-motion-960-rate255` 1.1528) | at `4b43bf74`: heap ≤0.6086, total RSS ≤0.9765 (15/15 lower) |
@@ -847,7 +858,8 @@ refuse. A decoder that refuses to open is a result both workers fold and compare
 Apart from the codec diagnostics, the only timed cases above the ceiling on ARMv7 are 5 of
 MP4 range's 51 (worst 1.2241); MP4 range is gated on Linux AArch64 only. The closest below
 it are capture `c13-motion-960-6m` 1.1536 and `c14-motion-960-rate255` 1.1528 at
-`dcf51398`, then Matroska 1.1466, MP4 forward 1.0811 and DVD 1.0360.
+`dcf51398`, then Matroska 1.1466, MP4 forward 1.0811, DVD 1.0360 and packet
+framing 0.9325 at `6ce7109c`.
 Each feature's evidence set lists every case's bound.
 
 The codec timings are not gated. At `79e0ae13`, 10 of the 20 workloads of

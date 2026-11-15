@@ -963,16 +963,16 @@ struct PacketPlan {
     has_irap: bool,
     avc_buffering: Option<AvcBufferingLookahead>,
     look_nals: usize,
-    // No fixed storage can be smaller than the budget control allocation.
-    // The two smaller values represent an unchecked and a proven bound.
-    live_base: usize,
+    storage_bound: PacketStorageBound,
     // A hint sizes a later spill without reserving while descriptors fit inline.
     segment_hint: Option<usize>,
 }
+enum PacketStorageBound {
+    Unchecked,
+    LimitsFit,
+    Fixed(usize),
+}
 impl PacketPlan {
-    const UNCHECKED_STORAGE: usize = 0;
-    const LIMITS_FIT: usize = 1;
-
     fn new(phase: PlanPhase) -> Self {
         Self {
             phase,
@@ -986,7 +986,7 @@ impl PacketPlan {
             has_irap: false,
             avc_buffering: None,
             look_nals: 0,
-            live_base: Self::UNCHECKED_STORAGE,
+            storage_bound: PacketStorageBound::Unchecked,
             segment_hint: None,
         }
     }
@@ -1113,10 +1113,10 @@ impl PacketPlan {
         // pool. Its fixed storage is therefore at most the current live charge.
         // If both logical ceilings fit in the remaining capacity, they bound
         // every future append. Actual reservations still check current pressure.
-        self.live_base = if maximum <= packet_pool(state.source.as_ref())?.available() {
-            Self::LIMITS_FIT
+        self.storage_bound = if maximum <= packet_pool(state.source.as_ref())?.available() {
+            PacketStorageBound::LimitsFit
         } else {
-            state.fixed_live_bytes()?
+            PacketStorageBound::Fixed(state.fixed_live_bytes()?)
         };
         Ok(())
     }
@@ -1133,14 +1133,13 @@ impl PacketPlan {
         segments: usize,
         output: usize,
     ) -> Result<()> {
-        if self.live_base == Self::UNCHECKED_STORAGE {
+        if matches!(self.storage_bound, PacketStorageBound::Unchecked) {
             self.establish_storage_bound(state)?;
         }
-        if self.live_base == Self::LIMITS_FIT {
+        let PacketStorageBound::Fixed(live_base) = self.storage_bound else {
             return Ok(());
-        }
-        let minimum = self
-            .live_base
+        };
+        let minimum = live_base
             .checked_add(Self::added_storage(
                 segments,
                 output,
@@ -1182,7 +1181,7 @@ impl PacketPlan {
                 maximum: state.session.limits.maximum_output_bytes,
             });
         }
-        if self.live_base != Self::LIMITS_FIT {
+        if !matches!(self.storage_bound, PacketStorageBound::LimitsFit) {
             self.check_storage_bound(state, count, total)?;
         }
         let source = &state.source;
@@ -1191,15 +1190,16 @@ impl PacketPlan {
                 let pool = packet_pool(source.as_ref())?;
                 // Spare slots must leave room for output at the pool's limit.
                 // Other reservations can be released before publication.
-                let capacity = if self.live_base == Self::LIMITS_FIT {
-                    maximum_parts
-                } else {
-                    let output = total.saturating_add(Bytes::owner_overhead_bytes());
-                    let room = pool
-                        .limit()
-                        .saturating_sub(self.live_base)
-                        .saturating_sub(output);
-                    (room / size_of::<NalPacketSegment>()).min(maximum_parts)
+                let capacity = match self.storage_bound {
+                    PacketStorageBound::Fixed(live_base) => {
+                        let output = total.saturating_add(Bytes::owner_overhead_bytes());
+                        let room = pool
+                            .limit()
+                            .saturating_sub(live_base)
+                            .saturating_sub(output);
+                        (room / size_of::<NalPacketSegment>()).min(maximum_parts)
+                    }
+                    _ => maximum_parts,
                 };
                 Ok((pool, capacity))
             },

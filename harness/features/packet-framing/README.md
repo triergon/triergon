@@ -22,6 +22,7 @@ process any trailing bytes individually.
 `avc-profile-extension-inputs.json` adds the five fixed-header lengths and a
 nonempty configuration update. `cargo xtask framing manifest --record` records
 their packet counts and whole-operation folds from the built FFmpeg worker.
+Use `--replace` to intentionally update existing input hashes or folds.
 
 The xtask entry point generates all inputs and delegates reports, paired timing,
 memory collection, isolation and gate-build checks to the shared harness. There
@@ -30,7 +31,8 @@ preload identical padded, immutable input templates before timing and memory
 markers, and retain every output until after close. The Rust worker enables the
 framing crate's `reference-trace` feature for comparison-only error codes.
 
-`provenance.json` binds the inputs and observations to their original archive and
-source hashes. The historical measurements used compiler overrides and are not
-current gate results. Qualification requires the pinned stable build and all
+`provenance.json` binds the original 125 inputs and observations to their archive
+and source hashes. The six extension scripts and their observed folds are pinned
+by `avc-profile-extension-inputs.json` and `corpus.json`. The historical measurements
+used compiler overrides. Qualification requires the pinned stable build and all
 131 cases on native AArch64 Linux.

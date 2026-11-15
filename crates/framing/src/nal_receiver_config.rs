@@ -51,7 +51,13 @@ impl ReceiverAvcConfiguration {
         let refusal = if fields.length_size_minus_one() == 2 {
             NalConfigurationRefusal::AvcWidthThree
         } else if profile_extension_required(fields.profile_indication())
-            && fields.raw_extension().is_none()
+            && fields.raw_extension().is_none_or(|header| {
+                let parsed = inner
+                    .arrays()
+                    .next_back()
+                    .map_or(0, |array| array.nal_indices().len());
+                usize::from(header[3]) != parsed
+            })
         {
             NalConfigurationRefusal::AvcExtensionTruncated
         } else {

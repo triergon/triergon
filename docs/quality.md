@@ -766,6 +766,8 @@ cargo xtask grade OUT/benchmark/mp4-forward/report.json OUT/memory/mp4-forward/r
 
 #### Early stop
 
+Packet framing collects every timing and memory pair.
+
 A gate timing session (`report`, `isobmff-bench`, `isobmff-seek`, `external-vector`,
 `codecs time`, `capture qualify`) may end after 20 of its 30 pairs, taken as two blocks
 of ten: when

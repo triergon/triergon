@@ -10,7 +10,7 @@ use model::{CAP, Case, Outcome};
 use std::env::ArgsOs;
 use std::ffi::OsStr;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::Error;
@@ -58,45 +58,29 @@ fn execute(case: &Case, iterations: u32) -> triergon_core::Result<Outcome> {
     Ok(total)
 }
 
-fn read_chunk(input: &mut impl Read, output: &mut [u8]) -> io::Result<usize> {
-    loop {
-        match input.read(output) {
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-            result => return result,
+fn read_case(mut input: impl Read + Seek) -> Result<Case, Failure> {
+    let length = usize::try_from(input.seek(SeekFrom::End(0))?).map_err(|_| Error::Overflow)?;
+    if length > CAP {
+        return Err(Error::Limit {
+            requested: length,
+            maximum: CAP,
         }
+        .into());
     }
-}
-
-#[inline(never)]
-fn read_case(mut input: impl Read) -> Result<Case, Failure> {
-    let mut chunk = [0; 1024];
-    let mut filled = 0;
-    while filled < chunk.len() {
-        let length = read_chunk(&mut input, &mut chunk[filled..])?;
-        if length == 0 {
-            return Ok(Case::parse(&chunk[..filled])?);
-        }
-        filled += length;
+    input.rewind()?;
+    let mut small = [0; 1024];
+    if length <= small.len() {
+        let script = &mut small[..length];
+        input.read_exact(script)?;
+        return Ok(Case::parse(script)?);
     }
-    // Small scripts never need a separate input allocation. Larger scripts
-    // use the same scratch block and keep the complete input capped.
     let mut script = Vec::new();
-    loop {
-        let length = script.len() + filled;
-        if length > CAP {
-            return Err(Error::Limit {
-                requested: length,
-                maximum: CAP,
-            }
-            .into());
-        }
-        script.try_reserve(filled).map_err(|_| Error::Allocation)?;
-        script.extend_from_slice(&chunk[..filled]);
-        filled = read_chunk(&mut input, &mut chunk)?;
-        if filled == 0 {
-            return Ok(Case::parse(&script)?);
-        }
-    }
+    script
+        .try_reserve_exact(length)
+        .map_err(|_| Error::Allocation)?;
+    script.resize(length, 0);
+    input.read_exact(&mut script)?;
+    Ok(Case::parse(&script)?)
 }
 
 fn write_report(
@@ -223,13 +207,13 @@ mod tests {
 
     #[test]
     fn script_reader_keeps_bytes_across_the_scratch_boundary() {
-        for length in [900, 1011, 1012, 2600] {
+        for length in [900, 1006, 1007, 1008, 2600] {
             let data: Vec<_> = (0..length).map(|i| (i % 251) as u8).collect();
             let mut script = b"SMBSF001\x01".to_vec();
             script.extend((length as u32).to_be_bytes());
             script.extend(&data);
             script.extend(0_u32.to_be_bytes());
-            let case = read_case(script.as_slice()).unwrap();
+            let case = read_case(io::Cursor::new(script)).unwrap();
             assert_eq!(case.configuration.as_ref(), data);
             assert!(case.events.is_empty());
         }
@@ -292,6 +276,25 @@ mod tests {
                 fixture.id
             );
             assert_eq!(case.pool.used(), case.baseline, "{} retention", fixture.id);
+        }
+    }
+
+    #[test]
+    fn avc_extension_header_without_entries_matches_the_base_parameter_sets() {
+        let mut fixture = fixtures::load_extensions()
+            .unwrap()
+            .into_iter()
+            .find(|case| case.id == "avc-profile-extension-4-bytes")
+            .unwrap();
+        assert_eq!(fixture.bytes[36], 0);
+        for count in [1, 2, 16, 255] {
+            fixture.bytes[36] = count;
+            let case = Case::parse(&fixture.bytes).unwrap();
+            let actual = execute(&case, 1).unwrap();
+            assert_eq!(actual.packets, fixture.expected.packets);
+            assert_eq!(actual.bytes, fixture.expected.bytes);
+            assert_eq!(actual.digest.0, fixture.expected.digest);
+            assert_eq!(actual.digest.1, fixture.expected.digest_b);
         }
     }
 

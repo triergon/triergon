@@ -467,23 +467,54 @@ fn avc_receiver_preserves_short_profile_extension_and_frames_complete_parameter_
 }
 
 #[test]
-fn avc_receiver_refuses_missing_parameter_set_in_complete_extension() {
+fn avc_receiver_frames_base_parameter_sets_when_extension_entries_are_absent() {
     let pool = Budget::new(100_000).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut raw = avcc(4);
-    raw[1] = 100;
-    raw.extend_from_slice(&[0xfd, 0xf8, 0xf8, 1]);
-    let raw = bytes(&pool, &raw);
+    let configuration = [
+        1, 0x64, 0, 0x0a, 0xff, 0xe1, 0, 5, 0x67, 0x64, 0, 0x0a, 0x80, 1, 0, 4, 0x68, 0xce, 0x06,
+        0xe2, 0xfd, 0xf8, 0xf8, 1,
+    ];
+    let idr = [0, 0, 0, 3, 0x65, 0xb8, 0x80];
+    let expected = [
+        0, 0, 0, 1, 0x67, 0x64, 0, 0x0a, 0x80, 0, 0, 0, 1, 0x68, 0xce, 0x06, 0xe2, 0, 0, 1, 0x65,
+        0xb8, 0x80,
+    ];
+    let raw = bytes(&pool, &configuration);
     let mut strict = AvcConfigParser::new(&pool, source(), raw.clone(), alimits()).unwrap();
-    let mut receiver = ReceiverAvcConfigParser::new(&pool, source(), raw, alimits()).unwrap();
     assert!(matches!(
         strict.step(&mut WorkBudget::new(4096), &cancel),
         Err(Error::Truncated)
     ));
-    assert!(matches!(
-        receiver.step(&mut WorkBudget::new(4096), &cancel),
-        Err(Error::Truncated)
-    ));
+    for quantum in [1, 4096] {
+        let mut receiver =
+            ReceiverAvcConfigParser::new(&pool, source(), raw.clone(), alimits()).unwrap();
+        let config = (0..128)
+            .find_map(|_| {
+                match receiver
+                    .step(&mut WorkBudget::new(quantum), &cancel)
+                    .unwrap()
+                {
+                    BuildStep::Ready(config) => Some(config),
+                    BuildStep::Yield => None,
+                    BuildStep::Complete => panic!("AVC receiver finished without a record"),
+                }
+            })
+            .expect("AVC receiver must publish with bounded work");
+        assert_eq!(config.source_bytes().as_ref(), configuration);
+        assert_eq!(config.fields().raw_extension(), Some([0xfd, 0xf8, 0xf8, 1]));
+        assert!(config.array(2).unwrap().nal_indices().is_empty());
+        assert_eq!(config.strict_source_refusal(), Some(Error::Truncated));
+        let mut session =
+            NalPacketSession::new(&pool, NalPacketConfiguration::ReceiverAvc(config), limits())
+                .unwrap();
+        let framed = output(&mut session.packet(packet(&pool, &idr), None).unwrap());
+        assert_eq!(framed.bytes().as_ref(), expected);
+        assert_eq!(framed.configuration_bytes().as_ref(), configuration);
+        assert_eq!(
+            framed.configuration_source_refusal(),
+            Some(Error::Truncated)
+        );
+    }
 }
 
 #[test]

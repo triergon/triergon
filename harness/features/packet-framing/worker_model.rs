@@ -1,5 +1,4 @@
 //! Caller-owned, preloaded immutable input. Codec parsing remains in each operation.
-use std::ops::Range;
 use triergon_core::{Budget, Bytes, Error, Result};
 use triergon_framing::{Codec, NalPacketFields};
 
@@ -8,8 +7,8 @@ pub(super) const CAP: usize = 16 * 1024 * 1024;
 pub enum Event {
     Packet {
         fields: NalPacketFields,
-        bytes: Range<usize>,
-        extra: Option<Range<usize>>,
+        bytes: Bytes,
+        extra: Option<Bytes>,
         offset: u64,
         extra_offset: u64,
     },
@@ -21,7 +20,6 @@ pub struct Case {
     pub pool: Budget,
     pub codec: Codec,
     pub configuration: Bytes,
-    pub input: Bytes,
     pub config_offset: u64,
     pub events: Vec<Event>,
     pub baseline: usize,
@@ -44,27 +42,24 @@ impl<'a> Reader<'a> {
     fn len32(&mut self) -> Result<usize> {
         usize::try_from(u32::from_be_bytes(self.fixed()?)).map_err(|_| Error::Overflow)
     }
-    fn blob(&mut self, n: usize) -> Result<&'a [u8]> {
+    fn blob(&mut self, pool: &Budget, n: usize) -> Result<Bytes> {
         if n > CAP {
             return Err(Error::Limit {
                 requested: n,
                 maximum: CAP,
             });
         }
-        self.take(n)
+        let raw = self.take(n)?;
+        let padded_len = n + 64;
+        let mut padded = Vec::new();
+        padded
+            .try_reserve_exact(padded_len)
+            .map_err(|_| Error::Allocation)?;
+        padded.extend_from_slice(raw);
+        padded.resize(padded_len, 0);
+        let storage = Bytes::try_from_vec(pool, padded).map_err(|e| e.error())?;
+        storage.slice(0..n)
     }
-}
-
-// Each view excludes the 64 zero bytes that follow its input. This keeps
-// the caller padding guarantee with one shared allocation for all views.
-const PADDING: usize = 64;
-
-fn append_blob(arena: &mut Vec<u8>, raw: &[u8]) -> Range<usize> {
-    let start = arena.len();
-    arena.extend_from_slice(raw);
-    let end = arena.len();
-    arena.resize(end + PADDING, 0);
-    start..end
 }
 
 impl Case {
@@ -87,7 +82,7 @@ impl Case {
         };
         let config_len = r.len32()?;
         let config_offset = r.at as u64;
-        let config = r.blob(config_len)?;
+        let configuration = r.blob(&pool, config_len)?;
         let count = r.len32()?;
         if count > 64 {
             return Err(Error::Limit {
@@ -95,13 +90,6 @@ impl Case {
                 maximum: 64,
             });
         }
-        let mut arena = Vec::new();
-        // Each action has at most two blobs, and their bytes are already in
-        // the bounded script. This reservation covers all padding up front.
-        arena
-            .try_reserve_exact(raw.len() + (1 + 2 * count) * PADDING)
-            .map_err(|_| Error::Allocation)?;
-        let configuration_range = append_blob(&mut arena, config);
         let mut events = Vec::new();
         events
             .try_reserve_exact(count)
@@ -122,13 +110,13 @@ impl Case {
                     let size = r.len32()?;
                     let extra_size = u32::from_be_bytes(r.fixed()?);
                     let offset = r.at as u64;
-                    let bytes = append_blob(&mut arena, r.blob(size)?);
+                    let bytes = r.blob(&pool, size)?;
                     let extra_offset = r.at as u64;
                     let extra = if extra_size == u32::MAX {
                         None
                     } else {
                         let length = usize::try_from(extra_size).map_err(|_| Error::Overflow)?;
-                        Some(append_blob(&mut arena, r.blob(length)?))
+                        Some(r.blob(&pool, length)?)
                     };
                     Event::Packet {
                         fields,
@@ -145,14 +133,11 @@ impl Case {
         if r.at != raw.len() {
             return Err(Error::Invalid("trailing case bytes"));
         }
-        let input = Bytes::try_from_vec(&pool, arena).map_err(|e| e.error())?;
-        let configuration = input.slice(configuration_range)?;
         let baseline = pool.used();
         Ok(Self {
             pool,
             codec,
             configuration,
-            input,
             config_offset,
             events,
             baseline,
@@ -179,7 +164,6 @@ pub struct Digest(pub u64, pub u64);
 impl Digest {
     /// Same wrapping polynomial fold as one byte at a time. Eight-byte groups use
     /// h*k^8 + sum(b[i]*k^(7-i)), which is equal modulo 2^64 and shortens the chain.
-    #[inline(never)]
     pub fn raw(&mut self, bytes: &[u8]) {
         let (chunks, rest) = bytes.as_chunks::<8>();
         for chunk in chunks {
@@ -206,12 +190,10 @@ impl Digest {
     }
     /// A word is exactly one eight-byte group of its little-endian bytes.
     // Initialization, packet metadata, and teardown all emit the same word.
-    #[inline(never)]
     pub fn word(&mut self, n: u64) {
         self.group(&n.to_le_bytes());
     }
     /// Append consecutive metadata words with a single fold call.
-    #[inline(never)]
     pub fn words(&mut self, words: &[u64]) {
         for &word in words {
             self.group(&word.to_le_bytes());

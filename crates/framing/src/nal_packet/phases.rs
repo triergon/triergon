@@ -744,13 +744,12 @@ impl PacketEmission {
         cancel: &AtomicBool,
     ) -> Result<Step> {
         let parts = state.segments.as_slice();
-        let source = state
+        let source = &state
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?
-            .bytes
-            .as_ref();
-        let configuration = state.config().bytes().as_ref();
+            .bytes;
+        let configuration = state.config().bytes();
         let buffer = self
             .output
             .as_mut()
@@ -760,12 +759,9 @@ impl PacketEmission {
                 if work.remaining() == 0 {
                     return Ok(YIELD);
                 }
-                let backing = if part.is_configuration() {
-                    configuration
-                } else {
-                    source
-                };
-                let payload = backing
+                let payload = part
+                    .backing(source, configuration)
+                    .as_ref()
                     .get(part.source_range())
                     .ok_or(Error::Invalid("packet segment range"))?;
                 if !copy_annex_b_segment(

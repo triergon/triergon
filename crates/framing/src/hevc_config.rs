@@ -785,7 +785,9 @@ impl HvcConfiguration {
         // The validated extent includes the fixed record header and the
         // three-byte header of every array. Replace the two-byte NAL lengths
         // in the rest of the record with four-byte start codes.
-        (self.understood_end - (23 + 3 * self.array_count())).checked_add(2 * self.nal_count())
+        self.understood_end
+            .checked_sub(23 + 3 * self.array_count())?
+            .checked_add(2 * self.nal_count())
     }
     pub fn nal(&self, index: usize) -> Option<HvcConfigNal<'_>> {
         self.nals

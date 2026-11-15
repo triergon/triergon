@@ -10,7 +10,6 @@ use triergon_framing::*;
 const QUANTUM: u64 = 4096;
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
-#[inline(never)]
 fn avc_into(
     pool: &Budget,
     raw: Bytes,
@@ -53,7 +52,6 @@ fn avc_into(
     }
 }
 
-#[inline(never)]
 fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -> Result<()> {
     let raw = &case.configuration;
     if raw.len() < 4 || raw.starts_with(&[0, 0, 1]) || raw.starts_with(&[0, 0, 0, 1]) {
@@ -115,7 +113,6 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
 }
 
 // Both live and retained packet observations use the same fold.
-#[inline(never)]
 fn packet_digest(hash: &mut Digest, kind: u64, input: i64, ordinal: u64, packet: &NalPacketOutput) {
     let fields = packet.source().fields;
     hash.words(&[
@@ -240,10 +237,6 @@ fn operation(case: &Case) -> Result<Outcome> {
             }
             continue;
         };
-        let extra = extra
-            .as_ref()
-            .map(|range| case.input.slice(range.clone()))
-            .transpose()?;
         let mut update = None;
         if case.codec == Codec::Avc
             && let Some(raw) = extra.as_ref().filter(|b| !b.is_empty())
@@ -258,14 +251,14 @@ fn operation(case: &Case) -> Result<Outcome> {
             }
         }
         let packet = NalPacket {
-            bytes: case.input.slice(bytes.clone())?,
+            bytes: bytes.clone(),
             fields: *fields,
             location: SourceLocation {
                 source: SourceId(1),
                 offset: *offset,
             },
             generation: 1,
-            new_extradata: extra,
+            new_extradata: extra.clone(),
         };
         let mut job = match session.receiver_packet(packet, update) {
             Ok(job) => job,

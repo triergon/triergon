@@ -36,7 +36,7 @@ pub(super) fn load() -> Result<Vec<Case>, String> {
         || profiles.len() < ORIGINAL_CASE_COUNT
         || scripts.len() != ORIGINAL_CASE_COUNT
     {
-        return Err("packet framing requires all 125 cases".into());
+        return Err("packet framing is missing its original inputs".into());
     }
     if contract.get("work_fields")
         != Some(&Value::strings(["packets", "bytes", "digest", "digest_b"]))

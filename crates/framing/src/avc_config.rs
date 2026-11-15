@@ -207,10 +207,17 @@ impl Scan {
                 };
                 let bytes: [u8; 4] = bytes.try_into().map_err(|_| Error::Truncated)?;
                 self.position = end;
+                // A receiver can publish the base parameter sets when the
+                // record ends immediately after the extension header.
+                let count = if receiver && end == raw.len() {
+                    0
+                } else {
+                    bytes[3]
+                };
                 self.group(
                     AvcConfigArrayKind::SequenceExtension,
                     start,
-                    bytes[3],
+                    count,
                     ScanPhase::End,
                     Some(bytes),
                 )

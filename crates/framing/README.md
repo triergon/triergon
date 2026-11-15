@@ -124,42 +124,17 @@ size/type header); sample jobs take one complete container sample.
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
 generation. Raw and reserved fields stay readable; local violations are reported
 through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
-fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
-retained view keeps the whole backing allocation charged. An AVC configuration
-keeps up to four NAL descriptors inline; larger records use charged heap storage.
-Small records reuse the checked offsets from the validation pass when the
-remaining work budget covers publishing the descriptors. Each scan step keeps
-its cursor local and saves it at a return to the caller. Array counts and the
-validated end offset are derived from the descriptors and the extension fields.
-HEVC configurations independently keep up to four array descriptors and four NAL
-descriptors inline. The validation pass fills both tables when they fit inline.
-When either exceeds its inline capacity, a second pass fills the tables with
-exact-capacity charged storage for the larger tables. Both paths keep the same
-work checkpoints and retain the original record.
-The HEVC record also retains the first array type the Annex B receiver
-refuses. Configuration and packet writers charge the array checks in order
-and report the refusal at its original work boundary.
-The configuration writer can size its contiguous Annex B output from the
-validated record extent when the available work covers the whole sizing pass.
+fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input. A
+retained view keeps the whole backing allocation charged. The configuration
+writers use the validated parameter-set ranges from these records.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs keep up to six segment descriptors inline, then spill the
-complete table into charged heap storage. The spill can use the exact segment
-count from HEVC lookahead or from the final AVC NAL and the parameter-set
-arrays it selects. A refused reservation falls back to ordinary growth.
-A refused spill keeps the inline descriptors intact for retry.
-Retaining complete outputs in a `BudgetVec`
-charges their full element size, including inline descriptors. Passthrough packets
-share the original payload. Segment descriptors store the wire-bounded NAL
-length once, with full-width source and output offsets. Whole-packet passthrough
-lengths remain full width as well.
-Contiguous copying selects the packet buffer directly for packet segments and
-looks up the active configuration only for configuration segments. Both paths
-retain their checked payload ranges.
+Stateful packet jobs charge heap segment storage to the caller's pool and
+share the original payload for passthrough packets.
 
 **Codec-specific limits.**
 
@@ -173,10 +148,12 @@ retain their checked payload ranges.
   (H.264 Annex D). It uses in-band sets found before the following slice, then
   falls back to the active configuration for missing sets. It preserves the
   original packet NALs and does not parse the SEI payload.
-- With complete AVC sequence and picture parameter-set arrays, the AVC receiver
-  can frame a sample whose required profile extension has zero to three bytes.
-  It preserves that suffix as trailing bytes and reports `Truncated` as the
-  strict source refusal.
+- The AVC High-profile comparisons frame samples from complete sequence and
+  picture parameter-set arrays with zero to three extension header bytes.
+  The receiver preserves those bytes as a trailing suffix and reports
+  `Truncated` as the strict source refusal. When a complete extension header
+  declares entries and the record ends at the header, the receiver frames
+  the base parameter sets and preserves the header and the strict refusal.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps. `append_payload` can consume an interior NAL
   slice while the reader is waiting for input.
