@@ -1,4 +1,5 @@
 # The functions the link-order training runs in playback-matroska-worker on thumbv7neon-unknown-linux-gnueabihf, in first-use order.
+# Recorded from operations 4bdd1d4bc8e6a00bed46f21e9419a0d1a723be52e9524ccc16c919413879f3bb of harness/link-order/training.json.
 # Written by `cargo xtask link-order train`; see docs/quality.md.
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main

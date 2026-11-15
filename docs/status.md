@@ -21,11 +21,21 @@ which links both sides' toolchain runtime support libraries from their static ar
 policy changes every Rust worker and the HarfBuzz and libass references; the FFmpeg and
 FreeType references link as before. A row that names another revision names its host class
 too ([measured revisions](#measured-revisions)).
-Rows that name `d2c391b8`, `6dc6440d` or `cd7d9d7c` link the media, playback and
-Matroska playback workers, the framing worker on Linux AArch64 and the transport worker on
-ARMv7 in their trained orders under the link policy
-`static-toolchain-runtime-trained-order-v1`; every other worker and every reference links
-as under `static-toolchain-runtime-v1`.
+Rows that name `d2c391b8`, `6dc6440d` or `cd7d9d7c` are measured under the link policy
+`static-toolchain-runtime-trained-order-v1`. It links the media, playback and Matroska
+playback workers, the framing worker on Linux AArch64 and the transport worker on ARMv7
+with the toolchain's `lld` instead of its default linker, the functions their trained
+orders list first and the rest in module order, so their results reflect the linker,
+the module order and the trained order together. Every other worker and every
+reference links as under `static-toolchain-runtime-v1`, byte for byte as before. The
+other workers keep their link because a trained order made a row worse or would not
+help: the codec worker's file workloads for FLAC, MP3, MP2, Vorbis and Opus took more
+resident memory with an order trained on the corpus's AAC, H.264 and HEVC operations
+(worst total RSS 0.5416 to 0.5607 on Linux AArch64, 0.6158 to 0.6380 on ARMv7); on
+ARMv7 the framing worker's cases kept their resident peaks and two reached the
+reference's; on Linux AArch64 three malformed PSI cases of the transport worker, whose
+code the corpus does not run, held one more 64 KiB window of code; and the ISO BMFF
+worker's operations read only the raw-video and timed-text movies of its comparison.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -974,10 +984,10 @@ The total RSS gate passes on ARMv7 in every container and playback row. Which of
 worker's code is resident is set by where the functions an operation runs lie among the
 64 KiB windows the kernel faults in around each access: an MP4 range operation runs
 about 250 KB of the playback worker's code, which module order spreads over most of its
-windows. The media, playback, Matroska playback and transport workers link in their
-trained orders ([quality](quality.md#measuring-performance)), which keep the functions
-the training corpus runs together. Against main's builds, linked in module order on the
-same images, MP4 forward's total RSS bound falls from 1.0856 (0/46 lower) at `7c4057c5`
+windows. The media, playback, Matroska playback and transport workers link with `lld`
+in their trained orders ([quality](quality.md#measuring-performance)), which keep the
+functions the training corpus runs together. Against main's builds, linked by the
+toolchain's default linker on the same images, MP4 forward's total RSS bound falls from 1.0856 (0/46 lower) at `7c4057c5`
 to 0.9911 (46/46 lower) at `6dc6440d`, MP4 range's from 1.0742 (0/51 lower) to 0.9173
 (51/51 lower), and the six Matroska feature groups' from 1.0464 (110/115 lower) at
 `f71495ea` to 0.9498 (115/115 lower) at `d2c391b8`, whose media worker `6dc6440d`

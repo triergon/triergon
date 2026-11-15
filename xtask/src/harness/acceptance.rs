@@ -681,7 +681,7 @@ pub(crate) fn acceptance_iter(
     }
     match gate_build::pinned_release(root) {
         Ok(pinned) => reasons.extend(
-            gate_build::refusals(identity, &pinned)
+            gate_build::identity_refusals(root, identity, &pinned)
                 .into_iter()
                 .map(|reason| format!("not the gate build: {reason}")),
         ),

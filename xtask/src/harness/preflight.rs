@@ -322,7 +322,8 @@ fn built_reference(root: &Path, identity: &Value, name: &str) -> R<String> {
 
 /// The gate build's workers and every comparison reference match the identity.
 fn workers(root: &Path, identity: &Value) -> R<String> {
-    let refusals = gate_build::refusals(identity, &gate_build::pinned_release(root)?);
+    let refusals =
+        gate_build::identity_refusals(root, identity, &gate_build::pinned_release(root)?);
     if !refusals.is_empty() {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }

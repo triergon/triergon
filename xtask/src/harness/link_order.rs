@@ -10,14 +10,14 @@
 //! name, a closure by its function's, and drop glue by the type it drops, with
 //! generic arguments left out. Sorting by that path puts each crate's functions
 //! together, and within a crate each module's and each type's. A name the binary
-//! does not hold is skipped, so a stale trained order still links. The file is
+//! does not hold is skipped and counted: a build whose binary holds fewer than
+//! [`MIN_HELD_PERCENT`] of its trained order's names fails. The file is
 //! computed from a first link of the worker and applied by linking again
 //! ([`super::gate_build::ordered_link_arguments`]); ordering the second link
 //! gives the same file.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 /// Where the trained order of `worker` for `target` is committed.
 pub fn trained_path(root: &Path, target: &str, worker: &str) -> PathBuf {
@@ -46,23 +46,6 @@ pub fn parse_trained(text: &str) -> Result<Vec<String>, String> {
     Ok(names)
 }
 
-/// The committed trained order of `worker` for `target`; none when the worker has
-/// none, and links as its toolchain does.
-pub fn committed_trained(
-    root: &Path,
-    target: &str,
-    worker: &str,
-) -> Result<Option<Vec<String>>, String> {
-    let path = trained_path(root, target, worker);
-    match std::fs::read_to_string(&path) {
-        Ok(text) => parse_trained(&text)
-            .map(Some)
-            .map_err(|error| format!("{}: {error}", path.display())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(format!("{}: {error}", path.display())),
-    }
-}
-
 /// A demangled name without the suffix LLVM gives a local function it promotes,
 /// which changes from build to build.
 fn stable_name(name: &str) -> &str {
@@ -70,28 +53,60 @@ fn stable_name(name: &str) -> &str {
         .map_or(name, |end| name[..end].trim_end_matches(" ("))
 }
 
-/// The text symbols of `binary` as `nm` lists them, in symbol-table order.
-fn text_symbols(binary: &Path, demangle: bool) -> Result<Vec<String>, String> {
-    let mut command = Command::new("nm");
-    command.args(["--defined-only", "-p"]);
+/// A code symbol as `nm` lists it: its address, its size where the symbol table
+/// gives one, and its name.
+struct Symbol {
+    address: u64,
+    size: Option<u64>,
+    name: String,
+}
+
+/// The code symbols `binary` defines, demangled or not, in symbol-table order.
+fn code_symbols(binary: &Path, demangle: bool) -> Result<Vec<Symbol>, String> {
+    let mut argv: Vec<String> = ["nm", "--defined-only", "-p", "-S"]
+        .map(str::to_owned)
+        .to_vec();
     if demangle {
-        command.arg("-C");
+        argv.push("-C".to_owned());
     }
-    let output = command
-        .arg(binary)
-        .output()
-        .map_err(|error| format!("nm: {error}"))?;
-    if !output.status.success() {
-        return Err(format!("nm {}: {}", binary.display(), output.status));
+    argv.push(binary.display().to_string());
+    let text = crate::process::check_output(&argv)?;
+    Ok(text.lines().filter_map(code_symbol).collect())
+}
+
+/// One line of `nm -S`: `ADDRESS [SIZE] KIND NAME`, the name possibly with spaces.
+fn code_symbol(line: &str) -> Option<Symbol> {
+    let (address, rest) = line.split_once(' ')?;
+    let address = u64::from_str_radix(address, 16).ok()?;
+    let (size, rest) = match rest.split_once(' ')? {
+        (kind, _) if kind.len() == 1 => (None, rest),
+        (size, rest) => (Some(u64::from_str_radix(size, 16).ok()?), rest),
+    };
+    let (kind, name) = rest.split_once(' ')?;
+    matches!(kind, "t" | "T" | "w" | "W").then(|| Symbol {
+        address,
+        size,
+        name: name.to_owned(),
+    })
+}
+
+/// The code symbols of `binary` paired with their demangled names.
+fn named_symbols(binary: &Path) -> Result<Vec<(Symbol, String)>, String> {
+    let symbols = code_symbols(binary, false)?;
+    let names = code_symbols(binary, true)?;
+    if symbols.len() != names.len() {
+        return Err(format!(
+            "{}: nm lists {} symbols and {} demangled names",
+            binary.display(),
+            symbols.len(),
+            names.len()
+        ));
     }
-    let text = String::from_utf8(output.stdout).map_err(|error| format!("nm: {error}"))?;
-    Ok(text
-        .lines()
-        .filter_map(|line| {
-            let mut fields = line.splitn(3, ' ');
-            let (_, kind, name) = (fields.next()?, fields.next()?, fields.next()?);
-            matches!(kind, "t" | "T" | "w" | "W").then(|| name.to_owned())
-        })
+    Ok(symbols
+        .into_iter()
+        .zip(names)
+        .filter(|(symbol, _)| !linker_made(&symbol.name))
+        .map(|(symbol, named)| (symbol, named.name))
         .collect())
 }
 
@@ -106,46 +121,59 @@ fn linker_made(symbol: &str) -> bool {
             || symbol.starts_with("__CortexA8657417_"))
 }
 
+/// The least share, in percent, of a trained order's names a binary must hold for
+/// the order to lay it out.
+pub const MIN_HELD_PERCENT: usize = 95;
+
+/// A binary's symbol ordering file and how many of the trained order's names the
+/// binary holds.
+pub struct Ordering {
+    pub text: String,
+    pub held: usize,
+}
+
+/// Whether a binary that holds `held` of a trained order's `trained` names is laid out
+/// by it.
+pub fn holds_enough(held: usize, trained: usize) -> bool {
+    held * 100 >= trained * MIN_HELD_PERCENT
+}
+
 /// The symbol ordering file of `binary`: one symbol per line, those `trained` names
 /// first in its order, then the rest by owning path, demangled name and symbol name,
 /// without the code the linker makes itself.
-pub fn symbol_order(binary: &Path, trained: &[String]) -> Result<String, String> {
-    let symbols = text_symbols(binary, false)?;
-    let names = text_symbols(binary, true)?;
-    if symbols.len() != names.len() {
-        return Err(format!(
-            "{}: nm lists {} symbols and {} demangled names",
-            binary.display(),
-            symbols.len(),
-            names.len()
-        ));
-    }
+pub fn symbol_order(binary: &Path, trained: &[String]) -> Result<Ordering, String> {
+    let symbols = named_symbols(binary)?;
     let rank: HashMap<&str, usize> = trained
         .iter()
         .enumerate()
         .map(|(index, name)| (name.as_str(), index))
         .collect();
-    let mut rows: Vec<(usize, String, &str, &str)> = names
+    let mut held = HashSet::new();
+    let mut rows: Vec<(usize, String, &str, &str)> = symbols
         .iter()
-        .zip(&symbols)
-        .filter(|(_, symbol)| !linker_made(symbol))
-        .map(|(name, symbol)| {
+        .map(|(symbol, name)| {
             let rank = rank.get(stable_name(name)).copied().unwrap_or(usize::MAX);
-            (rank, owner(name), name.as_str(), symbol.as_str())
+            if rank != usize::MAX {
+                held.insert(rank);
+            }
+            (rank, owner(name), name.as_str(), symbol.name.as_str())
         })
         .collect();
     rows.sort_unstable();
-    let mut order = String::new();
+    let mut text = String::new();
     let mut previous = None;
     for (_, _, _, symbol) in rows {
         // A local name the binary holds more than once is one line of the file.
         if previous != Some(symbol) {
-            order.push_str(symbol);
-            order.push('\n');
+            text.push_str(symbol);
+            text.push('\n');
         }
         previous = Some(symbol);
     }
-    Ok(order)
+    Ok(Ordering {
+        text,
+        held: held.len(),
+    })
 }
 
 /// A function of a binary: where its code lies and its stable demangled name.
@@ -155,53 +183,19 @@ struct Function {
     name: String,
 }
 
-/// The sized text symbols of `binary` with their demangled names, by address.
+/// The sized code symbols of `binary` with their stable demangled names, by address.
 fn functions(binary: &Path) -> Result<Vec<Function>, String> {
-    let list = |demangle: bool| -> Result<Vec<(u64, u64, String)>, String> {
-        let mut command = Command::new("nm");
-        command.args(["--defined-only", "-p", "-S"]);
-        if demangle {
-            command.arg("-C");
-        }
-        let output = command
-            .arg(binary)
-            .output()
-            .map_err(|error| format!("nm: {error}"))?;
-        if !output.status.success() {
-            return Err(format!("nm {}: {}", binary.display(), output.status));
-        }
-        let text = String::from_utf8(output.stdout).map_err(|error| format!("nm: {error}"))?;
-        Ok(text
-            .lines()
-            .filter_map(|line| {
-                let mut fields = line.splitn(4, ' ');
-                let address = u64::from_str_radix(fields.next()?, 16).ok()?;
-                let size = u64::from_str_radix(fields.next()?, 16).ok()?;
-                let (kind, name) = (fields.next()?, fields.next()?);
-                (matches!(kind, "t" | "T" | "w" | "W") && size > 0)
-                    .then(|| (address, size, name.to_owned()))
-            })
-            .collect())
-    };
-    let symbols = list(false)?;
-    let names = list(true)?;
-    if symbols.len() != names.len() {
-        return Err(format!(
-            "{}: nm lists {} sized symbols and {} demangled names",
-            binary.display(),
-            symbols.len(),
-            names.len()
-        ));
-    }
-    let mut functions: Vec<Function> = symbols
-        .iter()
-        .zip(names)
-        .filter(|((_, _, symbol), _)| !linker_made(symbol))
-        .map(|((address, size, _), (_, _, name))| Function {
+    let mut functions: Vec<Function> = named_symbols(binary)?
+        .into_iter()
+        .filter_map(|(symbol, name)| {
+            let size = symbol.size.filter(|&size| size > 0)?;
             // A Thumb function's symbol holds its address with the lowest bit set.
-            start: address & !1,
-            end: (address & !1) + size,
-            name: stable_name(&name).to_owned(),
+            let start = symbol.address & !1;
+            Some(Function {
+                start,
+                end: start.checked_add(size)?,
+                name: stable_name(&name).to_owned(),
+            })
         })
         .collect();
     functions.sort_by(|a, b| (a.start, &a.name).cmp(&(b.start, &b.name)));
@@ -211,41 +205,54 @@ fn functions(binary: &Path) -> Result<Vec<Function>, String> {
 /// The addresses the executable load segments of `binary` span in its ELF
 /// program headers: the lowest start and the highest end of their file contents.
 fn executable_span(binary: &Path) -> Result<(u64, u64), String> {
+    use super::linux::{u16le, u32le, u64le};
     let image = std::fs::read(binary).map_err(|error| format!("{}: {error}", binary.display()))?;
-    let malformed = || format!("{}: malformed ELF header", binary.display());
-    let bytes = |at: usize, width: usize| -> Result<u64, String> {
-        let field = image.get(at..at + width).ok_or_else(malformed)?;
-        let mut value = [0; 8];
-        value[..width].copy_from_slice(field);
-        Ok(u64::from_le_bytes(value))
-    };
+    let malformed = |problem: &str| format!("{}: {problem}", binary.display());
     if image.get(0..4) != Some(b"\x7fELF") || image.get(5) != Some(&1) {
-        return Err(format!(
-            "{}: not a little-endian ELF file",
-            binary.display()
-        ));
+        return Err(malformed("not a little-endian ELF file"));
     }
-    // (word width, program header offset field, entry size field, count field,
+    // (word reader, program header offset field, entry size field, count field,
     // flags offset, virtual address offset, file size offset) of ELF32 and ELF64.
-    let (word, table, size, count, flags, address, length) = match image.get(4) {
-        Some(1) => (4, 28, 42, 44, 24, 8, 16),
-        Some(2) => (8, 32, 54, 56, 4, 16, 32),
-        _ => return Err(format!("{}: unknown ELF class", binary.display())),
+    let word32 = |at: usize| u32le(&image, at).map(u64::from);
+    let word64 = |at: usize| u64le(&image, at);
+    let (word, table, size, count, flags, address, length): (
+        &dyn Fn(usize) -> Result<u64, String>,
+        _,
+        _,
+        _,
+        _,
+        _,
+        _,
+    ) = match image.get(4) {
+        Some(1) => (&word32, 28, 42, 44, 24, 8, 16),
+        Some(2) => (&word64, 32, 54, 56, 4, 16, 32),
+        _ => return Err(malformed("unknown ELF class")),
     };
-    let table = usize::try_from(bytes(table, word)?).map_err(|_| malformed())?;
-    let size = usize::try_from(bytes(size, 2)?).map_err(|_| malformed())?;
+    let table =
+        usize::try_from(word(table)?).map_err(|_| malformed("program headers out of range"))?;
+    let size = usize::from(u16le(&image, size)?);
     let mut span: Option<(u64, u64)> = None;
-    for index in 0..bytes(count, 2)? as usize {
-        let header = table + index * size;
+    for index in 0..usize::from(u16le(&image, count)?) {
+        let header = index
+            .checked_mul(size)
+            .and_then(|offset| offset.checked_add(table))
+            .ok_or_else(|| malformed("program headers out of range"))?;
+        let at = |field: usize| {
+            header
+                .checked_add(field)
+                .ok_or_else(|| malformed("program headers out of range"))
+        };
         // A loadable segment (PT_LOAD) that is executable (PF_X).
-        if bytes(header, 4)? != 1 || bytes(header + flags, 4)? & 1 == 0 {
+        if u32le(&image, header)? != 1 || u32le(&image, at(flags)?)? & 1 == 0 {
             continue;
         }
-        let start = bytes(header + address, word)?;
-        let end = start + bytes(header + length, word)?;
+        let start = word(at(address)?)?;
+        let end = start
+            .checked_add(word(at(length)?)?)
+            .ok_or_else(|| malformed("segment out of range"))?;
         span = Some(span.map_or((start, end), |(low, high)| (low.min(start), high.max(end))));
     }
-    span.ok_or_else(|| format!("{}: no executable segment", binary.display()))
+    span.ok_or_else(|| malformed("no executable segment"))
 }
 
 /// A `NAME 0xADDRESS` line of QEMU's `page` log.
@@ -412,7 +419,7 @@ fn without_generics(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{linker_made, owner, parse_trained, stable_name};
+    use super::{code_symbol, holds_enough, linker_made, owner, parse_trained, stable_name};
 
     #[test]
     fn a_trained_order_lists_each_function_once_and_may_hold_comments() {
@@ -439,6 +446,24 @@ mod tests {
             stable_name("_Unwind_GetGR.constprop.0"),
             "_Unwind_GetGR.constprop.0"
         );
+    }
+
+    #[test]
+    fn nm_lines_give_code_symbols_with_or_without_a_size() {
+        let sized =
+            code_symbol("0000000000012340 0000000000000024 T core::fmt::write (.llvm.1)").unwrap();
+        assert_eq!((sized.address, sized.size), (0x12340, Some(0x24)));
+        assert_eq!(sized.name, "core::fmt::write (.llvm.1)");
+        let unsized_ = code_symbol("00012341 t $t").unwrap();
+        assert_eq!((unsized_.address, unsized_.size), (0x12341, None));
+        assert!(code_symbol("0000000000012340 0000000000000008 D data").is_none());
+    }
+
+    #[test]
+    fn a_binary_must_hold_most_of_its_trained_order() {
+        assert!(holds_enough(95, 100));
+        assert!(!holds_enough(94, 100));
+        assert!(holds_enough(0, 0));
     }
 
     #[test]

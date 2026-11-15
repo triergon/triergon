@@ -1,4 +1,5 @@
 # The functions the link-order training runs in framing-worker on aarch64-unknown-linux-gnu, in first-use order.
+# Recorded from operations cd8e8b2f7011762431b2626ce93395a43ac9dced830c38dd5d7eb5a763b86207 of harness/link-order/training.json.
 # Written by `cargo xtask link-order train`; see docs/quality.md.
 _start
 call_weak_fn

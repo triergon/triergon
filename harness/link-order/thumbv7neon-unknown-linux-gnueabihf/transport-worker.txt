@@ -1,4 +1,5 @@
 # The functions the link-order training runs in transport-worker on thumbv7neon-unknown-linux-gnueabihf, in first-use order.
+# Recorded from operations cac6ead2f21eeef784c46580895ddaecd02745b50249f6d419497b185cb10722 of harness/link-order/training.json.
 # Written by `cargo xtask link-order train`; see docs/quality.md.
 std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
 main

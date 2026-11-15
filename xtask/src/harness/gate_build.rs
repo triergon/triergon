@@ -140,6 +140,12 @@ fn static_runtime(target: &str) -> bool {
     target.contains("-linux-gnu")
 }
 
+/// Whether [`LINK_POLICY`] links the workers for `target` with `lld`, those with a
+/// trained order in it ([`ordered_link_arguments`]).
+pub fn orders_links(target: &str) -> bool {
+    static_runtime(target)
+}
+
 /// The arguments `cargo rustc` passes to a worker's own compile, after `--`, to link
 /// it under [`LINK_POLICY`]. Placed with the worker's native libraries, ahead of the
 /// standard library's `-lgcc_s`, libgcc's static unwinder resolves every unwinder
@@ -388,6 +394,15 @@ pub fn refusals(identity: &Value, pinned: &str) -> Vec<String> {
     reasons
 }
 
+/// Why the build `identity.json` records is not the gate build: [`refusals`], and
+/// workers not linked as the training manifest and the committed trained orders give
+/// ([`super::link_training::link_order_refusals`]).
+pub fn identity_refusals(root: &Path, identity: &Value, pinned: &str) -> Vec<String> {
+    let mut reasons = refusals(identity, pinned);
+    reasons.extend(super::link_training::link_order_refusals(root, identity));
+    reasons
+}
+
 /// One line naming the build a record describes.
 pub fn name(identity: &Value) -> String {
     let compiler = identity
@@ -467,7 +482,7 @@ pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<Str
         Err(error) => return vec![format!("no build identity: {error}")],
     };
     let mut reasons = match pinned_release(root) {
-        Ok(pinned) => refusals(&identity, &pinned),
+        Ok(pinned) => identity_refusals(root, &identity, &pinned),
         Err(error) => vec![error],
     };
     let digest = |path: &Path| std::fs::read(path).map(|bytes| sha256::hex(&bytes)).ok();
@@ -891,11 +906,22 @@ mod tests {
         fs::write(&other, "other").unwrap();
         assert!(pair_refusals(&tree, &worker, &reference)[0].starts_with("no build identity"));
 
+        fs::create_dir_all(tree.join("harness/link-order")).unwrap();
+        fs::write(
+            tree.join(super::super::link_training::MANIFEST),
+            r#"{"directory": "corpus", "files": [], "operations": []}"#,
+        )
+        .unwrap();
         let digest = |text: &str| sha256::hex(text.as_bytes());
         let mut identity = record("", None);
         if let Value::Object(fields) = &mut identity {
-            let entry =
-                |sha: String| Value::object([("w", Value::object([("sha256", Value::str(sha))]))]);
+            let entry = |sha: String| {
+                Value::object([(
+                    "w",
+                    Value::object([("sha256", Value::str(sha)), ("link_order", Value::Null)]),
+                )])
+            };
+            fields.push(("candidate_link_order".into(), Value::Null));
             fields.push(("additional_candidates".into(), entry(digest("worker"))));
             fields.push(("comparison_references".into(), entry(digest("reference"))));
         }

@@ -14,6 +14,7 @@ mod ebml;
 mod evidence;
 mod fate;
 mod fetch;
+mod ffprobe;
 mod fonts;
 mod framing_bench;
 mod fuzz;
@@ -1194,14 +1195,21 @@ fn link_order(root: &Path, args: &[String]) -> Task {
     };
     match args.first().map(String::as_str) {
         Some("corpus") => match args {
-            [_, out] => harness::link_training::corpus(Path::new(out)),
+            [_, out] => harness::link_corpus::corpus(Path::new(out)),
             _ => Err(LINK_ORDER_USAGE.into()),
         },
         Some("separate") => harness::link_training::separate(root, option("--corpus")?),
         Some("train") => harness::link_training::train(
             root,
             option("--corpus")?,
-            option("--only")?.and_then(Path::to_str),
+            match args.iter().position(|argument| argument == "--only") {
+                Some(at) => Some(
+                    args.get(at + 1)
+                        .map(String::as_str)
+                        .ok_or_else(|| format!("--only needs a value\n{LINK_ORDER_USAGE}"))?,
+                ),
+                None => None,
+            },
         ),
         Some("check") => harness::link_training::check(root),
         Some(_) => {
@@ -1225,10 +1233,10 @@ fn link_order(root: &Path, args: &[String]) -> Task {
                 .collect();
             match positional[..] {
                 [binary] => harness::link_order::symbol_order(Path::new(binary), &trained)
-                    .map(|order| print!("{order}")),
+                    .map(|order| print!("{}", order.text)),
                 [binary, out] => harness::link_order::symbol_order(Path::new(binary), &trained)
                     .and_then(|order| {
-                        std::fs::write(out, order).map_err(|error| format!("{out}: {error}"))
+                        std::fs::write(out, order.text).map_err(|error| format!("{out}: {error}"))
                     }),
                 _ => Err(LINK_ORDER_USAGE.into()),
             }

@@ -138,6 +138,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
         ("build_environment", Value::Object(Vec::new())),
         ("cargo_configuration", Value::Array(Vec::new())),
         ("link_policy", Value::str(gate_build::LINK_POLICY)),
+        ("candidate_link_order", Value::Null),
         (
             "instrumentation",
             v(r#"{"probe_sha256": "probe-hash", "observer_sha256": "observer-hash"}"#),
