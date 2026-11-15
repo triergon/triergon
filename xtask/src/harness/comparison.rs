@@ -69,6 +69,21 @@ impl Work {
     }
 }
 
+/// The work fields among `fields` that each role reports of its own output: those
+/// whose reviewed expected values (`{candidate, reference}`) differ between the
+/// roles. Each role is still held to its own expected value; every other field
+/// must be the same for both.
+pub(crate) fn own_fields(expected: Option<&Value>, fields: &[String]) -> Vec<String> {
+    let roles = expected.and_then(|e| Some((e.get("candidate")?, e.get("reference")?)));
+    let Some((candidate, reference)) = roles else {
+        return Vec::new();
+    };
+    required_fields(fields)
+        .into_iter()
+        .filter(|key| candidate.get(key) != reference.get(key))
+        .collect()
+}
+
 /// The work of one timed pair: each role's complete work, after checking the
 /// iteration count, the elapsed time and that both roles report the same value
 /// for every field outside `work.own`.
@@ -442,6 +457,18 @@ mod work_tests {
             Value::object([("worker", Value::str("reference")), ("result", complete)]),
         ];
         assert_eq!(warmup_work(&warmups, 50, &shared).unwrap(), summary);
+    }
+
+    #[test]
+    fn own_fields_are_those_the_reviewed_roles_differ_in() {
+        let fields = work_fields(&v("{}")).unwrap();
+        let expected = v(r#"{"candidate":{"packets":3,"bytes":9,"digest":1},
+            "reference":{"packets":3,"bytes":9,"digest":2,"input_bytes":7}}"#);
+        assert_eq!(own_fields(Some(&expected), &fields), ["digest"]);
+        let same = v(r#"{"candidate":{"packets":3,"bytes":9,"digest":1},
+            "reference":{"packets":3,"bytes":9,"digest":1}}"#);
+        assert!(own_fields(Some(&same), &fields).is_empty());
+        assert!(own_fields(None, &fields).is_empty());
     }
 
     #[test]

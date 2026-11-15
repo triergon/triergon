@@ -29323,6 +29323,538 @@
    "source_revisions": {
     "candidate": "359a90b46ba2bfa9a896b827c9bd4869ff7b7b48"
    }
+  },
+  {
+   "name": "ogg-reader-inputs",
+   "path": "ogg-reader-inputs",
+   "retention": "retained",
+   "reason": "The inputs of the Ogg reader comparison and its seek cases (harness/codecs/reader-manifest.json lane reader-ogg, harness/codecs/reader-seeks.json): the FATE Vorbis, Theora and chained Ogg samples and the generated Ogg and Speex streams (harness/codecs/ogg/make_vectors.sh, make_speex_vectors.sh), each matching its listed SHA-256, unpacked at the repository root of a gate host; the gate item ogg-readers reads them",
+   "key": "evidence/ogg-reader-inputs/3e0a9f464c4c4efcab8f94f5b91f921daa3efe7f63f4214278a4171dbf6b8f2d.tar.gz",
+   "sha256": "3e0a9f464c4c4efcab8f94f5b91f921daa3efe7f63f4214278a4171dbf6b8f2d",
+   "bytes": 2755817,
+   "unpacked_at": "repository",
+   "files": [
+    {
+     "path": ".research/fate-samples/ogg-flac/chained-meta.ogg",
+     "sha256": "03809147054f307c79913e25aab5dfa9294773796d591dbc556e0adb98388a7a"
+    },
+    {
+     "path": ".research/fate-samples/ogg-opus/chained-meta.ogg",
+     "sha256": "14ef86e6d37476d4008ec33722c406136f261bb76dfb8fad5ddb8d6f64cdbd6c"
+    },
+    {
+     "path": ".research/fate-samples/ogg-vorbis/chained-meta.ogg",
+     "sha256": "9a664f79d0a201b8733a26a3a178a14f3c07c2f116f4e87738f692a69f187804"
+    },
+    {
+     "path": ".research/fate-samples/ogg/bear.ogv",
+     "sha256": "c6281b645fc9ddcba7ecc8eb16c525758cec498de9645a5e6be44f6a8962ce57"
+    },
+    {
+     "path": ".research/fate-samples/ogg/empty_theora_packets.ogv",
+     "sha256": "de42934c0ad6049dada4c27132982a09213c24d2d82d80f2959a183e94f1b97b"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/1.0-test_small.ogg",
+     "sha256": "9f510e92b976eaf735009b444511f856db601eb13698b54fdfc9c4e078f9f3bc"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/1.0.1-test_small.ogg",
+     "sha256": "1eef411505a81a7b4e2e6bcc382844479fa51db88f2d03ed8e638682b0786e4e"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/6.ogg",
+     "sha256": "1dbce194fb1ca74250c156b4aba10b3bf76f90bc5ca8896823cef6c965a2c46a"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/beta3-test_small.ogg",
+     "sha256": "c756dbf9e72680b6b35b9d5547aa15a76298e3d53600b85f17f1a2d19714ec14"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/beta4-test_small.ogg",
+     "sha256": "67517ea51560fac1c6190bd90ab3c18ff1bcdbc30d8e10e3585476ea44aba518"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/chain-test1_small.ogg",
+     "sha256": "f5099bddbe1c7dd80c1b46ba99930cd7f818c63f5120d7c5a5d9d991852cafe0"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/chain-test2_small.ogg",
+     "sha256": "48e5024d95170b064208c469ea75915e98294cf74c7fcec2b73b4e679d0dfd0a"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/highrate-test_small.ogg",
+     "sha256": "9974ea9a70159b6157ff8c157ca6969183037a8e6ccdc4f0d84e4a8aa607e923"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/lsp-test2_small.ogg",
+     "sha256": "6946aa25a4d27153b38aefeb3c139fa8542689adafc5ae2bdb2ce4aa3af77e54"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/lsp-test3_small.ogg",
+     "sha256": "3358bacdc7cd33b0b75e4ed84913b1f11847e1d556dbe00ff60fb1e30cf711f5"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/lsp-test4_small.ogg",
+     "sha256": "5dd55ac71ebffe5db1a351fc5beaeddeab61e415853ce351d268eda547b2264e"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/lsp-test_small.ogg",
+     "sha256": "f908598728585cdec80f47d96ae36eaa9f3afaa2774c01638f52b11a6e4c5727"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/mono_small.ogg",
+     "sha256": "67565c74021eb0a6b68bd20bbef431ff76a0bd7d8c4865702b6d6408860f54cd"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/moog_small.ogg",
+     "sha256": "25778a973824fcf488c751ecbc2fdbc594e8655666802e1f7d319c11c2814461"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/rc1-test_small.ogg",
+     "sha256": "0db535709f6b3f9810c6980370ec72911df2a22d67cf0a32c1445aa5f2b43e99"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/rc2-test2_small.ogg",
+     "sha256": "db45e1c0ad0c172f2ac32a09984c1a8486963e4be4924bdf3049a4db46880ab7"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/rc2-test_small.ogg",
+     "sha256": "2277d4f8278a0b38894cded850e036db53702f16b6631d69a1407f575bed2e59"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/rc3-test_small.ogg",
+     "sha256": "f6e63631d1e757780ebee1cc82844a3f5e7aa7b49daa0ff7963bd9bcc27659d6"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/sleepzor_small.ogg",
+     "sha256": "dcc01bcbccd9c1ed4cd2304f893a52e3f551573a99a2183635c8db070d18ada2"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/test-short2_small.ogg",
+     "sha256": "56900907a3603f842970467a3ea0ed19d4d7426b9c31388333cf45ca2566561c"
+    },
+    {
+     "path": ".research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg",
+     "sha256": "b3490672085ff1377f6d23f2d4738129a1b96d3e735711654f535f42228730df"
+    },
+    {
+     "path": ".research/fate-samples/vp3/offset_test.ogv",
+     "sha256": "83ba8d258cc3a1715be473925faf757469f67d2e29a553cf6d5a521488393f3e"
+    },
+    {
+     "path": ".research/ogg-generated/a_flac.oga",
+     "sha256": "8f8c5a846e484931852b466a3e08ef33fb125630cebf921a1a00abcd716ad1da"
+    },
+    {
+     "path": ".research/ogg-generated/a_opus.opus",
+     "sha256": "c53015f62682fc2936cc1f29456445087e82b687b853490b89f9abf1b0146ae9"
+    },
+    {
+     "path": ".research/ogg-generated/a_vorbis.ogg",
+     "sha256": "ff3157d4b3b1ed595665a314a597a5d357ed5f1570bb22de57b02a1d9c8a3a7c"
+    },
+    {
+     "path": ".research/ogg-generated/b_opus.opus",
+     "sha256": "ed1b19e31297aad7db9fa663d4e6631341678b9da8abdcdef730d56e47ba2904"
+    },
+    {
+     "path": ".research/ogg-generated/b_vorbis.ogg",
+     "sha256": "f9bd978104bcaf4c02f0232c6102ba51d744370158a51570cc78d1a6dc6ee419"
+    },
+    {
+     "path": ".research/ogg-generated/chain_opus.opus",
+     "sha256": "8c4318d74908867bc5e56e44e6c9aaa609cbcbc5cf0886fb9e0cfabc7c534aab"
+    },
+    {
+     "path": ".research/ogg-generated/chain_vorbis.ogg",
+     "sha256": "19cd38a41bd876db81c5f7a881c7fa9bdfc4821be9b8588f7fe7265202932690"
+    },
+    {
+     "path": ".research/ogg-generated/crc_bad.opus",
+     "sha256": "58955283b54fc60407a235dc3579c6919619ca8d7f8f77ef7f0f41bd9430e614"
+    },
+    {
+     "path": ".research/ogg-generated/flac_51_24.oga",
+     "sha256": "4353a415af59ce3567aacb3cd040b81bb7afdd6b22475042c8d5db2a2901cdb8"
+    },
+    {
+     "path": ".research/ogg-generated/lost_page.opus",
+     "sha256": "553d074916d34d4687b6bea0bcd9d1004aa2e4b3a98713f0c4bc04fc4c819f13"
+    },
+    {
+     "path": ".research/ogg-generated/mc_opus.opus",
+     "sha256": "b814a5ddc354e41a63ac97aaabbf0c87aae5fe40c52e4de972b1ec606f058b8b"
+    },
+    {
+     "path": ".research/ogg-generated/mux2.opus",
+     "sha256": "504885e07bab8e7d19285f706d4d6437dd3859e8c26d9bec5cae42b3a32b4ec1"
+    },
+    {
+     "path": ".research/ogg-generated/truncated.opus",
+     "sha256": "ad8c5f58bd770cc5604e55fdd4ea506ea5d5eb56e0aa545e05c961d81f9f2446"
+    },
+    {
+     "path": ".research/speex-generated/chain_speex.spx",
+     "sha256": "6688b5492f43b4f5812d8acb91dc426c63f0bbe8a31b4b6c1fed081cddff914d"
+    },
+    {
+     "path": ".research/speex-generated/speex_nb.spx",
+     "sha256": "7a620f8ac4bcc4e8121e802853e731aa34b81e6149cd6cf547dcf4e604d15d87"
+    },
+    {
+     "path": ".research/speex-generated/speex_skeleton.spx",
+     "sha256": "07a5070c8bcc01f545a17acb529879f6cddd06efa0bff9ab53b7befeeafb1e27"
+    },
+    {
+     "path": ".research/speex-generated/speex_uwb_stereo.spx",
+     "sha256": "2cfd837317047e6fb7a81871a99d92f13f8b9c478c2ba75fd76faade89d484ba"
+    },
+    {
+     "path": ".research/speex-generated/speex_wb.spx",
+     "sha256": "e191096259c6e07792e4e9207c58cab205c2e25b495db36b236a49279faa1462"
+    }
+   ]
+  },
+  {
+   "name": "gate-run-aarch64-4d31df88",
+   "path": "gate-run-aarch64-4d31df88",
+   "retention": "retained",
+   "reason": "A partial gate run at 4d31df88 on Linux AArch64, one c6g.4xlarge from the gate image with the ogg-reader-inputs set unpacked at the repository root, items codecs, codec-workloads and its five memory parts, codec-file-workloads and its three memory parts, isobmff-1, isobmff-2, isobmff-3, isobmff-reader, isobmff-seek and ogg-readers: the shard's outputs as tools/gate-host.sh writes them, with its summary and host log; every step passes but isobmff-seek, whose authored movies fail runtime and fragmented-1200 fails heap, and whose range plans this revision's harness could not time (measured again at 00159785); for the codec, ISO BMFF, ISO BMFF reader and Ogg reader rows and the reuse of their results",
+   "key": "evidence/gate-run-aarch64-4d31df88/6a55a3b0db8d15f45346510df0dde777d1aef60fab5c473f68116fe25c2c4ba5.tar.zst",
+   "sha256": "6a55a3b0db8d15f45346510df0dde777d1aef60fab5c473f68116fe25c2c4ba5",
+   "bytes": 20474435,
+   "results": [
+    {
+     "path": "benchmark/codec-file-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "28c5584b627a56624c1cd4262a178d98770a09fdc8d08d658ef1c78fe46efd2b",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "benchmark/codec-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "7f620e12543a32300fd8066e6bd796196f16c4fccfb37077442d32153a2bea75",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "benchmark/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "20ca16309f84afc8e8caf6088cd30b179e2a0848fce869ac11ff557b5c6c4d88",
+     "status": 0,
+     "report_sha256": "a8e9bc36eaac4cdc204885ddc1116246093ba50d919c0e32b5efc3216b31d958"
+    },
+    {
+     "path": "benchmark/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "8b2fbe6deab6b50f0f85c3b2d02e2e2ac1ed56573837da0ef34d1a9582d072bd",
+     "status": 0,
+     "report_sha256": "2ecaa78cf65c91c345532944b9a5033ebc29df8ffb65c1ca0cc2be7e393693cb"
+    },
+    {
+     "path": "benchmark/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "77af31635314b9e687ebc341648d7f7321474d1bb955ff8cafb51667a8b19cc1",
+     "status": 0,
+     "report_sha256": "8ea93c85fa1a0c1e13c70934f34f077c0f92809944b53ab9f29ba4336c91976f"
+    },
+    {
+     "path": "benchmark/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --benchmark",
+     "key": "90b1d6fd061694bc91c62bd8ee5bd1b008142d194aef63c959310148cdc38b19",
+     "status": 1,
+     "report_sha256": "1b4d5b424c846589092069cf0ad81d2d91cabd25f803f17e7e6642385333be94"
+    },
+    {
+     "path": "memory/codec-file-workloads-1/gate-result.json",
+     "command": "codecs memory",
+     "key": "be081abc74dbec019def869f957b38565258a553aa897285cc6bb951aa05d66b",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-file-workloads-2/gate-result.json",
+     "command": "codecs memory",
+     "key": "2b7adc54c8377fcd0736d094465a810656a75de69e09308eeec5bc92f55286c9",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-file-workloads-3/gate-result.json",
+     "command": "codecs memory",
+     "key": "9786ab61ba4f8d3d7dc23f3de31b99ecc28a13da9a3e571324c6983a074aa221",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-1/gate-result.json",
+     "command": "codecs memory",
+     "key": "a0d8678023da0acca1fc33b1f256a65aa9e25c9497bf88a2e91687d2ee4b4735",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-2/gate-result.json",
+     "command": "codecs memory",
+     "key": "c1270445e810510fdd58a8ccb848a5d8f29605ca0ff05ffa760b572d407bc0dd",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-3/gate-result.json",
+     "command": "codecs memory",
+     "key": "85bd9502b28be862557c64274e9ad50e121185741efbf085755b4b21344d2e62",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-4/gate-result.json",
+     "command": "codecs memory",
+     "key": "1736438aa350e0b5778587d86d46c6712fd2e9c4a73d082b2d4ba5887ab74d77",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-5/gate-result.json",
+     "command": "codecs memory",
+     "key": "ac0dcc307f6ef7f98b8dc6d0299ca6490fe3a4a2587a3a72ebce02df47dec817",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "210e331dd69b38d5ac3b2c9ab3af9ea3c5435285dbe621739e17a7e2edb09cb0",
+     "status": 0,
+     "report_sha256": "967282f4c80c194bcbb7f7c5c6f742841beb8a0fb064a88a64ac5187964b3cab"
+    },
+    {
+     "path": "memory/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "38e1da5c123a82baa5113bf1398e9dcc70632ee5532b11ae623c576df0650257",
+     "status": 0,
+     "report_sha256": "d70ae86793d9dfa169314815cb3e5cb0d4630634bc6de5719c177af0cde6f2cd"
+    },
+    {
+     "path": "memory/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "8ec81bebd9e4e66dfc13422f8d6d17d885b7d122c45c619dd50588503da9dfe5",
+     "status": 0,
+     "report_sha256": "7cca9f7312d7fb83fb0bb5ac4588bb3976ca4170743c4434c68ed398c8301c7b"
+    },
+    {
+     "path": "memory/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --memory",
+     "key": "36444ca0323c9159f9426246cd5d8cdd821aeeef81046d9414dae586cf9ab7d3",
+     "status": 1,
+     "report_sha256": "aad7add4d71bf464d3061debecc31f4ea97a509b888ccf334b27808c1db63044"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c"
+   }
+  },
+  {
+   "name": "gate-run-armv7-4d31df88",
+   "path": "gate-run-armv7-4d31df88",
+   "retention": "retained",
+   "reason": "A partial gate run at 4d31df88 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image with the ogg-reader-inputs set unpacked at the repository root, items codecs, codec-workloads and its five memory parts, codec-file-workloads and its three memory parts, isobmff-1, isobmff-2, isobmff-3, isobmff-reader, isobmff-seek and ogg-readers: the shard's outputs as tools/gate-host.sh writes them, with its summary and host log; every step passes but isobmff-seek (measured again at 00159785), and the codec timing and memory are diagnostics on this target; for the ARMv7 codec, ISO BMFF, ISO BMFF reader and Ogg reader rows and the reuse of their results",
+   "key": "evidence/gate-run-armv7-4d31df88/840ad51a537eb0b05aea13fa2597836c4b1e5301f6eb01e884399f6003b128cb.tar.zst",
+   "sha256": "840ad51a537eb0b05aea13fa2597836c4b1e5301f6eb01e884399f6003b128cb",
+   "bytes": 22625326,
+   "results": [
+    {
+     "path": "benchmark/codec-file-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "a08d322db130759cf8d1b93d33d2c100ba0362d8d86289b181e19186f0ac0c1c",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "benchmark/codec-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "ba2c7c78ad7b6bdc13aee4894fa6dc6a64c36b86790a565cd12c2c92610335b4",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "benchmark/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "3f055247e6e246fe7ae68339a08a9fe749c7440a2e2e7df3c02f066d8634a3d3",
+     "status": 0,
+     "report_sha256": "f7c224bbe21f221dbc1e9d9a2ef6b094e1e651d1f1ec2043e32f79d5859c41dc"
+    },
+    {
+     "path": "benchmark/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "9b62a99a67181bbacdcf0b85682efa452ab61dcedfa7825f54f62325560a2796",
+     "status": 0,
+     "report_sha256": "eaffa9974cec70e7145a4044e383dd059e27be6ece2573db5ae57233e502c5dc"
+    },
+    {
+     "path": "benchmark/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --benchmark",
+     "key": "940ba20b294eb1b6ebe5b575001e6066cff5e9947fd998c29b3e99be2b3fc44d",
+     "status": 0,
+     "report_sha256": "4fbeb834153cecb0d7dec7f964ecb29ad700824ff472810c541a4354f92092f3"
+    },
+    {
+     "path": "benchmark/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --benchmark",
+     "key": "1c1baa16d3d4dffd3616adb531ca958df5366cf3176ca3f744467b527f074a2a",
+     "status": 1,
+     "report_sha256": "e1b3037d01eb4aba3a8939aa30baf210d8bcfdb7d4b953cfd19f44c4af0c703c"
+    },
+    {
+     "path": "memory/codec-file-workloads-1/gate-result.json",
+     "command": "codecs memory",
+     "key": "9a8785fc5788bf7a18e0c6238f87be5f13e3974baf5ff5500d122f87ab4a5229",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-file-workloads-2/gate-result.json",
+     "command": "codecs memory",
+     "key": "4d596d4e2de85d5f0c782c32aae725cbfe6683e0de5232992a2e8a7367989387",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-file-workloads-3/gate-result.json",
+     "command": "codecs memory",
+     "key": "f3a8e3346e24429c8049ca6fa07bbd7be3f40bf46bedcc7782368307f4c955c9",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-1/gate-result.json",
+     "command": "codecs memory",
+     "key": "574f144386205796de3fdacf0e4c3d59fd2d574614d14fa8bc1e4341b30ba49e",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-2/gate-result.json",
+     "command": "codecs memory",
+     "key": "b2bcc5c729afc5127149b80ac7d15e102872b180b85df72fd6305fe68d18d1b6",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-3/gate-result.json",
+     "command": "codecs memory",
+     "key": "ad9bebf243da812277297893e15523c221aa4b3d0d208e656c1f9f5c39ac91ec",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-4/gate-result.json",
+     "command": "codecs memory",
+     "key": "fff3a3e99b26f09361874fafda1a3674db6780f29fe519cd7353fd56a635c7d5",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/codec-workloads-5/gate-result.json",
+     "command": "codecs memory",
+     "key": "397a5a2a79768eb905a0025f36e2b439ff2a878cc4bf94244b39137e6501ccb3",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "memory/isobmff-1/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "6bfd25d5802025baf680ff365d01b3abf3ddadd70fe732eef2cf75f0c734a445",
+     "status": 0,
+     "report_sha256": "4d0efe11296a6111ffc49da394c479ba275ca5a724f7dcc283716ed45ed7bf4f"
+    },
+    {
+     "path": "memory/isobmff-2/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "203a78f279eb36b66479170fa7a8a08d9ef5f84b7581e8a04311e308c9a571ff",
+     "status": 0,
+     "report_sha256": "5370897fe144197fabf2d718d2f3a9acb78f5e32e00f1439199dc52a5a1c0840"
+    },
+    {
+     "path": "memory/isobmff-3/gate-result.json",
+     "command": "isobmff-bench --memory",
+     "key": "d28642041d6c5535a530f089c6e40f03d4d7dfb6f705c3dda7870433fe52dbc9",
+     "status": 0,
+     "report_sha256": "9f36bf0d09ae50d2ea41cb161f9a685b25edef6eaadbcd149953ddcb028d58b1"
+    },
+    {
+     "path": "memory/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --memory",
+     "key": "14fa17be66eeb5e41c74e2d702f41ced438c973c4077a049c2a0b2198f952cb3",
+     "status": 1,
+     "report_sha256": "7102c6a435f26eb72fe88a8d5558eb8b1797542bdcb9ab9a2ab972e2f8c50782"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-00159785-20261115-034659-shard-1",
+   "path": "gate-run-aarch64-00159785-20261115-034659-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 00159785 on Linux AArch64, one c6g.4xlarge from the gate image, item isobmff-seek: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; 476/476 parity, the authored movies fail runtime and fragmented-1200 fails heap; for the ISO BMFF seek and range plan row and the reuse of its results",
+   "key": "evidence/gate-runs/001597859a0faf2508d29773627116ee33689cda-aarch64-20261115-034659/shard-1/f4bbd658d24164f76bee744ed119f7ff8fda400f04da071e3667d8f24a05dc0e.tar.zst",
+   "sha256": "f4bbd658d24164f76bee744ed119f7ff8fda400f04da071e3667d8f24a05dc0e",
+   "bytes": 40955782,
+   "results": [
+    {
+     "path": "memory/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --memory",
+     "key": "f02d466974bc7ce91fcddefbeed2d4df586aef5313efbc1561258487ffb1c8d7",
+     "status": 1,
+     "report_sha256": "e4751ef63ffbf9452d1c141edec39503a6c084f991253eced76a13d83c4b29da",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --benchmark",
+     "key": "5d8370cb3db8d7fff42a98c9b9e94203eae4d356b4a19ab78e33b00e4fde0d9f",
+     "status": 1,
+     "report_sha256": "13b8320cc5ef11465ad419969e7aae8de03e56d803100876706aa31a1a130682",
+     "cases_checked": true
+    }
+   ],
+   "source_revisions": {
+    "candidate": "001597859a0faf2508d29773627116ee33689cda"
+   }
+  },
+  {
+   "name": "gate-run-armv7-00159785-20261115-034714-shard-1",
+   "path": "gate-run-armv7-00159785-20261115-034714-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 00159785 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image, item isobmff-seek: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; 476/476 parity, the authored movies fail runtime and fragmented-1200 fails heap; for the ISO BMFF seek and range plan row and the reuse of its results",
+   "key": "evidence/gate-runs/001597859a0faf2508d29773627116ee33689cda-armv7-20261115-034714/shard-1/fcf9a2a4dffb550368cae52927cde3b08fd8693e48639a53c2498f120f21f339.tar.zst",
+   "sha256": "fcf9a2a4dffb550368cae52927cde3b08fd8693e48639a53c2498f120f21f339",
+   "bytes": 46016747,
+   "results": [
+    {
+     "path": "memory/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --memory",
+     "key": "e71dd0b29bf4ed7f50eeb5888a94fed44df6446415bf9133db0da0b26ca1dc4d",
+     "status": 1,
+     "report_sha256": "113318bf27d0cb5134313390593c121abe28363cc62db67fdadb29ce4c43ed06",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/isobmff-seek/gate-result.json",
+     "command": "isobmff-seek --benchmark",
+     "key": "9b092d3da797968d591d521256d8b376e4766486d9d45dafb4f1023a2a572d03",
+     "status": 1,
+     "report_sha256": "76cca2fbb4759b56c6d22786ddd84a67ed3642ef7b79ed23e020545f6c34cb41",
+     "cases_checked": true
+    }
+   ],
+   "source_revisions": {
+    "candidate": "001597859a0faf2508d29773627116ee33689cda"
+   }
   }
  ]
 }

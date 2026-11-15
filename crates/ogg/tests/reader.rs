@@ -1,8 +1,8 @@
 //! The reader over authored streams: pages, packets, mappings, timing, seeking, limits.
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
-    CodecId, ContainerReader, Event, MediaKind, PacketInfo, SeekMethod, SeekPolicy, SeekRequest,
-    TrackInfo, Trim,
+    CodecId, ContainerReader, Event, MediaKind, PacketInfo, RandomAccess, SeekMethod, SeekPolicy,
+    SeekRequest, TrackInfo, Trim,
 };
 use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceId, Step, Time,
@@ -839,4 +839,233 @@ fn budgets_and_limits_refuse_without_panicking() {
     }
     assert!(pressured);
     assert_eq!(count, 200);
+}
+
+/// Seek `track` (an index once `prefix` events are read) to `target` and read to the end:
+/// the receipt and the packets after it.
+fn seek_after(
+    file: &[u8],
+    random_access: bool,
+    prefix: Option<usize>,
+    track: usize,
+    target: Time,
+    policy: SeekPolicy,
+) -> (triergon_core::container::SeekReceipt, Vec<Summary>) {
+    let pool = Budget::new(64 << 20).unwrap();
+    let capabilities = SourceCapabilities {
+        length: random_access.then_some(file.len() as u64),
+        random_access,
+    };
+    let mut reader =
+        Reader::new(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
+    let mut events = Vec::new();
+    drive(&mut reader, &pool, file, 1 << 20, &mut events, prefix).unwrap();
+    let track = reader.tracks()[track].id();
+    let request = reader
+        .request_seek(SeekRequest {
+            track,
+            target,
+            policy,
+        })
+        .unwrap();
+    supply(&mut reader, &pool, file, &request).unwrap();
+    let mut after = Vec::new();
+    drive(&mut reader, &pool, file, 1 << 20, &mut after, None).unwrap();
+    let receipt = after
+        .iter()
+        .find_map(|e| match e {
+            Event::Seek(receipt) => Some(*receipt),
+            _ => None,
+        })
+        .expect("a receipt");
+    (receipt, summary(&after))
+}
+
+#[test]
+fn chained_seeks_land_in_the_link_holding_the_target() {
+    let mut file = Vec::new();
+    opus_stream(1, 300, 6, 0, &mut file);
+    opus_stream(2, 300, 6, 0, &mut file);
+    opus_stream(3, 300, 6, 0, &mut file);
+    let (reader, linear, _) = read_with(&file, 1 << 16, 1 << 20, true, Limits::default());
+    let ids: Vec<u64> = reader.tracks().iter().map(|t| t.id().0).collect();
+    let linear = summary(&linear);
+    // Each link presents 300 * 960 - 312 samples.
+    let link = 300 * 960 - 312;
+    for random_access in [true, false] {
+        for (prefix, track, target, link_index) in [
+            // Only the first link is known: the seek follows into the later ones.
+            (Some(30), 0, link + 48_000, 1),
+            (Some(30), 0, 2 * link + 100_000, 2),
+            (Some(30), 0, 48_000, 0),
+            // Every link is known: a later link's track seeks into an earlier link.
+            (None, 2, 48_000, 0),
+            (None, 0, 2 * link + 7, 2),
+        ] {
+            let (receipt, packets) = seek_after(
+                &file,
+                random_access,
+                prefix,
+                track,
+                Time::new(i128::from(target), 48_000).unwrap(),
+                SeekPolicy::PreviousRandomAccess,
+            );
+            let case = format!("{random_access} {prefix:?} {track} {target}");
+            let first = &packets[0];
+            assert_eq!(first.0, ids[link_index], "{case}");
+            let start = linear.iter().position(|p| p == first).expect(&case);
+            assert_eq!(&linear[start..], &packets[..], "{case}");
+            let pts = first.2.unwrap();
+            assert!(
+                pts <= target && target < pts + 960,
+                "{case}: lands at {pts}"
+            );
+            assert_eq!(receipt.landing, Time::new(i128::from(pts), 48_000).unwrap());
+        }
+    }
+}
+
+/// A Theora identification header (Theora I section 6.2): version 3.2.1, `rate` frames a
+/// second, keyframe granule shift 6.
+fn theora_identification(rate: u32) -> Vec<u8> {
+    let mut header = b"\x80theora\x03\x02\x01".to_vec();
+    header.extend_from_slice(&[0, 20, 0, 15, 0, 1, 64, 0, 0, 240, 0, 0]);
+    header.extend_from_slice(&rate.to_be_bytes());
+    header.extend_from_slice(&1u32.to_be_bytes());
+    header.extend_from_slice(&[0, 0, 1, 0, 0, 1, 0, 0, 0, 0]);
+    header.extend_from_slice(&(6u16 << 5 | 0b10 << 3).to_be_bytes());
+    header
+}
+
+/// A Theora stream of `frames` frames, a keyframe every `interval`, three to a page.
+fn theora_stream(serial: u32, frames: usize, interval: usize, out: &mut Vec<u8>) {
+    let mut muxer = Muxer::new(serial);
+    muxer.packet(&theora_identification(25), 0, out);
+    muxer.flush(false, out);
+    muxer.packet(b"\x81theora\0\0\0\0\0\0\0\0", 0, out);
+    muxer.packet(b"\x82theora setup", 0, out);
+    muxer.flush(false, out);
+    let mut keyframe = 0;
+    for n in 0..frames {
+        let key = n % interval == 0;
+        if key {
+            keyframe = n;
+        }
+        // The frame count up to the keyframe, then the frames since (appendix A.2.3).
+        let granule = ((keyframe as i64 + 1) << 6) | (n - keyframe) as i64;
+        let mut packet = vec![if key { 0x00 } else { 0x40 }, n as u8];
+        packet.resize(3 + n % 5, 7);
+        muxer.packet(&packet, granule, out);
+        if n % 3 == 2 || n + 1 == frames {
+            muxer.flush(n + 1 == frames, out);
+        }
+    }
+}
+
+#[test]
+fn theora_frames_are_timed_from_split_granules_and_seeks_land_on_keyframes() {
+    let mut file = Vec::new();
+    theora_stream(9, 200, 30, &mut file);
+    let (reader, events, error) = read_with(&file, 1 << 16, 1 << 20, true, Limits::default());
+    assert_eq!(error, None);
+    let track = &reader.tracks()[0];
+    assert_eq!(
+        (track.codec(), track.kind(), track.frame_rate()),
+        (CodecId::Theora, MediaKind::Video, Some((25, 1)))
+    );
+    assert_eq!(
+        track.time_base(),
+        triergon_core::TimeBase::new(1, 25).unwrap()
+    );
+    assert_eq!(track.end(), Some(200));
+    let configuration = track.configuration();
+    assert_eq!(&configuration[..3], &[2, 42, 15]);
+    assert_eq!(track.comments(), Some(&b"\x81theora\0\0\0\0\0\0\0\0"[..]));
+    let packets = packets(&events);
+    assert_eq!(packets.len(), 200);
+    for (n, packet) in packets.iter().enumerate() {
+        assert_eq!((packet.pts(), packet.duration()), (Some(n as i64), Some(1)));
+        let sync = if n % 30 == 0 {
+            RandomAccess::Sync
+        } else {
+            RandomAccess::NotSync
+        };
+        assert_eq!(packet.random_access(), sync, "frame {n}");
+        assert_eq!(packet.trim(), Trim::default());
+    }
+    let linear = summary(&events);
+    for random_access in [true, false] {
+        for (target, policy, keyframe) in [
+            (127, SeekPolicy::PreviousRandomAccess, 120),
+            (127, SeekPolicy::PlaybackPreroll, 120),
+            (90, SeekPolicy::PreviousRandomAccess, 90),
+            (29, SeekPolicy::PreviousRandomAccess, 0),
+            (199, SeekPolicy::PlaybackPreroll, 180),
+        ] {
+            let requested = Time::new(target, 25).unwrap();
+            let (receipt, after) = seek_after(&file, random_access, Some(5), 0, requested, policy);
+            let case = format!("{random_access} {target} {policy:?}");
+            assert_eq!(after[0].2, Some(keyframe), "{case}");
+            assert_eq!(&linear[keyframe as usize..], &after[..], "{case}");
+            let landing = Time::new(i128::from(keyframe), 25).unwrap();
+            assert_eq!(receipt.landing, landing, "{case}");
+            let discard = match policy {
+                SeekPolicy::PlaybackPreroll => requested,
+                SeekPolicy::PreviousRandomAccess => landing,
+            };
+            assert_eq!(receipt.discard_until, discard, "{case}");
+        }
+    }
+}
+
+/// A Speex header (Speex manual, Ogg file format) for 8 kHz narrowband, two 160-sample
+/// frames a packet.
+fn speex_header() -> Vec<u8> {
+    let mut header = b"Speex   1.2.1".to_vec();
+    header.resize(28, 0);
+    for value in [1, 80, 8000, 0, 4, 1, u32::MAX, 160, 0, 2, 0, 0, 0] {
+        header.extend_from_slice(&value.to_le_bytes());
+    }
+    header
+}
+
+#[test]
+fn speex_packets_are_timed_from_the_header_frames_with_granule_trims() {
+    let mut file = Vec::new();
+    let mut muxer = Muxer::new(4);
+    muxer.packet(&speex_header(), 0, &mut file);
+    muxer.flush(false, &mut file);
+    muxer.packet(b"comment", 0, &mut file);
+    muxer.flush(false, &mut file);
+    // Granule positions lag the samples coded by 100 (an encoder's delay), and the last
+    // page ends 250 samples into its last packet.
+    for n in 0..20i64 {
+        let last = n == 19;
+        let granule = if last {
+            19 * 320 + 250 - 100
+        } else {
+            320 * (n + 1) - 100
+        };
+        muxer.packet(&[n as u8; 9], granule, &mut file);
+        if n % 5 == 4 {
+            muxer.flush(last, &mut file);
+        }
+    }
+    let (reader, events, error) = read_with(&file, 1 << 16, 1 << 20, true, Limits::default());
+    assert_eq!(error, None);
+    let track = &reader.tracks()[0];
+    assert_eq!(
+        (track.codec(), track.sample_rate(), track.channels()),
+        (CodecId::Speex, Some(8000), Some(1))
+    );
+    assert_eq!(track.configuration(), speex_header());
+    assert_eq!(track.comments(), Some(&b"comment"[..]));
+    let packets = packets(&events);
+    assert_eq!(packets.len(), 20);
+    for (n, packet) in packets.iter().enumerate() {
+        assert_eq!(packet.pts(), Some(320 * n as i64 - 100), "packet {n}");
+        assert_eq!(packet.duration(), Some(320));
+    }
+    assert_eq!(packets[0].trim().start, Some(100));
+    assert_eq!(packets[19].trim().end, Some(70));
 }

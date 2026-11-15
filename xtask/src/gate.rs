@@ -2,9 +2,10 @@
 //! that can run on different hosts, and split into shards of about equal work.
 //!
 //! An item is the work for one measured thing: a feature's timing, memory and
-//! grade, a part of the ISO BMFF suite, the packet-framing or progressive suite,
-//! the codecs' parity, a codec workload list, a capture case, a test profile, the
-//! reference comparisons. Its steps run on one host, in stages:
+//! grade, a part of the ISO BMFF suite, the ISO BMFF seek, packet-framing or
+//! progressive suite, the codecs' parity, the Ogg reader's packets and seeks, a codec
+//! workload list, a capture case, a test profile, the reference comparisons. Its steps
+//! run on one host, in stages:
 //! `timing` runs the parity and timing steps alone on CPU 1 with the RSS module
 //! unloaded; `memory`, after the host has proved the kernel bound and rebuilt the
 //! workers with the proof, runs the memory collections on every CPU but CPU 0 and
@@ -157,11 +158,13 @@ const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor in [`FEATURES`].
-const COVERED: [(&str, Coverage); 23] = [
+const COVERED: [(&str, Coverage); 25] = [
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
     ),
+    ("isobmff-reader", Coverage::Item("codecs isobmff-reader")),
+    ("isobmff-seek", Coverage::Item("isobmff-seek")),
     ("packet-framing", Coverage::Item("framing")),
     ("progressive-ts188", Coverage::Item("progressive")),
     ("font-outlines", Coverage::Item("fonts compare")),
@@ -272,10 +275,21 @@ const CAPTURE_WEIGHT: u32 = 10;
 
 /// How many parts the ISO BMFF suite's measurements are split into.
 const ISOBMFF_PARTS: usize = 3;
+/// The ISO BMFF seek suite's planning weight, until a gate run measures it: its
+/// memory from a collection of six cases on four CPUs, its timing from the worker
+/// cycles of each operation with every pair run, and the ARMv7 share from the open
+/// and index suite's.
+const ISOBMFF_SEEK_WEIGHT: u32 = 14;
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
 const FFMPEG_BIN: &str = ".research/reference-decode/install/bin";
+/// The formats reference's `ffprobe`, which the neutral ISO BMFF reader is compared with.
+const FORMATS_FFPROBE: &str = ".research/reference-formats/install/bin/ffprobe";
+/// The reader comparison's inputs and seek cases, and the lanes the gate compares.
+const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
+const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
+const OGG_READER_LANES: &str = "reader-ogg,reader-ogg-seek";
 
 fn xtask(args: &[&str]) -> Vec<String> {
     std::iter::once("xtask")
@@ -459,6 +473,27 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             preflight: owned(&["--isobmff"]),
         });
     }
+    let seek = |mode: &str, flag: &str| {
+        with_full(xtask(&[
+            "isobmff-seek",
+            &format!("--{mode}"),
+            flag,
+            &pairs,
+            "--output",
+            &format!("{out}/{mode}/isobmff-seek"),
+        ]))
+    };
+    items.push(Item {
+        name: "isobmff-seek".into(),
+        weight: ISOBMFF_SEEK_WEIGHT,
+        steps: collections(
+            "isobmff-seek",
+            seek("benchmark", "--pairs"),
+            seek("memory", "--memory-pairs"),
+        )
+        .into(),
+        preflight: owned(&["--isobmff-seek"]),
+    });
 
     let framing = |mode: &str| {
         with_full(xtask(&[
@@ -519,6 +554,28 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 crate::progressive_bench::FEATURE
             ),
         ]),
+    });
+
+    // The neutral ISO BMFF reader against the formats reference's MOV demuxer.
+    items.push(Item {
+        name: "isobmff-reader".into(),
+        weight: 3,
+        steps: vec![step(
+            "isobmff-reader-compare",
+            Stage::Timing,
+            Placement::Free,
+            xtask(&[
+                "codecs",
+                "isobmff-reader",
+                "--ffprobe",
+                FORMATS_FFPROBE,
+                "--codec-worker",
+                &format!("{release}/codec-worker"),
+                "--out",
+                &format!("{out}/parity/isobmff-reader.jsonl"),
+            ]),
+        )],
+        preflight: owned(&["--isobmff-reader", "--reference", "ffmpeg-formats-native"]),
     });
 
     let target_args = |mut args: Vec<String>| {
@@ -584,6 +641,36 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         weight: 23,
         steps: codecs,
         preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
+    });
+    // The Ogg reader's packets and seeks against ffprobe, in both views; the step fails
+    // on a case that neither passes nor differs only by its reviewed differences.
+    items.push(Item {
+        name: "ogg-readers".into(),
+        weight: 1,
+        steps: vec![step(
+            "ogg-readers",
+            Stage::Timing,
+            Placement::Free,
+            xtask(&[
+                "codecs",
+                "readers",
+                "--manifest",
+                READER_MANIFEST,
+                "--seeks",
+                READER_SEEKS,
+                "--only",
+                OGG_READER_LANES,
+                "--root",
+                ".",
+                "--ffprobe",
+                &format!("{FFMPEG_BIN}/ffprobe"),
+                "--codec-worker",
+                &codec_worker,
+                "--out",
+                &format!("{out}/ogg-readers.jsonl"),
+            ]),
+        )],
+        preflight: owned(&["--readers", OGG_READER_LANES]),
     });
     // Each list's timing is one item and its memory is in parts, each part every
     // Nth workload: a list's memory took up to 108 minutes in one piece.
@@ -2097,6 +2184,7 @@ mod tests {
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
         assert!(names.contains(&"benchmark-capture-c04") && names.contains(&"memory-capture-c04"));
+        assert!(names.contains(&"isobmff-reader-compare"));
         assert!(
             names.contains(&"memory-codec-file-workloads-3") && names.contains(&"test-release")
         );

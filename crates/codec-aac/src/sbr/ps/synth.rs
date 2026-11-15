@@ -12,8 +12,9 @@
 //! of 14 slots up to band 34 and of one slot above. Observed behaviour, given by no
 //! available text and documented with its probes where it is implemented: the lead delay
 //! and phase before the sections ([`Kind::AllPass`]), the taper of the coefficients over
-//! the QMF bands ([`layout`]) and the transient ducking, which attenuates the decorrelated
-//! signal per parameter band after power drops ([`Synth::ducking`]). The constants,
+//! the QMF bands ([`layout`]), the state the decorrelator keeps over the stream
+//! ([`Line`]) and the transient ducking, which attenuates the decorrelated signal per
+//! parameter band after power drops ([`Synth::ducking`]). The constants,
 //! prototypes and band maps are recovered from the reference decoder's output
 //! (`harness/codecs/aac/ps`, tables in `tables.rs`).
 
@@ -34,6 +35,10 @@ const AHEAD: usize = 6;
 pub(super) const MAX_HYBRID: usize = 91;
 const MAX_LOW: usize = 32;
 const MAX_SPLIT: usize = 5;
+/// Inputs a decorrelator line keeps: the longest delay that reads them.
+const INPUTS: usize = t::LONG_DELAY;
+/// State values of the three all-pass sections.
+const SECTION_STATE: usize = t::SECTION_DELAY[0] + t::SECTION_DELAY[1] + t::SECTION_DELAY[2];
 /// Parameter bands of the larger configuration.
 pub(super) const MAX_PAR: usize = 34;
 
@@ -60,6 +65,8 @@ enum Kind {
 struct Band {
     qmf: usize,
     par: usize,
+    /// The decorrelator state line the band owns ([`Line`]).
+    line: usize,
     /// Index of the band's filter among the split bands, if it is one.
     low: Option<usize>,
     image: bool,
@@ -84,6 +91,13 @@ pub(super) struct Layout {
 /// decorrelator frequency, image band).
 type LowBand = (u8, u8, u16, u8, f64, bool);
 
+/// The decorrelator state line of each 20-band split band, in `LOW_20` order: QMF band 0's
+/// bands by increasing frequency (sub-bands 6, 7, 0, 1, 2+5, 3+4), then QMF bands 1 and 2
+/// as listed. Observed behaviour: probe o12 (a joint regression over the state each band
+/// of a frame takes from the bands of the other layout's last frame) gives every QMF-0
+/// band exactly one source with coefficient 1.000 and this order, in both directions.
+const LINES_20: [u8; 10] = [2, 1, 3, 0, 4, 5, 6, 7, 8, 9];
+
 fn cis(x: f64) -> Cpx {
     Cpx::new(x.cos() as f32, x.sin() as f32)
 }
@@ -92,6 +106,13 @@ fn cis(x: f64) -> Cpx {
 /// taper as a_m (1 - `SLOPE` (k - split)) in QMF band k: observed behaviour, given by no
 /// available text; probes d08, d10, d14 and d16 (slope, start at the first QMF band not
 /// split, none in the split bands), rerun by `signal/dec/recover_dec.py` stages 1, 2 and 5.
+///
+/// Each band owns one of the decorrelator's 91 state lines ([`Line`]). The 34-band split
+/// bands take theirs in sub-band order: QMF band 0's sub-bands m = 0..11 lines 0..11, QMF
+/// band 1's m = 0..7 lines 12..19, QMF bands 2, 3 and 4 four lines each from 20. The
+/// 20-band split bands take `LINES_20`. QMF band k above the split takes the line after
+/// the split bands' plus k - split: 32 + (k - 5) or 10 + (k - 3). Only how the two
+/// layouts' lines correspond is observable (probes o04, o05, o12, o13).
 fn layout(big: bool) -> Layout {
     use std::f64::consts::PI;
     let (low, qmf_par, split): (&[LowBand], &[(u8, u8)], usize) = if big {
@@ -131,15 +152,23 @@ fn layout(big: bool) -> Layout {
             Cpx::new((gn * re) as f32, (gn * im) as f32)
         }));
         image_pars[par as usize] |= image;
+        let line = if big {
+            // one sub-band per band: the sub-bands of the QMF bands below, then the index
+            low.iter().filter(|b| b.0 < k).count() + mask.trailing_zeros() as usize
+        } else {
+            usize::from(LINES_20[i])
+        };
         bands.push(Band {
             qmf: k as usize,
             par: par as usize,
+            line,
             low: Some(i),
             image,
             kind: all_pass(f, 1.0),
         });
     }
     let mut par = 0;
+    let first_qmf_line = low.len();
     for k in split..64 {
         if let Some(&(_, p)) = qmf_par.iter().find(|&&(k0, _)| k0 as usize == k) {
             par = p as usize;
@@ -155,6 +184,7 @@ fn layout(big: bool) -> Layout {
         bands.push(Band {
             qmf: k,
             par,
+            line: first_qmf_line + (k - split),
             low: None,
             image: false,
             kind,
@@ -184,17 +214,47 @@ pub(super) struct SlotMatrix {
     pub(super) image_im: [f32; 4],
 }
 
+/// One line of decorrelator state, kept over the whole stream.
+///
+/// Observed behaviour, given by no available text. Each band of a layout owns one of 91
+/// lines ([`layout`]); a frame reads its layout's lines as stored and writes back what it
+/// updates, and everything else keeps its value, lines the other layout left included. A
+/// registered 20 <-> 34 change clears every line and the ducking state of all 34
+/// parameter bands; a layout change registered while the PS was off (a corner) clears
+/// nothing, so the bands of the new layout take the state of the old layout's bands on
+/// the same line. Every band writes its inputs, which the plain delays and the lead delay
+/// read whatever kind of band wrote them; only all-pass bands write the section state.
+/// Probes: o01 (the corner restarts nothing), o04 (state by line), o05 and o05c (the
+/// lattice form of the sections), o09 and o12 (QMF band 0's 20-band lines), o13 (stale
+/// lines, section state written by the all-pass bands only, a registered change clearing
+/// every line; the composed model of this rule against the reference, whole streams, at
+/// most 1.4e-8 rms), all in `harness/codecs/aac/ps/signal/open`.
+#[derive(Clone, Copy, Debug, Default)]
+struct Line {
+    /// The last `INPUTS` inputs, oldest first.
+    input: [Cpx; INPUTS],
+    /// The sections' lattice state s (3, 4 and 5 values, oldest first): with input u and
+    /// output y, y\[t\] = Q s\[t - d\] - a u\[t\] and s\[t\] = u\[t\] + a y\[t\]. The
+    /// transfer function is (-a + Q z^-d) / (1 - a Q z^-d) in any form; the stored values
+    /// show only when a band of another coefficient takes them (o05: direct forms I and
+    /// II, transposed II and the lattice with Q stored leave 1e-7 to 6e-6 in QMF bands
+    /// 3..22).
+    sections: [Cpx; SECTION_STATE],
+    /// Some input is nonzero.
+    input_live: bool,
+    /// Some section value is nonzero.
+    sections_live: bool,
+}
+
 /// Signal state and scratch of the synthesis.
 #[derive(Debug)]
 pub(super) struct Synth {
     /// The last 6 input slots of the QMF bands either configuration splits.
     history: [[Cpx; AHEAD]; MAX_SPLIT],
-    /// Delay-line state per hybrid band: the lead delay and the three sections (2 + 3 + 4 +
-    /// 5 slots) of an all-pass band, the newest slots of a delay band.
-    lines: BudgetVec<[Cpx; 14]>,
-    /// The band's delay lines hold nonzero values.
-    busy: [bool; MAX_HYBRID],
-    /// Ducking state per parameter band: peak, smoothed peak excess, smoothed power.
+    /// Decorrelator state by line.
+    lines: BudgetVec<Line>,
+    /// Ducking state per parameter band: peak, smoothed peak excess, smoothed power. A
+    /// 20-band frame keeps the values of bands 20..33.
     duck: [[f32; 3]; MAX_PAR],
     /// Scratch: hybrid samples of the split bands, ducking gains per slot.
     low: BudgetVec<[Cpx; SLOTS]>,
@@ -209,8 +269,7 @@ impl Synth {
     pub(super) fn new(budget: &Budget) -> Result<Synth> {
         Ok(Synth {
             history: [[Cpx::default(); AHEAD]; MAX_SPLIT],
-            lines: BudgetVec::try_filled(budget, [Cpx::default(); 14], MAX_HYBRID)?,
-            busy: [false; MAX_HYBRID],
+            lines: BudgetVec::try_filled(budget, Line::default(), MAX_HYBRID)?,
             duck: [[0.0; 3]; MAX_PAR],
             low: BudgetVec::try_filled(budget, [Cpx::default(); SLOTS], MAX_LOW)?,
             gain: BudgetVec::try_filled(budget, [0.0; MAX_PAR], SLOTS)?,
@@ -225,11 +284,10 @@ impl Synth {
         self.restart();
     }
 
-    /// Zero decorrelator and ducking state, as at a change between 20 and 34 bands (the
-    /// hybrid filter history is kept).
+    /// Zero decorrelator and ducking state, every line and parameter band, as at a
+    /// registered change between 20 and 34 bands (the hybrid filter history is kept).
     pub(super) fn restart(&mut self) {
-        self.lines.fill([Cpx::default(); 14]);
-        self.busy = [false; MAX_HYBRID];
+        self.lines.fill(Line::default());
         self.duck = [[0.0; 3]; MAX_PAR];
     }
 
@@ -245,8 +303,10 @@ impl Synth {
             .find(|&k| x[..SLOTS].iter().any(|r| r[k] != zero))
             .map_or(lay.split, |k| k + 1);
         let mut live = [false; MAX_HYBRID];
-        for ((l, band), &busy) in live.iter_mut().zip(&lay.bands).zip(&self.busy) {
-            *l = band.low.is_some() || band.qmf < top || busy;
+        for (l, band) in live.iter_mut().zip(&lay.bands) {
+            let s = &self.lines[band.line];
+            let ringing = s.sections_live && matches!(band.kind, Kind::AllPass { .. });
+            *l = band.low.is_some() || band.qmf < top || s.input_live || ringing;
         }
         self.analysis(lay, x);
         self.ducking(lay, x, &live);
@@ -270,8 +330,7 @@ impl Synth {
                     }
                 }
             }
-            decorrelate(band.kind, &mut self.lines[j], &m, &mut d);
-            self.busy[j] = self.lines[j].iter().any(|&v| v != zero);
+            decorrelate(band.kind, &mut self.lines[band.line], &m, &mut d);
             for (v, g) in d.iter_mut().zip(self.gain.iter()) {
                 let g = g[band.par];
                 v.re *= g;
@@ -417,43 +476,42 @@ impl Synth {
 }
 
 /// The linear decorrelator of one band over a frame, with its state in `line`.
-fn decorrelate(kind: Kind, line: &mut [Cpx; 14], x: &[Cpx; SLOTS], y: &mut [Cpx; SLOTS]) {
+fn decorrelate(kind: Kind, line: &mut Line, x: &[Cpx; SLOTS], y: &mut [Cpx; SLOTS]) {
+    let zero = Cpx::default();
+    // x[t - n] for t < n comes from the inputs kept, oldest first
+    let delayed = |n: usize, out: &mut [Cpx; SLOTS]| {
+        out[..n].copy_from_slice(&line.input[INPUTS - n..]);
+        out[n..].copy_from_slice(&x[..SLOTS - n]);
+    };
     match kind {
-        Kind::Delay(n) => {
-            // line[..n] holds the last n inputs, oldest first
-            let mut buf = [Cpx::default(); 14 + SLOTS];
-            buf[..n].copy_from_slice(&line[..n]);
-            buf[n..n + SLOTS].copy_from_slice(x);
-            y.copy_from_slice(&buf[..SLOTS]);
-            line[..n].copy_from_slice(&buf[SLOTS..SLOTS + n]);
-        }
+        Kind::Delay(n) => delayed(n, y),
         Kind::AllPass { lead, frac, decay } => {
-            // lead: y0[t] = lead x[t - 2]
-            let mut cur = [Cpx::default(); SLOTS];
-            let mut buf = [Cpx::default(); 5 + SLOTS];
-            buf[..t::LEAD_DELAY].copy_from_slice(&line[..t::LEAD_DELAY]);
-            buf[t::LEAD_DELAY..t::LEAD_DELAY + SLOTS].copy_from_slice(x);
-            for (c, v) in cur.iter_mut().zip(&buf[..SLOTS]) {
-                *c = lead.mul(*v);
+            // lead: u[t] = lead x[t - 2]
+            let mut cur = [zero; SLOTS];
+            delayed(t::LEAD_DELAY, &mut cur);
+            for c in &mut cur {
+                *c = lead.mul(*c);
             }
-            line[..t::LEAD_DELAY].copy_from_slice(&buf[SLOTS..SLOTS + t::LEAD_DELAY]);
-            // sections: w[t] = in[t] + a Q w[t - n]; out[t] = -a w[t] + Q w[t - n]
-            let mut off = t::LEAD_DELAY;
-            for ((&n, q), a) in t::SECTION_DELAY.iter().zip(frac).zip(decay) {
-                let aq = Cpx::new(a * q.re, a * q.im);
-                buf[..n].copy_from_slice(&line[off..off + n]);
+            // sections in lattice form: y[t] = Q s[t - d] - a u[t], s[t] = u[t] + a y[t]
+            let mut buf = [zero; 5 + SLOTS];
+            let mut off = 0;
+            for ((&d, q), a) in t::SECTION_DELAY.iter().zip(frac).zip(decay) {
+                let state = &mut line.sections[off..off + d];
+                buf[..d].copy_from_slice(state);
                 for i in 0..SLOTS {
-                    let old = buf[i];
-                    let fb = aq.mul(old);
-                    let w = Cpx::new(cur[i].re + fb.re, cur[i].im + fb.im);
-                    buf[n + i] = w;
-                    let o = q.mul(old);
-                    cur[i] = Cpx::new(o.re - a * w.re, o.im - a * w.im);
+                    let o = q.mul(buf[i]);
+                    let u = cur[i];
+                    let v = Cpx::new(o.re - a * u.re, o.im - a * u.im);
+                    buf[d + i] = Cpx::new(u.re + a * v.re, u.im + a * v.im);
+                    cur[i] = v;
                 }
-                line[off..off + n].copy_from_slice(&buf[SLOTS..SLOTS + n]);
-                off += n;
+                state.copy_from_slice(&buf[SLOTS..SLOTS + d]);
+                off += d;
             }
+            line.sections_live = line.sections.iter().any(|&v| v != zero);
             y.copy_from_slice(&cur);
         }
     }
+    line.input.copy_from_slice(&x[SLOTS - INPUTS..]);
+    line.input_live = line.input.iter().any(|&v| v != zero);
 }

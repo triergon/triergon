@@ -607,10 +607,14 @@ impl Sbr {
                     *r = xl[i + T_HFADJ];
                 }
                 let hf = kxi..(kxi + mi).min(64);
-                if i < i_temp {
-                    row[hf.clone()].copy_from_slice(&ch.y_prev[i][hf]);
-                } else if ready {
-                    row[hf.clone()].copy_from_slice(&ch.y[i][hf]);
+                // slots before i_temp take the previous frame's high band, whose last
+                // envelope ended after the frame border; a frame without its SBR element
+                // has no high band, that one included (observed behaviour, HE-AAC v1 and v2
+                // alike: probe o31 in harness/codecs/aac/ps/signal/open, kx = 32 in both
+                // frames)
+                if ready {
+                    let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
+                    row[hf.clone()].copy_from_slice(&high[hf]);
                 }
             }
             // keep state for the next frame
@@ -655,6 +659,15 @@ impl Sbr {
                 // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
                     self.ps.apply(&mut self.x, &mut self.x_r);
+                    if !ready {
+                        // without its SBR element the frame's PS output above kx is zero,
+                        // the decorrelated signal of earlier frames included (observed
+                        // behaviour: probes o00, o31, o32 in
+                        // harness/codecs/aac/ps/signal/open, all with kx = 32)
+                        for row in self.x[..32].iter_mut().chain(self.x_r[..32].iter_mut()) {
+                            row[kx..].fill(Cpx::default());
+                        }
+                    }
                 } else {
                     // no PS data yet: both outputs carry the mono signal
                     for i in 0..32 {
