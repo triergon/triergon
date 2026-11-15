@@ -238,10 +238,8 @@ pub fn timing_valid(
     let Ok(fields) = super::comparison::work_fields(contract) else {
         return false;
     };
-    let work = super::comparison::Work {
-        fields,
-        own: vec![],
-    };
+    let own = super::comparison::own_fields(row.get("expected_time_outputs"), &fields);
+    let work = super::comparison::Work { fields, own };
     timing
         .get("iterations")
         .is_some_and(|count| super::validation::iterations_valid(contract, count))

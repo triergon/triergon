@@ -1,10 +1,12 @@
 //! Decoder measurement worker for the harness: the same operations as
 //! the decode build of `harness/reference.c`, through the session decoders.
 //!
-//! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE, KIND-CODEC one of video-h264,
-//! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
-//! audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
+//! usage: `codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
+//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK] |
+//! seek ogg FILE TRACK SECONDS POLICY`, KIND-CODEC
+//! one of video-h264, video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac,
+//! audio-mp3, audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations,
+//! elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
 //! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
@@ -20,6 +22,7 @@
 //! `packets` prints what a container reader emits per packet ([`packets`]).
 #![forbid(unsafe_code)]
 mod aac_access_units;
+mod isobmff_packets;
 mod packets;
 
 use std::io::Write;
@@ -269,10 +272,22 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
 fn main() {
     // <lane>-<codec>-bench FILE ITERATIONS | <lane>-<codec>-memory FILE | <lane>-<codec>-raw FILE OUT
     let args: Vec<String> = std::env::args().collect();
-    if let [_, command, format, path] = args.as_slice()
+    if let [_, command, format, path, seek @ ..] = args.as_slice()
         && command == "packets"
+        && seek.len() <= 1
     {
-        if let Err(error) = packets::run(format, path) {
+        if let Err(error) = packets::run(format, path, seek.first().map(String::as_str)) {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+        return;
+    }
+    if let [_, command, format, path, track, seconds, policy] = args.as_slice()
+        && command == "seek"
+    {
+        if let Err(error) = packets::Seek::parse(track, seconds, policy)
+            .and_then(|seek| packets::seek(format, path, &seek))
+        {
             eprintln!("{error}");
             std::process::exit(2);
         }
@@ -280,7 +295,7 @@ fn main() {
     }
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [TRACK_ID@MICROSECONDS] | seek ogg FILE TRACK SECONDS exact|preroll"
         );
         std::process::exit(2);
     };

@@ -1456,6 +1456,7 @@ mod tests {
             ("hls-segments", 71),
             ("packet-framing", 125),
             ("isobmff-open-index", 1020),
+            ("isobmff-seek", 476),
             ("font-outlines", 53),
             ("font-hinting-none", 159),
             ("font-hinting-default", 159),

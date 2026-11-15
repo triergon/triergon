@@ -1332,9 +1332,25 @@ fn interval_value(interval: &stats::Interval) -> Value {
     super::timing::interval_value(interval)
 }
 
-fn work_valid(samples: &[Value], fields: &[String], expected: Option<&Value>) -> bool {
+/// Every observation reports complete work; with `expected`, the same as it in
+/// each field outside `own`, the fields each role reports of its own output.
+fn work_valid(
+    samples: &[Value],
+    fields: &[String],
+    expected: Option<&Value>,
+    own: &[String],
+) -> bool {
+    let shared = |work: Value| match work {
+        Value::Object(members) => Value::Object(
+            members
+                .into_iter()
+                .filter(|(key, _)| !own.contains(key))
+                .collect(),
+        ),
+        other => other,
+    };
     let Ok(expected) = expected
-        .map(|v| super::comparison::work_summary(v, fields))
+        .map(|v| super::comparison::work_summary(v, fields).map(shared))
         .transpose()
     else {
         return false;
@@ -1349,7 +1365,9 @@ fn work_valid(samples: &[Value], fields: &[String], expected: Option<&Value>) ->
                     observed
                         .get("work")
                         .and_then(|work| super::comparison::work_summary(work, fields).ok())
-                        .is_some_and(|work| expected.as_ref().is_none_or(|e| equal(&work, e)))
+                        .is_some_and(|work| {
+                            expected.as_ref().is_none_or(|e| equal(&shared(work), e))
+                        })
                 })
         })
 }
@@ -1500,7 +1518,7 @@ fn measure(
     }
     let mut result = if invocation
         .work_fields
-        .is_some_and(|fields| !work_valid(&samples, fields, None))
+        .is_some_and(|fields| !work_valid(&samples, fields, None, &[]))
     {
         obj(vec![
             ("status", Value::str("invalid-memory-work")),
@@ -2119,8 +2137,10 @@ pub fn evidence_valid_with_outputs(
             },
         };
         let fields = super::comparison::work_fields(contract).ok()?;
+        // `evaluate` below holds each role to its own expected outputs.
+        let own = super::comparison::own_fields(expected_outputs, &fields);
         let expected = row.get("parity").and_then(|p| p.get("expected"));
-        if !work_valid(raw, &fields, expected) {
+        if !work_valid(raw, &fields, expected, &own) {
             return Some(false);
         }
         for sample in raw {
@@ -2417,7 +2437,8 @@ mod command_tests {
         assert!(work_valid(
             std::slice::from_ref(&sample),
             &fields,
-            Some(&expected)
+            Some(&expected),
+            &[]
         ));
         for bad in [Some(Value::int(5)), None] {
             for roles in [
@@ -2452,7 +2473,8 @@ mod command_tests {
                 assert!(!work_valid(
                     &[Value::Object(entries)],
                     &fields,
-                    Some(&expected)
+                    Some(&expected),
+                    &[]
                 ));
             }
         }
