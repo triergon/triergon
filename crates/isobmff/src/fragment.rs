@@ -457,6 +457,13 @@ impl FragmentBuilder {
                         .runs
                         .as_mut()
                         .ok_or(Error::Invalid("missing fragment runs"))?;
+                    // Most fragments hold one run: allocate the first exactly.
+                    if runs.capacity() == 0
+                        && let Err(error) = runs.try_reserve_exact(1)
+                    {
+                        self.pending = Some(value);
+                        return Err(error);
+                    }
                     if let Err(error) = runs.try_push(value) {
                         self.pending = Some(error.value);
                         return Err(error.error);

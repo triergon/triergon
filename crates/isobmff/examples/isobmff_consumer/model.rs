@@ -348,6 +348,8 @@ fn index_fragments(
     if moofs.is_empty() {
         return Ok(indexes);
     }
+    // One track fragment per movie fragment is the common layout.
+    indexes.try_reserve_exact(moofs.len())?;
     let extends = child(movie, b"mvex")?;
     let mut defaults = BudgetVec::new(budget);
     for raw in children(&extends, 0, budget)?.as_slice() {
