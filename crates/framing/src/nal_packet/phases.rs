@@ -454,18 +454,22 @@ impl PacketPlan {
             self.segment_hint = Some(self.look_nals + injected);
         } else if codec == Codec::Avc
             && end == source.bytes.len()
-            && let Some(which) = inject
             && !matches!(state.segments, PacketSegmentStorage::Heap(_))
-            && let ConfigurationRef::Avc(config) = state.config()
         {
-            // Count only the parameter sets this NAL selects. Unused entries
-            // would leave less of the pool available for the output payload.
-            let (sps, pps) = config.base_parameter_set_counts();
-            let inserted = match which {
-                Injection::Sps => sps,
-                Injection::Pps => pps,
-                Injection::All => sps + pps,
+            let inserted = if let Some(which) = inject
+                && let ConfigurationRef::Avc(config) = state.config()
+            {
+                let (sps, pps) = config.base_parameter_set_counts();
+                match which {
+                    Injection::Sps => sps,
+                    Injection::Pps => pps,
+                    Injection::All => sps + pps,
+                }
+            } else {
+                0
             };
+            // The last NAL gives the exact segment count. A first spill can
+            // use it without taking capacity from the output buffer.
             self.segment_hint = Some(state.segments.len() + 1 + inserted);
         }
         if let Some(i) = inject {
