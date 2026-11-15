@@ -163,8 +163,6 @@ impl ReceiverHevcConfiguration {
 pub struct ReceiverAvcConfigParser {
     inner: AvcConfigParser,
     raw: Bytes,
-    source: AvcConfigSource,
-    failure: Option<Error>,
     refusal: NalConfigurationRefusal,
     update_role: bool,
     rejection_taken: bool,
@@ -176,6 +174,18 @@ impl ReceiverAvcConfigParser {
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
+        Self::with_role(pool, source, raw, limits, false)
+    }
+
+    // Initial configuration and updates have the same construction checks.
+    #[inline(never)]
+    fn with_role(
+        pool: &Budget,
+        source: AvcConfigSource,
+        raw: Bytes,
+        limits: AvcConfigLimits,
+        update_role: bool,
+    ) -> Result<Self> {
         let inner = AvcConfigParser::new_receiver(pool, source, raw.clone(), limits)?;
         let refusal = if raw.len() >= 6 && raw[0] == 1 && raw[4] & 3 == 2 {
             NalConfigurationRefusal::AvcWidthThree
@@ -185,10 +195,8 @@ impl ReceiverAvcConfigParser {
         Ok(Self {
             inner,
             raw,
-            source,
-            failure: None,
             refusal,
-            update_role: false,
+            update_role,
             rejection_taken: false,
         })
     }
@@ -200,9 +208,7 @@ impl ReceiverAvcConfigParser {
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
-        let mut parser = Self::new(pool, source, raw, limits)?;
-        parser.update_role = true;
-        Ok(parser)
+        Self::with_role(pool, source, raw, limits, true)
     }
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
@@ -236,20 +242,11 @@ impl ReceiverAvcConfigParser {
         cancel: &AtomicBool,
         ready: &mut Option<ReceiverAvcConfiguration>,
     ) -> Result<ConfigProgress> {
-        if ready.is_some() {
-            return Err(Error::Invalid("configuration output sink occupied"));
-        }
-        let result = self.inner.step_into_with(work, cancel, ready, |inner| {
+        self.inner.step_into_with(work, cancel, ready, |inner| {
             let record = ReceiverAvcConfiguration::from_record(inner);
             self.refusal = record.refusal();
             record
-        });
-        if let Err(error) = result
-            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
-        {
-            self.failure = Some(error);
-        }
-        result
+        })
     }
     pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
         // A complete AVC record requires the six-byte prefix and a PPS count.
@@ -258,14 +255,14 @@ impl ReceiverAvcConfigParser {
         if !self.update_role || self.rejection_taken || self.raw.len() >= 7 {
             return None;
         }
-        let error = self.failure?;
+        let error = self.inner.failure()?;
         if error != Error::Truncated || self.raw.first().copied() != Some(1) {
             return None;
         }
         self.rejection_taken = true;
         Some(ReceiverAvcUpdateRejection {
             raw: self.raw.clone(),
-            source: self.source,
+            source: self.inner.source(),
             error,
             strict_source_refusal: self.strict_source_refusal(),
         })

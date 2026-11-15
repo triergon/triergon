@@ -384,6 +384,14 @@ impl AvcConfigParser {
         self.step_into_with(work, cancel, ready, |record| record)
     }
 
+    pub(crate) const fn source(&self) -> AvcConfigSource {
+        self.source
+    }
+
+    pub(crate) const fn failure(&self) -> Option<Error> {
+        self.failure
+    }
+
     // Only publication is generic: the grammar walk is shared by source and
     // receiver slots, without an intermediate source-record publication slot.
     #[inline]
