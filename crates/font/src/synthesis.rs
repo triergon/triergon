@@ -108,9 +108,10 @@ impl Outline {
     /// Emboldens the outline by `strength` 26.6 units in total, half on each
     /// side of every contour, moving points along the bisectors of their
     /// corners. Returns `false`, leaving the outline as it is, for an outline
-    /// of zero area ([`Orientation::None`]), which FreeType refuses to embolden
-    /// by a strength of two units or more; below two, every outline is left as
-    /// it is and the call succeeds (probes `orientation-contours`,
+    /// of zero area ([`Orientation::None`]) and a strength of two units or
+    /// more either way (2 or more, or -2 or less), which FreeType refuses for
+    /// the positive strengths probed; between -1 and 1, every outline is left
+    /// as it is and the call succeeds (probes `orientation-contours`,
     /// `emboldening-zero-strength`).
     ///
     /// # Errors
