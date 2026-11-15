@@ -1,0 +1,29 @@
+# The box of CFF2 glyphs: as cff-box, without endchar, which CFF2 does not
+# have.
+format cff2
+glyph # 0: no drawing
+end
+glyph # 1: lines: x 100..400, y 200..600
+  100 200 rmoveto 300 0 rlineto 0 400 rlineto
+end
+glyph # 2: a curve whose control points lie above its arc (arc top 75)
+  0 0 rmoveto 0 100 100 0 0 -100 rrcurveto
+end
+glyph # 3: a lone moveto
+  500 500 rmoveto
+end
+glyph # 4: a line, then a moveto that draws nothing
+  0 0 rmoveto 10 10 rlineto 500 500 rmoveto
+end
+glyph # 5: fractions: x 0.5..100.75, y 0.5..101
+  fixed:0.5 fixed:0.5 rmoveto fixed:100.25 0 rlineto 0 fixed:100.5 rlineto
+end
+glyph # 6: x 0.4..1.6, y 0.4..1.4
+  fixed:0.4 fixed:0.4 rmoveto fixed:1.2 fixed:1 rlineto
+end
+glyph # 7: with endchar, which CFF2 does not define
+  10 10 rmoveto 20 30 rlineto endchar
+end
+glyph # 8: a line after endchar
+  10 10 rmoveto 20 30 rlineto endchar 500 500 rlineto
+end

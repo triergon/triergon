@@ -1,0 +1,27 @@
+# The subroutine bias for 1240 local and 1240 global subroutines: 1131. Local
+# 0 and global 0 draw lines; every other subroutine only returns. Glyph 1
+# calls local index -1131 (subroutine 0); glyph 2 index -107; glyph 3 calls
+# global -1131; glyph 4 global -107.
+global
+  0 77 rlineto return
+end
+pad-global 1239
+local
+  66 0 rlineto return
+end
+pad-local 1239
+glyph
+  endchar
+end
+glyph
+  100 100 rmoveto -1131 callsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -107 callsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -1131 callgsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -107 callgsubr 5 5 rlineto endchar
+end
