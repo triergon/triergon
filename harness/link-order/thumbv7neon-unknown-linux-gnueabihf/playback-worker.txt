@@ -57,7 +57,7 @@ triergon_isobmff::open::push::<triergon_isobmff::boxes::BoxView>
 triergon_isobmff::open::push::<core::ops::range::Range<u64>>
 <triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>::grow_for_push
 <triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>::reallocate
-<triergon_core::input::InputCursor>::request_range
+<triergon_core::input::InputCursor>::request_range_reusing_window
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::PendingMedia>>
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::Walk>>
 <triergon_core::input::InputCursor>::pending_request
@@ -124,6 +124,9 @@ core::ptr::drop_glue::<triergon_isobmff::encoded_recovery_context::RecoveryConte
 <triergon_core::time::Time>::to_ticks
 <triergon_isobmff::encoded_edits::EncodedEditJob>::check
 <triergon_isobmff::regular::SampleCursor>::poll
+<triergon_isobmff::regular::SampleCursor>::advance
+<triergon_isobmff::regular::SampleCursor>::enter
+<triergon_isobmff::regular::ChunkCursor>::enter
 <triergon_isobmff::tables::Offsets>::get
 <triergon_isobmff::tables::Sizes>::get
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::encoded_edits::EncodedEditPlan>>
@@ -166,11 +169,14 @@ triergon_playback::mp4_plan::push::<triergon_isobmff::boxes::BoxView>
 triergon_playback::mp4_plan::push::<core::ops::range::Range<u64>>
 <triergon_isobmff::mov_cursor::PacketCursor>::check_projections_before_replay
 <triergon_isobmff::mov_cursor::PacketCursor>::poll
-<triergon_isobmff::interleave::TrackSampleCursor>::poll
+<triergon_isobmff::interleave::TrackSpans>::poll
+triergon_isobmff::mov_cursor::within_one_extent
+<triergon_isobmff::mov_cursor::PacketCursor>::initialize_range_seek_checkpoints
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::range_seek::Track>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_isobmff::mov_cursor::range_seek::Track>>
 <triergon_core::time::TickScale>::new
 <triergon_isobmff::mov_cursor::Slot>::fill
+<triergon_isobmff::interleave::TrackSampleCursor>::poll_inner
 <triergon_isobmff::mov_clock::SchedulingClock>::from_clock
 <triergon_isobmff::mov_cursor::PacketCursor>::record_seek_checkpoint
 <triergon_isobmff::mov_cursor::Slot>::try_clone_with_edit_storage
@@ -193,7 +199,6 @@ core::ptr::drop_glue::<triergon_playback::mp4_plan::Mp4IndexJob>
 core::ptr::drop_glue::<triergon_playback::engines::RawEvent>
 <triergon_isobmff::packet::SampleReader>::new_with_shared_window
 <triergon_isobmff::packet::SampleReader>::new_checked
-<triergon_core::input::InputCursor>::request_range_reusing_window
 core::ptr::drop_glue::<core::option::Option<(usize, triergon_isobmff::packet::SampleReader)>>
 <triergon_playback::engines::Mp4Engine>::poll_packet
 <triergon_isobmff::packet::SampleReader>::poll_inner
@@ -272,13 +277,12 @@ triergon_isobmff::open::push::<triergon_isobmff::fragment::Trex>
 <triergon_isobmff::open::MovieOpen>::fragment
 <triergon_isobmff::fragment::FragmentBuilder>::new
 <triergon_isobmff::fragment::FragmentBuilder>::poll
-<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::reallocate
 <triergon_isobmff::fragment::Run>::values
 <triergon_isobmff::fragment::FragmentBuilder>::finish
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::FragmentIndex>>::reallocate
 <triergon_isobmff::mov_cursor::PacketCursor>::check_duration_before_replay
-<triergon_isobmff::fragment::FragmentCursor>::poll
+<triergon_isobmff::fragment::FragmentCursor>::advance
 <triergon_isobmff::mov_cursor::Slot>::fragment_origin
 <triergon_isobmff::mov_view::PacketProjector>::project_fragment
 <triergon_isobmff::mov_view::PacketProjector>::project_inner
@@ -317,6 +321,7 @@ playback_worker::mp4_forward::progressive
 <triergon_core::bytes::BudgetVec<triergon_playback::mp4_plan::SourceRow>>::try_push
 <triergon_core::bytes::BudgetVec<triergon_playback::mp4_plan::SourceRow>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_playback::mp4_plan::SourceRow>>::reallocate
+<triergon_isobmff::mov_cursor::PacketCursor>::take_occurrence
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::PacketOccurrence>>::try_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::PacketOccurrence>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::mov_cursor::PacketOccurrence>>::reallocate
@@ -751,6 +756,7 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::resolving::Resolver>
 <triergon_matroska::typed::reader::Reader>::step_seeking
 <triergon_core::time::Time>::combine
 <triergon_matroska::incremental::ElementReader>::begin_internal_cluster_range
+<triergon_core::input::InputCursor>::request_range
 <triergon_matroska::incremental::ElementReader>::step_mode::<triergon_matroska::incremental::PublicDelivery>
 <triergon_matroska::incremental::ElementReader>::begin::<triergon_matroska::incremental::PublicDelivery>
 <triergon_matroska::matroska::typed::seek_validate::CueValidationJob>::step_batch

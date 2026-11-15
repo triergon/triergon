@@ -134,7 +134,7 @@ triergon_isobmff::open::push::<triergon_isobmff::boxes::BoxView>
 triergon_isobmff::open::push::<core::ops::range::Range<u64>>
 <triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>::grow_for_push
 <triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>::reallocate
-<triergon_core::input::InputCursor>::request_range
+<triergon_core::input::InputCursor>::request_range_reusing_window
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::PendingMedia>>
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::Walk>>
 <<triergon_core::blocking::Blocking<triergon_elementary::reader::Reader<triergon_elementary::ac3::Ac3>, alloc::io::buffered::bufreader::BufReader<std::fs::File>>>::seekable::{closure#0} as core::ops::function::FnOnce<(&mut alloc::io::buffered::bufreader::BufReader<std::fs::File>, u64)>>::call_once
@@ -190,6 +190,7 @@ codec_worker::packets::string
 <alloc::string::String as core::fmt::Display>::fmt
 <core::fmt::Formatter>::pad
 <bool as core::fmt::Display>::fmt
+<triergon_core::input::InputCursor>::request_range
 <triergon_core::bytes::Bytes as core::convert::AsRef<[u8]>>::as_ref
 <triergon_core::input::InputCursor>::read_span
 <triergon_isobmff::container::Reader>::finish_packet
@@ -228,7 +229,6 @@ triergon_isobmff::open::push::<triergon_isobmff::fragment::Trex>
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::Trex>>::reallocate
 <triergon_isobmff::open::MovieOpen>::fragment
 <triergon_isobmff::fragment::FragmentBuilder>::new
-<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::reallocate
 <triergon_isobmff::fragment::Run>::values
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::FragmentIndex>>::reallocate
