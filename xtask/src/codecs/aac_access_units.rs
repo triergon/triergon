@@ -223,29 +223,7 @@ pub(crate) fn dump_bytes(dump: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-/// The `ffprobe` arguments, before the file, whose JSON [`access_units`] reads.
-pub(crate) const PROBE: [&str; 13] = [
-    "-v",
-    "error",
-    "-ignore_editlist",
-    "1",
-    "-fflags",
-    "+noparse+nofillin",
-    "-select_streams",
-    "a:0",
-    "-show_entries",
-    "stream=codec_name,profile,channels,sample_rate,extradata:packet=pos,size",
-    "-show_data",
-    "-of",
-    "json",
-];
-
-/// The access-unit input of the first audio stream of `source`, an AAC-LC stream
-/// `probe` describes ([`PROBE`]), with its rate, channels and packet count.
-pub(crate) fn access_units(
-    source: &[u8],
-    probe: &Value,
-) -> Result<(Vec<u8>, u32, u32, u32), String> {
+fn access_units(source: &[u8], probe: &Value) -> Result<(Vec<u8>, u32, u32, u32), String> {
     let Some([stream]) = probe.get("streams").and_then(Value::as_array) else {
         return Err("expected one AAC stream".into());
     };
@@ -410,10 +388,25 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
                 source_path.display()
             ));
         }
-        let source_text = source_path.to_string_lossy();
-        let mut arguments = PROBE.to_vec();
-        arguments.push(&source_text);
-        let probe = command(&comparison.ffprobe, &arguments)?;
+        let probe = command(
+            &comparison.ffprobe,
+            &[
+                "-v",
+                "error",
+                "-ignore_editlist",
+                "1",
+                "-fflags",
+                "+noparse+nofillin",
+                "-select_streams",
+                "a:0",
+                "-show_entries",
+                "stream=codec_name,profile,channels,sample_rate,extradata:packet=pos,size",
+                "-show_data",
+                "-of",
+                "json",
+                &source_path.to_string_lossy(),
+            ],
+        )?;
         let (mut input, rate, channels, count) = access_units(&source, &probe)?;
         let configuration_byte = &mut input[HEADER_BYTES + 1];
         let configuration = *configuration_byte >> 3 & 15;
