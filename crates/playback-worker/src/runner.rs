@@ -64,3 +64,36 @@ pub fn main(worker: &str, runners: &[(&str, Run)]) -> ExitCode {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{MATROSKA_RUNNERS, RUNNERS, dispatch};
+
+    #[test]
+    fn the_matroska_worker_runs_only_its_runners_from_the_full_table() {
+        for (prefix, run) in MATROSKA_RUNNERS {
+            assert!(
+                RUNNERS
+                    .iter()
+                    .any(|(full, other)| *full == prefix && std::ptr::fn_addr_eq(*other, run)),
+                "{prefix}"
+            );
+        }
+        let worker = "playback-matroska-worker";
+        for (prefix, _) in RUNNERS {
+            if MATROSKA_RUNNERS.iter().any(|(own, _)| *own == prefix) {
+                continue;
+            }
+            for mode in ["fold", "bench", "memory", "trace"] {
+                let args = [format!("{prefix}{mode}"), "input".to_owned()];
+                let error = dispatch(worker, &MATROSKA_RUNNERS, &args).unwrap_err();
+                assert!(
+                    error
+                        .to_string()
+                        .starts_with("usage: playback-matroska-worker "),
+                    "{error}"
+                );
+            }
+        }
+    }
+}

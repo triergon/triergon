@@ -279,7 +279,8 @@ fn mp4_tick_before(ticks: i64, base: TimeBase, target: Time) -> Result<bool> {
         return Ok(match (ticks < 0, target_numerator < 0) {
             (false, false) => left < right,
             (true, true) => left > right,
-            (true, false) => left != 0 || right != 0,
+            // A negative tick count lies below every target that is not negative.
+            (true, false) => true,
             (false, true) => false,
         });
     }

@@ -138,7 +138,8 @@ impl TickScale {
     }
 
     /// The magnitude of `ticks` in ticks of `to`, rounded to nearest with ties
-    /// away from zero, when the scaled magnitude fits 64 bits.
+    /// away from zero; `None` when the conversion has no reduced 64-bit factor
+    /// or `ticks` times that factor does not fit 64 bits.
     pub fn nearest_away_magnitude(&self, ticks: u64) -> Option<u64> {
         let (quotient, _, at_least_half) = self.divide(ticks)?;
         // A zero remainder is never at least half of a nonzero divisor.

@@ -1,5 +1,6 @@
 //! Playback measurement worker with the Matroska runners alone: Matroska startup and
-//! seek, and Matroska audio clocks. Its reference build demuxes Matroska alone.
+//! seek, and Matroska audio clocks. Its reference build demuxes Matroska alone; the
+//! playback engine it links still holds the MP4 and TS backends.
 #![forbid(unsafe_code)]
 use playback_worker::runner;
 use std::process::ExitCode;

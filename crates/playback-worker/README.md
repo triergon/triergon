@@ -7,12 +7,13 @@ It is tooling (`publish = false`), not part of the library.
 
 ## Binaries
 
-Each binary carries the container scope of the reference build it is measured
-against ([quality](../../docs/quality.md#reference-and-corpus)). `playback-worker`
-carries every mode family below and is measured against the `formats` build.
-`playback-matroska-worker` carries the Matroska families alone, `feed-` and
-`mkv-audio-`, and is measured against the `video` build, whose only demuxer is
-Matroska. Both dispatch to the same runners (`src/runner.rs`).
+Each binary carries only the mode families the reference build it is measured
+against can demux ([quality](../../docs/quality.md#reference-and-corpus)).
+`playback-worker` carries every mode family below and is measured against the
+`formats` build. `playback-matroska-worker` carries the Matroska families alone,
+`feed-` and `mkv-audio-`, and is measured against the `video` build, whose only
+demuxer is Matroska. Both dispatch to the same runners (`src/runner.rs`) and link
+every backend of the playback engine, MP4 and TS included.
 
 ## Command line
 

@@ -302,7 +302,7 @@ const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
         features: &[],
     },
     // A second binary of the playback-worker package with the Matroska runners
-    // alone, the container scope of its reference build.
+    // alone, the runner families its reference build can demux.
     Candidate {
         name: "playback-matroska-worker",
         package: "playback-worker",

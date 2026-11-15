@@ -865,8 +865,9 @@ Matroska cases; it is above in every MP4 forward and MP4 range case, and in `avc
 `avc-eac3`, `negative-block-time` and `discard-padding` (`matroska-demux`) and
 `header-lace` and `header-private` (`matroska-header-removal`), by at most 2.9%. Peak heap
 is lower than the reference in every case. The difference is the workers' own code. Each
-candidate worker carries the container scope of its reference build
-([quality](quality.md#reference-and-corpus)); on builds of `9be327a2`:
+candidate worker carries only the runner families its reference build can demux
+([quality](quality.md#reference-and-corpus)), and both playback workers still link the
+playback engine's MP4 and TS backends; on builds of `9be327a2`:
 
 | Worker | Bytes | `.text` | Compared with | Bytes | `.text` |
 |---|---|---|---|---|---|

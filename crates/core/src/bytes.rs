@@ -509,7 +509,12 @@ impl<T> BudgetVec<T> {
             .try_reserve_exact(target)
             .ok()
             .map(|()| replacement.capacity());
-        settle_replacement(&mut self.charge, size, capacity, size_of::<T>())?;
+        if let Err(error) = settle_replacement(&mut self.charge, size, capacity, size_of::<T>()) {
+            // The replacement's charge is returned once its storage is gone.
+            drop(replacement);
+            self.charge.shrink_by(size);
+            return Err(error);
+        }
         replacement.append(&mut self.data);
         drop(std::mem::replace(&mut self.data, replacement));
         self.charge.shrink_by(old);
@@ -620,8 +625,9 @@ fn charge_replacement(
 }
 
 /// Charges whatever capacity a replacement allocation holds beyond the `size`
-/// bytes charged for it. When the allocation failed (`capacity` is `None`) or
-/// that charge is refused, returns the `size` bytes and the error.
+/// bytes charged for it. Fails when the allocation failed (`capacity` is
+/// `None`) or that charge is refused, leaving the `size` bytes charged for the
+/// caller to return once the replacement is gone.
 #[inline(never)]
 fn settle_replacement(
     charge: &mut Reservation,
@@ -629,14 +635,10 @@ fn settle_replacement(
     capacity: Option<usize>,
     element: usize,
 ) -> Result<()> {
-    let settled = capacity
+    capacity
         .ok_or(Error::Allocation)
         .and_then(|capacity| capacity.checked_mul(element).ok_or(Error::Overflow))
-        .and_then(|bytes| charge.grow_by(bytes - size));
-    if settled.is_err() {
-        charge.shrink_by(size);
-    }
-    settled
+        .and_then(|bytes| charge.grow_by(bytes - size))
 }
 
 impl<T> std::ops::Deref for BudgetVec<T> {

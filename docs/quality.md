@@ -82,11 +82,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture output independently, and `capture` (gating) and `capture-small` for the
   capture comparison. The two capture profiles link FFmpeg's component libraries
   into the worker so the allocation observer can audit the code doing the work.
-- **Container scope.** A candidate worker carries exactly the container scope of its
-  reference build, so that neither side's code size includes demuxers the other lacks.
-  `media-worker` reads Matroska for the `matroska` build's container harness;
-  `playback-matroska-worker` runs Matroska startup and seek (`feed-`) and Matroska audio
-  clocks (`mkv-audio-`) against `video`, whose only demuxer is Matroska; and
+- **Container scope.** A candidate worker carries only the runner families its
+  reference build can demux. `media-worker` reads Matroska for the `matroska` build's
+  container harness; `playback-matroska-worker` runs Matroska startup and seek (`feed-`)
+  and Matroska audio clocks (`mkv-audio-`) against `video`, whose only demuxer is
+  Matroska, and still links the playback engine's MP4 and TS backends, which `Engine`
+  holds beside Matroska; and
   `playback-worker` carries every playback runner family for MP4 forward and range, TS
   programs, raw Annex B and HLS segments against `formats` and its 12 demuxers (`ass`,
   `h264`, `hevc`, `matroska`, `mov`, `mpegps`, `mpegts`, `mpegtsraw`, `srt`, `sup`,
@@ -380,8 +381,8 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 `cargo xtask report` runs the correctness comparison of one feature contract
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
-`matroska-startup-seek` does with `playback-matroska-worker` and the `video` reference
-and `hls-segments` with `playback-worker` and the `formats` reference, the six bitmap, caption and teletext `subtitle-*` features with
+`matroska-startup-seek` and `matroska-audio-clocks` do with `playback-matroska-worker`
+and the `video` reference and `hls-segments` with `playback-worker` and the `formats` reference, the six bitmap, caption and teletext `subtitle-*` features with
 `subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
 and the `formats` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
