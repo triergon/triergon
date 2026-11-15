@@ -827,11 +827,11 @@ refusing them if the sources, workers, cases or host differ; without `--stage` o
 does both, its memory after all its timing. Collecting side by side, it gives each
 case its own copy of its generated input, checked against the hash its timing recorded
 and removed when the run ends, so cases of one input no longer share a file; on one CPU
-they read the input itself. Pinned to one CPU, collection runs exactly as before. The reference's memory is measured afresh in every pair, not reused from
-earlier runs: on a second host
-of the same class it gives the same heaps and resident peaks within their spread
-(evidence set `gate-reference-memory-cross-host`), but caching it would save a few
-minutes and give up the interleaving of both workers within each pair.
+they read the input itself. Pinned to one CPU, collection runs exactly as before. The
+reference's memory is measured afresh in every pair, not reused from earlier runs: on a
+second host of the same class it gives the same heaps and resident peaks within their
+spread (evidence set `gate-reference-memory-cross-host`), but caching it would save a
+few minutes and give up the interleaving of both workers within each pair.
 Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
