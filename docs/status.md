@@ -881,6 +881,14 @@ runs about 250 KB of the playback worker's code, spread over most of its windows
 change that moves functions across windows moves its resident code by 16 to 32 pages
 either way. The playback worker also holds more stack pages than the reference's 3.
 
+Both MP4 rows are further above the reference at `9be327a2` than at `79e0ae13`: MP4
+forward's total RSS bound rose from 1.0519 to 1.0916, and MP4 range's from 1.0406, with 6
+of 51 cases lower, to 1.0820, with none lower. The playback worker's `.text` is 37.5 KB
+smaller and its deepest MP4 runs hold 2 to 4 fewer stack pages, but the functions these
+operations run lie across more windows: in snapshots of resident pages at the end of the
+operation, from an empty page cache, the build holds about 18 more pages of its code on
+every MP4 case than the build before the changes.
+
 At `79e0ae13` packet framing's total RSS is lower than the reference's in all 125 cases
 (worst 0.9972). At `4a932ef9` it was lower in 73, with a worst bound of
 1.010086455331412 (`bad-packet-good-update`) and a median of the 125 bounds of 0.9971.
