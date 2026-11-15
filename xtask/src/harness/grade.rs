@@ -1462,7 +1462,7 @@ mod tests {
             ("matroska-segment-metadata", 48),
             ("matroska-startup-seek", 44),
             ("hls-segments", 71),
-            ("packet-framing", 125),
+            ("packet-framing", 131),
             ("isobmff-open-index", 1020),
             ("isobmff-seek", 476),
             ("font-outlines", 53),

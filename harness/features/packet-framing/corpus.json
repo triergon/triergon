@@ -2750,6 +2750,96 @@
         "digest": 4347213743278495047,
         "digest_b": 14016551016102411099
       }
+    },
+    {
+      "id": "avc-profile-extension-0-bytes",
+      "profile": "avc-profile-extension-0-bytes",
+      "file": "avc-profile-extension-0-bytes.bsf",
+      "sha256": "3698a9ebaa008b5c2aad852c6a951bcf3371d4b23e6fd0b7bcb3592f3c07eac4",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3771063309789483034,
+        "digest_b": 14619438228978557346
+      }
+    },
+    {
+      "id": "avc-profile-extension-1-bytes",
+      "profile": "avc-profile-extension-1-bytes",
+      "file": "avc-profile-extension-1-bytes.bsf",
+      "sha256": "47d158726dfd708a05dfe112510e7721ed2dc2af4d5b37c6155305f7bbc111c7",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3771063309789483034,
+        "digest_b": 14619438228978557346
+      }
+    },
+    {
+      "id": "avc-profile-extension-2-bytes",
+      "profile": "avc-profile-extension-2-bytes",
+      "file": "avc-profile-extension-2-bytes.bsf",
+      "sha256": "27bc300e408e9de0f73d75a3db6c0042b375eb82907325849b19bec3623c55ee",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3771063309789483034,
+        "digest_b": 14619438228978557346
+      }
+    },
+    {
+      "id": "avc-profile-extension-3-bytes",
+      "profile": "avc-profile-extension-3-bytes",
+      "file": "avc-profile-extension-3-bytes.bsf",
+      "sha256": "d25836b43336a7ea93eb9d89fb617ff7d41a8a5e40a53ba0a05fc4251415828a",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3771063309789483034,
+        "digest_b": 14619438228978557346
+      }
+    },
+    {
+      "id": "avc-profile-extension-4-bytes",
+      "profile": "avc-profile-extension-4-bytes",
+      "file": "avc-profile-extension-4-bytes.bsf",
+      "sha256": "a54a615c911b11ecf8dd743c8c444779f5ec5bbd9bef0ccfe04cf35409b3a66e",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3771063309789483034,
+        "digest_b": 14619438228978557346
+      }
+    },
+    {
+      "id": "avc-profile-extension-update",
+      "profile": "avc-profile-extension-update",
+      "file": "avc-profile-extension-update.bsf",
+      "sha256": "cdc8bcff61926605f28ffe07fb28bd0451aade42ee0029b14bab561d951c897b",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 12250666434438874969,
+        "digest_b": 17993043491084337333
+      }
     }
   ]
 }

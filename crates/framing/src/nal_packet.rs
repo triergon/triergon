@@ -67,9 +67,7 @@ impl NalPacketConfiguration {
     }
     pub(crate) fn refusal(&self) -> NalConfigurationRefusal {
         match self {
-            Self::ReceiverAvc(v) if v.fields().length_size_minus_one() == 2 => {
-                NalConfigurationRefusal::AvcWidthThree
-            }
+            Self::ReceiverAvc(v) => v.refusal(),
             Self::ReceiverHevc(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::HevcWidthThree
             }
@@ -155,6 +153,7 @@ impl NalPacketConfiguration {
 pub(crate) enum NalConfigurationRefusal {
     None,
     AvcWidthThree,
+    AvcExtensionTruncated,
     HevcWidthThree,
 }
 impl NalConfigurationRefusal {
@@ -162,6 +161,7 @@ impl NalConfigurationRefusal {
         match self {
             Self::None => None,
             Self::AvcWidthThree => Some(Error::Invalid("AVC three-byte sample length")),
+            Self::AvcExtensionTruncated => Some(Error::Truncated),
             Self::HevcWidthThree => Some(Error::Unsupported("hvcC three-byte sample length")),
         }
     }
