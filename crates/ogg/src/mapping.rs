@@ -233,12 +233,12 @@ impl Timeline {
     }
 
     /// The tick the last keyframe up to a granule position starts at, for mappings
-    /// whose granule positions name it.
+    /// whose granule positions name it; `None` where that tick is out of range.
     pub(crate) fn keyframe(&self, granule: i64) -> Option<i64> {
         match *self {
-            Timeline::Theora { shift, count } => {
-                Some((granule >> shift).saturating_add(i64::from(count)) - 1)
-            }
+            Timeline::Theora { shift, count } => (granule >> shift)
+                .checked_add(i64::from(count))?
+                .checked_sub(1),
             _ => None,
         }
     }
@@ -791,6 +791,30 @@ mod tests {
         }
         assert_eq!(header.len(), SpeexHeader::BYTES);
         header
+    }
+
+    #[test]
+    fn theora_keyframes_of_extreme_granules_are_none_not_wrapped() {
+        let budget = Budget::new(1 << 20).unwrap();
+        for (revision, shift) in [(0, 0), (1, 0), (1, 6), (1, 31)] {
+            let identification = theora_identification(revision, 25, 1, shift);
+            let config =
+                Configuration::first(&budget, Mapping::Theora, &identification, 1 << 20).unwrap();
+            let timeline = config.timeline;
+            for granule in [i64::MIN, i64::MIN + 1, -1, 0, i64::MAX] {
+                // Neither panics; a keyframe tick, where there is one, is in range.
+                let _ = timeline.ticks(granule);
+                let _ = timeline.keyframe(granule);
+            }
+        }
+        // Bitstream 3.2.1 counts frames from one: keyframe count i64::MIN names tick
+        // i64::MIN - 1, which is out of range.
+        let identification = theora_identification(1, 25, 1, 0);
+        let timeline = Configuration::first(&budget, Mapping::Theora, &identification, 1 << 20)
+            .unwrap()
+            .timeline;
+        assert_eq!(timeline.keyframe(i64::MIN), None);
+        assert_eq!(timeline.keyframe(i64::MIN + 1), Some(i64::MIN));
     }
 
     #[test]
