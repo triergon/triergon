@@ -977,18 +977,20 @@ impl<'a> SampleCursor<'a> {
         let end = start.checked_add(u64::from(size)).ok_or(Error::Overflow)?;
         let sync =
             sequential_contains(self.table.sync.as_ref(), &mut self.sync_row, ordinal, true)?;
-        sequential_contains(
+        let partial = sequential_contains(
             self.table.partial.as_ref(),
             &mut self.partial_row,
             ordinal,
             false,
         )?;
-        let dts = self.dts;
+        let (dts, delta) = (self.dts, self.delta);
         self.leave(ordinal, end)?;
         Ok(SkippedSample {
             ordinal,
             dts,
+            delta,
             sync,
+            partial,
             start,
             size,
         })
@@ -1088,7 +1090,9 @@ impl<'a> DecodeDeltas<'a> {
 pub(crate) struct SkippedSample {
     pub(crate) ordinal: u64,
     pub(crate) dts: i128,
+    pub(crate) delta: u32,
     pub(crate) sync: bool,
+    pub(crate) partial: bool,
     pub(crate) start: u64,
     pub(crate) size: u32,
 }

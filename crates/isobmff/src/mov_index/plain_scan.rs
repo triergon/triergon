@@ -14,6 +14,7 @@
 //! it gives up, and the seek builds the entries one by one instead.
 use crate::fragment::RunSkip;
 use crate::mov_cursor::{PlainSource, PlainStart, PreviousClock, PreviousSample};
+use crate::mov_edits::EmitStart;
 use crate::{FragmentCursor, FragmentIndex, SampleCursor};
 use triergon_core::WorkBudget;
 
@@ -65,6 +66,13 @@ enum Walk<'a> {
         next_fragment: usize,
         current: Option<FragmentCursor<'a>>,
         edit_offset: i64,
+    },
+    /// The emitted samples of an edit cursor, with the counts it keeps.
+    Edited {
+        cursor: SampleCursor<'a>,
+        edit: EmitStart<'a>,
+        generated: u64,
+        ended: bool,
     },
 }
 
@@ -121,6 +129,12 @@ impl<'a> PlainScan<'a> {
                 current: None,
                 edit_offset,
             },
+            PlainSource::Edited(edit) => Walk::Edited {
+                cursor: edit.table.cursor(),
+                edit,
+                generated: 0,
+                ended: false,
+            },
         };
         Self {
             walk,
@@ -158,6 +172,12 @@ impl<'a> PlainScan<'a> {
                 current,
                 *edit_offset,
             ),
+            Walk::Edited {
+                cursor,
+                edit,
+                generated,
+                ended,
+            } => state.poll_edited(work, cursor, edit, generated, ended),
         }
     }
 }
@@ -284,6 +304,73 @@ impl<'a> State<'a> {
             }
             if sample.sync {
                 self.keep(start, timestamp);
+            }
+        }
+    }
+
+    /// The occurrences an [`EditCursor`](crate::EditCursor) emits for one media
+    /// edit: its samples from the first it emits through the first sync sample
+    /// that reaches the edit's end, or through the last sample. Each scan, decode
+    /// delta and occurrence counts toward the edit cursor's limits as it does
+    /// there.
+    fn poll_edited(
+        &mut self,
+        work: &mut WorkBudget,
+        cursor: &mut SampleCursor<'a>,
+        edit: &mut EmitStart<'a>,
+        generated: &mut u64,
+        ended: &mut bool,
+    ) -> PlainStep<'a> {
+        let table = edit.table;
+        if table.has_composition_offsets() || table.has_dependency_table() {
+            return PlainStep::GiveUp;
+        }
+        loop {
+            if *ended || cursor.ordinal() == table.sample_count() {
+                return self.finish();
+            }
+            if !work.try_charge(1) {
+                return PlainStep::Yield;
+            }
+            let Ok(sample) = cursor.skip() else {
+                return PlainStep::GiveUp;
+            };
+            edit.scanned += 1;
+            if edit.scanned > edit.limits.max_scanned_samples {
+                return PlainStep::GiveUp;
+            }
+            if sample.ordinal < edit.first {
+                continue;
+            }
+            if sample.delta == 0 || sample.partial {
+                return PlainStep::GiveUp;
+            }
+            *generated += 1;
+            // The decode delta of the occurrence's own ordinal.
+            if *generated <= table.sample_count() {
+                edit.scanned += 1;
+            }
+            if *generated > edit.limits.max_occurrences
+                || edit.scanned > edit.limits.max_scanned_samples
+            {
+                return PlainStep::GiveUp;
+            }
+            // The edit projects decode times that fit signed 64 bits in ticks.
+            let Some(timestamp) = timestamp(sample.dts, i128::from(edit.shift)).filter(|_| {
+                i64::try_from(sample.dts).is_ok() && representable(sample.start, sample.size)
+            }) else {
+                return PlainStep::GiveUp;
+            };
+            *ended = sample.sync
+                && sample
+                    .dts
+                    .checked_add(i128::from(sample.delta))
+                    .is_some_and(|end| end >= i128::from(edit.end));
+            if !self.record(timestamp, sample.sync, false) {
+                return PlainStep::GiveUp;
+            }
+            if sample.sync {
+                self.keep(PlainStart::Edited(sample.ordinal), timestamp);
             }
         }
     }

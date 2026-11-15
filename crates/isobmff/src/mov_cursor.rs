@@ -10,7 +10,9 @@
 use crate::{
     CursorStatus, DurationBasis, EditCursor, EditLimits, EditList, FragmentCursor, FragmentIndex,
     MediaClock, PacketProjector, PacketView, Sample, SampleCursor, SampleStep, SampleTable,
-    SchedulingClock, SourceTrack, SpanStep, TrackSampleCursor, interleave::TrackSpans,
+    SchedulingClock, SourceTrack, SpanStep, TrackSampleCursor,
+    interleave::TrackSpans,
+    mov_edits::{EmitPrepare, EmitStart},
     require_range_within,
 };
 use std::{
@@ -426,8 +428,8 @@ impl<'a> Slot<'a> {
     }
 }
 
-/// A track whose occurrences are its samples in order with unedited clocks; see
-/// [`PacketCursor::plain_track`].
+/// A track whose occurrences are its samples in order, each once; see
+/// [`PacketCursor::prepare_plain`].
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PlainSource<'a> {
     /// A regular table, projected with its composition shift.
@@ -438,12 +440,23 @@ pub(crate) enum PlainSource<'a> {
         fragments: &'a [FragmentIndex],
         edit_offset: i64,
     },
+    /// A regular table under one media edit, after at most an empty one.
+    Edited(EmitStart<'a>),
+}
+
+/// One step of [`PacketCursor::prepare_plain`].
+#[derive(Debug)]
+pub(crate) enum PlainPrepare<'a> {
+    Ready(Option<PlainSource<'a>>),
+    Yield,
 }
 
 /// Where a [`PlainSource`] track continues from.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PlainStart<'a> {
     Regular(SampleCursor<'a>),
+    /// The sample with this ordinal, under the track's edit.
+    Edited(u64),
     /// The cursor over fragment `next_fragment - 1` that produces the sample,
     /// the sample before it, if any, and the discard boundary of its run.
     Fragment {
@@ -1146,14 +1159,12 @@ impl<'a> PacketCursor<'a> {
         })
     }
 
-    /// A prepared one-track cursor's track when its occurrences are its samples
-    /// in order with unedited clocks: a regular table with no edit list, partial
-    /// sync or dependency samples, or fragments alone.
-    pub(crate) fn plain_track(&self) -> Option<PlainSource<'a>> {
+    /// The slot of a prepared one-track complete-source cursor that has produced
+    /// nothing yet.
+    fn prepared_slot(&self) -> Option<&Slot<'a>> {
         let [slot] = self.slots.as_slice() else {
             return None;
         };
-        let table = slot.track.table;
         let prepared = matches!(self.phase, Phase::Fill)
             && self.at == 0
             && self.generated == 0
@@ -1170,16 +1181,21 @@ impl<'a> PacketCursor<'a> {
             && slot.head.is_none()
             && slot.resume_remaining == 0
             && slot.clock.is_some()
-            && slot.edited.is_none()
             && slot.encoded_edit.is_none()
             && !slot.front_fragment
             && slot.previous_clock.is_none()
             && slot.append_run.is_none()
             && self.validated != 0
             && self.validated <= self.limits.max_occurrences;
-        if !prepared {
-            return None;
-        }
+        prepared.then_some(slot)
+    }
+
+    /// A prepared one-track cursor's track when its occurrences are its samples
+    /// in order with unedited clocks: a regular table with no edit list, partial
+    /// sync or dependency samples, or fragments alone.
+    fn plain_track(&self) -> Option<PlainSource<'a>> {
+        let slot = self.prepared_slot().filter(|slot| slot.edited.is_none())?;
+        let table = slot.track.table;
         if !slot.saw_fragment
             && slot.track.edits.is_none()
             && slot.fragment_edit.is_none()
@@ -1198,9 +1214,53 @@ impl<'a> PacketCursor<'a> {
         })
     }
 
-    /// Continue a prepared [`plain_track`](Self::plain_track) cursor from
-    /// `start`, as though the samples before it had been produced.
-    pub(crate) fn start_plain_at(&mut self, start: PlainStart<'a>) -> Result<()> {
+    /// Prepares a one-track complete-source cursor and finds whether its
+    /// occurrences can be read from its tables: those of a [`PlainSource`].
+    pub(crate) fn prepare_plain(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<PlainPrepare<'a>> {
+        match self.prepare(work, cancel)? {
+            CursorStatus::Yield => return Ok(PlainPrepare::Yield),
+            CursorStatus::End => return Ok(PlainPrepare::Ready(None)),
+            CursorStatus::Ready => {}
+        }
+        if let Some(source) = self.plain_track() {
+            return Ok(PlainPrepare::Ready(Some(source)));
+        }
+        // A regular track under a media edit emits each sample once.
+        if self.prepared_slot().is_none_or(|slot| slot.saw_fragment) {
+            return Ok(PlainPrepare::Ready(None));
+        }
+        let Some(edited) = self.slots.as_mut_slice()[0].edited.as_mut() else {
+            return Ok(PlainPrepare::Ready(None));
+        };
+        Ok(match edited.as_mut_slice()[0].prepare_emit(work)? {
+            EmitPrepare::Ready(start) => PlainPrepare::Ready(Some(PlainSource::Edited(start))),
+            EmitPrepare::Yield => PlainPrepare::Yield,
+            EmitPrepare::Unsuited => PlainPrepare::Ready(None),
+        })
+    }
+
+    /// Continue a cursor that [`prepare_plain`](Self::prepare_plain) found plain
+    /// from `start`, as though the occurrences before it had been produced.
+    /// `false` when the work is spent.
+    pub(crate) fn start_plain_at(
+        &mut self,
+        start: PlainStart<'a>,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        if let PlainStart::Edited(ordinal) = start {
+            if self.prepared_slot().is_none() {
+                return Err(Error::Invalid("plain start needs a prepared edited track"));
+            }
+            let edited = self.slots.as_mut_slice()[0]
+                .edited
+                .as_mut()
+                .ok_or(Error::Invalid("plain start needs a prepared edited track"))?;
+            return edited.as_mut_slice()[0].skip_to(ordinal, work);
+        }
         let source = self
             .plain_track()
             .ok_or(Error::Invalid("plain start needs a prepared plain track"))?;
@@ -1228,7 +1288,7 @@ impl<'a> PacketCursor<'a> {
             }
             _ => return Err(Error::Invalid("plain start from another track")),
         }
-        Ok(())
+        Ok(true)
     }
 
     /// The complete-source cursor over these tracks, in catalogue order, that

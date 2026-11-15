@@ -2,7 +2,7 @@
 //! Original Samples and clock/config/edit provenance travel with every entry.
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
-use crate::mov_cursor::{PlainStart, TrackProjection, TrackResume};
+use crate::mov_cursor::{PlainPrepare, PlainStart, TrackProjection, TrackResume};
 use crate::{
     BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
     OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
@@ -421,27 +421,43 @@ impl<'a> IndexCursor<'a> {
         self.cursor.discard_occurrence();
     }
 
-    /// A prepared index over a plain track, before its first entry, for a seek
-    /// to `target` in the index's clock.
-    fn plain_track(&self, target: i128, allow_initial_prefix: bool) -> Option<PlainTrack<'a>> {
+    /// Prepares the index and, before its first entry, finds whether a seek to
+    /// `query` can read its entries from the track's tables. `None` when the
+    /// work is spent.
+    fn prepare_plain(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        query: i128,
+        allow_initial_prefix: bool,
+    ) -> Result<Option<Option<PlainTrack<'a>>>> {
         if self.next != 0 || self.ready.is_some() || self.dependency_table {
-            return None;
+            return Ok(Some(None));
         }
-        Some(PlainTrack {
-            source: self.cursor.plain_track()?,
+        let PlainPrepare::Ready(source) = self.cursor.prepare_plain(work, cancel)? else {
+            return Ok(None);
+        };
+        Ok(Some(source.map(|source| PlainTrack {
+            source,
             allow_initial_nonkey: self.allow_initial_nonkey,
             allow_initial_prefix,
             max_entries: self.max_entries,
-            target,
-        })
+            // As the first entry does, take a fragment edit's media start from
+            // the query.
+            target: query - i128::from(self.cursor.index_edit_offset()),
+        })))
     }
 
-    /// Continue a [`plain_track`](Self::plain_track) index from `start`, whose
-    /// sample is entry `ordinal`.
-    fn start_plain_at(&mut self, start: PlainStart<'a>, ordinal: u64) -> Result<()> {
-        self.cursor.start_plain_at(start)?;
+    /// Continue a prepared plain index from `start`, whose sample is entry
+    /// `ordinal`. `false` when the work is spent.
+    fn start_plain_at(
+        &mut self,
+        start: PlainStart<'a>,
+        ordinal: u64,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
         self.next = ordinal;
-        Ok(())
+        self.cursor.start_plain_at(start, work)
     }
 }
 
@@ -506,7 +522,9 @@ enum Plain<'a> {
     /// The index has not been prepared yet.
     Untried,
     Scanning(PlainScan<'a>),
-    /// The scan chose this entry, which the index produces next.
+    /// The scan chose this entry; the index moves to it.
+    Starting(PlainChoice<'a>),
+    /// The index produces the chosen entry next.
     Selecting(PlainChoice<'a>),
     /// The seek reads every entry.
     Off,
@@ -714,31 +732,33 @@ impl<'a> SeekJob<'a> {
             match &mut self.plain {
                 Plain::Off => return Ok(false),
                 Plain::Untried => {
-                    match self.index.cursor.prepare(work, cancel)? {
-                        CursorStatus::Yield => return Ok(true),
-                        CursorStatus::End => {
-                            self.plain = Plain::Off;
-                            continue;
-                        }
-                        CursorStatus::Ready => {}
-                    }
-                    // As the first entry does, take a fragment edit's media start
-                    // from the query.
-                    let target =
-                        self.index_timestamp - i128::from(self.index.cursor.index_edit_offset());
-                    self.plain = match self.index.plain_track(target, self.allow_initial_prefix) {
-                        Some(track) => Plain::Scanning(PlainScan::new(track)),
-                        None => Plain::Off,
+                    let Some(track) = self.index.prepare_plain(
+                        work,
+                        cancel,
+                        self.index_timestamp,
+                        self.allow_initial_prefix,
+                    )?
+                    else {
+                        return Ok(true);
                     };
+                    self.plain =
+                        track.map_or(Plain::Off, |track| Plain::Scanning(PlainScan::new(track)));
                 }
                 Plain::Scanning(scan) => match scan.poll(work) {
                     PlainStep::Yield => return Ok(true),
                     PlainStep::GiveUp => self.plain = Plain::Off,
-                    PlainStep::Done(choice) => {
-                        self.index.start_plain_at(choice.start, choice.ordinal)?;
-                        self.plain = Plain::Selecting(choice);
-                    }
+                    PlainStep::Done(choice) => self.plain = Plain::Starting(choice),
                 },
+                Plain::Starting(choice) => {
+                    let choice = *choice;
+                    if !self
+                        .index
+                        .start_plain_at(choice.start, choice.ordinal, work)?
+                    {
+                        return Ok(true);
+                    }
+                    self.plain = Plain::Selecting(choice);
+                }
                 Plain::Selecting(choice) => {
                     let choice = *choice;
                     match self.index.poll(work, cancel)? {
