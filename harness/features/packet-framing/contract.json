@@ -16,6 +16,7 @@
     "configuration publication and exact signed packet fields, complete payload and NEW_EXTRADATA side data",
     "receive failures, flush and drain actions, close, then complete retained packet access in order",
     "dual wrapping byte-polynomial fold (31 and 131), including configuration, failures and retained data",
+    "only timing reads the clock; memory markers bracket the whole operation and fold",
     "send, EAGAIN and EOF progress are not part of this output projection"
   ],
   "required_profiles": [
@@ -143,7 +144,13 @@
     "avc-same-update-continuation",
     "avc-inband-update-continuation",
     "avc-configured-annexb",
-    "hevc-configured-annexb"
+    "hevc-configured-annexb",
+    "avc-profile-extension-0-bytes",
+    "avc-profile-extension-1-bytes",
+    "avc-profile-extension-2-bytes",
+    "avc-profile-extension-3-bytes",
+    "avc-profile-extension-4-bytes",
+    "avc-profile-extension-update"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

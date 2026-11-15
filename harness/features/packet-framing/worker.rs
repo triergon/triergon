@@ -57,13 +57,9 @@ pub fn main(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         println!("TRIERGON_BEGIN_V1");
         io::stdout().flush()?;
     }
-    let start = Instant::now();
+    let start = timing.then(Instant::now);
     let total = execute(&case, iterations)?;
-    let elapsed = if timing {
-        start.elapsed().as_nanos()
-    } else {
-        0
-    };
+    let elapsed = start.map_or(0, |start| start.elapsed().as_nanos());
     if memory {
         println!("TRIERGON_END_V1");
         io::stdout().flush()?;
@@ -127,6 +123,26 @@ mod tests {
             );
         }
         assert_eq!(fixtures.len(), 125);
+    }
+
+    #[test]
+    fn avc_profile_extensions_match_recorded_reference_folds() {
+        let fixtures = fixtures::load_extensions().unwrap();
+        assert_eq!(fixtures.len(), 6);
+        for fixture in fixtures {
+            let case = Case::parse(&fixture.bytes).unwrap();
+            let actual = execute(&case, 1).unwrap();
+            let expected = fixture.expected;
+            assert_eq!(actual.packets, expected.packets, "{} packets", fixture.id);
+            assert_eq!(actual.bytes, expected.bytes, "{} bytes", fixture.id);
+            assert_eq!(actual.digest.0, expected.digest, "{} digest", fixture.id);
+            assert_eq!(
+                actual.digest.1, expected.digest_b,
+                "{} digest_b",
+                fixture.id
+            );
+            assert_eq!(case.pool.used(), case.baseline, "{} retention", fixture.id);
+        }
     }
 
     #[test]

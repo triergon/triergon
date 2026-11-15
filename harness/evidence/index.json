@@ -9887,6 +9887,59 @@
    ]
   },
   {
+   "name": "packet-framing-memory-clock-ee052323-aarch64",
+   "path": "packet-framing-memory-clock-ee052323-aarch64",
+   "retention": "retained",
+   "reason": "Records the packet framing comparison with the clock read confined to timing and the associated resident mapping measurements.",
+   "key": "evidence/packet-framing-memory-clock-ee052323-aarch64/f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183.tar.zst",
+   "sha256": "f9d7ba202a53090a694132d78992ff359884474622ce4bebd119178de1c74183",
+   "bytes": 42091880
+  },
+  {
+   "name": "packet-framing-64fc1b08-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 parity, timing and kernel-bound memory for 125 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-64fc1b08-aarch64/aa9eaa38cc3463de47490dcc449b581da9d45cc8c80f407d0d97b4279751013b.tar.zst",
+   "sha256": "aa9eaa38cc3463de47490dcc449b581da9d45cc8c80f407d0d97b4279751013b",
+   "bytes": 17648020,
+   "source_revisions": {
+    "candidate": "64fc1b08163364dd1f9cba25dc17970e6bc9555f"
+   }
+  },
+  {
+   "name": "packet-framing-b3d01267-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 parity, timing and kernel-bound memory for 125 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-b3d01267-aarch64/0afb50e86cde3238b372ea31bfc248eedaf7895c4206bc8d5a7d82f0d26d2f92.tar.zst",
+   "sha256": "0afb50e86cde3238b372ea31bfc248eedaf7895c4206bc8d5a7d82f0d26d2f92",
+   "bytes": 16972768,
+   "source_revisions": {
+    "candidate": "b3d01267428a2bf318bb05a9c02f0b9435c5f61f"
+   }
+  },
+  {
+   "name": "packet-framing-64fc1b08-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 parity, timing and kernel-bound memory for 125 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-64fc1b08-armv7/70dee62eda8f3ab761c7eb05d445d4a913ce7ef8cbc8ca2e7a3035a1843b2f9d.tar.zst",
+   "sha256": "70dee62eda8f3ab761c7eb05d445d4a913ce7ef8cbc8ca2e7a3035a1843b2f9d",
+   "bytes": 14579374,
+   "source_revisions": {
+    "candidate": "64fc1b08163364dd1f9cba25dc17970e6bc9555f"
+   }
+  },
+  {
+   "name": "packet-framing-b3d01267-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 parity, timing and kernel-bound memory for 125 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-b3d01267-armv7/db1d8f73b7fb8b36d8868a78bbe56bc3c82f599d2bb7a430eff1bb520da57265.tar.zst",
+   "sha256": "db1d8f73b7fb8b36d8868a78bbe56bc3c82f599d2bb7a430eff1bb520da57265",
+   "bytes": 14854887,
+   "source_revisions": {
+    "candidate": "b3d01267428a2bf318bb05a9c02f0b9435c5f61f"
+   }
+  },
+  {
    "name": "codec-budgets-linux-arm64",
    "path": "codec-budgets-linux-arm64",
    "retention": "retained",
@@ -11180,6 +11233,104 @@
    "retention": "90 days",
    "key": "qualification/repository/packet-framing-gate-diagnostics/168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9.tar.gz",
    "sha256": "168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9"
+  },
+  {
+   "name": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
+   "path": "packet-framing-avc-profile-extension-cc7e59d2-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet framing comparison with short AVC profile extensions",
+   "key": "evidence/packet-framing-avc-profile-extension-cc7e59d2-aarch64/05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320.tar.zst",
+   "sha256": "05a700f15536e0b793abad2cf001f33d86561f602b13a282e46f829ca2094320",
+   "bytes": 74607220
+  },
+  {
+   "name": "packet-framing-resident-state-9d3d1f58-aarch64",
+   "path": "packet-framing-resident-state-9d3d1f58-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 comparison of compact AVC and HEVC packet framing with short AVC profile extensions.",
+   "key": "evidence/packet-framing-resident-state-9d3d1f58-aarch64/bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b.tar.zst",
+   "sha256": "bba49d0e6ab39c738db4307751eabb91b6d1a3253f821e8a17ba585415d1608b",
+   "bytes": 696141192
+  },
+  {
+   "name": "packet-framing-validated-lengths-fe155a8c-aarch64",
+   "path": "packet-framing-validated-lengths-fe155a8c-aarch64",
+   "retention": "retained",
+   "reason": "Records the full AArch64 packet framing comparison and mapping measurements after reusing validated NAL lengths and array checks.",
+   "key": "evidence/packet-framing-validated-lengths-fe155a8c-aarch64/63b1acf21312e56d2d5b128f1fce3084181fe7814ff1f43f598d531077ad1a79.tar.zst",
+   "sha256": "63b1acf21312e56d2d5b128f1fce3084181fe7814ff1f43f598d531077ad1a79",
+   "bytes": 41983089
+  },
+  {
+   "name": "packet-framing-clock-faults-9d3d1f58-aarch64",
+   "path": "packet-framing-clock-faults-9d3d1f58-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 clock page-fault measurements on three packet framing cases.",
+   "key": "evidence/packet-framing-clock-faults-9d3d1f58-aarch64/3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f.tar.zst",
+   "sha256": "3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f",
+   "bytes": 2758327
+  },
+  {
+   "name": "packet-framing-configuration-length-58546a66-aarch64",
+   "path": "packet-framing-configuration-length-58546a66-aarch64",
+   "retention": "retained",
+   "reason": "Records the AArch64 packet framing comparison using the validated Annex B configuration size.",
+   "key": "evidence/packet-framing-configuration-length-58546a66-aarch64/d39ec483eb8cdd99bf49145ece64421b10614e0de7a088bdc2c49ce1e56af68d.tar.zst",
+   "sha256": "d39ec483eb8cdd99bf49145ece64421b10614e0de7a088bdc2c49ce1e56af68d",
+   "bytes": 41672511
+  },
+  {
+   "name": "packet-framing-cycles-ee052323-aarch64",
+   "path": "packet-framing-cycles-ee052323-aarch64",
+   "retention": "90 days",
+   "reason": "Samples packet framing cycles on six configuration and packet cases.",
+   "key": "qualification/packet-framing-cycles-ee052323-aarch64/646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e.tar.zst",
+   "sha256": "646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e",
+   "bytes": 366419
+  },
+  {
+   "name": "packet-framing-83993880-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-83993880-aarch64/94612c1c766917359cecc21162a8a9dc2a5d1830dc0518b05c5681d5ba95ab43.tar.zst",
+   "sha256": "94612c1c766917359cecc21162a8a9dc2a5d1830dc0518b05c5681d5ba95ab43",
+   "bytes": 18871645,
+   "source_revisions": {
+    "candidate": "839938804f297a06ce40c9ff6c0f59ea30cc8863"
+   }
+  },
+  {
+   "name": "packet-framing-3f07dcc4-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-3f07dcc4-aarch64/d960dc53a15ba7657a6fa63f0a44ec2d95dcbcc3dcc90eb2c8701a0d7887ccb8.tar.zst",
+   "sha256": "d960dc53a15ba7657a6fa63f0a44ec2d95dcbcc3dcc90eb2c8701a0d7887ccb8",
+   "bytes": 18646588,
+   "source_revisions": {
+    "candidate": "3f07dcc4c596cf387ce307458db0aaa88b77d14d"
+   }
+  },
+  {
+   "name": "packet-framing-83993880-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-83993880-armv7/54747081ae9da817301b5d8db4324c1781cf240a5ef867b1678fbdc16ef3143f.tar.zst",
+   "sha256": "54747081ae9da817301b5d8db4324c1781cf240a5ef867b1678fbdc16ef3143f",
+   "bytes": 16062513,
+   "source_revisions": {
+    "candidate": "839938804f297a06ce40c9ff6c0f59ea30cc8863"
+   }
+  },
+  {
+   "name": "packet-framing-3f07dcc4-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-3f07dcc4-armv7/8bb3458c1ac6af0b8527a76617cd0a7e250b44a8dfe6671b28093e8b05da92e6.tar.zst",
+   "sha256": "8bb3458c1ac6af0b8527a76617cd0a7e250b44a8dfe6671b28093e8b05da92e6",
+   "bytes": 16491844,
+   "source_revisions": {
+    "candidate": "3f07dcc4c596cf387ce307458db0aaa88b77d14d"
+   }
   },
   {
    "name": "progressive-cursor-gate-build",
@@ -31411,6 +31562,30 @@
    ],
    "source_revisions": {
     "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-75f35bac-20261115-144423-shard-1",
+   "path": "gate-run-aarch64-75f35bac-20261115-144423-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 75f35bac on Linux AArch64, one c6g.4xlarge from the gate image built with ogg-reader-inputs, item ogg-readers: the shard's outputs as tools/gate-aws.sh packs them, archived from the host after the run's own upload failed, with the index entry written on it; 45 files and 26 seeks, none failing, the chained seeks past the first link graded under their reviewed disposition; for the Ogg row",
+   "key": "evidence/gate-runs/75f35bac8f53be59861ddb02b1f3212aaa45d4b6-aarch64-20261115-144423/shard-1/da8a9bc4c6680c73abb48c0f4d8284a55d962dbdf8b9f1a3cd483cc36c3d59b1.tar.zst",
+   "sha256": "da8a9bc4c6680c73abb48c0f4d8284a55d962dbdf8b9f1a3cd483cc36c3d59b1",
+   "bytes": 341164,
+   "source_revisions": {
+    "candidate": "75f35bac8f53be59861ddb02b1f3212aaa45d4b6"
+   }
+  },
+  {
+   "name": "gate-run-armv7-75f35bac-20261115-144432-shard-1",
+   "path": "gate-run-armv7-75f35bac-20261115-144432-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 75f35bac on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image built with ogg-reader-inputs, item ogg-readers: the shard's outputs as tools/gate-aws.sh packs them, archived from the host after the run's own upload failed, with the index entry written on it; 45 files and 26 seeks, none failing, the chained seeks past the first link graded under their reviewed disposition; for the Ogg row",
+   "key": "evidence/gate-runs/75f35bac8f53be59861ddb02b1f3212aaa45d4b6-armv7-20261115-144432/shard-1/dd7d2d2ea490b26d455061cda86111f477c03e80d057d0966145aabbcfd7a676.tar.zst",
+   "sha256": "dd7d2d2ea490b26d455061cda86111f477c03e80d057d0966145aabbcfd7a676",
+   "bytes": 341756,
+   "source_revisions": {
+    "candidate": "75f35bac8f53be59861ddb02b1f3212aaa45d4b6"
    }
   }
  ]
