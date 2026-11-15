@@ -191,6 +191,10 @@ pub fn cited(root: &Path, key: &Key) -> R<Option<Value>> {
                 "report_sha256",
                 result.get("report_sha256").cloned().unwrap_or(Value::Null),
             ),
+            (
+                "cases_checked",
+                result.get("cases_checked").cloned().unwrap_or(Value::Null),
+            ),
         ]))
     }))
 }
@@ -256,6 +260,32 @@ pub fn was_reused(directory: &Path) -> bool {
     read(directory).is_ok_and(|result| result.get("reused").is_some_and(|r| *r != Value::Null))
 }
 
+/// Record in the measured result in `directory` that `gate run` checked every case
+/// of it was measured, with the step's verdict as its status: a later run that
+/// reuses the result takes that verdict.
+pub fn checked(directory: &Path, status: i32) -> R<()> {
+    let Value::Object(mut fields) = read(directory)? else {
+        return Err(format!(
+            "{}: not a gate result",
+            directory.join(RESULT).display()
+        ));
+    };
+    fields.retain(|(key, _)| key != "status" && key != "cases_checked");
+    fields.push(("status".into(), Value::int(status)));
+    fields.push(("cases_checked".into(), Value::Bool(true)));
+    crate::corpus::write_json(&directory.join(RESULT), &Value::Object(fields))
+}
+
+/// Whether the reused result in `directory` is one whose cases a gate run checked.
+pub fn reused_checked(directory: &Path) -> bool {
+    read(directory).is_ok_and(|result| {
+        result
+            .get("reused")
+            .and_then(|cited| cited.get("cases_checked"))
+            == Some(&Value::Bool(true))
+    })
+}
+
 /// The fresh gate results among an evidence set's files, as its index entry
 /// lists them.
 pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
@@ -292,6 +322,11 @@ pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
                 result.get("report_sha256").cloned().unwrap_or(Value::Null),
             ),
         ]));
+        if result.get("cases_checked") == Some(&Value::Bool(true))
+            && let Some(Value::Object(fields)) = results.last_mut()
+        {
+            fields.push(("cases_checked".into(), Value::Bool(true)));
+        }
     }
     Ok(results)
 }
@@ -590,6 +625,16 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].get("command"), Some(&Value::str("grade")));
         assert_eq!(listed[0].get("status"), Some(&Value::int(0)));
+        assert_eq!(listed[0].get("cases_checked"), None);
+        // A result whose cases a gate run checked lists that, with the verdict.
+        checked(&root.join("fresh"), 1).unwrap();
+        let entry = [(
+            format!("fresh/{RESULT}"),
+            fs::read(root.join("fresh").join(RESULT)).unwrap(),
+        )];
+        let listed = super::listed(&entry).unwrap();
+        assert_eq!(listed[0].get("status"), Some(&Value::int(1)));
+        assert_eq!(listed[0].get("cases_checked"), Some(&Value::Bool(true)));
         fs::remove_dir_all(root).unwrap();
     }
 }

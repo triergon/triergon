@@ -294,7 +294,11 @@ impl Case {
             prefix: format!("{}-", self.mode),
             arguments: self.arguments.iter().map(OsString::from).collect(),
             candidate_options: self.candidate_options.iter().map(OsString::from).collect(),
-            work: timing::Work::default(),
+            // A range plan's roles each fold their own digest (harness/features/isobmff-seek).
+            work: timing::Work {
+                fields: Vec::new(),
+                own: comparison::own_fields(Some(&self.time_outputs), &[]),
+            },
             timeout: worker::DEFAULT_TIMEOUT,
         }
     }

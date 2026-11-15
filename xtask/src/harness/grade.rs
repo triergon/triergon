@@ -123,6 +123,21 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
+/// The fields of a case row that its timing and memory collections must agree on:
+/// all but the measurements and the elapsed time of the reference's parity run,
+/// which each collection's own parity run records. The run's status is compared.
+fn joined_fields(row: &Value) -> R<Value> {
+    let mut fields = without(row, &["timing", "memory"])?;
+    if let Some(parity) = row.get("parity")
+        && let Some(run) = parity.get("reference_run")
+    {
+        let mut parity = parity.clone();
+        put(&mut parity, "reference_run", without(run, &["elapsed_ns"])?)?;
+        put(&mut fields, "parity", parity)?;
+    }
+    Ok(fields)
+}
+
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let value = json::parse_observations(
@@ -552,8 +567,8 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &joined_fields(timed)?,
+        &joined_fields(measured)?,
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
@@ -576,8 +591,8 @@ fn join_case(
     ceiling: f64,
 ) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &joined_fields(timed)?,
+        &joined_fields(measured)?,
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
@@ -1966,6 +1981,67 @@ mod tests {
             Value::Array(samples),
         );
         assert!(fixture.join().unwrap_err().contains("digest_b"));
+    }
+
+    #[test]
+    fn collections_join_across_reference_run_times_but_no_other_parity_difference() {
+        let run = |status: &str, elapsed: i64| {
+            object(&[
+                ("status", Value::str(status)),
+                ("elapsed_ns", Value::int(elapsed)),
+            ])
+        };
+        let fixture = || {
+            let mut fixture = Fixture::new();
+            change(
+                &mut fixture.timed,
+                &["parity"],
+                "reference_run",
+                run("ok", 2_301_137),
+            );
+            change(
+                &mut fixture.measured,
+                &["parity"],
+                "reference_run",
+                run("ok", 2_332_973),
+            );
+            fixture
+        };
+        // Each collection's parity run records its own elapsed time.
+        fixture().join().unwrap();
+        let mut status = fixture();
+        change(
+            &mut status.measured,
+            &["parity"],
+            "reference_run",
+            run("timeout", 2_332_973),
+        );
+        let mut run_field = fixture();
+        change(
+            &mut run_field.measured,
+            &["parity", "reference_run"],
+            "signal",
+            Value::int(9),
+        );
+        let mut output = fixture();
+        change(
+            &mut output.measured,
+            &["parity"],
+            "reference",
+            object(&[("digest", Value::int(8))]),
+        );
+        let mut verdict = fixture();
+        change(
+            &mut verdict.measured,
+            &["parity"],
+            "status",
+            Value::str("fail"),
+        );
+        for differing in [status, run_field, output, verdict] {
+            assert!(differing.join().unwrap_err().contains("case fields/parity"));
+            let open = open_case(&differing.timed, &differing.measured);
+            assert!(open.unwrap_err().contains("case fields/parity"));
+        }
     }
 
     #[test]

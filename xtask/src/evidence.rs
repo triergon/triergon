@@ -379,7 +379,7 @@ fn aws_cp(from: &str, to: &str) -> Result<(), String> {
 /// `qualification/SET/`, where it expires 90 days after upload unless promoted,
 /// and print the entry to add to the index.
 pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
-    let (key, entry) = entry(name, archive)?;
+    let (key, entry) = entry(name, archive, None)?;
     let location = archive_location()?;
     aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
     Ok(entry)
@@ -388,7 +388,9 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
 /// The index entry `upload` would print for packed set `name`, and the key under
 /// `qualification/` it goes to, without uploading: for a host that packs a set but
 /// holds no archive credentials, whose upload streams through another machine.
-pub fn entry(name: &str, archive: &Path) -> Result<(String, String), String> {
+/// `key` names another key under `qualification/` that the pack was or will be
+/// uploaded to, ending in the pack's SHA-256 and suffix as every key does.
+pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, String), String> {
     if name.is_empty()
         || !name
             .bytes()
@@ -408,11 +410,22 @@ pub fn entry(name: &str, archive: &Path) -> Result<(String, String), String> {
     let bytes = fs::metadata(archive)
         .map_err(|e| format!("{}: {e}", archive.display()))?
         .len();
-    let key = format!(
-        "{}{name}/{sha}{}",
-        Retention::Expiring.prefix(),
-        compression.suffix()
-    );
+    let ending = format!("{sha}{}", compression.suffix());
+    let key = match key {
+        None => format!("{}{name}/{ending}", Retention::Expiring.prefix()),
+        Some(key)
+            if Retention::of_key(key) == Some(Retention::Expiring)
+                && key.ends_with(&format!("/{ending}")) =>
+        {
+            key.to_owned()
+        }
+        Some(key) => {
+            return Err(format!(
+                "{key}: a set's key lies under {} and ends in /{ending}",
+                Retention::Expiring.prefix()
+            ));
+        }
+    };
     let results = gate_results(archive, compression)?;
     let mut entry = vec![
         ("name", Value::str(name)),
@@ -923,6 +936,30 @@ mod tests {
             assert_eq!(streamed, expected, "{len} bytes");
             assert_eq!(crate::archive::gunzip(&streamed, 1 << 20).unwrap(), data);
         }
+    }
+
+    #[test]
+    fn an_entry_takes_the_key_its_pack_lies_at() {
+        let dir = crate::walk::scratch("evidence-entry");
+        fs::create_dir_all(dir.join("set/memory/f")).unwrap();
+        fs::write(dir.join("set/run.log"), b"done\n").unwrap();
+        let out = dir.join("set.tar.gz");
+        let sha = pack_command(&dir.join("set"), &out).unwrap();
+        let (own, _) = entry("gate-shard", &out, None).unwrap();
+        assert_eq!(own, format!("qualification/gate-shard/{sha}.tar.gz"));
+        let at = format!("qualification/gate-runs/run-1/shard-1/{sha}.tar.gz");
+        let (key, printed) = entry("gate-shard", &out, Some(&at)).unwrap();
+        assert_eq!(key, at);
+        assert!(printed.contains(&format!("\"key\": \"{at}\"")), "{printed}");
+        for wrong in [
+            format!("evidence/gate-runs/run-1/shard-1/{sha}.tar.gz"),
+            "qualification/gate-runs/run-1/shard-1.tar.gz".to_owned(),
+            format!("qualification/gate-runs/run-1/shard-1/{sha}.tar.zst"),
+            format!("qualification/gate-runs/run-1/x{sha}.tar.gz"),
+        ] {
+            assert!(entry("gate-shard", &out, Some(&wrong)).is_err(), "{wrong}");
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

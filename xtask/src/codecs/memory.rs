@@ -193,9 +193,10 @@ pub fn run(options: &Options) -> Result<(), String> {
         fields.push(("parity_sha256".into(), Value::str(&parity.sha256)));
     }
     write(&options.out.join("identity.json"), &identity)?;
-    let mut summary = Vec::new();
-    let mut unmeasured = Vec::new();
-    let mut bounds = Vec::new();
+    // Every workload's unobserved work first, then the memory of all of them in one
+    // collection, side by side, each slot measuring its own copies of the gate
+    // build's workers.
+    let mut planned = Vec::new();
     for (index, w) in workloads.iter().enumerate() {
         let id = text(w, "id")?;
         if only.as_ref().is_some_and(|o| !o.contains(&id)) || !in_part(index, options.part) {
@@ -211,54 +212,80 @@ pub fn run(options: &Options) -> Result<(), String> {
                 w.get("sha256").cloned().unwrap_or(Value::Null),
             ),
         ];
-        let measured =
-            if Some(file_sha(&input)?.as_str()) != w.get("sha256").and_then(Value::as_str) {
-                Value::object([("status", Value::str("input-hash-mismatch"))])
-            } else {
-                match (
-                    work(&options.candidate, operation, &input),
-                    work(&options.reference, operation, &input),
-                ) {
-                    (Ok(candidate), Ok(reference))
-                        if crate::harness::diff::equal(&candidate, &reference) =>
-                    {
-                        let expected =
-                            Value::object([("candidate", candidate), ("reference", reference)]);
-                        record.push(("expected_outputs".into(), expected.clone()));
-                        let arguments = [format!("{operation}-memory"), python::path(&input)];
-                        let workers = memory::WorkerPaths {
-                            candidate: &options.candidate,
-                            reference: &options.reference,
-                            registered: false,
-                        };
-                        memory::collect_one(memory::Job::new(&workers, [input.clone()], |slot| {
-                            memory::collect_command(
-                                slot,
-                                &options.repository,
-                                &options.candidate,
-                                &options.reference,
-                                &input,
-                                memory::Pairs::gate(options.pairs, memory::CEILING)
-                                    .early_stop(options.early_stop),
-                                options.seed,
-                                &arguments,
-                                &expected,
-                                limit,
-                            )
-                        }))?
-                    }
-                    (Ok(candidate), Ok(reference)) => Value::object([
-                        ("status", Value::str("unequal-memory-work")),
-                        ("candidate_work", candidate),
-                        ("reference_work", reference),
-                    ]),
-                    (candidate, reference) => Value::object([
-                        ("status", Value::str("worker-failure")),
-                        ("candidate", candidate.err().map_or(Value::Null, Value::str)),
-                        ("reference", reference.err().map_or(Value::Null, Value::str)),
-                    ]),
+        let ready = if Some(file_sha(&input)?.as_str()) != w.get("sha256").and_then(Value::as_str) {
+            Err(Value::object([(
+                "status",
+                Value::str("input-hash-mismatch"),
+            )]))
+        } else {
+            match (
+                work(&options.candidate, operation, &input),
+                work(&options.reference, operation, &input),
+            ) {
+                (Ok(candidate), Ok(reference))
+                    if crate::harness::diff::equal(&candidate, &reference) =>
+                {
+                    let expected =
+                        Value::object([("candidate", candidate), ("reference", reference)]);
+                    record.push(("expected_outputs".into(), expected.clone()));
+                    Ok((
+                        expected,
+                        [format!("{operation}-memory"), python::path(&input)],
+                    ))
                 }
-            };
+                (Ok(candidate), Ok(reference)) => Err(Value::object([
+                    ("status", Value::str("unequal-memory-work")),
+                    ("candidate_work", candidate),
+                    ("reference_work", reference),
+                ])),
+                (candidate, reference) => Err(Value::object([
+                    ("status", Value::str("worker-failure")),
+                    ("candidate", candidate.err().map_or(Value::Null, Value::str)),
+                    ("reference", reference.err().map_or(Value::Null, Value::str)),
+                ])),
+            }
+        };
+        planned.push((w, id, record, input, ready));
+    }
+    let workers = memory::WorkerPaths {
+        candidate: &options.candidate,
+        reference: &options.reference,
+        registered: refusals.is_empty(),
+    };
+    let pairs = memory::Pairs::gate(options.pairs, memory::CEILING).early_stop(options.early_stop);
+    let mut jobs = Vec::new();
+    let mut collected = Vec::new();
+    for (index, (_, _, _, input, ready)) in planned.iter().enumerate() {
+        let Ok((expected, arguments)) = ready else {
+            continue;
+        };
+        jobs.push(memory::Job::new(&workers, [input.clone()], move |slot| {
+            memory::collect_command(
+                slot,
+                &options.repository,
+                workers,
+                input,
+                pairs,
+                options.seed,
+                arguments,
+                expected,
+                limit,
+            )
+        }));
+        collected.push(index);
+    }
+    let mut memories: Vec<Option<Value>> = vec![None; planned.len()];
+    for (index, memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
+        memories[index] = Some(memory?);
+    }
+    let mut summary = Vec::new();
+    let mut unmeasured = Vec::new();
+    let mut bounds = Vec::new();
+    for ((w, id, mut record, _, ready), memory) in planned.into_iter().zip(memories) {
+        let measured = match ready {
+            Err(refused) => refused,
+            Ok(_) => memory.ok_or("a codec memory collection did not run")?,
+        };
         if measured.get("status").and_then(Value::as_str) != Some("qualified") {
             unmeasured.push(id.to_owned());
         }

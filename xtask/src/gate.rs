@@ -740,43 +740,53 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         }
     }
 
-    // Each capture case on its own: one is up to a quarter of an hour on ARMv7.
+    // Each capture case on its own: one is up to a quarter of an hour on ARMv7. Its
+    // correctness and timing run in the timing stage, and its memory, from the records
+    // they wrote, under the kernel bound in the memory stage.
     for id in capture {
         let name = format!("capture-{id}");
-        let mut command = xtask(&[
-            "capture",
-            "qualify",
-            "--candidate",
-            &format!("{release}/capture-worker"),
-            "--reference",
-            "target/harness/ffmpeg-capture-worker",
-            "--reference-small",
-            "target/harness/ffmpeg-capture-small-worker",
-            "--oracle-bin",
-            FFMPEG_BIN,
-            "--observer",
-            "target/harness/allocations.so",
-            "--inputs",
-            &format!("{out}/capture-inputs"),
-            "--out",
-            &format!("{out}/{name}"),
-            "--only",
-        ]);
-        command.push(id.clone());
-        let mut qualify = step(
-            name.clone(),
-            Stage::Timing,
-            Placement::Timed,
-            with_full(command),
+        let timing = format!("{out}/{name}-timing");
+        let qualify = |stage: &[&str], output: &str| {
+            let mut command = xtask(&[
+                "capture",
+                "qualify",
+                "--candidate",
+                &format!("{release}/capture-worker"),
+                "--reference",
+                "target/harness/ffmpeg-capture-worker",
+                "--reference-small",
+                "target/harness/ffmpeg-capture-small-worker",
+                "--oracle-bin",
+                FFMPEG_BIN,
+                "--observer",
+                "target/harness/allocations.so",
+                "--inputs",
+                &format!("{out}/capture-inputs"),
+                "--out",
+                output,
+            ]);
+            command.extend(owned(stage));
+            command.extend(owned(&["--only", id]));
+            with_full(command)
+        };
+        let mut steps = collections(
+            &name,
+            qualify(&["--stage", "timing"], &timing),
+            qualify(
+                &["--stage", "memory", "--timing", &timing],
+                &format!("{out}/{name}"),
+            ),
         );
-        qualify.environment.push(("TRIERGON_PYTHON", "python3"));
+        for step in &mut steps {
+            step.environment.push(("TRIERGON_PYTHON", "python3"));
+        }
         items.push(Item {
             name,
             weight: CAPTURE_WEIGHTS
                 .iter()
                 .find(|(case, _)| case == id)
                 .map_or(CAPTURE_WEIGHT, |(_, weight)| *weight),
-            steps: vec![qualify],
+            steps: steps.into(),
             preflight: owned(&["--capture", CAPTURE_CASES]),
         });
     }
@@ -1602,6 +1612,9 @@ fn run_step(
         Vec::new()
     };
     let code = if unmeasured.is_empty() { code } else { 1 };
+    if let Some(result) = checked_result(step) {
+        crate::harness::reuse::checked(&result, code)?;
+    }
     append(log, &format!("{} EXIT={code}", step.name))?;
     // The verdict lines of a grade or a codec collection, which tell listed open
     // cases from other failures.
@@ -1651,32 +1664,57 @@ fn run_step(
 /// fail on a workload or case they did not measure, writing no `report.json`.
 const SELF_CHECKING: [&str; 2] = ["codecs", "capture"];
 
+fn self_checking(step: &Step) -> bool {
+    step.command
+        .get(1)
+        .is_some_and(|command| SELF_CHECKING.contains(&command.as_str()))
+}
+
+/// The directory a step writes its report and gate result to (`--output DIR`).
+fn step_output(step: &Step) -> Option<PathBuf> {
+    step.command
+        .windows(2)
+        .find(|pair| pair[0] == "--output")
+        .map(|pair| PathBuf::from(&pair[1]))
+}
+
+/// The measured result of a timing or memory step that [`unmeasured_cases`]
+/// checks, whose gate result then records the step's verdict.
+fn checked_result(step: &Step) -> Option<PathBuf> {
+    if !matches!(step.placement, Placement::Timed | Placement::Memory) || self_checking(step) {
+        return None;
+    }
+    let output = step_output(step)?;
+    (output.join(crate::harness::reuse::RESULT).is_file()
+        && !crate::harness::reuse::was_reused(&output))
+    .then_some(output)
+}
+
 /// What a timing or memory step did not measure: the cases of its report
 /// (`--output DIR`/report.json) whose timing is not `measured` or whose memory
 /// collection is not `qualified`, or the report itself when it is missing, does
 /// not read or says its collection is incomplete. A command in [`SELF_CHECKING`]
-/// checks itself.
+/// checks itself. A step that reused a result has no report: it passes only when
+/// a gate run checked the reused result's cases and recorded its verdict.
 fn unmeasured_cases(step: &Step) -> Vec<String> {
     let (key, measured) = match step.placement {
         Placement::Timed => ("timing", "measured"),
         Placement::Memory => ("memory", "qualified"),
         _ => return Vec::new(),
     };
-    if step
-        .command
-        .get(1)
-        .is_some_and(|command| SELF_CHECKING.contains(&command.as_str()))
-    {
+    if self_checking(step) {
         return Vec::new();
     }
-    let Some(output) = step
-        .command
-        .windows(2)
-        .find(|pair| pair[0] == "--output")
-        .map(|pair| PathBuf::from(&pair[1]))
-    else {
+    let Some(output) = step_output(step) else {
         return vec!["the step names no --output".into()];
     };
+    if crate::harness::reuse::was_reused(&output) {
+        return if crate::harness::reuse::reused_checked(&output) {
+            Vec::new()
+        } else {
+            vec!["a reused result whose cases no gate run checked; --full measures it".into()]
+        };
+    }
     let path = output.join("report.json");
     match crate::checks::read_json(&path) {
         Ok(report) => unmeasured_in(&report, key, measured),
@@ -2134,13 +2172,18 @@ mod tests {
                     step.stage == Stage::Memory && step.placement != Placement::Grade
                 );
                 if step.placement == Placement::Memory {
-                    assert_eq!(step.environment, [("TRIERGON_RSS_KERNEL_BOUND", "1")]);
+                    assert!(
+                        step.environment
+                            .contains(&("TRIERGON_RSS_KERNEL_BOUND", "1")),
+                        "{}",
+                        step.name
+                    );
                 }
             }
         }
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
-        assert!(names.contains(&"capture-c04"));
+        assert!(names.contains(&"benchmark-capture-c04") && names.contains(&"memory-capture-c04"));
         assert!(names.contains(&"isobmff-reader-compare"));
         assert!(
             names.contains(&"memory-codec-file-workloads-3") && names.contains(&"test-release")
@@ -2149,6 +2192,28 @@ mod tests {
             names.contains(&"memory-codec-workloads-5")
                 && names.contains(&"benchmark-codec-workloads")
         );
+    }
+
+    #[test]
+    fn capture_memory_reads_the_records_its_timing_wrote() {
+        for item in plan().iter().filter(|i| i.name.starts_with("capture-")) {
+            let [timing, memory] = &item.steps[..] else {
+                panic!("{}: a timing and a memory step", item.name);
+            };
+            let value = |step: &Step, flag: &str| {
+                let at = step.command.iter().position(|a| a == flag).unwrap();
+                step.command[at + 1].clone()
+            };
+            assert_eq!(value(timing, "--stage"), "timing");
+            assert_eq!(value(memory, "--stage"), "memory");
+            assert_eq!(value(memory, "--timing"), value(timing, "--out"));
+            assert_ne!(value(memory, "--out"), value(timing, "--out"));
+            assert_eq!(value(memory, "--only"), value(timing, "--only"));
+            assert_eq!(
+                (timing.placement, memory.placement),
+                (Placement::Timed, Placement::Memory)
+            );
+        }
     }
 
     #[test]
@@ -2377,6 +2442,55 @@ mod tests {
         assert!(unmeasured_cases(&timed)[0].starts_with("no report: "));
         timed.command = xtask(&["codecs", "time", "--out", "/nonexistent-gate-output"]);
         assert!(unmeasured_cases(&timed).is_empty());
+    }
+
+    #[test]
+    fn a_reused_measurement_passes_only_with_the_verdict_a_gate_run_recorded() {
+        use crate::harness::reuse;
+        let root = crate::walk::scratch("gate-reused-check");
+        let output = root.join("benchmark/f");
+        let timed = step(
+            "benchmark-f",
+            Stage::Timing,
+            Placement::Timed,
+            xtask(&["report", "--output", output.to_str().unwrap()]),
+        );
+        let key = reuse::Key {
+            sha256: "k".repeat(64),
+            components: Value::object([("command", Value::str("report --benchmark"))]),
+        };
+        // A measured result with an unmeasured case: the gate's verdict goes into it.
+        reuse::record(&output, &key, 0, None).unwrap();
+        crate::corpus::write_json(
+            &output.join("report.json"),
+            &crate::json::parse(
+                r#"{"cases": [{"id": "a", "timing": {"status": "warmup-failed"}}]}"#,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(checked_result(&timed), Some(output.clone()));
+        assert_eq!(unmeasured_cases(&timed), vec!["a"]);
+        reuse::checked(&output, 1).unwrap();
+        let result = reuse::read(&output).unwrap();
+        assert_eq!(result.get("status"), Some(&Value::int(1)));
+        assert_eq!(result.get("cases_checked"), Some(&Value::Bool(true)));
+        assert_eq!(result.get("key"), Some(&Value::str(&key.sha256)));
+        // Reused results: one a gate run checked passes, one it did not fails.
+        let cited = |checked: Value| {
+            Value::object([
+                ("set", Value::str("run")),
+                ("status", Value::int(0)),
+                ("cases_checked", checked),
+            ])
+        };
+        fs::remove_file(output.join("report.json")).unwrap();
+        reuse::record(&output, &key, 0, Some(cited(Value::Bool(true)))).unwrap();
+        assert_eq!(checked_result(&timed), None);
+        assert!(unmeasured_cases(&timed).is_empty());
+        reuse::record(&output, &key, 0, Some(cited(Value::Null))).unwrap();
+        assert!(unmeasured_cases(&timed)[0].starts_with("a reused result whose cases"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
