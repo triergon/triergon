@@ -140,6 +140,8 @@ pub struct OtMetrics<'a> {
     x_mult: i64,
     x_multf: f32,
     y_multf: f32,
+    /// A CFF or CFF2 face's charstring tables, read once.
+    cff: Option<cff::Face<'a>>,
 }
 
 impl<'a> OtMetrics<'a> {
@@ -158,18 +160,22 @@ impl<'a> OtMetrics<'a> {
             x_mult: i64::from(scale.x) * 0x10000 / upem,
             x_multf: scale.x as f32 / f32::from(font.units_per_em()),
             y_multf: scale.y as f32 / f32::from(font.units_per_em()),
+            cff: cff::Face::new(font),
         }
     }
 
     /// The unscaled ink box (x min, y max, width, height ≤ 0) as hb-ot reads it:
     /// for TrueType the `glyf` header box moved to the `hmtx` side bearing, for
     /// CFF and CFF2 the box HarfBuzz's own charstring reading gives
-    /// ([`cff::extents`]).
+    /// ([`cff::Face::extents`]).
     fn unscaled_extents(&self, glyph: GlyphId) -> Result<Option<[i32; 4]>> {
         // HarfBuzz's own functions have no budget beyond the face's limits.
         let mut work = WorkBudget::new(self.font.limits().work);
         if self.font.outline_format() != OutlineFormat::TrueType {
-            return cff::extents(self.font, glyph, &mut work);
+            return self
+                .cff
+                .as_ref()
+                .map_or(Ok(None), |face| face.extents(glyph, &mut work));
         }
         let control = self.font.control_box(glyph, &mut work).map(Some);
         let Some(control) = unless_unloadable(control, None)? else {

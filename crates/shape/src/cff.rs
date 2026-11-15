@@ -41,47 +41,190 @@ const STANDARD_ENCODING: [u8; 256] = [
     0, 0, 0,
 ];
 
-/// The extents HarfBuzz's OpenType font functions give `glyph` of a CFF or
-/// CFF2 face, in font units: x bearing, y bearing (the top), width and height
-/// (zero or negative).
-///
-/// The box holds every point the charstring draws, control points included:
-/// the current point when a line or curve starts and each point it adds, so a
-/// moveto counts only once something is drawn from it. Coordinates are kept
-/// unrounded; each side is rounded half up, the bearings being the rounded
-/// left and top and the size the difference of the rounded sides, each
-/// saturating at the 32-bit range, and an axis over which the box has no
-/// extent gives a zero bearing and size. The FontMatrix does not apply.
-/// probe: cff-box, cff2-box, cff-matrix, cff-huge
-///
-/// `Ok(None)` is a glyph HarfBuzz gives no extents for: one outside the
-/// face, a table it cannot read, or a charstring that fails, as the probes
-/// under `harness/shape/probes` show each failure. A charstring that draws
-/// nothing gives `Some([0; 4])`.
-///
-/// # Errors
-///
-/// `Policy` when the charstring's operators, or the charset an accented
-/// glyph is looked up in, exceed `work`, or its subroutine calls nest deeper
-/// than the face's [`Limits`](triergon_font::Limits) depth.
-pub(crate) fn extents(
-    font: &Font,
-    glyph: GlyphId,
-    work: &mut WorkBudget,
-) -> Result<Option<[i32; 4]>> {
-    let (tag, cff2) = match font.outline_format() {
-        OutlineFormat::Cff => (*b"CFF ", false),
-        OutlineFormat::Cff2 => (*b"CFF2", true),
-        OutlineFormat::TrueType => return Ok(None),
-    };
-    let Some(table) = font.table(tag) else {
-        return Ok(None);
-    };
-    table_extents(table, cff2, glyph.0, font.limits().depth, work)
+/// A CFF or CFF2 table's parts that do not depend on the glyph, read once
+/// for a face, whose glyphs' extents it then gives.
+pub(crate) struct Face<'a> {
+    table: &'a [u8],
+    cff2: bool,
+    charstrings: Index<'a>,
+    global: Index<'a>,
+    charset: Option<Charset<'a>>,
+    store: Option<&'a [u8]>,
+    privates: Privates<'a>,
+    /// The face's limit on nested subroutine calls.
+    depth: u32,
 }
 
-/// [`extents`] of glyph `glyph` of the CFF (or, with `cff2`, CFF2) table
+/// Where a glyph's Private DICT is: the one of a name-keyed CFF table, or
+/// the Font DICT FDSelect gives the glyph (Font DICT 0 in a CFF2 table
+/// without FDSelect).
+enum Privates<'a> {
+    One([i64; 2]),
+    FdArray {
+        select: Option<usize>,
+        fonts: Index<'a>,
+    },
+}
+
+impl std::fmt::Debug for Face<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Face")
+            .field("cff2", &self.cff2)
+            .field("glyphs", &self.charstrings.count)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Face<'a> {
+    /// The face's CFF or CFF2 table, `None` for a TrueType face, a face
+    /// without the table, or a table it cannot read.
+    pub(crate) fn new(font: &'a Font) -> Option<Self> {
+        let (tag, cff2) = match font.outline_format() {
+            OutlineFormat::Cff => (*b"CFF ", false),
+            OutlineFormat::Cff2 => (*b"CFF2", true),
+            OutlineFormat::TrueType => return None,
+        };
+        Self::read(font.table(tag)?, cff2, font.limits().depth)
+    }
+
+    fn read(table: &'a [u8], cff2: bool, depth: u32) -> Option<Self> {
+        let header = usize::from(*table.get(2)?);
+        if cff2 {
+            let top = table.get(header..header + usize::from(u16_at(table, 3)?))?;
+            let (global, _) = Index::read(table, header + top.len(), true)?;
+            let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, true)?;
+            let select = match dict_find(top, 0x0C25) {
+                Some(v) => Some(offset(v[1])?),
+                None => None,
+            };
+            let (fonts, _) = Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, true)?;
+            let store = match dict_find(top, 24) {
+                Some(v) => {
+                    let at = offset(v[1])?;
+                    let len = usize::from(u16_at(table, at)?);
+                    Some(table.get(at + 2..at + 2 + len)?)
+                }
+                None => None,
+            };
+            return Some(Self {
+                table,
+                cff2,
+                charstrings,
+                global,
+                charset: None,
+                store,
+                privates: Privates::FdArray { select, fonts },
+                depth,
+            });
+        }
+        let (_, at) = Index::read(table, header, false)?;
+        let (tops, at) = Index::read(table, at, false)?;
+        let (_, at) = Index::read(table, at, false)?;
+        let (global, _) = Index::read(table, at, false)?;
+        let top = tops.get(0)?;
+        let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, false)?;
+        let cid = dict_find(top, 0x0C1E).is_some();
+        let privates = if cid {
+            Privates::FdArray {
+                select: Some(offset(dict_find(top, 0x0C25)?[1])?),
+                fonts: Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, false)?.0,
+            }
+        } else {
+            Privates::One(dict_find(top, 18)?)
+        };
+        let charset = (!cid).then(|| Charset {
+            table,
+            at: dict_find(top, 15).map_or(0, |v| v[1]),
+            glyphs: charstrings.count,
+        });
+        Some(Self {
+            table,
+            cff2,
+            charstrings,
+            global,
+            charset,
+            store: None,
+            privates,
+            depth,
+        })
+    }
+
+    /// The extents HarfBuzz's OpenType font functions give `glyph` of a CFF or
+    /// CFF2 face, in font units: x bearing, y bearing (the top), width and height
+    /// (zero or negative).
+    ///
+    /// The box holds every point the charstring draws, control points included:
+    /// the current point when a line or curve starts and each point it adds, so a
+    /// moveto counts only once something is drawn from it. Coordinates are kept
+    /// unrounded; each side is rounded half up, the bearings being the rounded
+    /// left and top and the size the difference of the rounded sides, each
+    /// saturating at the 32-bit range, and an axis over which the box has no
+    /// extent gives a zero bearing and size. The FontMatrix does not apply.
+    /// probe: cff-box, cff2-box, cff-matrix, cff-huge
+    ///
+    /// `Ok(None)` is a glyph HarfBuzz gives no extents for: one outside the
+    /// face, a table it cannot read, or a charstring that fails, as the probes
+    /// under `harness/shape/probes` show each failure. A charstring that draws
+    /// nothing gives `Some([0; 4])`.
+    ///
+    /// # Errors
+    ///
+    /// `Policy` when the charstring's operators, or the charset an accented
+    /// glyph is looked up in, exceed `work`, or its subroutine calls nest deeper
+    /// than the face's [`Limits`](triergon_font::Limits) depth.
+    pub(crate) fn extents(
+        &self,
+        glyph: GlyphId,
+        work: &mut WorkBudget,
+    ) -> Result<Option<[i32; 4]>> {
+        let Some(program) = self.program(glyph.0) else {
+            return Ok(None);
+        };
+        let Some(charstring) = program.charstrings.get(u32::from(glyph.0)) else {
+            return Ok(None);
+        };
+        let mut run = Run {
+            program: &program,
+            work,
+            depth: self.depth,
+            bounds: None,
+        };
+        match run.glyph(charstring, (0.0, 0.0), true) {
+            Ok(()) => Ok(Some(run.extents())),
+            Err(Fault::Glyph) => Ok(None),
+            Err(Fault::Limit(error)) => Err(error),
+        }
+    }
+
+    /// The parts `glyph`'s charstring runs with: the face's, and the local
+    /// subroutines and `vsindex` of its Private DICT.
+    fn program(&self, glyph: u16) -> Option<Program<'a>> {
+        let private = match self.privates {
+            Privates::One(private) => private,
+            Privates::FdArray { select, fonts } => {
+                let fd = match select {
+                    Some(at) => fd_select(self.table, at, glyph, self.cff2)?,
+                    None => 0,
+                };
+                dict_find(fonts.get(fd)?, 18)?
+            }
+        };
+        let (local, vsindex) = Program::private(self.table, private, self.cff2)?;
+        Some(Program {
+            cff2: self.cff2,
+            charstrings: self.charstrings,
+            global: self.global,
+            local,
+            charset: self.charset,
+            store: self.store,
+            vsindex: if self.cff2 { vsindex } else { 0 },
+        })
+    }
+}
+
+/// [`Face::extents`] of glyph `glyph` of the CFF (or, with `cff2`, CFF2) table
 /// `table`, with calls nesting at most `depth` deep.
+#[cfg(test)]
 fn table_extents(
     table: &[u8],
     cff2: bool,
@@ -89,23 +232,7 @@ fn table_extents(
     depth: u32,
     work: &mut WorkBudget,
 ) -> Result<Option<[i32; 4]>> {
-    let Some(program) = Program::new(table, cff2, glyph) else {
-        return Ok(None);
-    };
-    let Some(charstring) = program.charstrings.get(u32::from(glyph)) else {
-        return Ok(None);
-    };
-    let mut run = Run {
-        program: &program,
-        work,
-        depth,
-        bounds: None,
-    };
-    match run.glyph(charstring, (0.0, 0.0), true) {
-        Ok(()) => Ok(Some(run.extents())),
-        Err(Fault::Glyph) => Ok(None),
-        Err(Fault::Limit(error)) => Err(error),
-    }
+    Face::read(table, cff2, depth).map_or(Ok(None), |face| face.extents(GlyphId(glyph), work))
 }
 
 /// Why a charstring stopped short: it fails the glyph, or it exceeded the
@@ -273,77 +400,6 @@ struct Program<'a> {
 }
 
 impl<'a> Program<'a> {
-    fn new(table: &'a [u8], cff2: bool, glyph: u16) -> Option<Self> {
-        if cff2 {
-            Self::cff2(table, glyph)
-        } else {
-            Self::cff(table, glyph)
-        }
-    }
-
-    fn cff(table: &'a [u8], glyph: u16) -> Option<Self> {
-        let header = usize::from(*table.get(2)?);
-        let (_, at) = Index::read(table, header, false)?;
-        let (tops, at) = Index::read(table, at, false)?;
-        let (_, at) = Index::read(table, at, false)?;
-        let (global, _) = Index::read(table, at, false)?;
-        let top = tops.get(0)?;
-        let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, false)?;
-        let cid = dict_find(top, 0x0C1E).is_some();
-        let private = if cid {
-            let fd = fd_select(table, offset(dict_find(top, 0x0C25)?[1])?, glyph, false)?;
-            let (fds, _) = Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, false)?;
-            dict_find(fds.get(fd)?, 18)?
-        } else {
-            dict_find(top, 18)?
-        };
-        let (local, _) = Self::private(table, private, false)?;
-        let charset = (!cid).then(|| Charset {
-            table,
-            at: dict_find(top, 15).map_or(0, |v| v[1]),
-            glyphs: charstrings.count,
-        });
-        Some(Self {
-            cff2: false,
-            charstrings,
-            global,
-            local,
-            charset,
-            store: None,
-            vsindex: 0,
-        })
-    }
-
-    fn cff2(table: &'a [u8], glyph: u16) -> Option<Self> {
-        let header = usize::from(*table.get(2)?);
-        let top = table.get(header..header + usize::from(u16_at(table, 3)?))?;
-        let (global, _) = Index::read(table, header + top.len(), true)?;
-        let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, true)?;
-        let fd = match dict_find(top, 0x0C25) {
-            Some(v) => fd_select(table, offset(v[1])?, glyph, true)?,
-            None => 0,
-        };
-        let (fds, _) = Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, true)?;
-        let (local, vsindex) = Self::private(table, dict_find(fds.get(fd)?, 18)?, true)?;
-        let store = match dict_find(top, 24) {
-            Some(v) => {
-                let at = offset(v[1])?;
-                let len = usize::from(u16_at(table, at)?);
-                Some(table.get(at + 2..at + 2 + len)?)
-            }
-            None => None,
-        };
-        Some(Self {
-            cff2: true,
-            charstrings,
-            global,
-            local,
-            charset: None,
-            store,
-            vsindex,
-        })
-    }
-
     /// The local subroutines and `vsindex` of the Private DICT a `Private`
     /// entry (size, offset) names.
     fn private(
@@ -415,6 +471,7 @@ fn fd_select(table: &[u8], at: usize, glyph: u16, cff2: bool) -> Option<u32> {
 
 /// A name-keyed CFF table's charset (TN 5176 §13), which maps glyphs to
 /// string IDs.
+#[derive(Clone, Copy)]
 struct Charset<'a> {
     table: &'a [u8],
     /// The charset's offset, or 0 for the predefined ISOAdobe charset (1 and
@@ -628,8 +685,9 @@ impl<'a> Run<'_, 'a, '_> {
                     Some(if b0 < 251 { v(247) } else { -v(251) })
                 }
                 255 => {
-                    // A 16.16 number cut short ends the charstring. probe:
-                    // cff2-tail
+                    // A 16.16 number cut short ends the charstring, or the
+                    // subroutine it is in, after which the caller goes on.
+                    // probe: cff2-tail, cff2-subr-tail
                     let Some(v) = u32_at(code, at) else {
                         self.count(s)?;
                         return Ok(Flow::End);
@@ -648,8 +706,9 @@ impl<'a> Run<'_, 'a, '_> {
                 continue;
             }
             let op = if b0 == 12 {
-                // An escape without its second byte ends the charstring.
-                // probe: cff2-tail
+                // An escape without its second byte ends the charstring, or
+                // the subroutine it is in, after which the caller goes on.
+                // probe: cff2-tail, cff2-subr-tail
                 let Some(&b1) = code.get(at) else {
                     self.count(s)?;
                     return Ok(Flow::End);
@@ -681,6 +740,9 @@ impl<'a> Run<'_, 'a, '_> {
                 // cff2-tail
                 11 if depth == 0 => return Err(Fault::Glyph),
                 11 => return Ok(Flow::Return),
+                // endchar ends the glyph, in CFF2 too, which does not define
+                // it: what follows is not drawn. probe: cff-endchar,
+                // cff2-subr-tail
                 14 => {
                     self.endchar(s, accents)?;
                     return Ok(Flow::Endchar);
