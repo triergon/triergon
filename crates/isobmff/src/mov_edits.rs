@@ -7,6 +7,7 @@
 use crate::{
     Access, ClockField, EditList, PacketProjector, PacketView, ProjectedEdit, Sample, SampleCursor,
     SampleStep, SampleTable,
+    regular::{DecodeDeltas, DeltaStep},
 };
 use triergon_core::{Error, Result, Rounding, Time, TimeBase, WorkBudget};
 
@@ -75,7 +76,7 @@ pub struct EditCursor<'a> {
     limits: EditLimits,
     phase: Phase,
     scan: SampleCursor<'a>,
-    duration_scan: SampleCursor<'a>,
+    duration_scan: DecodeDeltas<'a>,
     staging: Option<EditOccurrence>,
     after_emit: Phase,
     next_edit: u32,
@@ -102,6 +103,30 @@ struct EditTicks {
     shift: i64,
     start: i64,
     end: i64,
+}
+
+const EDIT_PROFILE: Error = Error::Unsupported("native edit reordered/zero-delta/recovery profile");
+
+/// One step of [`EditCursor::prepare_emit`].
+#[derive(Debug)]
+pub(crate) enum EmitPrepare<'a> {
+    Ready(EmitStart<'a>),
+    Yield,
+    /// The edits or clocks need the cursor's full steps.
+    Unsuited,
+}
+
+/// A prepared edit cursor: its table, the first sample it emits, the demux
+/// decode-time shift and the edit's end in media ticks, how many samples it has
+/// scanned, and its limits.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EmitStart<'a> {
+    pub(crate) table: &'a SampleTable,
+    pub(crate) first: u64,
+    pub(crate) shift: i64,
+    pub(crate) end: i64,
+    pub(crate) scanned: u64,
+    pub(crate) limits: EditLimits,
 }
 
 fn count_limit(value: u64, maximum: u64) -> Result<()> {
@@ -136,7 +161,7 @@ impl<'a> EditCursor<'a> {
             limits,
             phase: Phase::Advance,
             scan: table.cursor(),
-            duration_scan: table.cursor(),
+            duration_scan: DecodeDeltas::new(table),
             staging: None,
             after_emit: Phase::Emit,
             next_edit: 0,
@@ -167,7 +192,7 @@ impl<'a> EditCursor<'a> {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let result = self.poll_inner(work);
+        let result = self.poll_inner::<false>(work);
         if let Err(error) = result {
             self.failed = Some(error);
         }
@@ -186,9 +211,7 @@ impl<'a> EditCursor<'a> {
                 || sample.dts_ticks.is_none()
                 || sample.dts_ticks != sample.cts_ticks
             {
-                return Err(Error::Unsupported(
-                    "native edit reordered/zero-delta/recovery profile",
-                ));
+                return Err(EDIT_PROFILE);
             }
         }
         Ok(step)
@@ -287,7 +310,120 @@ impl<'a> EditCursor<'a> {
         }
         Ok(occurrence)
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<CursorStatus> {
+    /// Runs a fresh cursor until its last edit, a media edit after at most a
+    /// leading empty edit, is about to emit its first occurrence, and returns
+    /// what [`skip_to`](Self::skip_to) and a scan of the occurrences need.
+    /// `Unsuited` for another edit list or a projection that needs exact time.
+    pub(crate) fn prepare_emit(&mut self, work: &mut WorkBudget) -> Result<EmitPrepare<'a>> {
+        if let Some(error) = self.failed {
+            return Err(error);
+        }
+        if self.generated != 0
+            || self.staging.is_some()
+            || self.pending.is_some()
+            || self.ready.is_some()
+            || !(self.edits.len() == 1
+                || (self.edits.len() == 2 && self.edits.entry(0)?.is_empty()))
+        {
+            return Ok(EmitPrepare::Unsuited);
+        }
+        let status = self.poll_inner::<true>(work);
+        if let Err(error) = status {
+            self.failed = Some(error);
+        }
+        if status? == CursorStatus::Yield {
+            return Ok(EmitPrepare::Yield);
+        }
+        let Some(ticks) = self
+            .active_ticks
+            .filter(|_| matches!(self.phase, Phase::Emit) && self.next_edit == self.edits.len())
+        else {
+            return Ok(EmitPrepare::Unsuited);
+        };
+        Ok(EmitPrepare::Ready(EmitStart {
+            table: self.table,
+            first: self.first,
+            shift: ticks.shift,
+            end: ticks.end,
+            scanned: self.scanned,
+            limits: self.limits,
+        }))
+    }
+
+    /// Moves a cursor that [`prepare_emit`](Self::prepare_emit) left ready, and
+    /// that holds no occurrence, to sample `ordinal` without building the
+    /// occurrences before it. Each sample before `ordinal` is scanned; each from
+    /// the edit's first emitted sample on is also counted as an occurrence and
+    /// has its decode delta read, against the cursor's limits, as polling counts
+    /// them. The next occurrence the cursor makes ready is then `ordinal`'s.
+    ///
+    /// Charges two work units per sample from the edit's first emitted sample,
+    /// one per sample before it, and returns `false` when fewer than two are
+    /// left; a later call continues. Fails, and keeps failing, where the cursor
+    /// is not so prepared, where `ordinal` precedes the edit's first emitted
+    /// sample, where a skipped sample is a sync sample that reaches the edit's
+    /// end, where the track has composition offsets or a dependency table, where
+    /// a skipped sample has a zero decode delta or is a partial sync sample, or
+    /// where a limit is passed.
+    pub(crate) fn skip_to(&mut self, ordinal: u64, work: &mut WorkBudget) -> Result<bool> {
+        if let Some(error) = self.failed {
+            return Err(error);
+        }
+        let result = self.skip_inner(ordinal, work);
+        if let Err(error) = result {
+            self.failed = Some(error);
+        }
+        result
+    }
+    fn skip_inner(&mut self, ordinal: u64, work: &mut WorkBudget) -> Result<bool> {
+        if !matches!(self.phase, Phase::Emit)
+            || self.staging.is_some()
+            || self.pending.is_some()
+            || self.ready.is_some()
+            || ordinal < self.first
+        {
+            return Err(Error::Invalid("edit skip needs a prepared emitting cursor"));
+        }
+        let ticks = self
+            .active_ticks
+            .ok_or(Error::Invalid("edit skip needs tick clocks"))?;
+        while self.scan.ordinal() + 1 < ordinal {
+            // A sample's scan and its decode delta; or, before the first, its scan.
+            if work.remaining() < 2 {
+                return Ok(false);
+            }
+            work.take(1);
+            let sample = self.scan.skip()?;
+            self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
+            count_limit(self.scanned, self.limits.max_scanned_samples)?;
+            if sample.ordinal < self.first {
+                continue;
+            }
+            if self.table.has_composition_offsets()
+                || sample.delta == 0
+                || sample.partial
+                || self.table.has_dependency_table()
+            {
+                return Err(EDIT_PROFILE);
+            }
+            let end = sample
+                .dts
+                .checked_add(i128::from(sample.delta))
+                .ok_or(Error::Overflow)?;
+            if sample.sync && end >= i128::from(ticks.end) {
+                return Err(Error::Invalid("edit skip target past its edit"));
+            }
+            self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
+            count_limit(self.generated, self.limits.max_occurrences)?;
+            if let DeltaStep::Delta(_) = self.duration_scan.poll(work)? {
+                self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
+                count_limit(self.scanned, self.limits.max_scanned_samples)?;
+            }
+        }
+        Ok(true)
+    }
+
+    fn poll_inner<const PREPARE: bool>(&mut self, work: &mut WorkBudget) -> Result<CursorStatus> {
         if self.ready.is_some() {
             return Ok(CursorStatus::Ready);
         }
@@ -417,7 +553,21 @@ impl<'a> EditCursor<'a> {
                     }
                 },
                 Phase::Emit => {
-                    if self.staging.is_none() {
+                    if PREPARE {
+                        return Ok(CursorStatus::Ready);
+                    }
+                    let mut next = if let Some(staged) = self.staging.take() {
+                        staged
+                    } else {
+                        // Finding the edit checked the samples before its first.
+                        while self.scan.ordinal() + 1 < self.first {
+                            if !work.try_charge(1) {
+                                return Ok(CursorStatus::Yield);
+                            }
+                            self.scan.skip()?;
+                            self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
+                            count_limit(self.scanned, self.limits.max_scanned_samples)?;
+                        }
                         let source = match self.scan_sample(work)? {
                             SampleStep::Yield => return Ok(CursorStatus::Yield),
                             SampleStep::End => {
@@ -445,31 +595,30 @@ impl<'a> EditCursor<'a> {
                         self.staged_empty_endpoint = false;
                         self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                         count_limit(self.generated, self.limits.max_occurrences)?;
-                        self.staging = Some(EditOccurrence {
+                        EditOccurrence {
                             sequence: self.generated,
                             edit_ordinal: self.next_edit,
                             source,
                             demux,
                             duration_basis: DurationBasis::SourceDeltaAtTerminal,
-                        });
-                    }
+                        }
+                    };
                     // One original decode-table row per packet ordinal until
                     // exhausted. This cursor is independent of the repeated
                     // source occurrence scan; neither source samples nor runs
-                    // are expanded. Keep staging across a one-token work yield.
+                    // are expanded. Keep the occurrence across a one-token work yield.
                     let delta = match self.duration_scan.poll(work)? {
-                        SampleStep::Yield => return Ok(CursorStatus::Yield),
-                        SampleStep::Sample(sample) => {
+                        DeltaStep::Yield => {
+                            self.staging = Some(next);
+                            return Ok(CursorStatus::Yield);
+                        }
+                        DeltaStep::Delta(delta) => {
                             self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
                             count_limit(self.scanned, self.limits.max_scanned_samples)?;
-                            Some(sample.duration_ticks)
+                            Some(delta)
                         }
-                        SampleStep::End => None,
+                        DeltaStep::End => None,
                     };
-                    let mut next = self
-                        .staging
-                        .take()
-                        .ok_or(Error::Invalid("missing staged native occurrence"))?;
                     if let Some(delta) = delta {
                         next.demux.duration = i64::from(delta);
                         next.duration_basis = DurationBasis::OriginalDecodeTableOrdinal;
@@ -496,7 +645,7 @@ impl<'a> EditCursor<'a> {
                     self.pending = Some(next);
                 }
                 Phase::Done => {
-                    if self.pending.is_none() {
+                    if PREPARE || self.pending.is_none() {
                         return Ok(CursorStatus::End);
                     }
                     if !work.try_charge(1) {
