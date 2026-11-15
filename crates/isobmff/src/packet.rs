@@ -66,7 +66,10 @@ impl TerminalMdat {
     /// Checks the source-declared lower bound. Actual sample bytes must still be
     /// read, and only a source-bound completion can establish the final endpoint.
     pub fn require_sample(self, sample: &Sample) -> Result<()> {
-        if sample.range.start > sample.range.end || sample.range.start < self.payload_start {
+        self.require_range(&sample.range)
+    }
+    pub(crate) fn require_range(self, range: &Range<u64>) -> Result<()> {
+        if range.start > range.end || range.start < self.payload_start {
             return Err(Error::Invalid("sample outside terminal MDAT declaration"));
         }
         Ok(())
@@ -174,10 +177,12 @@ impl SampleReader {
             buffer.try_reserve_exact(length)?;
             SampleBuffer::Copying(buffer)
         };
-        // Internal I/O transaction only; core preserves parser generation.
-        if mode == ReadMode::SharedWindow && input.capabilities().random_access {
+        // Internal I/O transaction only; core preserves parser generation. Bytes
+        // the current window already holds from the sample's start are read from
+        // it rather than requested again.
+        if input.capabilities().random_access {
             input.request_range_reusing_window(sample.range.start)?;
-        } else if input.position() != sample.range.start || input.capabilities().random_access {
+        } else if input.position() != sample.range.start {
             input.request_range(sample.range.start)?;
         }
         Ok(Self {
