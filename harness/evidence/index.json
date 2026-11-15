@@ -31592,7 +31592,7 @@
    "name": "gate-run-aarch64-d2c391b8-20261115-143518-shard-1",
    "path": "gate-run-aarch64-d2c391b8-20261115-143518-shard-1",
    "retention": "retained",
-   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-file-workloads, codec-workloads-1, isobmff-seek, matroska-header-removal, matroska-startup-seek, mpegts-access-units; for the rows of the Matroska feature groups and MPEG-TS, whose media and transport workers the trained-order merge head keeps byte for byte",
+   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-file-workloads, codec-workloads-1, isobmff-seek, matroska-header-removal, matroska-startup-seek, mpegts-access-units; for the rows of the Matroska feature groups, whose media worker the trained-order merge head keeps byte for byte; its transport worker took a trained order that the later revisions leave out on this target",
    "key": "evidence/gate-runs/d2c391b85a1a4e844275d45df279e5d4f448b772-aarch64-20261115-143518/shard-1/f101cab28e61ce47d9c4ea4be54afb1b090e31f5d58f1e9ec59ca713ea85eab7.tar.zst",
    "sha256": "f101cab28e61ce47d9c4ea4be54afb1b090e31f5d58f1e9ec59ca713ea85eab7",
    "bytes": 71072473,
@@ -31705,7 +31705,7 @@
    "name": "gate-run-aarch64-d2c391b8-20261115-143518-shard-2",
    "path": "gate-run-aarch64-d2c391b8-20261115-143518-shard-2",
    "retention": "retained",
-   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-file-workloads-1, codec-workloads-5, framing, isobmff-2, matroska-zlib, mpegts-pes; for the rows of the Matroska feature groups and MPEG-TS, whose media and transport workers the trained-order merge head keeps byte for byte",
+   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-file-workloads-1, codec-workloads-5, framing, isobmff-2, matroska-zlib, mpegts-pes; for the rows of the Matroska feature groups, whose media worker the trained-order merge head keeps byte for byte; its transport worker took a trained order that the later revisions leave out on this target",
    "key": "evidence/gate-runs/d2c391b85a1a4e844275d45df279e5d4f448b772-aarch64-20261115-143518/shard-2/b937074bfa960037ab3d97c87fcdaa93f2b27d01bc8ec0584472d469214afc13.tar.zst",
    "sha256": "b937074bfa960037ab3d97c87fcdaa93f2b27d01bc8ec0584472d469214afc13",
    "bytes": 64586972,
@@ -31818,7 +31818,7 @@
    "name": "gate-run-aarch64-d2c391b8-20261115-143518-shard-4",
    "path": "gate-run-aarch64-d2c391b8-20261115-143518-shard-4",
    "retention": "retained",
-   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-workloads-3, hls-segments, isobmff-1, matroska-cues-preroll, progressive, raw-annex-b; for the rows of the Matroska feature groups and MPEG-TS, whose media and transport workers the trained-order merge head keeps byte for byte",
+   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-workloads-3, hls-segments, isobmff-1, matroska-cues-preroll, progressive, raw-annex-b; for the rows of the Matroska feature groups, whose media worker the trained-order merge head keeps byte for byte; its transport worker took a trained order that the later revisions leave out on this target",
    "key": "evidence/gate-runs/d2c391b85a1a4e844275d45df279e5d4f448b772-aarch64-20261115-143518/shard-4/2030637aac6ba37ffa0ba2ce256daf449520db079d6c121dbbbcc04889b8915f.tar.zst",
    "sha256": "2030637aac6ba37ffa0ba2ce256daf449520db079d6c121dbbbcc04889b8915f",
    "bytes": 53366871,
@@ -31940,7 +31940,7 @@
    "name": "gate-run-aarch64-d2c391b8-20261115-143518-shard-5",
    "path": "gate-run-aarch64-d2c391b8-20261115-143518-shard-5",
    "retention": "retained",
-   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-file-workloads-3, codec-workloads, codec-workloads-2, matroska-colour, matroska-demux, matroska-segment-metadata, ts-program; for the rows of the Matroska feature groups and MPEG-TS, whose media and transport workers the trained-order merge head keeps byte for byte",
+   "reason": "A partial gate run at d2c391b8 on Linux AArch64, five c6g.4xlarge from the gate image, of the media workers' items under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items codec-file-workloads-3, codec-workloads, codec-workloads-2, matroska-colour, matroska-demux, matroska-segment-metadata, ts-program; for the rows of the Matroska feature groups, whose media worker the trained-order merge head keeps byte for byte; its transport worker took a trained order that the later revisions leave out on this target",
    "key": "evidence/gate-runs/d2c391b85a1a4e844275d45df279e5d4f448b772-aarch64-20261115-143518/shard-5/33791280f65217634e58054ee1db45f253b579dea0c500c1e7e7580843312436.tar.zst",
    "sha256": "33791280f65217634e58054ee1db45f253b579dea0c500c1e7e7580843312436",
    "bytes": 25137142,
@@ -32633,6 +32633,511 @@
    ],
    "source_revisions": {
     "candidate": "d2c391b85a1a4e844275d45df279e5d4f448b772"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-6dc6440d-20261115-184229-shard-1",
+   "path": "gate-run-aarch64-6dc6440d-20261115-184229-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 6dc6440d on Linux AArch64, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items hls-segments, matroska-audio-clocks, progressive; for their rows, whose workers the later trained-order revisions keep byte for byte",
+   "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-aarch64-20261115-184229/shard-1/1fb4f802b1e328883e3650b15e5936445c0a5313c2346a5223cdcf7648767bf1.tar.zst",
+   "sha256": "1fb4f802b1e328883e3650b15e5936445c0a5313c2346a5223cdcf7648767bf1",
+   "bytes": 17169729,
+   "results": [
+    {
+     "path": "memory/hls-segments/gate-result.json",
+     "command": "report --memory",
+     "key": "daf6737b467835b81d8de57a2593381b1a158fa483976165b0c1d34382bc4fe5",
+     "status": 0,
+     "report_sha256": "4f795b83e42909e5ed083391788faf3bb9ddfa1f75e6c4d94093bb228b46444f",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/matroska-audio-clocks/gate-result.json",
+     "command": "report --memory",
+     "key": "dfb763418744dc80f9b221e1e3c93a054724f7ca0b08e69f1f9fee435ec1ad6f",
+     "status": 0,
+     "report_sha256": "ff49c05bc84e461af948012ce386297b6023cfd6e9551ca43901c69e5c9df24a",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/progressive/gate-result.json",
+     "command": "report --memory",
+     "key": "a19303ab1bd2c9f2d125044c5689e77303f2a21eb3d18fe483059c07281ee43b",
+     "status": 0,
+     "report_sha256": "c5d23ecdebbb15afa049aacf9e31e09617a9b9e04ae14e888295187de3df5dea",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/hls-segments/gate-result.json",
+     "command": "report --benchmark",
+     "key": "33d3512284327a7b9a8f7777b56cd99a8bf7d58373a9093cfdfb64521f3be690",
+     "status": 0,
+     "report_sha256": "9276649efeb9090d8d1ae5a73257d3c49afc5eab48af9e99bd4a5da303f8295c",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/matroska-audio-clocks/gate-result.json",
+     "command": "report --benchmark",
+     "key": "a9fbf8a1225514e866abec972840318a4c8113fde758fee926c7eb2e90962f5f",
+     "status": 0,
+     "report_sha256": "cd02dd802d34d9416c265b4ea2a1cbdfa94cfac2e1a25f0e72694e1e6b622f6e",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/progressive/gate-result.json",
+     "command": "report --benchmark",
+     "key": "cf74c06625514e598501366c4afcd84b46b1d57120340ae22b6ac252395e6345",
+     "status": 0,
+     "report_sha256": "f67352d37a1e73fd1e87ce3b7faecf7b5168c64c8cb37a8f96c49e4198ef1352",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/hls-segments/gate-result.json",
+     "command": "grade",
+     "key": "a5e2c117f843853d94829e9eb2562ac998a12c6c6743616e206d6732efcd7008",
+     "status": 0,
+     "report_sha256": "b9706bb751617f685f36c60d40a7be43ebcff30f5f041431548e33561efd3c06"
+    },
+    {
+     "path": "graded/matroska-audio-clocks/gate-result.json",
+     "command": "grade",
+     "key": "d5603771b9c3f732d7c218e98ad4c7280ebed898c8f09ace96699764a246093a",
+     "status": 0,
+     "report_sha256": "bb05de17c40e47a50a99df1b6f1f8ad333673c82a9b3aac5eed61c1bac9c9684"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-6dc6440d-20261115-184229-shard-2",
+   "path": "gate-run-aarch64-6dc6440d-20261115-184229-shard-2",
+   "retention": "retained",
+   "reason": "A partial gate run at 6dc6440d on Linux AArch64, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items framing, matroska-startup-seek, raw-annex-b; for their rows, whose workers the later trained-order revisions keep byte for byte",
+   "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-aarch64-20261115-184229/shard-2/68babd9b4d90f0b68230e3b81065c87cb466661fa12f4ec62d3888470911524a.tar.zst",
+   "sha256": "68babd9b4d90f0b68230e3b81065c87cb466661fa12f4ec62d3888470911524a",
+   "bytes": 27785646,
+   "results": [
+    {
+     "path": "memory/matroska-startup-seek/gate-result.json",
+     "command": "report --memory",
+     "key": "fd096a80ae114bc0afee828a067603fee45a39ce2c9ae62857633c3e72103cde",
+     "status": 0,
+     "report_sha256": "cde6de92ed080e8d4d9d284de9bb6be88d72916b464033597a80811e315cc803",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/raw-annex-b/gate-result.json",
+     "command": "report --memory",
+     "key": "7b4355aafdd1cd6b111ff8caa32611ad362abeb815a5f00f284c6a34c7dd0ce3",
+     "status": 0,
+     "report_sha256": "1ccede4d184b98633fd2fa9fc9c96967d03d92af2b0cec8860132959966562a6",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "7dda6b8e3a88326f2510d53ea97e7d6d56aebb52f569c46510c9e54b47b88c23",
+     "status": 0,
+     "report_sha256": "310ade1fcd321374a91649eb450043e99e281781ed792932cacc0fcdafcd89c0",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/matroska-startup-seek/gate-result.json",
+     "command": "report --benchmark",
+     "key": "bb437ec66fd2cfd0c76e8b15b9027b5dde79db810b6b427ee3c48d9248ccefed",
+     "status": 0,
+     "report_sha256": "8807b3e42e90622ca218c3df27ee54dc7f09efeb7c4e9b9f79f49ed2dcf2d41b",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/raw-annex-b/gate-result.json",
+     "command": "report --benchmark",
+     "key": "7f057a8b4ab713446f17d6e6b12a7e2f0efd6fb3874a1af04d3c7284058e9c55",
+     "status": 0,
+     "report_sha256": "94bddc3a10674bfbbca202522c421bd827cdad90ded98c6876716969e7f56426",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "7b25f277ef6242539c43263e351b7c94ed06125063ec75c77d2e52d9a24c5336",
+     "status": 0,
+     "report_sha256": "8576de564305d022e24c35f3c5c49a7bd1a065b0d922968c7a9931e5ec8f5fbf",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/matroska-startup-seek/gate-result.json",
+     "command": "grade",
+     "key": "b9577acc78935fb4e2fb0523df91559342eb7845eb4dd8e033f5952d7cdd85c0",
+     "status": 0,
+     "report_sha256": "ca49715d976cf4efa4cbf33efde5553f6b370e06a90345305ceecac6f39e5f76"
+    },
+    {
+     "path": "graded/raw-annex-b/gate-result.json",
+     "command": "grade",
+     "key": "b2b0f33d67e6e72d6d1424174ee5b67269bff9dc7fc8d436f6dbc9858a44760b",
+     "status": 0,
+     "report_sha256": "872bda7599667daafd6e6d19ae024278744fb58443fcf69e375b695f33082cb0"
+    },
+    {
+     "path": "graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "e9040b6ecd6b9af79b13c67e1a2754734e0f0277f9411cddb3236b7f5b82925b",
+     "status": 0,
+     "report_sha256": "df7d94e940c0cdac2732fa2336ff5d4d98f0c307b764b182b38d9b5dc4b2fbfb"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-6dc6440d-20261115-184229-shard-3",
+   "path": "gate-run-aarch64-6dc6440d-20261115-184229-shard-3",
+   "retention": "retained",
+   "reason": "A partial gate run at 6dc6440d on Linux AArch64, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items mp4-forward, mp4-range, ts-program; for their rows, whose workers the later trained-order revisions keep byte for byte",
+   "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-aarch64-20261115-184229/shard-3/2cef2fed47c80345d353bbc0c9d1fad33a1dde7d94bb0be514c23c806f47d289.tar.zst",
+   "sha256": "2cef2fed47c80345d353bbc0c9d1fad33a1dde7d94bb0be514c23c806f47d289",
+   "bytes": 20914414,
+   "results": [
+    {
+     "path": "memory/mp4-forward/gate-result.json",
+     "command": "report --memory",
+     "key": "7248e9fd976154627633f36c4ce75d6d0feb568d0c50cbc965ca81376384130f",
+     "status": 0,
+     "report_sha256": "9d95f754f5f9ec6564fa5de4acf72bf3577549b4928798fd76fa912798bfdd51",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/ts-program/gate-result.json",
+     "command": "report --memory",
+     "key": "f2041a9e5c4385128b75dec5237937e6e6b5b9499267a482a3acf6300bd415c4",
+     "status": 0,
+     "report_sha256": "a7114e4cca292a9c42e7e2fe012bf5e6fab34a1fed9985820ae8fefb0aa49fd7",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/mp4-range/gate-result.json",
+     "command": "report --memory",
+     "key": "f56d268bd5bf825a91cec03887caeb0cd7b7224d9acc9b53e8575f4eb8fc4071",
+     "status": 0,
+     "report_sha256": "dc04f7c0b99c792ff7d1e66fb1891fe3d6257358281203d625eb5587c0e2f621",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/mp4-forward/gate-result.json",
+     "command": "report --benchmark",
+     "key": "a87a0c29a2881866588b0b89a4a5da3c7b7fb8a9d23fefc0057cebb5c6cbe6d4",
+     "status": 0,
+     "report_sha256": "fddc24af40110e01726521f2000e7e80adb0a4ef3ec87f8a39a0d7c89f1d74cf",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/ts-program/gate-result.json",
+     "command": "report --benchmark",
+     "key": "38e60ebb4d63e19919da8234521809ea5fd6210d430564b22da7dab2348e9865",
+     "status": 0,
+     "report_sha256": "07bac37affd6c6bd05dcb102ea4840f14b8abce0c55b27bb2afe76a77d50398a",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/mp4-range/gate-result.json",
+     "command": "report --benchmark",
+     "key": "042c3346d3444f542daef80e1e2bbbc95614bdadec95098011ba630aed78d8a6",
+     "status": 0,
+     "report_sha256": "608fc7bc54e72ed35d45d59e0f9e9683aac8ffc048292c6077e3cd1fa7586606",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/mp4-forward/gate-result.json",
+     "command": "grade",
+     "key": "876a48b7a0a662ee0c6488957d034f35fb046d3d9f56e9e3e19fa12f3bd09ab8",
+     "status": 0,
+     "report_sha256": "10af711af876810b703dd39ee91b690e84e8f671237681853994033d7b41fa7e"
+    },
+    {
+     "path": "graded/ts-program/gate-result.json",
+     "command": "grade",
+     "key": "9f9a543e605f3d34055f06bb7f22ee2b6022c3bdc9880e5a0feb2cbb1e91a927",
+     "status": 0,
+     "report_sha256": "86f48ca00993a1235c7333f848c31660875252a90d59c396ba087fa9471c9d62"
+    },
+    {
+     "path": "graded/mp4-range/gate-result.json",
+     "command": "grade",
+     "key": "c1a4a8239ad14379f044c9720a67eddb15e26b8bdee46648e5442843b1bdcd8c",
+     "status": 0,
+     "report_sha256": "5d8cd2457ec8648dfef3e8e084548b10f594f487dfac1d48a1e781b08bb8e6a7"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+   }
+  },
+  {
+   "name": "gate-run-armv7-6dc6440d-20261115-184229-shard-1",
+   "path": "gate-run-armv7-6dc6440d-20261115-184229-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 6dc6440d on 32-bit ARMv7 in the armhf user space, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items hls-segments, raw-annex-b, ts-program; for their rows, whose workers the later trained-order revisions keep byte for byte",
+   "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-armv7-20261115-184229/shard-1/261f27f436a0f19cb47627e176e556321767ffadd5b459e002868fb8049abba1.tar.zst",
+   "sha256": "261f27f436a0f19cb47627e176e556321767ffadd5b459e002868fb8049abba1",
+   "bytes": 16783032,
+   "results": [
+    {
+     "path": "memory/ts-program/gate-result.json",
+     "command": "report --memory",
+     "key": "3cb91e6e28fddd174a877575f62d2971e2beca5e3ed1ee1d124dbea39cb24029",
+     "status": 0,
+     "report_sha256": "54cb17b02343def9ca54b6a5e25a66abaa00c99b6354be485ddef9880b667a2b",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/raw-annex-b/gate-result.json",
+     "command": "report --memory",
+     "key": "3dc49eeedfec190fd685a7d9e3c76dd64780c8701a45cfb6c4c87fc494caf075",
+     "status": 0,
+     "report_sha256": "1b72bd1a6574eda2719cc730bf546f4b923fab842179505480079f5f7a6bcc9b",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/hls-segments/gate-result.json",
+     "command": "report --memory",
+     "key": "63ef79deb4ea301785f220719072294efe3cb5f13ccf2d5090b911f85b5c887c",
+     "status": 0,
+     "report_sha256": "1c4247528750ad14cfe78842dca61f3cbf2d98ea29e0d630eeaa8fa303daeb4f",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/ts-program/gate-result.json",
+     "command": "report --benchmark",
+     "key": "8a2dcad39a47f7f47c7fc1c93dd21d4c393dab317fd0384febfc7dbc3d49f219",
+     "status": 0,
+     "report_sha256": "10fab65fe3f994800b42c6da031280d361a74c50df3a1e02e5e98d88691dfe40",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/raw-annex-b/gate-result.json",
+     "command": "report --benchmark",
+     "key": "352b3e2439e865b0b7726308fe86b57092493da8ccd115c6651d064adf7442b0",
+     "status": 0,
+     "report_sha256": "186867c5fb20eb4688f025e09be31104961bb07ffa2a0b2bb36c6bda6b093338",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/hls-segments/gate-result.json",
+     "command": "report --benchmark",
+     "key": "61d08f4b3e42f67a33899789cdf11a2e2ebab146916b5558a0b8914c830c32a2",
+     "status": 0,
+     "report_sha256": "4fb5fdcd087745688f5b8f0e4f08932d75795a12c2f50d9de755300b1901247f",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/ts-program/gate-result.json",
+     "command": "grade",
+     "key": "ac2eb4e0475b76c9812ffc28b6f3af40bf0f6436f94f8051196b3c16743ab074",
+     "status": 0,
+     "report_sha256": "a7ad390441e5a4b7ce799a2b12a8b0820edffc047483aab1f66ff420d201489c"
+    },
+    {
+     "path": "graded/raw-annex-b/gate-result.json",
+     "command": "grade",
+     "key": "1c58c3ba27bdf7c290a104407935b24b287597a3c3ab5d414434515c80b6a5a2",
+     "status": 0,
+     "report_sha256": "47aa2adc66fa0ca3a3e227d9b9ef0068958a0bd5473a15d9370dd76d4d85fbf1"
+    },
+    {
+     "path": "graded/hls-segments/gate-result.json",
+     "command": "grade",
+     "key": "2fd4b372fdbede784b54c8ceaec71453383a070053c427acd098538eb210a503",
+     "status": 0,
+     "report_sha256": "06a5c192d3fd8ddf368d55a67c235708f1405c6aa1ea16842483b662a0bbe7e0"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+   }
+  },
+  {
+   "name": "gate-run-armv7-6dc6440d-20261115-184229-shard-3",
+   "path": "gate-run-armv7-6dc6440d-20261115-184229-shard-3",
+   "retention": "retained",
+   "reason": "A partial gate run at 6dc6440d on 32-bit ARMv7 in the armhf user space, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items matroska-audio-clocks, mp4-forward, mp4-range; for their rows, whose workers the later trained-order revisions keep byte for byte",
+   "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-armv7-20261115-184229/shard-3/73f28b9110022f342a496839dd48c2d91c379d023b375bdac73f562d45c3a6c0.tar.zst",
+   "sha256": "73f28b9110022f342a496839dd48c2d91c379d023b375bdac73f562d45c3a6c0",
+   "bytes": 15997311,
+   "results": [
+    {
+     "path": "memory/mp4-forward/gate-result.json",
+     "command": "report --memory",
+     "key": "e1c60a8e11616d6330d193c96153a6834f32923d458677d3cd0264f3b011ad0b",
+     "status": 0,
+     "report_sha256": "1b9011b080ec209815ee6f4bf6256986756388310e6b4b7eca9c98bfc6a89ae4",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/mp4-range/gate-result.json",
+     "command": "report --memory",
+     "key": "f42be555709004be4b4d731858fbd49c3e0c7a56de8c309c28c1388497cc00b3",
+     "status": 0,
+     "report_sha256": "5d8cfb288d6c52296b99cd2ea7304d242f877b9b2ad3c7107ca6f7ed1cb7156e",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/matroska-audio-clocks/gate-result.json",
+     "command": "report --memory",
+     "key": "9f7a7390179187d5c0ee68dcdd58b50b9991ec197443299ee1a4d1ed54f11803",
+     "status": 0,
+     "report_sha256": "7df417c1ca1b45f84b7ff51e000a2de2cd640f84927ceac2b94a6b5b849bf448",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/mp4-forward/gate-result.json",
+     "command": "report --benchmark",
+     "key": "f281b001578e48a41b35111dfa47e81f3ba808d67da7efee34bf11887306df6d",
+     "status": 0,
+     "report_sha256": "67bb60bde64837241e03d20f62d1241c288807076fd40f7dd08fc7b8cef133be",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/mp4-range/gate-result.json",
+     "command": "report --benchmark",
+     "key": "079e7001795fb74ed70cb78cd1f6861034c887cce6bf2264e6f2def758603f01",
+     "status": 0,
+     "report_sha256": "4bb9b6914c84db3aaf991aa88800ddd66f1d214e9b5172dcc86ced4ebfd76702",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/matroska-audio-clocks/gate-result.json",
+     "command": "report --benchmark",
+     "key": "f398af4aebea4fb35a895217e7aab17cca9105c46958d189fd4eb7c8022779ba",
+     "status": 0,
+     "report_sha256": "4178db091d5c0e9e2537f1aeee2b163bdaa8c585d4c8c1ab247a31e4980990b6",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/mp4-forward/gate-result.json",
+     "command": "grade",
+     "key": "16bdf54be39ccd3d8505742333f36f19b0ce58aece3cdcd469c5ea675adc32e6",
+     "status": 0,
+     "report_sha256": "8ef7cf12836f22dffeb36421273d057c292e5134d8815c82d0763fee12311912"
+    },
+    {
+     "path": "graded/mp4-range/gate-result.json",
+     "command": "grade",
+     "key": "d90a4e3ec8c9a3032fe38a4717d25202a52c58ee163d3ff553d120362cb0f5dd",
+     "status": 0,
+     "report_sha256": "6788f2504c56aff418030bb9227f174f06d75b840bc4270d661c91723d6f3ab8"
+    },
+    {
+     "path": "graded/matroska-audio-clocks/gate-result.json",
+     "command": "grade",
+     "key": "15d7ffaf48e084bea13eab6b7ef7f00bf7d68664dafd7daf7ab2ef381b2f4a84",
+     "status": 0,
+     "report_sha256": "cf52fc36d98945a43506e255f67fdd89db780b2d11582ee2b11baa9a408915f8"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+   }
+  },
+  {
+   "name": "gate-run-armv7-6dc6440d-20261115-184229-shard-2",
+   "path": "gate-run-armv7-6dc6440d-20261115-184229-shard-2",
+   "retention": "retained",
+   "reason": "A partial gate run at 6dc6440d on 32-bit ARMv7 in the armhf user space, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items framing, matroska-startup-seek; for the Matroska startup and seek row on this target, whose worker the later trained-order revisions keep byte for byte; its framing worker took a trained order that the later revisions leave out on this target",
+   "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-armv7-20261115-184229/shard-2/13a05ccb7da42642a6f7a80d816b35505e8790aa8a73094b9cfb21520827baa0.tar.zst",
+   "sha256": "13a05ccb7da42642a6f7a80d816b35505e8790aa8a73094b9cfb21520827baa0",
+   "bytes": 20832711,
+   "results": [
+    {
+     "path": "memory/matroska-startup-seek/gate-result.json",
+     "command": "report --memory",
+     "key": "5418775ec8e30037edd51dcf5d688b19d733883023fdf07de4dc9e5aa9f7a485",
+     "status": 0,
+     "report_sha256": "014bf6bb57dda6787bfb8481d28ceaa3fbffa0176130748fc066463034994579",
+     "cases_checked": true
+    },
+    {
+     "path": "memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "1a3277a536b9e8d0ce78ccb010f779d88396f445faa0a3acfc894fb2798cc876",
+     "status": 0,
+     "report_sha256": "d8cbcef1fc2b4d6712b7da02d2c0e13dc36846032ec78022471955326c2fe08d",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/matroska-startup-seek/gate-result.json",
+     "command": "report --benchmark",
+     "key": "f718defbbb4af2f3a036f91e3bb414b3bb7774ead8e68f325ee2760ff973425b",
+     "status": 0,
+     "report_sha256": "1b40eaefdf23859feae0c91faf887daadad1e487c1cb8a5cba261dbee4e0d66c",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "230e3753b87502496b591ce1dd3a06ed71b5414eb811381a7651767f8777fddb",
+     "status": 0,
+     "report_sha256": "a6e426cea039e6f0ee487e3a9640ba59a89632e91b53938bfde8b6874098bdee",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/matroska-startup-seek/gate-result.json",
+     "command": "grade",
+     "key": "148c40c35d91dd4386eda5985758ab41381a5d0aa78858b2a1927fd2a847498d",
+     "status": 0,
+     "report_sha256": "171b2e3d44ee4391b13040cbef4e36f51c9ef154136c0cf8b5b402869ea1059d"
+    },
+    {
+     "path": "graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "ed0c13a460db88efc4c85b825af2669e0e441c964d8191f961917256b26be019",
+     "status": 0,
+     "report_sha256": "89adb6d44c96ed09982dbe7e8b2a2f56702e2348a771f80d1369661a00552f38"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+   }
+  },
+  {
+   "name": "gate-run-armv7-cd7d9d7c-20261115-191630-shard-1",
+   "path": "gate-run-armv7-cd7d9d7c-20261115-191630-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at cd7d9d7c on 32-bit ARMv7 in the armhf user space, one c6g.4xlarge from the gate image, item framing, whose framing worker links in module order on this target, byte for byte as main's at 7c4057c5: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; for the ARMv7 packet framing row",
+   "key": "evidence/gate-runs/cd7d9d7caf433db115f0c3bec8768b4f6fab311e-armv7-20261115-191630/shard-1/56474beae98ef1738d20260fc8daa542b8baf3541d9c610ccba496f78ba366d6.tar.zst",
+   "sha256": "56474beae98ef1738d20260fc8daa542b8baf3541d9c610ccba496f78ba366d6",
+   "bytes": 14895908,
+   "results": [
+    {
+     "path": "memory/framing/gate-result.json",
+     "command": "report --memory",
+     "key": "d032657fc1509de28940eeed92f923e56b3a998d8b03fe665260143f42cb828b",
+     "status": 0,
+     "report_sha256": "faaec3bd748ae6aa85381d715f33f308a6bc7ece8003dc2ca16a1e6dbe0a33e7",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/framing/gate-result.json",
+     "command": "report --benchmark",
+     "key": "7c096dea3ad6988a713d9f48f5cf8b4c40769f74a85a6df01515c04c648c2dad",
+     "status": 0,
+     "report_sha256": "a672f25bcdbd30bf77f11bd3d50f6ff1dd1ce925778fd876d9e46348e1b7d8d8",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/framing/gate-result.json",
+     "command": "grade",
+     "key": "72370a66d4a74cb947b72293c24567b80fe52039b4b3cd503d8c7b8e319d4827",
+     "status": 0,
+     "report_sha256": "9d99cc40f14955b9acb565781477019eafc7d831c5d156262a64e78c959cb5a8"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "cd7d9d7caf433db115f0c3bec8768b4f6fab311e"
    }
   }
  ]
