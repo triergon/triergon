@@ -5,7 +5,7 @@
 //! and MPEG m76694 table9 Original, experimentally. Final clauses/brands stay open.
 use crate::{
     Access, BoxChildren, BoxStep, BoxView, BuildStatus, FragmentDecodeTime, Limits, Sample,
-    SampleStep, add_offset, fields, policy,
+    SampleSpan, SampleStep, SpanStep, add_offset, fields, policy,
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -197,21 +197,26 @@ impl Run {
         if index >= self.count {
             return Err(Error::Invalid("fragment sample index"));
         }
-        let mut at = usize::try_from(index)
+        let at = usize::try_from(index)
             .map_err(|_| Error::Overflow)?
             .checked_mul(self.stride)
             .and_then(|v| v.checked_add(self.start))
             .ok_or(Error::Overflow)?;
-        let mut read = |bit: u32, fallback: u32| -> Result<u32> {
+        // The row's present fields in their wire order: duration, size, flags,
+        // composition offset.
+        let row = fields::slice(self.raw.payload(), at, self.stride)?;
+        let mut words = row
+            .chunks_exact(4)
+            .map(|word| u32::from_be_bytes([word[0], word[1], word[2], word[3]]));
+        let mut read = |bit: u32, fallback: u32| {
             if self.fields & bit == 0 {
-                return Ok(fallback);
+                fallback
+            } else {
+                words.next().unwrap_or(fallback)
             }
-            let value = fields::u32_at(self.raw.payload(), at)?;
-            at += 4;
-            Ok(value)
         };
-        let duration = read(0x100, defaults.duration)?;
-        let size = read(0x200, defaults.size)?;
+        let duration = read(0x100, defaults.duration);
+        let size = read(0x200, defaults.size);
         let flags = read(
             0x400,
             if index == 0 {
@@ -219,8 +224,8 @@ impl Run {
             } else {
                 defaults.flags
             },
-        )?;
-        let raw_cto = read(0x800, 0)?;
+        );
+        let raw_cto = read(0x800, 0);
         let cto = if self.fields & 0x800 != 0 {
             Some(crate::CompositionOffset::from_wire(self.version, raw_cto)?)
         } else {
@@ -328,6 +333,7 @@ impl FragmentIndex {
             low: 0,
             high: self.runs.len(),
             target: ordinal,
+            passed_sync: None,
             done: false,
             failed: None,
         })
@@ -457,6 +463,15 @@ impl FragmentBuilder {
                         .runs
                         .as_mut()
                         .ok_or(Error::Invalid("missing fragment runs"))?;
+                    // Most fragments hold one run or a few: each of the first
+                    // four takes exactly its own slot, where a push would take
+                    // four at once. Longer lists grow geometrically.
+                    if runs.len() < 4
+                        && let Err(error) = runs.try_reserve_exact(1)
+                    {
+                        self.pending = Some(value);
+                        return Err(error);
+                    }
                     if let Err(error) = runs.try_push(value) {
                         self.pending = Some(error.value);
                         return Err(error.error);
@@ -611,21 +626,27 @@ impl FragmentBuilder {
                             .ok_or(Error::Overflow)?;
                         self.phase = Phase::Commit;
                     } else if self.sample < run.wire.count {
-                        let value = run.wire.values(self.sample, defaults)?;
-                        if self.reject_zero_size && value.size == 0 {
-                            return Err(Error::Invalid(
-                                "zero-size fragment sample in native MOV header",
-                            ));
+                        // One unit per sample: the first was charged above.
+                        loop {
+                            let value = run.wire.values(self.sample, defaults)?;
+                            if self.reject_zero_size && value.size == 0 {
+                                return Err(Error::Invalid(
+                                    "zero-size fragment sample in native MOV header",
+                                ));
+                            }
+                            self.total_bytes = self
+                                .total_bytes
+                                .checked_add(u64::from(value.size))
+                                .ok_or(Error::Overflow)?;
+                            self.total_duration = self
+                                .total_duration
+                                .checked_add(u64::from(value.duration))
+                                .ok_or(Error::Overflow)?;
+                            self.sample = self.sample.checked_add(1).ok_or(Error::Overflow)?;
+                            if self.sample == run.wire.count || !work.try_charge(1) {
+                                break;
+                            }
                         }
-                        self.total_bytes = self
-                            .total_bytes
-                            .checked_add(u64::from(value.size))
-                            .ok_or(Error::Overflow)?;
-                        self.total_duration = self
-                            .total_duration
-                            .checked_add(u64::from(value.duration))
-                            .ok_or(Error::Overflow)?;
-                        self.sample = self.sample.checked_add(1).ok_or(Error::Overflow)?;
                     } else {
                         self.phase = Phase::Commit;
                     }
@@ -691,6 +712,76 @@ impl FragmentBuilder {
     }
 }
 
+/// Where a walk over a fragment index's sample ranges stands.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RunPosition {
+    run: usize,
+    sample: u32,
+    byte: u64,
+}
+
+impl FragmentIndex {
+    /// The ranges [`FragmentCursor`] reports from `position` on, with the same
+    /// errors: the next at most `maximum` samples of one run, charging a work
+    /// unit for each and for each run passed. A span stops before a sample whose
+    /// end would overflow, and the next step reports that sample's error.
+    pub(crate) fn next_span(
+        &self,
+        position: &mut RunPosition,
+        maximum: u64,
+        work: &mut WorkBudget,
+    ) -> Result<SpanStep> {
+        loop {
+            let Some(run) = self.runs.as_slice().get(position.run) else {
+                return Ok(SpanStep::End);
+            };
+            if !work.try_charge(1) {
+                return Ok(SpanStep::Yield);
+            }
+            if position.sample == run.wire.count {
+                position.run = position.run.checked_add(1).ok_or(Error::Overflow)?;
+                position.sample = 0;
+                continue;
+            }
+            let start = if position.sample == 0 {
+                run.byte
+            } else {
+                position.byte
+            };
+            let wanted = u64::from(run.wire.count - position.sample)
+                .min(maximum.saturating_sub(1).min(work.remaining()) + 1);
+            let (mut end, mut count, mut offset_minimum) = (start, 0u32, None::<i32>);
+            while u64::from(count) < wanted {
+                let values = run.wire.values(position.sample + count, self.defaults)?;
+                match end.checked_add(u64::from(values.size)) {
+                    Some(next) => end = next,
+                    None if count == 0 => return Err(Error::Overflow),
+                    None => break,
+                }
+                if let Some(offset) = values.cto {
+                    let signed = offset.raw_bits().cast_signed();
+                    offset_minimum = Some(offset_minimum.map_or(signed, |least| least.min(signed)));
+                }
+                count += 1;
+            }
+            work.take(u64::from(count) - 1);
+            let first = run
+                .ordinal
+                .checked_add(u64::from(position.sample))
+                .ok_or(Error::Overflow)?;
+            position.sample += count;
+            position.byte = end;
+            return Ok(SpanStep::Span(SampleSpan {
+                first,
+                count: u64::from(count),
+                range: start..end,
+                fragment: true,
+                offset_minimum,
+            }));
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct FragmentCursor<'a> {
     index: &'a FragmentIndex,
@@ -706,19 +797,72 @@ impl FragmentCursor<'_> {
         self.run
     }
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+        let Advance::Sample(next) = self.advance(work)? else {
+            return Ok(SampleStep::Yield);
+        };
+        let Some(next) = next else {
+            return Ok(SampleStep::End);
+        };
+        let values = next.values;
+        let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
+        let cts = next
+            .decode
+            .map(|d| d.checked_add(cto_ticks).ok_or(Error::Overflow))
+            .transpose()?;
+        let sample = Sample {
+            ordinal: next.ordinal,
+            description_index: self.index.defaults.description_index,
+            range: next.start..next.end,
+            dts_ticks: next.decode,
+            cts_ticks: cts,
+            duration_ticks: values.duration,
+            composition_offset: values.cto,
+            access: if values.flags & 0x10000 == 0 {
+                Access::ContainerSync
+            } else {
+                Access::NonSync
+            },
+            partial_sync: false,
+            dependency: None,
+            fragment_flags: Some(values.flags),
+        };
+        self.commit(&next);
+        Ok(SampleStep::Sample(sample))
+    }
+    /// Steps past the next sample without building it, as [`poll`](Self::poll)
+    /// does.
+    pub(crate) fn skip(&mut self, work: &mut WorkBudget) -> Result<RunSkip> {
+        let Advance::Sample(next) = self.advance(work)? else {
+            return Ok(RunSkip::Yield);
+        };
+        let Some(next) = next else {
+            return Ok(RunSkip::End);
+        };
+        self.commit(&next);
+        Ok(RunSkip::Sample(SkippedRunSample {
+            ordinal: next.ordinal,
+            dts: next.decode,
+            duration: next.values.duration,
+            start: next.start,
+            size: next.values.size,
+            sync: next.values.flags & 0x10000 == 0,
+        }))
+    }
+    /// Finds the next sample, passing exhausted runs, without moving past it.
+    fn advance(&mut self, work: &mut WorkBudget) -> Result<Advance> {
         loop {
             let Some(run) = self.index.runs.as_slice().get(self.run) else {
-                return Ok(SampleStep::End);
+                return Ok(Advance::Sample(None));
             };
             if !work.try_charge(1) {
-                return Ok(SampleStep::Yield);
+                return Ok(Advance::Yield);
             }
             if self.sample == run.wire.count {
                 self.run = self.run.checked_add(1).ok_or(Error::Overflow)?;
                 self.sample = 0;
                 continue;
             }
-            let byte = if self.sample == 0 {
+            let start = if self.sample == 0 {
                 run.byte
             } else {
                 self.byte
@@ -729,13 +873,9 @@ impl FragmentCursor<'_> {
                 self.decode
             };
             let values = run.wire.values(self.sample, self.index.defaults)?;
-            let end = byte
+            let end = start
                 .checked_add(u64::from(values.size))
                 .ok_or(Error::Overflow)?;
-            let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
-            let cts = decode
-                .map(|d| d.checked_add(cto_ticks).ok_or(Error::Overflow))
-                .transpose()?;
             let decode_end = decode
                 .map(|d| {
                     d.checked_add(i128::from(values.duration))
@@ -746,30 +886,58 @@ impl FragmentCursor<'_> {
                 .ordinal
                 .checked_add(u64::from(self.sample))
                 .ok_or(Error::Overflow)?;
-            let sample = Sample {
+            let following = self.sample.checked_add(1).ok_or(Error::Overflow)?;
+            return Ok(Advance::Sample(Some(NextSample {
                 ordinal,
-                description_index: self.index.defaults.description_index,
-                range: byte..end,
-                dts_ticks: decode,
-                cts_ticks: cts,
-                duration_ticks: values.duration,
-                composition_offset: values.cto,
-                access: if values.flags & 0x10000 == 0 {
-                    Access::ContainerSync
-                } else {
-                    Access::NonSync
-                },
-                partial_sync: false,
-                dependency: None,
-                fragment_flags: Some(values.flags),
-            };
-            let next = self.sample.checked_add(1).ok_or(Error::Overflow)?;
-            self.byte = end;
-            self.decode = decode_end;
-            self.sample = next;
-            return Ok(SampleStep::Sample(sample));
+                start,
+                end,
+                decode,
+                decode_end,
+                following,
+                values,
+            })));
         }
     }
+    fn commit(&mut self, next: &NextSample) {
+        self.byte = next.end;
+        self.decode = next.decode_end;
+        self.sample = next.following;
+    }
+}
+
+/// The sample a [`FragmentCursor`] produces next.
+struct NextSample {
+    ordinal: u64,
+    start: u64,
+    end: u64,
+    decode: Option<i128>,
+    decode_end: Option<i128>,
+    following: u32,
+    values: Values,
+}
+
+enum Advance {
+    Sample(Option<NextSample>),
+    Yield,
+}
+
+/// One step of [`FragmentCursor::skip`].
+#[derive(Debug)]
+pub(crate) enum RunSkip {
+    Sample(SkippedRunSample),
+    Yield,
+    End,
+}
+
+/// A fragment sample [`FragmentCursor::skip`] stepped past.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SkippedRunSample {
+    pub(crate) ordinal: u64,
+    pub(crate) dts: Option<i128>,
+    pub(crate) duration: u32,
+    pub(crate) start: u64,
+    pub(crate) size: u32,
+    pub(crate) sync: bool,
 }
 
 #[derive(Debug)]
@@ -779,10 +947,35 @@ pub struct FragmentLocator<'a> {
     low: usize,
     high: usize,
     target: u64,
+    /// The last sync sample stepped past on the way to the target.
+    passed_sync: Option<u64>,
     done: bool,
     failed: Option<Error>,
 }
 impl FragmentLocator<'_> {
+    /// After the target, locate the sample that follows it in this index, by
+    /// continuing from it. `false` where that sample is not `ordinal` or the
+    /// index has no more.
+    pub(crate) fn continue_to(&mut self, ordinal: u64) -> bool {
+        let end = self.index.first_ordinal.saturating_add(self.index.count);
+        if !self.done
+            || self.failed.is_some()
+            || self.cursor.is_none()
+            || self.target.checked_add(1) != Some(ordinal)
+            || ordinal >= end
+        {
+            return false;
+        }
+        self.target = ordinal;
+        self.passed_sync = None;
+        self.done = false;
+        true
+    }
+    /// The last sync sample before the target in the target's run that locating
+    /// it stepped past, if it stepped past any.
+    pub(crate) fn passed_sync(&self) -> Option<u64> {
+        self.passed_sync
+    }
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -858,12 +1051,38 @@ impl FragmentLocator<'_> {
                     decode,
                 });
             }
-            match self
+            let cursor = self
                 .cursor
                 .as_mut()
-                .ok_or(Error::Invalid("fragment locator cursor missing"))?
-                .poll(work)?
+                .ok_or(Error::Invalid("fragment locator cursor missing"))?;
+            // The samples before the target need only stepping past.
+            if self
+                .index
+                .runs
+                .as_slice()
+                .get(cursor.run)
+                .is_some_and(|run| {
+                    cursor.sample < run.wire.count
+                        && run
+                            .ordinal
+                            .checked_add(u64::from(cursor.sample))
+                            .is_some_and(|next| next < self.target)
+                })
             {
+                match cursor.skip(work)? {
+                    RunSkip::Sample(sample) => {
+                        if sample.sync {
+                            self.passed_sync = Some(sample.ordinal);
+                        }
+                        continue;
+                    }
+                    RunSkip::Yield => return Ok(SampleStep::Yield),
+                    RunSkip::End => {
+                        return Err(Error::Invalid("fragment locator exhausted unexpectedly"));
+                    }
+                }
+            }
+            match cursor.poll(work)? {
                 SampleStep::Sample(sample) if sample.ordinal == self.target => {
                     self.done = true;
                     return Ok(SampleStep::Sample(sample));

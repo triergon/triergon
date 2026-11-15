@@ -1,0 +1,19 @@
+# Stem hints and masks in CFF2, which has no width: as cff-hint-counts.
+format cff2
+glyph
+end
+glyph # 1: hstem with an odd count first: 1 or 2 stems with 7 more, one mask byte
+  5 0 1 2 1 hstemhm 0 1 2 1 4 1 6 1 8 1 10 1 vstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto
+end
+glyph # 2: as 1, two mask bytes
+  5 0 1 2 1 hstemhm 0 1 2 1 4 1 6 1 8 1 10 1 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto
+end
+glyph # 3: 9 stems, two mask bytes
+  0 1 2 1 4 1 6 1 8 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto
+end
+glyph # 4: implicit vstems: 8 hstems and 2 before the mask, two bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 0 1 2 1 hintmask bytes:1515 100 100 rmoveto 10 20 rlineto
+end
+glyph # 5: the mask's bytes cut short at the end
+  0 1 2 1 4 1 6 1 8 1 hstemhm 100 100 rmoveto 10 20 rlineto 0 1 2 1 4 1 6 1 vstemhm hintmask byte:0x15
+end

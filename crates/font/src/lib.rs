@@ -924,7 +924,7 @@ impl Font {
 
     /// The control box of `glyph`, read without building its outline: the
     /// `glyf` header box of a TrueType glyph, the box of every point a CFF or CFF2
-    /// charstring draws. HarfBuzz takes glyph extents from it.
+    /// charstring draws. HarfBuzz takes TrueType glyph extents from it.
     ///
     /// # Errors
     ///

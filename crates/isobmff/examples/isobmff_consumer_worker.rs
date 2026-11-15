@@ -99,6 +99,7 @@ fn operation(
     let mut stats = Stats::default();
     stats.start(o.retain, o.window)?;
     let mut driver = Driver::new(input, length, o.window, o.quantum)?;
+    driver.shared_payloads = o.retain == 0;
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
     if policy.regular_recovery {

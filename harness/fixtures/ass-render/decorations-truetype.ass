@@ -1,0 +1,34 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@attach croscorefonts-1.31.0/Tinos-Regular.ttf
+;@attach croscorefonts-1.31.0/Cousine-Regular.ttf
+;@attach dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@attach NotoSansThai-Regular.ttf
+;@attach dejavu-fonts-ttf-2.37/ttf/DejaVuSansMono-Oblique.ttf
+;@attach dejavu-fonts-ttf-2.37/ttf/DejaVuSans-BoldOblique.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs in TrueType faces, from override tags and from a
+; style with Underline and StrikeOut set, switched within a line, including
+; glyphs whose outlines run counter-clockwise, against TrueType's direction
+; (ε υ ∭ in DejaVu Sans Mono Oblique, ẞ in DejaVu Sans Bold Oblique).
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,0,0,7,20,20,20,1
+Style: Decorated,Tinos,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)\u1}Arimo underlined{\u0} {\s1}struck{\s0} {\u1\s1}both
+Dialogue: 0,0:00:00.00,0:00:01.00,Decorated,,0,0,0,,{\pos(20,100)}Tinos style {\u0}no underline {\s0}neither {\u1}underline
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,180)\fnCousine\u1\s1}Cousine mono {\fnDejaVu Sans}DejaVu Sans
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,260)\fnNoto Sans Thai\u1\s1}ภาษาไทย
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,340)\u1\c&H00FFFF&}two {\1c&HFF00FF&}colours{\u0\s1\1a&H80&} alpha
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,420)\fnDejaVu Sans Mono\i1\u1\s1}ευ∭ aεa {\fnDejaVu Sans\b1}ẞ aẞa
