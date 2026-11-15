@@ -81,7 +81,11 @@ feature groups that name `9be327a2` come from a partial run of those items on on
 c6g.4xlarge host per target, the same kernel and link policy, timed on CPU 1 and their
 memory collected under the kernel RSS proof; evidence set
 `gate-playback-containers-9be327a2` holds both targets' graded reports, build identities,
-step records, logs, summaries and host times, and a bundle of the measured source.
+step records, logs, summaries and host times, and a bundle of the measured source. The
+ARMv7 rows of HLS segments, TS program and raw Annex B that name `359a90b4` come from a
+partial run of those items on one host of the same class, kernel and link policy
+(evidence set `gate-playback-ts-359a90b4`), which measures the playback worker these
+changes left in place of the one measured at `79e0ae13`.
 
 Most Linux AArch64 rows were measured before on c8g (Graviton4) hosts, not on the
 qualified c6g.4xlarge. On each such row's worst Linux AArch64 case the candidate's
@@ -491,6 +495,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Gate run, Linux AArch64: plans, step records, logs, summary and host times | `79e0ae138c71ffc57c73decc88d29ae86b1153d4` | `b3e4fff20e89cc54f6404088212ba5c1eb20a61acb9a2796d304d54f61ded5a4` |
 | Gate run, ARMv7: plans, step records, logs, summary and host times | `79e0ae138c71ffc57c73decc88d29ae86b1153d4` | `612813087738e85133648515bfa55a6760fc8c63338cf3fa5c9fc2f83f3aad3c` |
 | Partial gate run, Linux AArch64 and ARMv7: MP4 range, MP4 forward, Matroska startup and seek, Matroska audio clocks and the six Matroska feature groups, with each run's records, summary and host times | `9be327a202b7d31c464bcc6308864a3cb66f9c25` | `a96d7d7451c0c94371c3955212fb9e3c7772a1db69667420c239dd7c3f6e0e90` |
+| Partial gate run, ARMv7: HLS segments, TS program and raw Annex B, with the run's records, summary and host times | `359a90b46ba2bfa9a896b827c9bd4869ff7b7b48` | `8963a7a9ce2ef4ed8841838e4c880ccf881b05296c198bb53328d002c6587254` |
 | Partial gate run, Linux AArch64 and ARMv7: the memory of both codec workload lists | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `6ad80f90b4784bea932beae4bab944354a42d34dec581faa97d3b74e5cd2e56f` |
 | Partial gate run, ARMv7: the font, shaping, rasterising and ASS comparisons | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `e3561dfe596482134846bf8f629844fc0e1314fd7b8ca3ed9077eb3269b36fb6` |
 | Partial gate run, Linux AArch64: plans, step records, logs, summary and host times | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `1a6d1206380ad9b81fb67352d1d90775fa301182b14e7a66d74172434fc8173d` |
@@ -690,7 +695,7 @@ diagnostics: no codec contract is gated on this target.
 | Core | 51,235 exact-arithmetic cases; the workspace tests (4,326 in debug, 4,325 in release) and the worker tests pass at `3df7ae6d` | via dependents | via dependents |
 | Matroska / WebM | 116/116 (six feature groups and the external HDR vector) | 1.1527 (115/115 pass in the six feature groups) at `9be327a2` | heap ≤0.7747 (115/115 lower); total RSS fails: ≤1.0289, 109/115 lower, at `9be327a2` |
 | Matroska startup and seek | 44/44 | 0.8448 (44/44 pass) at `9be327a2` | heap ≤0.3956, total RSS ≤0.8921 (44/44 lower) at `9be327a2`, on `playback-matroska-worker` |
-| HLS segments | 71/71 | 0.5912 (71/71 pass) | heap ≤0.0196, total RSS ≤0.8568 (71/71 lower) |
+| HLS segments | 71/71 | 0.5909 (71/71 pass) at `359a90b4` | heap ≤0.0196, total RSS ≤0.8712 (71/71 lower) at `359a90b4` |
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals) | 0.9959 (972/972 pass) | heap ≤0.2736, total RSS ≤0.8249 (972/972 lower) |
 | Packet framing | 125/125 AVC/HEVC reference comparisons | 1.1411 (125/125 pass) | heap ≤0.7653, total RSS ≤0.9972 (125/125 lower) |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 1.9223 (10/20 within the ceiling) | diagnostic, not gated, at `8154812e`: heap ≤0.9441, total RSS ≤0.8339 (20/20 lower) |
@@ -701,8 +706,8 @@ diagnostics: no codec contract is gated on this target.
 | MPEG-TS access units | 169/169 transport compatibility folds (`mpegts-access-units`) | 0.9945 (169/169 pass) | heap ≤0.1327, total RSS ≤0.8810 (169/169 lower) |
 | Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 1.0835 (46/46 pass) at `9be327a2` | heap ≤0.5882 (46/46 lower); total RSS fails: ≤1.0916, 0/46 lower, at `9be327a2` |
 | Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 1.1053 (51/51 pass) at `9be327a2` | heap ≤0.8771 (51/51 lower); total RSS fails: ≤1.0820, 0/51 lower, at `9be327a2` |
-| Playback: TS program | 35/35 packet folds (`ts-program`) | 0.8823 (35/35 pass) | heap ≤0.1177, total RSS ≤0.9831 (35/35 lower) |
-| Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.7124 (7/7 pass) | heap ≤0.1265, total RSS ≤0.9305 (7/7 lower) |
+| Playback: TS program | 35/35 packet folds (`ts-program`) | 0.8760 (35/35 pass) at `359a90b4` | heap ≤0.1177, total RSS ≤0.9497 (35/35 lower) at `359a90b4` |
+| Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.7250 (7/7 pass) at `359a90b4` | heap ≤0.1265, total RSS ≤0.8971 (7/7 lower) at `359a90b4` |
 | Rasterising | `raster-glyphs` 12/12, `raster-outlines` 2/2 and `raster-bitmaps` 2/2 pass; `raster-sweep` 301/303 (below); the crate's tests pass | not measured | not measured |
 | ASS parsing | `ass-parse-scripts` 48/48, `ass-parse-chunks` 4/4 and `ass-parse-events` 21/21 pass; `ass-parse-host` 13/15 (2 open); the crate's tests pass | not measured | not measured |
 | Fonts | `font-outlines` 53/53, `font-hinting-none` 159/159 and `font-hinting-default` 53/53 at `8154812e`, as on AArch64 | not measured | not measured |
@@ -859,15 +864,16 @@ Its heaviest case, `bitmaps-24`, takes about 50 s on each side, within
 
 The total RSS gate fails on ARMv7 in three container and playback rows at `9be327a2`:
 Matroska, MP4 forward and MP4 range. It is lower in every ISO BMFF output, MPEG-TS
-operation and access unit, HLS segment, TS program, raw Annex B and packet framing case,
-in every Matroska startup and seek and Matroska audio clocks case, and in 109 of the 115
+operation and access unit and packet framing case, in every HLS segment, TS program and
+raw Annex B case at `359a90b4`, in every Matroska startup and seek and Matroska audio clocks case, and in 109 of the 115
 Matroska cases; it is above in every MP4 forward and MP4 range case, and in `avc-ac3`,
 `avc-eac3`, `negative-block-time` and `discard-padding` (`matroska-demux`) and
 `header-lace` and `header-private` (`matroska-header-removal`), by at most 2.9%. Peak heap
 is lower than the reference in every case. The difference is the workers' own code. Each
 candidate worker carries only the runner families its reference build can demux
 ([quality](quality.md#reference-and-corpus)), and both playback workers still link the
-playback engine's MP4 and TS backends; on builds of `9be327a2`:
+playback engine's MP4 and TS backends, about 190 KB of `playback-matroska-worker`'s
+`.text`; on builds of `9be327a2`:
 
 | Worker | Bytes | `.text` | Compared with | Bytes | `.text` |
 |---|---|---|---|---|---|

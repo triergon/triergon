@@ -29148,6 +29148,83 @@
    "source_revisions": {
     "candidate": "9be327a202b7d31c464bcc6308864a3cb66f9c25"
    }
+  },
+  {
+   "name": "gate-playback-ts-359a90b4",
+   "path": "gate-playback-ts-359a90b4",
+   "retention": "retained",
+   "reason": "Partial gate run at 359a90b4 under static-toolchain-runtime-v1 on one c6g.4xlarge host (Graviton2), kernel 7.0.0-1014-aws: TS program, raw Annex B and HLS segments on 32-bit ARMv7, timed on CPU 1 and their memory collected under the kernel RSS bound, with the graded reports, build identities, step records, logs, summary and host times; for the docs/status.md ARMv7 rows of those features",
+   "key": "evidence/gate-playback-ts-359a90b4/8963a7a9ce2ef4ed8841838e4c880ccf881b05296c198bb53328d002c6587254.tar.zst",
+   "sha256": "8963a7a9ce2ef4ed8841838e4c880ccf881b05296c198bb53328d002c6587254",
+   "bytes": 4764629,
+   "results": [
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/benchmark/hls-segments/gate-result.json",
+     "command": "report --benchmark",
+     "key": "9a8539315c6fb6624db0a565ce97e07cc4997262622ccc31921d78a0780563bd",
+     "status": 0,
+     "report_sha256": "f7a4d88873bf8c418de0ff19dd07d0e2cfe08da4f6287bbfa3d6bdc54f2f9add"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/benchmark/raw-annex-b/gate-result.json",
+     "command": "report --benchmark",
+     "key": "abf563293ed4b0b88dfb60527b69071bb66cc6ba82074d1c6d4f505a5b728e28",
+     "status": 0,
+     "report_sha256": "8c29af660298d8dd41b349289bdd51321f7ded3352dfb0933c86cc31d1289fa8"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/benchmark/ts-program/gate-result.json",
+     "command": "report --benchmark",
+     "key": "fa7f08d5612bb140dd673ae701537a69d7bf6bc337fbbb5f68672f37566a94b6",
+     "status": 0,
+     "report_sha256": "11e945380fb5628a2d60589f030943f7e1e7b4f23a6d2579ff4d1448825703e5"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/graded/hls-segments/gate-result.json",
+     "command": "grade",
+     "key": "06e7115f15529530f6f72475fec12d9fcd192d1b6f7835434dfa9b9cd583a454",
+     "status": 0,
+     "report_sha256": "2e925d9b7af57137b1e3defee0621059e7f48c914c5f1ba3dfdf56bc8c2047ec"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/graded/raw-annex-b/gate-result.json",
+     "command": "grade",
+     "key": "876e99b70f8cbf75ac872e2a158e565a37cd536d22d7ce17af819914bf2f0530",
+     "status": 0,
+     "report_sha256": "3c9da26d1371b3c1c8acbabec357e98473433ab5954a2ded3b7b5dfa8aff5167"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/graded/ts-program/gate-result.json",
+     "command": "grade",
+     "key": "7c386dca0344df7c2ae3821fddefa97045db60e4133e1a6bef9ad0d19fad35e1",
+     "status": 0,
+     "report_sha256": "6f0a69c8ee0d4eae99e9fb93b3ae21e36918f58046f701d6f550e4299813a109"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/memory/hls-segments/gate-result.json",
+     "command": "report --memory",
+     "key": "f7535373a7227d8fc6a789e09a771926db5d257a1a2be0bfefad38a7769c13a3",
+     "status": 0,
+     "report_sha256": "419a8895ff7ad0561feb70769e008e5314af85f5b5dbd9e87e562c89197f3704"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/memory/raw-annex-b/gate-result.json",
+     "command": "report --memory",
+     "key": "205d73df882f4d5e015e76b27c752c08f904a9337f1016466fde323b2fbd8c90",
+     "status": 0,
+     "report_sha256": "42c71653ce6122239f108eadeaa08a943384c42202d937857c9be03be002b526"
+    },
+    {
+     "path": "gate-playback-ts-359a90b4/armv7/shard-1/memory/ts-program/gate-result.json",
+     "command": "report --memory",
+     "key": "527660f2ee5eb3828b1c34ce3d0bea1de552846771b07c78d1a60b326fb9f232",
+     "status": 0,
+     "report_sha256": "e75dfa7dae931e9f250ac7f8b0c97dee97d0382e396644527c92e53c2bb22fc9"
+    }
+   ],
+   "source_revisions": {
+    "candidate": "359a90b46ba2bfa9a896b827c9bd4869ff7b7b48"
+   }
   }
  ]
 }
