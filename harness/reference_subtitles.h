@@ -20,7 +20,10 @@
  * decode every prepared packet in order with one call each; then drain with empty
  * packets until no subtitle comes out (at most 64); fold every output subtitle
  * (all rectangles, palettes, pixels, text and ASS) and free it; free the decoder.
- * The same protocol as crates/subtitle-worker. sub-fold adds "host_dependent":true
+ * The same protocol as crates/subtitle-worker. sub-fold, sub-bench and sub-memory
+ * also print "input_digest", worked out in preparation: the prepared packets' count and
+ * each packet's pts (whether present, then its value) and duration, in order,
+ * folded as the digest folds words. sub-fold adds "host_dependent":true
  * when the run reached a C library call whose result differs between the
  * reference's targets (reference_subtitles_host.h). The plain build
  * (TRIERGON_SUBTITLE_PLAIN_REFERENCE) leaves those wrappers out: it is the build
@@ -306,6 +309,19 @@ done:
     return rc;
 }
 
+static uint64_t sub_input_digest(const SubInput *in) {
+    uint64_t digest = 0;
+    sub_mix(&digest, (uint64_t)in->count);
+    for (size_t i = 0; i < in->count; i++) {
+        const AVPacket *p = in->packets[i];
+        const int has_pts = p->pts != AV_NOPTS_VALUE;
+        sub_mix(&digest, (uint64_t)has_pts);
+        sub_mix(&digest, has_pts ? (uint64_t)p->pts : 0);
+        sub_mix(&digest, (uint64_t)p->duration);
+    }
+    return digest;
+}
+
 static void sub_trace_input(const SubInput *in) {
     printf("{\"schema\":1,\"operation\":\"subtitle-input\",\"time_base\":[%d,%d],\"configuration\":",
            in->time_base.num, in->time_base.den);
@@ -349,6 +365,7 @@ static int sub_main(int argc, char **argv) {
         sub_input_free(&in);
         return 0;
     }
+    const uint64_t input_digest = sub_input_digest(&in);
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) return 2;
     SubWork total = {0};
     const uint64_t start = bench ? now_ns() : 0;
@@ -373,10 +390,12 @@ static int sub_main(int argc, char **argv) {
 #else
     const int flagged = fold_only && atomic_load(&sub_host_dependent);
 #endif
+    char input_field[48] = "";
+    snprintf(input_field, sizeof(input_field), ",\"input_digest\":%" PRIu64, input_digest);
     if (!trace)
         printf("{\"schema\":1,\"operation\":\"" SUB_OPERATION "\",\"iterations\":%lu,\"packets\":%" PRIu64
-               ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 "%s,\"eof\":true}\n",
-               iterations, total.events, total.bytes, total.digest, elapsed,
+               ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 "%s%s,\"eof\":true}\n",
+               iterations, total.events, total.bytes, total.digest, elapsed, input_field,
                flagged ? ",\"host_dependent\":true" : "");
     return 0;
 }

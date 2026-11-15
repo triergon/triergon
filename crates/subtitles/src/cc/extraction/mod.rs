@@ -34,21 +34,20 @@
 //!   picture decoding when the ones before it have lasted), each later frame
 //!   the time the frame before it ends, and the frame output at the end has
 //!   no time.
-//! * **H.264 pictures** before the first intra picture are discarded with
-//!   their bytes, and so are the ones presented before it (its leading
-//!   pictures). When that picture is not an IDR picture and no recovery point
-//!   SEI comes with it, the first P picture after its leading pictures is
-//!   discarded too.
-//! * **HEVC pictures** the decoding process skips (before the first IRAP
-//!   picture, and the RASL pictures of an IRAP picture that starts decoding)
-//!   pass their bytes to the next decoded picture. Captions come from prefix
-//!   SEI NAL units only.
-//! * **H.264 and HEVC frames** leave in PTS order (equal times in decode order;
-//!   a frame is settled once 16 later captioned frames are decoded, deeper than
-//!   decoders reorder) with their packet's duration or, when the container has
-//!   none, one frame period of the sequence parameter set's VUI timing (two
-//!   clock ticks for H.264, one for HEVC), truncated to the clock; without VUI
-//!   timing, the least step between successive decode times so far.
+//! * **H.264 and HEVC.** Each access unit is one picture, and the picture
+//!   output model of `triergon_framing::picture_output` (H.264 Annex C.4,
+//!   H.265 Annex C.5.2) decides which pictures leave, in order count order:
+//!   H.264 pictures once more wait than the reorder depth, HEVC pictures by
+//!   `sps_max_num_reorder_pics`, latency and buffer size. Pictures before a
+//!   stream recovers, H.264 pictures that would leave after a later one and
+//!   HEVC pictures discarded at an IRAP picture (a CRA picture after an end of
+//!   sequence, or `no_output_of_prior_pics_flag`) lose their captions; HEVC
+//!   pictures that are not decoded (before the first IRAP picture, RASL
+//!   pictures of a new sequence) pass theirs to the next picture decoded. A
+//!   frame keeps its packet's PTS and lasts the packet's duration, the VUI's
+//!   frame period, or the duration the reference estimates from the first
+//!   packets' times (`rate.rs`). The rules and FFmpeg's departures from the
+//!   specifications are described in `nal.rs`.
 //!
 //! Frames without caption bytes are left out.
 
@@ -56,6 +55,7 @@ mod captions;
 mod mpeg2;
 mod nal;
 mod queue;
+mod rate;
 
 use super::charge;
 use super::video::nal::{Codec, Framing};
@@ -101,6 +101,9 @@ pub struct VideoPacket<'a> {
     pub duration: Option<i64>,
 }
 
+// One extractor holds one variant for its stream's life; boxing the larger
+// would allocate outside the pool.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum Decode {
     Mpeg2(Mpeg2Decode),
@@ -152,6 +155,26 @@ impl CaptionExtractor {
         self.time_base
     }
 
+    /// Takes the parameter sets of the decoder configuration record of an
+    /// H.264 or HEVC track (`avcC` or `hvcC`, ISO/IEC 14496-15, as MP4 and
+    /// Matroska carry it), as a decoder takes them before the stream. Samples
+    /// of such tracks often hold no parameter sets of their own, and a picture
+    /// whose sets are missing is not decoded, so its captions are lost: call
+    /// this before the first packet, also on the new extractor after a seek.
+    /// MPEG-2 video ignores it. Charges one work unit per byte.
+    ///
+    /// # Errors
+    ///
+    /// When `work` cannot cover the record or the pool cannot hold its sets;
+    /// the extractor is then as it was before the call.
+    pub fn configure(&mut self, record: &[u8], work: &mut WorkBudget) -> Result<()> {
+        charge(work, record.len())?;
+        match &mut self.decode {
+            Decode::Mpeg2(_) => Ok(()),
+            Decode::Nal(decode) => decode.configure(record),
+        }
+    }
+
     /// Takes the next packet in decode order. Charges one work unit per byte.
     ///
     /// # Errors
@@ -196,9 +219,9 @@ impl CaptionExtractor {
     ///
     /// # Errors
     ///
-    /// When the pool cannot hold the remaining frames while it compacts them;
-    /// they are then kept as they were.
+    /// None: taking a frame allocates nothing (the bytes of the frames taken
+    /// are dropped when frames are next added).
     pub fn pop(&mut self) -> Result<Option<CaptionFrame<'_>>> {
-        self.output.pop_front()
+        Ok(self.output.pop_front())
     }
 }

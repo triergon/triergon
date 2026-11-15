@@ -1015,9 +1015,10 @@ repository does not generate, with repository-relative paths: evidence set
 `gate-media-inputs` holds the FATE samples, the codec workload inputs and the
 subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
 [file-workloads.json](../harness/codecs/file-workloads.json), and set
-`ogg-reader-inputs` the inputs of the Ogg reader comparison
+`ogg-reader-inputs` the inputs of the Ogg reader comparison, and set
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/index.json)); a gate image is built with all three. The image
+[index](../harness/evidence/index.json)); a gate image is built with all four. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
