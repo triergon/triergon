@@ -139,6 +139,7 @@ triergon_framing::nal_syntax::skip_avc_scaling_matrix::<triergon_bitstream::rbsp
 <triergon_framing::avc_picture::Rbsp>::fixed
 <triergon_framing::avc_picture::Rbsp>::signed
 <triergon_core::input::InputCursor>::consume_response::<<triergon_framing::reader::NalReader>::append_annex_payload::{closure#0}>
+triergon_framing::avc_picture::read_avc_slice_header
 <triergon_mpegts::reader::lane::Lane>::start_build
 core::ptr::drop_glue::<core::option::Option<triergon_mpegts::reader::lane::Build>>
 triergon_mpegts::clock::source_timestamp

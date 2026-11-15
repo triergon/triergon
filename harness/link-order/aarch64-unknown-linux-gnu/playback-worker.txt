@@ -588,6 +588,7 @@ playback_worker::packet_fold::drive::<playback_worker::raw_video::operate>::{clo
 <triergon_framing::avc_picture::Rbsp>::flag
 <triergon_framing::avc_picture::Rbsp>::fixed
 <triergon_framing::avc_picture::Rbsp>::signed
+triergon_framing::avc_picture::read_avc_slice_header
 <triergon_framing::avc_picture::Picture>::differs
 triergon_playback::hls_avc::syntax::vui_timing
 triergon_framing::nal_syntax::skip_vui_to_timing::<triergon_bitstream::rbsp::Rbsp>

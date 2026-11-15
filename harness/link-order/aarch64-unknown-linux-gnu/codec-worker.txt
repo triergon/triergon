@@ -24,7 +24,7 @@ std::sys::fs::unix::try_statx
 <alloc::raw_vec::RawVecInner>::finish_grow
 <std::fs::File as alloc::io::read::Read>::read
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
-OUTLINED_FUNCTION_39
+OUTLINED_FUNCTION_40
 OUTLINED_FUNCTION_19
 OUTLINED_FUNCTION_1
 <std::sys::sync::once::futex::Once>::call
