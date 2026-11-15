@@ -221,17 +221,29 @@ impl Metrics for OtMetrics<'_> {
         let Some([x, y, w, h]) = self.unscaled_extents(glyph)? else {
             return Ok(None);
         };
+        // At units per em the extents are the unscaled box, beyond 2^24 and
+        // at the ends of the 32-bit range too (probe `cff-huge`).
+        let upem = i32::from(self.font.units_per_em());
+        if (self.scale.x, self.scale.y) == (upem, upem) {
+            return Ok(Some(Extents {
+                x_bearing: x,
+                y_bearing: y,
+                width: w,
+                height: h,
+            }));
+        }
         // Scaled as HarfBuzz scales extents: outwards to whole units.
         let x1 = x as f32 * self.x_multf;
         let y1 = y as f32 * self.y_multf;
         let x2 = x1 + w as f32 * self.x_multf;
         let y2 = y1 + h as f32 * self.y_multf;
         let (x_bearing, y_bearing) = (x1.floor() as i32, y1.floor() as i32);
+        let size = |end: f32, start: i32| (end.ceil() as i32).saturating_sub(start);
         Ok(Some(Extents {
             x_bearing,
             y_bearing,
-            width: x2.ceil() as i32 - x_bearing,
-            height: y2.ceil() as i32 - y_bearing,
+            width: size(x2, x_bearing),
+            height: size(y2, y_bearing),
         }))
     }
 }
