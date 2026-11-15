@@ -201,27 +201,52 @@ fn functions(binary: &Path) -> Result<Vec<Function>, String> {
     Ok(functions)
 }
 
-/// The entry address in the ELF header of `binary`.
-fn entry(binary: &Path) -> Result<u64, String> {
-    let header = std::fs::read(binary).map_err(|error| format!("{}: {error}", binary.display()))?;
-    let field = |range: std::ops::Range<usize>| {
-        header
-            .get(range)
-            .ok_or_else(|| format!("{}: no ELF header", binary.display()))
+/// The addresses the executable load segments of `binary` span in its ELF
+/// program headers: the lowest start and the highest end of their file contents.
+fn executable_span(binary: &Path) -> Result<(u64, u64), String> {
+    let image = std::fs::read(binary).map_err(|error| format!("{}: {error}", binary.display()))?;
+    let malformed = || format!("{}: malformed ELF header", binary.display());
+    let bytes = |at: usize, width: usize| -> Result<u64, String> {
+        let field = image.get(at..at + width).ok_or_else(malformed)?;
+        let mut value = [0; 8];
+        value[..width].copy_from_slice(field);
+        Ok(u64::from_le_bytes(value))
     };
-    if field(0..4)? != b"\x7fELF" || field(5..6)? != [1] {
+    if image.get(0..4) != Some(b"\x7fELF") || image.get(5) != Some(&1) {
         return Err(format!(
             "{}: not a little-endian ELF file",
             binary.display()
         ));
     }
-    let mut bytes = [0; 8];
-    match field(4..5)? {
-        [1] => bytes[..4].copy_from_slice(field(24..28)?),
-        [2] => bytes.copy_from_slice(field(24..32)?),
+    // (word width, program header offset field, entry size field, count field,
+    // flags offset, virtual address offset, file size offset) of ELF32 and ELF64.
+    let (word, table, size, count, flags, address, length) = match image.get(4) {
+        Some(1) => (4, 28, 42, 44, 24, 8, 16),
+        Some(2) => (8, 32, 54, 56, 4, 16, 32),
         _ => return Err(format!("{}: unknown ELF class", binary.display())),
+    };
+    let table = usize::try_from(bytes(table, word)?).map_err(|_| malformed())?;
+    let size = usize::try_from(bytes(size, 2)?).map_err(|_| malformed())?;
+    let mut span: Option<(u64, u64)> = None;
+    for index in 0..bytes(count, 2)? as usize {
+        let header = table + index * size;
+        // A loadable segment (PT_LOAD) that is executable (PF_X).
+        if bytes(header, 4)? != 1 || bytes(header + flags, 4)? & 1 == 0 {
+            continue;
+        }
+        let start = bytes(header + address, word)?;
+        let end = start + bytes(header + length, word)?;
+        span = Some(span.map_or((start, end), |(low, high)| (low.min(start), high.max(end))));
     }
-    Ok(u64::from_le_bytes(bytes))
+    span.ok_or_else(|| format!("{}: no executable segment", binary.display()))
+}
+
+/// A `NAME 0xADDRESS` line of QEMU's `page` log.
+fn logged_address(text: &str, name: &str) -> Option<u64> {
+    text.lines()
+        .find_map(|line| line.strip_prefix(name))
+        .and_then(|rest| rest.trim().strip_prefix("0x"))
+        .and_then(|address| u64::from_str_radix(address, 16).ok())
 }
 
 /// The trained order of `binary` from logs of its runs under QEMU's user-mode
@@ -229,23 +254,34 @@ fn entry(binary: &Path) -> Result<u64, String> {
 /// first execute code in them, the runs in the order of `logs`.
 ///
 /// The emulator translates each block of guest code when it first runs it and logs
-/// the block's guest addresses then (`in_asm`); its `page` log gives the address it
-/// loaded the binary's entry point at, from which the binary's own addresses follow.
+/// the block's guest address then (`in_asm`); its `page` log gives where it loaded
+/// the binary's code (`start_code` and `end_code`), from which the binary's own
+/// addresses follow.
 pub fn first_use(binary: &Path, logs: &[PathBuf]) -> Result<Vec<String>, String> {
     let functions = functions(binary)?;
-    let entry = entry(binary)?;
+    let (start, end) = executable_span(binary)?;
     let mut order = Vec::new();
     let mut seen = HashSet::new();
     for log in logs {
         let text =
             std::fs::read_to_string(log).map_err(|error| format!("{}: {error}", log.display()))?;
-        let loaded = text
-            .lines()
-            .find_map(|line| line.strip_prefix("entry"))
-            .and_then(|rest| rest.trim().strip_prefix("0x"))
-            .and_then(|address| u64::from_str_radix(address, 16).ok())
-            .ok_or_else(|| format!("{}: no entry line; run with -d page,in_asm", log.display()))?;
-        let bias = loaded.wrapping_sub(entry);
+        let (Some(code), Some(code_end)) = (
+            logged_address(&text, "start_code"),
+            logged_address(&text, "end_code"),
+        ) else {
+            return Err(format!(
+                "{}: no start_code and end_code; run with -d page,in_asm",
+                log.display()
+            ));
+        };
+        let bias = code.wrapping_sub(start);
+        if code_end.wrapping_sub(bias) != end {
+            return Err(format!(
+                "{}: the logged code does not span {}'s executable segments",
+                log.display(),
+                binary.display()
+            ));
+        }
         for line in text.lines() {
             let Some(address) = line
                 .strip_prefix("0x")
@@ -369,7 +405,34 @@ fn without_generics(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{linker_made, owner};
+    use super::{linker_made, owner, parse_trained, stable_name};
+
+    #[test]
+    fn a_trained_order_lists_each_function_once_and_may_hold_comments() {
+        assert_eq!(
+            parse_trained("# header\nstd::rt::lang_start\nplayback_worker::main\n").unwrap(),
+            ["std::rt::lang_start", "playback_worker::main"]
+        );
+        for text in ["a\na\n", "a\n\nb\n", " a\n"] {
+            assert!(parse_trained(text).is_err(), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn a_promoted_local_function_keeps_its_name_without_the_build_suffix() {
+        assert_eq!(
+            stable_name("core::fmt::write (.llvm.1234567)"),
+            "core::fmt::write"
+        );
+        assert_eq!(
+            stable_name("core::fmt::write.llvm.1234567"),
+            "core::fmt::write"
+        );
+        assert_eq!(
+            stable_name("_Unwind_GetGR.constprop.0"),
+            "_Unwind_GetGR.constprop.0"
+        );
+    }
 
     #[test]
     fn code_the_linker_makes_for_the_layout_is_not_ordered() {
