@@ -492,9 +492,11 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
 /// target ([`super::link_order`]) is linked by the pinned toolchain's `lld`, then
 /// linked again with its functions in that order, the rest in module order;
 /// `command` then holds the second build. `binary` is where the build puts the
-/// worker. The ordering file is written to `target/harness/link-order/NAME.txt`, and
-/// the second build's own ordering file must be the same. Returns its SHA-256, or
-/// none for a worker linked as its toolchain links it.
+/// worker. The ordering file is written to `target/harness/link-order/NAME-HASH.txt`,
+/// HASH the first 16 hex digits of its SHA-256, so the second build's link arguments
+/// change whenever the order does and cargo never reuses a link made with another
+/// order. The second build's own ordering file must be the same. Returns its SHA-256,
+/// or none for a worker linked as its toolchain links it.
 fn build_in_link_order(
     root: &Path,
     command: &mut Vec<String>,
@@ -523,9 +525,10 @@ fn build_in_link_order(
     let first: Vec<String> = command.iter().cloned().chain(linker).collect();
     cargo(&first)?;
     let order = super::link_order::symbol_order(binary, &trained)?;
+    let hash = crate::sha256::hex(order.as_bytes());
     let directory = root.join("target/harness/link-order");
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-    let path = directory.join(format!("{name}.txt"));
+    let path = directory.join(format!("{name}-{}.txt", &hash[..16]));
     fs::write(&path, &order).map_err(|e| format!("{}: {e}", path.display()))?;
     command.extend(gate_build::ordered_link_arguments(root, Some(&path))?);
     cargo(command)?;
@@ -534,7 +537,7 @@ fn build_in_link_order(
             "{name}: the ordered link holds other functions than the first link"
         ));
     }
-    Ok(Some(crate::sha256::hex(order.as_bytes())))
+    Ok(Some(hash))
 }
 
 /// A built worker: its name, the command that built it and the SHA-256 of its

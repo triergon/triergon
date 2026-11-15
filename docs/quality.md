@@ -564,10 +564,11 @@ may override that count for diagnostic comparisons.
     `harness/link-order/training.json` lists its files by SHA-256 and the operations,
     each a worker's command line with `@NAME` for a training file; the files are kept
     as an evidence set and unpacked at `.research/link-order-training` (the set also
-    holds an AAC access-unit file that no operation reads). `cargo xtask link-order
-    corpus OUT` made them with `ffmpeg` and `ffprobe` from FFmpeg's own video and audio
-    generators (libx264, libx265 and FFmpeg's AAC, AC-3, E-AC-3 and Opus encoders); the
-    playback capsules and packet-framing scripts are made from those files. `cargo xtask link-order separate`, which `train` runs
+    holds two files no operation reads: AAC access units and the fragmented HEVC movie
+    the HEVC framing script is made from). `cargo xtask link-order corpus OUT` made
+    them with `ffmpeg` and `ffprobe` from FFmpeg's own video and audio generators
+    (libx264, libx265 and FFmpeg's AAC, AC-3, E-AC-3 and Opus encoders); the playback
+    capsules and packet-framing scripts are made from those files. `cargo xtask link-order separate`, which `train` runs
     first, fails when a training file has the SHA-256 of a file any gate item reads on
     either target or of a committed file, or when an operation runs a gate case's
     operation family on inputs of the same content with the same other arguments. The
@@ -579,9 +580,10 @@ may override that count for diagnostic comparisons.
     drop glue by the type it drops, generic arguments left out), then by name. A name
     the binary does not hold is skipped, so a stale trained order still links.
   - `build-workers` links each worker once, writes its ordering file to
-    `target/harness/link-order/WORKER.txt`, links it again with that file, and fails
-    unless the second link's ordering file is the same; `identity.json` records its
-    SHA-256 beside the command. `cargo xtask check` runs `cargo xtask link-order check`:
+    `target/harness/link-order/WORKER-HASH.txt`, HASH the first 16 hex digits of its
+    SHA-256 so that cargo links again whenever the order changes, links it again with
+    that file, and fails unless the second link's ordering file is the same;
+    `identity.json` records its SHA-256 beside the command. `cargo xtask check` runs `cargo xtask link-order check`:
     each worker with training operations has a trained order for each gate target and
     no other worker has one, each parses, and on GNU/Linux each links the worker built
     for the checking host. The linker arguments,

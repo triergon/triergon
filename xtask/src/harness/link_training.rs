@@ -867,13 +867,14 @@ pub fn corpus(out: &Path) -> R<()> {
         .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
         .collect();
     names.sort();
-    // The playlists, the other segments and the subtitle script are only the
-    // means of making the training files.
+    // The playlists, the other segments, the subtitle script and the fragmented HEVC
+    // movie are only the means of making the training files.
     let (made, means): (Vec<String>, Vec<String>) = names.into_iter().partition(|name| {
         !Path::new(name)
             .extension()
             .is_some_and(|extension| extension == "m3u8" || extension == "srt")
             && !name.contains("-segment-")
+            && name != "hevc-aac-fragmented.mp4"
     });
     for name in means {
         fs::remove_file(out.join(&name)).map_err(|e| format!("{name}: {e}"))?;
