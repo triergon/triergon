@@ -1,36 +1,43 @@
-//! A backward seek over a plain regular track, read from its sample table.
+//! A backward seek over a track whose index entries are its samples, read from
+//! its tables.
 //!
-//! A track with no edits, fragments, partial sync or dependency samples has one
-//! index entry per sample, in sample order. An entry's timestamp is the sample's
-//! decode time plus the track's composition shift, and it is a key where the
+//! A track with no edit list, partial sync or dependency samples, or a track of
+//! fragments alone, has one index entry per sample, in sample order. An entry's
+//! timestamp is the sample's decode time, with a regular track's composition
+//! shift added or a fragment edit's offset taken away, and it is a key where the
 //! sample is a sync sample, or the first sample under an explicitly empty sync
-//! table. [`PlainScan`] walks the table for exactly these facts, without building
-//! an occurrence, and makes the choices [`SeekJob`](super::SeekJob) makes from
-//! the entries. Wherever an entry would fail one of the index's or the seek's
-//! checks, it gives up, and the seek builds the entries one by one instead, which
-//! reports that failure.
-use crate::{ClockField, SampleCursor, SampleTable};
+//! table. [`PlainScan`] walks the tables for exactly these facts, without building
+//! an occurrence, and makes the choices [`SeekJob`](super::SeekJob) makes from the
+//! entries. Wherever an entry would fail one of the index's or the seek's checks,
+//! or would need a rule the scan does not follow (a fragment sample without a
+//! decode time, a discarded sample, a run that continues another without a key),
+//! it gives up, and the seek builds the entries one by one instead.
+use crate::fragment::RunSkip;
+use crate::mov_cursor::{PlainSource, PlainStart, PreviousClock, PreviousSample};
+use crate::{FragmentCursor, FragmentIndex, SampleCursor};
 use triergon_core::WorkBudget;
 
-/// What the scan needs beyond the table: the facts the packet cursor and the
-/// index established before their first entry.
+/// What the scan needs beyond the track: the facts the seek and its index
+/// established before their first entry.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct PlainTrack<'a> {
-    pub(super) table: &'a SampleTable,
-    /// The demux decode-time shift of the track's composition offsets.
-    pub(super) shift: i64,
-    /// Whether the first entry may be a non-key entry.
+    pub(super) source: PlainSource<'a>,
+    /// Whether the index admits a non-key first entry.
     pub(super) allow_initial_nonkey: bool,
+    /// Whether the seek may land on a non-key first entry.
+    pub(super) allow_initial_prefix: bool,
     /// The index's entry limit.
     pub(super) max_entries: u64,
+    /// The seek target in the index's clock.
+    pub(super) target: i128,
 }
 
-/// The entry a scan selected: the cursor that produces its sample, its index
-/// ordinal, whether it is the first key rather than one at or before the target,
-/// and how many entries the index has.
+/// The entry a scan selected: where its track continues from, its index ordinal,
+/// whether it is the first entry rather than a key at or before the target, and
+/// how many entries the index has.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct PlainChoice<'a> {
-    pub(super) cursor: SampleCursor<'a>,
+    pub(super) start: PlainStart<'a>,
     pub(super) ordinal: u64,
     pub(super) first_fallback: bool,
     pub(super) scanned: u64,
@@ -39,112 +46,304 @@ pub(super) struct PlainChoice<'a> {
 #[derive(Debug)]
 pub(super) enum PlainStep<'a> {
     Yield,
-    /// An entry fails a check, or the seek fails: build the entries instead.
+    /// An entry fails a check or needs another rule, or the seek fails.
     GiveUp,
     Done(PlainChoice<'a>),
 }
 
+/// The walk over the track's samples.
+#[derive(Clone, Copy, Debug)]
+enum Walk<'a> {
+    Regular {
+        cursor: SampleCursor<'a>,
+        shift: i64,
+        explicit_empty_sync: bool,
+    },
+    Fragments {
+        track_id: u32,
+        fragments: &'a [FragmentIndex],
+        next_fragment: usize,
+        current: Option<FragmentCursor<'a>>,
+        edit_offset: i64,
+    },
+}
+
+/// The index timestamp of decode time `dts` moved by `offset`: the exact ticks,
+/// which a demux clock field reads back unchanged where they fit its signed
+/// 64 bits. `None` where they do not, or are the index's null clock.
+fn timestamp(dts: i128, offset: i128) -> Option<i64> {
+    let ticks = dts.checked_add(offset)?;
+    i64::try_from(ticks)
+        .ok()
+        .filter(|&timestamp| timestamp != i64::MIN)
+}
+
+/// Whether a sample's bytes fit the index's size and position fields.
+fn representable(start: u64, size: u32) -> bool {
+    size <= 0x1fff_ffff && i64::try_from(start).is_ok()
+}
+
 #[derive(Debug)]
 pub(super) struct PlainScan<'a> {
-    cursor: SampleCursor<'a>,
-    shift: i64,
-    explicit_empty_sync: bool,
-    allow_initial_nonkey: bool,
-    target: i128,
-    first: Option<(SampleCursor<'a>, u64)>,
-    best: Option<(SampleCursor<'a>, u64)>,
-    previous: Option<i64>,
+    walk: Walk<'a>,
+    state: State<'a>,
+}
+
+/// What a scan has learnt from the entries so far.
+#[derive(Debug)]
+struct State<'a> {
+    track: PlainTrack<'a>,
+    entries: u64,
+    first: Option<(PlainStart<'a>, u64, bool)>,
+    best: Option<(PlainStart<'a>, u64)>,
+    previous: Option<PreviousSample>,
+    previous_timestamp: Option<i64>,
+    discard_boundary: Option<i128>,
     unordered_minimum: Option<i64>,
 }
 
 impl<'a> PlainScan<'a> {
-    /// A scan for the last key at or before `target`, in the index's clock.
-    pub(super) fn new(track: PlainTrack<'a>, target: i128) -> Option<Self> {
-        let count = track.table.sample_count();
-        if count > track.max_entries || count > i32::MAX as u64 {
-            return None;
+    pub(super) fn new(track: PlainTrack<'a>) -> Self {
+        let walk = match track.source {
+            PlainSource::Regular { table, shift } => Walk::Regular {
+                cursor: table.cursor(),
+                shift,
+                explicit_empty_sync: table.sync_entry_count() == Some(0),
+            },
+            PlainSource::Fragments {
+                track_id,
+                fragments,
+                edit_offset,
+            } => Walk::Fragments {
+                track_id,
+                fragments,
+                next_fragment: 0,
+                current: None,
+                edit_offset,
+            },
+        };
+        Self {
+            walk,
+            state: State {
+                track,
+                entries: 0,
+                first: None,
+                best: None,
+                previous: None,
+                previous_timestamp: None,
+                discard_boundary: None,
+                unordered_minimum: None,
+            },
         }
-        Some(Self {
-            cursor: track.table.cursor(),
-            shift: track.shift,
-            explicit_empty_sync: track.table.sync_entry_count() == Some(0),
-            allow_initial_nonkey: track.allow_initial_nonkey,
-            target,
-            first: None,
-            best: None,
-            previous: None,
-            unordered_minimum: None,
-        })
     }
 
     pub(super) fn poll(&mut self, work: &mut WorkBudget) -> PlainStep<'a> {
-        let count = self.cursor.table().sample_count();
+        let state = &mut self.state;
+        match &mut self.walk {
+            Walk::Regular {
+                cursor,
+                shift,
+                explicit_empty_sync,
+            } => state.poll_regular(work, cursor, *shift, *explicit_empty_sync),
+            Walk::Fragments {
+                track_id,
+                fragments,
+                next_fragment,
+                current,
+                edit_offset,
+            } => state.poll_fragments(
+                work,
+                (*track_id, fragments),
+                next_fragment,
+                current,
+                *edit_offset,
+            ),
+        }
+    }
+}
+
+impl<'a> State<'a> {
+    fn poll_regular(
+        &mut self,
+        work: &mut WorkBudget,
+        cursor: &mut SampleCursor<'a>,
+        shift: i64,
+        explicit_empty_sync: bool,
+    ) -> PlainStep<'a> {
+        let count = cursor.table().sample_count();
         loop {
-            let ordinal = self.cursor.ordinal();
-            if ordinal == count {
-                return self.finish(count);
+            if cursor.ordinal() == count {
+                return self.finish();
             }
             if !work.try_charge(1) {
                 return PlainStep::Yield;
             }
-            let before = self.cursor;
-            let Ok(sample) = self.cursor.skip() else {
+            let before = *cursor;
+            let Ok(sample) = cursor.skip() else {
                 return PlainStep::GiveUp;
             };
-            // The index's size and position representations.
-            if sample.size > 0x1fff_ffff || i64::try_from(sample.start).is_err() {
-                return PlainStep::GiveUp;
-            }
-            let key = sample.sync || (self.explicit_empty_sync && sample.ordinal == 1);
-            if !key && sample.ordinal == 1 && !self.allow_initial_nonkey {
-                return PlainStep::GiveUp;
-            }
-            let Some(timestamp) = sample
-                .dts
-                .checked_add(i128::from(self.shift))
-                .and_then(|ticks| ClockField::from_exact_ticks(ticks).ok())
-                .map(ClockField::signed_ticks)
-                .filter(|&timestamp| timestamp != i64::MIN)
+            let Some(timestamp) = timestamp(sample.dts, i128::from(shift))
+                .filter(|_| representable(sample.start, sample.size))
             else {
                 return PlainStep::GiveUp;
             };
-            if self.previous.is_some_and(|prior| timestamp <= prior)
-                || self.unordered_minimum.is_some()
-            {
-                self.unordered_minimum = Some(
-                    self.unordered_minimum
-                        .map_or(timestamp, |least| least.min(timestamp)),
-                );
+            let key = sample.sync || (explicit_empty_sync && sample.ordinal == 1);
+            if !self.record(timestamp, key, false) {
+                return PlainStep::GiveUp;
             }
-            self.previous = Some(timestamp);
             if key {
-                if self.first.is_none() {
-                    self.first = Some((before, ordinal));
-                }
-                if i128::from(timestamp) <= self.target {
-                    self.best = Some((before, ordinal));
-                }
+                self.keep(PlainStart::Regular(before), timestamp);
             }
         }
     }
 
-    fn finish(&self, scanned: u64) -> PlainStep<'a> {
+    fn poll_fragments(
+        &mut self,
+        work: &mut WorkBudget,
+        (track_id, fragments): (u32, &'a [FragmentIndex]),
+        next_fragment: &mut usize,
+        current: &mut Option<FragmentCursor<'a>>,
+        edit_offset: i64,
+    ) -> PlainStep<'a> {
+        loop {
+            let Some(fragment) = current else {
+                let Some(index) = fragments.get(*next_fragment) else {
+                    return self.finish();
+                };
+                if !work.try_charge(1) {
+                    return PlainStep::Yield;
+                }
+                *next_fragment += 1;
+                if index.track_id() == track_id {
+                    *current = Some(index.cursor());
+                }
+                continue;
+            };
+            let before = *fragment;
+            let sample = match fragment.skip(work) {
+                Ok(RunSkip::Sample(sample)) => sample,
+                Ok(RunSkip::Yield) => return PlainStep::Yield,
+                Ok(RunSkip::End) => {
+                    *current = None;
+                    continue;
+                }
+                Err(_) => return PlainStep::GiveUp,
+            };
+            let run = (*next_fragment - 1, fragment.run_index());
+            let Some((dts, timestamp)) = sample
+                .dts
+                .and_then(|dts| Some((dts, timestamp(dts, -i128::from(edit_offset))?)))
+                .filter(|_| representable(sample.start, sample.size))
+            else {
+                return PlainStep::GiveUp;
+            };
+            let start = PlainStart::Fragment {
+                next_fragment: *next_fragment,
+                cursor: before,
+                previous: self.previous,
+                discard_boundary: self.discard_boundary,
+            };
+            let previous = self.previous;
+            if previous.is_none_or(|previous| previous.run != run) {
+                // A run start: its samples are discarded at or below the
+                // timestamp before it.
+                let boundary = self.previous_timestamp.unwrap_or(i64::MIN);
+                if timestamp <= boundary {
+                    return PlainStep::GiveUp;
+                }
+                self.discard_boundary = Some(i128::from(boundary));
+                // A run without a key restarts the distance only where it
+                // starts the next fragment.
+                if let Some(previous) = previous
+                    && !sample.sync
+                    && !(run.0 > previous.run.0
+                        && run.1 == 0
+                        && previous.clock.sample.checked_add(1) == Some(sample.ordinal))
+                {
+                    return PlainStep::GiveUp;
+                }
+            }
+            self.previous = Some(PreviousSample {
+                clock: PreviousClock {
+                    sample: sample.ordinal,
+                    dts,
+                    signed_dts: timestamp,
+                    duration: sample.duration,
+                    source_known: true,
+                },
+                run,
+            });
+            // The first fragment sample may start the index without a key.
+            let first = self.entries == 0;
+            if !self.record(timestamp, sample.sync, sample.ordinal == 1) {
+                return PlainStep::GiveUp;
+            }
+            // A fragment track's first entry stands in for a key.
+            if first {
+                self.first = Some((start, 0, sample.sync));
+            }
+            if sample.sync {
+                self.keep(start, timestamp);
+            }
+        }
+    }
+
+    /// Counts an entry and follows its timestamp; `false` where the index would
+    /// refuse it. `starts_index` is whether a non-key entry may still start the
+    /// index.
+    fn record(&mut self, timestamp: i64, key: bool, starts_index: bool) -> bool {
+        let first = self.entries == 0;
+        self.entries += 1;
+        if self.entries > self.track.max_entries
+            || self.entries > i32::MAX as u64
+            || (first && !key && !starts_index && !self.track.allow_initial_nonkey)
+        {
+            return false;
+        }
+        if self
+            .previous_timestamp
+            .is_some_and(|prior| timestamp <= prior)
+            || self.unordered_minimum.is_some()
+        {
+            self.unordered_minimum = Some(
+                self.unordered_minimum
+                    .map_or(timestamp, |least| least.min(timestamp)),
+            );
+        }
+        self.previous_timestamp = Some(timestamp);
+        true
+    }
+
+    /// Keeps a key entry, the last recorded, as the first and best it may be.
+    fn keep(&mut self, start: PlainStart<'a>, timestamp: i64) {
+        let ordinal = self.entries - 1;
+        if self.first.is_none() {
+            self.first = Some((start, ordinal, true));
+        }
+        if i128::from(timestamp) <= self.track.target {
+            self.best = Some((start, ordinal));
+        }
+    }
+
+    fn finish(&self) -> PlainStep<'a> {
         if self
             .unordered_minimum
-            .is_some_and(|minimum| self.target >= i128::from(minimum))
+            .is_some_and(|minimum| self.track.target >= i128::from(minimum))
         {
             return PlainStep::GiveUp;
         }
-        let (choice, first_fallback) = match (self.best, self.first) {
+        let ((start, ordinal), first_fallback) = match (self.best, self.first) {
             (Some(best), _) => (best, false),
-            (None, Some(first)) => (first, true),
-            (None, None) => return PlainStep::GiveUp,
+            (None, Some((start, ordinal, key))) if key || self.track.allow_initial_prefix => {
+                ((start, ordinal), true)
+            }
+            _ => return PlainStep::GiveUp,
         };
         PlainStep::Done(PlainChoice {
-            cursor: choice.0,
-            ordinal: choice.1,
+            start,
+            ordinal,
             first_fallback,
-            scanned,
+            scanned: self.entries,
         })
     }
 }

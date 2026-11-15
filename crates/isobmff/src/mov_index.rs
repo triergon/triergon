@@ -2,21 +2,20 @@
 //! Original Samples and clock/config/edit provenance travel with every entry.
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
-use crate::SampleCursor;
-use crate::mov_cursor::{TrackProjection, TrackResume};
-use plain_scan::{PlainChoice, PlainScan, PlainStep, PlainTrack};
-
-mod plain_scan;
+use crate::mov_cursor::{PlainStart, TrackProjection, TrackResume};
 use crate::{
     BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
     OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
     opus_seek::OpusRecoverySeek,
 };
+use plain_scan::{PlainChoice, PlainScan, PlainStep, PlainTrack};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
+
+mod plain_scan;
 
 #[derive(Clone, Copy, Debug)]
 pub struct IndexLimits {
@@ -422,24 +421,25 @@ impl<'a> IndexCursor<'a> {
         self.cursor.discard_occurrence();
     }
 
-    /// A prepared index over a plain regular track, before its first entry.
-    fn plain_track(&self) -> Option<PlainTrack<'a>> {
+    /// A prepared index over a plain track, before its first entry, for a seek
+    /// to `target` in the index's clock.
+    fn plain_track(&self, target: i128, allow_initial_prefix: bool) -> Option<PlainTrack<'a>> {
         if self.next != 0 || self.ready.is_some() || self.dependency_table {
             return None;
         }
-        let (table, shift) = self.cursor.plain_regular_track()?;
         Some(PlainTrack {
-            table,
-            shift,
+            source: self.cursor.plain_track()?,
             allow_initial_nonkey: self.allow_initial_nonkey,
+            allow_initial_prefix,
             max_entries: self.max_entries,
+            target,
         })
     }
 
-    /// Continue a [`plain_track`](Self::plain_track) index from `cursor`, whose
-    /// next sample is entry `ordinal`.
-    fn start_plain_at(&mut self, cursor: SampleCursor<'a>, ordinal: u64) -> Result<()> {
-        self.cursor.start_regular_at(cursor)?;
+    /// Continue a [`plain_track`](Self::plain_track) index from `start`, whose
+    /// sample is entry `ordinal`.
+    fn start_plain_at(&mut self, start: PlainStart<'a>, ordinal: u64) -> Result<()> {
+        self.cursor.start_plain_at(start)?;
         self.next = ordinal;
         Ok(())
     }
@@ -726,10 +726,8 @@ impl<'a> SeekJob<'a> {
                     // from the query.
                     let target =
                         self.index_timestamp - i128::from(self.index.cursor.index_edit_offset());
-                    self.plain = match self.index.plain_track() {
-                        Some(track) => {
-                            PlainScan::new(track, target).map_or(Plain::Off, Plain::Scanning)
-                        }
+                    self.plain = match self.index.plain_track(target, self.allow_initial_prefix) {
+                        Some(track) => Plain::Scanning(PlainScan::new(track)),
                         None => Plain::Off,
                     };
                 }
@@ -737,7 +735,7 @@ impl<'a> SeekJob<'a> {
                     PlainStep::Yield => return Ok(true),
                     PlainStep::GiveUp => self.plain = Plain::Off,
                     PlainStep::Done(choice) => {
-                        self.index.start_plain_at(choice.cursor, choice.ordinal)?;
+                        self.index.start_plain_at(choice.start, choice.ordinal)?;
                         self.plain = Plain::Selecting(choice);
                     }
                 },
@@ -756,7 +754,9 @@ impl<'a> SeekJob<'a> {
                         None
                     };
                     let entry = self.index.take_entry()?;
-                    if entry.ordinal != choice.ordinal || entry.flags & 1 == 0 {
+                    if entry.ordinal != choice.ordinal
+                        || (entry.flags & 1 == 0 && !choice.first_fallback)
+                    {
                         return Err(Error::Invalid("plain seek selection disagreement"));
                     }
                     if choice.first_fallback {

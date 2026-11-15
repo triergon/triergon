@@ -618,21 +618,27 @@ impl FragmentBuilder {
                             .ok_or(Error::Overflow)?;
                         self.phase = Phase::Commit;
                     } else if self.sample < run.wire.count {
-                        let value = run.wire.values(self.sample, defaults)?;
-                        if self.reject_zero_size && value.size == 0 {
-                            return Err(Error::Invalid(
-                                "zero-size fragment sample in native MOV header",
-                            ));
+                        // One unit per sample: the first was charged above.
+                        loop {
+                            let value = run.wire.values(self.sample, defaults)?;
+                            if self.reject_zero_size && value.size == 0 {
+                                return Err(Error::Invalid(
+                                    "zero-size fragment sample in native MOV header",
+                                ));
+                            }
+                            self.total_bytes = self
+                                .total_bytes
+                                .checked_add(u64::from(value.size))
+                                .ok_or(Error::Overflow)?;
+                            self.total_duration = self
+                                .total_duration
+                                .checked_add(u64::from(value.duration))
+                                .ok_or(Error::Overflow)?;
+                            self.sample = self.sample.checked_add(1).ok_or(Error::Overflow)?;
+                            if self.sample == run.wire.count || !work.try_charge(1) {
+                                break;
+                            }
                         }
-                        self.total_bytes = self
-                            .total_bytes
-                            .checked_add(u64::from(value.size))
-                            .ok_or(Error::Overflow)?;
-                        self.total_duration = self
-                            .total_duration
-                            .checked_add(u64::from(value.duration))
-                            .ok_or(Error::Overflow)?;
-                        self.sample = self.sample.checked_add(1).ok_or(Error::Overflow)?;
                     } else {
                         self.phase = Phase::Commit;
                     }
@@ -783,19 +789,72 @@ impl FragmentCursor<'_> {
         self.run
     }
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+        let Advance::Sample(next) = self.advance(work)? else {
+            return Ok(SampleStep::Yield);
+        };
+        let Some(next) = next else {
+            return Ok(SampleStep::End);
+        };
+        let values = next.values;
+        let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
+        let cts = next
+            .decode
+            .map(|d| d.checked_add(cto_ticks).ok_or(Error::Overflow))
+            .transpose()?;
+        let sample = Sample {
+            ordinal: next.ordinal,
+            description_index: self.index.defaults.description_index,
+            range: next.start..next.end,
+            dts_ticks: next.decode,
+            cts_ticks: cts,
+            duration_ticks: values.duration,
+            composition_offset: values.cto,
+            access: if values.flags & 0x10000 == 0 {
+                Access::ContainerSync
+            } else {
+                Access::NonSync
+            },
+            partial_sync: false,
+            dependency: None,
+            fragment_flags: Some(values.flags),
+        };
+        self.commit(&next);
+        Ok(SampleStep::Sample(sample))
+    }
+    /// Steps past the next sample without building it, as [`poll`](Self::poll)
+    /// does.
+    pub(crate) fn skip(&mut self, work: &mut WorkBudget) -> Result<RunSkip> {
+        let Advance::Sample(next) = self.advance(work)? else {
+            return Ok(RunSkip::Yield);
+        };
+        let Some(next) = next else {
+            return Ok(RunSkip::End);
+        };
+        self.commit(&next);
+        Ok(RunSkip::Sample(SkippedRunSample {
+            ordinal: next.ordinal,
+            dts: next.decode,
+            duration: next.values.duration,
+            start: next.start,
+            size: next.values.size,
+            sync: next.values.flags & 0x10000 == 0,
+        }))
+    }
+    /// Finds the next sample, passing exhausted runs, without moving past it.
+    fn advance(&mut self, work: &mut WorkBudget) -> Result<Advance> {
         loop {
             let Some(run) = self.index.runs.as_slice().get(self.run) else {
-                return Ok(SampleStep::End);
+                return Ok(Advance::Sample(None));
             };
             if !work.try_charge(1) {
-                return Ok(SampleStep::Yield);
+                return Ok(Advance::Yield);
             }
             if self.sample == run.wire.count {
                 self.run = self.run.checked_add(1).ok_or(Error::Overflow)?;
                 self.sample = 0;
                 continue;
             }
-            let byte = if self.sample == 0 {
+            let start = if self.sample == 0 {
                 run.byte
             } else {
                 self.byte
@@ -806,13 +865,9 @@ impl FragmentCursor<'_> {
                 self.decode
             };
             let values = run.wire.values(self.sample, self.index.defaults)?;
-            let end = byte
+            let end = start
                 .checked_add(u64::from(values.size))
                 .ok_or(Error::Overflow)?;
-            let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
-            let cts = decode
-                .map(|d| d.checked_add(cto_ticks).ok_or(Error::Overflow))
-                .transpose()?;
             let decode_end = decode
                 .map(|d| {
                     d.checked_add(i128::from(values.duration))
@@ -823,30 +878,58 @@ impl FragmentCursor<'_> {
                 .ordinal
                 .checked_add(u64::from(self.sample))
                 .ok_or(Error::Overflow)?;
-            let sample = Sample {
+            let following = self.sample.checked_add(1).ok_or(Error::Overflow)?;
+            return Ok(Advance::Sample(Some(NextSample {
                 ordinal,
-                description_index: self.index.defaults.description_index,
-                range: byte..end,
-                dts_ticks: decode,
-                cts_ticks: cts,
-                duration_ticks: values.duration,
-                composition_offset: values.cto,
-                access: if values.flags & 0x10000 == 0 {
-                    Access::ContainerSync
-                } else {
-                    Access::NonSync
-                },
-                partial_sync: false,
-                dependency: None,
-                fragment_flags: Some(values.flags),
-            };
-            let next = self.sample.checked_add(1).ok_or(Error::Overflow)?;
-            self.byte = end;
-            self.decode = decode_end;
-            self.sample = next;
-            return Ok(SampleStep::Sample(sample));
+                start,
+                end,
+                decode,
+                decode_end,
+                following,
+                values,
+            })));
         }
     }
+    fn commit(&mut self, next: &NextSample) {
+        self.byte = next.end;
+        self.decode = next.decode_end;
+        self.sample = next.following;
+    }
+}
+
+/// The sample a [`FragmentCursor`] produces next.
+struct NextSample {
+    ordinal: u64,
+    start: u64,
+    end: u64,
+    decode: Option<i128>,
+    decode_end: Option<i128>,
+    following: u32,
+    values: Values,
+}
+
+enum Advance {
+    Sample(Option<NextSample>),
+    Yield,
+}
+
+/// One step of [`FragmentCursor::skip`].
+#[derive(Debug)]
+pub(crate) enum RunSkip {
+    Sample(SkippedRunSample),
+    Yield,
+    End,
+}
+
+/// A fragment sample [`FragmentCursor::skip`] stepped past.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SkippedRunSample {
+    pub(crate) ordinal: u64,
+    pub(crate) dts: Option<i128>,
+    pub(crate) duration: u32,
+    pub(crate) start: u64,
+    pub(crate) size: u32,
+    pub(crate) sync: bool,
 }
 
 #[derive(Debug)]

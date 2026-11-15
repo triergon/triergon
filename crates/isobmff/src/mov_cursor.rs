@@ -8,9 +8,10 @@
 //! appending a run.
 //! No demux implementation code, expanded sample array, I/O or payload storage.
 use crate::{
-    CursorStatus, DurationBasis, EditCursor, EditLimits, EditList, FragmentIndex, MediaClock,
-    PacketProjector, PacketView, Sample, SampleCursor, SampleStep, SampleTable, SchedulingClock,
-    SourceTrack, SpanStep, TrackSampleCursor, interleave::TrackSpans, require_range_within,
+    CursorStatus, DurationBasis, EditCursor, EditLimits, EditList, FragmentCursor, FragmentIndex,
+    MediaClock, PacketProjector, PacketView, Sample, SampleCursor, SampleStep, SampleTable,
+    SchedulingClock, SourceTrack, SpanStep, TrackSampleCursor, interleave::TrackSpans,
+    require_range_within,
 };
 use std::{
     ops::Range,
@@ -434,6 +435,41 @@ impl<'a> Slot<'a> {
         self.head = Some(occurrence);
         Ok(CursorStatus::Ready)
     }
+}
+
+/// A track whose occurrences are its samples in order with unedited clocks; see
+/// [`PacketCursor::plain_track`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PlainSource<'a> {
+    /// A regular table, projected with its composition shift.
+    Regular { table: &'a SampleTable, shift: i64 },
+    /// Fragments alone, whose decode times the fragment edit offsets.
+    Fragments {
+        track_id: u32,
+        fragments: &'a [FragmentIndex],
+        edit_offset: i64,
+    },
+}
+
+/// Where a [`PlainSource`] track continues from.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PlainStart<'a> {
+    Regular(SampleCursor<'a>),
+    /// The cursor over fragment `next_fragment - 1` that produces the sample,
+    /// the sample before it, if any, and the discard boundary of its run.
+    Fragment {
+        next_fragment: usize,
+        cursor: FragmentCursor<'a>,
+        previous: Option<PreviousSample>,
+        discard_boundary: Option<i128>,
+    },
+}
+
+/// A fragment sample's clock and the run that holds it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PreviousSample {
+    pub(crate) clock: PreviousClock,
+    pub(crate) run: (usize, usize),
 }
 
 /// One track's packet state at an occurrence its index produced: what a
@@ -1121,16 +1157,15 @@ impl<'a> PacketCursor<'a> {
         })
     }
 
-    /// A prepared one-track cursor's plain regular track: no edits, fragments,
-    /// partial sync or dependency samples, and every sample reaching the
-    /// projection that [`PacketProjector::project_regular`] gives with `shift`.
-    /// Its occurrences are its samples in order.
-    pub(crate) fn plain_regular_track(&self) -> Option<(&'a SampleTable, i64)> {
+    /// A prepared one-track cursor's track when its occurrences are its samples
+    /// in order with unedited clocks: a regular table with no edit list, partial
+    /// sync or dependency samples, or fragments alone.
+    pub(crate) fn plain_track(&self) -> Option<PlainSource<'a>> {
         let [slot] = self.slots.as_slice() else {
             return None;
         };
         let table = slot.track.table;
-        let plain = matches!(self.phase, Phase::Fill)
+        let prepared = matches!(self.phase, Phase::Fill)
             && self.at == 0
             && self.generated == 0
             && self.ready.is_none()
@@ -1146,30 +1181,64 @@ impl<'a> PacketCursor<'a> {
             && slot.head.is_none()
             && slot.resume_remaining == 0
             && slot.clock.is_some()
-            && slot.track.edits.is_none()
             && slot.edited.is_none()
             && slot.encoded_edit.is_none()
+            && !slot.front_fragment
+            && slot.previous_clock.is_none()
+            && slot.append_run.is_none()
+            && self.validated != 0
+            && self.validated <= self.limits.max_occurrences;
+        if !prepared {
+            return None;
+        }
+        if !slot.saw_fragment
+            && slot.track.edits.is_none()
             && slot.fragment_edit.is_none()
-            && !slot.saw_fragment
-            && table.sample_count() != 0
-            && table.sample_count() <= self.limits.max_occurrences
             && !table.has_partial_sync_samples()
-            && !table.has_dependency_table();
-        plain.then_some((table, slot.shift))
+            && !table.has_dependency_table()
+        {
+            return Some(PlainSource::Regular {
+                table,
+                shift: slot.shift,
+            });
+        }
+        (slot.saw_fragment && table.sample_count() == 0).then_some(PlainSource::Fragments {
+            track_id: slot.track.track_id,
+            fragments: slot.track.fragments,
+            edit_offset: slot.fragment_edit_offset(),
+        })
     }
 
-    /// Continue a prepared [`plain_regular_track`](Self::plain_regular_track)
-    /// cursor from `cursor`, a cursor over its table, as though the samples
-    /// before it had been produced.
-    pub(crate) fn start_regular_at(&mut self, cursor: SampleCursor<'a>) -> Result<()> {
-        let Some((table, _)) = self.plain_regular_track() else {
-            return Err(Error::Invalid("regular start needs a prepared plain track"));
-        };
-        if !std::ptr::eq(cursor.table(), table) {
-            return Err(Error::Invalid("regular start from another table"));
-        }
+    /// Continue a prepared [`plain_track`](Self::plain_track) cursor from
+    /// `start`, as though the samples before it had been produced.
+    pub(crate) fn start_plain_at(&mut self, start: PlainStart<'a>) -> Result<()> {
+        let source = self
+            .plain_track()
+            .ok_or(Error::Invalid("plain start needs a prepared plain track"))?;
         let slot = &mut self.slots.as_mut_slice()[0];
-        slot.cursor = TrackSampleCursor::from_regular(slot.source()?, cursor);
+        match (source, start) {
+            (PlainSource::Regular { table, .. }, PlainStart::Regular(cursor))
+                if std::ptr::eq(cursor.table(), table) =>
+            {
+                slot.cursor = TrackSampleCursor::from_regular(slot.source()?, cursor);
+            }
+            (
+                PlainSource::Fragments { fragments, .. },
+                PlainStart::Fragment {
+                    next_fragment,
+                    cursor,
+                    previous,
+                    discard_boundary,
+                },
+            ) if next_fragment > 0 && next_fragment <= fragments.len() => {
+                slot.cursor =
+                    TrackSampleCursor::from_fragment(slot.source()?, next_fragment, cursor);
+                slot.previous_clock = previous.map(|previous| previous.clock);
+                slot.append_run = previous.map(|previous| previous.run);
+                slot.discard_boundary = discard_boundary;
+            }
+            _ => return Err(Error::Invalid("plain start from another track")),
+        }
         Ok(())
     }
 
@@ -1349,7 +1418,7 @@ impl<'a> PacketCursor<'a> {
             .ok_or(Error::Invalid("no ready native packet"))
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        self.poll_until(work, cancel, false)
+        self.poll_until::<false>(work, cancel)
     }
     /// Runs the checks that precede the first occurrence: the sample extents,
     /// the clocks and the edit setup. `Ready` once the cursor would fill.
@@ -1358,29 +1427,28 @@ impl<'a> PacketCursor<'a> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<CursorStatus> {
-        self.poll_until(work, cancel, true)
+        self.poll_until::<true>(work, cancel)
     }
-    fn poll_until(
+    /// Polls; with `PREPARE`, only up to the first fill.
+    fn poll_until<const PREPARE: bool>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        prepared: bool,
     ) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let result = self.poll_inner(work, cancel, prepared);
+        let result = self.poll_inner::<PREPARE>(work, cancel);
         if let Err(error) = result {
             self.failed = Some(error);
             self.ready = None;
         }
         result
     }
-    fn poll_inner(
+    fn poll_inner<const PREPARE: bool>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        prepared: bool,
     ) -> Result<CursorStatus> {
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -1690,7 +1758,7 @@ impl<'a> PacketCursor<'a> {
                     self.slots.as_mut_slice()[self.at].head = None;
                 }
                 Phase::Fill => {
-                    if prepared {
+                    if PREPARE {
                         return Ok(CursorStatus::Ready);
                     }
                     if self.at == self.slots.len() {

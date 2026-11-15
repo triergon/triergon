@@ -89,6 +89,22 @@ impl<'a> TrackSampleCursor<'a> {
             ..Self::new(source)
         }
     }
+    /// The cursor whose next sample comes from `current`, a cursor over
+    /// fragment `next_fragment - 1` of the track's fragments, after the regular
+    /// samples have ended.
+    pub(crate) fn from_fragment(
+        source: SourceTrack<'a>,
+        next_fragment: usize,
+        current: FragmentCursor<'a>,
+    ) -> Self {
+        Self {
+            source,
+            regular: None,
+            next_fragment,
+            current: Some(current),
+            failed: None,
+        }
+    }
     /// Container-local append unit that produced the last fragment Sample:
     /// ordinal in the supplied fragment slice, then run ordinal in that index.
     /// This borrows existing cursor state in O(1), without an input token, epoch,
