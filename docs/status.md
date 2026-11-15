@@ -166,6 +166,14 @@ output fold. In `avc-width1`, the median resident page count at entry is 466
 versus 451 on AArch64 and 343 versus 329 on ARMv7. This difference is present
 before framing begins.
 
+The reference input adapter at `f40c8eb0` uses descriptor reads and bounded
+scratch storage. The earlier `f71495ea` adapter used stdio. In six first-write
+mapping snapshots per build for `avc-width1`, resident libc text at memory entry
+fell from 1088 to 896 KiB on AArch64 and from 756 to 634 KiB on ARMv7.
+Both reference workers rebuilt byte-identically from the same FFmpeg archives
+and compiler arguments. These diagnostic snapshots accompany the kernel-bound
+measurements in `packet-framing-reference-residency-f40c8eb0`.
+
 The earlier matched run at `62e1ad85` also had 0/131 lower total RSS on each
 target. Its two ARMv7 runtime misses, `hevc-irap_repeat` and `hevc-type19`, are
 within the ceiling at `f40c8eb0`. The comparisons at `6ce7109c` and
@@ -554,6 +562,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Gate run, Linux AArch64 and ARMv7: packet framing | `79e0ae138c71ffc57c73decc88d29ae86b1153d4` | `5bfaaaf0dc18f27473bff810c9eb5d895bd787bda9a4df5942c27f2370844e76` |
 | Packet framing, Linux AArch64, current | `f40c8eb009c15b812f131c935c6cfdfee1660df0` | `57b84793b0d187563123059018b30fd449c883f69dae1bdfde6e7ac60d074dd3` |
 | Packet framing, Linux ARMv7, current | `f40c8eb009c15b812f131c935c6cfdfee1660df0` | `3a49c9567e82e878e8e031c0a0252198db3f1ae98cee25e3eff3cb6a7df6c925` |
+| Packet framing reference-input mappings, Linux AArch64 and ARMv7 | `f40c8eb009c15b812f131c935c6cfdfee1660df0` | `68675427c442f834c2dc401ed1d336f11703144c36a3778c04f54643adf345fc` |
 | Earlier packet framing, Linux AArch64 | `62e1ad85011c85141ad58edfec275303a2d63b83` | `cb21eabf713fe7d55546a55ef264698436cbae0202058787890141100c824b8c` |
 | Earlier packet framing, Linux ARMv7 | `62e1ad85011c85141ad58edfec275303a2d63b83` | `b7d37c676319d2cd294639a8f2f51efb5dce9fde9dc948965850952c501bac3b` |
 | Earlier packet framing, Linux AArch64 | `7707d7768e1c6f1103ac333248857fba00290c94` | `4ce0fc95b2d8b3ec686a3853137619be86e99a0eb04d736ba3f945b68895ad8c` |
@@ -870,9 +879,15 @@ and `vobsub-idx-delay-beyond-32-bits`; its fifth, `vobsub-idx-size-int-min`, bot
 refuse. A decoder that refuses to open is a result both workers fold and compare.
 
 Apart from the codec diagnostics, one packet-framing case exceeds the ARMv7
-runtime ceiling at `f40c8eb0`. The upper bound for
-`hevc-update` is 1.2106. Five of MP4 range's 51 cases also exceed
-the ceiling on ARMv7, with a worst bound of 1.2241. MP4 range is gated on
+runtime ceiling at `f40c8eb0`. The upper bound for `hevc-update` is 1.2106.
+From `f71495ea` to `f40c8eb0`, its median fell from 6139 to 5186 ns per
+operation in Triergon and from 6229 to 4472 ns in the reference. The matched
+fold and reuse of empty packet shells both changed in the timed reference
+adapter. The per-side medians are in
+`packet-framing-reference-residency-f40c8eb0`.
+
+Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
+bound of 1.2241. MP4 range is gated on
 Linux AArch64 only. The closest below it are capture `c13-motion-960-6m` 1.1536
 and `c14-motion-960-rate255` 1.1528 at `dcf51398`, then Matroska 1.1466, MP4
 forward 1.0811 and DVD 1.0360.

@@ -17011,6 +17011,18 @@
    }
   },
   {
+   "name": "packet-framing-reference-residency-f40c8eb0",
+   "retention": "retained",
+   "reason": "Packet-framing reference input residency on AArch64 and ARMv7, byte-identical reference rebuilds and the per-side timing cited in the status rows",
+   "key": "evidence/packet-framing-reference-residency-f40c8eb0/68675427c442f834c2dc401ed1d336f11703144c36a3778c04f54643adf345fc.tar.zst",
+   "sha256": "68675427c442f834c2dc401ed1d336f11703144c36a3778c04f54643adf345fc",
+   "bytes": 9855,
+   "source_revisions": {
+    "baseline": "f71495ea154e95b30f8fa002637b4a6932cd32dd",
+    "candidate": "f40c8eb009c15b812f131c935c6cfdfee1660df0"
+   }
+  },
+  {
    "name": "packet-framing-7707d776-aarch64",
    "retention": "retained",
    "reason": "AArch64 packet-framing comparison before matching both adapters",
