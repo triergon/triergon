@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-7707d776-armv7",
+ "retention": "retained",
+ "reason": "ARMv7 packet-framing comparison before matching both adapters",
+ "key": "evidence/packet-framing-7707d776-armv7/e328d5c702f3fb527d3802aba615b107ca428121f83346c569fea1980369b3e1.tar.zst",
+ "sha256": "e328d5c702f3fb527d3802aba615b107ca428121f83346c569fea1980369b3e1",
+ "bytes": 15406965,
+ "source_revisions": {
+  "candidate": "7707d7768e1c6f1103ac333248857fba00290c94"
+ }
+}

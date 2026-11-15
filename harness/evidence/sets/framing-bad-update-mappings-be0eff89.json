@@ -1,0 +1,11 @@
+{
+ "name": "framing-bad-update-mappings-be0eff89",
+ "retention": "retained",
+ "reason": "AArch64 executable mapping snapshots and minor faults for the malformed AVC update",
+ "key": "evidence/framing-bad-update-mappings-be0eff89/8f88b57846eac803852b35c2f2ab030a18a5476b06b91f92f7f8f3eaaa16baac.tar.zst",
+ "sha256": "8f88b57846eac803852b35c2f2ab030a18a5476b06b91f92f7f8f3eaaa16baac",
+ "bytes": 23869,
+ "source_revisions": {
+  "candidate": "be0eff89e4655c0a2dfae16e10bceb4709d357d7"
+ }
+}

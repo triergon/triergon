@@ -14,6 +14,11 @@ is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
 Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
 and are fed with `provide` and closed with `finish` or `fail`.
 
+AVC and HEVC record parsers, including their compatibility wrappers, also offer
+`step_into` with an empty output slot and `ConfigProgress`. This publishes the
+configuration directly into caller storage. Occupied slots are rejected without
+advancing the parser; `step` retains the same progress and error behaviour.
+
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
@@ -119,18 +124,17 @@ size/type header); sample jobs take one complete container sample.
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
 generation. Raw and reserved fields stay readable; local violations are reported
 through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
-fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
-retained view keeps the whole backing allocation charged. Small AVC records can
-reuse the checked offsets from the validation pass when the remaining work
-budget covers publishing the descriptors.
+fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input. A
+retained view keeps the whole backing allocation charged. The configuration
+writers use the validated parameter-set ranges from these records.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs allocate segment storage as needed and share the original
-payload for passthrough packets.
+Stateful packet jobs charge heap segment storage to the caller's pool and
+share the original payload for passthrough packets.
 
 **Codec-specific limits.**
 
@@ -140,10 +144,16 @@ payload for passthrough packets.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
-- With complete AVC sequence and picture parameter-set arrays, the AVC receiver
-  can frame a sample whose required profile extension has zero to three bytes.
-  It preserves that suffix as trailing bytes and reports `Truncated` as the
-  strict source refusal.
+- The AVC packet receiver can emit parameter sets before a buffering-period SEI
+  (H.264 Annex D). It uses in-band sets found before the following slice, then
+  falls back to the active configuration for missing sets. It preserves the
+  original packet NALs and does not parse the SEI payload.
+- The AVC High-profile comparisons frame samples from complete sequence and
+  picture parameter-set arrays with zero to three extension header bytes.
+  The receiver preserves those bytes as a trailing suffix and reports
+  `Truncated` as the strict source refusal. When a complete extension header
+  declares entries and the record ends at the header, the receiver frames
+  the base parameter sets and preserves the header and the strict refusal.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps. `append_payload` can consume an interior NAL
   slice while the reader is waiting for input.
@@ -196,13 +206,17 @@ Verification:
   `hevc-aud0.hevc` with an end of sequence before its second VPS and an end of
   bitstream at the end.
 
-From the repository root, `cargo xtask framing` compares all 131 AVC/HEVC
+From the repository root, `cargo xtask framing` compares all 135 AVC/HEVC
 packet-framing scripts with the pinned FFmpeg bitstream-filter API. The
 [contract](../../harness/features/packet-framing/contract.json) covers configuration,
 complete packet fields and side data, malformed input, flush and drain actions,
 and retained packet access after close. Add `--benchmark --memory` to collect
 paired runtime and memory measurements through the shared harness; qualification
 requires the pinned gate build on native AArch64 Linux.
+
+Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
+`cargo test -p triergon-framing --features reference-trace --test packet_view`
+to export every complete event trace and digest with all digest assertions active.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in

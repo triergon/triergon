@@ -22,8 +22,10 @@
 #include <time.h>
 
 #define CAP (16U * 1024U * 1024U)
+#define SCRIPT_STACK_BYTES 1024
 #define EVENTS 64
 #define OUTPUTS 256
+_Static_assert(AV_INPUT_BUFFER_PADDING_SIZE == 64, "framing input padding");
 typedef struct {
     const uint8_t *p;
     size_t n, at;
@@ -35,7 +37,7 @@ typedef struct {
 } Event;
 typedef struct {
     unsigned codec, count;
-    const uint8_t *config;
+    uint8_t *config;
     unsigned config_n;
     Event events[EVENTS];
 } Case;
@@ -46,20 +48,20 @@ typedef struct {
     Digest hash;
     uint64_t packets, bytes;
 } Outcome;
-static void group(Digest *h, const uint8_t *p) {
-    /* Match the Rust worker's eight-byte polynomial grouping modulo 2^64. */
-    static const uint64_t pow31[9] = {
-        1, 31, 961, 29791, 923521, 28629151, 887503681, 27512614111, 852891037441};
-    static const uint64_t pow131[9] = {
-        1, 131, 17161, 2248091, 294499921, 38579489651, 5053913144281,
-        662062621900811, 86730203469006241};
-    uint64_t a = 0, b = 0;
-    for (unsigned i = 0; i < 8; ++i) {
-        a += (uint64_t)p[i] * pow31[7 - i];
-        b += (uint64_t)p[i] * pow131[7 - i];
-    }
-    h->a = h->a * pow31[8] + a;
-    h->b = h->b * pow131[8] + b;
+static inline uint32_t group_four(const uint8_t *p, uint32_t base,
+                                  uint32_t square, uint32_t cube) {
+    return p[0] * cube + p[1] * square + p[2] * base + p[3];
+}
+static inline uint64_t group_eight(const uint8_t *p, uint32_t base,
+                                   uint32_t square, uint32_t cube, uint32_t fourth) {
+    /* Fold two four-byte sums in 32 bits before widening, as in the Rust worker. */
+    return (uint64_t)group_four(p, base, square, cube) * fourth +
+           group_four(p + 4, base, square, cube);
+}
+static inline void group(Digest *h, const uint8_t *p) {
+    h->a = h->a * UINT64_C(852891037441) + group_eight(p, 31, 961, 29791, 923521);
+    h->b = h->b * UINT64_C(86730203469006241) +
+           group_eight(p, 131, 17161, 2248091, 294499921);
 }
 static void raw(Digest *h, const uint8_t *p, size_t n) {
     while (n >= 8) {
@@ -72,11 +74,15 @@ static void raw(Digest *h, const uint8_t *p, size_t n) {
         h->b = h->b * 131 + p[i];
     }
 }
-static void word(Digest *h, uint64_t n) {
-    uint8_t b[8];
-    for (unsigned i = 0; i < 8; ++i)
-        b[i] = (uint8_t)(n >> (i * 8));
+static inline void word(Digest *h, uint64_t n) {
+    uint8_t b[8] = {(uint8_t)n,         (uint8_t)(n >> 8),  (uint8_t)(n >> 16),
+                    (uint8_t)(n >> 24), (uint8_t)(n >> 32), (uint8_t)(n >> 40),
+                    (uint8_t)(n >> 48), (uint8_t)(n >> 56)};
     group(h, b);
+}
+static void words(Digest *h, const uint64_t *data, size_t n) {
+    for (size_t i = 0; i < n; ++i)
+        word(h, data[i]);
 }
 static void blob(Digest *h, const uint8_t *p, size_t n) {
     word(h, n);
@@ -108,6 +114,7 @@ static void release_buffer(void *opaque, uint8_t *data) {
 static void case_free(Case *c) {
     for (unsigned i = 0; i < c->count; ++i)
         av_packet_free(&c->events[i].packet);
+    av_free(c->config);
 }
 static int case_load(Case *c, const uint8_t *data, size_t n) {
     Reader r = {data, n, 0, 0};
@@ -116,12 +123,17 @@ static int case_load(Case *c, const uint8_t *data, size_t n) {
         return -1;
     c->codec = (unsigned)get(&r, 1);
     c->config_n = (unsigned)get(&r, 4);
-    c->config = span(&r, c->config_n);
+    const uint8_t *config = span(&r, c->config_n);
     c->count = (unsigned)get(&r, 4);
     if (r.bad || c->codec < 1 || c->codec > 2 || c->count > EVENTS) {
         c->count = 0;
         return -1;
     }
+    c->config = av_mallocz((size_t)c->config_n + AV_INPUT_BUFFER_PADDING_SIZE);
+    if (!c->config)
+        return -1;
+    if (c->config_n)
+        memcpy(c->config, config, c->config_n);
     for (unsigned i = 0; i < c->count; ++i) {
         Event *e = &c->events[i];
         e->type = (unsigned)get(&r, 1);
@@ -170,17 +182,13 @@ static int case_load(Case *c, const uint8_t *data, size_t n) {
     return r.bad || r.at != n ? -1 : 0;
 }
 static void packet(Digest *h, unsigned kind, int input, unsigned output, const AVPacket *p) {
-    word(h, kind);
-    word(h, (uint64_t)(int64_t)input);
-    word(h, output);
-    word(h, (uint64_t)p->pts);
-    word(h, (uint64_t)p->dts);
-    word(h, (uint64_t)p->duration);
-    word(h, (uint64_t)p->pos);
-    word(h, (uint64_t)(int64_t)p->flags);
-    word(h, (uint64_t)(int64_t)p->stream_index);
-    word(h, (uint64_t)(int64_t)p->time_base.num);
-    word(h, (uint64_t)(int64_t)p->time_base.den);
+    const uint64_t fields[] = {
+        kind, (uint64_t)(int64_t)input, output, (uint64_t)p->pts, (uint64_t)p->dts,
+        (uint64_t)p->duration, (uint64_t)p->pos, (uint64_t)(int64_t)p->flags,
+        (uint64_t)(int64_t)p->stream_index, (uint64_t)(int64_t)p->time_base.num,
+        (uint64_t)(int64_t)p->time_base.den,
+    };
+    words(h, fields, sizeof(fields) / sizeof(fields[0]));
     blob(h, p->data, (size_t)p->size);
     word(h, (unsigned)p->side_data_elems);
     for (int i = 0; i < p->side_data_elems; ++i) {
@@ -188,17 +196,18 @@ static void packet(Digest *h, unsigned kind, int input, unsigned output, const A
         blob(h, p->side_data[i].data, p->side_data[i].size);
     }
 }
-static int receive_all(AVBSFContext *ctx, AVPacket **kept, unsigned *count, int input,
-                       Outcome *out) {
+static int receive_all(AVBSFContext *ctx, AVPacket **slot, AVPacket **kept,
+                       unsigned *count, int input, Outcome *out) {
     for (;;) {
         if (*count >= OUTPUTS)
             return -1;
-        AVPacket *p = av_packet_alloc();
+        if (!*slot)
+            *slot = av_packet_alloc();
+        AVPacket *p = *slot;
         if (!p)
             return -1;
         int rc = av_bsf_receive_packet(ctx, p);
         if (rc < 0) {
-            av_packet_free(&p);
             if (rc == AVERROR(ENOMEM))
                 return -1;
             if (rc != AVERROR(EAGAIN) && rc != AVERROR_EOF) {
@@ -208,14 +217,13 @@ static int receive_all(AVBSFContext *ctx, AVPacket **kept, unsigned *count, int 
             }
             return 0;
         }
-        if (p->size < 0 || p->size > (int)CAP) {
-            av_packet_free(&p);
+        if (p->size < 0 || p->size > (int)CAP)
             return -1;
-        }
         packet(&out->hash, 2, input, *count, p);
         out->packets++;
         out->bytes += (unsigned)p->size;
         kept[(*count)++] = p;
+        *slot = NULL;
     }
 }
 static int operation(const Case *c, Outcome *out) {
@@ -224,7 +232,8 @@ static int operation(const Case *c, Outcome *out) {
     if (!filter)
         return -1;
     AVBSFContext *ctx = NULL;
-    AVPacket *kept[OUTPUTS] = {0};
+    AVPacket *send = NULL, *receive = NULL;
+    AVPacket *kept[OUTPUTS];
     unsigned count = 0;
     int failed = 0;
     if (av_bsf_alloc(filter, &ctx) < 0)
@@ -241,6 +250,10 @@ static int operation(const Case *c, Outcome *out) {
     ctx->par_in->extradata_size = (int)c->config_n;
     ctx->time_base_in = (AVRational){1, 90000};
     int rc = av_bsf_init(ctx);
+    if (rc == AVERROR(ENOMEM)) {
+        av_bsf_free(&ctx);
+        return -1;
+    }
     if (rc < 0) {
         word(&out->hash, 4);
         word(&out->hash, (uint64_t)(int64_t)rc);
@@ -258,21 +271,26 @@ static int operation(const Case *c, Outcome *out) {
             if (e->type == 2)
                 rc = av_bsf_send_packet(ctx, NULL);
             else {
-                AVPacket *p = av_packet_clone(e->packet);
-                if (!p) {
+                if (!send)
+                    send = av_packet_alloc();
+                if (!send || av_packet_ref(send, e->packet) < 0) {
                     failed = 1;
                     break;
                 }
-                rc = av_bsf_send_packet(ctx, p);
-                av_packet_free(&p);
+                rc = av_bsf_send_packet(ctx, send);
+                if (rc < 0)
+                    av_packet_unref(send);
             }
-            if (rc == AVERROR(ENOMEM) || (rc >= 0 && receive_all(ctx, kept, &count, (int)i, out))) {
+            if (rc == AVERROR(ENOMEM) ||
+                (rc >= 0 && receive_all(ctx, &receive, kept, &count, (int)i, out))) {
                 failed = 1;
                 break;
             }
         }
     }
     av_bsf_free(&ctx);
+    av_packet_free(&send);
+    av_packet_free(&receive);
     word(&out->hash, 6);
     word(&out->hash, count);
     for (unsigned i = 0; i < count; ++i) {

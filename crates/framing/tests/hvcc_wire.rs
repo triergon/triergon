@@ -74,6 +74,14 @@ fn example() -> Vec<u8> {
         &[],
     )
 }
+
+fn heap_example() -> Vec<u8> {
+    let mut raw = example();
+    raw[22] = 5;
+    raw.extend_from_slice(&[55, 0, 1, 0, 6]);
+    raw.extend_from_slice(&nal(55, 8));
+    raw
+}
 fn run(
     pool: &Budget,
     data: Bytes,
@@ -358,32 +366,44 @@ fn zero_work_no_allocation_and_atomic_cancel_are_sticky() {
 }
 #[test]
 fn descriptor_backpressure_retries_the_same_complete_record() {
-    let pool = Budget::new(10_000).unwrap();
-    let raw = example();
-    let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
-    let needed = parse(&raw).unwrap().descriptor_storage_bytes().unwrap();
-    let mut blocker = BudgetVec::<u8>::new(&pool);
-    blocker
-        .try_reserve_exact(pool.available() - needed / 2)
-        .unwrap();
-    let mut p = HvcConfigParser::new(&pool, source(), data.clone(), limits()).unwrap();
-    assert!(matches!(
-        p.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)),
-        Err(Error::Backpressure { .. })
-    ));
-    drop(blocker);
-    let o = loop {
-        match p
-            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
-            .unwrap()
-        {
-            BuildStep::Ready(o) => break o,
-            BuildStep::Yield => {}
-            BuildStep::Complete => panic!(),
+    for raw in [example(), heap_example()] {
+        let pool = Budget::new(10_000).unwrap();
+        let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
+        let needed = parse(&raw).unwrap().descriptor_storage_bytes().unwrap();
+        let mut blocker = BudgetVec::<u8>::new(&pool);
+        blocker
+            .try_reserve_exact(pool.available() - needed / 2)
+            .unwrap();
+        let mut p = HvcConfigParser::new(&pool, source(), data.clone(), limits()).unwrap();
+        if needed == 0 {
+            let BuildStep::Ready(output) = p
+                .step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
+                .unwrap()
+            else {
+                panic!("inline descriptors need no room beyond the input")
+            };
+            assert_eq!(output.source_bytes().as_ref(), raw);
+            assert_eq!(output.nal_count(), 4);
+            continue;
         }
-    };
-    assert_eq!(o.source_bytes().as_ref(), raw);
-    assert_eq!(o.nal_count(), 4);
+        assert!(matches!(
+            p.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)),
+            Err(Error::Backpressure { .. })
+        ));
+        drop(blocker);
+        let o = loop {
+            match p
+                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .unwrap()
+            {
+                BuildStep::Ready(o) => break o,
+                BuildStep::Yield => {}
+                BuildStep::Complete => panic!(),
+            }
+        };
+        assert_eq!(o.source_bytes().as_ref(), raw);
+        assert_eq!(o.nal_count(), 5);
+    }
 }
 #[test]
 fn foreign_pool_and_absolute_source_overflow_are_explicit() {
@@ -519,67 +539,262 @@ fn zero_count_limits_allow_only_the_literal_empty_structure() {
 
 #[test]
 fn impossible_required_live_set_is_limit_and_drops_private_input() {
-    let raw = example();
-    let pool = Budget::new(
-        Budget::control_storage_bytes() + raw.len() + Bytes::owner_overhead_bytes() + 1,
-    )
-    .unwrap();
-    let baseline = pool.used();
-    let mut parser = HvcConfigParser::new(
-        &pool,
-        source(),
-        Bytes::copy_from_slice(&pool, &raw).unwrap(),
-        limits(),
-    )
-    .unwrap();
-    let Err(error @ Error::Limit { .. }) =
-        parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
-    else {
-        panic!("an intrinsically impossible live-set must not wait for caller release")
-    };
-    assert_eq!(pool.used(), baseline);
-    assert!(
-        matches!(parser.step(&mut WorkBudget::new(0), &AtomicBool::new(false)), Err(e) if e == error)
-    );
+    for raw in [example(), heap_example()] {
+        let pool = Budget::new(
+            Budget::control_storage_bytes() + raw.len() + Bytes::owner_overhead_bytes() + 1,
+        )
+        .unwrap();
+        let baseline = pool.used();
+        let mut parser = HvcConfigParser::new(
+            &pool,
+            source(),
+            Bytes::copy_from_slice(&pool, &raw).unwrap(),
+            limits(),
+        )
+        .unwrap();
+        if raw[22] == 4 {
+            let BuildStep::Ready(output) = parser
+                .step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
+                .unwrap()
+            else {
+                panic!("the original small record now fits without descriptor heap")
+            };
+            assert_eq!(output.source_bytes().as_ref(), raw);
+            assert_eq!(output.descriptor_storage_bytes().unwrap(), 0);
+            drop((output, parser));
+            assert_eq!(pool.used(), baseline);
+            continue;
+        }
+        let Err(error @ Error::Limit { .. }) =
+            parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
+        else {
+            panic!("an intrinsically impossible live-set must not wait for caller release")
+        };
+        assert_eq!(pool.used(), baseline);
+        assert!(
+            matches!(parser.step(&mut WorkBudget::new(0), &AtomicBool::new(false)), Err(e) if e == error)
+        );
+    }
 }
 
 #[test]
 fn each_reservation_retry_is_stable_and_late_cancel_releases_all_scratch() {
-    let pool = Budget::new(20_000).unwrap();
-    let data = Bytes::copy_from_slice(&pool, &example()).unwrap();
-    let baseline = pool.used();
-    let mut retained = BudgetVec::<u8>::new(&pool);
-    retained.try_reserve_exact(pool.available() - 1).unwrap();
-    let mut parser = HvcConfigParser::new(&pool, source(), data.clone(), limits()).unwrap();
-    let first = parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false));
-    let Err(error @ Error::Backpressure { .. }) = first else {
-        panic!("reservation not exercised")
-    };
-    let charged = pool.used();
-    for _ in 0..4 {
-        assert!(
-            matches!(parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)), Err(e) if e == error)
-        );
-        assert_eq!(pool.used(), charged);
+    for raw in [example(), heap_example()] {
+        let pool = Budget::new(20_000).unwrap();
+        let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
+        let baseline = pool.used();
+        let mut retained = BudgetVec::<u8>::new(&pool);
+        retained.try_reserve_exact(pool.available() - 1).unwrap();
+        let mut parser = HvcConfigParser::new(&pool, source(), data.clone(), limits()).unwrap();
+        if raw[22] == 4 {
+            // Prefix + count walk + array reservation: the same boundary now has
+            // no heap charge, even when caller retention leaves only one byte.
+            let charged = pool.used();
+            assert!(matches!(
+                parser.step(&mut WorkBudget::new(15), &AtomicBool::new(false)),
+                Ok(BuildStep::Yield)
+            ));
+            assert_eq!(pool.used(), charged);
+            drop(retained);
+        } else {
+            let first = parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false));
+            let Err(error @ Error::Backpressure { .. }) = first else {
+                panic!("reservation not exercised")
+            };
+            let charged = pool.used();
+            for _ in 0..4 {
+                assert!(
+                    matches!(parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)), Err(e) if e == error)
+                );
+                assert_eq!(pool.used(), charged);
+            }
+            drop(retained);
+            assert!(matches!(
+                parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
+                Ok(BuildStep::Yield)
+            ));
+            assert!(
+                pool.used() > baseline,
+                "real array descriptors were reserved"
+            );
+        }
+        assert!(matches!(
+            parser.step(&mut WorkBudget::new(0), &AtomicBool::new(true)),
+            Err(Error::Cancelled)
+        ));
+        assert_eq!(pool.used(), baseline);
+        assert!(matches!(
+            parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)),
+            Err(Error::Cancelled)
+        ));
     }
-    drop(retained);
-    assert!(matches!(
-        parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
-        Ok(BuildStep::Yield)
-    ));
-    assert!(
-        pool.used() > baseline,
-        "real array descriptors were reserved"
-    );
-    assert!(matches!(
-        parser.step(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Cancelled)
-    ));
-    assert_eq!(pool.used(), baseline);
-    assert!(matches!(
-        parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)),
-        Err(Error::Cancelled)
-    ));
+}
+
+#[test]
+fn inline_tables_charge_independently_and_preserve_both_walks() {
+    for array_count in 0u8..=5 {
+        for nal_count in 0u8..=5 {
+            if array_count == 0 && nal_count != 0 {
+                continue;
+            }
+            let groups: Vec<_> = (0..array_count)
+                .map(|index| {
+                    let nals = if index == 0 {
+                        (0..nal_count).map(|i| nal(33 + i % 2, i)).collect()
+                    } else {
+                        vec![]
+                    };
+                    ([33, 55, 33, 32, 39][index as usize], index % 2 == 0, nals)
+                })
+                .collect();
+            let raw = record(&groups, &[0xde, 0xad]);
+            let array_bytes = if array_count > 4 {
+                usize::from(array_count) * (size_of::<std::ops::Range<usize>>() + 8)
+            } else {
+                0
+            };
+            let nal_bytes = if nal_count > 4 {
+                usize::from(nal_count) * (size_of::<usize>() + 8)
+            } else {
+                0
+            };
+            for quantum in [1, 7, 4096] {
+                let pool = Budget::new(100_000).unwrap();
+                let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
+                let baseline = pool.used();
+                let mut parser = HvcConfigParser::new(&pool, source(), data, limits()).unwrap();
+                let mut spent = 0;
+                let output = loop {
+                    let mut work = WorkBudget::new(quantum);
+                    let step = parser.step(&mut work, &AtomicBool::new(false)).unwrap();
+                    spent += work.spent();
+                    match step {
+                        BuildStep::Ready(output) => break output,
+                        BuildStep::Yield => (),
+                        BuildStep::Complete => panic!("missing output"),
+                    }
+                };
+                assert_eq!(
+                    spent,
+                    5 + 4 * u64::from(array_count) + 2 * u64::from(nal_count)
+                );
+                assert_eq!(output.array_count(), usize::from(array_count));
+                assert_eq!(output.nal_count(), usize::from(nal_count));
+                assert_eq!(
+                    output.descriptor_storage_bytes().unwrap(),
+                    array_bytes + nal_bytes
+                );
+                assert_eq!(pool.used(), baseline + array_bytes + nal_bytes);
+                assert_eq!(output.source_bytes().as_ref(), raw);
+                assert_eq!(output.opaque_suffix(), [0xde, 0xad]);
+                for (array, (kind, complete, nals)) in output.arrays().zip(&groups) {
+                    assert_eq!(array.declared_nal_type(), *kind);
+                    assert_eq!(array.completeness(), *complete);
+                    assert_eq!(array.nal_indices().len(), nals.len());
+                }
+                for (index, entry) in output.nals().enumerate() {
+                    assert_eq!(entry.source_bytes(), nal(33 + index as u8 % 2, index as u8));
+                    assert_eq!(entry.array_index(), 0);
+                    assert_eq!(entry.declared_nal_type(), 33);
+                    assert_eq!(entry.length_field_bytes(), [0, 6]);
+                }
+                drop((output, parser));
+                assert_eq!(pool.used(), Budget::control_storage_bytes());
+            }
+        }
+    }
+}
+
+#[test]
+fn mixed_tables_retry_the_array_then_nal_reservation_without_repeating_fill() {
+    for (array_count, nal_count, admit_arrays) in [(4u8, 5u8, false), (5, 4, false), (5, 5, true)] {
+        let groups: Vec<_> = (0..array_count)
+            .map(|index| {
+                (
+                    33,
+                    true,
+                    if index == 0 {
+                        vec![nal(33, 9); usize::from(nal_count)]
+                    } else {
+                        vec![]
+                    },
+                )
+            })
+            .collect();
+        let raw = record(&groups, &[]);
+        let array_bytes = if array_count > 4 {
+            usize::from(array_count) * (size_of::<std::ops::Range<usize>>() + 8)
+        } else {
+            0
+        };
+        let nal_bytes = if nal_count > 4 {
+            usize::from(nal_count) * (size_of::<usize>() + 8)
+        } else {
+            0
+        };
+        let pool = Budget::new(100_000).unwrap();
+        let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
+        let baseline = pool.used();
+        let room = if admit_arrays { array_bytes } else { 0 };
+        let mut retained = BudgetVec::<u8>::new(&pool);
+        retained.try_reserve_exact(pool.available() - room).unwrap();
+        let retained_charge = pool.used();
+        let mut parser = HvcConfigParser::new(&pool, source(), data, limits()).unwrap();
+        let mut work = WorkBudget::new(4096);
+        let error = parser
+            .step(&mut work, &AtomicBool::new(false))
+            .err()
+            .unwrap();
+        let arrays_reserved = array_bytes == 0 || admit_arrays;
+        assert_eq!(
+            error,
+            Error::Backpressure {
+                requested: if arrays_reserved {
+                    nal_bytes
+                } else {
+                    array_bytes
+                },
+                available: 0,
+            }
+        );
+        let count_work = 2 + 2 * u64::from(array_count) + u64::from(nal_count);
+        assert_eq!(
+            work.spent(),
+            count_work + if arrays_reserved { 2 } else { 1 }
+        );
+        let charged = retained_charge + if admit_arrays { array_bytes } else { 0 };
+        assert_eq!(pool.used(), charged);
+        for _ in 0..2 {
+            assert_eq!(
+                parser
+                    .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                    .err(),
+                Some(error)
+            );
+            assert_eq!(pool.used(), charged);
+        }
+        assert!(matches!(
+            parser.step(&mut WorkBudget::new(0), &AtomicBool::new(false)),
+            Ok(BuildStep::Yield)
+        ));
+        drop(retained);
+        let output = loop {
+            match parser
+                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .unwrap()
+            {
+                BuildStep::Ready(output) => break output,
+                BuildStep::Yield => (),
+                BuildStep::Complete => panic!("missing output"),
+            }
+        };
+        assert_eq!(output.source_bytes().as_ref(), raw);
+        assert_eq!(output.array_count(), usize::from(array_count));
+        assert_eq!(output.nal_count(), usize::from(nal_count));
+        assert_eq!(pool.used(), baseline + array_bytes + nal_bytes);
+        drop((output, parser));
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 }
 
 #[test]
