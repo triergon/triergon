@@ -1,10 +1,11 @@
 //! Decoder measurement worker for the harness: the same operations as
 //! the decode build of `harness/reference.c`, through the session decoders.
 //!
-//! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK], KIND-CODEC one of video-h264,
-//! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
-//! audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
+//! usage: `codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
+//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK]`, KIND-CODEC
+//! one of video-h264, video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac,
+//! audio-mp3, audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations,
+//! elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
 //! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
