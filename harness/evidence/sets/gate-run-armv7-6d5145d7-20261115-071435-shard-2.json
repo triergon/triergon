@@ -1,0 +1,44 @@
+{
+ "name": "gate-run-armv7-6d5145d7-20261115-071435-shard-2",
+ "path": "gate-run-armv7-6d5145d7-20261115-071435-shard-2",
+ "retention": "retained",
+ "reason": "A partial gate run at 6d5145d7 on 32-bit ARMv7, c6g.4xlarge, items subtitle-cc, tests and tests-release on two hosts, of which this shard ran subtitle-cc (with the worker tests and the core time test) from the gate image with evidence set subtitle-cc-inputs unpacked at the repository root before the host got ready: 461/461 caption cases pass timing, memory and the grade; its checked tests failed only on the manifest membership test's count of 449 caption cases, corrected in f9b3f138; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the ARMv7 closed caption row",
+ "key": "evidence/gate-runs/6d5145d7f31b002c72f9815130b522964d2abb64-armv7-20261115-071435/shard-2/284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277.tar.zst",
+ "sha256": "284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277",
+ "bytes": 52379165,
+ "results": [
+  {
+   "path": "memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "44527cdbc6e2571f34e332fbe30d16985ab434698ab1795333118dcb077d2eb8",
+   "status": 0,
+   "report_sha256": "6206ec6eb9599c795b6db2ae072262a0ab28bac57eef7c0e6deb8e28c5fe8386",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6cb9cb4a22d3c35d2eed4eb0aa03e26a7a2edd259ba2563309efde1edfa49695",
+   "status": 0,
+   "report_sha256": "a77479e64b5fd40b3ced17434cd6d97ed7ba1f6ec1a48eedd9eeb71b70c68e8d",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "3b4da85ec583166e3cd2971508fc4fdec0f313868289b5a8b006545b26b666da",
+   "status": 0,
+   "report_sha256": "0cd1f611418a3d46649d690b520bcc9c30e5334cdb5d0bc610a751e1e1d78347"
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "5252dc898d92aeb935244711ef9adaecb3a2730326a9604690b8864684a31570",
+   "status": 101,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6d5145d7f31b002c72f9815130b522964d2abb64"
+ }
+}

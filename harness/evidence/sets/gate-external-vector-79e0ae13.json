@@ -1,0 +1,56 @@
+{
+ "name": "gate-external-vector-79e0ae13",
+ "path": "gate-external-vector-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the mandatory external vector's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-external-vector-79e0ae13/a819cb6715a46cf8b7d2a2ad44236e02d2fb8954cbd6af6c422fe59775f6f7a4.tar.zst",
+ "sha256": "a819cb6715a46cf8b7d2a2ad44236e02d2fb8954cbd6af6c422fe59775f6f7a4",
+ "bytes": 913548,
+ "results": [
+  {
+   "path": "gate-external-vector-79e0ae13/aarch64/shard-2/benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "6a19798685c8b5a8a1dcf19d283c96fad8fa0afddde54e54ea56721b67a4a971",
+   "status": 0,
+   "report_sha256": "5617a4f01f012e693b2e529342328bfb54cba09e7023aa4f4f367efc2e0da999"
+  },
+  {
+   "path": "gate-external-vector-79e0ae13/aarch64/shard-2/graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "2bf32d556b9c4d9e857fcadcf13107b1128713787b5878d4334a19d73e53fdf7",
+   "status": 0,
+   "report_sha256": "3af602554051be252cb5c2b45629b4d1412f0f8211358778a4617e03fe1f63c8"
+  },
+  {
+   "path": "gate-external-vector-79e0ae13/aarch64/shard-2/memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "025371569a2161c2d47dc884065cecdfac7cff6fb678b831e45d8f97a538ac3d",
+   "status": 0,
+   "report_sha256": "6b92cd2d927f60f25b3dfdbf65ba5b81ff139e44c3e4b1cd8829e033f677a87b"
+  },
+  {
+   "path": "gate-external-vector-79e0ae13/armv7/shard-2/benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "78bf911f3c884f8036ade7ed3cb2f8e5f700f18c03e7b1d66d606eab06ad42b9",
+   "status": 0,
+   "report_sha256": "c16e2dde2c13c50f18e16e3ae05966bd4fd6a098b269a34ab29f78d6b16e0bd3"
+  },
+  {
+   "path": "gate-external-vector-79e0ae13/armv7/shard-2/graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "dc2b64daf894ed471c988d857b613ff73fa37ddba25f13c39bb541c75fe09fc4",
+   "status": 0,
+   "report_sha256": "21252772f74213324e71f15cf2ccbb75c1238447c67740058cfc85735b79f40c"
+  },
+  {
+   "path": "gate-external-vector-79e0ae13/armv7/shard-2/memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "49183dcbb6bb24b47e2228af765c467ccb7f79270f6cdeae071183210db27df3",
+   "status": 0,
+   "report_sha256": "56b65d1d8e69cd4ce2e2161888176effbad2018ec5b792443892765933b63c71"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

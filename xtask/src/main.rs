@@ -83,7 +83,7 @@ commands:
                  through a worker operation prefix otherwise
   evidence pack DIR OUT       deterministic .tar.gz or .tar.zst of DIR; prints its SHA-256
   evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
-                              (harness/evidence/index.json; TRIERGON_EVIDENCE_ARCHIVE)
+                              (harness/evidence/sets/SET.json; TRIERGON_EVIDENCE_ARCHIVE)
   playback-golds DIR [--check]
                  convert the FFprobe captures of evidence set playback-terminal-matrix-ffprobe,
                  unpacked in DIR, into the playback terminal-media records; --check compares

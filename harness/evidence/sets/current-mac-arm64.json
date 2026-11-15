@@ -1,0 +1,483 @@
+{
+ "name": "current-mac-arm64",
+ "path": "research/qualification/current-mac-arm64",
+ "retention": "90 days",
+ "reason": "superseded macOS receipts",
+ "key": "qualification/repository/current-mac-arm64/a453df865aae018cb5eec9404f21c628db4a74e1bb430de1bfe5fa35af2e043f.tar.gz",
+ "sha256": "a453df865aae018cb5eec9404f21c628db4a74e1bb430de1bfe5fa35af2e043f",
+ "bytes": 7449676,
+ "files": [
+  {
+   "path": "research/qualification/current-mac-arm64/README.md",
+   "sha256": "54afc15fe6747dbdb7a5029747ac9e8a90d99c33ccfff3cb1dbf437d398ba19c"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/checks.log",
+   "sha256": "6f27e866d95d606193d5a9f7b8a54efff8d77ae9acac1e0f789b6509f70801bc"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/claim-audit.md",
+   "sha256": "30be05c371a62f57d749bbeae40223d8f9407aeb6f4c0ecb602543f0259277c0"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/contaminated-k0-attempt-0.json",
+   "sha256": "5c622d4b282478c9d8bf0046d614e27e6844f0588beaf2636ea885e78d41a29b"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/fate-xiph.json",
+   "sha256": "a5268bda59dc94192b42d3be635618c81b5fbb16c2212e9ab7d9b93277db7f4b"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/fate-zero-length.json",
+   "sha256": "f7d6642a337c03bb84e628876a941c4489ffb10a061b2ee18043d23b5c6bcbb3"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-both/candidate.json",
+   "sha256": "429e6088574e037375ef47439a62b9bca4d2cbb5f71fd4e65163419740404a93"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-both/reference.json",
+   "sha256": "35c6651988ad0e7d43ed45c3533292333e069c46cbe110173e312c804c756c4f"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-both/source-candidate.json",
+   "sha256": "b656bf1cd578bd8352c621a9354af87edfb4ec9c020929891f088d5c6cc18615"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-both/source-oracle.json",
+   "sha256": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-empty/candidate.json",
+   "sha256": "6bc3b8e8816250b809d64cf9eab99aaf41f3544c8030d03b81dc9dae0e6e4d7e"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-empty/reference.json",
+   "sha256": "59ba004acbd3be0feac684a027e5fe62526edcebd4438d477ae99d6de236399b"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-empty/source-candidate.json",
+   "sha256": "999368b975ea7c09c08a297b1603439316aeb0020c83d7606eb2747bd1870cab"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-empty/source-oracle.json",
+   "sha256": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-lace/candidate.json",
+   "sha256": "46779b6704df791ac31d057ef1ffcaafc33c0b9870671a0c08eaac988f27ab8c"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-lace/reference.json",
+   "sha256": "279100dde93b1808dbc51fb0a8111cd3b5e444af98affeaf8e980392fe428776"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-lace/source-candidate.json",
+   "sha256": "963ba4ecd9ad126c749aedbab2b75ad90457d574ba5d90841053732fdeb80222"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-lace/source-oracle.json",
+   "sha256": "a6143073ef61dfacccc89e5735821f210b4fb092ddc5c68a406ded98a9f774c6"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-private/candidate.json",
+   "sha256": "dedb94683eeecdb6c00bb92c8da3fa1f848d324883ed59cc80865826880fdb20"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-private/reference.json",
+   "sha256": "42a8d8da4df17c26b14b95216e0d4b98f6225bc1f48290f6e35de2cd3a1bd5e7"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-private/source-candidate.json",
+   "sha256": "190984b99437bf6365c660bae247d1d777bdc5c248f4c23e33f4838b4a2e00d8"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/header-private/source-oracle.json",
+   "sha256": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/report.json",
+   "sha256": "b281d922966e60d0eba84a55ed713a21227420a74bcc481b1c3453384602bbf7"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/header/run.log",
+   "sha256": "8b0c53854c1834c965b7e869c1c2842c29ff5595e8b8c31ef60ab372cc81c18c"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-aac-sub/candidate.json",
+   "sha256": "cfe5664b95d2a2da56ceedeec95f5af48cc4e7f28fee4dfead17ed5386fb90b6"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-aac-sub/reference.json",
+   "sha256": "4d6b940206123fcaad076d4a334e60d0c2f07d53be226af7799f7fffb4d9b380"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-aac-sub/source-candidate.json",
+   "sha256": "b7d0587ad3b3a3fbd25376da7097b8f0a6f839c6c9c417e08a1063ae19e86623"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-aac-sub/source-oracle.json",
+   "sha256": "48f871bd9c0ea647922dd12f8ab28e3085802f88e05eef2c3aa5256ba9a67994"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-ac3/candidate.json",
+   "sha256": "3d36edf994346fe23c926e10647116410fe865bfd28e671ea9b701c31b782f83"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-ac3/reference.json",
+   "sha256": "d56bde3011ce86aff0bf118cc1409289a2bd78f338a34469cf221d91a7156290"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-ac3/source-candidate.json",
+   "sha256": "d2e755ef63b7be6dc47c74c70a12d1c032232fb7183fb4bae9a8ffade28e19e5"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-ac3/source-oracle.json",
+   "sha256": "ebde465f7d83ca7d0d81b25f4c4a5324973a08aea5b62667f4cab0e06e30a76a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-eac3/candidate.json",
+   "sha256": "425fec28b7ab0832ca235081a1884b68d6fbef79e54a661691a67f143d6ef193"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-eac3/reference.json",
+   "sha256": "c39e72e97eaac9b1f9a2280516919a9f3a677ce10aa6cab66d97224c565c0864"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-eac3/source-candidate.json",
+   "sha256": "cdd4ac02f78d06532bc69f089c30d24c11de1fe780577c8caf3e4f502f8d14e4"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/avc-eac3/source-oracle.json",
+   "sha256": "ebde465f7d83ca7d0d81b25f4c4a5324973a08aea5b62667f4cab0e06e30a76a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/blockgroup-reference/candidate.json",
+   "sha256": "eb03053e8b72664519fa80fe725e20e1145e65d4e0a9ccdb9f033eb7af1b1d87"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/blockgroup-reference/reference.json",
+   "sha256": "6cbe33d0898b9b93aeebc2a4e595f89afb7d254c69dddeaceb2c24e0adfe9911"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/blockgroup-reference/source-candidate.json",
+   "sha256": "6d5d7ab5c59b50fda6ebb52bafd736c063b6f88d34cd3a444450fc6d09c9ee54"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/blockgroup-reference/source-oracle.json",
+   "sha256": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/codec-delay/candidate.json",
+   "sha256": "e7c497a8d7d2e9109d0fea96769282e60c9479fa163a964817a479a468319d76"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/codec-delay/reference.json",
+   "sha256": "21b8475b3fb172cd939c391266890409efb66bb405d607290025c30bed4d89ef"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/codec-delay/source-candidate.json",
+   "sha256": "e87c4ca00a4d1431f65bc4e14e80889387ab6607468c7d4dd835f092dd279b62"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/codec-delay/source-oracle.json",
+   "sha256": "8822835579b4c19098849db896ae5cb19013c9b08bc1cdddf50df302c5d7e03c"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/discard-padding/candidate.json",
+   "sha256": "f78ac1e8de5adda092d8734070955c3439b545e8d1999901af0ad128478b3644"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/discard-padding/reference.json",
+   "sha256": "66aabb06fd2e22615285fb6fd71187ee08ec943ae3403611962e10577e892dd2"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/discard-padding/source-candidate.json",
+   "sha256": "76ceebb206ae52686a10531f7ead81ce6420c3841b557ac53226422f6ba24792"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/discard-padding/source-oracle.json",
+   "sha256": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/ebml-lace/candidate.json",
+   "sha256": "12119b1025937d58516271b466040e9cf7d78a61312459686dbc5b3b2dd0f94d"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/ebml-lace/reference.json",
+   "sha256": "13c4498a6b5345ae698602989b0a25a28f3137bdcb0d1d8bb767e8629d955bcc"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/ebml-lace/source-candidate.json",
+   "sha256": "f6f94fbc50e66377bcbcc042cc66dc06095669c7d47d321f8fe0f83d0def8cc5"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/ebml-lace/source-oracle.json",
+   "sha256": "339c875e6554c2776b5fc084284857c74a9481105589968516244efe3183048a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/fixed-lace/candidate.json",
+   "sha256": "089f35c3817cb910b78ee5d20bf2d876645382cb727cd343d3e1b2c5736c4d14"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/fixed-lace/reference.json",
+   "sha256": "d970a93e1b9e0b68a2c9da3a736fd9d19745a8c8347d0e8442b04dc3a654237f"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/fixed-lace/source-candidate.json",
+   "sha256": "203d4132e0a66569e21283a93b59a413b7f06d3aa99f1d361eeb3389e2611e55"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/fixed-lace/source-oracle.json",
+   "sha256": "339c875e6554c2776b5fc084284857c74a9481105589968516244efe3183048a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/hevc-aac/candidate.json",
+   "sha256": "e3453258f57b6e79ec3a1083a437398f66c306d120c407008776fb2713e7456f"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/hevc-aac/reference.json",
+   "sha256": "fbfdd54e54676e7238a37cc0433578dbf782c7e54c819857a317e35d7e59e674"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/hevc-aac/source-candidate.json",
+   "sha256": "d1a2746ab027a1d94176b73798281fa17958b7c5abbd67702540d9a399d337d0"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/hevc-aac/source-oracle.json",
+   "sha256": "a516defde697ea706d5a0b67faf1d9cf0168345ede2224cecc5569e66283e9f4"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/negative-block-time/candidate.json",
+   "sha256": "a6e91baca5362d3005073e0ad560ff3679fab0e8a39d52f3deb02216bfe421bc"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/negative-block-time/reference.json",
+   "sha256": "80e3983be919ed8d49e47a7ee331e4b0d3021408958f9ac36853d1798a7197d1"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/negative-block-time/source-candidate.json",
+   "sha256": "c1b80cb7995d86f59863d5e8fefce50cd0f03d3c24d09395d03cead0f128e8e2"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/negative-block-time/source-oracle.json",
+   "sha256": "dfc305764afea434034833a90bb2acb86cd30ff40fdcf7ff77ccb2af2069ab8a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/report.json",
+   "sha256": "72d9a6d90e3d90cf98594ff43df4bd2b57c0b1b7f3d9ebf9e2ebd5923f586912"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/run.log",
+   "sha256": "801ca61da593cffd16c5dfb5d37c08a3e51686f9d95ec630b9950cf0fdc3d24d"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/unknown-cluster/candidate.json",
+   "sha256": "012961ff179902eeb84fb52bf5ee372164756796c646953a0fcd4af8e77b9452"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/unknown-cluster/reference.json",
+   "sha256": "ddba3240978f2b1f8bd974dc4eb084d4dc07dd15552e08ae04f07c65451e05dc"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/unknown-cluster/source-candidate.json",
+   "sha256": "c232e9c61c6dac8be5b749ec166802836b3b1a5340644bab4f11fd39af432725"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/unknown-cluster/source-oracle.json",
+   "sha256": "2e1d228da7fff948d162437cf10eebcf5eef81830fcec7da37e9463435d89c29"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/xiph-lace/candidate.json",
+   "sha256": "4ea62841d4e1d4d2d5e33da4e7e12fd2e69d214897ae7c69bae6e5deb2354609"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/xiph-lace/reference.json",
+   "sha256": "bdb53dec1ed5bcd9b51e237481fa13498e40c543ef3fa2b6962e7dcfd4fcea25"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/xiph-lace/source-candidate.json",
+   "sha256": "0e4a746be1dd5304f639c7cb0c0779cfeca70c21727b15ba5b7128d6d3995b47"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/k0/xiph-lace/source-oracle.json",
+   "sha256": "339c875e6554c2776b5fc084284857c74a9481105589968516244efe3183048a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/mac-final-window-0.json",
+   "sha256": "cc2624f329b55e0237575c7b7d5d2c087b881d92c329b31856dd8aeb343fc3f3"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/mac-final-window-1.json",
+   "sha256": "e2a15fe6ae64f0cc16a8d579abf45a708d566460081594aa49f0dfbbf2b2dd30"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/qualification-controller.py",
+   "sha256": "7d1793f35a6af38bd9ac9fe74d57a2bc7ae65eab26997c8153b75758e8163e46"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/Cargo.lock",
+   "sha256": "6e23bc62d90a460380b116aefaad34438a8d8c637b5d048dae9f01da3bf2ab68"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/Cargo.toml",
+   "sha256": "24e239225c72d21cc99242ec60ac8be9303f5552b9cae041edcc7e8c9d8e0cb2"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/Cargo.toml",
+   "sha256": "e276328dc9c7b138bae4b9ac82d985df89a20100aeafa164325fede2479eee05"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/content_encoding.rs",
+   "sha256": "fc7ca36d80cd5fe9d71c9583a3960ec1fe134c30a44145a281a6d9ed3e8617b2"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/ebml.rs",
+   "sha256": "7b0e5a071cd1210c83b65a20bbc27763763c8921994d5265fd628a4206eba466"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/error.rs",
+   "sha256": "589443832d4f7ce05e403739731928bd206464886c5d6a0ed66f2954e04f2573"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/lib.rs",
+   "sha256": "b8b9d9e87394aa0e056bc2348afd60f5c0ca2569aab7ef08ca117ed1b448f3de"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/matroska.rs",
+   "sha256": "d16e0859057e21f7575f06c17f2af5dec2647c3c8eb0d1f58d2fc49d8e4c151d"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/time.rs",
+   "sha256": "f78844b2905ea19144ebe7c698c5f6db8c8fa7017657759d23afc24d1fe6eb94"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/src/timing.rs",
+   "sha256": "1824ec0ed73430ee74670fc47e46019e66edbac3c38180ba3e8115ccb360972a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/media/tests/matroska.rs",
+   "sha256": "41af42497ef86451e89ee565826acdfcc5b6c4811992b3a0429c73f912d830ec"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/worker/Cargo.toml",
+   "sha256": "cb86c19503237bac707220ffc3fbf68b90071a1cc7aac888c7b3bebbd4cb7a23"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/crates/worker/src/main.rs",
+   "sha256": "84ddf6a9d29d4ded9a36581e4940c5127fad8fdff59d55e95b822b55c8d77744"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/allocations.c",
+   "sha256": "16eae29746b4995ec4fa4fb057f4e39f9aa5b4c6273508cc78bb751d7cbdf8e1"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/corpus.json",
+   "sha256": "6763146d864e92085034359c8a013ebfa9486249aad5b1fc9ab75754cc7eed80"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/fate-map.json",
+   "sha256": "30367fd1468b03f248951b8d2113b355d94ab718081767c084737bb9932de53a"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/header-corpus.json",
+   "sha256": "1c7d8f5da17ac5b06c12552a61dca3c810a3793b157d484e475104a7f4c0ba2f"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/header-slice.json",
+   "sha256": "24eb1b3dae6514271ce7edea66f53f12bdce32bf6a1aa35ad5cc09d9dcd47d53"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/memory-check.c",
+   "sha256": "a5ac597801f3e753a38053f88424d63f17de8043b9868bc8df6609c216649fcf"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/memory.py",
+   "sha256": "b2b29a2a6d9f6ac4ee6b6cf889205907b70e9ffd346851e4f2202c286292a7ba"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/reference.c",
+   "sha256": "11e19c91cc0138ea5bcffbb15c4521ded0f6f2fe2b9601930509376d2d82b720"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/runner.py",
+   "sha256": "2cd025db95f6504e38e7ddafb4ed02c4638bd83e1515811dbd32b43b282c7309"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/slice.json",
+   "sha256": "1958e3942f2e7235d66935f319ad2c9a62e80f0d6e47daeb6c23cd4bbc1add10"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/spec_oracle.py",
+   "sha256": "539944968504f11674887e758cc818743bf2e2e82a44f0e10a406be63a529716"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/test_header.py",
+   "sha256": "8d24a31dd4cd8415ebe724a0d88a9360e499ec819e7a6ec504dd73dc5e1653a4"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/test_runner.py",
+   "sha256": "896e4d889270b3b30a676e4103864144cb370939cc948c3cc1b12dafc7f70979"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/harness/test_timing.py",
+   "sha256": "7f444b6c2d5c3ca2dfd700bab7a63297e61457b61e863c0c69e49023da7c66e2"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/specs/sources.json",
+   "sha256": "0913b2b48db61b96659f743b2d7a6c0c2856594c62a5bfd279b62b6512d7a01e"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/build-harness.py",
+   "sha256": "2763e030b2217c9c0c556fc320597ad81eb97958ee06ccc5807264c85dc18cff"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/check-design.py",
+   "sha256": "b9d16414211b11a461754c73f1e139652d20c5428975e375c37f815c997b46ce"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/check-safety.py",
+   "sha256": "f5956bd6c99938f381003d373cd3b16748a8f4156a52981d2c646d68108a2367"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/compare-candidates.py",
+   "sha256": "05e9bfb54a933ab6647718e82b5d838c9f98f8b0d26fe9372ac86795b1331228"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/fetch-specs.py",
+   "sha256": "fa360ba32b7e75bb09dca98469d5fd90fee3da685eeb1189e5a9d1d42e36c580"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/generate-corpus.py",
+   "sha256": "8791b4c1572ce4e604f5eb7af01dc98aa3a5fef380e03767c0b132d3e0879c96"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/generate-fixtures.py",
+   "sha256": "bc3b6589f068ea01565250d3979cfe8c551963b9c306b159ec6bd4376b058e92"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/generate-header-corpus.py",
+   "sha256": "fb86741a61fc2822760db99af85ce11d6b5d2e99f948c0f78fef47a8cad01e03"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/inventory-fate.py",
+   "sha256": "5e64aad597b99a7a2a9f4eb9956f58a9b92bcd2be2dd48fed60dfac21e214c0c"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/prepare-ffmpeg.py",
+   "sha256": "5510fa7917f87fbcbaa50dc2a90834db1f5550aec4281d4299e2214b8c2817a7"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/run-fate.py",
+   "sha256": "c501675b51371c8afe1af7a92b2a6ab68ab323b96c716750afe24606238d6783"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/source/tools/test-media.py",
+   "sha256": "f4d51ca56689a8c145f8889f9e60cd987215e538da7d2191aec76204d3eedc13"
+  },
+  {
+   "path": "research/qualification/current-mac-arm64/summary.json",
+   "sha256": "361e8fcfc57da5d1082299250675f20b9553132394c179bc6ee1e8166e3f29ef"
+  }
+ ]
+}

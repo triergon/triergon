@@ -1,0 +1,9 @@
+{
+ "name": "mp4-fragment-subtitles-04960913-aarch64",
+ "path": "mp4-fragment-subtitles-04960913-aarch64",
+ "retention": "90 days",
+ "reason": "MP4 range measurement with checked fragment restarts",
+ "key": "qualification/mp4-fragment-subtitles-04960913-aarch64/c90b2366570234f13a7c56944c792f17b67dc15127257176042c1d9cd870d3b8.tar.gz",
+ "sha256": "c90b2366570234f13a7c56944c792f17b67dc15127257176042c1d9cd870d3b8",
+ "bytes": 50018046
+}

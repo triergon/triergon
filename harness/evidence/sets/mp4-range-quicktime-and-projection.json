@@ -1,0 +1,9 @@
+{
+ "name": "mp4-range-quicktime-and-projection",
+ "path": "mp4-range-quicktime-and-projection",
+ "retention": "retained",
+ "reason": "MP4 range playback comparisons in docs/status.md",
+ "key": "evidence/mp4-range-quicktime-and-projection/b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2.tar.gz",
+ "sha256": "b368990b90a85a7286f28951ab2316264d98d3820342de51c8ec1b5ad998bdd2",
+ "bytes": 63889181
+}

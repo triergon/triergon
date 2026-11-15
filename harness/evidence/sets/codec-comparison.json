@@ -1,0 +1,131 @@
+{
+ "name": "codec-comparison",
+ "path": "research/d4/evidence",
+ "retention": "retained",
+ "reason": "codec status row and harness/codecs/STATUS.md",
+ "key": "evidence/codec-comparison/48fb4562354d9446b3ab3d97d518ea16972befd651df10e5d1ff12f81e9dc917.tar.gz",
+ "sha256": "48fb4562354d9446b3ab3d97d518ea16972befd651df10e5d1ff12f81e9dc917",
+ "bytes": 384560,
+ "files": [
+  {
+   "path": "research/d4/evidence/CORRECT-D1-IDENTITY.sha256",
+   "sha256": "d6157c09f022be632593089e91c1463cd0b310dc5c45c80e649012669d1ad67e"
+  },
+  {
+   "path": "research/d4/evidence/CORRECTNESS-D1-SUMMARY.json",
+   "sha256": "b8d0286b2f20ab287ac884f5738eab7bdc6f240d2311aabc66db671cde7dcee1"
+  },
+  {
+   "path": "research/d4/evidence/CORRECTNESS-MANIFEST-AC3-NODITHER.json",
+   "sha256": "b7a3a719127aec5d83dd6efa3c837a60a484ad4103fdad5725b40bfb39b2f70c"
+  },
+  {
+   "path": "research/d4/evidence/D1/D4-MEM-LEDGER.json",
+   "sha256": "3107efaf994398589a28550e2607ea59c266903bcecf72411e6b807b0ee18fd4"
+  },
+  {
+   "path": "research/d4/evidence/D1/D4-TIME-LEDGER.json",
+   "sha256": "0bb2d87377253b11d0a469bf429de403fd0436e7747ba9fb74cd2bc3b37d1985"
+  },
+  {
+   "path": "research/d4/evidence/D1/QUALIFY-D1-IDENTITY.sha256",
+   "sha256": "854549845159b69a63f153a7cb6a627a27d8fb71a578d42b52e193a6a89a28f2"
+  },
+  {
+   "path": "research/d4/evidence/D1/d4-mem-plan-D1.json",
+   "sha256": "5997534591f50e46d53ac0bad31b85ee8e52cbb170c1786939ca561edc20e300"
+  },
+  {
+   "path": "research/d4/evidence/D1/mem-D1-summary/commands.json",
+   "sha256": "2cc0cc3c1727619de7b9c058277186400354ae5779c73a5e77b68c8677193106"
+  },
+  {
+   "path": "research/d4/evidence/D1/mem-D1-summary/measurement-terminal.json",
+   "sha256": "d17d3df9d0a50c5ad89c15bf436126cff4b9287c55fad652b6129325121d0de2"
+  },
+  {
+   "path": "research/d4/evidence/D1/mem-D1-summary/outer-terminal.json",
+   "sha256": "7847beec04b84d57b124878cb5000fdd0bc41926d0d0de28b0c939712ccc26ce"
+  },
+  {
+   "path": "research/d4/evidence/D1/mem-D1-summary/root-terminal.json",
+   "sha256": "a70abb9bb92a8da1097a677ea0f3b65e369dfebdc72106465344594931c13ae1"
+  },
+  {
+   "path": "research/d4/evidence/D1/mem-D1.sha256",
+   "sha256": "467f203e3019cf0feb0a5331e0713f7627944a2593e36621691d4a8055273080"
+  },
+  {
+   "path": "research/d4/evidence/D1/time-D1.sha256",
+   "sha256": "f942d24e2310ffae2ae1b7f2fd08b6cf52c8942e3c52aa87582e63e0ed0c3808"
+  },
+  {
+   "path": "research/d4/evidence/D2/CORRECT-D2-IDENTITY.sha256",
+   "sha256": "6a85e91205a9bd7962189506244ee94b3b9fcf94232d089c233234f7e43622d4"
+  },
+  {
+   "path": "research/d4/evidence/D2/CORRECTNESS-D2-SUMMARY.json",
+   "sha256": "c4422550c3014db77a5c5b053aebd2600ec36e37258d92b7467a7e9905d8fd13"
+  },
+  {
+   "path": "research/d4/evidence/D2/D4-MEM-LEDGER.json",
+   "sha256": "16b6e8a8f0b5e4bf0cf3ec85d6554cadefe14488f5ac44849bd09ce5591cb292"
+  },
+  {
+   "path": "research/d4/evidence/D2/D4-TIME-LEDGER.json",
+   "sha256": "d12e0a100e8de1dae70d35509553a9afad849c26939159274e0966d6560b7e46"
+  },
+  {
+   "path": "research/d4/evidence/D2/QUALIFY-D2-IDENTITY.sha256",
+   "sha256": "b5d3d060143f90eb6d6c8443abf80f1ebd5c25a19256097afc500ba1c5636de1"
+  },
+  {
+   "path": "research/d4/evidence/D2/d4-mem-plan-D2.json",
+   "sha256": "af580e84c8c1c6b6ead126a462a87d5675c20da7b82be17774c2fb9a35a89e3b"
+  },
+  {
+   "path": "research/d4/evidence/D2/functional-combined-D2-summary/footers.json",
+   "sha256": "0e0acb5654e33d5bd12cb7bab17df9bd9aab5437286a31d282b0d5f270654f65"
+  },
+  {
+   "path": "research/d4/evidence/D2/functional-combined-D2-summary/replay-summary.json",
+   "sha256": "101d2e76b576bfa5de49bcf2263799f52e647eb9e40a689b71414bf837a1efe1"
+  },
+  {
+   "path": "research/d4/evidence/D2/functional-combined-D2-summary/results.json",
+   "sha256": "68c9865e1035f4844ebf1564e81b5a76297f35f5e138b2b1a468882565ee9e5e"
+  },
+  {
+   "path": "research/d4/evidence/D2/functional-combined-D2-summary/terminal.json",
+   "sha256": "c1790d881e58cf1ba1f20eea8e7ad13cf49a43ee28e7d39b87ffd9498905d245"
+  },
+  {
+   "path": "research/d4/evidence/D2/functional-combined-D2-summary/trace-comparisons.json",
+   "sha256": "5b953f312f21688807fdd9595563d5b3165264cfc43fe3f80fdea8bcc67c91e6"
+  },
+  {
+   "path": "research/d4/evidence/D2/mem-D2-summary/commands.json",
+   "sha256": "0333536f03f78ac4b89e714aa919950494ec16e4ce1f8fd269ebe244e464d17e"
+  },
+  {
+   "path": "research/d4/evidence/D2/mem-D2-summary/measurement-terminal.json",
+   "sha256": "e19016fa37ab05b76abce28282d6ef2d37ffc3b6031b111afb77b40f31c10819"
+  },
+  {
+   "path": "research/d4/evidence/D2/mem-D2-summary/outer-terminal.json",
+   "sha256": "2c1ecc9b7a1df96afe22278c7ee7eea332904f2418916eb386d018108ffaacae"
+  },
+  {
+   "path": "research/d4/evidence/D2/mem-D2-summary/root-terminal.json",
+   "sha256": "dd5d94b084ffa3e189581de4fba178f590e5a7e5eed3f5b7b6cd3df6de06f711"
+  },
+  {
+   "path": "research/d4/evidence/D2/mem-D2.sha256",
+   "sha256": "5b019c375b5b93610d01834d8539cf7551137ad804eab26d2cac7bc1432ba09c"
+  },
+  {
+   "path": "research/d4/evidence/D2/time-D2.sha256",
+   "sha256": "c023079888a6607889de77245d9e73c311997123929406c37409a12be19a14cf"
+  }
+ ]
+}

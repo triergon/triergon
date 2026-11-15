@@ -1,0 +1,12 @@
+{
+ "name": "gate-font-shape-raster-ass-79e0ae13",
+ "path": "gate-font-shape-raster-ass-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the font, shaping, rasterising and ASS comparisons; the ARMv7 fonts comparison is left out, because a FreeType reference run passed its 30 s per-run limit, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-font-shape-raster-ass-79e0ae13/ada63c33c6f79e413b5a7155cb9b17171196bc7c0a17c1dc3be00ca1ee9abb98.tar.zst",
+ "sha256": "ada63c33c6f79e413b5a7155cb9b17171196bc7c0a17c1dc3be00ca1ee9abb98",
+ "bytes": 661793,
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

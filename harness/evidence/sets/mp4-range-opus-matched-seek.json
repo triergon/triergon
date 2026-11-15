@@ -1,0 +1,10 @@
+{
+ "name": "mp4-range-opus-matched-seek",
+ "path": "mp4-range-opus-matched-seek",
+ "retention": "retained",
+ "reason": "MP4 range packet comparisons using one reference seek for source Opus roll groups.",
+ "key": "evidence/mp4-range-opus-matched-seek/405b5bec9c2c76a59b0343d4276f684b7b61a0d4847ce06e31d0d74831446e25.tar.gz",
+ "sha256": "405b5bec9c2c76a59b0343d4276f684b7b61a0d4847ce06e31d0d74831446e25",
+ "bytes": 22856931,
+ "source_revision": "fa02eb61592bc85ad2749a87f3a925385a5e31f2"
+}

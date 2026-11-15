@@ -1,0 +1,154 @@
+{
+ "name": "gate-run-codecs-8d6f2789",
+ "path": "gate-run-codecs-8d6f2789",
+ "retention": "retained",
+ "reason": "Partial sharded gate run at 8d6f2789 under static-toolchain-runtime-v1, 3 c6g.4xlarge hosts (Graviton2) per target from the gate images, kernel 7.0.0-1014-aws, Linux AArch64 and 32-bit ARMv7: the codecs' FATE parity, the timing of harness/codecs/workloads.json and its memory in five parts, and the workspace tests, checked and release; each shard's outputs, build identities, plan, step records and logs, the run summary and the workstation's logs and host times; for the docs/status.md codec rows. Its subtitle-cc grade failed on the reference run's elapsed time that #272 leaves out of the join; subtitle-cc is in gate-subtitle-cc-b6c36d3b",
+ "key": "evidence/gate-run-codecs-8d6f2789/db33a447578b4eaa7615e55318dbd13307826de18c4a720db64b515d19a6c69e.tar.zst",
+ "sha256": "db33a447578b4eaa7615e55318dbd13307826de18c4a720db64b515d19a6c69e",
+ "bytes": 23731191,
+ "source_revisions": {
+  "candidate": "8d6f278949aed417290058f1212dee0fc2a97243"
+ },
+ "results": [
+  {
+   "path": "aarch64/shard-1/benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "04e2bee0fd2ee7d78d2994975c31661b589e9e12447465691d9551d8daeb1363",
+   "status": 0,
+   "report_sha256": "2befb7dd2d8640c62aed32d94c01f3d49f4d59cae66c6e52c9db9a68720357f2"
+  },
+  {
+   "path": "aarch64/shard-1/memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "0cc1614ab4f6f3ac8e1ec92bdb07a05f67a41f2f727325fda0941f3c097982c7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-1/memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "32c92f24b882d69cef9388d575144bf5b64175139357553952d77eae5b3c5c7d",
+   "status": 0,
+   "report_sha256": "7725733b8226c5060c44e532e7169160d6b9acac486bfd516bde332eae29c557"
+  },
+  {
+   "path": "aarch64/shard-1/tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "d53272eafb669adee3c1a01e0ea927fd378a6905929eb400c3978ceec6fe74a2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-2/memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "f6254c3bfe275b1b54b76e6e3c14e4f45a8513c4e670f5b17851e22713872d2b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-2/memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "8a2533021a16b8e184ac5afe6a2a65e64ceda4704a07b3e089aabfb65635d950",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-2/memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "fc3c74cae86b0fcb4366b8c8900549ee62570d085856725b4e4affe786e5594f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-3/benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "0db840ec9edef032baaa620d77378baf8a832c9aa52d25e5bfb9d9b2768e8fec",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-3/memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "c286a243ab609633ef4695da4a1c0f220fe27667a4ec2a7c9acb1c150b2c269f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "aarch64/shard-3/tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "246df367376cbc00ea488be9b4a0bd53582c377fc1ab3cb15297ad9b50a60a3c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-1/benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "944044b0ec72340894399df9e6ac2da7434bacf3203d3577f904a73fa4ea14a6",
+   "status": 0,
+   "report_sha256": "5dd946027591c1d7138aade9785bb3f1d64e9512f3d02c918c7ab9a15b79c2f6"
+  },
+  {
+   "path": "armv7/shard-1/memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "35aa9adc7c11a2f13a0547830dc3dbf7efa09bc95a20ce6b2b4a94c26bb49481",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-1/memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "404e08fe6e61d0298e0141e5ab0ad0c4d3d7d4f9594ad1e364e70feaa1d54924",
+   "status": 0,
+   "report_sha256": "a91a21dfe8e506196d899ca64aea566ef49ea027c1b84efc97ccc2da2c6cbd43"
+  },
+  {
+   "path": "armv7/shard-1/tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "0bb192f4761a7bf282c6035417a50668ec3dd13bf18b9a701c90a50c0b0202c8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-2/memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "86e4471479f45a70c68cb5383e5db53c19ec60bd6d57bb971b52ce328677db44",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-2/memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "1d195bc81446541ad515c320a18f18588b2c8094409f4aa9b44c913f276ffcd1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-2/memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "ae48ffbd4d4417c96eb2c62ffce24f6c6c26f9225963cbf2c5ec9eabac2a7678",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-3/benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "16aca5afe6c01707df7ad6ab5ff9ff9715d22594803d97481208cb4a0b415ade",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-3/memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "ed44b0a51a9a54c6649059bac4d5108f0e10dc3ec203e778f500a1b806295453",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "armv7/shard-3/tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "0d3945778b2a81753bb678b7440a830f7c9eac5fb1e9ed1a88cf1ff20fb6c348",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+{
+ "name": "isobmff-armv7-runtime-runners-linux-arm64",
+ "path": "isobmff-armv7-runtime-runners-linux-arm64",
+ "retention": "retained",
+ "reason": "ISO BMFF ARMv7 runtime change, AArch64: 30-pair screens of every contract the core change reaches against the base worker on the gate build, with the CPU and kernel",
+ "key": "evidence/isobmff-armv7-runtime-runners-linux-arm64/80ae96afb42abfdae9c7ac54bbc96b9197a3d53ed763d01e4acff1fd325e30c2.tar.gz",
+ "sha256": "80ae96afb42abfdae9c7ac54bbc96b9197a3d53ed763d01e4acff1fd325e30c2",
+ "bytes": 225886565,
+ "source_revision": "4c823f7f74419cbfb9c8220a72b4684931c621f9"
+}

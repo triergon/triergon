@@ -1,0 +1,12 @@
+{
+ "name": "review-follow-ups-quick-check-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited same-code listings, instruction counts, paired timing screens of eight contracts and the unpaired 52-operation ISO BMFF runs of the review follow-ups against main",
+ "key": "evidence/review-follow-ups-quick-check-linux-arm64/09814ff9171abe0765ae6ff105c5a7aa8539ddce270b69d7757f85fbfb585045.tar.gz",
+ "sha256": "09814ff9171abe0765ae6ff105c5a7aa8539ddce270b69d7757f85fbfb585045",
+ "bytes": 602114945,
+ "source_revisions": {
+  "candidate": "c1ddf421dd4c9d629f926b79bd5645bc1489d935",
+  "baseline": "cf9ad665bfc96dd64a843828d4f57a2e1a73eed8"
+ }
+}

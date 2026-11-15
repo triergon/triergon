@@ -1,0 +1,66 @@
+{
+ "name": "avc-field-reader-comparison",
+ "path": "avc-field-reader-comparison",
+ "retention": "90 days",
+ "reason": "AVC field reader measurements",
+ "key": "qualification/repository/avc-field-reader-comparison/fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6.tar.gz",
+ "sha256": "fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6",
+ "files": [
+  {
+   "path": "avc-field-reader-comparison/FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "avc-field-reader-comparison/GUEST-PREFLIGHT.log",
+   "sha256": "3275677b26eeab6c6726f7ce54dcae2785cd538459d9361fefb7b25982e15a55"
+  },
+  {
+   "path": "avc-field-reader-comparison/HLS-CLOCK-ORACLE.log",
+   "sha256": "f1201b12e5b6af45b374b4e110e578871ab0b5f7cfc931b677b24ffc17f8f5ab"
+  },
+  {
+   "path": "avc-field-reader-comparison/HLS-WORKSPACE-CHECK.log",
+   "sha256": "4b5aa8cd3f03f02b95e54943ad03d7925f7bc2ddd21ac91bd2d0f6d6e74e74d3"
+  },
+  {
+   "path": "avc-field-reader-comparison/HLS-WORKSPACE-CLIPPY.log",
+   "sha256": "f885cbb9a9c57802408cd55651033ed13612036b926cddae11723925fc001950"
+  },
+  {
+   "path": "avc-field-reader-comparison/HLS-WORKSPACE-DOC.log",
+   "sha256": "e936f709dd473160b4f5994164274b856e7aa2563c0e9eedda460140ccd2887f"
+  },
+  {
+   "path": "avc-field-reader-comparison/HLS-WORKSPACE-TEST.log",
+   "sha256": "568d354bc3423a47c89cba7085d33117ff1c447501296877d7edcf1e27927e4b"
+  },
+  {
+   "path": "avc-field-reader-comparison/NATIVE-EXIT.txt",
+   "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4"
+  },
+  {
+   "path": "avc-field-reader-comparison/NATIVE-RESULTS.sha256",
+   "sha256": "ee629061566c2715b488e994c5b9d639de21ab90613df33516324ba2a2994380"
+  },
+  {
+   "path": "avc-field-reader-comparison/NATIVE-RESULTS.tar.gz",
+   "sha256": "e2fa753f8a55d029b2d05f8131f36f55f735b354e477e5f86d193b61adfe5de4"
+  },
+  {
+   "path": "avc-field-reader-comparison/NATIVE.log",
+   "sha256": "21463f46b64413bf035aeaca4cd518b5485c0744be3a049109d6228d7b9a6298"
+  },
+  {
+   "path": "avc-field-reader-comparison/ORACLE.tar.gz",
+   "sha256": "ea24cfa82af6eb92cc6fba54a0632b8d4013cd9f90ef02cc659cdf9a49b94c09"
+  },
+  {
+   "path": "avc-field-reader-comparison/SOURCE.bundle",
+   "sha256": "590eb6526fc9494033123699065d1a294dcad1b62d63534e854800e1bd6e7d30"
+  },
+  {
+   "path": "avc-field-reader-comparison/STOP-FAILED-COLLECTION.log",
+   "sha256": "4d0071af89ae38bf899e5bf3a473b2b16cc4b98af67a49b4b61043fb788671a7"
+  }
+ ]
+}

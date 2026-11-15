@@ -1,0 +1,10 @@
+{
+ "name": "rasterising-a7b6635e-linux-arm64",
+ "path": "rasterising-a7b6635e-linux-arm64",
+ "retention": "retained",
+ "reason": "Rasterising status row, Linux AArch64: raster compare --all --diagnostic (the C engine and the NEON diagnostic), fonts and shape compare --all and the raster tests at the head, with the zero-init flag instruction counts and paired timing against an unflagged reference build",
+ "key": "evidence/rasterising-a7b6635e-linux-arm64/0ba86c152cef51adc4b57d37f7d9eeeab29a2137425aec95c9b7198b0245a44f.tar.gz",
+ "sha256": "0ba86c152cef51adc4b57d37f7d9eeeab29a2137425aec95c9b7198b0245a44f",
+ "bytes": 61264981,
+ "source_revision": "a7b6635e20cc2dc9d4592a874ba0eecab24f2870"
+}

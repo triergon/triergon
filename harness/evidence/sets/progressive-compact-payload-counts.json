@@ -1,0 +1,6 @@
+{
+ "name": "progressive-compact-payload-counts",
+ "retention": "90 days",
+ "key": "qualification/repository/progressive-compact-payload-counts/73ddb2ba2511388f89dafe376743369a59cd2575ca713d394747b9feaeb1186f.tar.gz",
+ "sha256": "73ddb2ba2511388f89dafe376743369a59cd2575ca713d394747b9feaeb1186f"
+}
