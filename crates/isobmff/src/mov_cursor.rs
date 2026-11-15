@@ -436,6 +436,19 @@ impl<'a> Slot<'a> {
     }
 }
 
+/// One track's packet state at an occurrence its index produced: what a
+/// complete-source cursor over the same tracks holds for this track once a
+/// resume point has replayed it to that occurrence.
+#[derive(Debug)]
+pub(crate) struct TrackResume<'a> {
+    /// The occurrence's position in the track, from zero.
+    occurrence: u64,
+    /// The samples whose extents the index checked.
+    validated: u64,
+    /// The track's slot, with the occurrence as its head.
+    slot: Slot<'a>,
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Phase {
     Media,
@@ -497,7 +510,8 @@ impl TrackProjection {
 }
 
 /// One charged slot/head per track (including the existing edit cursor's bounded
-/// lookahead), plus one pending validation sample and one ready occurrence.
+/// lookahead), plus one pending validation sample. The ready occurrence stays in
+/// its track's slot until it is taken.
 /// Polling is cancellable/work-bounded, with sticky failures.
 /// Preflight validates *all* source sample extents before demux policy refusals.
 /// Backward source addresses remain legal: the consumer performs checked ranges.
@@ -517,7 +531,8 @@ pub struct PacketCursor<'a> {
     low: usize,
     high: usize,
     best: Option<usize>,
-    ready: Option<PacketOccurrence>,
+    /// The slot whose head is the ready occurrence.
+    ready: Option<usize>,
     failed: Option<Error>,
     complete_source: bool,
     front_source: bool,
@@ -914,15 +929,9 @@ impl<'a> PacketCursor<'a> {
         Ok(())
     }
     pub fn ready_encoded_skip(&self) -> Result<Option<[u8; 10]>> {
-        let item = self.ready.as_ref().ok_or(Error::Invalid(
+        let (slot, item) = self.ready_slot().ok_or(Error::Invalid(
             "encoded skip requires ready source occurrence",
         ))?;
-        let slot = self
-            .slots
-            .as_slice()
-            .iter()
-            .find(|s| s.track.track_id == item.track_id)
-            .ok_or(Error::Invalid("encoded occurrence track"))?;
         match slot.encoded_edit {
             Some(plan) => plan.skip_samples(&item.source),
             None => Ok(None),
@@ -1051,19 +1060,12 @@ impl<'a> PacketCursor<'a> {
     /// Provenance of the currently held source run, accessed before take. O(1)
     /// in the selected single-track index cursor; no run/sample array expansion.
     pub(crate) fn ready_source_run(&self) -> Result<Option<(usize, usize, u32)>> {
-        let ready = self
-            .ready
-            .as_ref()
+        let (slot, ready) = self
+            .ready_slot()
             .ok_or(Error::Invalid("no ready native occurrence"))?;
         if ready.source.fragment_flags.is_none() {
             return Ok(None);
         }
-        let slot = self
-            .slots
-            .as_slice()
-            .iter()
-            .find(|s| s.track.track_id == ready.track_id)
-            .ok_or(Error::Invalid("native source slot absent"))?;
         let (fragment, run) = slot
             .append_run
             .ok_or(Error::Invalid("native source run absent"))?;
@@ -1077,7 +1079,103 @@ impl<'a> PacketCursor<'a> {
     /// Inspect the current occurrence without consuming its place in the
     /// demux schedule.
     pub fn occurrence(&self) -> Option<&PacketOccurrence> {
-        self.ready.as_ref()
+        self.ready_slot().map(|(_, occurrence)| occurrence)
+    }
+
+    fn ready_slot(&self) -> Option<(&Slot<'a>, &PacketOccurrence)> {
+        let slot = self.slots.as_slice().get(self.ready?)?;
+        Some((slot, slot.head.as_ref()?))
+    }
+
+    /// Drop the ready occurrence without moving it out of its slot.
+    pub(crate) fn discard_occurrence(&mut self) {
+        if let Some(at) = self.ready.take() {
+            self.slots.as_mut_slice()[at].head = None;
+        }
+    }
+
+    /// This one-track complete-source cursor's state at its ready occurrence,
+    /// the `occurrence`-th from zero. `previous`, a state this method returned
+    /// earlier, lends its edit cursor storage.
+    pub(crate) fn ready_track_resume(
+        &self,
+        occurrence: u64,
+        previous: Option<TrackResume<'a>>,
+    ) -> Result<TrackResume<'a>> {
+        let ([slot], Some(0), true) = (self.slots.as_slice(), self.ready, self.complete_source)
+        else {
+            return Err(Error::Invalid(
+                "track resume needs a ready one-track complete cursor",
+            ));
+        };
+        Ok(TrackResume {
+            occurrence,
+            validated: self.validated,
+            slot: slot.try_clone_with_edit_storage(previous.and_then(|p| p.slot.edited))?,
+        })
+    }
+
+    /// The complete-source cursor over these tracks, in catalogue order, that
+    /// [`with_resume_points`](Self::with_resume_points) reaches by replaying each
+    /// track to its resumed occurrence. Every track's extents were checked when
+    /// its state was kept.
+    pub(crate) fn from_track_resumes(
+        budget: &Budget,
+        resumes: &[TrackResume<'a>],
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+    ) -> Result<Self> {
+        let max_tracks = limits.max_tracks.min(64);
+        if resumes.len() > max_tracks {
+            return Err(Error::Limit {
+                requested: resumes.len(),
+                maximum: max_tracks,
+            });
+        }
+        if media.len() > limits.max_media_extents {
+            return Err(Error::Limit {
+                requested: media.len(),
+                maximum: limits.max_media_extents,
+            });
+        }
+        let total = |value: fn(&TrackResume<'_>) -> u64| {
+            resumes.iter().try_fold(0u64, |sum, resume| {
+                sum.checked_add(value(resume)).ok_or(Error::Overflow)
+            })
+        };
+        count(
+            total(|resume| resume.slot.track.table.sample_count())?,
+            limits.max_source_samples,
+        )?;
+        count(total(|resume| resume.occurrence)?, limits.max_occurrences)?;
+        for resume in resumes {
+            count(resume.occurrence, limits.max_occurrences)?;
+        }
+        // A replay checks the extents again, failing at the first sample past the limit.
+        let validated = total(|resume| resume.validated)?;
+        count(
+            validated.min(limits.max_source_samples.saturating_add(1)),
+            limits.max_source_samples,
+        )?;
+        let mut slots = BudgetVec::new(budget);
+        slots.try_reserve_exact(resumes.len())?;
+        for resume in resumes {
+            let mut slot = resume.slot.try_clone()?;
+            // The index scheduled its one track alone.
+            if resumes.len() > 1 {
+                let base = slot.clock()?.demux_base;
+                if let Some(head) = &mut slot.head {
+                    head.scheduling_clock =
+                        SchedulingClock::from_demux_clock(head.demux.dts_field, base)?;
+                }
+            }
+            slots.try_push(slot).map_err(|error| error.error)?;
+        }
+        let mut cursor = Self::from_slots(slots, media, limits);
+        cursor.complete_source = true;
+        cursor.validated = validated;
+        cursor.phase = Phase::Fill;
+        Ok(cursor)
     }
 
     /// Start a separate replay of these immutable complete-source tables.
@@ -1189,6 +1287,7 @@ impl<'a> PacketCursor<'a> {
         }
         self.ready
             .take()
+            .and_then(|at| self.slots.as_mut_slice()[at].head.take())
             .ok_or(Error::Invalid("no ready native packet"))
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
@@ -1543,9 +1642,9 @@ impl<'a> PacketCursor<'a> {
                         if self.recording_seek_checkpoints {
                             self.record_seek_checkpoint(best);
                         }
-                        let occurrence = self.slots.as_mut_slice()[best].head.take();
+                        let slot = &mut self.slots.as_mut_slice()[best];
                         if let Some(end) = &mut self.forward_encoded_end
-                            && let Some(packet) = &occurrence
+                            && let Some(packet) = &slot.head
                         {
                             if *end > packet.source.range.start {
                                 return Err(Error::Unsupported(
@@ -1555,15 +1654,17 @@ impl<'a> PacketCursor<'a> {
                             *end = packet.source.range.end;
                         }
                         if let Some(duration) = &mut self.checked_duration_us {
-                            let row = occurrence
-                                .as_ref()
+                            let row = slot
+                                .head
+                                .take()
                                 .ok_or(Error::Invalid("missing projected packet"))?;
-                            record_duration(duration, row)?;
+                            record_duration(duration, &row)?;
                             self.at = 0;
                             self.phase = Phase::Fill;
                             continue;
                         }
-                        self.ready = occurrence;
+                        // The occurrence stays in its slot until it is taken.
+                        self.ready = slot.head.is_some().then_some(best);
                         self.at = 0;
                         self.phase = Phase::Fill;
                         continue;
