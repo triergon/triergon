@@ -394,7 +394,10 @@ impl Reader {
             let Some(index) = stream.track else { continue };
             let track = &mut self.tracks[index];
             track.reference_end = stream.reference.end();
-            let ticks = stream.clock.end().map(|ticks| ticks + track.offset);
+            let ticks = stream
+                .clock
+                .end()
+                .and_then(|ticks| ticks.checked_add(track.offset));
             if let Some(time) =
                 ticks.and_then(|t| Time::from_ticks(i128::from(t), track.time_base).ok())
                 && track.timeline().timed()
@@ -619,7 +622,8 @@ impl Reader {
                     },
                     payload: media.payload,
                     time_base: track.time_base,
-                    pts: media.slot.pts.map(|pts| pts + offset),
+                    // A time out of range is unknown.
+                    pts: media.slot.pts.and_then(|pts| pts.checked_add(offset)),
                     duration: media.slot.durations.exact.map(i64::from),
                     trim: media.slot.trim,
                     granule: media.last_on_page.then_some(header.granule),
@@ -720,7 +724,7 @@ impl Reader {
                         .find(|track| track.link == 0 && track.serial == header.serial)
                     && track.timeline().timed()
                 {
-                    track.end = Some(track.timeline().ticks(granule) + track.offset);
+                    track.end = track.timeline().ticks(granule).checked_add(track.offset);
                 }
                 return Ok(None);
             }
@@ -828,7 +832,11 @@ impl Reader {
         };
         let end = self.links.get(link + 1).map_or(length, |next| next.start);
         let timeline = *track.timeline();
-        let goal = landing.threshold - track.offset - timeline.longest_overlap();
+        // The bisection's goal only bounds the search, so it saturates.
+        let goal = landing
+            .threshold
+            .saturating_sub(track.offset)
+            .saturating_sub(timeline.longest_overlap());
         let mut bisection = Bisection::new(
             track.serial,
             timeline,

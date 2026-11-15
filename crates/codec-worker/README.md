@@ -14,6 +14,8 @@ codec-worker KIND-CODEC-bench  FILE ITERATIONS
 codec-worker KIND-CODEC-memory FILE
 codec-worker KIND-CODEC-raw    FILE OUT
 codec-worker packets FORMAT FILE
+codec-worker packets mov FILE [TRACK_ID@MICROSECONDS]
+codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 ```
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
@@ -68,6 +70,14 @@ Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
 (`triergon_ogg::compat::clock`), and the reader's `resync` and `lost` events are lines
 of their own. The last line lists the tracks and how reading ended (`eof`, or `error` with the
 reader's message).
+
+`seek ogg FILE TRACK SECONDS POLICY` opens an Ogg file the same way, seeks track TRACK
+(its index once the reader is open) to SECONDS (a decimal number) with POLICY (`exact`:
+`SeekPolicy::PreviousRandomAccess`; `preroll`: `SeekPolicy::PlaybackPreroll`), prints the
+receipt as a `{"event":"seek",...}` line (`requested`, `landing` and `discard_until` as
+`[numerator, denominator]` seconds, the method and the bytes scanned) and then every
+packet to the end of the file as `packets` does, Ogg packets that end a page with their
+`granule`. `cargo xtask codecs readers --seeks` compares it with FFmpeg.
 
 `packets mov FILE [TRACK_ID@MICROSECONDS]` reads through the neutral ISO BMFF reader
 (`triergon_isobmff::Reader`), for `cargo xtask codecs isobmff-reader`. Each line holds

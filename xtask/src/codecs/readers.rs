@@ -19,7 +19,9 @@
 //! end. FFmpeg lands on a page start: the packets it delivers before the reader's
 //! landing are counted and not compared (see `before_landing`), and the rest are aligned
 //! by position and size, packets that differ in both never pairing, so that packets of
-//! different chain links do not pair.
+//! different chain links do not pair. The reader's own landing is checked as well: a
+//! case fails where the receipt lands after the requested time or the sought track's
+//! first packet starts after it (`landing_check`).
 
 use std::fs;
 use std::io::Write;
@@ -611,6 +613,8 @@ const TRIM_END: usize = 6;
 /// A reader packet as `codec-worker packets` prints it, with what the scopes ask of it.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Emitted {
+    /// The reader's track index.
+    track: i128,
     native: Fields,
     /// The FFmpeg-compatible view, where the reader has one.
     compat: Option<Fields>,
@@ -877,6 +881,7 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
             fields
         });
         let emitted = Emitted {
+            track,
             native: FIELDS.map(|f| int(packet.get(f))),
             compat,
             time_base,
@@ -1706,12 +1711,18 @@ fn grade_case(
         "reproduced-by-compat" => 1,
         _ => 0,
     };
-    let status = views
+    let mut status = views
         .iter()
         .map(|(_, g)| g.status)
         .max_by_key(|s| rank(s))
         .unwrap_or("fail")
         .to_owned();
+    if let Some(seek) = seek
+        && let Err(error) = landing_check(&ours, seek)
+    {
+        fields.push(("landing_error".into(), Value::str(error)));
+        status = "fail".into();
+    }
     let proposals = views
         .iter()
         .filter_map(|(_, g)| g.proposal.clone())
@@ -1730,6 +1741,49 @@ fn grade_case(
         status,
         proposals,
     })
+}
+
+/// A seek's landing as the reader reports and delivers it: its receipt lands at or
+/// before the requested time, and the sought track's first packet after the seek
+/// starts at or before the requested time too, so a seek that lands past its target
+/// fails although the comparison drops FFmpeg's packets before the reader's landing.
+fn landing_check(ours: &Candidate, seek: &SeekCase) -> Result<(), String> {
+    let seconds = |key: &str| -> Result<Ratio, String> {
+        let time = ours
+            .receipt
+            .as_ref()
+            .and_then(|r| r.get(key))
+            .and_then(Value::as_array)
+            .and_then(|t| Some((int(t.first())?, int(t.get(1))?)))
+            .filter(|&(_, denominator)| denominator > 0);
+        time.ok_or(format!("the seek receipt has no {key} time"))
+    };
+    let requested = seconds("requested")?;
+    let landed = seconds("landing")?;
+    // a <= b for a = a.0 / a.1 and b = b.0 / b.1, both denominators positive.
+    let at_or_before = |a: Ratio, b: Ratio| a.0 * b.1 <= b.0 * a.1;
+    if !at_or_before(landed, requested) {
+        return Err(format!(
+            "lands at {}/{} s, after the requested {}/{} s",
+            landed.0, landed.1, requested.0, requested.1
+        ));
+    }
+    let track = i128::try_from(seek.track).map_err(|e| e.to_string())?;
+    let first = ours
+        .streams
+        .iter()
+        .flat_map(|(_, packets)| packets)
+        .find(|p| p.track == track)
+        .ok_or("the sought track delivers no packet")?;
+    let pts = first.native[PTS].ok_or("the sought track's first packet has no time")?;
+    let (numerator, denominator) = first.time_base;
+    if denominator <= 0 || !at_or_before((pts * numerator, denominator), requested) {
+        return Err(format!(
+            "the sought track's first packet starts at {pts} x {numerator}/{denominator} s, after the requested {}/{} s",
+            requested.0, requested.1
+        ));
+    }
+    Ok(())
 }
 
 /// Drop from each reference stream the packets FFmpeg delivers before the reader's
@@ -2337,6 +2391,45 @@ mod tests {
         assert!(SeekCase::parse(&case("exact", "1.5", "1.42")).is_err());
         assert!(SeekCase::parse(&case("exact", "-1", "-1")).is_err());
         assert!(SeekCase::parse(&case("nearest", "1", "1")).is_err());
+    }
+
+    #[test]
+    fn a_seek_must_land_at_or_before_its_target() {
+        let seek = SeekCase {
+            name: "n".into(),
+            input: "a.opus".into(),
+            track: 0,
+            seconds: "1.5".into(),
+            policy: "exact".into(),
+            reference_seconds: "1.5".into(),
+        };
+        // Packets of 48 kHz ticks; the receipt in seconds.
+        let landed = |landing: &str, first: i128| {
+            let mut ours = reading(
+                vec![[Some(9), Some(0), Some(first), None, None, None, None]],
+                None,
+            );
+            ours.receipt = Some(
+                json::parse(&format!(
+                    r#"{{"event":"seek","requested":[3,2],"landing":{landing}}}"#
+                ))
+                .unwrap(),
+            );
+            landing_check(&ours, &seek)
+        };
+        assert!(landed("[1,1]", 48_000).is_ok());
+        assert!(landed("[3,2]", 72_000).is_ok());
+        // The receipt or the first packet past the target.
+        assert!(landed("[2,1]", 48_000).is_err());
+        assert!(landed("[1,1]", 72_001).is_err());
+        assert!(landed("[1,0]", 48_000).is_err());
+        let mut other = reading(
+            vec![[Some(9), Some(0), Some(0), None, None, None, None]],
+            None,
+        );
+        other.streams[0].1[0].track = 1;
+        other.receipt = Some(json::parse(r#"{"requested":[3,2],"landing":[1,1]}"#).unwrap());
+        assert!(landing_check(&other, &seek).is_err());
     }
 
     #[test]

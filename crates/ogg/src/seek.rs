@@ -250,8 +250,13 @@ impl Landing {
             if packet.random_access == RandomAccess::Sync {
                 self.keyframe = packet.pts;
             }
-            if let Some(named) = packet.granule.and_then(|g| self.timeline.keyframe(g)) {
-                self.keyframe = Some(named + self.offset);
+            // A keyframe tick out of range names none.
+            if let Some(named) = packet
+                .granule
+                .and_then(|g| self.timeline.keyframe(g))
+                .and_then(|tick| tick.checked_add(self.offset))
+            {
+                self.keyframe = Some(named);
             }
         }
         if end.is_none_or(|end| end <= self.threshold) {

@@ -186,3 +186,9 @@ observation per workload and `summary.json`.
   `CORRECTNESS-MANIFEST-AC3-NODITHER.json` is the dither-stripped comparison set.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).
+- `ps-open-noext-after-error.adts`, `ps-open-dt-envelope-reference.adts`,
+  `ps-open-sbr-after-missing.adts` and `ps-open-sbr-truncated.adts`
+  ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open Parametric Stereo and
+  SBR cases, the manifest's `open_cases`: crafted streams of paths the probes did not
+  recover, which `summarize` requires to keep failing; their numbers are in the known
+  differences of [crates/codec-aac](../../crates/codec-aac/README.md).
