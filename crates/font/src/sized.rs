@@ -147,7 +147,12 @@ impl Font {
     /// next hinted load runs its TrueType control value program again from
     /// freshly scaled control values, cleared storage and a fresh twilight
     /// zone, at the size the face is already at too (probe
-    /// `sizes-same-size-request`).
+    /// `sizes-same-size-request`). That load so does the work of scaling the
+    /// `cvt ` table, clearing `maxp`'s storage area and twilight points and
+    /// running the control value program, in the storage the face kept from
+    /// its previous size, and pays for it from its own `WorkBudget`; a call
+    /// itself does no work, so request a size once for the glyphs loaded at
+    /// it.
     ///
     /// # Errors
     ///
@@ -502,25 +507,32 @@ impl<'f> SizedFont<'f> {
                 gasp: table(*b"gasp"),
             }
         };
-        let m = bytecode.with_size(tables, ppem, scale.y, font.limits.work, |state| {
-            state.units.clear();
-            let mut hinting = GlyfHinting {
-                font,
-                hinter: &mut state.hinter,
-                programs,
-                units: &mut state.units,
-                ends: &mut state.ends,
-            };
-            outline.begin(font.limits.points);
-            table.outline(
-                &font.glyf_context(),
-                glyph,
-                scale,
-                outline,
-                work,
-                &mut hinting,
-            )
-        })?;
+        let m = bytecode.with_size(
+            tables,
+            (ppem, scale.y),
+            font.limits.work,
+            work,
+            |state, work| {
+                state.hinter.usable()?;
+                state.units.clear();
+                let mut hinting = GlyfHinting {
+                    font,
+                    hinter: &mut state.hinter,
+                    programs,
+                    units: &mut state.units,
+                    ends: &mut state.ends,
+                };
+                outline.begin(font.limits.points);
+                table.outline(
+                    &font.glyf_context(),
+                    glyph,
+                    scale,
+                    outline,
+                    work,
+                    &mut hinting,
+                )
+            },
+        )?;
         let (origin, advances) = font.glyf_advances(m, scale);
         if origin != 0 {
             glyf::translate(outline.points_mut(), (-origin, 0))?;

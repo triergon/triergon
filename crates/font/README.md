@@ -452,7 +452,8 @@ characters and each latin or CJK style's metrics, charged to that budget, as is 
 scratch storage of an auto-hinted load. A face with TrueType programs makes, on
 its first hinted load, the interpreter's function and instruction definitions,
 which it keeps, and for the size it last loaded hinted at its control values,
-storage, twilight zone, stack and the zone one glyph is hinted in, charged to that budget and sized by `maxp` as FreeType
+storage, twilight zone, stack and the zone one glyph is hinted in, which the next
+size or request fills again, charged to that budget and sized by `maxp` as FreeType
 sizes them (the stack 128 values deeper and the twilight zone four points
 larger, at least 64 function definitions with a version 1.0 `maxp` and none
 with another); a hinted load holds it locked, and a glyph without a program
@@ -465,8 +466,10 @@ nothing.
 
 `Limits` bounds the work of one parse and of one outline (`work`, which a
 hinted load's instructions also count against, a unit for each instruction
-and for each value, point, flag or byte of code it goes through, as the font
-and control value programs count against a budget of their own), nested
+and for each value, point, flag or byte of code it goes through; the font and
+control value programs run within a `work` of their own, so a size comes out the
+same whichever load makes it, and the load that makes it is then charged what
+they used), nested
 composites and subroutine calls (`depth`) and the points of one outline
 (`points`); exceeding one is `Error::Policy`. Format ceilings (48 or 513 operands,
 96 stems, 32 transient slots, 16 nested subroutine calls in CFF, 64 nested

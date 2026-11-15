@@ -206,48 +206,63 @@ pub(crate) struct Hinter {
     glyph: Zone,
 }
 
-/// What each size starts from before its control value program: the control
-/// values scaled to it, zeroed storage, a twilight zone at the origin and an
-/// empty stack (observed, `sizes-storage`, `sizes-twilight`).
-struct Fresh {
+/// The storage a size's interpreter state lives in. A face keeps it from one
+/// size or request to the next, which fills it again instead of allocating it.
+#[derive(Debug)]
+struct Buffers {
     cvt: BudgetVec<i32>,
     storage: BudgetVec<i32>,
     twilight: Zone,
     stack: BudgetVec<i32>,
+    glyph_cvt: BudgetVec<i32>,
+    glyph_storage: BudgetVec<i32>,
+    glyph: Zone,
 }
 
-impl Fresh {
-    fn new(
+impl Buffers {
+    fn new(budget: &Budget) -> Self {
+        Self {
+            cvt: BudgetVec::new(budget),
+            storage: BudgetVec::new(budget),
+            twilight: Zone::new(budget),
+            stack: BudgetVec::new(budget),
+            glyph_cvt: BudgetVec::new(budget),
+            glyph_storage: BudgetVec::new(budget),
+            glyph: Zone::new(budget),
+        }
+    }
+
+    /// Fills the buffers with what each size starts from before its control
+    /// value program: the control values `cvt` (font units) scaled by the
+    /// 16.16 `scale`, zeroed storage, a twilight zone at the origin and an
+    /// empty stack (observed, `sizes-storage`, `sizes-twilight`).
+    fn fill(
+        &mut self,
         cvt: &[u8],
         profile: Profile,
         scale: i64,
-        budget: &Budget,
         work: &mut WorkBudget,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         // A unit of work for each value filled.
         let filled =
             cvt.len() / 2 + usize::from(profile.storage) + usize::from(profile.twilight_points);
         if !work.try_charge(filled as u64) {
             return Err(Error::Policy("TrueType instructions"));
         }
-        let mut values = BudgetVec::new(budget);
-        values.try_reserve_exact(cvt.len() / 2)?;
+        self.cvt.clear();
+        self.cvt.try_reserve_exact(cvt.len() / 2)?;
         for unit in cvt.chunks_exact(2) {
             let unit = i32::from(i16::from_be_bytes([unit[0], unit[1]]));
-            values
+            self.cvt
                 .try_push(math::scale(unit, scale))
                 .map_err(|e| e.error)?;
         }
-        let mut twilight = Zone::new(budget);
-        twilight.reset(profile.twilight_len())?;
-        let mut stack = BudgetVec::new(budget);
-        stack.try_reserve_exact(profile.stack_limit())?;
-        Ok(Self {
-            cvt: values,
-            storage: BudgetVec::try_filled(budget, 0, usize::from(profile.storage))?,
-            twilight,
-            stack,
-        })
+        self.storage.clear();
+        self.storage.try_resize(usize::from(profile.storage), 0)?;
+        self.twilight.reset(profile.twilight_len())?;
+        self.stack.clear();
+        self.stack.try_reserve_exact(profile.stack_limit())?;
+        Ok(())
     }
 }
 
@@ -259,38 +274,47 @@ const IGNORE_CONTROL_STATE: u8 = 2;
 impl Hinter {
     /// Runs the control value program at `ppem` and the 16.16 `scale`, with
     /// the control values `cvt ` (font units) scaled by it, after the
-    /// face's `definitions`, which it may add to. A limit the program runs
-    /// into is returned with the definitions, which the face keeps.
-    pub(crate) fn new(
+    /// face's `definitions`, which it may add to, in `buffers`. A limit the
+    /// program runs into is returned with the definitions, which the face
+    /// keeps.
+    fn new(
         tables: Tables<'_>,
         ppem: u16,
         scale: i64,
         definitions: Box<Definitions>,
-        budget: &Budget,
+        mut buffers: Buffers,
         work: &mut WorkBudget,
     ) -> std::result::Result<Self, (Error, Box<Definitions>)> {
         let profile = Profile::read(tables.maxp);
-        let fresh = match Fresh::new(tables.cvt, profile, scale, budget, work) {
-            Ok(fresh) => fresh,
-            Err(e) => return Err((e, definitions)),
-        };
+        if let Err(e) = buffers.fill(tables.cvt, profile, scale, work) {
+            return Err((e, definitions));
+        }
         let symmetric = symmetric_rendering(tables.gasp, ppem);
+        let Buffers {
+            cvt,
+            storage,
+            twilight,
+            stack,
+            glyph_cvt,
+            glyph_storage,
+            glyph,
+        } = buffers;
         let mut hinter = Self {
             ppem,
             scale,
             symmetric,
             definitions,
-            cvt: fresh.cvt,
-            storage: fresh.storage,
+            cvt,
+            storage,
             state: GraphicsState::default(),
             instruct_control: 0,
-            twilight: fresh.twilight,
+            twilight,
             stack_limit: profile.stack_limit(),
             failed: false,
-            stack: fresh.stack,
-            glyph_cvt: BudgetVec::new(budget),
-            glyph_storage: BudgetVec::new(budget),
-            glyph: Zone::new(budget),
+            stack,
+            glyph_cvt,
+            glyph_storage,
+            glyph,
         };
         let mut machine = Machine {
             code: [tables.programs.font, tables.programs.control, &[]],
@@ -327,6 +351,32 @@ impl Hinter {
         }
     }
 
+    /// The face's definitions and the storage of the size, which the next size
+    /// fills again.
+    fn into_parts(self) -> (Box<Definitions>, Buffers) {
+        let buffers = Buffers {
+            cvt: self.cvt,
+            storage: self.storage,
+            twilight: self.twilight,
+            stack: self.stack,
+            glyph_cvt: self.glyph_cvt,
+            glyph_storage: self.glyph_storage,
+            glyph: self.glyph,
+        };
+        (self.definitions, buffers)
+    }
+
+    /// Whether the size's glyphs load: the face's font program or the size's
+    /// control value program stopping on an error fails every hinted load at
+    /// the size, of a glyph without points too (observed,
+    /// `errors-font-program-empty`, `errors-control-program-empty`).
+    pub(crate) fn usable(&self) -> Result<()> {
+        if self.failed || self.definitions.failed {
+            return Err(Error::Invalid("TrueType font or control value program"));
+        }
+        Ok(())
+    }
+
     /// The 16.16 scale the hinter was made for.
     pub(crate) const fn scale(&self) -> i64 {
         self.scale
@@ -355,9 +405,7 @@ impl Hinter {
         glyph: GlyphPoints<'_>,
         work: &mut WorkBudget,
     ) -> Result<()> {
-        if self.failed || self.definitions.failed {
-            return Err(Error::Invalid("TrueType font or control value program"));
-        }
+        self.usable()?;
         // Without a program to run the points stay as they are.
         if !self.grid_fitting() || instructions.is_empty() {
             return Ok(());
@@ -511,12 +559,13 @@ impl Setup {
         }
     }
 
-    /// The face's definitions, leaving the size.
-    fn into_definitions(self) -> Option<Box<Definitions>> {
+    /// The face's definitions and, from a size that was made, its storage,
+    /// leaving the size.
+    fn into_parts(self) -> (Option<Box<Definitions>>, Option<Box<State>>) {
         match self {
-            Self::Unusable(_) => None,
-            Self::Failed { definitions, .. } => Some(definitions),
-            Self::Ready(state) => Some(state.hinter.definitions),
+            Self::Unusable(_) => (None, None),
+            Self::Failed { definitions, .. } => (Some(definitions), None),
+            Self::Ready(state) => (None, Some(state)),
         }
     }
 }
@@ -547,63 +596,85 @@ impl Bytecode {
         self.requested.store(true, Ordering::Relaxed);
     }
 
-    /// Runs `load` with the interpreter at `ppem` and the 16.16 `scale`, made
-    /// from `tables` (the face's) within `work` units unless it already is,
-    /// or made and failed, since the last request: the font program runs at
-    /// the first size, the control value program at each size and request.
+    /// Runs `load` with the interpreter at `ppem` and the 16.16 `scale` and the
+    /// caller's `work`, unless the interpreter's setup for the size failed. The
+    /// setup is made from `tables` (the face's) when the face is not at the
+    /// size since the last request: the font program runs at the first size,
+    /// the control value program at each size and request, in the storage the
+    /// previous size leaves. It runs within its own `limit` units, so whichever
+    /// load makes it, a size comes out the same and is kept; the units it used
+    /// are then charged to `work`, which fails that load if it cannot pay them.
     pub(crate) fn with_size<'t, R>(
         &self,
         tables: impl FnOnce() -> Tables<'t>,
-        ppem: u16,
-        scale: i64,
-        work: u64,
-        load: impl FnOnce(&mut State) -> Result<R>,
+        (ppem, scale): (u16, i64),
+        limit: u64,
+        work: &mut WorkBudget,
+        load: impl FnOnce(&mut State, &mut WorkBudget) -> Result<R>,
     ) -> Result<R> {
         let mut guard = self.setup.lock().unwrap_or_else(PoisonError::into_inner);
         let requested = self.requested.swap(false, Ordering::Relaxed);
+        let mut spent = 0;
         let setup = match guard.take() {
             Some(setup @ Setup::Unusable(_)) => guard.insert(setup),
             Some(setup) if !requested && setup.is_for(ppem, scale) => guard.insert(setup),
             kept => {
                 let tables = tables();
-                let mut budget = WorkBudget::new(work);
-                // The old size's state goes before the new one is made.
-                let definitions = match kept.map(Setup::into_definitions) {
-                    Some(Some(definitions)) => definitions,
-                    _ => match Definitions::new(tables, ppem, scale, &self.budget, &mut budget) {
-                        Ok(definitions) => Box::new(definitions),
-                        Err(e @ Error::Backpressure { .. }) => return Err(e),
-                        Err(error) => {
-                            *guard = Some(Setup::Unusable(error));
-                            return Err(error);
-                        }
-                    },
-                };
-                let setup = match Hinter::new(
-                    tables,
-                    ppem,
-                    scale,
-                    definitions,
-                    &self.budget,
-                    &mut budget,
-                ) {
-                    Ok(hinter) => Setup::Ready(Box::new(State {
-                        hinter,
-                        units: BudgetVec::new(&self.budget),
-                        ends: BudgetVec::new(&self.budget),
-                    })),
-                    Err((error, definitions)) => Setup::Failed {
-                        ppem,
-                        scale,
-                        error,
+                let mut budget = WorkBudget::new(limit);
+                let (definitions, old) = kept.map_or((None, None), Setup::into_parts);
+                let (definitions, buffers, units, ends) = match old {
+                    Some(state) => {
+                        let State {
+                            hinter,
+                            units,
+                            ends,
+                        } = *state;
+                        let (definitions, buffers) = hinter.into_parts();
+                        (Some(definitions), buffers, units, ends)
+                    }
+                    None => (
                         definitions,
-                    },
+                        Buffers::new(&self.budget),
+                        BudgetVec::new(&self.budget),
+                        BudgetVec::new(&self.budget),
+                    ),
                 };
+                let definitions = match definitions {
+                    Some(definitions) => definitions,
+                    None => {
+                        match Definitions::new(tables, ppem, scale, &self.budget, &mut budget) {
+                            Ok(definitions) => Box::new(definitions),
+                            Err(e @ Error::Backpressure { .. }) => return Err(e),
+                            Err(error) => {
+                                *guard = Some(Setup::Unusable(error));
+                                return Err(error);
+                            }
+                        }
+                    }
+                };
+                let setup =
+                    match Hinter::new(tables, ppem, scale, definitions, buffers, &mut budget) {
+                        Ok(hinter) => Setup::Ready(Box::new(State {
+                            hinter,
+                            units,
+                            ends,
+                        })),
+                        Err((error, definitions)) => Setup::Failed {
+                            ppem,
+                            scale,
+                            error,
+                            definitions,
+                        },
+                    };
+                spent = budget.spent();
                 guard.insert(setup)
             }
         };
         match setup {
-            Setup::Ready(state) => load(state),
+            Setup::Ready(_) if !work.try_charge(spent) => {
+                Err(Error::Policy("TrueType instructions"))
+            }
+            Setup::Ready(state) => load(state, work),
             Setup::Unusable(error) | Setup::Failed { error, .. } => Err(*error),
         }
     }
@@ -611,7 +682,7 @@ impl Bytecode {
 
 #[cfg(test)]
 mod tests {
-    use super::{Bytecode, Definitions, GlyphPoints, Hinter, Phantoms, Programs, Tables};
+    use super::{Buffers, Bytecode, Definitions, GlyphPoints, Hinter, Phantoms, Programs, Tables};
     use crate::outline::{Outline, Point, PointKind};
     use std::cell::Cell;
     use triergon_core::{Budget, Error, WorkBudget};
@@ -666,7 +737,7 @@ mod tests {
             16,
             0x8000,
             Box::new(definitions),
-            &budget,
+            Buffers::new(&budget),
             &mut setup,
         )
         .map_err(|(e, _)| e)?;
@@ -826,10 +897,10 @@ mod tests {
                     made.set(made.get() + 1);
                     tables(&MAXP, &[], &looping)
                 },
-                ppem,
-                i64::from(ppem) << 11,
+                (ppem, i64::from(ppem) << 11),
                 1000,
-                |_| Ok(()),
+                &mut WorkBudget::new(1000),
+                |_, _| Ok(()),
             )
         };
         assert_eq!(at(16), Err(Error::Policy("TrueType instructions")));
@@ -849,10 +920,10 @@ mod tests {
                     made.set(made.get() + 1);
                     tables(&MAXP, &[], &[])
                 },
-                ppem,
-                i64::from(ppem) << 11,
+                (ppem, i64::from(ppem) << 11),
                 1000,
-                |_| Ok(()),
+                &mut WorkBudget::new(1000),
+                |_, _| Ok(()),
             )
         };
         at(16).unwrap();
@@ -862,6 +933,31 @@ mod tests {
         at(16).unwrap();
         at(16).unwrap();
         assert_eq!(made.get(), 2);
+    }
+
+    #[test]
+    fn the_caller_pays_for_the_setup_its_load_makes() {
+        let bytecode = Bytecode::new(Budget::new(1 << 20).unwrap());
+        let at = |work: &mut WorkBudget| {
+            bytecode.with_size(
+                || tables(&MAXP, &[], &[]),
+                (16, 16 << 11),
+                1000,
+                work,
+                |_, _| Ok(()),
+            )
+        };
+        // Too little for the setup: the load fails, and the size is kept.
+        assert_eq!(
+            at(&mut WorkBudget::new(1)),
+            Err(Error::Policy("TrueType instructions"))
+        );
+        let mut work = WorkBudget::new(1000);
+        at(&mut work).unwrap();
+        assert_eq!(work.spent(), 0);
+        bytecode.request();
+        at(&mut work).unwrap();
+        assert!(work.spent() > 0);
     }
 
     #[test]
@@ -885,10 +981,10 @@ mod tests {
     fn function_1_at(bytecode: &Bytecode, tables: Tables<'_>, ppem: u16) -> Result<i32, Error> {
         bytecode.with_size(
             || tables,
-            ppem,
-            i64::from(ppem) << 11,
+            (ppem, i64::from(ppem) << 11),
             10_000,
-            |state| {
+            &mut WorkBudget::new(10_000),
+            |state, _| {
                 let points = [(0, 0), (0, 0)].map(|(x, y)| Point::new(x, y));
                 let mut outline = Outline::new(&Budget::new(1 << 20)?);
                 outline.begin(usize::MAX);
