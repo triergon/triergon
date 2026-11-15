@@ -22,7 +22,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TickScale, TimeBase, WorkBudget};
 
 mod range_seek;
 use range_seek::Checkpoints;
@@ -298,12 +298,15 @@ impl<'a> Slot<'a> {
             "native first origin needs complete-source context",
         ))
     }
+    /// Project the next occurrence into `head`. `micros`, when given, converts
+    /// the demux base to the microseconds of a global schedule.
     fn fill(
         &mut self,
         work: &mut WorkBudget,
         complete_source: bool,
         global_schedule: bool,
         front_source: bool,
+        micros: Option<&TickScale>,
     ) -> Result<CursorStatus> {
         let clock = self.clock()?;
         let (source, demux, edit, clock_origin) = if let Some(plan) = self.encoded_edit {
@@ -411,7 +414,10 @@ impl<'a> Slot<'a> {
         let scheduling_clock = if front_source {
             SchedulingClock::NonseekableSourcePosition(demux.source_range.start)
         } else if global_schedule {
-            SchedulingClock::from_demux_clock(demux.dts_field, clock.demux_base)?
+            match micros {
+                Some(micros) => SchedulingClock::from_scaled_clock(demux.dts_field, micros)?,
+                None => SchedulingClock::from_demux_clock(demux.dts_field, clock.demux_base)?,
+            }
         } else {
             SchedulingClock::SingleTrack
         };
@@ -587,6 +593,27 @@ pub struct PacketCursor<'a> {
     projection: TrackProjection,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
+    /// The demux base of each of the first tracks in microseconds, for the
+    /// scheduling clock and the checked duration of every packet; prepared on
+    /// first use. Slots and their checkpoint copies stay as they are.
+    micros: [Option<TickScale>; SCALED_TRACKS],
+}
+
+/// How many tracks keep a prepared microsecond scale; later tracks convert
+/// through [`TimeBase::rescale`] per packet.
+const SCALED_TRACKS: usize = 4;
+
+impl PacketCursor<'_> {
+    /// Prepare track `at`'s demux base in microseconds, for the first
+    /// [`SCALED_TRACKS`] tracks once they have a projected clock; read it from
+    /// `micros`.
+    fn prepare_micros(&mut self, at: usize) {
+        if let Some(cached @ None) = self.micros.get_mut(at)
+            && let Some(clock) = &self.slots.as_slice()[at].clock
+        {
+            *cached = Some(TickScale::new(clock.demux_base, TimeBase::MICROSECONDS));
+        }
+    }
 }
 
 pub(crate) fn fragment_media_start(edits: &EditList) -> Result<i64> {
@@ -789,6 +816,7 @@ impl<'a> PacketCursor<'a> {
             projection: TrackProjection::default(),
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
+            micros: [None; SCALED_TRACKS],
         }
     }
     /// The caller establishes one complete original media source and all its
@@ -1775,9 +1803,11 @@ impl<'a> PacketCursor<'a> {
                         continue;
                     }
                     let global_schedule = self.slots.len() > 1;
+                    self.prepare_micros(self.at);
+                    let micros = self.micros.get(self.at).and_then(Option::as_ref);
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.head.is_none() {
-                        match slot.fill(work, true, global_schedule, false)? {
+                        match slot.fill(work, true, global_schedule, false, micros)? {
                             CursorStatus::Yield => return Ok(CursorStatus::Yield),
                             CursorStatus::Ready => {}
                             CursorStatus::End => {
@@ -1799,7 +1829,7 @@ impl<'a> PacketCursor<'a> {
                             .head
                             .as_ref()
                             .ok_or(Error::Invalid("missing projected packet"))?;
-                        record_duration(duration, row)?;
+                        record_duration(duration, row, micros)?;
                     }
                     if self.recording_seek_checkpoints {
                         self.record_seek_checkpoint(self.at);
@@ -1817,6 +1847,10 @@ impl<'a> PacketCursor<'a> {
                         continue;
                     }
                     let global_schedule = self.slots.len() > 1;
+                    if global_schedule {
+                        self.prepare_micros(self.at);
+                    }
+                    let micros = self.micros.get(self.at).and_then(Option::as_ref);
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.ended {
                         if !work.try_charge(1) {
@@ -1842,6 +1876,7 @@ impl<'a> PacketCursor<'a> {
                         self.complete_source,
                         global_schedule,
                         self.front_source,
+                        micros,
                     )? {
                         CursorStatus::Yield => return Ok(CursorStatus::Yield),
                         CursorStatus::End => {
@@ -1881,6 +1916,8 @@ impl<'a> PacketCursor<'a> {
                         if self.recording_seek_checkpoints {
                             self.record_seek_checkpoint(best);
                         }
+                        self.prepare_micros(best);
+                        let micros = self.micros.get(best).and_then(Option::as_ref);
                         let slot = &mut self.slots.as_mut_slice()[best];
                         if let Some(end) = &mut self.forward_encoded_end
                             && let Some(packet) = &slot.head
@@ -1897,7 +1934,7 @@ impl<'a> PacketCursor<'a> {
                                 .head
                                 .take()
                                 .ok_or(Error::Invalid("missing projected packet"))?;
-                            record_duration(duration, &row)?;
+                            record_duration(duration, &row, micros)?;
                             self.at = 0;
                             self.phase = Phase::Fill;
                             continue;
@@ -1947,16 +1984,25 @@ fn within_one_extent(media: &[Range<u64>], range: &Range<u64>) -> bool {
         .is_some_and(|extent| require_range_within(range, extent.clone()).is_ok())
 }
 
-fn record_duration(duration: &mut i64, packet: &PacketOccurrence) -> Result<()> {
+/// Raise `duration` to the end of `packet` in microseconds; `micros`, when
+/// given, is the packet's demux base in microseconds.
+fn record_duration(
+    duration: &mut i64,
+    packet: &PacketOccurrence,
+    micros: Option<&TickScale>,
+) -> Result<()> {
     if let Some(pts) = packet.demux.pts {
         let end = pts
             .checked_add(packet.demux.duration)
             .ok_or(Error::Overflow)?;
-        let micros = packet.media_clock.demux_base.rescale(
-            end,
-            TimeBase::MICROSECONDS,
-            Rounding::NearestAway,
-        )?;
+        let micros = match micros {
+            Some(micros) => micros.rescale(end, Rounding::NearestAway)?,
+            None => packet.media_clock.demux_base.rescale(
+                end,
+                TimeBase::MICROSECONDS,
+                Rounding::NearestAway,
+            )?,
+        };
         *duration = (*duration).max(micros);
     }
     Ok(())
