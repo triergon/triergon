@@ -1,4 +1,5 @@
-//! Frame buffers, per-picture motion storage and decoded picture buffer entries.
+//! Frame buffers, per-picture motion storage and the frame stores of the decoded picture
+//! buffer.
 
 use triergon_codec::{Budget, BudgetVec, StorageError};
 
@@ -158,14 +159,6 @@ impl Motion {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub(crate) enum RefMark {
-    #[default]
-    None,
-    Short,
-    Long,
-}
-
 /// How a frame store's content was coded (Table 8-7 PicCodingStruct).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum Coding {
@@ -182,65 +175,50 @@ pub(crate) struct OutputInfo {
     pub colour: crate::ColourDescription,
 }
 
-/// A decoded picture buffer entry: a frame or complementary field pair (or a single field).
+/// The contents of a frame buffer of the decoded picture buffer: a frame, a complementary
+/// field pair or a single field. Its reference marking and output state are kept by the
+/// buffer (`triergon_framing::picture_output::DecodedPictures`) that stores it.
 #[derive(Debug)]
 pub(crate) struct FrameStore {
+    /// The frame buffer's number. A picture takes the free frame buffer with the lowest
+    /// number, so buffers, and the samples they keep, are reused in a fixed order.
+    pub number: usize,
     /// Shared with output pictures; the decoder writes only into an unshared buffer. None
     /// before first use and while the store's picture is being decoded.
     pub buf: Option<std::sync::Arc<FrameBuf>>,
     /// Frame motion in `motion[0]`, or top / bottom field motion in `motion[0]` / `motion[1]`.
     pub motion: [Motion; 2],
     pub uid: u32,
-    pub in_use: bool,
     /// Decoded fields: bit 0 top, bit 1 bottom (3 = frame or both fields).
     pub fields: u8,
     pub coding: Coding,
-    pub mark: [RefMark; 2],
     pub frame_num: u32,
     pub long_term_frame_idx: u32,
     pub poc: [i32; 2],
-    pub needed_for_output: bool,
     pub pts: Option<i64>,
     pub non_existing: bool,
     pub info: OutputInfo,
-    /// The picture had memory_management_control_operation 5.
-    pub mmco5: bool,
     pub idr: bool,
-    /// Decode order counter (for diagnostics / tie breaks).
-    pub decode_order: u64,
 }
 
 impl FrameStore {
-    /// An unused entry without samples.
-    pub(crate) fn new(budget: &Budget) -> FrameStore {
+    /// Frame buffer `number`, empty and without samples.
+    pub(crate) fn new(number: usize, budget: &Budget) -> FrameStore {
         FrameStore {
+            number,
             buf: None,
             motion: [Motion::empty(budget), Motion::empty(budget)],
             uid: 0,
-            in_use: false,
             fields: 0,
             coding: Coding::default(),
-            mark: [RefMark::None; 2],
             frame_num: 0,
             long_term_frame_idx: 0,
             poc: [0; 2],
-            needed_for_output: false,
             pts: None,
             non_existing: false,
             info: OutputInfo::default(),
-            mmco5: false,
             idr: false,
-            decode_order: 0,
         }
-    }
-    pub(crate) fn is_ref(&self) -> bool {
-        self.mark[0] != RefMark::None || self.mark[1] != RefMark::None
-    }
-    pub(crate) fn is_short_frame(&self) -> bool {
-        self.mark[0] == RefMark::Short && self.mark[1] == RefMark::Short
-    }
-    pub(crate) fn is_long_frame(&self) -> bool {
-        self.mark[0] == RefMark::Long && self.mark[1] == RefMark::Long
     }
     /// PicOrderCnt of the frame / complementary field pair (8-1): min of the decoded fields.
     pub(crate) fn frame_poc(&self) -> i32 {

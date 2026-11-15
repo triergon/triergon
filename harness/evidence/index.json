@@ -30707,6 +30707,711 @@
    "source_revisions": {
     "candidate": "d7a6d8f78c7d9963455f3a0872ca935b79fa14b4"
    }
+  },
+  {
+   "name": "subtitle-cc-inputs",
+   "path": "subtitle-cc-inputs",
+   "retention": "retained",
+   "reason": "The closed caption streams of harness/features/subtitle-cc/corpus.json that gate-media-inputs lacks (.research/subtitle-corpus/cc), authored by harness/subtitles/cc_streams.py, each matching its manifest SHA-256, unpacked at the repository root of a gate host; the gate images are built with it",
+   "key": "evidence/subtitle-cc-inputs/91c6bb1e3fa4a44f160550d9059b242cac4222262f6ebec6981060c8031dcfb9.tar.gz",
+   "sha256": "91c6bb1e3fa4a44f160550d9059b242cac4222262f6ebec6981060c8031dcfb9",
+   "bytes": 964483,
+   "unpacked_at": "repository",
+   "files": [
+    {
+     "path": ".research/subtitle-corpus/cc/h264-b-in-order.ts",
+     "sha256": "a65fadbd71521fe96f750310c419b62b104490832cec1ec86244a927212810b6"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-config.mkv",
+     "sha256": "569b5367354a91cd0c5b8665441af1c00a27d9f18f03b9086dfe24883d0e9a94"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-config.mp4",
+     "sha256": "2af83b900aa10fb985ed4900f0addefaa1078a6a993742b4255e6118634a0686"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-depth-grow.ts",
+     "sha256": "2d68b921859dcc565f0aad50c15373c3967f16184c1f93b3182be7d5b4a43336"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-depth-two.ts",
+     "sha256": "2fde4c12d19faca9bfaaa8e8208ca62fedebc0a2a6d3c48751d9c9cd1404c963"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-estimate.ts",
+     "sha256": "de92911ea245d5fe6a5ee5403d42ce3a09e4873101eb5f764c2f62429250be7e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-far-back.ts",
+     "sha256": "2f545679abe637c94f0de1754c134f5c43fde4abb978262bc10d1575da82b197"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-fields-lone.ts",
+     "sha256": "2998006b5ab521390d4ce0d54ee302ff29992461479d5e7851570fbcbd4426e2"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-fields-packed.ts",
+     "sha256": "e9ddc57ab87366c5be8be46667dd27104b6a701c283c6fa804c1d9a8e47f4d2e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-fields.ts",
+     "sha256": "c53fc2a88faff18d7fbae1d91c09da8c87a627129ad2ff5fbb8382ad7dd026de"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-gap-allowed.ts",
+     "sha256": "925bc98ff0562fbb88d49a74d3053cbbedcafa12d965cf9984f281f57cff8d33"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-gap-jump.ts",
+     "sha256": "6c8c82b58be1af7016526977e635c92f733c279f67b776685c2e8c8a2f0da3a6"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-gap.ts",
+     "sha256": "fd66b32c585ba953ba38d62402e1415f4ec78f76a423fccddfc62581a2fd53ab"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-grow.ts",
+     "sha256": "a12fb26fe1087caab5d8550f96b25aab9803baaeabd3f8948d0bed1b8074740a"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-depth1.ts",
+     "sha256": "4a9480df615b713fc873234bc5b31ae7e8dc552d2864fd8843be4ba14337afcb"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-dpb.ts",
+     "sha256": "1e980ac0eb63429d803b9db68a22296f8b257dbdaf4998c3f772786276785992"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-jump.ts",
+     "sha256": "4dcf90a44515d19cdba43c7582396edc223d42e2c9f4c081c4037870a95d5348"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-hold-step3.ts",
+     "sha256": "0af37710aefd88e194f05473973bd45f6d7e8745158878fd1168d72d015ba45e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-jump-depth.ts",
+     "sha256": "7d24896eb58e7c152dda6038310d54793849e570761c51667d6caaaa944622d8"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-jump-stated.ts",
+     "sha256": "348d40529cb1851ce27a212d3533165e0c6b08271e2243e63eeb623d35b056c0"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-mmco5-start.ts",
+     "sha256": "7ff465ec18c59f07f33eb6f3903a687c7143a32527d69d200b0e969380eac997"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-mmco5.ts",
+     "sha256": "95b9d0929acfd77597bb27f7163effb4221d20401e04b07aaa2b917b4a3eb590"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-nodur-coarse.mkv",
+     "sha256": "0d571db070b445c41f5f629aa084b53898c42b77e69de8e02308473aa9a23ab4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-nodur-fine.mkv",
+     "sha256": "358a01ad01ffddc944461fbd6b9327d0e303026db4feb00a80c6df5863777a60"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-nodur.mkv",
+     "sha256": "346ae7cbfb8ee3275f4b0a6f61e58500302868568378223b58d3fbd9efed79fd"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-noout.ts",
+     "sha256": "dc07629f89e27df3ddd9c480780ed16360cca706839832b91a9f009b5b0f278f"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-norestr.ts",
+     "sha256": "dc9353eb02c14f9ca60edcaa74669ba733c5e2c752462a2d1a98ef4d1127615b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-close.ts",
+     "sha256": "9df803736f1aa9ab026fcb4a44d985b2076222ba857d770442baf60a73819175"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-divisor.ts",
+     "sha256": "ad021566e2916fe64f7a7738f0c34e5a7bd40b3ea76853e229b04474daf5a510"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-fallback.ts",
+     "sha256": "1fafe8e456dd5902618ebab314718f563f7c4e92511eebee4172359b642e6c85"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-far.ts",
+     "sha256": "291ac1657690ac94bbc4375fdb956fcc3f7e4d89231c85bc1fefbb64d657b27a"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-fast.ts",
+     "sha256": "dff6c946952aa4924f692011c546aaa6239e4380032bb24e30fe3ae2f956069e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-jump.ts",
+     "sha256": "f2513115e0e7e2f4f3f50888af966d634dc931c441e8f6fc7d0dc23e5f50bdd4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-multiple.ts",
+     "sha256": "4f8ff5d7c08a23cf08b3c20d3d24cbc396df082e4fd49e0c0e13a3638da31da6"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-ntsc.ts",
+     "sha256": "46cf11073119cccd17ccdf8f8170d24d117a24023b117b291494a236749a33e3"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-pts-b.ts",
+     "sha256": "d7fbfcfdd4b29a25735f1da6d117714f11ab3adab93dbb052b8fb3b96b767d9b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-pts-run.ts",
+     "sha256": "5ab76fa1a5849029ba07a8379299e5fe2f1070a2ce3c7ca5e9ae4f04db77fb83"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-skip.ts",
+     "sha256": "8c37731624e355e07c070a5cddb91b66e8de964a4fa193fabbde47b7609b295c"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-twelfths.ts",
+     "sha256": "5478d5864e2571220a11f63ef88e3543d30ee0cbbd1edcb9c0dfb011812ba0f2"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-two.ts",
+     "sha256": "ba1a2163b66b6be7b7d598571ae2a0a50f285c2039fc2df711945dd899fb386a"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-rate-whole.ts",
+     "sha256": "6f507b72bcfa2c8d503c5afa6762a7ad8272f18ba53305230b6c3edfb5be8cc9"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-recovery-above.ts",
+     "sha256": "e027ea333243d65111013b8f86ec59f399ed4cdad29066ddbd654f5e8a726359"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-recovery-cnt1.ts",
+     "sha256": "89c459cbbb6e25955befef21854c672c781cf6a4a913a52a9a42916227418020"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-reorder.ts",
+     "sha256": "a369a00320be102e24e80db50ee111f242f7075e1affb3f3239abbace732037b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-b-window.ts",
+     "sha256": "5c514a8fe060d71420711bfd8995777fd1baf839b5a2e0fd0f3eb3cd8cced74d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-fn0.ts",
+     "sha256": "522e52151502a3528d70477f5c8b661a16a801c5714c50e9ac8f88152762396d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-hold.ts",
+     "sha256": "15ac1f8a09ad667e53a9e6bbd5ef2a97c9855d20afa16d75c4d0fa4641738d9d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-intra-r2.ts",
+     "sha256": "832e02d5e997828aafbeef0944d1a04ffed6b748b4ec7e1e148ccd9e76e68429"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-intra-run.ts",
+     "sha256": "49d1d45a4cd6b94c5453faf20ed9e2ad1747a743fcebc5d62e0bf570e27b67de"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-intra.ts",
+     "sha256": "ad02897998a121594c5b8c3d8b0fb4268ffbdbd4d2d1a1b38cb14970c28045f0"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-jump.ts",
+     "sha256": "111bc4babbea5e47357257a83fd63d6e60ff0db2bb5e35364169483cfbfd2658"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-start-nonref.ts",
+     "sha256": "84241b2f16e82d7c2ef7c71eb38b5c43455b446ab8bba8e1b6a326422c683b3b"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-stated-b20.ts",
+     "sha256": "893f782f7e184abef324396bfcd49ffab2c25c8fe5a81e28ab54354a822187a5"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-untimed-bytes.ts",
+     "sha256": "40d801abd21ad8558476dacef081d21b3256ee4dd7e4e877d3005c8ef28075b3"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-untimed-far.ts",
+     "sha256": "9704855cd4768c829fa8c991c3a91a58aeda37d2997e71c5fd5c20c6752b059d"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-untimed.ts",
+     "sha256": "8349e1d282f7c4aed0256e56ebc979209e2e7f06f0853e4215f7c1c6f2517099"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/h264-vui-fast.ts",
+     "sha256": "c9787bf865ff15d90f61a4aaecdd7e49b0ac868fe2f7a198c414dd7940b6b9e4"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-config.mkv",
+     "sha256": "29ed3e7ba69fdfa618af8eee30b4fc2b80f2e7adc39aa35f23c385c47b5946d9"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-config.mp4",
+     "sha256": "47efc2f1d5925b0b9538a1d73a1cf3f300920b528ab7ad37272a2b48dba11849"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-dpb-raise.ts",
+     "sha256": "00a1593026976457e5e302666d782aab6c3fab4e07795a96386e659374be5628"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-dpb.ts",
+     "sha256": "6ec47d0a9b68ab4c6707982b809adb911800653ad84934792ae9b3a63ffc64da"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-eos-rasl.ts",
+     "sha256": "451e48aceda261d3cd21a7a68aa661a420b01b45a7ae863c5ea7d58901a84d91"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-sps-change.ts",
+     "sha256": "f13915808b327301d2a6f46efb44f5dc9b9660875da80e2fac63d2cff92efa6e"
+    },
+    {
+     "path": ".research/subtitle-corpus/cc/hevc-sps-ids.ts",
+     "sha256": "6a5b163c216ced774137bfd9bf39123f8e25704e73e7058ff55f14cc67458a34"
+    }
+   ]
+  },
+  {
+   "name": "cc-picture-output-armv7",
+   "path": "cc-picture-output-armv7",
+   "retention": "retained",
+   "reason": "subtitle-cc on the ARMv7 gate target in the armhf user space on a c6g.4xlarge (kernel 7.0.0-1014-aws) at 72276346: parity 413 of 421 with the 8 open cases, timing 413/413 in 30 pairs pinned to CPU 1, kernel-bound memory on CPUs 1-15 with every observation valid, the grade, the release tests, whole-run instruction counts against main at cc20079f, the kmem:rss_stat trace of updates by other tasks during the memory collection, the Linux AArch64 parity report at the same commit, the step logs, the RSS module proof and the source bundles",
+   "key": "evidence/cc-picture-output-armv7/3fe1ce1cc49b27030a87c4f7c57c9ad4d34064a9104258eca28305f99eeb398d.tar.zst",
+   "sha256": "3fe1ce1cc49b27030a87c4f7c57c9ad4d34064a9104258eca28305f99eeb398d",
+   "bytes": 49939448,
+   "source_revisions": {
+    "candidate": "7227634612bde41866179e80b0dfcbb1d26cde82"
+   },
+   "results": [
+    {
+     "path": "grade/gate-result.json",
+     "command": "grade",
+     "key": "767cc17de1e35bf6c78d697ac31b82bd3248d2d126c873caa41ad3ed7540c69b",
+     "status": 1,
+     "report_sha256": "adce7b041276fb4d6aab6ff6f5e566f8f9a1b50d12a37e9257a30bfb5c7f8ee1"
+    },
+    {
+     "path": "mem/gate-result.json",
+     "command": "report --memory",
+     "key": "3b8ae910c376d826c50a639d936902529f43f3a29b26968dc29532a6b8f17860",
+     "status": 0,
+     "report_sha256": "a91f4e2bffe01be4be7a1a14581fa13f9abff595071b760785205e8cee7eebaa"
+    },
+    {
+     "path": "time/gate-result.json",
+     "command": "report --benchmark",
+     "key": "c3c71ae0df6d7b1a0a417a7e2cff5e5607e25097876c3a8df7c0a048280099c5",
+     "status": 0,
+     "report_sha256": "358a6dc62dd2cdfbcd9d7462735ee0133d655ca279ad5304da135ca480b5660e"
+    }
+   ]
+  },
+  {
+   "name": "cc-picture-output-aarch64-c6g",
+   "path": "cc-picture-output-aarch64-c6g",
+   "retention": "retained",
+   "reason": "subtitle-cc on Linux AArch64 on a c6g.4xlarge (kernel 7.0.0-1014-aws) at 72276346: parity 413 of 421 with the 8 open cases, timing 413/413 in 30 pairs pinned to CPU 1, kernel-bound memory on CPUs 1-15 with every observation valid, the grade, the kmem:rss_stat trace of updates by other tasks during the memory collection, the step logs, the RSS module proof and the source bundles",
+   "key": "evidence/cc-picture-output-aarch64-c6g/69518174fe4bf2ee867698786d16b618c5fb83adaf83aa24e85cca05fe8152d3.tar.zst",
+   "sha256": "69518174fe4bf2ee867698786d16b618c5fb83adaf83aa24e85cca05fe8152d3",
+   "bytes": 49989472,
+   "source_revisions": {
+    "candidate": "7227634612bde41866179e80b0dfcbb1d26cde82"
+   },
+   "results": [
+    {
+     "path": "grade/gate-result.json",
+     "command": "grade",
+     "key": "73d0ebdd46bcbdf49680e31443adb00c0a5918d8fd6cf2732a0f7b8ce0c045be",
+     "status": 1,
+     "report_sha256": "ac8612857383867fbbfd47ace783f102352bb76db8ce86ea52b48c0a22d4498c"
+    },
+    {
+     "path": "mem/gate-result.json",
+     "command": "report --memory",
+     "key": "3eadf8afc71be8d8eabfb49887c6d2ccd1ee3a001f57de2554ac0463ff555a1f",
+     "status": 0,
+     "report_sha256": "ec54cdbfcea12ba0b1045db596a22744de4ddc1933f615336f3492934a8c84ef"
+    },
+    {
+     "path": "time/gate-result.json",
+     "command": "report --benchmark",
+     "key": "4947132e5c5843d58d133d5bb3418ba3a43d047e4d0584b962988b89cc1b9e3b",
+     "status": 0,
+     "report_sha256": "0add3a2c3e12b7e2faabe357da761fc59008a48b0cf0258a0c998364fb1bb683"
+    }
+   ]
+  },
+  {
+   "name": "gate-run-codecs-8d6f2789",
+   "path": "gate-run-codecs-8d6f2789",
+   "retention": "retained",
+   "reason": "Partial sharded gate run at 8d6f2789 under static-toolchain-runtime-v1, 3 c6g.4xlarge hosts (Graviton2) per target from the gate images, kernel 7.0.0-1014-aws, Linux AArch64 and 32-bit ARMv7: the codecs' FATE parity, the timing of harness/codecs/workloads.json and its memory in five parts, and the workspace tests, checked and release; each shard's outputs, build identities, plan, step records and logs, the run summary and the workstation's logs and host times; for the docs/status.md codec rows. Its subtitle-cc grade failed on the reference run's elapsed time that #272 leaves out of the join; subtitle-cc is in gate-subtitle-cc-b6c36d3b",
+   "key": "evidence/gate-run-codecs-8d6f2789/db33a447578b4eaa7615e55318dbd13307826de18c4a720db64b515d19a6c69e.tar.zst",
+   "sha256": "db33a447578b4eaa7615e55318dbd13307826de18c4a720db64b515d19a6c69e",
+   "bytes": 23731191,
+   "source_revisions": {
+    "candidate": "8d6f278949aed417290058f1212dee0fc2a97243"
+   },
+   "results": [
+    {
+     "path": "aarch64/shard-1/benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "04e2bee0fd2ee7d78d2994975c31661b589e9e12447465691d9551d8daeb1363",
+     "status": 0,
+     "report_sha256": "2befb7dd2d8640c62aed32d94c01f3d49f4d59cae66c6e52c9db9a68720357f2"
+    },
+    {
+     "path": "aarch64/shard-1/memory/codec-workloads-1/gate-result.json",
+     "command": "codecs memory",
+     "key": "0cc1614ab4f6f3ac8e1ec92bdb07a05f67a41f2f727325fda0941f3c097982c7",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-1/memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "32c92f24b882d69cef9388d575144bf5b64175139357553952d77eae5b3c5c7d",
+     "status": 0,
+     "report_sha256": "7725733b8226c5060c44e532e7169160d6b9acac486bfd516bde332eae29c557"
+    },
+    {
+     "path": "aarch64/shard-1/tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "d53272eafb669adee3c1a01e0ea927fd378a6905929eb400c3978ceec6fe74a2",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-2/memory/codec-workloads-2/gate-result.json",
+     "command": "codecs memory",
+     "key": "f6254c3bfe275b1b54b76e6e3c14e4f45a8513c4e670f5b17851e22713872d2b",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-2/memory/codec-workloads-3/gate-result.json",
+     "command": "codecs memory",
+     "key": "8a2533021a16b8e184ac5afe6a2a65e64ceda4704a07b3e089aabfb65635d950",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-2/memory/codec-workloads-5/gate-result.json",
+     "command": "codecs memory",
+     "key": "fc3c74cae86b0fcb4366b8c8900549ee62570d085856725b4e4affe786e5594f",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-3/benchmark/codec-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "0db840ec9edef032baaa620d77378baf8a832c9aa52d25e5bfb9d9b2768e8fec",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-3/memory/codec-workloads-4/gate-result.json",
+     "command": "codecs memory",
+     "key": "c286a243ab609633ef4695da4a1c0f220fe27667a4ec2a7c9acb1c150b2c269f",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "aarch64/shard-3/tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "246df367376cbc00ea488be9b4a0bd53582c377fc1ab3cb15297ad9b50a60a3c",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-1/benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "944044b0ec72340894399df9e6ac2da7434bacf3203d3577f904a73fa4ea14a6",
+     "status": 0,
+     "report_sha256": "5dd946027591c1d7138aade9785bb3f1d64e9512f3d02c918c7ab9a15b79c2f6"
+    },
+    {
+     "path": "armv7/shard-1/memory/codec-workloads-1/gate-result.json",
+     "command": "codecs memory",
+     "key": "35aa9adc7c11a2f13a0547830dc3dbf7efa09bc95a20ce6b2b4a94c26bb49481",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-1/memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "404e08fe6e61d0298e0141e5ab0ad0c4d3d7d4f9594ad1e364e70feaa1d54924",
+     "status": 0,
+     "report_sha256": "a91a21dfe8e506196d899ca64aea566ef49ea027c1b84efc97ccc2da2c6cbd43"
+    },
+    {
+     "path": "armv7/shard-1/tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "0bb192f4761a7bf282c6035417a50668ec3dd13bf18b9a701c90a50c0b0202c8",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-2/memory/codec-workloads-2/gate-result.json",
+     "command": "codecs memory",
+     "key": "86e4471479f45a70c68cb5383e5db53c19ec60bd6d57bb971b52ce328677db44",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-2/memory/codec-workloads-3/gate-result.json",
+     "command": "codecs memory",
+     "key": "1d195bc81446541ad515c320a18f18588b2c8094409f4aa9b44c913f276ffcd1",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-2/memory/codec-workloads-5/gate-result.json",
+     "command": "codecs memory",
+     "key": "ae48ffbd4d4417c96eb2c62ffce24f6c6c26f9225963cbf2c5ec9eabac2a7678",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-3/benchmark/codec-workloads/gate-result.json",
+     "command": "codecs time",
+     "key": "16aca5afe6c01707df7ad6ab5ff9ff9715d22594803d97481208cb4a0b415ade",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-3/memory/codec-workloads-4/gate-result.json",
+     "command": "codecs memory",
+     "key": "ed44b0a51a9a54c6649059bac4d5108f0e10dc3ec203e778f500a1b806295453",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "armv7/shard-3/tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "0d3945778b2a81753bb678b7440a830f7c9eac5fb1e9ed1a88cf1ff20fb6c348",
+     "status": 0,
+     "report_sha256": null
+    }
+   ]
+  },
+  {
+   "name": "gate-subtitle-cc-b6c36d3b",
+   "path": "gate-subtitle-cc-b6c36d3b",
+   "retention": "retained",
+   "reason": "Partial gate run of subtitle-cc at b6c36d3b under static-toolchain-runtime-v1, one c6g.4xlarge host (Graviton2) per target from the gate images, which lack evidence set subtitle-cc-inputs, with that set unpacked at the repository root of each host before it got ready, kernel 7.0.0-1014-aws, Linux AArch64 and 32-bit ARMv7: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grade, 449 of 449 cases on each target; the shard outputs, build identities, plan, step records and logs, the run summary and the workstation's logs; for the docs/status.md closed caption rows",
+   "key": "evidence/gate-subtitle-cc-b6c36d3b/7052328cf69e4905a1b8146780340cabfe442aa9224e9c55af7da81e752c96a9.tar.zst",
+   "sha256": "7052328cf69e4905a1b8146780340cabfe442aa9224e9c55af7da81e752c96a9",
+   "bytes": 15820172,
+   "source_revisions": {
+    "candidate": "b6c36d3ba22e45874549e26ffeab0487cc031dba"
+   },
+   "results": [
+    {
+     "path": "aarch64/shard-1/benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "c4db9f62f6ac7f2ef07cf1e0fba0b6499b288ee80b745bbbbb5f2ada0ff91c6a",
+     "status": 0,
+     "report_sha256": "83db8f4421c601e51ea6afa657afb29ad51336eb544fcce78285682acf4bfbd6"
+    },
+    {
+     "path": "aarch64/shard-1/graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "af8ef2f1c1f6d030cbb2abd29a80173f1c8fa04cfe3fd2a825ac3032c5bba44c",
+     "status": 0,
+     "report_sha256": "b9b9afe266cef0a7f2b4dfbd0a6dd7b2ce3c3dd9a1a62c29296cb6e50b8d5aca"
+    },
+    {
+     "path": "aarch64/shard-1/memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "78b6bde6b07e09a4448175c4b94f03d68ae00473568ba2a9e5bcaf8158e91e50",
+     "status": 0,
+     "report_sha256": "46be540647e247fffab0e483df91fbdfb118abf15809524052306a803c2027e6"
+    },
+    {
+     "path": "armv7/shard-1/benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "1ff8313fe330ad3be19e90d907722364943cca56236ac097855ae8fa1b62ec89",
+     "status": 0,
+     "report_sha256": "24b2d3d0e60fc342a06e7953c6f45a1a654bfdde8b49eac8e99a6d11c996b26a"
+    },
+    {
+     "path": "armv7/shard-1/graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "896b63c59652b1cd6d1eca1711bb78ee7681781aee9aca1535068b1cab94c948",
+     "status": 0,
+     "report_sha256": "c0081b1aaf702b3ea252890efbdc6656ca6841a77a63caa74dd7eaab622b6b2d"
+    },
+    {
+     "path": "armv7/shard-1/memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "b4a6ff864e7d763f57f780a119b8108c0220b4a1e57404ed1102d81ff0c0f69c",
+     "status": 0,
+     "report_sha256": "a51bdd0a0c30301c2149c4c085742e606a55def3624428d712ff7cc602311238"
+    }
+   ]
+  },
+  {
+   "name": "codec-picture-output-8d6f2789",
+   "path": "codec-picture-output-8d6f2789",
+   "retention": "retained",
+   "reason": "The H.264 and HEVC decoders on the shared picture output model at 8d6f2789 against 985bb4d4, on a c6g.4xlarge (Graviton2), kernel 7.0.0-1014-aws, Linux AArch64 and the armhf user space: the codecs equivalence records (byte-identical), the conformance tests with HEVC_CONFORMANCE_FULL=1, the caption sub-input of every subtitle-cc case (identical), the workspace tests, clippy, rustdoc and rustfmt logs, and instructions:u of decoding each video timing workload, three runs each, with the scripts",
+   "key": "evidence/codec-picture-output-8d6f2789/8e3485b2a0b184649f87ee5ae2bbbf1562ed3f786c3865f1c898ad4dee2f30b4.tar.zst",
+   "sha256": "8e3485b2a0b184649f87ee5ae2bbbf1562ed3f786c3865f1c898ad4dee2f30b4",
+   "bytes": 858656,
+   "source_revisions": {
+    "candidate": "8d6f278949aed417290058f1212dee0fc2a97243",
+    "baseline": "985bb4d4502743c06413812d7655d85ba15b452a"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-6d5145d7-20261115-071404-shard-2",
+   "path": "gate-run-aarch64-6d5145d7-20261115-071404-shard-2",
+   "retention": "retained",
+   "reason": "A partial gate run at 6d5145d7 on Linux AArch64, c6g.4xlarge, items subtitle-cc, tests and tests-release on two hosts, of which this shard ran subtitle-cc (with the worker tests and the core time test) from the gate image with evidence set subtitle-cc-inputs unpacked at the repository root before the host got ready: 461/461 caption cases pass timing, memory and the grade; its checked tests failed only on the manifest membership test's count of 449 caption cases, corrected in f9b3f138; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the closed caption row",
+   "key": "evidence/gate-runs/6d5145d7f31b002c72f9815130b522964d2abb64-aarch64-20261115-071404/shard-2/7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497.tar.zst",
+   "sha256": "7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497",
+   "bytes": 59347851,
+   "results": [
+    {
+     "path": "memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "cbccdf6d3ff2a9b2d7899cc85f2ac97384aadffad5d76d56105a84c81dd2f944",
+     "status": 0,
+     "report_sha256": "a9ab6b73961ab8656a18a0b2bb2474dfdc014d9c32fe4f4321f9dfc6eb9d564c",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "69a44be35ea8831b6e7fd5254b9477b258dff204d5e62d82fe64f7201242c514",
+     "status": 0,
+     "report_sha256": "a79186ef33b834257e4f1506d31233c6dc91dab6aa5784f70068c6ebe4fedf17",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "77cc6b387507201c794014abdb4d321834c2464920b1830d3ffd3fd901e9c3f4",
+     "status": 0,
+     "report_sha256": "8adb189196e38ca7889603f2982c748109f9c483e3a768440e3d4b0a7216573c"
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "ec64228d264919f4f588d567235178acae5a2139265a5c8abb280ceb8cfa4b3a",
+     "status": 101,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6d5145d7f31b002c72f9815130b522964d2abb64"
+   }
+  },
+  {
+   "name": "gate-run-armv7-6d5145d7-20261115-071435-shard-2",
+   "path": "gate-run-armv7-6d5145d7-20261115-071435-shard-2",
+   "retention": "retained",
+   "reason": "A partial gate run at 6d5145d7 on 32-bit ARMv7, c6g.4xlarge, items subtitle-cc, tests and tests-release on two hosts, of which this shard ran subtitle-cc (with the worker tests and the core time test) from the gate image with evidence set subtitle-cc-inputs unpacked at the repository root before the host got ready: 461/461 caption cases pass timing, memory and the grade; its checked tests failed only on the manifest membership test's count of 449 caption cases, corrected in f9b3f138; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the ARMv7 closed caption row",
+   "key": "evidence/gate-runs/6d5145d7f31b002c72f9815130b522964d2abb64-armv7-20261115-071435/shard-2/284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277.tar.zst",
+   "sha256": "284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277",
+   "bytes": 52379165,
+   "results": [
+    {
+     "path": "memory/subtitle-cc/gate-result.json",
+     "command": "report --memory",
+     "key": "44527cdbc6e2571f34e332fbe30d16985ab434698ab1795333118dcb077d2eb8",
+     "status": 0,
+     "report_sha256": "6206ec6eb9599c795b6db2ae072262a0ab28bac57eef7c0e6deb8e28c5fe8386",
+     "cases_checked": true
+    },
+    {
+     "path": "benchmark/subtitle-cc/gate-result.json",
+     "command": "report --benchmark",
+     "key": "6cb9cb4a22d3c35d2eed4eb0aa03e26a7a2edd259ba2563309efde1edfa49695",
+     "status": 0,
+     "report_sha256": "a77479e64b5fd40b3ced17434cd6d97ed7ba1f6ec1a48eedd9eeb71b70c68e8d",
+     "cases_checked": true
+    },
+    {
+     "path": "graded/subtitle-cc/gate-result.json",
+     "command": "grade",
+     "key": "3b4da85ec583166e3cd2971508fc4fdec0f313868289b5a8b006545b26b666da",
+     "status": 0,
+     "report_sha256": "0cd1f611418a3d46649d690b520bcc9c30e5334cdb5d0bc610a751e1e1d78347"
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "5252dc898d92aeb935244711ef9adaecb3a2730326a9604690b8864684a31570",
+     "status": 101,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "6d5145d7f31b002c72f9815130b522964d2abb64"
+   }
+  },
+  {
+   "name": "gate-run-aarch64-f9b3f138-20261115-075910-shard-1",
+   "path": "gate-run-aarch64-f9b3f138-20261115-075910-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at f9b3f138 on Linux AArch64, c6g.4xlarge, items tests and tests-release on one host from the gate image: the workspace tests, checked and release, pass; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the tests of the closed caption change",
+   "key": "evidence/gate-runs/f9b3f13839e31b8a1c97cb299902e9748acaf9ec-aarch64-20261115-075910/shard-1/07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479.tar.zst",
+   "sha256": "07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479",
+   "bytes": 6182289,
+   "results": [
+    {
+     "path": "tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "43faca389064aa1acddd0e175700ea36b816fbc9e8d880adf9bd9aec2908b352",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "f483b8780feaad991472ba4f31507ca60df981631035259f8855ae102b1904cd",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+   }
+  },
+  {
+   "name": "gate-run-armv7-f9b3f138-20261115-075939-shard-1",
+   "path": "gate-run-armv7-f9b3f138-20261115-075939-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at f9b3f138 on 32-bit ARMv7, c6g.4xlarge, items tests and tests-release on one host from the gate image: the workspace tests, checked and release, pass; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the tests of the closed caption change",
+   "key": "evidence/gate-runs/f9b3f13839e31b8a1c97cb299902e9748acaf9ec-armv7-20261115-075939/shard-1/78d171085e6d6e671d46fcd595877ffd7417ebedcb28f9b5f54d67eed52242d8.tar.zst",
+   "sha256": "78d171085e6d6e671d46fcd595877ffd7417ebedcb28f9b5f54d67eed52242d8",
+   "bytes": 6468673,
+   "results": [
+    {
+     "path": "tests/release/gate-result.json",
+     "command": "gate test",
+     "key": "4c081eb9de88fbf57de39aac77735756f18277dae83386392f7a716502ed6562",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "tests/checked/gate-result.json",
+     "command": "gate test",
+     "key": "7b1831d7c54e58d766dfd784842d374ff33cce4b7ec84e21bb3582234a26f1a5",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+   }
   }
  ]
 }
