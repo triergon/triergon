@@ -46,12 +46,19 @@ pub fn parse_trained(text: &str) -> Result<Vec<String>, String> {
     Ok(names)
 }
 
-/// The committed trained order of `worker` for `target`; none when it has none.
-pub fn committed_trained(root: &Path, target: &str, worker: &str) -> Result<Vec<String>, String> {
+/// The committed trained order of `worker` for `target`; none when the worker has
+/// none, and links as its toolchain does.
+pub fn committed_trained(
+    root: &Path,
+    target: &str,
+    worker: &str,
+) -> Result<Option<Vec<String>>, String> {
     let path = trained_path(root, target, worker);
     match std::fs::read_to_string(&path) {
-        Ok(text) => parse_trained(&text).map_err(|error| format!("{}: {error}", path.display())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Ok(text) => parse_trained(&text)
+            .map(Some)
+            .map_err(|error| format!("{}: {error}", path.display())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(format!("{}: {error}", path.display())),
     }
 }

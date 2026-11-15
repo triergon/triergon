@@ -129,9 +129,10 @@ pub fn release_dir() -> Result<String, String> {
 /// libgcc's unwinder (`libgcc_eh`), the C and C++ references libgcc, libstdc++ and
 /// libatomic. A process then maps only the toolchain support code its own libraries use.
 /// The C library, libc with libm, and third-party libraries stay shared on both sides.
-/// The Rust workers there are linked by the pinned toolchain's `lld` with their
-/// functions in their trained order, then module order ([`ordered_link_arguments`]);
-/// the references link as before. Elsewhere both sides link as their toolchains do.
+/// A Rust worker with a committed trained order is linked there by the pinned
+/// toolchain's `lld` with its functions in that order, then module order
+/// ([`ordered_link_arguments`]); the other workers and the references link as before.
+/// Elsewhere both sides link as their toolchains do.
 pub const LINK_POLICY: &str = "static-toolchain-runtime-trained-order-v1";
 
 /// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.

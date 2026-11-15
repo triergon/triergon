@@ -537,11 +537,15 @@ may override that count for diagnostic comparisons.
   libatomic today: the FFmpeg references name it, and the linker leaves it out. glibc's
   static libm needs the static libc, so libm stays with libc. Elsewhere both sides link
   as their toolchains do.
-- On GNU/Linux the policy also links each Rust worker with its functions in a trained
-  order, then module order, with the pinned toolchain's own `lld`; the references link
-  with their toolchain's default linker as before. The code one operation runs is a
-  fraction of a worker's, and the kernel faults code in 64 KiB windows, so how much of
-  a worker becomes resident depends on how its functions lie among those windows.
+- On GNU/Linux the policy also links each Rust worker that commits a trained order with
+  its functions in that order, then module order, with the pinned toolchain's own
+  `lld`. The media workers do: `media-worker`, `playback-worker`,
+  `playback-matroska-worker`, `transport-worker`, `codec-worker`, `isobmff-worker` and
+  `framing-worker`. The font, shaping, rasterising, ASS, subtitle and capture workers
+  and the references link with their toolchain's default linker as before. The code
+  one operation runs is a fraction of a worker's, and the kernel faults code in 64 KiB
+  windows, so how much of a worker becomes resident depends on how its functions lie
+  among those windows.
   - The trained order of a worker for a target, `harness/link-order/TARGET/WORKER.txt`,
     lists by demangled name the functions a training corpus runs in the release
     worker, in the order the operations first run them. `cargo xtask link-order train`
@@ -550,8 +554,8 @@ may override that count for diagnostic comparisons.
     cortex-a15` for ARMv7 in the armhf user space, `qemu-aarch64 -cpu neoverse-n1`;
     package `qemu-user`) with `-d page,in_asm`, which logs every block of code when it
     first runs, and maps those addresses to the worker's functions. The workers carry
-    no instrumentation. A worker with no training operations has a trained order
-    without functions.
+    no instrumentation. A worker takes a trained order when the training manifest has
+    operations for it; any worker can.
   - The training corpus is its own, apart from everything the gate reads.
     `harness/link-order/training.json` lists its files by SHA-256 and the operations,
     each a worker's command line with `@NAME` for a training file; the files are kept
@@ -574,8 +578,9 @@ may override that count for diagnostic comparisons.
     `target/harness/link-order/WORKER.txt`, links it again with that file, and fails
     unless the second link's ordering file is the same; `identity.json` records its
     SHA-256 beside the command. `cargo xtask check` runs `cargo xtask link-order check`:
-    every worker has a trained order for each gate target, each parses, and on
-    GNU/Linux each links the worker built for the checking host. The linker arguments,
+    each worker with training operations has a trained order for each gate target and
+    no other worker has one, each parses, and on GNU/Linux each links the worker built
+    for the checking host. The linker arguments,
     after the policy's own, are
 
     ```text

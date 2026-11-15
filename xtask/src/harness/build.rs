@@ -487,18 +487,19 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
 }
 
 /// Builds the worker `name` with `command`, a `cargo rustc` command line that ends
-/// with its link arguments, linked by the pinned toolchain's `lld`, then builds it
-/// again with its functions in link order ([`super::link_order`]): its committed
-/// trained order first, the rest in module order; `command` then holds the second
-/// build. `binary` is where the build puts the worker. The ordering file is written
-/// to `target/harness/link-order/NAME.txt`, and the second build's own ordering file
-/// must be the same. Returns its SHA-256.
+/// with its link arguments. A worker with a committed trained order for the worker
+/// target ([`super::link_order`]) is linked by the pinned toolchain's `lld`, then
+/// linked again with its functions in that order, the rest in module order;
+/// `command` then holds the second build. `binary` is where the build puts the
+/// worker. The ordering file is written to `target/harness/link-order/NAME.txt`, and
+/// the second build's own ordering file must be the same. Returns its SHA-256, or
+/// none for a worker linked as its toolchain links it.
 fn build_in_link_order(
     root: &Path,
     command: &mut Vec<String>,
     binary: &Path,
     name: &str,
-) -> R<String> {
+) -> R<Option<String>> {
     let cargo = |command: &[String]| -> R<()> {
         let status = Command::new("cargo")
             .args(&command[1..])
@@ -512,35 +513,34 @@ fn build_in_link_order(
             Err(format!("{name} build failed: {status}"))
         }
     };
-    let first: Vec<String> = command
-        .iter()
-        .cloned()
-        .chain(gate_build::ordered_link_arguments(root, None)?)
-        .collect();
-    cargo(&first)?;
     let trained = super::link_order::committed_trained(root, gate_build::worker_target()?, name)?;
+    let linker = gate_build::ordered_link_arguments(root, None)?;
+    let Some(trained) = trained.filter(|_| !linker.is_empty()) else {
+        cargo(command)?;
+        return Ok(None);
+    };
+    let first: Vec<String> = command.iter().cloned().chain(linker).collect();
+    cargo(&first)?;
     let order = super::link_order::symbol_order(binary, &trained)?;
     let directory = root.join("target/harness/link-order");
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let path = directory.join(format!("{name}.txt"));
     fs::write(&path, &order).map_err(|e| format!("{}: {e}", path.display()))?;
-    let ordered = gate_build::ordered_link_arguments(root, Some(&path))?;
-    if !ordered.is_empty() {
-        command.extend(ordered);
-        cargo(command)?;
-        if super::link_order::symbol_order(binary, &trained)? != order {
-            return Err(format!(
-                "{name}: the ordered link holds other functions than the first link"
-            ));
-        }
+    command.extend(gate_build::ordered_link_arguments(root, Some(&path))?);
+    cargo(command)?;
+    if super::link_order::symbol_order(binary, &trained)? != order {
+        return Err(format!(
+            "{name}: the ordered link holds other functions than the first link"
+        ));
     }
-    Ok(crate::sha256::hex(order.as_bytes()))
+    Ok(Some(crate::sha256::hex(order.as_bytes())))
 }
 
-fn additional_candidates(
-    root: &Path,
-    selected: &[&Candidate],
-) -> R<Vec<(&'static str, Vec<String>, String)>> {
+/// A built worker: its name, the command that built it and the SHA-256 of its
+/// ordering file, none when it links as its toolchain does.
+type Built = (&'static str, Vec<String>, Option<String>);
+
+fn additional_candidates(root: &Path, selected: &[&Candidate]) -> R<Vec<Built>> {
     let mut built = Vec::new();
     for spec in selected {
         let mut command: Vec<String> = [
@@ -582,7 +582,7 @@ fn additional_candidates(
     Ok(built)
 }
 
-fn candidate_records(root: &Path, built: &[(&str, Vec<String>, String)]) -> R<Value> {
+fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
     let mut candidates = Vec::new();
     for (name, command, order) in built {
         let path = format!("{}/{name}", gate_build::release_dir()?);
@@ -592,7 +592,10 @@ fn candidate_records(root: &Path, built: &[(&str, Vec<String>, String)]) -> R<Va
                 ("path", Value::str(&path)),
                 ("sha256", Value::str(sha(&root.join(&path))?)),
                 ("command", strings(command)),
-                ("link_order_sha256", Value::str(order)),
+                (
+                    "link_order_sha256",
+                    order.as_ref().map_or(Value::Null, Value::str),
+                ),
                 ("selected_graph", candidate_graph(root, name)?),
             ]),
         ));
@@ -1311,7 +1314,10 @@ fn build_selected(
             }),
         ),
         ("candidate_command", strings(&candidate_command)),
-        ("candidate_link_order_sha256", Value::str(candidate_order)),
+        (
+            "candidate_link_order_sha256",
+            candidate_order.as_ref().map_or(Value::Null, Value::str),
+        ),
         ("selected_graph", graph.clone()),
         ("additional_candidates", candidates),
         (

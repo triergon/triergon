@@ -4,10 +4,12 @@
 //! ones.
 //!
 //! [`MANIFEST`] lists the training files by SHA-256 and the operations: a worker and
-//! its command line, where `@NAME` stands for the training file `NAME`. `train` runs
-//! each operation of each worker under QEMU's user-mode emulator, which logs every
-//! block of code when it first runs it, and writes the worker's trained order
-//! ([`super::link_order::first_use`]) to `harness/link-order/TARGET/WORKER.txt`.
+//! its command line, where `@NAME` stands for the training file `NAME`. The workers
+//! with operations are the ordered ones; every other worker links as its toolchain
+//! does. `train` runs each operation of each ordered worker under QEMU's user-mode
+//! emulator, which logs every block of code when it first runs it, and writes the
+//! worker's trained order ([`super::link_order::first_use`]) to
+//! `harness/link-order/TARGET/WORKER.txt`.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -104,6 +106,14 @@ fn strings(value: Option<&Value>) -> Vec<String> {
 }
 
 impl Training {
+    /// Whether the manifest has operations for `worker`, which then links in a
+    /// trained order.
+    fn orders(&self, worker: &str) -> bool {
+        self.operations
+            .iter()
+            .any(|operation| operation.worker == worker)
+    }
+
     fn load(root: &Path) -> R<Self> {
         let path = root.join(MANIFEST);
         let document = crate::checks::read_json(&path)?;
@@ -326,9 +336,9 @@ fn header(worker: &str, target: &str) -> String {
     )
 }
 
-/// Runs the training operations of each built worker (only `only` when given) under
-/// the emulator and writes its trained order for the worker target. The corpus is
-/// checked with [`separate`] first.
+/// Runs the training operations of each built ordered worker (only `only` when
+/// given) under the emulator and writes its trained order for the worker target.
+/// The corpus is checked with [`separate`] first.
 pub fn train(root: &Path, directory: Option<&Path>, only: Option<&str>) -> R<()> {
     separate(root, directory)?;
     let training = Training::load(root)?;
@@ -338,7 +348,7 @@ pub fn train(root: &Path, directory: Option<&Path>, only: Option<&str>) -> R<()>
     let release = root.join(gate_build::release_dir()?);
     let logs = root.join("target/harness/link-order/training");
     for worker in workers() {
-        if only.is_some_and(|only| only != worker.name) {
+        if only.is_some_and(|only| only != worker.name) || !training.orders(worker.name) {
             continue;
         }
         let binary = release.join(worker.name);
@@ -395,20 +405,32 @@ pub fn train(root: &Path, directory: Option<&Path>, only: Option<&str>) -> R<()>
     Ok(())
 }
 
-/// Checks the training manifest and the committed trained orders: every worker has
-/// one for each gate target, each parses, and, where the policy orders the link,
-/// each links: the worker is built for this host, linked with the ordering file the
-/// trained order gives that build, and linked again to the same ordering file.
+/// Checks the training manifest and the committed trained orders: every ordered
+/// worker has one for each gate target and no other worker has one, each parses,
+/// and, where the policy orders the link, each links: the worker is built for this
+/// host, linked with the ordering file the trained order gives that build, and
+/// linked again to the same ordering file.
 pub fn check(root: &Path) -> R<()> {
-    Training::load(root)?;
+    let training = Training::load(root)?;
     let mut trained = Vec::new();
     for worker in workers() {
         for target in crate::gate::TARGETS {
             let path = link_order::trained_path(root, target, worker.name);
-            let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-            let names =
-                link_order::parse_trained(&text).map_err(|e| format!("{}: {e}", path.display()))?;
-            trained.push((worker.name, target, names));
+            match (
+                link_order::committed_trained(root, target, worker.name)?,
+                training.orders(worker.name),
+            ) {
+                (Some(names), true) => trained.push((worker.name, target, names)),
+                (None, false) => {}
+                (Some(_), false) => {
+                    return Err(format!(
+                        "{}: {} has no training operations",
+                        path.display(),
+                        worker.name
+                    ));
+                }
+                (None, true) => return Err(format!("{}: missing", path.display())),
+            }
         }
     }
     if gate_build::ordered_link_arguments(root, None)?.is_empty() {
@@ -419,6 +441,9 @@ pub fn check(root: &Path) -> R<()> {
         return Ok(());
     }
     for worker in workers() {
+        if !training.orders(worker.name) {
+            continue;
+        }
         let binary = link(root, &worker, None)?;
         for (_, target, names) in trained.iter().filter(|(name, ..)| *name == worker.name) {
             let order = link_order::symbol_order(&binary, names)?;
