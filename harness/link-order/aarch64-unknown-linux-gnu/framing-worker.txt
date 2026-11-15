@@ -1,0 +1,78 @@
+# The functions the link-order training runs in framing-worker on aarch64-unknown-linux-gnu, in first-use order.
+# Written by `cargo xtask link-order train`; see docs/quality.md.
+_start
+call_weak_fn
+init_have_lse_atomics
+__init_cpu_features
+__init_cpu_features_constructor
+std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
+main
+__aarch64_cas8_relax
+std::sys::pal::unix::stack_overflow::imp::make_handler
+std::sys::pal::unix::stack_overflow::thread_info::set_current_info
+__aarch64_cas4_acq
+__aarch64_cas8_acq
+__aarch64_swp4_rel
+std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+framing_worker::main
+<std::env::Args as core::iter::traits::iterator::Iterator>::nth
+core::str::converts::from_utf8
+<std::sys::fs::unix::File>::open_c
+alloc::io::read::default_read_to_end::small_probe_read::<core::io::util::Take<std::fs::File>>
+<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+<alloc::raw_vec::RawVecInner>::finish_grow
+<triergon_core::budget::Budget>::new
+<framing_worker::worker::model::Reader>::blob
+<triergon_core::bytes::Bytes>::try_from_vec
+__aarch64_ldadd8_relax
+__aarch64_ldadd8_rel
+<alloc::raw_vec::RawVecInner>::try_reserve_exact
+<alloc::vec::Vec<framing_worker::worker::model::Event>>::push_mut
+std::io::stdio::_print
+<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
+<std::sys::sync::once::futex::Once>::call
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+core::fmt::write
+<core::io::write::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
+<std::io::stdio::StdoutLock as core::io::write::Write>::write_all
+<std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
+<std::io::stdio::Stdout as core::io::write::Write>::flush
+<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
+<std::sys::pal::unix::time::Timespec>::now
+framing_worker::worker::execute
+framing_worker::worker::operation::run
+framing_worker::worker::operation::avc
+<triergon_core::bytes::BudgetVec<triergon_framing::avc_config::AvcNalDescriptor>>::reallocate
+triergon_core::bytes::charge_replacement
+triergon_core::bytes::settle_replacement
+<triergon_framing::nal_packet_config::NalPacketConfigWriter>::nal
+<triergon_core::bytes::BudgetVec<u8>>::reallocate
+<triergon_core::bytes::BudgetVec<u8>>::freeze
+<framing_worker::worker::model::Digest>::blob
+<triergon_framing::nal_packet::NalPacketConfiguration>::width
+<triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
+<triergon_framing::nal_packet::NalPacketJob>::append
+<triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketSegment>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketSegment>>::reallocate
+<triergon_framing::nal_packet::NalPacketSegment>::payload
+framing_worker::worker::operation::packet_digest
+<triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketOutput>>::reallocate
+core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketJob>
+core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketSession>
+<alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
+core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketOutput>
+<u32 as core::fmt::Display>::fmt
+<core::fmt::Formatter>::pad_integral
+<core::fmt::Formatter>::pad_integral::write_prefix
+<u64 as core::fmt::Display>::fmt
+<u128 as core::fmt::Display>::fmt
+core::ptr::drop_glue::<framing_worker::worker::model::Case>
+<alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
+<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
+release_registered_frames
+btree_destroy
+__aarch64_swp8_acq_rel
+<triergon_core::bytes::BudgetVec<triergon_framing::hevc_config::HvcArrayDescriptor>>::reallocate
+core::ptr::drop_glue::<triergon_framing::nal_receiver_config::ReceiverHevcConfigParser>
+<triergon_framing::nal_packet::NalPacketConfiguration>::hevc_array_type
+core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>

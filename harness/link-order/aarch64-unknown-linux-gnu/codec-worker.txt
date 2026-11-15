@@ -1,0 +1,245 @@
+# The functions the link-order training runs in codec-worker on aarch64-unknown-linux-gnu, in first-use order.
+# Written by `cargo xtask link-order train`; see docs/quality.md.
+_start
+call_weak_fn
+init_have_lse_atomics
+__init_cpu_features
+__init_cpu_features_constructor
+std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
+main
+__aarch64_cas8_relax
+std::sys::pal::unix::stack_overflow::imp::make_handler
+std::sys::pal::unix::stack_overflow::thread_info::set_current_info
+__aarch64_cas4_acq
+__aarch64_cas8_acq
+__aarch64_swp4_rel
+std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
+codec_worker::main
+core::str::converts::from_utf8
+core::slice::memchr::memrchr_aligned
+<std::fs::OpenOptions>::_open
+<std::sys::fs::unix::File>::open_c
+<std::fs::File>::metadata
+std::sys::fs::unix::try_statx
+<alloc::raw_vec::RawVecInner>::finish_grow
+<std::fs::File as alloc::io::read::Read>::read
+<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
+OUTLINED_FUNCTION_39
+OUTLINED_FUNCTION_19
+OUTLINED_FUNCTION_1
+<std::sys::sync::once::futex::Once>::call
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+OUTLINED_FUNCTION_14
+<std::io::stdio::StdoutLock as core::io::write::Write>::write_all
+<std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
+<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
+codec_worker::run
+<triergon_session::track::TrackDecoder>::aac_access_units_with_layout_in
+<triergon_core::bytes::Bytes>::copy_from_slice
+__aarch64_ldadd8_relax
+<triergon_framing::aac_config::Bits>::object_type
+core::ptr::drop_glue::<triergon_framing::aac_config::AacAscParser>
+__aarch64_ldadd8_rel
+<alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
+core::ptr::drop_glue::<core::option::Option<triergon_framing::aac_config::AacProgramConfig>>
+<triergon_session::track::AacAccessUnitConfig>::decoder_with_layout_in
+<triergon_codec_aac::decoder::Core>::new
+triergon_codec::window::kbd_window
+<alloc::vec::Vec<f32> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<f32, core::iter::adapters::map::Map<core::ops::range::Range<usize>, <triergon_codec_aac::filterbank::Windows>::new::{closure#0}::{closure#0}>>>::from_iter
+<alloc::vec::Vec<f32> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<f32, core::iter::adapters::map::Map<core::ops::range::Range<usize>, <triergon_codec_aac::filterbank::Windows>::new::{closure#1}::{closure#0}>>>::from_iter
+<triergon_codec_aac::fft::Mdct>::new
+<triergon_codec_aac::fft::Dct4>::new
+<triergon_codec_aac::fft::Fft>::new
+<alloc::raw_vec::RawVec<f32>>::grow_one
+<alloc::raw_vec::RawVec<triergon_codec_aac::fft::Stage>>::grow_one
+<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global>
+<alloc::vec::Vec<f32> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<f32, core::iter::adapters::map::Map<core::ops::range::Range<usize>, <triergon_codec_aac::fft::Dct4>::new::{closure#0}::{closure#0}>>>::from_iter
+<f64>::cos
+<f64>::sin
+<triergon_codec_aac::decoder::Core>::configure
+triergon_codec_aac::decoder::fixed_config_slots
+<triergon_codec_aac::decoder::Core>::build_elements
+<triergon_codec_aac::decoder::ChannelState>::new
+<triergon_core::budget::Charged<alloc::boxed::Box<triergon_codec_aac::ics::ChannelData>>>::try_new::<<triergon_core::budget::Charged<triergon_codec_aac::ics::ChannelData>>::boxed::{closure#0}>
+<triergon_codec_aac::decoder::Core>::layout_of
+<alloc::raw_vec::RawVec<core::option::Option<triergon_core::budget::Charged<alloc::boxed::Box<triergon_codec_aac::sbr::Sbr>>>>>::grow_one
+core::slice::sort::shared::smallsort::insertion_sort_shift_left::<(triergon_codec::layout::Speaker, usize, usize), <[(triergon_codec::layout::Speaker, usize, usize)]>::sort_by_key<triergon_codec::layout::Speaker, <triergon_codec_aac::decoder::Core>::layout_of::{closure#0}>::{closure#0}>
+<triergon_elementary::stream::Track as triergon_core::container::TrackInfo>::id
+<triergon_codec_aac::RawLcDecoder as triergon_codec::AudioDecoder>::decode
+<triergon_codec::AudioFrame>::try_resize
+<triergon_codec_aac::decoder::Core>::decode_cpe
+triergon_codec_aac::ics::parse_ics_info
+triergon_codec_aac::ics::parse_ics
+<std::sync::once_lock::OnceLock<triergon_codec_aac::huffman::Books>>::initialize::<<std::sync::once_lock::OnceLock<triergon_codec_aac::huffman::Books>>::get_or_init<triergon_codec_aac::huffman::books::{closure#0}>::{closure#0}, !>
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<triergon_codec_aac::huffman::Books>>::initialize<<std::sync::once_lock::OnceLock<triergon_codec_aac::huffman::Books>>::get_or_init<triergon_codec_aac::huffman::books::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+<triergon_codec_aac::huffman::Vlc>::new
+triergon_codec_aac::huffman::spectral_book
+<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::initialize::<<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::get_or_init<triergon_codec_aac::ics::pow43_table::{closure#0}>::{closure#0}, !>
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::initialize<<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::get_or_init<triergon_codec_aac::ics::pow43_table::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::initialize::<<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::get_or_init<triergon_codec_aac::ics::pow2_quarter::{closure#0}>::{closure#0}, !>
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::initialize<<std::sync::once_lock::OnceLock<alloc::vec::Vec<f32>>>::get_or_init<triergon_codec_aac::ics::pow2_quarter::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+<triergon_bitstream::reader::Cached as triergon_bitstream::reader::Window>::new
+<std::sync::once_lock::OnceLock<[f32; 33]>>::initialize::<<std::sync::once_lock::OnceLock<[f32; 33]>>::get_or_init<triergon_codec_aac::ics::pow43_signed::{closure#0}>::{closure#0}, !>
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<[f32; 33]>>::initialize<<std::sync::once_lock::OnceLock<[f32; 33]>>::get_or_init<triergon_codec_aac::ics::pow43_signed::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+triergon_bitstream::reader::tail
+triergon_codec_aac::decoder::process_channel
+triergon_codec_aac::cce::apply_spectral
+<triergon_codec_aac::filterbank::Filterbank>::synth
+<triergon_codec_aac::fft::Dct4>::run_split
+triergon_codec_aac::fft::pre
+<triergon_codec_aac::fft::Fft>::middle
+triergon_codec_aac::fft::radix4_block
+triergon_codec_aac::fft::last_post
+<triergon_codec_aac::fft::Dct4>::run
+triergon_codec_aac::fft::post
+<triergon_codec_vorbis::Decoder as triergon_codec::AudioDecoder>::flush
+core::ptr::drop_glue::<triergon_codec::AudioFrame>
+core::ptr::drop_glue::<alloc::boxed::Box<dyn triergon_codec::AudioDecoder>>
+core::ptr::drop_glue::<triergon_codec_aac::RawLcDecoder>
+core::ptr::drop_glue::<triergon_codec_aac::decoder::Core>
+core::ptr::drop_glue::<triergon_core::budget::Charged<alloc::boxed::Box<triergon_codec_aac::decoder::ElementState>>>
+core::ptr::drop_glue::<core::option::Option<triergon_codec_aac::ltp::LtpState>>
+core::ptr::drop_glue::<core::option::Option<triergon_core::budget::Charged<alloc::boxed::Box<triergon_codec_aac::sbr::Sbr>>>>
+core::ptr::drop_glue::<triergon_codec_aac::filterbank::Filterbank>
+core::ptr::drop_glue::<triergon_codec_aac::fft::Dct4>
+core::ptr::drop_glue::<core::option::Option<triergon_codec_aac::pce::Pce>>
+<alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
+core::fmt::write
+<core::io::write::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
+<u64 as core::fmt::Display>::fmt
+<core::fmt::Formatter>::pad_integral
+<core::fmt::Formatter>::pad_integral::write_prefix
+<triergon_harness_protocol::interleaved::InterleavedDigest>::finish
+std::io::stdio::_eprint
+<core::io::write::default_write_fmt::Adapter<std::io::stdio::StderrLock> as core::fmt::Write>::write_str
+<std::sys::stdio::unix::Stderr as core::io::write::Write>::write_all
+<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
+release_registered_frames
+btree_destroy
+__aarch64_swp8_acq_rel
+<std::io::stdio::Stdout>::lock
+<codec_worker::isobmff_packets::Seek>::parse
+codec_worker::isobmff_packets::packets::<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock>>
+<triergon_isobmff::container::Reader as triergon_core::container::ContainerReader>::step
+<triergon_isobmff::open::MovieOpen>::advance
+<triergon_core::input::InputCursor>::check_cancel
+<triergon_core::input::InputCursor>::buffered
+<triergon_core::blocking::Blocking<triergon_isobmff::container::Reader, alloc::io::buffered::bufreader::BufReader<std::fs::File>>>::serve
+<triergon_core::bytes::BudgetVec<u8>>::try_filled
+<triergon_core::bytes::BudgetVec<u8>>::reallocate
+triergon_core::bytes::charge_replacement
+triergon_core::bytes::settle_replacement
+triergon_core::blocking::read_retrying::<alloc::io::buffered::bufreader::BufReader<std::fs::File>>
+<triergon_core::input::InputCursor>::provide
+<triergon_core::input::InputCursor>::advance
+<triergon_isobmff::boxes::BoxHeader>::parse
+<triergon_core::bytes::BudgetVec<u8>>::try_reserve_exact
+<triergon_core::bytes::BudgetVec<u8>>::try_extend_from_slice
+core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_codec_hevc::state::BlkInfo>>>
+<triergon_core::bytes::BudgetVec<u8>>::freeze
+<triergon_isobmff::boxes::BoxView>::new
+<triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
+<triergon_core::bytes::BudgetVec<triergon_isobmff::boxes::BoxView>>::reallocate
+triergon_isobmff::open::push::<triergon_isobmff::boxes::BoxView>
+triergon_isobmff::open::push::<core::ops::range::Range<u64>>
+<triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>::grow_for_push
+<triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>::reallocate
+<triergon_isobmff::input_boxes::BoxReader>::skip
+<triergon_core::input::InputCursor>::request_range
+core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::PendingMedia>>
+core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::Walk>>
+<<triergon_core::blocking::Blocking<triergon_elementary::reader::Reader<triergon_elementary::ac3::Ac3>, alloc::io::buffered::bufreader::BufReader<std::fs::File>>>::seekable::{closure#0} as core::ops::function::FnOnce<(&mut alloc::io::buffered::bufreader::BufReader<std::fs::File>, u64)>>::call_once
+<triergon_core::input::InputCursor>::finish
+<triergon_isobmff::open::Walk>::new
+<triergon_core::bytes::BudgetVec<core::option::Option<triergon_isobmff::open::Frame>>>::reallocate
+<triergon_isobmff::open::Walk>::poll
+<triergon_isobmff::boxes::BoxChildren>::poll
+<triergon_isobmff::boxes::BoxView>::checked
+<triergon_isobmff::metadata::MovieHeader>::parse
+<triergon_core::bytes::BudgetVec<triergon_isobmff::open::Parts>>::reallocate
+<triergon_isobmff::open::Walk>::descend
+<triergon_isobmff::regular::SampleTableBuilder>::with_policy
+<triergon_isobmff::boxes::BoxView>::payload
+triergon_isobmff::open::push::<bool>
+<triergon_core::bytes::BudgetVec<bool>>::grow_for_push
+<triergon_core::bytes::BudgetVec<bool>>::reallocate
+<triergon_isobmff::regular::SampleTableBuilder>::poll
+<triergon_core::bytes::BudgetVec<triergon_isobmff::metadata::SampleDescription>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_isobmff::metadata::SampleDescription>>::reallocate
+<triergon_isobmff::tables::Words>::parse
+<triergon_isobmff::tables::Words>::rows
+<triergon_isobmff::regular::SampleTableBuilder>::finish
+core::ptr::drop_glue::<triergon_isobmff::regular::SampleTableBuilder>
+<triergon_isobmff::metadata::TrackHeader>::parse_inner
+<triergon_isobmff::metadata::EditList>::parse
+<triergon_core::bytes::BudgetVec<triergon_isobmff::open::MovieTrack>>::reallocate
+triergon_isobmff::open::push::<triergon_isobmff::open::MovieTrack>
+core::ptr::drop_glue::<triergon_isobmff::open::Parts>
+core::ptr::drop_glue::<core::option::Option<triergon_isobmff::fragment::FragmentBuilder>>
+<triergon_core::bytes::BudgetVec<triergon_isobmff::container::Track>>::reallocate
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVecIntoIter<triergon_isobmff::open::MovieTrack>>
+triergon_isobmff::container::codec_id
+core::ptr::drop_glue::<core::option::Option<triergon_isobmff::container::EntryScan>>
+<triergon_isobmff::encoded_stream::EsdsDescriptionWalk>::with_profile
+core::ptr::drop_glue::<triergon_isobmff::encoded_stream::EsdsDescriptionWalk>
+<triergon_core::time::Time>::new
+<triergon_isobmff::container::Reader as triergon_core::container::ContainerReader>::request_seek
+<triergon_core::time::Time>::to_ticks
+<triergon_isobmff::container::Track>::fill
+<triergon_isobmff::tables::Offsets>::get
+alloc::fmt::format::format_inner
+<alloc::string::String as core::fmt::Write>::write_str
+<i128 as core::fmt::Display>::fmt
+<u128>::_fmt_inner
+<u128 as core::fmt::Display>::fmt
+<triergon_core::container::SeekMethod as core::fmt::Debug>::fmt
+codec_worker::packets::string
+<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock> as core::io::write::Write>::write_fmt
+<core::io::write::default_write_fmt::Adapter<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock>> as core::fmt::Write>::write_str
+<alloc::string::String as core::fmt::Display>::fmt
+<core::fmt::Formatter>::pad
+<bool as core::fmt::Display>::fmt
+<triergon_core::bytes::Bytes as core::convert::AsRef<[u8]>>::as_ref
+<triergon_core::input::InputCursor>::read_span
+<triergon_isobmff::container::Reader>::finish_packet
+<usize>::_fmt
+__rustc::__rust_alloc
+<u64>::_fmt
+<&str as core::fmt::Display>::fmt
+<i64 as alloc::string::SpecToString>::spec_to_string
+<triergon_isobmff::container::Packet as triergon_core::container::PacketInfo>::payload
+triergon_harness_protocol::md5::hex_digest
+<alloc::raw_vec::RawVec<u8>>::grow_one
+<u32>::_fmt
+<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock>>::write_all_cold
+<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock>>::flush_buf
+<triergon_core::container::MediaKind as core::fmt::Debug>::fmt
+<triergon_isobmff::metadata::EditList>::entry
+<i64 as core::fmt::Display>::fmt
+<i16 as core::fmt::Display>::fmt
+alloc::str::join_generic_copy::<str, u8, alloc::string::String>
+<triergon_core::container::CodecId as core::fmt::Debug>::fmt
+<alloc::string::String>::from_utf8_lossy
+<core::str::lossy::Utf8Chunks as core::iter::traits::iterator::Iterator>::next
+codec_worker::packets::finish::<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock>>
+core::ptr::drop_glue::<triergon_core::blocking::Blocking<triergon_isobmff::container::Reader, alloc::io::buffered::bufreader::BufReader<std::fs::File>>>
+core::ptr::drop_glue::<triergon_isobmff::container::Reader>
+core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::Movie>>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_isobmff::open::MovieTrack>>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_isobmff::container::Track>>
+core::ptr::drop_glue::<triergon_isobmff::open::MovieTrack>
+core::ptr::drop_glue::<triergon_isobmff::regular::SampleTable>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::FragmentIndex>>
+<std::io::stdio::StdoutLock as core::io::write::Write>::flush
+core::ptr::drop_glue::<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutLock>>
+triergon_isobmff::open::push::<triergon_isobmff::fragment::Trex>
+<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::Trex>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::Trex>>::reallocate
+<triergon_isobmff::open::MovieOpen>::fragment
+<triergon_isobmff::fragment::FragmentBuilder>::new
+<triergon_isobmff::fragment_time::FragmentDecodeTime>::parse
+<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::reallocate
+<triergon_isobmff::fragment::Run>::values
+<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::FragmentIndex>>::reallocate
+core::ptr::drop_glue::<triergon_isobmff::fragment::FragmentIndex>
