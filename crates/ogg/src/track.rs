@@ -101,6 +101,12 @@ impl Track {
         self.config.channels
     }
 
+    /// The frame rate a video identification header states, as numerator and
+    /// denominator (Theora: FRN and FRD); the track time base is its inverse.
+    pub fn frame_rate(&self) -> Option<(u32, u32)> {
+        self.config.frame_rate
+    }
+
     /// The comment header: the Vorbis comment packet, the `OpusTags` packet or the
     /// body of FLAC's VORBIS_COMMENT block.
     pub fn comments(&self) -> Option<&[u8]> {
@@ -154,8 +160,9 @@ impl TrackInfo for Track {
 /// Times are ticks of the track time base, 1/sample rate (Opus 1/48000), on the
 /// physical stream's timeline: a packet starts where the previous one's samples end,
 /// the duration counts every sample the packet completes, and [`PacketInfo::trim`]
-/// says how many of them are not presented. Decode order is presentation order, so
-/// the DTS is the PTS. A packet of an uninterpreted mapping has no time.
+/// says how many of them are not presented. A Theora packet is one frame. Decode order
+/// is presentation order, so the DTS is the PTS. A packet of an uninterpreted mapping
+/// has no time.
 #[derive(Clone, Debug)]
 pub struct Packet {
     pub(crate) track: TrackId,
@@ -167,7 +174,7 @@ pub struct Packet {
     pub(crate) trim: Trim,
     pub(crate) granule: Option<i64>,
     pub(crate) page: u64,
-    pub(crate) timed: bool,
+    pub(crate) random_access: RandomAccess,
     pub(crate) reference: ReferenceTiming,
 }
 
@@ -220,14 +227,10 @@ impl PacketInfo for Packet {
     fn duration(&self) -> Option<i64> {
         self.duration
     }
-    /// Every Vorbis, Opus and FLAC packet can start decoding; a seek receipt states the
-    /// preroll their output needs.
+    /// Every Vorbis, Opus, FLAC and Speex packet can start decoding (a seek receipt
+    /// states the preroll their output needs); of Theora, the intra frames.
     fn random_access(&self) -> RandomAccess {
-        if self.timed {
-            RandomAccess::Sync
-        } else {
-            RandomAccess::Unknown
-        }
+        self.random_access
     }
     fn trim(&self) -> Trim {
         self.trim

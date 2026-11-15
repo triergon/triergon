@@ -1,0 +1,210 @@
+{
+ "schema": "triergon.isobmff.reader-rules.v1",
+ "frozen_utc": "2026-11-14T23:30:00Z",
+ "reference": "ffprobe of the formats profile of cargo xtask prepare-ffmpeg (.research/reference-formats/install/bin/ffprobe), -show_packets with the MOV demuxer forced and the options below; a seek case adds -read_intervals SECONDS%",
+ "candidate": "codec-worker packets mov FILE [TRACK_ID@MICROSECONDS]: every packet triergon_isobmff::Reader emits, as the reader reports it",
+ "ffprobe_options": ["-f", "mov", "-fflags", "+noparse+nofillin", "-ignore_editlist", "1"],
+ "compare": ["size", "position", "hash", "sync", "pts", "dts", "duration"],
+ "rules": [
+  {
+   "id": "forced-demuxer",
+   "scope": "every case",
+   "rule": "ffprobe reads every input with -f mov",
+   "reason": "the comparison is of one reader against one demuxer"
+  },
+  {
+   "id": "no-parsing-no-fill-in",
+   "scope": "every case",
+   "rule": "ffprobe reads with -fflags +noparse+nofillin",
+   "reason": "the reader reports what the file states and fills nothing in; with FFmpeg's defaults every packet of a raw video track is a keyframe whatever stss states (probe: r-front-stco, 377 of 781 probed inputs differ in the sync flag), with +noparse+nofillin the flag follows stss"
+  },
+  {
+   "id": "media-times",
+   "scope": "pts, dts and duration",
+   "rule": "ffprobe reads with -ignore_editlist 1, and times are compared on the media clock of each track",
+   "reason": "the reader does not apply edit lists: its times are media times and the list stays on Track::edits. With edit lists applied FFmpeg's times of every edited track differ (95 of 781 probed inputs); with -ignore_editlist 1 they are media times, as for the original access units of the AAC MOV manifest"
+  },
+  {
+   "id": "tracks-by-id",
+   "scope": "every case",
+   "rule": "a reader track is the FFmpeg stream whose id is its track_ID; a stream without an id stands for no track",
+   "reason": "ffprobe reports a MOV stream's track_ID as its id; the stream index is FFmpeg's own numbering"
+  },
+  {
+   "id": "time-base-projection",
+   "scope": "pts, dts and duration",
+   "rule": "the reader's ticks are expressed in FFmpeg's stream time base, exactly: a time that is not a whole number of FFmpeg ticks is compared as the fraction and differs",
+   "reason": "both sides report ticks of their own time base; FFmpeg's is the media timescale for every probed input, so the projection is the identity there"
+  },
+  {
+   "id": "aligned-pairing",
+   "scope": "every case",
+   "rule": "per track, packets are aligned in order by source position and size at the least cost, as the Ogg and elementary reader comparison aligns them; every unpaired packet is an 'unmatched' difference and every compared field of every pair is compared; a track only one side has packets of is one 'packets' difference of the two counts",
+   "reason": "both sides report a sample's byte offset; aligning keeps one packet one side cuts differently from shifting every later pair, while nothing is skipped"
+  },
+  {
+   "id": "payload-and-flags",
+   "scope": "every paired packet",
+   "rule": "the payload is compared by its MD5 (ffprobe -show_data_hash MD5 against the worker's MD5 of the reader's payload); the reader's sync flag (RandomAccess::Sync 1, NotSync 0, Unknown absent) against the K of ffprobe's flags",
+   "reason": "the bytes and the random-access fact are what a consumer decodes from"
+  },
+  {
+   "id": "order-across-tracks",
+   "scope": "every case",
+   "rule": "the paired packets of all tracks are listed in each side's delivery order; each run of places where the two lists name different packets is one 'order' difference, at its first place, of the two packets' tracks",
+   "reason": "the reader delivers in ascending byte order across tracks; a run, not every displaced packet, keeps one interleaving choice one difference"
+  },
+  {
+   "id": "seek-from-the-same-time",
+   "scope": "seek cases",
+   "rule": "the reader seeks on the case's track with SeekPolicy::PreviousRandomAccess; ffprobe reads from the same time with -read_intervals; everything both deliver after the seek is compared as a read",
+   "reason": "ffprobe has no landing receipt; the packets after the seek are where each side landed, per track"
+  },
+  {
+   "id": "streams-and-end",
+   "scope": "every case",
+   "rule": "the set of track IDs both sides report is compared, and whether reading ended in an error: the reader's error message against ffprobe's exit status",
+   "reason": "a refusal is a result; the reader's message names the rule the file breaks"
+  },
+  {
+   "id": "scoped-dispositions",
+   "scope": "every difference",
+   "rule": "a difference must be one of the reviewed differences of its case in differences.json (by their SHA-256), and fall within the scope (fields, packets, value relation, seek cases) of exactly one disposition the case lists, the one it was reviewed under; a case listing a disposition that covers none of its differences fails",
+   "reason": "a disposition explains only the kind of difference it names, on the packets it names"
+  }
+ ],
+ "dispositions": [
+  {
+   "id": "media-outside-mdat",
+   "reason": "a chunk offset puts a sample outside every mdat payload (outside the file, or in another box): the reader refuses the file, as its README states (media outside an mdat is refused); FFmpeg reports a partial file and delivers what it can read",
+   "scope": [
+    {"fields": ["end"], "packets": "file", "candidate": ["error: invalid data: sample outside media extent"]},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "candidate-zero"}
+   ]
+  },
+  {
+   "id": "inconsistent-sample-table",
+   "reason": "the sample tables contradict ISO/IEC 14496-12: an stsc sample description index of zero or past stsd, or first chunks out of order (8.7.4), stts or ctts runs that do not add up to the stsz sample count (8.6.1.2, 8.6.1.3), stss entries out of order or past the last sample (8.6.2): the reader refuses the track's index; FFmpeg delivers packets from what it can use, in the reviewed cases repeating byte ranges or timing samples it has no time for",
+   "scope": [
+    {"fields": ["end"], "packets": "file", "candidate": [
+     "error: invalid data: stsc order/count/description",
+     "error: invalid data: time run exceeds sample count",
+     "error: invalid data: time table sample count mismatch",
+     "error: invalid data: zero sample count in time run",
+     "error: invalid data: sync sample order/range"
+    ]},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "candidate-zero"}
+   ]
+  },
+  {
+   "id": "truncated-file",
+   "reason": "a box or a sample runs past the end of the file: the reader refuses it as truncated; FFmpeg delivers the samples it can read",
+   "scope": [
+    {"fields": ["end"], "packets": "file", "candidate": ["error: truncated input"]},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "candidate-zero"}
+   ]
+  },
+  {
+   "id": "zero-timescale",
+   "reason": "an mdhd or mvhd timescale of zero states no clock (ISO/IEC 14496-12 8.4.2.3, 8.2.2.3): the reader refuses the file; FFmpeg times the packets on a clock of its own",
+   "scope": [
+    {"fields": ["end"], "packets": "file", "candidate": ["error: invalid data: zero media/movie timescale"]},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "candidate-zero"}
+   ]
+  },
+  {
+   "id": "times-beyond-i64",
+   "reason": "a decode or presentation time past i64 (a tfdt above 2^63 - 1, or a run that carries the clock past it): the reader delivers the packets whose times fit and then fails with Error::Overflow, as its README states; FFmpeg either refuses the header or delivers times wrapped to negative values",
+   "scope": [
+    {"fields": ["end"], "packets": "file", "candidate": ["error: arithmetic overflow"]},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "candidate-zero"},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "reference-zero"}
+   ]
+  },
+  {
+   "id": "ffmpeg-refuses-header",
+   "reason": "FFmpeg fails to open the file (\"error reading header\", exit 1) and delivers nothing, where the reader reads the packets the tables state: observed on a private sample entry carriage (r-private-carriage), fragment timelines that end near i64::MAX (tfdt-control-03, -04) and fragmented files with empty samples or an empty endpoint (native-terminal-controls, progressive/pending-empty-endpoint.mp4); where the reader stops at a sample outside every mdat (short-before-empty.mp4), it has delivered the samples before it",
+   "scope": [
+    {"fields": ["end"], "packets": "file", "candidate": ["eof"]},
+    {"fields": ["packets", "streams"], "packets": "file", "reference": "reference-zero"}
+   ]
+  },
+  {
+   "id": "cross-track-order",
+   "reason": "the reader delivers samples in ascending byte order across tracks (README); FFmpeg delivers a sample of another track first when it is timed earlier, though it lies later in the file (r-multitrack: the subtitle sample at 3 s before the video sample at 5 s stored ahead of it), so the same packets interleave differently; every packet still pairs within its track",
+   "scope": [
+    {"fields": ["order"], "packets": "order"}
+   ]
+  },
+  {
+   "id": "fragment-without-tfdt",
+   "reason": "a track fragment without tfdt states no decode time: the reader keeps its times unknown (README: a fragment without tfdt has None times); FFmpeg times its samples from the end of the previous fragment, or from zero",
+   "scope": [
+    {"fields": ["pts", "dts"], "packets": "any", "reference": "candidate-absent"}
+   ]
+  },
+  {
+   "id": "regular-negative-offset-dts-shift",
+   "reason": "a version 1 ctts with negative offsets (ISO/IEC 14496-12 8.6.1.3): the reader reports the stts decode times and presentation = decode + offset; FFmpeg reports the same presentation times and moves every decode time earlier by the track's most negative offset",
+   "scope": [
+    {"fields": ["dts"], "packets": "any", "reference": "constant-offset"}
+   ]
+  },
+  {
+   "id": "fragment-negative-offset-pts-shift",
+   "reason": "negative composition offsets in version 1 trun boxes (ISO/IEC 14496-12 8.8.8) or a version 1 ctts in a fragmented track: the reader reports presentation = decode + offset; FFmpeg reports the same decode times and every presentation time later by the most negative offset of the track",
+   "scope": [
+    {"fields": ["pts"], "packets": "any", "reference": "constant-offset"}
+   ]
+  },
+  {
+   "id": "version-0-offset-high-bit",
+   "reason": "a version 0 ctts or trun composition offset of 2^31 or more, which ISO/IEC 14496-12 (8.6.1.3, 8.8.8) states unsigned: the reader adds it as unsigned; FFmpeg reads it as negative and then moves the times as for negative offsets",
+   "scope": [
+    {"fields": ["pts", "dts"], "packets": "any"}
+   ]
+  },
+  {
+   "id": "tfdt-near-i64-max",
+   "reason": "a tfdt of 9223372036854775788 (2^63 - 20) with times that stay within i64: the reader reports the stated times; FFmpeg reports each 9223090561878065151 (2^63 - 2^48 - 1) lower",
+   "scope": [
+    {"fields": ["pts", "dts"], "packets": "any", "reference": "constant-offset"}
+   ]
+  },
+  {
+   "id": "pcm-chunk-packets",
+   "reason": "QuickTime version 0 PCM states one sample per PCM frame: the reader delivers each frame as a packet; FFmpeg delivers the frames of a chunk, or a run of them, as one packet spanning the same bytes",
+   "scope": [
+    {"fields": ["size", "hash", "duration", "unmatched"], "packets": "resplit"}
+   ]
+  },
+  {
+   "id": "zero-decode-delta",
+   "reason": "the time table states a decode delta of 0 for a sample: the reader reports a duration of 0; FFmpeg reports no duration, or for the RTP hint tracks of avc-aac-rtp-hints.mp4 a duration it derives (5520 and 17920 ticks)",
+   "scope": [
+    {"fields": ["duration"], "packets": "any", "reference": "candidate-zero"}
+   ]
+  },
+  {
+   "id": "empty-stss",
+   "reason": "an stss with no entries states that no sample is a sync sample (ISO/IEC 14496-12 8.6.2): the reader marks none; FFmpeg marks the first sample a keyframe",
+   "scope": [
+    {"fields": ["sync"], "packets": "first-of-stream"}
+   ]
+  },
+  {
+   "id": "seek-other-tracks-earlier",
+   "reason": "after a seek both land the seek track on the same sync sample; the reader resumes every other track at its first sample at or after the landing presentation time (README), FFmpeg at its last sample at or before the landing decode time, so FFmpeg delivers the samples of other tracks between the two first",
+   "scope": [
+    {"fields": ["unmatched"], "packets": "leading-in-other-track", "cases": "seeks"}
+   ]
+  },
+  {
+   "id": "seek-landing-by-decode-time",
+   "reason": "a target before a sync sample's presentation time but not before its decode time (a reordered video track): the reader lands on the latest sync sample presented at or before the target (README), an earlier one; FFmpeg lands on the sync sample decoded at or before it. The reader delivers the packets between the two landings first, on the seek track and, resuming from its earlier landing, on the other tracks",
+   "scope": [
+    {"fields": ["unmatched"], "packets": "leading-in-reader", "cases": "seeks"}
+   ]
+  }
+ ]
+}

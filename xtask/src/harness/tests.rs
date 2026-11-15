@@ -968,7 +968,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
         (
             "matroska-startup-seek",
             "playback-feed-fold-v1",
-            Some("playback-worker"),
+            Some("playback-matroska-worker"),
             Some("ffmpeg-video-native"),
         ),
         (
@@ -980,7 +980,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
         (
             "matroska-audio-clocks",
             "playback-mkv-audio-fold-v1",
-            Some("playback-worker"),
+            Some("playback-matroska-worker"),
             Some("ffmpeg-video-native"),
         ),
         (

@@ -368,7 +368,7 @@ impl<'a> TrackSeek<'a> {
                 return Err(Error::Cancelled);
             }
             if self.cursor.head.is_none() {
-                match self.cursor.fill(work, true, false, false)? {
+                match self.cursor.fill(work, true, false, false, None)? {
                     CursorStatus::Yield => return Ok(false),
                     CursorStatus::End if self.search == Search::Forward => {
                         self.finish_forward(points)?;
