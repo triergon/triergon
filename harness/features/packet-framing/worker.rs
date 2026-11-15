@@ -67,6 +67,7 @@ fn read_chunk(input: &mut impl Read, output: &mut [u8]) -> io::Result<usize> {
     }
 }
 
+#[inline(never)]
 fn read_case(mut input: impl Read) -> Result<Case, Failure> {
     let mut chunk = [0; 1024];
     let mut filled = 0;

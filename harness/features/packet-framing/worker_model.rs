@@ -59,7 +59,7 @@ impl Reader<'_> {
         padded.extend_from_slice(source);
         padded.resize(n + 64, 0);
         let storage = Bytes::try_from_vec(pool, padded).map_err(|e| e.error())?;
-        storage.slice(0..n)
+        storage.into_slice(0..n)
     }
 }
 
@@ -146,24 +146,26 @@ impl Case {
     }
 }
 
-const fn powers(base: u64) -> [u64; 9] {
-    let mut out = [1u64; 9];
-    let mut i = 1;
-    while i < 9 {
-        out[i] = out[i - 1].wrapping_mul(base);
-        i += 1;
-    }
-    out
+#[inline(always)]
+fn group_four<const BASE: u32>(group: [u8; 4]) -> u32 {
+    let [a, b, c, d] = group.map(u32::from);
+    (a * BASE.pow(3)) + (b * BASE.pow(2)) + (c * BASE) + d
 }
-const POW31: [u64; 9] = powers(31);
-const POW131: [u64; 9] = powers(131);
+
+#[inline(always)]
+fn group_eight<const BASE: u32>(first: [u8; 4], last: [u8; 4]) -> u64 {
+    // Four bytes fit in u32 for each of the two bases. Widen only when
+    // combining the halves so 32-bit targets can use a widening multiply.
+    u64::from(group_four::<BASE>(first)) * u64::from(BASE.pow(4))
+        + u64::from(group_four::<BASE>(last))
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Digest(pub u64, pub u64);
 impl Digest {
     /// Same wrapping polynomial fold as one byte at a time. Eight-byte groups use
     /// h*k^8 + sum(b[i]*k^(7-i)), which is equal modulo 2^64 and shortens the chain.
-    #[inline]
+    #[inline(never)]
     pub fn raw(&mut self, bytes: &[u8]) {
         let (chunks, rest) = bytes.as_chunks::<8>();
         for chunk in chunks {
@@ -176,19 +178,30 @@ impl Digest {
     }
     #[inline(always)]
     fn group(&mut self, chunk: &[u8; 8]) {
-        let (mut a, mut b) = (0u64, 0u64);
-        for (i, &byte) in chunk.iter().enumerate() {
-            a = a.wrapping_add(u64::from(byte).wrapping_mul(POW31[7 - i]));
-            b = b.wrapping_add(u64::from(byte).wrapping_mul(POW131[7 - i]));
-        }
-        self.0 = self.0.wrapping_mul(POW31[8]).wrapping_add(a);
-        self.1 = self.1.wrapping_mul(POW131[8]).wrapping_add(b);
+        let &[a, b, c, d, e, f, g, h] = chunk;
+        let first = [a, b, c, d];
+        let last = [e, f, g, h];
+        self.0 = self
+            .0
+            .wrapping_mul(31_u64.pow(8))
+            .wrapping_add(group_eight::<31>(first, last));
+        self.1 = self
+            .1
+            .wrapping_mul(131_u64.pow(8))
+            .wrapping_add(group_eight::<131>(first, last));
     }
     /// A word is exactly one eight-byte group of its little-endian bytes.
     // Initialization, packet metadata, and teardown all emit the same word.
     #[inline(never)]
     pub fn word(&mut self, n: u64) {
         self.group(&n.to_le_bytes());
+    }
+    /// Append consecutive metadata words with a single fold call.
+    #[inline(never)]
+    pub fn words(&mut self, words: &[u64]) {
+        for &word in words {
+            self.group(&word.to_le_bytes());
+        }
     }
     #[inline]
     pub fn signed(&mut self, n: i64) {
