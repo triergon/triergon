@@ -158,6 +158,17 @@ pub fn measure(
     held: Option<&Budget>,
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
+    measure_dyn(invocation, name, held, &mut operation)
+}
+
+/// [`measure`] with the operation behind a reference, so each worker binary holds
+/// one copy of the loop and of the result line.
+fn measure_dyn(
+    invocation: &Invocation<'_>,
+    name: &str,
+    held: Option<&Budget>,
+    operation: &mut dyn FnMut() -> Result<Totals>,
+) -> Result<()> {
     let retained = held.map(Budget::used);
     let memory = invocation.mode == Mode::Memory;
     let mut out = io::stdout().lock();
