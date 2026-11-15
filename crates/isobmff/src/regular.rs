@@ -222,10 +222,7 @@ impl SampleTable {
         let composition_offset = self
             .ctts
             .as_ref()
-            .map(|table| {
-                let (version, _) = fields::full(table.raw.payload())?;
-                crate::CompositionOffset::from_wire(version, cto)
-            })
+            .map(|table| crate::CompositionOffset::from_wire(table.version, cto))
             .transpose()?;
         let cts = dts
             .checked_add(composition_offset.map_or(0, crate::CompositionOffset::ticks))
@@ -930,6 +927,7 @@ impl<'a> SampleCursor<'a> {
     pub(crate) fn ordinal(&self) -> u64 {
         self.ordinal
     }
+    #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         if self.ordinal == self.table.sample_count() {
             return Ok(SampleStep::End);

@@ -116,6 +116,7 @@ impl<'a> TrackSampleCursor<'a> {
                 .map(|fragment| (fragment, cursor.run_index()))
         })
     }
+    #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         if let Some(error) = self.failed {
             return Err(error);

@@ -10,13 +10,15 @@ use triergon_core::{Error, Result};
 pub(crate) struct Words {
     pub raw: BoxView,
     pub count: u32,
+    /// The full box version.
+    pub version: u8,
     start: usize,
     stride: usize,
 }
 impl Words {
     pub(crate) fn parse(raw: BoxView, stride: usize, limits: Limits) -> Result<Self> {
         fields::full_zero(raw.payload())?;
-        Self::rows(raw, stride, limits)
+        Self::rows(raw, 0, stride, limits)
     }
     /// Only ctts has the acquired version-1 row interpretation. Other tables
     /// keep their version/flags-zero constructor above.
@@ -30,15 +32,16 @@ impl Words {
                 "ctts version/flags outside acquired syntax",
             ));
         }
-        Self::rows(raw, 8, limits)
+        Self::rows(raw, version, 8, limits)
     }
-    fn rows(raw: BoxView, stride: usize, limits: Limits) -> Result<Self> {
+    fn rows(raw: BoxView, version: u8, stride: usize, limits: Limits) -> Result<Self> {
         let count = fields::u32_at(raw.payload(), 4)?;
         fields::exact_rows(raw.payload(), 8, count, stride)?;
         policy(count, limits.max_records)?;
         Ok(Self {
             raw,
             count,
+            version,
             start: 8,
             stride,
         })
@@ -147,6 +150,14 @@ impl Sizes {
         }
         if self.constant != 0 {
             return Ok(self.constant);
+        }
+        if self.width == 32 {
+            let at = usize::try_from(sample)
+                .ok()
+                .and_then(|index| index.checked_mul(4))
+                .and_then(|offset| offset.checked_add(12))
+                .ok_or(Error::Overflow)?;
+            return fields::u32_at(self.raw.payload(), at);
         }
         let bit = sample
             .checked_mul(u64::from(self.width))

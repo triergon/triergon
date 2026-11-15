@@ -304,7 +304,7 @@ impl<'a> Slot<'a> {
         front_source: bool,
     ) -> Result<CursorStatus> {
         let clock = self.clock()?;
-        let mut occurrence = if let Some(plan) = self.encoded_edit {
+        let (source, demux, edit, clock_origin) = if let Some(plan) = self.encoded_edit {
             let sample = match self.cursor.poll(work)? {
                 SampleStep::Yield => return Ok(CursorStatus::Yield),
                 SampleStep::End => return Ok(CursorStatus::End),
@@ -318,33 +318,22 @@ impl<'a> Slot<'a> {
                 edit_ordinal: plan.edit_ordinal(),
                 duration_basis: DurationBasis::OriginalDecodeTableOrdinal,
             };
-            PacketOccurrence {
-                track_id: self.track.track_id,
-                source: sample,
-                demux,
-                edit: Some(edit),
-                clock_origin: ClockOrigin::SourceClock,
-                media_clock: clock,
-                scheduling_clock: SchedulingClock::SingleTrack,
-            }
+            (sample, demux, Some(edit), ClockOrigin::SourceClock)
         } else if let Some(edited) = &mut self.edited {
             let cursor = &mut edited.as_mut_slice()[0];
             match cursor.poll(work)? {
                 CursorStatus::Ready => {
                     let occurrence = cursor.take_occurrence()?;
-                    PacketOccurrence {
-                        track_id: self.track.track_id,
-                        source: occurrence.source,
-                        demux: occurrence.demux,
-                        edit: Some(EditIdentity {
+                    (
+                        occurrence.source,
+                        occurrence.demux,
+                        Some(EditIdentity {
                             sequence: occurrence.sequence,
                             edit_ordinal: occurrence.edit_ordinal,
                             duration_basis: occurrence.duration_basis,
                         }),
-                        clock_origin: ClockOrigin::SourceClock,
-                        media_clock: clock,
-                        scheduling_clock: SchedulingClock::SingleTrack,
-                    }
+                        ClockOrigin::SourceClock,
+                    )
                 }
                 other => return Ok(other),
             }
@@ -415,24 +404,24 @@ impl<'a> Slot<'a> {
                 });
             }
             let edit = self.fragment_edit.map(|edit| edit.identity(sample.ordinal));
-            PacketOccurrence {
-                track_id: self.track.track_id,
-                source: sample,
-                demux,
-                edit,
-                clock_origin,
-                media_clock: clock,
-                scheduling_clock: SchedulingClock::SingleTrack,
-            }
+            (sample, demux, edit, clock_origin)
         };
-        occurrence.scheduling_clock = if front_source {
-            SchedulingClock::NonseekableSourcePosition(occurrence.demux.source_range.start)
+        let scheduling_clock = if front_source {
+            SchedulingClock::NonseekableSourcePosition(demux.source_range.start)
         } else if global_schedule {
-            SchedulingClock::from_demux_clock(occurrence.demux.dts_field, clock.demux_base)?
+            SchedulingClock::from_demux_clock(demux.dts_field, clock.demux_base)?
         } else {
             SchedulingClock::SingleTrack
         };
-        self.head = Some(occurrence);
+        self.head = Some(PacketOccurrence {
+            track_id: self.track.track_id,
+            source,
+            demux,
+            edit,
+            clock_origin,
+            media_clock: clock,
+            scheduling_clock,
+        });
         Ok(CursorStatus::Ready)
     }
 }
@@ -1804,6 +1793,12 @@ impl<'a> PacketCursor<'a> {
                             slot.ended = true;
                         }
                         CursorStatus::Ready => {
+                            // A lone track's next occurrence is the selection.
+                            if !global_schedule && slot.resume_remaining == 0 {
+                                self.at = 1;
+                                self.best = Some(0);
+                                self.phase = Phase::Select;
+                            }
                             continue;
                         }
                     }
