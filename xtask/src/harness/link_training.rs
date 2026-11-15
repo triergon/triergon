@@ -106,12 +106,12 @@ fn strings(value: Option<&Value>) -> Vec<String> {
 }
 
 impl Training {
-    /// Whether the manifest has operations for `worker`, which then links in a
-    /// trained order.
-    fn orders(&self, worker: &str) -> bool {
+    /// Whether the manifest has operations for `worker` on `target`, where it then
+    /// links in a trained order.
+    fn orders(&self, worker: &str, target: &str) -> bool {
         self.operations
             .iter()
-            .any(|operation| operation.worker == worker)
+            .any(|operation| operation.worker == worker && operation.runs_on(target))
     }
 
     fn load(root: &Path) -> R<Self> {
@@ -348,7 +348,7 @@ pub fn train(root: &Path, directory: Option<&Path>, only: Option<&str>) -> R<()>
     let release = root.join(gate_build::release_dir()?);
     let logs = root.join("target/harness/link-order/training");
     for worker in workers() {
-        if only.is_some_and(|only| only != worker.name) || !training.orders(worker.name) {
+        if only.is_some_and(|only| only != worker.name) || !training.orders(worker.name, target) {
             continue;
         }
         let binary = release.join(worker.name);
@@ -405,8 +405,8 @@ pub fn train(root: &Path, directory: Option<&Path>, only: Option<&str>) -> R<()>
     Ok(())
 }
 
-/// Checks the training manifest and the committed trained orders: every ordered
-/// worker has one for each gate target and no other worker has one, each parses,
+/// Checks the training manifest and the committed trained orders: a worker has one
+/// for each gate target its operations run on and for no other, each parses,
 /// and, where the policy orders the link, each links: the worker is built for this
 /// host, linked with the ordering file the trained order gives that build, and
 /// linked again to the same ordering file.
@@ -418,13 +418,13 @@ pub fn check(root: &Path) -> R<()> {
             let path = link_order::trained_path(root, target, worker.name);
             match (
                 link_order::committed_trained(root, target, worker.name)?,
-                training.orders(worker.name),
+                training.orders(worker.name, target),
             ) {
                 (Some(names), true) => trained.push((worker.name, target, names)),
                 (None, false) => {}
                 (Some(_), false) => {
                     return Err(format!(
-                        "{}: {} has no training operations",
+                        "{}: {} has no training operations for {target}",
                         path.display(),
                         worker.name
                     ));
@@ -441,7 +441,7 @@ pub fn check(root: &Path) -> R<()> {
         return Ok(());
     }
     for worker in workers() {
-        if !training.orders(worker.name) {
+        if !trained.iter().any(|(name, ..)| *name == worker.name) {
             continue;
         }
         let binary = link(root, &worker, None)?;

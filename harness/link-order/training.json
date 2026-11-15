@@ -484,6 +484,9 @@
    "arguments": [
     "nal-memory",
     "@avc.bsf"
+   ],
+   "targets": [
+    "aarch64-unknown-linux-gnu"
    ]
   },
   {
@@ -491,6 +494,9 @@
    "arguments": [
     "nal-memory",
     "@hevc.bsf"
+   ],
+   "targets": [
+    "aarch64-unknown-linux-gnu"
    ]
   }
  ]
