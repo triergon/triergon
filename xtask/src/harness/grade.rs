@@ -123,11 +123,12 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
-// A parity probe has its own process duration in each stage. Keep the
-// probe's status and output in the comparison, and validate each duration.
-fn case_fields(row: &Value) -> R<Value> {
+/// The fields of a case row that its timing and memory collections must agree on:
+/// Compare parity outputs and status, plus the presence of a valid duration.
+/// Its numeric value may differ because each collection runs its own probe.
+fn joined_fields(row: &Value) -> R<Value> {
     let mut fields = without(row, &["timing", "memory"])?;
-    if let Some(parity) = fields.get("parity")
+    if let Some(parity) = row.get("parity")
         && let Some(run) = parity.get("reference_run")
     {
         let elapsed = run.get("elapsed_ns").ok_or("missing elapsed_ns")?;
@@ -574,8 +575,8 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     require_same(
-        &case_fields(timed)?,
-        &case_fields(measured)?,
+        &joined_fields(timed)?,
+        &joined_fields(measured)?,
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
@@ -598,8 +599,8 @@ fn join_case(
     ceiling: f64,
 ) -> R<Value> {
     require_same(
-        &case_fields(timed)?,
-        &case_fields(measured)?,
+        &joined_fields(timed)?,
+        &joined_fields(measured)?,
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
@@ -1859,34 +1860,6 @@ mod tests {
     }
 
     #[test]
-    fn independent_framing_probes_may_take_different_time() {
-        let row = |status: &str, elapsed, digest| {
-            object(&[(
-                "parity",
-                object(&[
-                    ("reference", object(&[("digest", Value::int(digest))])),
-                    (
-                        "reference_run",
-                        object(&[("elapsed_ns", elapsed), ("status", Value::str(status))]),
-                    ),
-                ]),
-            )])
-        };
-        let timed = case_fields(&row("ok", Value::int(100), 1)).unwrap();
-        let other = case_fields(&row("ok", Value::int(200), 1)).unwrap();
-        assert!(require_same(&timed, &other, "case fields/parity").is_ok());
-        for different in [
-            row("timeout", Value::int(200), 1),
-            row("ok", Value::int(200), 2),
-            row("ok", Value::Null, 1),
-        ] {
-            let different = case_fields(&different).unwrap();
-            assert!(require_same(&timed, &different, "case fields/parity").is_err());
-        }
-        assert!(case_fields(&row("ok", Value::int(-1), 1)).is_err());
-    }
-
-    #[test]
     fn registered_role_proofs_reject_integer_to_float_coercion() {
         let mut fixture = Fixture::new();
         let proof = object(&[
@@ -2015,6 +1988,95 @@ mod tests {
             Value::Array(samples),
         );
         assert!(fixture.join().unwrap_err().contains("digest_b"));
+    }
+
+    #[test]
+    fn independent_framing_probes_may_take_different_time() {
+        let row = |status: &str, elapsed, digest| {
+            object(&[(
+                "parity",
+                object(&[
+                    ("reference", object(&[("digest", Value::int(digest))])),
+                    (
+                        "reference_run",
+                        object(&[("elapsed_ns", elapsed), ("status", Value::str(status))]),
+                    ),
+                ]),
+            )])
+        };
+        let timed = joined_fields(&row("ok", Value::int(100), 1)).unwrap();
+        let other = joined_fields(&row("ok", Value::int(200), 1)).unwrap();
+        assert!(require_same(&timed, &other, "case fields/parity").is_ok());
+        for different in [
+            row("timeout", Value::int(200), 1),
+            row("ok", Value::int(200), 2),
+            row("ok", Value::Null, 1),
+        ] {
+            let different = joined_fields(&different).unwrap();
+            assert!(require_same(&timed, &different, "case fields/parity").is_err());
+        }
+        assert!(joined_fields(&row("ok", Value::int(-1), 1)).is_err());
+    }
+
+    #[test]
+    fn collections_join_across_reference_run_times_but_no_other_parity_difference() {
+        let run = |status: &str, elapsed: i64| {
+            object(&[
+                ("status", Value::str(status)),
+                ("elapsed_ns", Value::int(elapsed)),
+            ])
+        };
+        let fixture = || {
+            let mut fixture = Fixture::new();
+            change(
+                &mut fixture.timed,
+                &["parity"],
+                "reference_run",
+                run("ok", 2_301_137),
+            );
+            change(
+                &mut fixture.measured,
+                &["parity"],
+                "reference_run",
+                run("ok", 2_332_973),
+            );
+            fixture
+        };
+        // Each collection's parity run records its own elapsed time.
+        fixture().join().unwrap();
+        let mut status = fixture();
+        change(
+            &mut status.measured,
+            &["parity"],
+            "reference_run",
+            run("timeout", 2_332_973),
+        );
+        let mut run_field = fixture();
+        change(
+            &mut run_field.measured,
+            &["parity", "reference_run"],
+            "signal",
+            Value::int(9),
+        );
+        let mut output = fixture();
+        change(
+            &mut output.measured,
+            &["parity"],
+            "reference",
+            object(&[("digest", Value::int(8))]),
+        );
+        let mut verdict = fixture();
+        change(
+            &mut verdict.measured,
+            &["parity"],
+            "status",
+            Value::str("fail"),
+        );
+        for differing in [status, run_field, output, verdict] {
+            assert!(differing.join().unwrap_err().contains("case fields/parity"));
+            let open = open_case(&differing.timed, &differing.measured);
+            assert!(open.unwrap_err().contains("case fields/parity"));
+        }
     }
 
     #[test]

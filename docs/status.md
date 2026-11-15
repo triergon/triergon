@@ -540,6 +540,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Earlier: codecs and decode sessions, runtime | `add6b272cb622bae0d921dc3fbbf0812958c2023` | `ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929` |
 | Audio codecs in files: the per-workload runtimes the row's Open cell cites, and the earlier row | `ccff5b5734c113c1d88160b84825157508c701c0` | `0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53` |
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
+| ARMv7: capture's kernel-bound memory, collected in parallel, with its parity and timing; codec memory in parallel | `4b43bf7497c18822e96ca224fa5ba0e367088f93` | `6429b9987bcf25b09b19e6fbf7aa8af0c7e76ae54a4b73117145e5fc3c0d3040` |
 | ARMv7: capture, the conversion probes, parity, runtime and standard-bound memory | `dcf51398e97c781d517c2c577194a9d92f8c7f15` | `1b48bb701d74e5bc17a0e930ecf08e1061454b94e98b519b092573d9d24e0d99` |
 | Capture on Linux AArch64: parity with the conversion open, tests and instruction counts against main | `dcf51398e97c781d517c2c577194a9d92f8c7f15` | `016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2` |
 | Capture on Linux AArch64 under the link policy: tests, parity with the conversion open, runtime and kernel-bound memory | `5aa554886320b59d220523032d9b81e998a60deb` | `c8a13c1a1388ffdcc928206334410d0d6d7556943d432f694fcbdbc881d47921` |
@@ -675,14 +676,12 @@ the tests and the rasterising, shaping and ASS parsing comparisons at `3df7ae6d`
 `dcf51398`, and closed captions at `4fc96a49`. The progressive TS suite is not measured on
 this target: its playback worker runs its numeric modes only on native Linux AArch64, so the
 gate plan leaves it out ([running the gates](quality.md#running-the-gates)).
-Memory is kernel-bound in every row but capture: measured under the kernel RSS bound,
-through its 32-bit entry point, with both workers' cached pages dropped before every run
+Memory is kernel-bound in every row: measured under the kernel RSS bound, through its
+32-bit entry point, with both workers' cached pages dropped before every run
 ([quality](quality.md#measuring-performance)), so total RSS is the candidate's proven
-resident peak over the reference's observed peak. The capture row uses the standard
-bounds: its total RSS is the candidate's virtual peak over the reference's observed
-resident peak, a ceiling that already lies below the reference. The capture row's memory was not
-collected under the kernel bound on this target: `capture qualify` measures memory one case
-at a time, about ten minutes a case here. The codec timings are
+resident peak over the reference's observed peak. The capture row's memory comes from
+`4b43bf74`: all 15 cases collected in parallel on CPUs 1–15 from the records of a timing
+run on CPU 1 on the same host (`capture qualify --stage memory`). The codec timings are
 diagnostics: no codec contract is gated on this target.
 
 | Area | Verified against the reference | Runtime | Memory |
@@ -695,7 +694,7 @@ diagnostics: no codec contract is gated on this target.
 | Packet framing | 131/131 AVC/HEVC reference comparisons | 1.1036 (131/131 within the ceiling) | heap ≤0.7653 (131/131 lower), total RSS ≤0.9944 (131/131 lower) |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision; the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: 1.9223 (10/20 within the ceiling) | diagnostic, not gated, at `8154812e`: heap ≤0.9441, total RSS ≤0.8339 (20/20 lower) |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | diagnostic, not gated: 1.8584 (7/10 within the ceiling) | diagnostic, not gated, at `8154812e`: heap ≤0.8991, total RSS ≤0.7704 (10/10 lower) |
-| Capture | 15/15 at `dcf51398`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1536 at `dcf51398` (15/15 pass; worst `c13-motion-960-6m`, then `c14-motion-960-rate255` 1.1528) | standard bounds at `dcf51398`: heap ≤0.609, total RSS ≤0.982 (14/15 lower); `c05-noise-960` has no memory result: FFmpeg's run under the RSS observer outlasts the 30 s worker limit in all 30 pairs |
+| Capture | 15/15 at `dcf51398`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1536 at `dcf51398` (15/15 pass; worst `c13-motion-960-6m`, then `c14-motion-960-rate255` 1.1528) | at `4b43bf74`: heap ≤0.6086, total RSS ≤0.9765 (15/15 lower) |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7862 (10/10 pass) | heap ≤0.7323 (10/10 lower); total RSS fails: ≤1.1491, 0/10 lower |
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.8837 (97/97 pass) | heap ≤0.0902, total RSS ≤0.8734 (97/97 lower) |
 | MPEG-TS access units | 169/169 transport compatibility folds (`mpegts-access-units`) | 0.9945 (169/169 pass) | heap ≤0.1327, total RSS ≤0.8810 (169/169 lower) |
