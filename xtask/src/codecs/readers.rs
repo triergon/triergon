@@ -20,8 +20,9 @@
 //! landing are counted and not compared (see `before_landing`), and the rest are aligned
 //! by position and size, packets that differ in both never pairing, so that packets of
 //! different chain links do not pair. The reader's own landing is checked as well: a
-//! case fails where the receipt lands after the requested time or the sought track's
-//! first packet starts after it (`landing_check`).
+//! case fails where the receipt lands after the requested time or the sought stream's
+//! first packet starts after it (`landing_check`); in a chained file that is the track
+//! at the case track's position in the link the reader sought.
 
 use std::fs;
 use std::io::Write;
@@ -613,8 +614,6 @@ const TRIM_END: usize = 6;
 /// A reader packet as `codec-worker packets` prints it, with what the scopes ask of it.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Emitted {
-    /// The reader's track index.
-    track: i128,
     native: Fields,
     /// The FFmpeg-compatible view, where the reader has one.
     compat: Option<Fields>,
@@ -631,6 +630,8 @@ struct Emitted {
 #[derive(Debug, Default)]
 struct Candidate {
     tracks: Vec<i128>,
+    /// The FFmpeg stream of each reader track, by track index.
+    stream_of_track: Vec<(i128, i128)>,
     streams: Vec<(i128, Vec<Emitted>)>,
     error: Option<String>,
     /// The seek receipt line, for a seek case.
@@ -832,8 +833,16 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
         .collect();
     mapped.sort_unstable();
     mapped.dedup();
+    let stream_of_track = tracks
+        .iter()
+        .filter_map(|t| {
+            let index = int(t.get("index"))?;
+            Some((index, stream_of(index)?))
+        })
+        .collect();
     let mut reading = Candidate {
         tracks: mapped,
+        stream_of_track,
         error: match end.get("end").and_then(Value::as_str) {
             Some("eof") => None,
             _ => Some(python::str(end.get("error").unwrap_or(&Value::Null))),
@@ -881,7 +890,6 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
             fields
         });
         let emitted = Emitted {
-            track,
             native: FIELDS.map(|f| int(packet.get(f))),
             compat,
             time_base,
@@ -1744,9 +1752,12 @@ fn grade_case(
 }
 
 /// A seek's landing as the reader reports and delivers it: its receipt lands at or
-/// before the requested time, and the sought track's first packet after the seek
+/// before the requested time, and the sought stream's first packet after the seek
 /// starts at or before the requested time too, so a seek that lands past its target
 /// fails although the comparison drops FFmpeg's packets before the reader's landing.
+/// The sought stream is the FFmpeg stream of the case's track: in a chained file the
+/// reader seeks the track at the same position in the link that holds the target, a
+/// track of the same stream, and its times count from the start of the file.
 fn landing_check(ours: &Candidate, seek: &SeekCase) -> Result<(), String> {
     let seconds = |key: &str| -> Result<Ratio, String> {
         let time = ours
@@ -1769,17 +1780,20 @@ fn landing_check(ours: &Candidate, seek: &SeekCase) -> Result<(), String> {
         ));
     }
     let track = i128::try_from(seek.track).map_err(|e| e.to_string())?;
-    let first = ours
-        .streams
+    let stream = ours
+        .stream_of_track
         .iter()
-        .flat_map(|(_, packets)| packets)
-        .find(|p| p.track == track)
-        .ok_or("the sought track delivers no packet")?;
-    let pts = first.native[PTS].ok_or("the sought track's first packet has no time")?;
+        .find(|(index, _)| *index == track)
+        .map(|(_, stream)| *stream)
+        .ok_or("the sought track is no FFmpeg stream")?;
+    let first = packets_of(&ours.streams, stream)
+        .first()
+        .ok_or("the sought stream delivers no packet")?;
+    let pts = first.native[PTS].ok_or("the sought stream's first packet has no time")?;
     let (numerator, denominator) = first.time_base;
     if denominator <= 0 || !at_or_before((pts * numerator, denominator), requested) {
         return Err(format!(
-            "the sought track's first packet starts at {pts} x {numerator}/{denominator} s, after the requested {}/{} s",
+            "the sought stream's first packet starts at {pts} x {numerator}/{denominator} s, after the requested {}/{} s",
             requested.0, requested.1
         ));
     }
@@ -2103,6 +2117,7 @@ mod tests {
             .collect();
         Candidate {
             tracks: vec![0],
+            stream_of_track: vec![(0, 0)],
             streams: vec![(0, packets)],
             error: None,
             receipt: None,
@@ -2423,13 +2438,26 @@ mod tests {
         assert!(landed("[2,1]", 48_000).is_err());
         assert!(landed("[1,1]", 72_001).is_err());
         assert!(landed("[1,0]", 48_000).is_err());
-        let mut other = reading(
-            vec![[Some(9), Some(0), Some(0), None, None, None, None]],
-            None,
-        );
-        other.streams[0].1[0].track = 1;
-        other.receipt = Some(json::parse(r#"{"requested":[3,2],"landing":[1,1]}"#).unwrap());
-        assert!(landing_check(&other, &seek).is_err());
+        // A chain: the seek to track 0 delivers track 1, the same stream in the second
+        // link, timed from the start of the file.
+        let chained = |first: i128| {
+            let mut ours = reading(
+                vec![[Some(9), Some(0), Some(first), None, None, None, None]],
+                None,
+            );
+            ours.stream_of_track = vec![(0, 0), (1, 0)];
+            ours.receipt = Some(json::parse(r#"{"requested":[3,2],"landing":[1,1]}"#).unwrap());
+            ours
+        };
+        assert!(landing_check(&chained(48_000), &seek).is_ok());
+        assert!(landing_check(&chained(72_001), &seek).is_err());
+        // A track of no compared stream, and a stream that delivers nothing.
+        let mut unmapped = chained(48_000);
+        unmapped.stream_of_track = vec![(1, 0)];
+        assert!(landing_check(&unmapped, &seek).is_err());
+        let mut silent = chained(48_000);
+        silent.streams.clear();
+        assert!(landing_check(&silent, &seek).is_err());
     }
 
     #[test]
