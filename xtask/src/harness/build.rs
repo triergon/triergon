@@ -294,9 +294,17 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 12] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
     Candidate {
         name: "playback-worker",
+        package: "playback-worker",
+        example: None,
+        features: &[],
+    },
+    // A second binary of the playback-worker package with the Matroska runners
+    // alone, the container scope of its reference build.
+    Candidate {
+        name: "playback-matroska-worker",
         package: "playback-worker",
         example: None,
         features: &[],
