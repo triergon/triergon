@@ -898,22 +898,17 @@ impl Context {
                 filter_ready(f, &mut self.st, &sps, &pps, &cur.layout, band, saved, true);
             }
         }
-        // Collocated motion storage (16x16 granularity).
-        let w = sps.width as usize;
-        let h = sps.height as usize;
-        let w16 = w.div_ceil(16);
-        let h16 = h.div_ceil(16);
-        let data = &mut cur.col.data;
+        // Collocated motion storage (16x16 granularity): the motion of each block's
+        // top-left 4x4 unit, with the order counts of the slice of the block's CTB.
         let st = &self.st;
-        let (log2_ctb, pic_w_ctb) = (sps.log2_ctb, sps.pic_w_ctb as usize);
-        for y in 0..h16 {
-            for x in 0..w16 {
-                let (lx, ly) = (x * 16, y * 16);
-                let m = st.motion[(ly >> 2) * st.w4 + (lx >> 2)];
-                if !m.is_inter() {
-                    continue;
-                }
-                let ctb = (ly >> log2_ctb) * pic_w_ctb + (lx >> log2_ctb);
+        // 1, 2 or 4 blocks to a CTB side (log2_ctb is 4 to 6).
+        let ctb_blocks = 1 << (sps.log2_ctb - 4);
+        let w16 = cur.col.w16;
+        for (y, row) in cur.col.data.chunks_exact_mut(w16).enumerate() {
+            let motion = &st.motion[y * 4 * st.w4..];
+            let ctb_row = (y >> (sps.log2_ctb - 4)) * sps.pic_w_ctb as usize;
+            for (cx, blocks) in row.chunks_mut(ctb_blocks).enumerate() {
+                let ctb = ctb_row + cx;
                 // A CTB no slice of this picture decoded holds an earlier picture's motion.
                 if st.ctb_slice_addr[ctb] == u32::MAX {
                     continue;
@@ -921,21 +916,27 @@ impl Context {
                 let Some(si) = st.slices.get(st.ctb_slice_idx[ctb] as usize) else {
                     continue;
                 };
-                let mut c = ColMv {
-                    mv: m.mv,
-                    ref_poc: [0; 2],
-                    flags: 0,
-                };
-                for l in 0..2 {
-                    if m.ref_idx[l] >= 0 {
-                        c.flags |= 1 << l;
-                        c.ref_poc[l] = si.ref_poc[l][m.ref_idx[l] as usize];
-                        if si.ref_lt[l][m.ref_idx[l] as usize] {
-                            c.flags |= 4 << l;
+                for (x, out) in (cx * ctb_blocks..).zip(blocks) {
+                    let m = motion[x * 4];
+                    if !m.is_inter() {
+                        continue;
+                    }
+                    let mut c = ColMv {
+                        mv: m.mv,
+                        ref_poc: [0; 2],
+                        flags: 0,
+                    };
+                    for l in 0..2 {
+                        if m.ref_idx[l] >= 0 {
+                            c.flags |= 1 << l;
+                            c.ref_poc[l] = si.ref_poc[l][m.ref_idx[l] as usize];
+                            if si.ref_lt[l][m.ref_idx[l] as usize] {
+                                c.flags |= 4 << l;
+                            }
                         }
                     }
+                    *out = c;
                 }
-                data[y * w16 + x] = c;
             }
         }
         let col = Arc::new(cur.col);
