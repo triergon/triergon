@@ -102,6 +102,28 @@ another 2.5%. `panic = "abort"` saves a further 2 to 3%; it is safe unless the p
 wraps calls into these crates in `catch_unwind`. See
 [measuring performance](docs/quality.md#measuring-performance).
 
+On GNU/Linux the published memory also assumes the program's functions linked in the
+playback worker's trained order, as the measurement workers are: linked by the Rust
+toolchain's own `lld`, with a symbol ordering file that puts the functions a training
+corpus runs first, in the order it first runs them, and the rest grouped by crate,
+module and type. In your project, link once; in a checkout of this repository, write
+the ordering file for that binary from the trained order committed for the target; then
+link again in your project with it. The ordering file of the second link is the same.
+With `TRIERGON` the checkout and `TARGET` `aarch64-unknown-linux-gnu` or
+`thumbv7neon-unknown-linux-gnueabihf`, from your project's directory (a cross build puts
+the binary under `target/$TARGET/release` instead):
+
+```sh
+LLD="-C link-arg=-B$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin/gcc-ld -C link-arg=-fuse-ld=lld"
+cargo rustc --release --bin PLAYER -- $LLD
+(cd "$TRIERGON" && cargo xtask link-order "$OLDPWD/target/release/PLAYER" "$OLDPWD/order.txt" \
+    --trained "harness/link-order/$TARGET/playback-worker.txt")
+cargo rustc --release --bin PLAYER -- $LLD -C link-arg=-Wl,--symbol-ordering-file=$PWD/order.txt -C link-arg=-Wl,--no-warn-symbol-ordering
+```
+
+[Measuring performance](docs/quality.md#measuring-performance) describes the trained
+orders and how they are recorded.
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract

@@ -14,6 +14,7 @@ mod ebml;
 mod evidence;
 mod fate;
 mod fetch;
+mod ffprobe;
 mod fonts;
 mod framing_bench;
 mod fuzz;
@@ -116,6 +117,11 @@ commands:
                  gate build is refused unless it is for paired comparisons only; a profile
                  reference whose profile is not prepared is skipped and printed, and with
                  --all-references it fails the build
+  link-order     BINARY [OUT] [--trained FILE]   the symbol ordering file that lays a
+                 program's functions out in a trained order, then module order, as the
+                 workers are linked (docs/quality.md); corpus OUT, separate, train and
+                 check generate the training corpus, check it is apart from the gate,
+                 record the workers' trained orders and check the committed ones
   memory-admission CANDIDATE REFERENCE
                  check the native Linux memory observer (AArch64 or 32-bit ARMv7)
                  for two built workers and print the certificate
@@ -188,6 +194,7 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
+        Some("link-order") => link_order(&root, &args[1..]),
         Some("same-code") => match &args[1..] {
             [candidate, reference] => {
                 return passing(harness::screen::same_code(
@@ -1170,6 +1177,74 @@ fn smoke_campaigns<'a>(
     Ok(())
 }
 
+const LINK_ORDER_USAGE: &str = "usage: cargo xtask link-order BINARY [OUT] [--trained FILE]
+       cargo xtask link-order corpus OUT
+       cargo xtask link-order separate [--corpus DIR]
+       cargo xtask link-order train [--corpus DIR] [--only WORKER]
+       cargo xtask link-order check";
+
+fn link_order(root: &Path, args: &[String]) -> Task {
+    let option = |name: &str| -> Result<Option<&Path>, String> {
+        match args.iter().position(|argument| argument == name) {
+            Some(at) => args
+                .get(at + 1)
+                .map(|value| Some(Path::new(value.as_str())))
+                .ok_or_else(|| format!("{name} needs a value\n{LINK_ORDER_USAGE}")),
+            None => Ok(None),
+        }
+    };
+    match args.first().map(String::as_str) {
+        Some("corpus") => match args {
+            [_, out] => harness::link_corpus::corpus(Path::new(out)),
+            _ => Err(LINK_ORDER_USAGE.into()),
+        },
+        Some("separate") => harness::link_training::separate(root, option("--corpus")?),
+        Some("train") => harness::link_training::train(
+            root,
+            option("--corpus")?,
+            match args.iter().position(|argument| argument == "--only") {
+                Some(at) => Some(
+                    args.get(at + 1)
+                        .map(String::as_str)
+                        .ok_or_else(|| format!("--only needs a value\n{LINK_ORDER_USAGE}"))?,
+                ),
+                None => None,
+            },
+        ),
+        Some("check") => harness::link_training::check(root),
+        Some(_) => {
+            let trained = match option("--trained")? {
+                Some(path) => {
+                    let text = std::fs::read_to_string(path)
+                        .map_err(|error| format!("{}: {error}", path.display()))?;
+                    harness::link_order::parse_trained(&text)
+                        .map_err(|error| format!("{}: {error}", path.display()))?
+                }
+                None => Vec::new(),
+            };
+            let positional: Vec<&String> = args
+                .iter()
+                .enumerate()
+                .filter(|(at, _)| {
+                    args[..*at].last().map(String::as_str) != Some("--trained")
+                        && args[*at] != "--trained"
+                })
+                .map(|(_, argument)| argument)
+                .collect();
+            match positional[..] {
+                [binary] => harness::link_order::symbol_order(Path::new(binary), &trained)
+                    .map(|order| print!("{}", order.text)),
+                [binary, out] => harness::link_order::symbol_order(Path::new(binary), &trained)
+                    .and_then(|order| {
+                        std::fs::write(out, order.text).map_err(|error| format!("{out}: {error}"))
+                    }),
+                _ => Err(LINK_ORDER_USAGE.into()),
+            }
+        }
+        None => Err(LINK_ORDER_USAGE.into()),
+    }
+}
+
 fn check(root: &Path) -> Task {
     cargo(root, None, &["fmt", "--all", "--check"])?;
     cargo_for_workers(root, None, &["test", "--workspace", "--locked"])?;
@@ -1268,6 +1343,8 @@ fn check(root: &Path) -> Task {
     check_design(root)?;
     check_links(root)?;
     check_revisions(root)?;
+    println!("$ cargo xtask link-order check");
+    harness::link_training::check(root)?;
     let mut core_time = Command::new("python3");
     core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
     let target = harness::gate_build::worker_target()?;

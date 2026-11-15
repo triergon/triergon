@@ -138,12 +138,32 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
         ("build_environment", Value::Object(Vec::new())),
         ("cargo_configuration", Value::Array(Vec::new())),
         ("link_policy", Value::str(gate_build::LINK_POLICY)),
+        ("candidate_link_order", link_order_record("media-worker")),
         (
             "instrumentation",
             v(r#"{"probe_sha256": "probe-hash", "observer_sha256": "observer-hash"}"#),
         ),
     ]);
     (contract, vec![row], identity)
+}
+
+/// The link-order record a gate build of `worker` gives on this host: its committed
+/// trained order, wholly held, where the policy orders the link and the training
+/// manifest trains the worker for this host's target; none elsewhere.
+fn link_order_record(worker: &str) -> Value {
+    let target = gate_build::worker_target().unwrap();
+    if !gate_build::orders_links(target) {
+        return Value::Null;
+    }
+    match super::link_training::trained_order(root(), target, worker).unwrap() {
+        Some(trained) => Value::object([
+            ("trained_sha256", Value::str(trained.sha256)),
+            ("trained", Value::int(trained.names.len() as i128)),
+            ("held", Value::int(trained.names.len() as i128)),
+            ("ordering_sha256", Value::str("0".repeat(64))),
+        ]),
+        None => Value::Null,
+    }
 }
 
 fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
