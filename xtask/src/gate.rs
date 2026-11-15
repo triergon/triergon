@@ -575,7 +575,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 &format!("{out}/parity/isobmff-reader.jsonl"),
             ]),
         )],
-        preflight: owned(&["--reference", "ffmpeg-formats-native"]),
+        preflight: owned(&["--isobmff-reader", "--reference", "ffmpeg-formats-native"]),
     });
 
     let target_args = |mut args: Vec<String>| {

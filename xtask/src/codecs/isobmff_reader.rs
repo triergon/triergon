@@ -58,6 +58,32 @@ pub struct Case {
     pub seek: Option<(u64, i64)>,
 }
 
+/// The corpus inputs, once each, with their pinned SHA-256.
+pub fn inputs(root: &Path) -> Result<Vec<(PathBuf, String)>, String> {
+    let mut inputs: Vec<(PathBuf, String)> = corpus(root)?
+        .into_iter()
+        .map(|case| (root.join(&case.path), case.sha256))
+        .collect();
+    inputs.sort();
+    inputs.dedup();
+    Ok(inputs)
+}
+
+/// Check that every corpus input is present with its pinned SHA-256.
+pub fn verify_inputs(root: &Path) -> Result<String, String> {
+    let inputs = inputs(root)?;
+    for (path, pin) in &inputs {
+        let actual = file_sha(path)?;
+        if actual != *pin {
+            return Err(format!(
+                "{}: SHA-256 {actual}, pinned {pin}",
+                path.display()
+            ));
+        }
+    }
+    Ok(format!("{} inputs", inputs.len()))
+}
+
 /// The cases of `corpus.json`, checked against the counts the contract states.
 pub fn corpus(root: &Path) -> Result<Vec<Case>, String> {
     let manifest = crate::checks::read_json(&root.join(FEATURE).join("corpus.json"))?;

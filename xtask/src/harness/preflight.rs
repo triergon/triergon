@@ -21,7 +21,8 @@ use crate::json::Value;
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
-       [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--codecs WORKLOADS]...
+       [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--isobmff-reader]
+       [--codecs WORKLOADS]...
        [--readers LANE,...]
        [--external-vector] [--capture CASES] [--reference NAME]...
        [--review FILE | --standard-memory] [--kernel]
@@ -31,7 +32,8 @@ references are current and the gate build; that each --feature's cases name know
 references and have every input with its pinned hash (in --corpus, else the
 manifest's recorded directory, else .research/fixtures; --manifest replaces the
 contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with
---isobmff-seek the ISO BMFF seek suite's, with --codecs each workload list's inputs,
+--isobmff-seek the ISO BMFF seek suite's, with --isobmff-reader the ISO BMFF reader
+comparison's, with --codecs each workload list's inputs,
 with --readers the reader comparison's inputs of those lanes
 (harness/codecs/reader-manifest.json; reader-ogg-seek is reader-ogg's seek cases,
 harness/codecs/reader-seeks.json), with --external-vector the mandatory external
@@ -56,6 +58,7 @@ struct Options {
     manifests: BTreeMap<String, PathBuf>,
     isobmff: bool,
     isobmff_seek: bool,
+    isobmff_reader: bool,
     codecs: Vec<PathBuf>,
     /// Reader comparison lanes.
     readers: Vec<String>,
@@ -93,6 +96,7 @@ impl Options {
                 "--manifest" => pair(&mut options.manifests, value()?)?,
                 "--isobmff" => options.isobmff = true,
                 "--isobmff-seek" => options.isobmff_seek = true,
+                "--isobmff-reader" => options.isobmff_reader = true,
                 "--codecs" => options.codecs.push(root.join(value()?)),
                 "--readers" => options
                     .readers
@@ -177,6 +181,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         checks.check(
             "isobmff seek inputs",
             crate::isobmff_seek::verify_inputs(root),
+        );
+    }
+    if options.isobmff_reader {
+        checks.check(
+            "isobmff reader inputs",
+            crate::codecs::isobmff_reader::verify_inputs(root),
         );
     }
     for workloads in &options.codecs {
@@ -563,6 +573,11 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     if options.isobmff_seek {
         for (path, pin) in crate::isobmff_seek::inputs(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    if options.isobmff_reader {
+        for (path, pin) in crate::codecs::isobmff_reader::inputs(root)? {
             add(path, Some(&pin));
         }
     }
