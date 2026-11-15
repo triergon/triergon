@@ -378,6 +378,32 @@ const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
     },
 ];
 
+/// How `cargo` builds a measurement worker: its name, package, example (none for a
+/// binary of the same name) and features.
+pub struct WorkerBuild {
+    pub name: &'static str,
+    pub package: &'static str,
+    pub example: Option<&'static str>,
+    pub features: &'static [&'static str],
+}
+
+/// Every measurement worker, `media-worker` first.
+pub fn workers() -> Vec<WorkerBuild> {
+    std::iter::once(WorkerBuild {
+        name: "media-worker",
+        package: "media-worker",
+        example: None,
+        features: &[],
+    })
+    .chain(ADDITIONAL_CANDIDATES.iter().map(|spec| WorkerBuild {
+        name: spec.name,
+        package: spec.package,
+        example: spec.example,
+        features: spec.features,
+    }))
+    .collect()
+}
+
 pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let spec = ADDITIONAL_CANDIDATES
         .iter()
@@ -462,11 +488,12 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
 
 /// Builds the worker `name` with `command`, a `cargo rustc` command line that ends
 /// with its link arguments, linked by the pinned toolchain's `lld`, then builds it
-/// again with its functions in module order ([`super::link_order`]); `command` then
-/// holds the second build. `binary` is where the build puts the worker. The order is
-/// written to `target/harness/link-order/NAME.txt`, and the second build's own order
-/// must be the same file. Returns its SHA-256.
-fn build_in_module_order(
+/// again with its functions in link order ([`super::link_order`]): its committed
+/// trained order first, the rest in module order; `command` then holds the second
+/// build. `binary` is where the build puts the worker. The ordering file is written
+/// to `target/harness/link-order/NAME.txt`, and the second build's own ordering file
+/// must be the same. Returns its SHA-256.
+fn build_in_link_order(
     root: &Path,
     command: &mut Vec<String>,
     binary: &Path,
@@ -488,21 +515,22 @@ fn build_in_module_order(
     let first: Vec<String> = command
         .iter()
         .cloned()
-        .chain(gate_build::module_order_link_arguments(root, None)?)
+        .chain(gate_build::ordered_link_arguments(root, None)?)
         .collect();
     cargo(&first)?;
-    let order = super::link_order::symbol_order(binary)?;
+    let trained = super::link_order::committed_trained(root, gate_build::worker_target()?, name)?;
+    let order = super::link_order::symbol_order(binary, &trained)?;
     let directory = root.join("target/harness/link-order");
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     let path = directory.join(format!("{name}.txt"));
     fs::write(&path, &order).map_err(|e| format!("{}: {e}", path.display()))?;
-    let ordered = gate_build::module_order_link_arguments(root, Some(&path))?;
+    let ordered = gate_build::ordered_link_arguments(root, Some(&path))?;
     if !ordered.is_empty() {
         command.extend(ordered);
         cargo(command)?;
-        if super::link_order::symbol_order(binary)? != order {
+        if super::link_order::symbol_order(binary, &trained)? != order {
             return Err(format!(
-                "{name}: the module-ordered link holds other functions than the first link"
+                "{name}: the ordered link holds other functions than the first link"
             ));
         }
     }
@@ -544,7 +572,7 @@ fn additional_candidates(
             Some(example) => release.join("examples").join(example),
             None => release.join(spec.name),
         };
-        let order = build_in_module_order(root, &mut command, &binary, spec.name)?;
+        let order = build_in_link_order(root, &mut command, &binary, spec.name)?;
         if spec.example.is_some() {
             fs::copy(&binary, release.join(spec.name))
                 .map_err(|error| format!("{}: {error}", spec.name))?;
@@ -908,7 +936,7 @@ fn build_selected(
     candidate_command.extend(gate_build::target_args()?);
     candidate_command.extend(["--bin".into(), "media-worker".into(), "--".into()]);
     candidate_command.extend(gate_build::worker_link_arguments()?);
-    let candidate_order = build_in_module_order(
+    let candidate_order = build_in_link_order(
         root,
         &mut candidate_command,
         &root.join(gate_build::release_dir()?).join("media-worker"),

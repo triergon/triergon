@@ -524,7 +524,7 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
-- Workers and references follow one link policy, `static-toolchain-runtime-module-order-v1`:
+- Workers and references follow one link policy, `static-toolchain-runtime-trained-order-v1`:
   on GNU/Linux each side links its toolchain's runtime support libraries from their static
   archives, libgcc's unwinder (`libgcc_eh`) for the Rust workers and libgcc, libstdc++
   and libatomic for the C and C++ references. The C library, libc with libm, and

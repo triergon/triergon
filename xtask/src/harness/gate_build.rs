@@ -130,9 +130,9 @@ pub fn release_dir() -> Result<String, String> {
 /// libatomic. A process then maps only the toolchain support code its own libraries use.
 /// The C library, libc with libm, and third-party libraries stay shared on both sides.
 /// The Rust workers there are linked by the pinned toolchain's `lld` with their
-/// functions in module order ([`module_order_link_arguments`]); the references link
-/// as before. Elsewhere both sides link as their toolchains do.
-pub const LINK_POLICY: &str = "static-toolchain-runtime-module-order-v1";
+/// functions in their trained order, then module order ([`ordered_link_arguments`]);
+/// the references link as before. Elsewhere both sides link as their toolchains do.
+pub const LINK_POLICY: &str = "static-toolchain-runtime-trained-order-v1";
 
 /// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
 fn static_runtime(target: &str) -> bool {
@@ -160,10 +160,7 @@ fn worker_link_flags(target: &str) -> Vec<String> {
 /// `gcc-ld` directory it ships for `-fuse-ld=lld`; with `order`, a symbol ordering
 /// file ([`super::link_order::symbol_order`]), its functions are laid out in that
 /// order. None where the policy leaves linking to the toolchain.
-pub fn module_order_link_arguments(
-    root: &Path,
-    order: Option<&Path>,
-) -> Result<Vec<String>, String> {
+pub fn ordered_link_arguments(root: &Path, order: Option<&Path>) -> Result<Vec<String>, String> {
     let target = worker_target()?;
     if !static_runtime(target) {
         return Ok(Vec::new());
@@ -187,10 +184,10 @@ pub fn module_order_link_arguments(
             linker.join("ld.lld").display()
         ));
     }
-    Ok(module_order_flags(&linker, order))
+    Ok(ordered_link_flags(&linker, order))
 }
 
-fn module_order_flags(linker: &Path, order: Option<&Path>) -> Vec<String> {
+fn ordered_link_flags(linker: &Path, order: Option<&Path>) -> Vec<String> {
     let mut arguments = vec![
         format!("link-arg=-B{}", linker.display()),
         "link-arg=-fuse-ld=lld".to_owned(),
@@ -678,15 +675,15 @@ mod tests {
         let earlier = record("link_policy", Some(Value::str("toolchain-default")));
         assert_eq!(
             refusals(&earlier, PIN),
-            ["link policy toolchain-default, not static-toolchain-runtime-module-order-v1"]
+            ["link policy toolchain-default, not static-toolchain-runtime-trained-order-v1"]
         );
     }
 
     #[test]
-    fn workers_link_in_module_order_with_the_toolchain_lld() {
+    fn workers_link_in_trained_order_with_the_toolchain_lld() {
         let linker = Path::new("/sysroot/lib/rustlib/host/bin/gcc-ld");
         assert_eq!(
-            module_order_flags(linker, None),
+            ordered_link_flags(linker, None),
             [
                 "-C",
                 "link-arg=-B/sysroot/lib/rustlib/host/bin/gcc-ld",
@@ -695,7 +692,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            module_order_flags(linker, Some(Path::new("/t/order.txt")))[4..],
+            ordered_link_flags(linker, Some(Path::new("/t/order.txt")))[4..],
             [
                 "-C",
                 "link-arg=-Wl,--symbol-ordering-file=/t/order.txt",

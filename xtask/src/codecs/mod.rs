@@ -2,7 +2,7 @@
 //! comparison, paired timing and memory, and output identities of the codec crates
 //! against the pinned FFmpeg decoders.
 
-mod aac_access_units;
+pub(crate) mod aac_access_units;
 mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
