@@ -623,7 +623,7 @@ impl PrefixFeature {
         Ok((candidate, self.reference_worker(root, &identity)?))
     }
 
-    pub(super) fn reference_worker(
+    pub(crate) fn reference_worker(
         &self,
         root: &Path,
         identity: &Value,

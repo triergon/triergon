@@ -150,7 +150,11 @@
     "avc-profile-extension-2-bytes",
     "avc-profile-extension-3-bytes",
     "avc-profile-extension-4-bytes",
-    "avc-profile-extension-update"
+    "avc-profile-extension-update",
+    "avc-profile-extension-missing-entry",
+    "avc-buffering-period-in-band",
+    "avc-buffering-period-across-flush",
+    "avc-header-only-idr"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu"

@@ -17,7 +17,7 @@ pub const USAGE: &str = "usage: cargo xtask framing [fixtures] [--output DIR]
        [--no-early-stop]
        cargo xtask framing manifest --record [--replace]
 
-All 131 cases are required. `fixtures` writes their hash-checked bytes.
+All 135 cases are required. `fixtures` writes their hash-checked bytes.
 The default operation uses the shared report, timing, memory and build-identity
 checks. A baseline comparison cannot produce an acceptance result.";
 
@@ -69,12 +69,12 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
 
 pub(crate) fn generate(output: &Path) -> Result<(), String> {
     let original = fixtures::load()?;
-    let extensions = fixtures::load_extensions()?;
+    let additional = fixtures::load_additional()?;
     fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
     for (id, bytes) in original
         .into_iter()
         .map(|case| (case.id, case.bytes))
-        .chain(extensions.into_iter().map(|case| (case.id, case.bytes)))
+        .chain(additional.into_iter().map(|case| (case.id, case.bytes)))
     {
         let path = output.join(format!("{id}.bsf"));
         fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -82,7 +82,7 @@ pub(crate) fn generate(output: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn record_extensions(root: &Path, replace: bool) -> Result<(), String> {
+fn record_additional(root: &Path, replace: bool) -> Result<(), String> {
     fixtures::load()?;
     let options = options(root, &[])?;
     let feature = PrefixFeature::load(
@@ -91,22 +91,23 @@ fn record_extensions(root: &Path, replace: bool) -> Result<(), String> {
         &options.manifest,
         Some(&options.corpus),
     )?;
-    let (_, reference) = feature.workers(root)?;
+    let identity = checks::read_json(&root.join("target/harness/identity.json"))?;
+    let reference = feature.reference_worker(root, &identity)?;
     fs::create_dir_all(&options.corpus).map_err(|e| e.to_string())?;
     let mut cases = feature.cases;
-    let inputs = fixtures::extension_inputs()?;
+    let inputs = fixtures::additional_inputs()?;
     let previous = cases
         .get(fixtures::ORIGINAL_CASE_COUNT..)
         .ok_or("packet framing manifest is missing original cases")?;
     if previous.iter().any(|row| {
         !inputs
             .iter()
-            .any(|(id, _)| row.get("id").and_then(Value::as_str) == Some(id.as_str()))
+            .any(|input| row.get("id").and_then(Value::as_str) == Some(input.id.as_str()))
     }) {
         return Err("packet framing manifest has an unexpected additional case".into());
     }
-    let mut extensions = Vec::with_capacity(inputs.len());
-    for (id, bytes) in inputs {
+    let mut additional = Vec::with_capacity(inputs.len());
+    for fixtures::AdditionalInput { id, bytes, group } in inputs {
         let file = format!("{id}.bsf");
         let path = options.corpus.join(&file);
         fs::write(&path, &bytes).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -138,7 +139,7 @@ fn record_extensions(root: &Path, replace: bool) -> Result<(), String> {
             ("file", Value::str(file)),
             ("sha256", Value::str(sha256::hex(&bytes))),
             ("rights", Value::str("authored-synthetic")),
-            ("group", Value::str("avc-profile-extension")),
+            ("group", Value::str(group)),
             ("required", Value::Bool(true)),
             ("expected", Value::Object(work)),
         ]);
@@ -153,10 +154,10 @@ fn record_extensions(root: &Path, replace: bool) -> Result<(), String> {
                 "{id}: reference pins changed, use --replace to update them"
             ));
         }
-        extensions.push(row);
+        additional.push(row);
     }
     cases.truncate(fixtures::ORIGINAL_CASE_COUNT);
-    cases.extend(extensions);
+    cases.extend(additional);
     let mut manifest = checks::read_json(&options.manifest)?;
     let Value::Object(entries) = &mut manifest else {
         return Err("packet framing manifest must be an object".into());
@@ -183,7 +184,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             [_, record, replace] if record == "--record" && replace == "--replace" => true,
             _ => return Err(USAGE.into()),
         };
-        record_extensions(root, replace)?;
+        record_additional(root, replace)?;
         return Ok(0);
     }
     if args.first().is_some_and(|s| s == "fixtures") {
@@ -210,13 +211,22 @@ mod tests {
     }
 
     #[test]
-    fn reference_frames_every_avc_extension_case() {
-        let cases = fixtures::load_extensions().unwrap();
-        assert_eq!(cases.len(), 6);
+    fn reference_frames_every_additional_avc_case() {
+        let cases = fixtures::load_additional().unwrap();
+        assert_eq!(cases.len(), 10);
         let initial = cases[0].expected;
         assert_eq!(initial.packets, 1);
         assert!(cases[..5].iter().all(|case| case.expected == initial));
         assert_eq!(cases[5].expected.packets, 3);
+        assert_eq!(cases[6].bytes[36], 1);
+        assert_eq!(cases[6].expected, initial);
+        assert_eq!(
+            cases[7..]
+                .iter()
+                .map(|case| (case.expected.packets, case.expected.bytes))
+                .collect::<Vec<_>>(),
+            [(1, 40), (4, 60), (1, 21)]
+        );
     }
 
     #[test]

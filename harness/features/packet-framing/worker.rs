@@ -260,9 +260,9 @@ mod tests {
     }
 
     #[test]
-    fn avc_profile_extensions_match_recorded_reference_folds() {
-        let fixtures = fixtures::load_extensions().unwrap();
-        assert_eq!(fixtures.len(), 6);
+    fn additional_avc_cases_match_recorded_reference_folds() {
+        let fixtures = fixtures::load_additional().unwrap();
+        assert_eq!(fixtures.len(), 10);
         for fixture in fixtures {
             let case = Case::parse(&fixture.bytes).unwrap();
             let actual = execute(&case, 1).unwrap();
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn avc_extension_header_without_entries_matches_the_base_parameter_sets() {
-        let mut fixture = fixtures::load_extensions()
+        let mut fixture = fixtures::load_additional()
             .unwrap()
             .into_iter()
             .find(|case| case.id == "avc-profile-extension-4-bytes")
