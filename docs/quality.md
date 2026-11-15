@@ -539,10 +539,11 @@ may override that count for diagnostic comparisons.
   as their toolchains do.
 - On GNU/Linux the policy also links each Rust worker that commits a trained order with
   its functions in that order, then module order, with the pinned toolchain's own
-  `lld`. The media workers do: `media-worker`, `playback-worker`,
-  `playback-matroska-worker`, `transport-worker`, `codec-worker`, `isobmff-worker` and
-  `framing-worker`. The font, shaping, rasterising, ASS, subtitle and capture workers
-  and the references link with their toolchain's default linker as before. The code
+  `lld`. These media workers do: `media-worker`, `playback-worker`,
+  `playback-matroska-worker`, `transport-worker`, `codec-worker` and `framing-worker`.
+  The ISO BMFF worker, whose operations read only the raw-video and timed-text movies
+  of its comparison, the font, shaping, rasterising, ASS, subtitle and capture
+  workers, and the references link with their toolchain's default linker as before. The code
   one operation runs is a fraction of a worker's, and the kernel faults code in 64 KiB
   windows, so how much of a worker becomes resident depends on how its functions lie
   among those windows.

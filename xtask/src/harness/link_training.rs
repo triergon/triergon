@@ -523,7 +523,8 @@ const CELLS: &str = "cellauto=size=320x176:rate=24:seed=11:rule=110";
 const CHORD_48K: &str = "aevalsrc=0.3*sin(2*PI*523*t)|0.3*sin(2*PI*659*t):s=48000";
 const CHORD_44K: &str = "aevalsrc=0.3*sin(2*PI*392*t)|0.2*sin(2*PI*587*t):s=44100";
 
-/// The video encoders, on one thread so their output does not depend on the host.
+/// The video encoders, on one thread so their output does not depend on the host,
+/// with closed GOPs.
 const AVC: [&str; 12] = [
     "-c:v", "libx264", "-preset", "veryfast", "-g", "25", "-bf", "2", "-pix_fmt", "yuv420p",
     "-threads", "1",
@@ -534,7 +535,7 @@ const HEVC: [&str; 8] = [
     "-preset",
     "ultrafast",
     "-x265-params",
-    "pools=none:frame-threads=1:log-level=error:keyint=30",
+    "pools=none:frame-threads=1:log-level=error:keyint=30:open-gop=0",
     "-pix_fmt",
     "yuv420p",
 ];
@@ -729,6 +730,20 @@ pub fn corpus(out: &Path) -> R<()> {
     )?;
     ffmpeg(
         out,
+        &[(CELLS, "5"), (CHORD_44K, "5")],
+        &with(&[
+            &AVC,
+            &[
+                "-c:a",
+                "aac",
+                "-movflags",
+                "frag_keyframe+empty_moov+default_base_moof",
+            ],
+        ]),
+        "avc-aac-fragmented.mp4",
+    )?;
+    ffmpeg(
+        out,
         &[(MANDELBROT, "4"), (CHORD_48K, "4")],
         &with(&[&AVC, &["-c:a", "libopus"]]),
         "avc-opus.mp4",
@@ -747,9 +762,9 @@ pub fn corpus(out: &Path) -> R<()> {
         &[(LIFE, "4"), (CHORD_48K, "4")],
         &with(&[
             &HEVC,
-            &["-c:a", "ac3", "-f", "mpegts", "-mpegts_start_pid", "768"],
+            &["-c:a", "aac", "-f", "mpegts", "-mpegts_start_pid", "768"],
         ]),
-        "program-hevc-ac3.ts",
+        "program-hevc-aac.ts",
     )?;
     ffmpeg(
         out,
@@ -770,13 +785,13 @@ pub fn corpus(out: &Path) -> R<()> {
                 "eac3",
                 "-f",
                 "mpegts",
+                "-mpegts_flags",
+                "system_b",
                 "-mpegts_service_id",
-                "7",
-                "-mpegts_m2ts_mode",
-                "1",
+                "9",
             ],
         ]),
-        "service-7.m2ts",
+        "service-9-dvb.ts",
     )?;
     ffmpeg(
         out,
