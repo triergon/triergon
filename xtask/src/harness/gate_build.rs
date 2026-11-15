@@ -124,13 +124,15 @@ pub fn release_dir() -> Result<String, String> {
     Ok(format!("target/{}", release_subdir()?))
 }
 
-/// How workers and references link their toolchains' runtime support libraries. On a
-/// GNU/Linux target both sides take them from their static archives: the Rust workers
+/// How workers and references link. On a GNU/Linux target both sides take their
+/// toolchains' runtime support libraries from their static archives: the Rust workers
 /// libgcc's unwinder (`libgcc_eh`), the C and C++ references libgcc, libstdc++ and
 /// libatomic. A process then maps only the toolchain support code its own libraries use.
 /// The C library, libc with libm, and third-party libraries stay shared on both sides.
-/// Elsewhere both sides link as their toolchains do.
-pub const LINK_POLICY: &str = "static-toolchain-runtime-v1";
+/// The Rust workers there are linked by the pinned toolchain's `lld` with their
+/// functions in module order ([`module_order_link_arguments`]); the references link
+/// as before. Elsewhere both sides link as their toolchains do.
+pub const LINK_POLICY: &str = "static-toolchain-runtime-module-order-v1";
 
 /// Whether [`LINK_POLICY`] changes how a worker or reference for `target` links.
 fn static_runtime(target: &str) -> bool {
@@ -151,6 +153,61 @@ fn worker_link_flags(target: &str) -> Vec<String> {
     } else {
         Vec::new()
     }
+}
+
+/// The arguments `cargo rustc` adds to [`worker_link_arguments`], after `--`, to link a
+/// worker under [`LINK_POLICY`] with the pinned toolchain's own `lld`, through the
+/// `gcc-ld` directory it ships for `-fuse-ld=lld`; with `order`, a symbol ordering
+/// file ([`super::link_order::symbol_order`]), its functions are laid out in that
+/// order. None where the policy leaves linking to the toolchain.
+pub fn module_order_link_arguments(
+    root: &Path,
+    order: Option<&Path>,
+) -> Result<Vec<String>, String> {
+    let target = worker_target()?;
+    if !static_runtime(target) {
+        return Ok(Vec::new());
+    }
+    let output = Command::new("rustc")
+        .args(["--print", "sysroot"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("rustc: {error}"))?;
+    if !output.status.success() {
+        return Err(format!("rustc --print sysroot: {}", output.status));
+    }
+    let sysroot = String::from_utf8(output.stdout).map_err(|error| format!("rustc: {error}"))?;
+    let linker = Path::new(sysroot.trim())
+        .join("lib/rustlib")
+        .join(host()?)
+        .join("bin/gcc-ld");
+    if !linker.join("ld.lld").is_file() {
+        return Err(format!(
+            "the pinned toolchain has no {}",
+            linker.join("ld.lld").display()
+        ));
+    }
+    Ok(module_order_flags(&linker, order))
+}
+
+fn module_order_flags(linker: &Path, order: Option<&Path>) -> Vec<String> {
+    let mut arguments = vec![
+        format!("link-arg=-B{}", linker.display()),
+        "link-arg=-fuse-ld=lld".to_owned(),
+    ];
+    if let Some(order) = order {
+        arguments.push(format!(
+            "link-arg=-Wl,--symbol-ordering-file={}",
+            order.display()
+        ));
+        // A local symbol listed once may name several functions; lld would report
+        // the duplicates it orders by the first.
+        arguments.push("link-arg=-Wl,--no-warn-symbol-ordering".to_owned());
+    }
+    arguments
+        .into_iter()
+        .flat_map(|argument| ["-C".to_owned(), argument])
+        .collect()
 }
 
 /// A reference's link flags under [`LINK_POLICY`]: libstdc++ and libatomic from their
@@ -621,7 +678,30 @@ mod tests {
         let earlier = record("link_policy", Some(Value::str("toolchain-default")));
         assert_eq!(
             refusals(&earlier, PIN),
-            ["link policy toolchain-default, not static-toolchain-runtime-v1"]
+            ["link policy toolchain-default, not static-toolchain-runtime-module-order-v1"]
+        );
+    }
+
+    #[test]
+    fn workers_link_in_module_order_with_the_toolchain_lld() {
+        let linker = Path::new("/sysroot/lib/rustlib/host/bin/gcc-ld");
+        assert_eq!(
+            module_order_flags(linker, None),
+            [
+                "-C",
+                "link-arg=-B/sysroot/lib/rustlib/host/bin/gcc-ld",
+                "-C",
+                "link-arg=-fuse-ld=lld"
+            ]
+        );
+        assert_eq!(
+            module_order_flags(linker, Some(Path::new("/t/order.txt")))[4..],
+            [
+                "-C",
+                "link-arg=-Wl,--symbol-ordering-file=/t/order.txt",
+                "-C",
+                "link-arg=-Wl,--no-warn-symbol-ordering"
+            ]
         );
     }
 

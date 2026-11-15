@@ -459,10 +459,59 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
     }
 }
 
+/// Builds the worker `name` with `command`, a `cargo rustc` command line that ends
+/// with its link arguments, linked by the pinned toolchain's `lld`, then builds it
+/// again with its functions in module order ([`super::link_order`]); `command` then
+/// holds the second build. `binary` is where the build puts the worker. The order is
+/// written to `target/harness/link-order/NAME.txt`, and the second build's own order
+/// must be the same file. Returns its SHA-256.
+fn build_in_module_order(
+    root: &Path,
+    command: &mut Vec<String>,
+    binary: &Path,
+    name: &str,
+) -> R<String> {
+    let cargo = |command: &[String]| -> R<()> {
+        let status = Command::new("cargo")
+            .args(&command[1..])
+            .env("CARGO_INCREMENTAL", "0")
+            .current_dir(root)
+            .status()
+            .map_err(|e| e.to_string())?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("{name} build failed: {status}"))
+        }
+    };
+    let first: Vec<String> = command
+        .iter()
+        .cloned()
+        .chain(gate_build::module_order_link_arguments(root, None)?)
+        .collect();
+    cargo(&first)?;
+    let order = super::link_order::symbol_order(binary)?;
+    let directory = root.join("target/harness/link-order");
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let path = directory.join(format!("{name}.txt"));
+    fs::write(&path, &order).map_err(|e| format!("{}: {e}", path.display()))?;
+    let ordered = gate_build::module_order_link_arguments(root, Some(&path))?;
+    if !ordered.is_empty() {
+        command.extend(ordered);
+        cargo(command)?;
+        if super::link_order::symbol_order(binary)? != order {
+            return Err(format!(
+                "{name}: the module-ordered link holds other functions than the first link"
+            ));
+        }
+    }
+    Ok(crate::sha256::hex(order.as_bytes()))
+}
+
 fn additional_candidates(
     root: &Path,
     selected: &[&Candidate],
-) -> R<Vec<(&'static str, Vec<String>)>> {
+) -> R<Vec<(&'static str, Vec<String>, String)>> {
     let mut built = Vec::new();
     for spec in selected {
         let mut command: Vec<String> = [
@@ -489,32 +538,24 @@ fn additional_candidates(
         }
         command.push("--".into());
         command.extend(gate_build::worker_link_arguments()?);
-        let status = Command::new("cargo")
-            .args(&command[1..])
-            .env("CARGO_INCREMENTAL", "0")
-            .current_dir(root)
-            .status()
-            .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err(format!("{} build failed: {status}", spec.name));
+        let release = root.join(gate_build::release_dir()?);
+        let binary = match spec.example {
+            Some(example) => release.join("examples").join(example),
+            None => release.join(spec.name),
+        };
+        let order = build_in_module_order(root, &mut command, &binary, spec.name)?;
+        if spec.example.is_some() {
+            fs::copy(&binary, release.join(spec.name))
+                .map_err(|error| format!("{}: {error}", spec.name))?;
         }
-        if let Some(example) = spec.example {
-            fs::copy(
-                root.join(gate_build::release_dir()?)
-                    .join("examples")
-                    .join(example),
-                root.join(gate_build::release_dir()?).join(spec.name),
-            )
-            .map_err(|error| format!("{}: {error}", spec.name))?;
-        }
-        built.push((spec.name, command));
+        built.push((spec.name, command, order));
     }
     Ok(built)
 }
 
-fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
+fn candidate_records(root: &Path, built: &[(&str, Vec<String>, String)]) -> R<Value> {
     let mut candidates = Vec::new();
-    for (name, command) in built {
+    for (name, command, order) in built {
         let path = format!("{}/{name}", gate_build::release_dir()?);
         candidates.push((
             *name,
@@ -522,6 +563,7 @@ fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
                 ("path", Value::str(&path)),
                 ("sha256", Value::str(sha(&root.join(&path))?)),
                 ("command", strings(command)),
+                ("link_order_sha256", Value::str(order)),
                 ("selected_graph", candidate_graph(root, name)?),
             ]),
         ));
@@ -865,15 +907,12 @@ fn build_selected(
     candidate_command.extend(gate_build::target_args()?);
     candidate_command.extend(["--bin".into(), "media-worker".into(), "--".into()]);
     candidate_command.extend(gate_build::worker_link_arguments()?);
-    let status = Command::new("cargo")
-        .args(&candidate_command[1..])
-        .env("CARGO_INCREMENTAL", "0")
-        .current_dir(root)
-        .status()
-        .map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err(format!("candidate build failed: {status}"));
-    }
+    let candidate_order = build_in_module_order(
+        root,
+        &mut candidate_command,
+        &root.join(gate_build::release_dir()?).join("media-worker"),
+        "media-worker",
+    )?;
     let additional = additional_candidates(root, &selected)?;
     let out = root.join("target/harness");
     fs::create_dir_all(&out).map_err(|e| e.to_string())?;
@@ -1243,6 +1282,7 @@ fn build_selected(
             }),
         ),
         ("candidate_command", strings(&candidate_command)),
+        ("candidate_link_order_sha256", Value::str(candidate_order)),
         ("selected_graph", graph.clone()),
         ("additional_candidates", candidates),
         (

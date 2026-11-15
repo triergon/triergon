@@ -113,6 +113,8 @@ commands:
                  gate build is refused unless it is for paired comparisons only; a profile
                  reference whose profile is not prepared is skipped and printed, and with
                  --all-references it fails the build
+  link-order     BINARY [OUT]   the symbol ordering file that lays a program's functions
+                 out in module order, as the workers are linked (docs/quality.md)
   memory-admission CANDIDATE REFERENCE
                  check the native Linux memory observer (AArch64 or 32-bit ARMv7)
                  for two built workers and print the certificate
@@ -185,6 +187,17 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
+        Some("link-order") => match &args[1..] {
+            [binary] => {
+                harness::link_order::symbol_order(Path::new(binary)).map(|order| print!("{order}"))
+            }
+            [binary, out] => {
+                harness::link_order::symbol_order(Path::new(binary)).and_then(|order| {
+                    std::fs::write(out, order).map_err(|error| format!("{out}: {error}"))
+                })
+            }
+            _ => Err("usage: cargo xtask link-order BINARY [OUT]".into()),
+        },
         Some("same-code") => match &args[1..] {
             [candidate, reference] => {
                 return passing(harness::screen::same_code(
