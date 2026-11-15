@@ -234,7 +234,8 @@ The 648 cases are 522 distinct inputs read through (the 251 authored open-index
 inputs, the committed ISO BMFF, playback and AAC fixtures, the MP4 range fixtures with
 FATE's `mp4-init-nonkeyframe.mp4`, and the subtitle corpus's MP4 files) and 126 seeks
 on 42 of them. 333 match exactly, 3 are refused by both, and 312 differ only by
-reviewed FFmpeg behaviour (4 reads by two kinds):
+17 reviewed dispositions: 12 FFmpeg behaviours and 5 kinds of input the reader refuses
+under its documented policy (4 reads by two kinds):
 
 - **Refusals** (131 reads). The reader refuses media outside every `mdat`,
   inconsistent sample tables, truncated files, a zero timescale and times beyond `i64`,
@@ -464,6 +465,14 @@ corpus:
 `--benchmark --memory` times and measures the 472 successful cases and `--part I/N`
 every Nth of them; every case is compared in every run. The worker runs a range plan
 for a seek mode given `--range-plan`.
+
+Gate results (c6g.4xlarge, `00159785`): every case matches on both targets, and every
+open and index input passes runtime and memory. The eight authored movies do not:
+129 of their cases fail runtime (worst upper bound 6.32 on Linux AArch64, 10.70 on
+32-bit ARMv7), because the open walks each track's samples three times (the index
+build, the byte-range validation and the per-sample fill of the packet cursor), and
+`fragmented-1200` fails heap (worst 1.203), because the 64 KiB input window holds all
+of its 33,408 bytes while the open walks its fragments.
 
 Not compared yet: the compatibility seek refuses a global seek across tracks with
 unequal clocks, overlapping or null index clocks and regular table recovery as
