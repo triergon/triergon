@@ -16967,6 +16967,50 @@
    }
   },
   {
+   "name": "packet-framing-62e1ad85-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet-framing parity, timing and kernel-bound memory on the matched adapters",
+   "key": "evidence/packet-framing-62e1ad85-aarch64/cb21eabf713fe7d55546a55ef264698436cbae0202058787890141100c824b8c.tar.zst",
+   "sha256": "cb21eabf713fe7d55546a55ef264698436cbae0202058787890141100c824b8c",
+   "bytes": 20217167,
+   "source_revisions": {
+    "candidate": "62e1ad85011c85141ad58edfec275303a2d63b83"
+   }
+  },
+  {
+   "name": "packet-framing-62e1ad85-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 packet-framing parity, timing and kernel-bound memory on the matched adapters",
+   "key": "evidence/packet-framing-62e1ad85-armv7/b7d37c676319d2cd294639a8f2f51efb5dce9fde9dc948965850952c501bac3b.tar.zst",
+   "sha256": "b7d37c676319d2cd294639a8f2f51efb5dce9fde9dc948965850952c501bac3b",
+   "bytes": 15214033,
+   "source_revisions": {
+    "candidate": "62e1ad85011c85141ad58edfec275303a2d63b83"
+   }
+  },
+  {
+   "name": "packet-framing-7707d776-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 packet-framing comparison before matching both adapters",
+   "key": "evidence/packet-framing-7707d776-aarch64/4ce0fc95b2d8b3ec686a3853137619be86e99a0eb04d736ba3f945b68895ad8c.tar.zst",
+   "sha256": "4ce0fc95b2d8b3ec686a3853137619be86e99a0eb04d736ba3f945b68895ad8c",
+   "bytes": 19167162,
+   "source_revisions": {
+    "candidate": "7707d7768e1c6f1103ac333248857fba00290c94"
+   }
+  },
+  {
+   "name": "packet-framing-7707d776-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 packet-framing comparison before matching both adapters",
+   "key": "evidence/packet-framing-7707d776-armv7/e328d5c702f3fb527d3802aba615b107ca428121f83346c569fea1980369b3e1.tar.zst",
+   "sha256": "e328d5c702f3fb527d3802aba615b107ca428121f83346c569fea1980369b3e1",
+   "bytes": 15406965,
+   "source_revisions": {
+    "candidate": "7707d7768e1c6f1103ac333248857fba00290c94"
+   }
+  },
+  {
    "name": "packet-framing-6ce7109c-aarch64",
    "retention": "retained",
    "reason": "AArch64 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
