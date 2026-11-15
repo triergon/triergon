@@ -44,6 +44,8 @@ pub(super) struct PlainChoice<'a> {
     pub(super) scanned: u64,
 }
 
+// One per poll of a scan.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(super) enum PlainStep<'a> {
     Yield,

@@ -42,8 +42,10 @@ flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 
 `SampleReader::new_with_shared_window` can return a view of a complete sample
 in an existing shared input window. The view retains the window's budget charge.
-Random access can reuse bytes already supplied in the same generation. Samples
-split across windows use a bounded packet buffer.
+Random access can reuse bytes already supplied in the same generation:
+`SampleReader::new` copies a sample from the current window where it holds the
+sample's start, and `BoxReader::skip` continues from it where the skipped box ends
+inside it. Samples split across windows use a bounded packet buffer.
 Complete indexed sources can check all packet projections and find the latest
 presentation end by track before rewinding for merged playback. Rewinding
 reuses the existing edit cursors.
@@ -54,6 +56,20 @@ Complete fragment-only tracks can also retain a restart for backward seek
 when their projected decode times increase. Non-sync run starts can retain
 restarts at fragment boundaries. A small number of additional restarts at
 short intervals and fragment boundaries reduce replay work for nearby seeks.
+
+Packet cursors check sample extents a chunk or a fragment run at a time, and
+check samples one at a time only where a span leaves an extent, so that the first
+failing sample reports the error. The compatibility seek (`SeekJob`,
+`GlobalSeekJob`) reads the index of a track whose entries are its samples, each
+once, from its tables: a regular track with no edit list, or under one media
+edit after at most an empty edit, and a track of fragments alone. It steps through
+the samples without building their packets, builds only the entry it selects, and
+gives way to building every entry wherever an entry needs a rule the table walk
+does not follow or fails a check, which then reports that failure. A global seek
+starts each track's packets from the state its own seek reached at the selected
+entry instead of replaying the track from its first sample. Source seek plans
+continue a fragment run's lookup from one sample to the next and step over the
+samples before a target without building them.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -252,7 +268,8 @@ reviewed FFmpeg behaviour (4 reads by two kinds):
   or before the landing decode time, the reader at the first at or after the landing.
 
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
-comparison runs and needs the `reference-trace` feature.
+comparison runs and needs the `reference-trace` feature. When it retains no packets
+it reads each payload as a view of the input window, and copies it otherwise.
 
 The comparison worker's `--recover-regular-tables` profile uses the bounded
 regular recovery cursors for a single local, unedited track. Use it alone

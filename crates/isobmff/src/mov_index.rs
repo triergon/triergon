@@ -310,7 +310,7 @@ impl<'a> IndexCursor<'a> {
                             && (previous.flags ^ flags) & !0x800 == 0
                             && flags & 0x400 != 0
                             && occurrence.demux.flags & 4 == 0
-                            && previous.clocks_continue(&occurrence)
+                            && previous.clocks_continue(occurrence)
                     }
                     _ => false,
                 };
@@ -422,30 +422,32 @@ impl<'a> IndexCursor<'a> {
     }
 
     /// Prepares the index and, before its first entry, finds whether a seek to
-    /// `query` can read its entries from the track's tables. `None` when the
-    /// work is spent.
+    /// `query` can read its entries from the track's tables: still `Untried`
+    /// when the work is spent.
     fn prepare_plain(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         query: i128,
         allow_initial_prefix: bool,
-    ) -> Result<Option<Option<PlainTrack<'a>>>> {
+    ) -> Result<Plain<'a>> {
         if self.next != 0 || self.ready.is_some() || self.dependency_table {
-            return Ok(Some(None));
+            return Ok(Plain::Off);
         }
         let PlainPrepare::Ready(source) = self.cursor.prepare_plain(work, cancel)? else {
-            return Ok(None);
+            return Ok(Plain::Untried);
         };
-        Ok(Some(source.map(|source| PlainTrack {
-            source,
-            allow_initial_nonkey: self.allow_initial_nonkey,
-            allow_initial_prefix,
-            max_entries: self.max_entries,
-            // As the first entry does, take a fragment edit's media start from
-            // the query.
-            target: query - i128::from(self.cursor.index_edit_offset()),
-        })))
+        Ok(source.map_or(Plain::Off, |source| {
+            Plain::Scanning(PlainScan::new(PlainTrack {
+                source,
+                allow_initial_nonkey: self.allow_initial_nonkey,
+                allow_initial_prefix,
+                max_entries: self.max_entries,
+                // As the first entry does, take a fragment edit's media start
+                // from the query.
+                target: query - i128::from(self.cursor.index_edit_offset()),
+            }))
+        }))
     }
 
     /// Continue a prepared plain index from `start`, whose sample is entry
@@ -516,7 +518,9 @@ pub struct SeekJob<'a> {
     ready: bool,
     failed: Option<Error>,
 }
-/// Where a seek stands with reading a plain regular track from its table.
+/// Where a seek stands with reading a track's entries from its tables.
+// One per seek job.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 enum Plain<'a> {
     /// The index has not been prepared yet.
@@ -732,17 +736,16 @@ impl<'a> SeekJob<'a> {
             match &mut self.plain {
                 Plain::Off => return Ok(false),
                 Plain::Untried => {
-                    let Some(track) = self.index.prepare_plain(
+                    let next = self.index.prepare_plain(
                         work,
                         cancel,
                         self.index_timestamp,
                         self.allow_initial_prefix,
-                    )?
-                    else {
+                    )?;
+                    if matches!(next, Plain::Untried) {
                         return Ok(true);
-                    };
-                    self.plain =
-                        track.map_or(Plain::Off, |track| Plain::Scanning(PlainScan::new(track)));
+                    }
+                    self.plain = next;
                 }
                 Plain::Scanning(scan) => match scan.poll(work) {
                     PlainStep::Yield => return Ok(true),
