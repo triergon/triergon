@@ -123,6 +123,22 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
+/// A case's fields apart from what each report measured, which the timing and
+/// memory reports must hold alike: its timing, its memory, and how long the
+/// reference's parity run took.
+fn case_fields(row: &Value) -> R<Value> {
+    let mut fields = without(row, &["timing", "memory"])?;
+    if let Some(parity) = fields.get("parity")
+        && let Some(run) = parity.get("reference_run")
+    {
+        let run = without(run, &["elapsed_ns"])?;
+        let mut parity = parity.clone();
+        put(&mut parity, "reference_run", run)?;
+        put(&mut fields, "parity", parity)?;
+    }
+    Ok(fields)
+}
+
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let value = json::parse_observations(
@@ -552,8 +568,8 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &case_fields(timed)?,
+        &case_fields(measured)?,
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
@@ -576,8 +592,8 @@ fn join_case(
     ceiling: f64,
 ) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &case_fields(timed)?,
+        &case_fields(measured)?,
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
@@ -1985,6 +2001,38 @@ mod tests {
             change(row, &["operation"], "name", Value::str("other operation"));
         }
         assert!(fixture.join().unwrap_err().contains("contract operation"));
+    }
+
+    #[test]
+    fn the_reference_run_s_elapsed_time_may_differ_between_reports_and_its_status_may_not() {
+        let run = |status: &str, elapsed: i64| {
+            object(&[
+                ("status", Value::str(status)),
+                ("elapsed_ns", Value::int(elapsed)),
+            ])
+        };
+        let mut fixture = Fixture::new();
+        change(
+            &mut fixture.timed,
+            &["parity"],
+            "reference_run",
+            run("ok", 1_000),
+        );
+        change(
+            &mut fixture.measured,
+            &["parity"],
+            "reference_run",
+            run("ok", 2_000),
+        );
+        let joined = fixture.join().unwrap();
+        assert_eq!(joined.get("parity"), fixture.timed.get("parity"));
+        change(
+            &mut fixture.measured,
+            &["parity"],
+            "reference_run",
+            run("timeout", 1_000),
+        );
+        assert!(fixture.join().unwrap_err().contains("case fields/parity"));
     }
 
     #[test]
