@@ -621,28 +621,50 @@ may override that count for diagnostic comparisons.
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the
-codecs' parity, a codec workload list's timing, a part of its memory (`codecs memory
---part I/N`, every Nth workload), a capture case, the checked or the release tests, and the font, shaping,
-rasterising and ASS comparisons. Every registered feature is either one of them or
-named, in `xtask/src/gate.rs`, with the reason it is not gated (an on-demand or
+measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the codecs'
+parity, a codec workload list's timing, a part of its memory (`codecs memory --part
+I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, then
+`--stage memory` from its records under the kernel bound), the checked or the release
+tests, and the font, shaping, rasterising and ASS comparisons. Every registered feature
+is either one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated
+(an on-demand or
 diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
-target leaves out an item that cannot measure there, with the reason `gate plan
---target TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback
-worker runs its numeric modes only on native Linux AArch64. `cargo xtask gate plan
---shards N` splits the items into N shards of about equal planning weight, each for
-its own host; the weights are the minutes each item took on a c6g.4xlarge, the more of
-the two targets. `--items NAME,...`, given to every gate command of a run, narrows the
-plan to those items, for a run of part of the gate; the shards record it, and `gate
-summary` checks them against the same narrowed plan, prints that the run is partial and
-writes `"partial": true` with the selection at the top of its result. A result cited as
-the full gate is a summary whose `partial` is false; a partial one is cited only for the
+target leaves out an item that cannot measure there, with the reason `gate plan --target
+TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback worker runs
+its numeric modes only on native Linux AArch64. `cargo xtask gate plan --shards N`
+splits the items into N shards of about equal planning weight, each for its own host;
+the weights are the minutes each item took on a c6g.4xlarge, the more of the two
+targets. `--items NAME,...`, given to every gate command of a run, narrows the plan to
+those items, for a run of part of the gate; the shards record it, and `gate summary`
+checks them against the same narrowed plan, prints that the run is partial and writes
+`"partial": true` with the selection at the top of its result. A result cited as the
+full gate is a summary whose `partial` is false; a partial one is cited only for the
 items it ran.
+
+A change that reaches a few items gates them alone, one host per target, from a
+checkout at the change's head:
+
+```sh
+tools/gate-aws.sh run aarch64 1 HEAD .research/gate-aarch64 --items matroska-startup-seek,matroska-audio-clocks
+tools/gate-aws.sh run armv7 1 HEAD .research/gate-armv7 --items matroska-startup-seek,matroska-audio-clocks
+```
+
+`cargo xtask gate plan --target TARGET --items NAME,...` prints what the selection runs.
+A change reaches the items whose contract, corpus or inputs it changes, and those whose
+workers link a crate it changes (`cargo tree -i CRATE` lists the workers; a contract's
+`candidate` names its feature's worker). To let a later run take such a run's results,
+add each `OUT/shard-I/entry.json` to the index with its reason and promote it in the
+pull request that cites the run. A result is [reused](#reuse) only while its key
+holds: a change to `xtask/src`, to a worker the item runs or to any other input of the
+key measures it again.
 
 A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
 timing step whose report holds a case not `measured`, or a memory step one not
 `qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
-they did not measure, after writing every record. Where the codec gates apply (native
+they did not measure, after writing every record. `gate run` writes its verdict into the
+step's `gate-result.json` (its `status`, with `"cases_checked": true`), so a step that
+[reuses](#reuse) the result takes the verdict; a reused result that no gate run checked
+fails the step, which `--full` measures again. Where the codec gates apply (native
 Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
 does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
 are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
@@ -800,12 +822,21 @@ own copies of the worker executables, and only those copies are evicted before e
 run, so one slot's eviction never touches an executable another slot runs. Inputs are
 not evicted: they stay in the page cache as in a serial run, and cases that read a
 common file (the input, an ordered entity or a companion) run in the same slot one
-after another. Workers measured from their own paths are such a file, so their cases
-run one at a time. Pinned to one CPU, collection runs exactly as before. The reference's
-memory is measured afresh in every pair, not reused from earlier runs: on a second host
-of the same class it gives the same heaps and resident peaks within their spread
-(evidence set `gate-reference-memory-cross-host`), but caching it would save a few
-minutes and give up the interleaving of both workers within each pair.
+after another. Workers measured from their own paths, as a comparison with another
+build is, are such a file, so their cases run one at a time; `codecs memory` and
+`capture qualify` measure copies whenever both workers are the gate build, as the other
+commands do unless they compare with another build. `capture qualify --stage timing`
+runs correctness and timing alone, on one CPU, and `--stage memory --timing DIR` then
+collects every case's memory in one collection from the records the timing run wrote,
+refusing them if the sources, workers, cases or host differ; without `--stage` one run
+does both, its memory after all its timing. Collecting side by side, it gives each
+case its own copy of its generated input, checked against the hash its timing recorded
+and removed when the run ends, so cases of one input no longer share a file; on one CPU
+they read the input itself. Pinned to one CPU, collection runs exactly as before. The
+reference's memory is measured afresh in every pair, not reused from earlier runs: on a
+second host of the same class it gives the same heaps and resident peaks within their
+spread (evidence set `gate-reference-memory-cross-host`), but caching it would save a
+few minutes and give up the interleaving of both workers within each pair.
 Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
 (evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
 same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
@@ -821,6 +852,19 @@ all 956 cases the same peak heap sample for sample, moves no case's median resid
 by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread, and
 passes every case either way; the collection took 82 instead of 252 minutes on AArch64
 and 96 instead of 296 on ARMv7.
+Capture, collected at `4b43bf74` from one timing run's records serially on five cases and
+in parallel on all fifteen (evidence sets `gate-parallel-memory-capture-codecs-aarch64`
+and `gate-parallel-memory-capture-codecs-armv7`), gives those five cases the same peak
+heap sample for sample on both targets, keeps every resident median inside the serial
+spread, and grades them the same; the fifteen took 10 minutes on AArch64 and 11 on ARMv7,
+where the five took 31 serially. The codec workloads, collected in parallel at the same
+revision, grade every workload as the serial collection of the same worker bytes at
+`8154812e` does, with the reference's heap identical sample for sample. The candidate's
+heap is identical in 21 of 30 workloads on AArch64 and 25 of 30 on ARMv7, and 8 or 16
+bytes apart in the others, in every sample: the codec worker keeps its own path, which a
+slot's copy lengthens. Collected serially, those workloads give the serial collection's
+heaps when measured from the workers' own paths and the parallel collection's when
+measured from a slot's copies.
 
 Each collection records the number of slots (`memory_slots`) and what the host's memory
 did over it (`host_memory`): `MemAvailable` at its start and end and the change of the
@@ -966,15 +1010,22 @@ is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
 
+`tools/gate-aws.sh` needs bash 4 or later and refuses to start under an older one,
+such as macOS's `/bin/bash` 3.2, where a shard's exit handler never runs and its
+outputs would be lost; on macOS run it with Homebrew's bash first on `PATH`, or as
+`/opt/homebrew/bin/bash tools/gate-aws.sh`.
+
 `tools/gate-aws.sh run TARGET N REVISION OUT`, in a checkout at REVISION without
 changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
 start when it fails. Then it launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
 archive's packs (building and uploading the others), gets each host ready and runs
 shard I of N on host I. When a shard ends, finished or not, its host's outputs are
-archived under `qualification/gate-runs/`, where they expire after 90 days unless
-promoted, and checked by downloading them back on the host; its logs and step records
-are copied to OUT, and the host is terminated. The last shard to end keeps its host
+archived under `qualification/gate-runs/RUN/shard-I/`, where they expire after 90 days
+unless promoted, and checked by downloading them back on the host;
+`OUT/shard-I/entry.json` holds the archive's index entry, which lists the [gate
+results](#reuse) it holds. Its logs and step records are copied to OUT, and the host is
+terminated. The last shard to end keeps its host
 for the summary when every shard finished, and a host whose outputs could not be
 archived stays until the command ends. OUT/hosts.txt records when each host was
 launched, ready, done and terminated. The command exits non-zero when a shard did not

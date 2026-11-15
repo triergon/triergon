@@ -353,8 +353,13 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             println!("{}", evidence::upload(set, Path::new(archive))?);
             Ok(())
         }
-        [command, set, archive] if command == "entry" => {
-            println!("{}", evidence::entry(set, Path::new(archive))?.1);
+        [command, set, archive, rest @ ..] if command == "entry" => {
+            let key = match rest {
+                [] => None,
+                [flag, key] if flag == "--key" => Some(key.as_str()),
+                _ => return Err("usage: evidence entry SET ARCHIVE [--key KEY]".into()),
+            };
+            println!("{}", evidence::entry(set, Path::new(archive), key)?.1);
             Ok(())
         }
         [command, set] if command == "promote" => {
@@ -363,7 +368,7 @@ fn evidence(root: &Path, args: &[String]) -> Task {
         }
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence entry SET ARCHIVE | evidence promote SET | evidence fetch SET [DIR]"
+                  | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR]"
                 .into(),
         ),
     }
