@@ -350,10 +350,21 @@ impl<'a> EditCursor<'a> {
         }))
     }
 
-    /// Steps a prepared cursor past its occurrences before sample `ordinal`
-    /// without building them, keeping the counts and positions the occurrences
-    /// leave behind. `false` when the work is spent. Its next occurrence is then
-    /// that sample's, and the one after it the first it makes ready.
+    /// Moves a cursor that [`prepare_emit`](Self::prepare_emit) left ready, and
+    /// that holds no occurrence, to sample `ordinal` without building the
+    /// occurrences before it. Each sample before `ordinal` is scanned; each from
+    /// the edit's first emitted sample on is also counted as an occurrence and
+    /// has its decode delta read, against the cursor's limits, as polling counts
+    /// them. The next occurrence the cursor makes ready is then `ordinal`'s.
+    ///
+    /// Charges two work units per sample from the edit's first emitted sample,
+    /// one per sample before it, and returns `false` when fewer than two are
+    /// left; a later call continues. Fails, and keeps failing, where the cursor
+    /// is not so prepared, where `ordinal` precedes the edit's first emitted
+    /// sample, where a skipped sample is a sync sample that reaches the edit's
+    /// end, where the track has composition offsets or a dependency table, where
+    /// a skipped sample has a zero decode delta or is a partial sync sample, or
+    /// where a limit is passed.
     pub(crate) fn skip_to(&mut self, ordinal: u64, work: &mut WorkBudget) -> Result<bool> {
         if let Some(error) = self.failed {
             return Err(error);
