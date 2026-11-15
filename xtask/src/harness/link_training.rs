@@ -168,6 +168,13 @@ impl Training {
             }
             operations.push(operation);
         }
+        if let Some(unused) = files.keys().find(|file| {
+            !operations
+                .iter()
+                .any(|operation| operation.files().any(|own| own == file.as_str()))
+        }) {
+            return Err(fail(format!("{unused}: no operation reads it")));
+        }
         Ok(Self {
             directory: root.join(directory),
             files,
@@ -844,4 +851,24 @@ pub fn corpus(out: &Path) -> R<()> {
         println!("{{\"file\": \"{name}\", \"sha256\": \"{hash}\"}}");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Training;
+    use std::path::Path;
+
+    #[test]
+    fn the_training_manifest_names_known_workers_and_uses_every_file() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let training = Training::load(root).unwrap();
+        assert!(!training.operations.is_empty());
+        let mp4_range = training
+            .operations
+            .iter()
+            .find(|operation| operation.arguments.len() > 2 && operation.family() == "mp4-range-")
+            .unwrap();
+        assert_eq!(mp4_range.others(), ["24320"]);
+        assert_eq!(mp4_range.command_line()[1], "avc-aac.mp4");
+    }
 }
