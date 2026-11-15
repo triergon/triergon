@@ -38,8 +38,20 @@ fn text_symbols(binary: &Path, demangle: bool) -> Result<Vec<String>, String> {
         .collect())
 }
 
+/// Code the linker makes itself where the layout needs it: branch thunks for targets
+/// out of a branch's range and patches for ARM core errata (lld's `__*Thunk_*`,
+/// `__CortexA53843419_*` and `__CortexA8657417_*`). Which exist depends on where
+/// functions lie, so they are left out of the order.
+fn linker_made(symbol: &str) -> bool {
+    symbol.starts_with("__")
+        && (symbol.contains("Thunk_")
+            || symbol.starts_with("__CortexA53843419_")
+            || symbol.starts_with("__CortexA8657417_"))
+}
+
 /// The symbol ordering file of `binary`: one symbol per line, ordered by owning
-/// path, then by demangled name, then by symbol name.
+/// path, then by demangled name, then by symbol name, without the code the linker
+/// makes itself.
 pub fn symbol_order(binary: &Path) -> Result<String, String> {
     let symbols = text_symbols(binary, false)?;
     let names = text_symbols(binary, true)?;
@@ -54,6 +66,7 @@ pub fn symbol_order(binary: &Path) -> Result<String, String> {
     let mut rows: Vec<(String, &str, &str)> = names
         .iter()
         .zip(&symbols)
+        .filter(|(_, symbol)| !linker_made(symbol))
         .map(|(name, symbol)| (owner(name), name.as_str(), symbol.as_str()))
         .collect();
     rows.sort_unstable();
@@ -164,7 +177,22 @@ fn without_generics(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::owner;
+    use super::{linker_made, owner};
+
+    #[test]
+    fn code_the_linker_makes_for_the_layout_is_not_ordered() {
+        for symbol in [
+            "__CortexA53843419_C3008",
+            "__ThumbV7PILongThunk_malloc",
+            "__AArch64ADRPThunk_memcpy",
+            "__ARMv7PILongThunk__RNvCs1_4core3fmt5write",
+        ] {
+            assert!(linker_made(symbol), "{symbol}");
+        }
+        for symbol in ["__aeabi_uidiv", "__libc_csu_init", "_RNvCs1_7example4main"] {
+            assert!(!linker_made(symbol), "{symbol}");
+        }
+    }
 
     #[test]
     fn functions_belong_to_their_item_without_generic_arguments() {

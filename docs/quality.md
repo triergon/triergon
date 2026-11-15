@@ -521,8 +521,8 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
-- Workers and references follow one link policy, `static-toolchain-runtime-v1`: on
-  GNU/Linux each side links its toolchain's runtime support libraries from their static
+- Workers and references follow one link policy, `static-toolchain-runtime-module-order-v1`:
+  on GNU/Linux each side links its toolchain's runtime support libraries from their static
   archives, libgcc's unwinder (`libgcc_eh`) for the Rust workers and libgcc, libstdc++
   and libatomic for the C and C++ references. The C library, libc with libm, and
   third-party libraries, such as zlib, stay shared on both sides. A C program already
@@ -533,7 +533,31 @@ may override that count for diagnostic comparisons.
   276 for `libstdc++` in the libass player reference. No worker or reference maps
   libatomic today: the FFmpeg references name it, and the linker leaves it out. glibc's
   static libm needs the static libc, so libm stays with libc. Elsewhere both sides link
-  as their toolchains do. `build-workers` records the policy in `identity.json`, and
+  as their toolchains do.
+- On GNU/Linux the policy also links each Rust worker with its functions in module
+  order, with the pinned toolchain's own `lld`; the references link with their
+  toolchain's default linker as before. The code one operation runs is a fraction of a
+  worker's, and the kernel faults code in 64 KiB windows, so how much of a worker
+  becomes resident depends on how its functions lie among those windows. Module order
+  keeps each crate's, module's and type's functions together: `cargo xtask link-order
+  BINARY` lists the binary's functions sorted by the path of the item each belongs to
+  (a function by its own path, a method by its type's, a closure by its function's, drop
+  glue by the type it drops, generic arguments left out), then by name. The order comes
+  from the symbol names alone, never from profiles or from what a measurement runs.
+  `build-workers` links each worker once, writes its order to
+  `target/harness/link-order/WORKER.txt`, links it again with that file, and fails
+  unless the second link's order is the same file; `identity.json` records the order's
+  SHA-256 beside the command. The linker arguments, after the policy's own, are
+
+  ```text
+  -C link-arg=-B$(rustc --print sysroot)/lib/rustlib/HOST/bin/gcc-ld
+  -C link-arg=-fuse-ld=lld
+  -C link-arg=-Wl,--symbol-ordering-file=ORDER
+  -C link-arg=-Wl,--no-warn-symbol-ordering
+  ```
+
+  where `HOST` is the host triple of `rustc -vV` and the first link leaves out the
+  last two. `build-workers` records the policy in `identity.json`, and
   `report` and `grade` refuse a build that records another policy or none, so results
   from differently linked builds are never compared or reused together.
 - A gate run builds with `cargo xtask build-workers --all-references`, which fails when
@@ -543,7 +567,8 @@ may override that count for diagnostic comparisons.
   exactly those it built.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
-  with the same two settings in its own release profile. Cargo's default profile has
+  with the same two settings in its own release profile and, on GNU/Linux, linked in
+  module order as the workers are (the [README](../README.md#getting-started) gives the commands). Cargo's default profile has
   neither. On ARMv7, building the playback worker without fat LTO adds 12.6% user-mode
   instructions on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times
   as long; 16 codegen units add up to another 2.5%. `panic = "abort"` saves

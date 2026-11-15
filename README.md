@@ -102,6 +102,19 @@ another 2.5%. `panic = "abort"` saves a further 2 to 3%; it is safe unless the p
 wraps calls into these crates in `catch_unwind`. See
 [measuring performance](docs/quality.md#measuring-performance).
 
+On GNU/Linux the published memory also assumes the program's functions linked in module
+order, as the measurement workers are: linked by the Rust toolchain's own `lld`, with a
+symbol ordering file that groups them by crate, module and type. Link once, write the
+order from that binary with this repository's `cargo xtask link-order`, and link again
+with it; the order of the second link is the same file:
+
+```sh
+LLD="-C link-arg=-B$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin/gcc-ld -C link-arg=-fuse-ld=lld"
+cargo rustc --release --bin PLAYER -- $LLD
+cargo xtask link-order target/release/PLAYER order.txt   # in a checkout of this repository
+cargo rustc --release --bin PLAYER -- $LLD -C link-arg=-Wl,--symbol-ordering-file=$PWD/order.txt -C link-arg=-Wl,--no-warn-symbol-ordering
+```
+
 ## Documentation
 
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract
