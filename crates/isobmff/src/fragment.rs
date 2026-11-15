@@ -463,8 +463,10 @@ impl FragmentBuilder {
                         .runs
                         .as_mut()
                         .ok_or(Error::Invalid("missing fragment runs"))?;
-                    // Most fragments hold one run: allocate the first exactly.
-                    if runs.capacity() == 0
+                    // Most fragments hold one run or a few: each of the first
+                    // four takes exactly its own slot, where a push would take
+                    // four at once. Longer lists grow geometrically.
+                    if runs.len() < 4
                         && let Err(error) = runs.try_reserve_exact(1)
                     {
                         self.pending = Some(value);
