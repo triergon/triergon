@@ -653,43 +653,53 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         }
     }
 
-    // Each capture case on its own: one is up to a quarter of an hour on ARMv7.
+    // Each capture case on its own: one is up to a quarter of an hour on ARMv7. Its
+    // correctness and timing run in the timing stage, and its memory, from the records
+    // they wrote, under the kernel bound in the memory stage.
     for id in capture {
         let name = format!("capture-{id}");
-        let mut command = xtask(&[
-            "capture",
-            "qualify",
-            "--candidate",
-            &format!("{release}/capture-worker"),
-            "--reference",
-            "target/harness/ffmpeg-capture-worker",
-            "--reference-small",
-            "target/harness/ffmpeg-capture-small-worker",
-            "--oracle-bin",
-            FFMPEG_BIN,
-            "--observer",
-            "target/harness/allocations.so",
-            "--inputs",
-            &format!("{out}/capture-inputs"),
-            "--out",
-            &format!("{out}/{name}"),
-            "--only",
-        ]);
-        command.push(id.clone());
-        let mut qualify = step(
-            name.clone(),
-            Stage::Timing,
-            Placement::Timed,
-            with_full(command),
+        let timing = format!("{out}/{name}-timing");
+        let qualify = |stage: &[&str], output: &str| {
+            let mut command = xtask(&[
+                "capture",
+                "qualify",
+                "--candidate",
+                &format!("{release}/capture-worker"),
+                "--reference",
+                "target/harness/ffmpeg-capture-worker",
+                "--reference-small",
+                "target/harness/ffmpeg-capture-small-worker",
+                "--oracle-bin",
+                FFMPEG_BIN,
+                "--observer",
+                "target/harness/allocations.so",
+                "--inputs",
+                &format!("{out}/capture-inputs"),
+                "--out",
+                output,
+            ]);
+            command.extend(owned(stage));
+            command.extend(owned(&["--only", id]));
+            with_full(command)
+        };
+        let mut steps = collections(
+            &name,
+            qualify(&["--stage", "timing"], &timing),
+            qualify(
+                &["--stage", "memory", "--timing", &timing],
+                &format!("{out}/{name}"),
+            ),
         );
-        qualify.environment.push(("TRIERGON_PYTHON", "python3"));
+        for step in &mut steps {
+            step.environment.push(("TRIERGON_PYTHON", "python3"));
+        }
         items.push(Item {
             name,
             weight: CAPTURE_WEIGHTS
                 .iter()
                 .find(|(case, _)| case == id)
                 .map_or(CAPTURE_WEIGHT, |(_, weight)| *weight),
-            steps: vec![qualify],
+            steps: steps.into(),
             preflight: owned(&["--capture", CAPTURE_CASES]),
         });
     }
@@ -2047,13 +2057,18 @@ mod tests {
                     step.stage == Stage::Memory && step.placement != Placement::Grade
                 );
                 if step.placement == Placement::Memory {
-                    assert_eq!(step.environment, [("TRIERGON_RSS_KERNEL_BOUND", "1")]);
+                    assert!(
+                        step.environment
+                            .contains(&("TRIERGON_RSS_KERNEL_BOUND", "1")),
+                        "{}",
+                        step.name
+                    );
                 }
             }
         }
         assert!(names.contains(&"grade-subtitle-cc"));
         assert!(names.contains(&"benchmark-isobmff-3"));
-        assert!(names.contains(&"capture-c04"));
+        assert!(names.contains(&"benchmark-capture-c04") && names.contains(&"memory-capture-c04"));
         assert!(
             names.contains(&"memory-codec-file-workloads-3") && names.contains(&"test-release")
         );
@@ -2061,6 +2076,28 @@ mod tests {
             names.contains(&"memory-codec-workloads-5")
                 && names.contains(&"benchmark-codec-workloads")
         );
+    }
+
+    #[test]
+    fn capture_memory_reads_the_records_its_timing_wrote() {
+        for item in plan().iter().filter(|i| i.name.starts_with("capture-")) {
+            let [timing, memory] = &item.steps[..] else {
+                panic!("{}: a timing and a memory step", item.name);
+            };
+            let value = |step: &Step, flag: &str| {
+                let at = step.command.iter().position(|a| a == flag).unwrap();
+                step.command[at + 1].clone()
+            };
+            assert_eq!(value(timing, "--stage"), "timing");
+            assert_eq!(value(memory, "--stage"), "memory");
+            assert_eq!(value(memory, "--timing"), value(timing, "--out"));
+            assert_ne!(value(memory, "--out"), value(timing, "--out"));
+            assert_eq!(value(memory, "--only"), value(timing, "--only"));
+            assert_eq!(
+                (timing.placement, memory.placement),
+                (Placement::Timed, Placement::Memory)
+            );
+        }
     }
 
     #[test]
