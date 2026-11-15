@@ -107,18 +107,23 @@ impl Outline {
 
     /// Emboldens the outline by `strength` 26.6 units in total, half on each
     /// side of every contour, moving points along the bisectors of their
-    /// corners. An outline of zero area is left as it is (FreeType refuses it).
+    /// corners. Returns `false`, leaving the outline as it is, for an outline
+    /// of zero area ([`Orientation::None`]) and a strength of two units or
+    /// more either way (2 or more, or -2 or less), which FreeType refuses for
+    /// the positive strengths probed; between -1 and 1, every outline is left
+    /// as it is and the call succeeds (probes `orientation-contours`,
+    /// `emboldening-zero-strength`).
     ///
     /// # Errors
     ///
     /// `Overflow` when a coordinate leaves `i32`.
-    pub fn embolden(&mut self, strength: i32) -> Result<()> {
+    pub fn embolden(&mut self, strength: i32) -> Result<bool> {
         let half = i64::from(strength) / 2;
         if half == 0 {
-            return Ok(());
+            return Ok(true);
         }
         let truetype = match self.orientation() {
-            Orientation::None => return Ok(()),
+            Orientation::None => return Ok(false),
             o => o == Orientation::TrueType,
         };
         let mut first = 0;
@@ -129,7 +134,7 @@ impl Outline {
             }
             first = end;
         }
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -235,7 +240,7 @@ mod tests {
         let budget = Budget::new(1 << 16).unwrap();
         let mut o = square(&budget, true);
         assert_eq!(o.orientation(), Orientation::TrueType);
-        o.embolden(64).unwrap();
+        assert!(o.embolden(64).unwrap());
         let xs: Vec<_> = o.points().iter().map(|p| p.point).collect();
         assert_eq!(
             xs,

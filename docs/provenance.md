@@ -67,7 +67,7 @@ lookup in `cmap.rs`.
 
 ## triergon-shape
 
-Translated from HarfBuzz 14.6.0: every module outside `bidi/` and `unicode/bidi/`. That is
+Translated from HarfBuzz 14.6.0: every module outside `bidi/`, `unicode/bidi/` and `cff.rs`. That is
 the shaping pipeline (`shape.rs`, `plan.rs`, `buffer.rs`, `normalize.rs`, `fallback.rs`,
 `props.rs`, `face.rs`, `work.rs`, `tag.rs`), the layout tables (`ot/`), the script
 shapers (`shapers/`), the language tags (`language/`), the `cmap` reading of HarfBuzz's
@@ -81,6 +81,11 @@ Unicode data: `language/tables.rs`, `cmap/tables.rs`, `unicode/tables.rs` and
 Following libass 0.17.5: the font functions libass installs on a sized face
 (`SizedMetrics` in `metrics.rs`, from `ass_shaper.c`) and the rotation decisions of its
 glyph metrics cache (`rotations.rs`).
+
+`cff.rs`, the CFF and CFF2 glyph extents of HarfBuzz's built-in font functions, is
+written from Adobe's CFF and Type 2 charstring specifications (Technical Notes #5176
+and #5177) and the OpenType CFF2 chapter, with HarfBuzz's behaviour where they leave
+it open established by probes of its output (`harness/shape/probes`).
 
 `bidi/` is written from UAX #9 with the Unicode C reference implementation as its model,
 and `unicode/bidi/tables.rs` is generated from the Unicode Character Database;

@@ -18,13 +18,19 @@
  *                (FT_LOAD_NO_SCALE).
  *   font-sized   per face, as libass loads it at the 26.6 pixel HEIGHT: libass's GDI
  *                face metrics (`set_font_metrics`) and the size request libass makes
- *                (`ass_face_set_size`: REAL_DIM); then by MODE
+ *                (`ass_face_set_size`: REAL_DIM), whose error is ignored where the
+ *                size has zero pixels per em; then by MODE. HEIGHT may list several
+ *                heights separated by commas: each face is then requested at each
+ *                in turn, as libass resizes one face, and each height's values
+ *                follow a `request` group;
  *     outlines   the size metrics, libass's ascent and descent, HarfBuzz scale,
  *                emboldening strength, PostScript flag and decoration bands; the
  *                kerning at the size of every pair the `kern` table lists
  *                (FT_KERNING_DEFAULT); and for every glyph the unhinted outline and
  *                advance libass draws (FT_LOAD_NO_HINTING), then that outline
- *                emboldened, slanted, and both (libass's order);
+ *                emboldened, slanted, and both (libass's order), each outline
+ *                after its orientation (FT_Outline_Get_Orientation), which sets
+ *                the direction libass runs a glyph's underline and strike-out in;
  *     advances   every glyph's default-load (FT_LOAD_DEFAULT) advance, which
  *                libass's HarfBuzz callbacks report.
  *     vertical   every glyph's vertical advances, which libass uses for the glyphs
@@ -83,7 +89,11 @@ enum {
     FONT_HINTED,
     FONT_VERTICAL,
     FONT_DEFAULT,
+    FONT_REQUEST,
 };
+
+/* The most heights one font-sized operation requests in turn. */
+#define FONT_MAX_HEIGHTS 64
 
 typedef enum {
     FONT_FACES,
@@ -171,6 +181,23 @@ static void font_outline(FontWork *w, const FT_Outline *o) {
     }
     w->packets++;
     w->bytes += (uint64_t)o->n_points;
+}
+
+/* The orientation FT_Outline_Get_Orientation finds: 0 TrueType (fill on the
+ * right), 1 PostScript (fill on the left), 2 none, as font-worker folds
+ * triergon_font::Orientation. */
+static void font_orientation(FontWork *w, const FT_Outline *o) {
+    static const char *const names[] = {"truetype", "postscript", "none"};
+    int orientation;
+    switch (FT_Outline_Get_Orientation((FT_Outline *)o)) {
+    case FT_ORIENTATION_TRUETYPE: orientation = 0; break;
+    case FT_ORIENTATION_POSTSCRIPT: orientation = 1; break;
+    default: orientation = 2; break;
+    }
+    if (w->dump)
+        fprintf(w->dump, "%s ", names[orientation]);
+    else
+        font_fold(w, (uint64_t)orientation);
 }
 
 /* Every charmap FreeType lists but the variation-sequence subtables of formats
@@ -489,6 +516,7 @@ static void font_styled(FontWork *w, int style, long g, const FT_Outline *o, int
             return;
         }
     }
+    font_orientation(w, o);
     font_outline(w, o);
 }
 
@@ -514,6 +542,7 @@ static void font_scaled(FT_Library library, FT_Face face, long height, FontWork 
             font_fold(w, (uint64_t)g);
             font_fold(w, font_signed(face->glyph->advance.x));
         }
+        font_orientation(w, o);
         font_outline(w, o);
         FT_Outline copy;
         if (FT_Outline_New(library, (FT_UInt)o->n_points, o->n_contours, &copy)) abort();
@@ -624,7 +653,7 @@ static void font_default(FT_Face face, FontWork *w) {
 
 /* One operation over the font in memory; nonzero when FreeType opens no font. */
 static int font_read(FT_Library library, const FT_Byte *data, FT_Long size, FontOperation operation,
-                     long height, FontWork *w) {
+                     const long *heights, int count, FontWork *w) {
     FT_Face probe;
     if (FT_New_Memory_Face(library, data, size, -1, &probe)) return 1;
     long faces = probe->num_faces;
@@ -646,21 +675,38 @@ static int font_read(FT_Library library, const FT_Byte *data, FT_Long size, Font
             }
             font_gdi_metrics(face);
             font_text_charmap(face);
-            FT_Size_RequestRec rq;
-            memset(&rq, 0, sizeof rq);
-            rq.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
-            rq.height = height;
-            FT_Error error = FT_Request_Size(face, &rq);
-            if (error || !face->size->metrics.x_ppem || !face->size->metrics.y_ppem)
-                font_error(w, FONT_SIZE_ERROR, "size", height);
-            else if (operation == FONT_SCALED)
-                font_scaled(library, face, height, w);
-            else if (operation == FONT_HINTED_ADVANCES)
-                font_hinted(face, w);
-            else if (operation == FONT_VERTICAL_ADVANCES)
-                font_vertical(face, w);
-            else
-                font_default(face, w);
+            /* Several heights are requested in turn on the same face, as libass
+             * resizes a face; each after a `request` group. */
+            for (int h = 0; h < count; h++) {
+                long height = heights[h];
+                if (count > 1) {
+                    if (w->dump) {
+                        fprintf(w->dump, "request %ld\n", height);
+                    } else {
+                        font_fold(w, FONT_REQUEST);
+                        font_fold(w, font_signed(height));
+                    }
+                }
+                FT_Size_RequestRec rq;
+                memset(&rq, 0, sizeof rq);
+                rq.type = FT_SIZE_REQUEST_TYPE_REAL_DIM;
+                rq.height = height;
+                FT_Error error = FT_Request_Size(face, &rq);
+                /* At zero pixels per em the request fails for TrueType faces and
+                 * succeeds for CFF ones, and both then load glyphs unscaled: such
+                 * a size is read like any other (probe: zero-ppem). */
+                int zero_ppem = !face->size->metrics.x_ppem || !face->size->metrics.y_ppem;
+                if (error && !zero_ppem)
+                    font_error(w, FONT_SIZE_ERROR, "size", height);
+                else if (operation == FONT_SCALED)
+                    font_scaled(library, face, height, w);
+                else if (operation == FONT_HINTED_ADVANCES)
+                    font_hinted(face, w);
+                else if (operation == FONT_VERTICAL_ADVANCES)
+                    font_vertical(face, w);
+                else
+                    font_default(face, w);
+            }
         }
         FT_Done_Face(face);
     }
@@ -671,7 +717,8 @@ int main(int argc, char **argv) {
     const char *usage = "usage: reference OPERATION-fold FILE [MODE HEIGHT]\n"
                         "       | OPERATION-bench FILE N [MODE HEIGHT]\n"
                         "       | OPERATION-memory FILE [MODE HEIGHT] | OPERATION-dump FILE [MODE HEIGHT]\n"
-                        "  OPERATION: font, or font-sized with MODE outlines, advances, vertical or default\n";
+                        "  OPERATION: font, or font-sized with MODE outlines, advances, vertical or default\n"
+                        "  HEIGHT: 26.6 pixels, or several separated by commas, requested in turn\n";
     const char *mode = argc > 1 ? argv[1] : "";
     const char *action = strrchr(mode, '-');
     size_t prefix = action ? (size_t)(action - mode) : 0;
@@ -704,10 +751,28 @@ int main(int argc, char **argv) {
         fputs(usage, stderr);
         return 2;
     }
-    char *end = NULL, *height_end = NULL;
+    char *end = NULL;
     unsigned long iterations = bench ? strtoul(argv[3], &end, 10) : 1;
-    long height = sized ? strtol(argv[4 + bench], &height_end, 10) : 0;
-    if ((end && *end) || (height_end && *height_end) || iterations < 1 || iterations > 1000000) {
+    long heights[FONT_MAX_HEIGHTS];
+    int count = 0, heights_ok = 1;
+    if (sized) {
+        const char *at = argv[4 + bench];
+        for (;;) {
+            char *next = NULL;
+            if (count == FONT_MAX_HEIGHTS || *at == ',' || !*at) {
+                heights_ok = 0;
+                break;
+            }
+            heights[count++] = strtol(at, &next, 10);
+            if (next == at || (*next && *next != ',')) {
+                heights_ok = 0;
+                break;
+            }
+            if (!*next) break;
+            at = next + 1;
+        }
+    }
+    if ((end && *end) || !heights_ok || iterations < 1 || iterations > 1000000) {
         fputs(usage, stderr);
         return 2;
     }
@@ -731,13 +796,13 @@ int main(int argc, char **argv) {
     int status = 0;
     if (dump) {
         FontWork work = {0, 0, 0, stdout};
-        status = font_read(library, data, size, operation, height, &work);
+        status = font_read(library, data, size, operation, heights, count, &work);
     } else {
         if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) status = 2;
         uint64_t start = font_now_ns(), packets = 0, bytes = 0, digest = 0;
         for (unsigned long i = 0; i < iterations && !status; i++) {
             FontWork work = {0, 0, 0, NULL};
-            status = font_read(library, data, size, operation, height, &work);
+            status = font_read(library, data, size, operation, heights, count, &work);
             packets += work.packets;
             bytes += work.bytes;
             digest = digest * 31 + work.digest;

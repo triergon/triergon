@@ -1498,9 +1498,12 @@ impl Machine<'_> {
 
 /// Moves the untouched points after `a` and before `b`, on the contour
 /// `range`, between the touched points `a` and `b`, along x or y. Observed:
-/// a point between them in font units is placed by a 16.16 ratio of the
-/// touched points' current to font-unit distance, rounded, and a point
-/// outside is shifted from its current position (`interpolation`).
+/// the touched point lower in font units is the low one; a point whose
+/// scaled original position is at or below the low one's is shifted with
+/// it, else one at or above the high one's is shifted with that, both from
+/// its current position; a point between them is placed by a 16.16 ratio of
+/// the touched points' current to font-unit distance, rounded
+/// (`interpolation`, `interpolation-scaled-ends`).
 fn interpolate_run(z: &mut Zone, x: bool, a: usize, b: usize, range: std::ops::Range<usize>) {
     let at = |points: &BudgetVec<Point>, p: usize| {
         let point = points.as_slice()[p];
@@ -1525,10 +1528,10 @@ fn interpolate_run(z: &mut Zone, x: bool, a: usize, b: usize, range: std::ops::R
         if p == b {
             break;
         }
-        let (u, c) = (at(&z.units, p), at(&z.current, p));
+        let (u, o, c) = (at(&z.units, p), at(&z.original, p), at(&z.current, p));
         let v = match ratio {
-            _ if u <= u_low => c.wrapping_add(c_low.wrapping_sub(o_low)),
-            _ if u >= u_high => c.wrapping_add(c_high.wrapping_sub(o_high)),
+            _ if o <= o_low => c.wrapping_add(c_low.wrapping_sub(o_low)),
+            _ if o >= o_high => c.wrapping_add(c_high.wrapping_sub(o_high)),
             Some(ratio) => {
                 let offset = math::div_round((i64::from(u) - i64::from(u_low)) * ratio, 1 << 16);
                 c_low.wrapping_add(offset as i32)

@@ -158,7 +158,7 @@ const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
 /// nor in [`FEATURES`].
-const COVERED: [(&str, Coverage); 25] = [
+const COVERED: [(&str, Coverage); 26] = [
     (
         "isobmff-open-index",
         Coverage::Item("isobmff-bench, in parts"),
@@ -175,6 +175,7 @@ const COVERED: [(&str, Coverage); 25] = [
     ("shape-bidi", Coverage::Item("shape compare")),
     ("shape-simple", Coverage::Item("shape compare")),
     ("shape-unicode", Coverage::Item("shape compare")),
+    ("shape-extents", Coverage::Item("shape compare")),
     ("raster-glyphs", Coverage::Item("raster compare --all")),
     ("raster-outlines", Coverage::Item("raster compare --all")),
     ("raster-bitmaps", Coverage::Item("raster compare --all")),

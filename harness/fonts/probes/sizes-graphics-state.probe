@@ -1,0 +1,23 @@
+# The graphics state the font program leaves, when one face is requested at
+# several sizes in turn: below 12 ppem it sets a minimum distance of 1000,
+# from 12 ppem of 2000. The glyph moves point 1, at the distance 0 from point
+# 0, to the minimum distance (MDRP with it) and writes the move into its y.
+sequence 1000 640 1000
+heights 1000 640
+fpgm
+  MPPEM; PUSH 12; LT
+  IF
+    PUSH 1000; SMD
+  ELSE
+    PUSH 2000; SMD
+  EIF
+end
+prep
+  PUSH 0; POP
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]; PUSH 0; SRP0; PUSH 1; MDRP[01000]
+  end
+end

@@ -423,8 +423,8 @@ fn mp4_dvd_reaches_the_dvd_receiver() {
     assert!(mp4_player(&b, raw, subtitle_only(TrackKey::Mp4(track_id))).is_ok());
 }
 
-/// The `avcC` NAL unit length size of an MP4 AVC packet's sample entry.
-fn avc_framing(packet: &Mp4Packet) -> Framing {
+/// The `avcC` record of an MP4 AVC packet's sample entry.
+fn avc_configuration(packet: &Mp4Packet) -> Vec<u8> {
     let mut children = packet
         .configuration
         .description
@@ -433,8 +433,7 @@ fn avc_framing(packet: &Mp4Packet) -> Framing {
     loop {
         match children.poll(&mut WorkBudget::new(64)).unwrap() {
             BoxStep::Box(child) if child.header().kind == *b"avcC" => {
-                let body = &child.bytes()[usize::from(child.header().header_size)..];
-                return Framing::Lengths((body[4] & 3) + 1);
+                return child.bytes()[usize::from(child.header().header_size)..].to_vec();
             }
             BoxStep::Box(_) | BoxStep::Yield => {}
             BoxStep::End => panic!("no avcC"),
@@ -442,36 +441,34 @@ fn avc_framing(packet: &Mp4Packet) -> Framing {
     }
 }
 
-#[test]
-fn mp4_video_captions_reach_the_text_bridge_in_presentation_order() {
-    let b = pool();
-    let raw = include_bytes!("fixtures/subtitles/cc-h264-a53.mp4");
-    let mut player = mp4_player(&b, raw, Selection::All).unwrap();
-    let outputs = collect(&mut player, 4096).unwrap();
-    let video: Vec<&Mp4Packet> = outputs
-        .iter()
-        .filter_map(mp4_packet)
-        .filter(|p| p.configuration.track.handler == *b"vide")
-        .collect();
-    let base = video[0].configuration.track.base.require().unwrap();
-    let framing = avc_framing(video[0]);
-    let generation = outputs[0].generation();
-    let units = video.iter().map(|p| CaptionUnit {
-        data: p.source.payload.clone(),
-        pts: p.source.sample.cts_ticks.map(|t| i64::try_from(t).unwrap()),
-        dts: p.source.sample.dts_ticks.map(|t| i64::try_from(t).unwrap()),
-        duration: Some(i64::from(p.source.sample.duration_ticks)),
-    });
+/// The NAL units of a sample behind `size`-byte lengths.
+fn sample_units(sample: &[u8], size: usize) -> Vec<&[u8]> {
+    let mut units = Vec::new();
+    let mut rest = sample;
+    while rest.len() >= size {
+        let len = rest[..size]
+            .iter()
+            .fold(0, |len, &byte| len << 8 | usize::from(byte));
+        units.push(&rest[size..size + len]);
+        rest = &rest[size + len..];
+    }
+    units
+}
 
-    // The bridge, one unit at a time under small work budgets.
+type Cue = (Vec<u8>, Option<Time>, Option<Time>);
+
+/// The cues of `units` through a caption bridge for `video` made with
+/// `configuration`, one unit at a time under small work budgets.
+fn caption_cues(
+    b: &Budget,
+    generation: u64,
+    video: CaptionVideo,
+    configuration: &[u8],
+    units: impl IntoIterator<Item = CaptionUnit>,
+) -> Vec<Cue> {
     let options = cc::Options::default();
-    let video_clock = CaptionVideo {
-        coding: cc::VideoCoding::Nal(Codec::H264, framing),
-        time_base: base,
-        max_packet_bytes: PACKET_LIMIT,
-    };
-    let mut bridge = CaptionBridge::new(&b, ID, generation, video_clock, options).unwrap();
-    let mut text = TextBridge::new(&b, ID, 0, generation, text::Limits::default());
+    let mut bridge = CaptionBridge::new(b, ID, generation, video, configuration, options).unwrap();
+    let mut text = TextBridge::new(b, ID, 0, generation, text::Limits::default());
     let mut seen = Vec::new();
     let mut drive = |bridge: &mut CaptionBridge, seen: &mut Vec<_>| loop {
         match bridge.poll(&mut WorkBudget::new(97), &off()).unwrap() {
@@ -487,6 +484,46 @@ fn mp4_video_captions_reach_the_text_bridge_in_presentation_order() {
     }
     bridge.finish();
     assert!(drive(&mut bridge, &mut seen));
+    seen
+}
+
+/// The video packets of the H.264 caption fixture, its `avcC` record, the
+/// video's clock and the outputs' generation.
+fn caption_fixture(b: &Budget) -> (Vec<CaptionUnit>, Vec<u8>, CaptionVideo, u64) {
+    let raw = include_bytes!("fixtures/subtitles/cc-h264-a53.mp4");
+    let mut player = mp4_player(b, raw, Selection::All).unwrap();
+    let outputs = collect(&mut player, 4096).unwrap();
+    let video: Vec<&Mp4Packet> = outputs
+        .iter()
+        .filter_map(mp4_packet)
+        .filter(|p| p.configuration.track.handler == *b"vide")
+        .collect();
+    let configuration = avc_configuration(video[0]);
+    let clock = CaptionVideo {
+        coding: cc::VideoCoding::Nal(
+            Codec::H264,
+            Framing::of_configuration(Codec::H264, &configuration),
+        ),
+        time_base: video[0].configuration.track.base.require().unwrap(),
+        max_packet_bytes: PACKET_LIMIT,
+    };
+    let units = video
+        .iter()
+        .map(|p| CaptionUnit {
+            data: p.source.payload.clone(),
+            pts: p.source.sample.cts_ticks.map(|t| i64::try_from(t).unwrap()),
+            dts: p.source.sample.dts_ticks.map(|t| i64::try_from(t).unwrap()),
+            duration: Some(i64::from(p.source.sample.duration_ticks)),
+        })
+        .collect();
+    (units, configuration, clock, outputs[0].generation())
+}
+
+#[test]
+fn mp4_video_captions_reach_the_text_bridge_in_presentation_order() {
+    let b = pool();
+    let (units, configuration, video, generation) = caption_fixture(&b);
+    let seen = caption_cues(&b, generation, video, &configuration, units);
 
     // The reference's events at 1.4014 s, 3.470133 s and 5.138467 s: the
     // source view keeps the edit list's media time of 3003 ticks at 90 kHz.
@@ -506,4 +543,57 @@ fn mp4_video_captions_reach_the_text_bridge_in_presentation_order() {
             .starts_with(b"0,0,Default,,0,0,0,,{\\an7}{\\pos(38,213)}\\h\\h\\h\\hPOP-ON")
     );
     assert!(seen[2].0.ends_with(b"MIDDLE CYAN"));
+}
+
+#[test]
+fn mp4_video_captions_need_only_the_parameter_sets_of_the_configuration() {
+    // The fixture repeats its SPS and PPS in band. Without them, the `avcC`
+    // record's sets give the same cues, from the start and from every IDR
+    // picture a seek lands on; without the record no picture is decoded.
+    let b = pool();
+    let (units, configuration, video, generation) = caption_fixture(&b);
+    let size = match video.coding {
+        cc::VideoCoding::Nal(_, Framing::Lengths(size)) => usize::from(size),
+        coding => panic!("{coding:?}"),
+    };
+    let kind = |nal: &[u8]| nal[0] & 0x1f;
+    let alone: Vec<CaptionUnit> = units
+        .iter()
+        .map(|unit| {
+            let mut data = Vec::new();
+            for nal in sample_units(&unit.data, size) {
+                if !matches!(kind(nal), 7 | 8) {
+                    data.extend_from_slice(&(nal.len() as u32).to_be_bytes()[4 - size..]);
+                    data.extend_from_slice(nal);
+                }
+            }
+            CaptionUnit {
+                data: Bytes::copy_from_slice(&b, &data).unwrap(),
+                ..unit.clone()
+            }
+        })
+        .collect();
+    assert!(alone[0].data.len() < units[0].data.len());
+    let cues = |configuration: &[u8], units: &[CaptionUnit]| {
+        caption_cues(&b, generation, video, configuration, units.to_vec())
+    };
+    let in_band = cues(&configuration, &units);
+    assert_eq!(in_band.len(), 3);
+    assert_eq!(cues(&configuration, &alone), in_band);
+    assert_eq!(cues(&[], &alone), []);
+    let idr: Vec<usize> = (1..units.len())
+        .filter(|&at| {
+            sample_units(&units[at].data, size)
+                .iter()
+                .any(|nal| kind(nal) == 5)
+        })
+        .collect();
+    assert!(idr.len() > 3);
+    let mut captioned = 0;
+    for at in idr {
+        let from_seek = cues(&configuration, &units[at..]);
+        captioned += usize::from(!from_seek.is_empty());
+        assert_eq!(cues(&configuration, &alone[at..]), from_seek);
+    }
+    assert!(captioned > 0);
 }

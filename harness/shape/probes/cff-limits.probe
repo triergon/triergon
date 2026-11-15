@@ -1,0 +1,58 @@
+# Whether long charstrings fail, and what they count: subroutine calls,
+# operators, operands or drawn points. Glyphs 9 and 10 run 199999 and 200000
+# operators and operands; glyph 11 is an accented glyph whose base (glyph 12)
+# runs 150008 and accent (glyph 13) 60008; glyph 14 runs 100005 before the
+# accented form of the same two. Local 0 only returns; local 1 pushes
+# 512 operands and clears them with a reserved operator. Each glyph after
+# glyph 0 starts with `100 100 rmoveto`.
+local
+  return
+end
+local
+  1*512 op:0 return
+end
+glyph
+  endchar
+end
+glyph # 1: 2000 calls of a subroutine that returns
+  100 100 rmoveto [ -107 callsubr ]*2000 10 10 rlineto endchar
+end
+glyph # 2: 20000 calls
+  100 100 rmoveto [ -107 callsubr ]*20000 10 10 rlineto endchar
+end
+glyph # 3: 89600 lines of (1, 1) in 350 rlinetos, no calls
+  100 100 rmoveto [ 1*512 rlineto ]*350 endchar
+end
+glyph # 4: 102400 lines in 400 rlinetos
+  100 100 rmoveto [ 1*512 rlineto ]*400 endchar
+end
+glyph # 5: 512000 operands cleared by 1000 reserved operators, no points
+  100 100 rmoveto [ 1*512 op:0 ]*1000 10 10 rlineto endchar
+end
+glyph # 6: 100000 lines of zero length, one operator each
+  100 100 rmoveto [ 0 0 rlineto ]*100000 10 10 rlineto endchar
+end
+glyph # 7: 300000 reserved operators
+  100 100 rmoveto op:0*300000 10 10 rlineto endchar
+end
+glyph # 8: 1000 calls of a subroutine of 512 operands
+  100 100 rmoveto [ -106 callsubr ]*1000 10 10 rlineto endchar
+end
+glyph # 9: 199999 operators and operands, endchar included
+  100 100 rmoveto op:0*199995 endchar
+end
+glyph # 10: 200000
+  100 100 rmoveto op:0*199996 endchar
+end
+glyph # 11: the accented form of glyphs 12 and 13
+  0 0 65 194 endchar
+end
+glyph sid 34 # 12
+  100 100 rmoveto op:0*150000 10 10 rlineto endchar
+end
+glyph sid 125 # 13
+  250 650 rmoveto op:0*60000 10 10 rlineto endchar
+end
+glyph # 14: 100005 operators and operands, then the accented form of glyphs 12 and 13
+  100 100 rmoveto op:0*100000 0 0 65 194 endchar
+end

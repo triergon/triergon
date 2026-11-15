@@ -1,0 +1,65 @@
+# What the font and control value programs leave for later sizes, when one face
+# is requested at several sizes in turn (sequence). The font program counts its
+# runs in storage 0, keeps the ppem it ran at in storage 1 and control value 0,
+# and puts twilight point 0 at that ppem in pixels; the control value program
+# counts its runs in storage 2, keeps its ppem in storage 3, what it reads of
+# control values 0 and 1 in storage 4 and 5 and of twilight point 0 in storage
+# 6, then adds a pixel to control value 1. Each glyph counts in storage 7 and
+# writes storage 0 to 7, the ppem, control values 0 and 1 and twilight point 0
+# into the y of points 0 to 11.
+sequence 1000 640 1000 16384
+sequence 640 1000 640
+heights 1000 640
+cvt 100 200
+fpgm
+  PUSH 0 0; RS; PUSH 1; ADD; WS
+  PUSH 1; MPPEM; WS
+  PUSH 0; MPPEM; WCVTP
+  PUSH 0; SZP2; SVTCA[0]; PUSH 0; MPPEM; PUSH 4096; MUL; SCFS
+end
+prep
+  PUSH 2 2; RS; PUSH 1; ADD; WS
+  PUSH 3; MPPEM; WS
+  PUSH 4 0; RCVT; WS
+  PUSH 5 1; RCVT; WS
+  PUSH 6; PUSH 0; SZP2; SVTCA[0]; PUSH 0; GC[0]; WS
+  PUSH 1 1; RCVT; PUSH 64; ADD; WCVTP
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0, 400 0, 500 0, 600 0, 700 0, 800 0, 900 0, 1000 0, 1100 0
+  program
+    PUSH 7 7; RS; PUSH 1; ADD; WS
+    SVTCA[0]
+    PUSH 0 0; RS; SCFS
+    PUSH 1 1; RS; SCFS
+    PUSH 2 2; RS; SCFS
+    PUSH 3 3; RS; SCFS
+    PUSH 4 4; RS; SCFS
+    PUSH 5 5; RS; SCFS
+    PUSH 6 6; RS; SCFS
+    PUSH 7 7; RS; SCFS
+    PUSH 8; MPPEM; SCFS
+    PUSH 9 0; RCVT; SCFS
+    PUSH 10 1; RCVT; SCFS
+    PUSH 11; PUSH 0; SZP2; PUSH 0; GC[0]; PUSH 1; SZP2; SCFS
+  end
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0, 400 0, 500 0, 600 0, 700 0, 800 0, 900 0, 1000 0, 1100 0
+  program
+    PUSH 7 7; RS; PUSH 1; ADD; WS
+    SVTCA[0]
+    PUSH 0 0; RS; SCFS
+    PUSH 1 1; RS; SCFS
+    PUSH 2 2; RS; SCFS
+    PUSH 3 3; RS; SCFS
+    PUSH 4 4; RS; SCFS
+    PUSH 5 5; RS; SCFS
+    PUSH 6 6; RS; SCFS
+    PUSH 7 7; RS; SCFS
+    PUSH 8; MPPEM; SCFS
+    PUSH 9 0; RCVT; SCFS
+    PUSH 10 1; RCVT; SCFS
+    PUSH 11; PUSH 0; SZP2; PUSH 0; GC[0]; PUSH 1; SZP2; SCFS
+  end
+end
