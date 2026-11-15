@@ -649,9 +649,18 @@ impl HvcConfigParser {
                 }
                 Phase::FillInline(ref mut remaining) => {
                     *remaining -= 1;
-                    if *remaining == 0 {
-                        return Ok(ConfigProgress::Ready);
+                    // These entries were stored during validation. Spend each
+                    // remaining fill unit at its usual cancellation boundary.
+                    while *remaining != 0 {
+                        if cancel.load(Ordering::Relaxed) {
+                            return Err(Error::Cancelled);
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(ConfigProgress::Yield);
+                        }
+                        *remaining -= 1;
                     }
+                    return Ok(ConfigProgress::Ready);
                 }
                 Phase::Complete => return Ok(ConfigProgress::Complete),
             }

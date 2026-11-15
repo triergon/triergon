@@ -137,20 +137,6 @@ impl NalPacketConfiguration {
             _ => NalConfigurationRefusal::None,
         }
     }
-    fn avc_record(&self) -> Option<&AvcConfiguration> {
-        match self {
-            Self::Avc(v) => Some(v),
-            Self::ReceiverAvc(v) => Some(v.record()),
-            _ => None,
-        }
-    }
-    fn hevc_record(&self) -> Option<&HvcConfiguration> {
-        match self {
-            Self::Hevc(v) => Some(v),
-            Self::ReceiverHevc(v) => Some(v.record()),
-            _ => None,
-        }
-    }
     fn record(&self) -> ConfigurationRef<'_> {
         match self {
             Self::Avc(record) => ConfigurationRef::Avc(record),
@@ -166,19 +152,19 @@ impl NalPacketConfiguration {
     }
     /// Element-count lower bound for live descriptor storage.
     pub(crate) fn descriptor_lower_bound(&self) -> Result<usize> {
-        if let Some(c) = self.avc_record() {
-            c.descriptor_lower_bound()
-        } else if let Some(c) = self.hevc_record() {
-            c.descriptor_lower_bound()
-        } else {
-            Ok(0)
+        match self.record() {
+            ConfigurationRef::Avc(record) => record.descriptor_lower_bound(),
+            ConfigurationRef::Hevc(record) => record.descriptor_lower_bound(),
+            ConfigurationRef::Passthrough(_) => Ok(0),
         }
     }
     /// Sample length width; None for explicit passthrough.
     pub(crate) fn width(&self) -> Option<LengthSize> {
-        self.avc_record()
-            .map(AvcConfiguration::sample_length_size)
-            .or_else(|| self.hevc_record().map(HvcConfiguration::length_size))
+        match self.record() {
+            ConfigurationRef::Avc(record) => Some(record.sample_length_size()),
+            ConfigurationRef::Hevc(record) => Some(record.length_size()),
+            ConfigurationRef::Passthrough(_) => None,
+        }
     }
     /// Charge the array checks already established by the record parser.
     /// A refusal still consumes its own unit and is exposed only when reached.
@@ -187,7 +173,7 @@ impl NalPacketConfiguration {
         checked: &mut usize,
         work: &mut WorkBudget,
     ) -> std::result::Result<bool, u8> {
-        let Some(record) = self.hevc_record() else {
+        let ConfigurationRef::Hevc(record) = self.record() else {
             return Ok(true);
         };
         let (limit, refused) = record.first_unsupported_array().map_or_else(
@@ -210,18 +196,16 @@ impl NalPacketConfiguration {
     }
     /// The materialized configuration size and the sizing walk's work charge.
     pub(crate) fn annex_b_configuration_extent(&self) -> Option<(usize, u64)> {
-        if let Some(record) = self.avc_record() {
-            Some((
+        match self.record() {
+            ConfigurationRef::Avc(record) => Some((
                 record.annex_b_configuration_len(),
                 record.nal_count() as u64 + 1,
-            ))
-        } else if let Some(record) = self.hevc_record() {
-            Some((
+            )),
+            ConfigurationRef::Hevc(record) => Some((
                 record.annex_b_configuration_len()?,
                 record.nal_count() as u64 + 1,
-            ))
-        } else {
-            Some((self.bytes().len(), 2))
+            )),
+            ConfigurationRef::Passthrough(raw) => Some((raw.len(), 2)),
         }
     }
 }
@@ -522,9 +506,9 @@ impl NalPacketSession {
             PlanPhase::Scan
         };
         Ok(NalPacketJob {
+            source: Some(source),
             state: PacketState {
                 session: self,
-                source: Some(source),
                 update: avc_update,
                 codec,
                 length_width,
@@ -720,7 +704,7 @@ impl PacketSegmentStorage {
     }
     fn try_push<'a>(
         &mut self,
-        spill_budget: impl FnOnce() -> Result<(&'a Budget, usize)>,
+        spill_budget: impl FnOnce() -> (&'a Budget, usize),
         planned: Option<usize>,
         segment: NalPacketSegment,
     ) -> Result<()> {
@@ -730,7 +714,7 @@ impl PacketSegmentStorage {
                 *len += 1;
             }
             Self::Inline { data, .. } => {
-                let (pool, capacity) = spill_budget()?;
+                let (pool, capacity) = spill_budget();
                 *self = Self::Heap(Self::spill(pool, planned, capacity, data, segment)?);
             }
             Self::Heap(parts) => parts.try_push(segment).map_err(|e| e.error)?,
@@ -933,9 +917,8 @@ enum Injection {
 
 // Source, effective update and descriptors coexist through packet copying and
 // publication. Only the preparation scratch can share space with the buffer.
-struct PacketState<'a, M> {
+struct PacketState<'a> {
     session: &'a mut NalPacketSession,
-    source: Option<NalPacket<M>>,
     update: Option<AvcUpdate>,
     codec: Codec,
     length_width: Option<LengthSize>,
@@ -1014,50 +997,27 @@ enum PacketPhase {
 
 /// One cooperative packet framing job over the session it borrows.
 pub struct NalPacketJob<'a, M = NalPacketFields> {
-    state: PacketState<'a, M>,
+    source: Option<NalPacket<M>>,
+    state: PacketState<'a>,
     phase: PacketPhase,
 }
-// Session creation and packet admission ensure every retained source and
-// configuration uses this pool. The live packet already keeps it alive.
-fn packet_pool<M>(source: Option<&NalPacket<M>>) -> Result<&Budget> {
-    source
-        .map(|packet| packet.bytes.budget())
-        .ok_or(Error::Invalid("missing packet source"))
+
+// While planning, the source stays borrowed and every retained buffer uses
+// its pool. Packet metadata is needed only when publishing the result.
+#[derive(Clone, Copy)]
+struct PacketInput<'a> {
+    bytes: &'a Bytes,
+    new_extradata: Option<&'a Bytes>,
 }
 
-impl<M> PacketState<'_, M> {
+impl PacketState<'_> {
     fn config(&self) -> ConfigurationRef<'_> {
         match &self.update {
             Some(update) => ConfigurationRef::Avc(update.record()),
             None => self.session.configuration.record(),
         }
     }
-    fn source(&self) -> Option<&NalPacket<M>> {
-        self.source.as_ref()
-    }
-    /// Move the original failed source into an observed receiver-error view.
-    /// Only the physical error sites below can enable this transition.
-    /// The job's source error remains sticky after the one-time move.
-    fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
-        let kind = self.receiver_failure?;
-        let error = self.failure?;
-        let source = self.source.take()?;
-        Some(NalPacketRejection {
-            kind,
-            error,
-            source,
-            configuration: self.session.configuration.bytes().clone(),
-            configuration_identity: self.session.configuration.source_identity(),
-            configuration_source_refusal: self.session.configuration.refusal(),
-            packet_source_refusal: self.packet_source_refusal,
-            receiver_epoch: self.session.receiver_epoch,
-        })
-    }
-    fn fixed_live_bytes(&self) -> Result<usize> {
-        let packet = self
-            .source
-            .as_ref()
-            .ok_or(Error::Invalid("missing packet source"))?;
+    fn fixed_live_bytes(&self, input: PacketInput<'_>) -> Result<usize> {
         let mut total = Budget::control_storage_bytes()
             .checked_add(self.session.configuration.descriptor_lower_bound()?)
             .ok_or(Error::Overflow)?;
@@ -1069,8 +1029,8 @@ impl<M> PacketState<'_, M> {
         let owners = [
             Some(self.session.configuration.bytes()),
             self.update.as_ref().map(AvcUpdate::bytes),
-            Some(&packet.bytes),
-            packet.new_extradata.as_ref(),
+            Some(input.bytes),
+            input.new_extradata,
         ];
         for (i, owner) in owners.iter().enumerate() {
             if let Some(b) = owner
@@ -1102,7 +1062,11 @@ impl PacketPlan {
             .ok_or(Error::Overflow)
     }
 
-    fn establish_storage_bound<M>(&mut self, state: &PacketState<'_, M>) -> Result<()> {
+    fn establish_storage_bound(
+        &mut self,
+        state: &PacketState<'_>,
+        input: PacketInput<'_>,
+    ) -> Result<()> {
         let maximum = if state.length_width.is_some() {
             state.session.maximum_copy_storage
         } else {
@@ -1113,10 +1077,10 @@ impl PacketPlan {
         // pool. Its fixed storage is therefore at most the current live charge.
         // If both logical ceilings fit in the remaining capacity, they bound
         // every future append. Actual reservations still check current pressure.
-        self.storage_bound = if maximum <= packet_pool(state.source.as_ref())?.available() {
+        self.storage_bound = if maximum <= input.bytes.budget().available() {
             PacketStorageBound::LimitsFit
         } else {
-            PacketStorageBound::Fixed(state.fixed_live_bytes()?)
+            PacketStorageBound::Fixed(state.fixed_live_bytes(input)?)
         };
         Ok(())
     }
@@ -1127,14 +1091,15 @@ impl PacketPlan {
     // overflows exactly when the original left-to-right sum overflowed.
     #[cold]
     #[inline(never)]
-    fn check_storage_bound<M>(
+    fn check_storage_bound(
         &mut self,
-        state: &PacketState<'_, M>,
+        state: &PacketState<'_>,
+        input: PacketInput<'_>,
         segments: usize,
         output: usize,
     ) -> Result<()> {
         if matches!(self.storage_bound, PacketStorageBound::Unchecked) {
-            self.establish_storage_bound(state)?;
+            self.establish_storage_bound(state, input)?;
         }
         let PacketStorageBound::Fixed(live_base) = self.storage_bound else {
             return Ok(());
@@ -1146,7 +1111,7 @@ impl PacketPlan {
                 state.length_width.is_some(),
             )?)
             .ok_or(Error::Overflow)?;
-        let limit = packet_pool(state.source.as_ref())?.limit();
+        let limit = input.bytes.budget().limit();
         if minimum > limit {
             return Err(Error::Limit {
                 requested: minimum,
@@ -1157,9 +1122,10 @@ impl PacketPlan {
     }
     // Share storage accounting across the packet and configuration segments.
     #[inline(never)]
-    fn append<M>(
+    fn append(
         &mut self,
-        state: &mut PacketState<'_, M>,
+        state: &mut PacketState<'_>,
+        input: PacketInput<'_>,
         segment: NalPacketSegment,
     ) -> Result<()> {
         let parts = state.segments.len();
@@ -1182,12 +1148,11 @@ impl PacketPlan {
             });
         }
         if !matches!(self.storage_bound, PacketStorageBound::LimitsFit) {
-            self.check_storage_bound(state, count, total)?;
+            self.check_storage_bound(state, input, count, total)?;
         }
-        let source = &state.source;
         state.segments.try_push(
             || {
-                let pool = packet_pool(source.as_ref())?;
+                let pool = input.bytes.budget();
                 // Spare slots must leave room for output at the pool's limit.
                 // Other reservations can be released before publication.
                 let capacity = match self.storage_bound {
@@ -1201,7 +1166,7 @@ impl PacketPlan {
                     }
                     _ => maximum_parts,
                 };
-                Ok((pool, capacity))
+                (pool, capacity)
             },
             self.segment_hint,
             segment,
@@ -1213,12 +1178,25 @@ impl PacketPlan {
 
 impl<M> NalPacketJob<'_, M> {
     pub fn source(&self) -> Option<&NalPacket<M>> {
-        self.state.source()
+        self.source.as_ref()
     }
     /// Move the original failed source into an observed receiver-error view.
     /// The source error remains sticky after the one-time move.
     pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
-        self.state.take_receiver_rejection()
+        let state = &self.state;
+        let kind = state.receiver_failure?;
+        let error = state.failure?;
+        let source = self.source.take()?;
+        Some(NalPacketRejection {
+            kind,
+            error,
+            source,
+            configuration: state.session.configuration.bytes().clone(),
+            configuration_identity: state.session.configuration.source_identity(),
+            configuration_source_refusal: state.session.configuration.refusal(),
+            packet_source_refusal: state.packet_source_refusal,
+            receiver_epoch: state.session.receiver_epoch,
+        })
     }
     /// The same state engine as `step_into`, returning the output directly.
     pub fn step(
@@ -1400,7 +1378,7 @@ mod inline_packet_segments {
             let mut parts = PacketSegmentStorage::new();
             for index in 0..INLINE_PACKET_SEGMENTS {
                 parts
-                    .try_push(|| Ok((&pool, usize::MAX)), Some(hint), segment(index))
+                    .try_push(|| (&pool, usize::MAX), Some(hint), segment(index))
                     .unwrap();
                 assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
                 assert_eq!(pool.used(), base);
@@ -1408,7 +1386,7 @@ mod inline_packet_segments {
             }
             parts
                 .try_push(
-                    || Ok((&pool, usize::MAX)),
+                    || (&pool, usize::MAX),
                     Some(hint),
                     segment(INLINE_PACKET_SEGMENTS),
                 )
@@ -1434,14 +1412,14 @@ mod inline_packet_segments {
         assert!(parts.as_slice().is_empty());
         for index in 0..INLINE_PACKET_SEGMENTS {
             parts
-                .try_push(|| Ok((&pool, usize::MAX)), None, segment(index))
+                .try_push(|| (&pool, usize::MAX), None, segment(index))
                 .unwrap();
             assert_eq!(pool.used(), base);
             assert_eq!(parts.len(), index + 1);
         }
         for index in INLINE_PACKET_SEGMENTS..9 {
             parts
-                .try_push(|| Ok((&pool, usize::MAX)), None, segment(index))
+                .try_push(|| (&pool, usize::MAX), None, segment(index))
                 .unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
                 panic!("descriptor did not spill");
@@ -1472,7 +1450,7 @@ mod inline_packet_segments {
         assert_eq!(pool.used(), charge);
         for index in 0..INLINE_PACKET_SEGMENTS {
             parts
-                .try_push(|| Ok((&pool, usize::MAX)), Some(9), segment(index))
+                .try_push(|| (&pool, usize::MAX), Some(9), segment(index))
                 .unwrap();
             assert_eq!(parts.len(), index + 1);
             assert_eq!(parts.as_slice()[index], segment(index));
@@ -1482,7 +1460,7 @@ mod inline_packet_segments {
         for _ in 0..2 {
             assert!(matches!(
                 parts.try_push(
-                    || Ok((&pool, usize::MAX)),
+                    || (&pool, usize::MAX),
                     Some(9),
                     segment(INLINE_PACKET_SEGMENTS)
                 ),
@@ -1499,7 +1477,7 @@ mod inline_packet_segments {
             .unwrap();
         parts
             .try_push(
-                || Ok((&pool, usize::MAX)),
+                || (&pool, usize::MAX),
                 Some(9),
                 segment(INLINE_PACKET_SEGMENTS),
             )
@@ -1545,7 +1523,7 @@ mod inline_packet_segments {
             let mut parts = PacketSegmentStorage::new();
             for index in 0..actual {
                 parts
-                    .try_push(|| Ok((&pool, usize::MAX)), Some(hint), segment(index))
+                    .try_push(|| (&pool, usize::MAX), Some(hint), segment(index))
                     .unwrap();
                 assert_eq!(parts.len(), index + 1);
                 assert_eq!(parts.as_slice()[index], segment(index));
