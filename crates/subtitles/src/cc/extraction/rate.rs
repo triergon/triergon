@@ -14,8 +14,8 @@
 //! The times come from the packets read while fewer than 5,000,000 bytes of
 //! packets came before them (probes p93b, p100): the estimate settles once it
 //! has its times, once that much has been read, or at the end of the stream.
-//! Frames waiting for it hold only their caption bytes, so they take a small
-//! part of the packet data the reference keeps until then.
+//! Frames waiting for it hold only their caption bytes, not the packets the
+//! reference keeps until then.
 //!
 //! Packets of a length-prefixed (Matroska) stream that carry only
 //! presentation times are taken in [`Shown`] order instead.

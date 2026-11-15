@@ -1882,7 +1882,8 @@ def output_rule_cases(written):
 def hold_and_field_cases(written, carrier, fields, data):
     """The start hold by an order count jump and by MaxDpbFrames, the depth
     raised by a jump, frame_num gaps, unpaired fields, field pairs in one
-    packet and parameter sets only in a Matroska CodecPrivate."""
+    packet and parameter sets only in a Matroska CodecPrivate or an MP4 avcC
+    or hvcC box."""
     out = []
     # A step of 4 from the IDR picture before the B picture that makes the
     # depth 1 ends the hold at index 7: the B picture 5 below at index 8 is
@@ -1914,13 +1915,18 @@ def hold_and_field_cases(written, carrier, fields, data):
     # frames before it, none waiting for its second field).
     field_case("h264-fields-packed", lambda n, au: field_unit(2 * n, n == 0, (1, 2)) + field_unit(2 * n + 1, False)
                if 2 * n + 1 < len(fields) else None)
-    # The H.264 stream of h264-hold-depth1 in Matroska with its parameter
-    # sets only in the CodecPrivate.
-    source = os.path.join(OUT, "h264-hold-depth1.ts")
-    target = os.path.join(OUT, "h264-config.mkv")
-    run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-i", source, "-map", "0:v", "-c", "copy",
-         "-bsf:v", "filter_units=remove_types=7|8", "-fflags", "+bitexact", target])
-    out.append(("h264-config-mkv", target, ["cc"]))
+    # The H.264 stream of h264-hold-depth1 and the HEVC stream of hevc-a53 in
+    # Matroska and MP4 with their parameter sets only in the CodecPrivate or
+    # the avcC or hvcC box.
+    for source, name, kinds in (("h264-hold-depth1", "h264-config.mkv", "7|8"),
+                                ("h264-hold-depth1", "h264-config.mp4", "7|8"),
+                                ("hevc-a53", "hevc-config.mkv", "32|33|34"),
+                                ("hevc-a53", "hevc-config.mp4", "32|33|34")):
+        target = os.path.join(OUT, name)
+        run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y", "-i", os.path.join(OUT, source + ".ts"),
+             "-map", "0:v", "-c", "copy", "-bsf:v", "filter_units=remove_types=" + kinds,
+             "-fflags", "+bitexact", target])
+        out.append((name.replace(".", "-"), target, ["cc"]))
     return out
 
 

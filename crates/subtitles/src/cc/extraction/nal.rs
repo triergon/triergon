@@ -46,7 +46,7 @@
 //! `h264-hold-step3-ts`, `h264-hold-dpb-ts`). Where those outputs keep being
 //! dropped, the hold ends once more pictures are stored than MaxDpbFrames
 //! and 32 (probe p92: order counts 0, 600, 620, then 100 up by two, where
-//! the reference outputs every picture in order). The output of a first
+//! the reference outputs every picture in order; no probe pins the 32). The output of a first
 //! picture that is a non-IDR intra picture with `frame_num` 0 does not count (probes
 //! p89b, p89c; `h264-start-fn0-ts`). Among the first 20 pictures at least one
 //! waits (probe p27). A picture below each of the last 16 decoded makes those
@@ -117,8 +117,9 @@
 //! above 15 is not taken (`hevc-dpb-ts`, `hevc-dpb-raise-ts`). A picture that
 //! is not an IRAP picture but follows an end of sequence or end of bitstream
 //! NAL unit outputs every picture waiting before it is decoded
-//! (`hevc-eos-rasl-ts`). Pictures already output are removed, oldest first,
-//! once more are stored than the SPS's buffer size and 2: a conforming stream
+//! (`hevc-eos-rasl-ts`). Pictures already output or not to be output are
+//! removed, oldest first, once more are stored than the SPS's buffer size and
+//! 2: a conforming stream
 //! stores no more than its buffer size (C.4), but reference picture sets
 //! naming pictures by their order count LSBs can keep any number.
 //!
@@ -153,7 +154,10 @@
 //! packet, and at ticks between 1 and 2 ms the reference picks a multiple of a
 //! 10 fps rate (probes p96-p98).
 //!
-//! A picture whose parameter sets are missing or invalid is not decoded.
+//! A picture whose parameter sets are missing or invalid is not decoded. The
+//! sets come from the access units or, before the first, from the track's
+//! decoder configuration record (`avcC`, `hvcC`), as the reference's decoders
+//! take the container's extradata.
 //!
 //! A push or the finish either succeeds or leaves the decoder and its output as
 //! they were. A step first reads its access unit, which only adds caption bytes
@@ -168,7 +172,8 @@ use super::rate::{RateEstimate, Shown};
 use crate::cc::video::avc;
 use crate::cc::video::hevc::{self, Reference};
 use crate::cc::video::nal::{
-    Codec, Framing, SEI_RECOVERY_POINT, SEI_USER_DATA_REGISTERED, Timing, nal_units, sei_messages,
+    Codec, Framing, SEI_RECOVERY_POINT, SEI_USER_DATA_REGISTERED, Timing, configuration_units,
+    nal_units, sei_messages,
 };
 use triergon_bitstream::{BitSource, Rbsp};
 use triergon_core::{Budget, BudgetVec, Result};
@@ -197,13 +202,14 @@ const DEEP: u32 = 3;
 
 /// H.264 without a bitstream restriction: the start hold ends at the latest
 /// once more pictures are stored than MaxDpbFrames and this many. A bound
-/// for streams whose early outputs keep being dropped, such as order counts
-/// 0, 30000, 30010, then 50, 51, 52 and on, where the seven outputs never
-/// come; the probes' holds all end by index 24 (probe p70).
+/// for streams whose early outputs keep being dropped, so that the seven
+/// outputs never come, such as order counts 0, 600, 620, then 100 up by two,
+/// which the reference outputs in order (probe p92). No probe pins the
+/// margin; the other probes' holds all end by index 24 (probe p70).
 const HOLD_MARGIN: usize = 32;
 
 /// HEVC: the pictures stored beyond the SPS's buffer size and this many are
-/// removed, oldest first, once they have been output. A conforming stream
+/// removed, oldest first, once they have been output or are not to be. A conforming stream
 /// stores no more than the buffer size (C.4); reference picture sets naming
 /// pictures by order count LSBs can keep more, without bound.
 const HEVC_SLACK: usize = 2;
@@ -529,7 +535,7 @@ enum Tables {
 enum Replaced {
     AvcSps(u8, Option<avc::Sps>),
     AvcPps(u8, Option<triergon_framing::AvcPps>),
-    HevcSps(u8, Option<hevc::Sps>),
+    HevcSps(hevc::ReplacedSps),
     HevcPps(u8, Option<hevc::Pps>),
 }
 
@@ -688,7 +694,7 @@ impl NalDecode {
             match (&mut self.tables, replaced) {
                 (Tables::Avc(t), Replaced::AvcSps(id, old)) => t.restore_sps(id, old),
                 (Tables::Avc(t), Replaced::AvcPps(id, old)) => t.restore_pps(id, old),
-                (Tables::Hevc(t), Replaced::HevcSps(id, old)) => t.restore_sps(id, old),
+                (Tables::Hevc(t), Replaced::HevcSps(old)) => t.restore_sps(old),
                 (Tables::Hevc(t), Replaced::HevcPps(id, old)) => t.restore_pps(id, old),
                 _ => {}
             }
@@ -721,27 +727,8 @@ impl NalDecode {
                 }
                 continue;
             }
-            if matches!(
-                (self.codec, kind),
-                (
-                    Codec::H264,
-                    triergon_framing::avc::SPS | triergon_framing::avc::PPS
-                ) | (Codec::Hevc, kinds::SPS | kinds::PPS)
-            ) {
-                // Room to note the set it replaces, before it does.
-                self.replaced.try_reserve(1)?;
-            }
+            unit.changed_sps |= self.parameter_set(kind, payload)?;
             match (&mut self.tables, kind) {
-                (Tables::Avc(tables), triergon_framing::avc::SPS) => {
-                    if let Some((id, old)) = tables.put_sps(payload)? {
-                        keep(&mut self.replaced, Replaced::AvcSps(id, old));
-                    }
-                }
-                (Tables::Avc(tables), triergon_framing::avc::PPS) => {
-                    if let Some((id, old)) = tables.put_pps(payload)? {
-                        keep(&mut self.replaced, Replaced::AvcPps(id, old));
-                    }
-                }
                 (
                     Tables::Avc(tables),
                     triergon_framing::avc::SLICE | triergon_framing::avc::IDR,
@@ -767,19 +754,6 @@ impl NalDecode {
                     }
                     _ => {}
                 },
-                (Tables::Hevc(tables), kinds::SPS) => {
-                    if let Some((id, old)) = tables.put_sps(payload)? {
-                        if old.is_some() {
-                            unit.changed_sps |= 1 << id;
-                        }
-                        keep(&mut self.replaced, Replaced::HevcSps(id, old));
-                    }
-                }
-                (Tables::Hevc(tables), kinds::PPS) => {
-                    if let Some((id, old)) = tables.put_pps(payload)? {
-                        keep(&mut self.replaced, Replaced::HevcPps(id, old));
-                    }
-                }
                 (Tables::Hevc(_), kinds::EOS | kinds::EOB) => match &mut unit.picture {
                     Picture::Hevc { end_after, .. } => *end_after = true,
                     _ => unit.after_end = true,
@@ -801,6 +775,60 @@ impl NalDecode {
             *read = recovery;
         }
         Ok(unit)
+    }
+
+    /// Stores the set of an SPS or PPS NAL unit, noting the set it replaces;
+    /// returns the bit of an HEVC SPS id whose content it changed. Other NAL
+    /// units change nothing.
+    fn parameter_set(&mut self, kind: u8, payload: &[u8]) -> Result<u16> {
+        let is_set = matches!(
+            (self.codec, kind),
+            (
+                Codec::H264,
+                triergon_framing::avc::SPS | triergon_framing::avc::PPS
+            ) | (Codec::Hevc, kinds::SPS | kinds::PPS)
+        );
+        if !is_set {
+            return Ok(0);
+        }
+        // Room to note the set it replaces, before it does.
+        self.replaced.try_reserve(1)?;
+        let mut changed = 0;
+        let replaced = match (&mut self.tables, kind) {
+            (Tables::Avc(tables), triergon_framing::avc::SPS) => tables
+                .put_sps(payload)?
+                .map(|(id, old)| Replaced::AvcSps(id, old)),
+            (Tables::Avc(tables), _) => tables
+                .put_pps(payload)?
+                .map(|(id, old)| Replaced::AvcPps(id, old)),
+            (Tables::Hevc(tables), kinds::SPS) => tables.put_sps(payload)?.map(|replaced| {
+                if replaced.sps.is_some() {
+                    changed = 1 << replaced.id;
+                }
+                Replaced::HevcSps(replaced)
+            }),
+            (Tables::Hevc(tables), _) => tables
+                .put_pps(payload)?
+                .map(|(id, old)| Replaced::HevcPps(id, old)),
+        };
+        if let Some(replaced) = replaced {
+            keep(&mut self.replaced, replaced);
+        }
+        Ok(changed)
+    }
+
+    /// Takes the parameter sets of a decoder configuration record before the
+    /// first access unit.
+    pub(super) fn configure(&mut self, record: &[u8]) -> Result<()> {
+        self.step(|decode| {
+            for nal in configuration_units(decode.codec, record) {
+                if let Some(kind) = decode.codec.nal_type(nal) {
+                    let changed = decode.parameter_set(kind, decode.codec.payload(nal))?;
+                    decode.progress.hevc.changed_sps |= changed;
+                }
+            }
+            Ok(())
+        })
     }
 
     /// Decodes an access unit read by [`read`](Self::read), with its
@@ -1035,7 +1063,7 @@ impl NalDecode {
                 }
             } else if let Some(lone) = self.pictures.take(first.id) {
                 // An unpaired field is not output: its caption bytes go to
-                // the next picture (package case0021, case0116).
+                // the next picture (`h264-fields-lone-ts`).
                 if lone.end == held.start {
                     held.start = lone.start;
                 }
@@ -1375,7 +1403,7 @@ impl NalDecode {
     fn bump_avc(&mut self, out: &mut FrameQueue) {
         let state = &self.progress.avc;
         // Pictures leave by frames: none while a first field waits for its
-        // second (package case0060, case0749).
+        // second (`h264-fields-packed-ts`).
         if state.first_field.is_some() || state.holds && !state.early.ended {
             return;
         }

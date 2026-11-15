@@ -56,10 +56,11 @@ impl Deltas {
     }
 
     /// A set of more than 32 pictures is refused: 7.4.8 allows at most
-    /// `sps_max_dec_pic_buffering_minus1`, which is below 16.
+    /// `sps_max_dec_pic_buffering_minus1`, which is below 16. So is a delta
+    /// beyond 32 bits, which 7.4.8 keeps within 16.
     fn push(&mut self, delta: i64) -> std::result::Result<(), Failure> {
         let slot = self.values.get_mut(self.len).ok_or(Failure::Invalid)?;
-        *slot = delta as i32;
+        *slot = i32::try_from(delta).map_err(|_| Failure::Invalid)?;
         self.len += 1;
         Ok(())
     }
@@ -122,6 +123,14 @@ pub(crate) struct Slice {
     pub poc_lsb: u32,
 }
 
+/// An SPS a new one replaced, with the payload it was read from.
+#[derive(Debug)]
+pub(crate) struct ReplacedSps {
+    pub id: u8,
+    pub sps: Option<Sps>,
+    payload: LastPayload,
+}
+
 /// The parameter sets received, by id.
 #[derive(Debug)]
 pub(crate) struct Tables {
@@ -175,10 +184,10 @@ impl Tables {
     }
 
     /// Reads an SPS NAL unit payload (after the two header bytes) and stores
-    /// it, returning its id and the set it replaces; a set repeating the one
-    /// stored under its id changes nothing, whatever sets came between. An
-    /// SPS cut short, out of range or not taken by the reference is ignored.
-    pub(crate) fn put_sps(&mut self, payload: &[u8]) -> Result<Option<(u8, Option<Sps>)>> {
+    /// it, returning the set it replaces; a set repeating the one stored under
+    /// its id changes nothing, whatever sets came between. An SPS cut short,
+    /// out of range or not taken by the reference is ignored.
+    pub(crate) fn put_sps(&mut self, payload: &[u8]) -> Result<Option<ReplacedSps>> {
         if self.sps.is_empty() {
             self.sps.try_extend_with(SPS_IDS, |_| None)?;
         }
@@ -197,8 +206,13 @@ impl Tables {
         match self.read_sps(&mut bits) {
             Ok((id, sps)) => {
                 let at = usize::from(id);
-                self.sps_payloads[at].remember(payload)?;
-                Ok(Some((id, self.sps[at].replace(sps))))
+                let mut stored = LastPayload::new(&self.pool);
+                stored.remember(payload)?;
+                Ok(Some(ReplacedSps {
+                    id,
+                    sps: self.sps[at].replace(sps),
+                    payload: std::mem::replace(&mut self.sps_payloads[at], stored),
+                }))
             }
             Err(Failure::Memory(error)) => Err(error),
             Err(Failure::Invalid) => Ok(None),
@@ -220,18 +234,18 @@ impl Tables {
         }))
     }
 
-    /// Forgets the last sets read, after a failed step puts sets back.
+    /// Forgets the last sets read, after a failed step puts sets back. The
+    /// payload stored under each SPS id comes back with its set.
     pub(crate) fn forget_repeats(&mut self) {
         self.last_sps.forget();
         self.last_pps.forget();
-        for payload in self.sps_payloads.iter_mut() {
-            payload.forget();
-        }
     }
 
-    pub(crate) fn restore_sps(&mut self, id: u8, old: Option<Sps>) {
-        if let Some(slot) = self.sps.get_mut(usize::from(id)) {
-            *slot = old;
+    pub(crate) fn restore_sps(&mut self, old: ReplacedSps) {
+        let at = usize::from(old.id);
+        if let (Some(slot), Some(payload)) = (self.sps.get_mut(at), self.sps_payloads.get_mut(at)) {
+            *slot = old.sps;
+            *payload = old.payload;
         }
     }
 
@@ -638,7 +652,9 @@ mod tests {
         let pool = Budget::new(1 << 20).expect("pool");
         let mut tables = Tables::new(&pool);
         match tables.put_sps(&nal[2..]).expect("memory") {
-            Some((id, _)) => (true, tables.sps(id).and_then(|sps| sps.fields.timing)),
+            Some(ReplacedSps { id, .. }) => {
+                (true, tables.sps(id).and_then(|sps| sps.fields.timing))
+            }
             None => (false, None),
         }
     }
@@ -678,15 +694,51 @@ mod tests {
         let pool = Budget::new(1 << 20).expect("pool");
         let mut tables = Tables::new(&pool);
         let sps = hevc_sps(4);
-        assert!(matches!(tables.put_sps(&sps[2..]), Ok(Some((0, None)))));
+        assert!(matches!(
+            tables.put_sps(&sps[2..]),
+            Ok(Some(ReplacedSps {
+                id: 0,
+                sps: None,
+                ..
+            }))
+        ));
         assert!(matches!(tables.put_sps(&sps[2..]), Ok(None)));
         // Another set replaces it, and the first comes back in its place.
         let other = hevc_sps(5);
         assert!(matches!(
             tables.put_sps(&other[2..]),
-            Ok(Some((0, Some(_))))
+            Ok(Some(ReplacedSps {
+                id: 0,
+                sps: Some(_),
+                ..
+            }))
         ));
-        assert!(matches!(tables.put_sps(&sps[2..]), Ok(Some((0, Some(_))))));
+        assert!(matches!(
+            tables.put_sps(&sps[2..]),
+            Ok(Some(ReplacedSps {
+                id: 0,
+                sps: Some(_),
+                ..
+            }))
+        ));
+    }
+
+    #[test]
+    fn a_set_put_back_is_repeated_by_its_payload() {
+        // A failed step puts back the set it replaced; the payload stored
+        // under the id comes back with it, so repeating that set changes
+        // nothing.
+        let pool = Budget::new(1 << 20).expect("pool");
+        let mut tables = Tables::new(&pool);
+        let (sps, other) = (hevc_sps(4), hevc_sps(5));
+        assert!(tables.put_sps(&sps[2..]).expect("memory").is_some());
+        let replaced = tables
+            .put_sps(&other[2..])
+            .expect("memory")
+            .expect("replaced");
+        tables.restore_sps(replaced);
+        tables.forget_repeats();
+        assert!(matches!(tables.put_sps(&sps[2..]), Ok(None)));
     }
 
     #[test]
@@ -694,8 +746,22 @@ mod tests {
         let pool = Budget::new(1 << 20).expect("pool");
         let mut tables = Tables::new(&pool);
         let (zero, one) = (hevc_sps_of(4, 0), hevc_sps_of(4, 1));
-        assert!(matches!(tables.put_sps(&zero[2..]), Ok(Some((0, None)))));
-        assert!(matches!(tables.put_sps(&one[2..]), Ok(Some((1, None)))));
+        assert!(matches!(
+            tables.put_sps(&zero[2..]),
+            Ok(Some(ReplacedSps {
+                id: 0,
+                sps: None,
+                ..
+            }))
+        ));
+        assert!(matches!(
+            tables.put_sps(&one[2..]),
+            Ok(Some(ReplacedSps {
+                id: 1,
+                sps: None,
+                ..
+            }))
+        ));
         for _ in 0..3 {
             assert!(matches!(tables.put_sps(&zero[2..]), Ok(None)));
             assert!(matches!(tables.put_sps(&one[2..]), Ok(None)));
@@ -704,7 +770,11 @@ mod tests {
         let changed = hevc_sps_of(5, 1);
         assert!(matches!(
             tables.put_sps(&changed[2..]),
-            Ok(Some((1, Some(_))))
+            Ok(Some(ReplacedSps {
+                id: 1,
+                sps: Some(_),
+                ..
+            }))
         ));
         assert!(matches!(tables.put_sps(&zero[2..]), Ok(None)));
     }

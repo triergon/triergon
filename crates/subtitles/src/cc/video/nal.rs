@@ -23,6 +23,23 @@ pub enum Framing {
     Lengths(u8),
 }
 
+impl Framing {
+    /// The framing of the samples an `avcC` or `hvcC` decoder configuration
+    /// record (ISO/IEC 14496-15) describes: lengths of
+    /// `lengthSizeMinusOne + 1` bytes, or start codes when the record is too
+    /// short to say.
+    #[must_use]
+    pub fn of_configuration(codec: Codec, record: &[u8]) -> Self {
+        let at = match codec {
+            Codec::H264 => 4,
+            Codec::Hevc => 21,
+        };
+        record
+            .get(at)
+            .map_or(Self::StartCodes, |b| Self::Lengths((b & 3) + 1))
+    }
+}
+
 /// The video coding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Codec {
@@ -143,6 +160,51 @@ pub(crate) fn nal_units(access_unit: &[u8], framing: Framing) -> impl Iterator<I
         Some(unit)
     });
     start_codes.into_iter().flatten().chain(lengths)
+}
+
+/// The NAL units an `avcC` or `hvcC` decoder configuration record lists, in
+/// record order: an `avcC` record's SPSs then PPSs, each of an `hvcC`
+/// record's arrays in turn. A list cut short ends them.
+pub(crate) fn configuration_units(codec: Codec, record: &[u8]) -> impl Iterator<Item = &[u8]> {
+    // Where the next unit's 16-bit length is, the units left in the current
+    // list and the lists after it.
+    let (mut at, mut left, mut lists) = match codec {
+        Codec::H264 => (6, record.get(5).map_or(0, |b| usize::from(b & 0x1f)), 1),
+        Codec::Hevc => (23, 0, record.get(22).map_or(0, |&b| usize::from(b))),
+    };
+    std::iter::from_fn(move || {
+        while left == 0 {
+            if lists == 0 {
+                return None;
+            }
+            lists -= 1;
+            // An `avcC` record's PPS count is one byte; each `hvcC` array
+            // starts with its NAL type byte and a 16-bit count.
+            let count = match codec {
+                Codec::H264 => record.get(at).map(|&b| (1, usize::from(b))),
+                Codec::Hevc => record
+                    .get(at + 1..at + 3)
+                    .map(|n| (3, usize::from(u16::from_be_bytes([n[0], n[1]])))),
+            };
+            let Some((header, count)) = count else {
+                lists = 0;
+                return None;
+            };
+            at += header;
+            left = count;
+        }
+        let unit = record.get(at..at + 2).and_then(|len| {
+            let len = usize::from(u16::from_be_bytes([len[0], len[1]]));
+            record.get(at + 2..at + 2 + len)
+        });
+        if let Some(unit) = unit {
+            at += 2 + unit.len();
+            left -= 1;
+        } else {
+            (left, lists) = (0, 0);
+        }
+        unit
+    })
 }
 
 /// `user_data_registered_itu_t_t35`.

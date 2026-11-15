@@ -28,9 +28,20 @@ fn extract<'a>(
     coding: VideoCoding,
     packets: impl IntoIterator<Item = VideoPacket<'a>>,
 ) -> Vec<Frame> {
+    extract_configured(coding, &[], packets)
+}
+
+/// [`extract`] with the parameter sets of a decoder configuration record
+/// taken first.
+fn extract_configured<'a>(
+    coding: VideoCoding,
+    record: &[u8],
+    packets: impl IntoIterator<Item = VideoPacket<'a>>,
+) -> Vec<Frame> {
     let pool = Budget::new(1 << 24).expect("pool");
     let mut work = WorkBudget::new(1 << 24);
     let mut extractor = CaptionExtractor::new(&pool, coding, (1, 90_000));
+    extractor.configure(record, &mut work).expect("configure");
     let mut frames = Vec::new();
     let mut collect = |extractor: &mut CaptionExtractor| {
         while let Some(f) = extractor.pop().expect("pop") {
@@ -1034,6 +1045,115 @@ fn h264_length_prefixed_nal_units_give_the_same_frames() {
     );
 }
 
+/// An `avcC` record (ISO/IEC 14496-15 §5.3.3.1) with 4-byte lengths, one SPS
+/// and one PPS.
+fn avcc(sps: &[u8], pps: &[u8]) -> Vec<u8> {
+    let list = |nal: &[u8]| [&(nal.len() as u16).to_be_bytes()[..], nal].concat();
+    [
+        &[1, 0x64, 0, 0x1e, 0xff, 0xe1][..],
+        &list(sps),
+        &[1],
+        &list(pps),
+    ]
+    .concat()
+}
+
+/// An `hvcC` record (ISO/IEC 14496-15 §8.3.3.1) with 4-byte lengths and one
+/// array of each NAL unit given.
+fn hvcc(nals: &[Vec<u8>]) -> Vec<u8> {
+    let mut record = vec![1, 1, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5d];
+    record.extend([0xf0, 0, 0xfc, 0xfd, 0xf8, 0xf8, 0, 0, 0x0f]);
+    record.push(nals.len() as u8);
+    for nal in nals {
+        record.extend([0x80 | (nal[0] >> 1), 0, 1]);
+        record.extend((nal.len() as u16).to_be_bytes());
+        record.extend(nal);
+    }
+    record
+}
+
+#[test]
+fn h264_parameter_sets_can_come_from_the_configuration_record_alone() {
+    // An MP4 or Matroska track whose samples carry no SPS or PPS: the
+    // record's sets give the frames of a stream that repeats them in band,
+    // and without them no picture is decoded. A stream read from its second
+    // IDR picture, as after a seek, gives that stream's frames too.
+    let sps = AvcSps::default();
+    let coding = VideoCoding::Nal(Codec::H264, Framing::Lengths(4));
+    let gop = [avc_gop(0), avc_gop(0)].concat();
+    let samples = |in_band: bool| -> Vec<(Vec<u8>, i64)> {
+        gop.iter()
+            .enumerate()
+            .map(|(n, &(slice_type, reference, lsb, frame_num))| {
+                let idr = n % 7 == 0;
+                let slice = AvcSlice {
+                    idr,
+                    reference,
+                    slice_type,
+                    frame_num,
+                    poc_lsb: lsb,
+                    ..AvcSlice::default()
+                };
+                let sets = (idr && in_band).then_some(&sps);
+                let pts = 90_000 + (n / 7 * 14 + lsb as usize / 2) as i64 * 3003;
+                (length_prefixed(&avc_nals(sets, n as u8, &slice, 0)), pts)
+            })
+            .collect()
+    };
+    let (in_band, alone) = (samples(true), samples(false));
+    let record = avcc(&avc_sps(&sps), &avc_pps());
+    let expected = extract(coding, ts_packets(&in_band));
+    assert_eq!(expected.len(), 14);
+    assert_eq!(
+        extract_configured(coding, &record, ts_packets(&alone)),
+        expected
+    );
+    assert_eq!(extract(coding, ts_packets(&alone)), []);
+    assert_eq!(
+        extract_configured(coding, &record, ts_packets(&alone[7..])),
+        extract(coding, ts_packets(&in_band[7..]))
+    );
+    assert_eq!(tags(&extract(coding, ts_packets(&in_band[7..]))).len(), 7);
+}
+
+#[test]
+fn hevc_parameter_sets_can_come_from_the_configuration_record_alone() {
+    // As for H.264: without the record's sets no picture is decoded and the
+    // captions only gather, waiting for one. Read from the CRA picture, as
+    // after a seek, its RASL pictures are not decoded either way.
+    let coding = VideoCoding::Nal(Codec::Hevc, Framing::Lengths(4));
+    let samples = |in_band: bool| -> Vec<(Vec<u8>, i64)> {
+        hevc_open_gop()
+            .iter()
+            .enumerate()
+            .map(|(n, (kind, poc, deltas))| {
+                let mut nals = Vec::new();
+                if in_band && (16..=23).contains(kind) {
+                    nals.extend([hevc_sps(4, 1, 0), hevc_pps()]);
+                }
+                nals.push(caption_sei(&[0x4e, 0x01], n as u8));
+                nals.push(hevc_slice(*kind, *poc, deltas, false));
+                (length_prefixed(&nals), 90_000 + i64::from(*poc) * 3003)
+            })
+            .collect()
+    };
+    let (in_band, alone) = (samples(true), samples(false));
+    let record = hvcc(&[hevc_sps(4, 1, 0), hevc_pps()]);
+    let expected = extract(coding, ts_packets(&in_band));
+    assert_eq!(expected.len(), 13);
+    assert_eq!(
+        extract_configured(coding, &record, ts_packets(&alone)),
+        expected
+    );
+    assert_eq!(extract(coding, ts_packets(&alone)), []);
+    let from_cra = extract(coding, ts_packets(&in_band[7..]));
+    assert!(!from_cra.is_empty());
+    assert_eq!(
+        extract_configured(coding, &record, ts_packets(&alone[7..])),
+        from_cra
+    );
+}
+
 /// HEVC pictures (NAL type, order count, reference deltas) of an open GOP
 /// with two B pictures, as libx265 codes them: IDR0 P3 B1 B2 P6 B4 B5, then a
 /// CRA picture 9 with RASL pictures 7 and 8, P12 B10 B11.
@@ -1072,6 +1192,30 @@ fn hevc_stream(pictures: &[(u8, u32, Vec<i32>)]) -> Vec<(Vec<u8>, i64)> {
 
 fn with_end_of_sequence(au: &[u8]) -> Vec<u8> {
     [&[0, 0, 1, 0x48, 0x01][..], au].concat()
+}
+
+#[test]
+fn hevc_reserved_vcl_types_do_not_decide_a_picture() {
+    // Case hevc-reserved-ts: a reserved VCL NAL unit type (10 to 15, 22 to
+    // 31) is not a slice, and the CRA slice after it decides the picture.
+    let coding = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
+    for reserved in (10..=15).chain(22..=31) {
+        let first = annex_b(&[
+            hevc_sps(4, 1, 0),
+            hevc_pps(),
+            vec![reserved << 1, 1, 0x80],
+            caption_sei(&[0x4e, 0x01], 0),
+            hevc_slice(21, 0, &[], false),
+        ]);
+        let units = [
+            (first, 0),
+            (hevc_au(false, 1, hevc_slice(1, 1, &[-1], false)), 1001),
+        ];
+        let frames = extract(coding, ts_packets(&units));
+        assert_eq!(tags(&frames), [[0], [1]], "type {reserved}");
+        let pts: Vec<_> = frames.iter().map(|f| f.0).collect();
+        assert_eq!(pts, [Some(0), Some(1001)], "type {reserved}");
+    }
 }
 
 #[test]

@@ -155,6 +155,26 @@ impl CaptionExtractor {
         self.time_base
     }
 
+    /// Takes the parameter sets of the decoder configuration record of an
+    /// H.264 or HEVC track (`avcC` or `hvcC`, ISO/IEC 14496-15, as MP4 and
+    /// Matroska carry it), as a decoder takes them before the stream. Samples
+    /// of such tracks often hold no parameter sets of their own, and a picture
+    /// whose sets are missing is not decoded, so its captions are lost: call
+    /// this before the first packet, also on the new extractor after a seek.
+    /// MPEG-2 video ignores it. Charges one work unit per byte.
+    ///
+    /// # Errors
+    ///
+    /// When `work` cannot cover the record or the pool cannot hold its sets;
+    /// the extractor is then as it was before the call.
+    pub fn configure(&mut self, record: &[u8], work: &mut WorkBudget) -> Result<()> {
+        charge(work, record.len())?;
+        match &mut self.decode {
+            Decode::Mpeg2(_) => Ok(()),
+            Decode::Nal(decode) => decode.configure(record),
+        }
+    }
+
     /// Takes the next packet in decode order. Charges one work unit per byte.
     ///
     /// # Errors

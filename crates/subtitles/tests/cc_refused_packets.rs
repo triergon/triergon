@@ -218,17 +218,20 @@ fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
 #[test]
 fn a_refused_hevc_access_unit_leaves_the_extractor_as_it_was() {
     use nal_streams::{annex_b, caption_sei, hevc_pps, hevc_slice, hevc_sps};
-    // IDR0, then trailing pictures 1 to 29 in order, each referring to the
-    // one before.
+    // IDR0, then trailing pictures 1 to 19 in order, each referring to the
+    // one before; then an IDR picture with no_output_of_prior_pics_flag that
+    // repeats the SPS unchanged, and trailing pictures 21 to 29 after it.
     let units: Vec<_> = (0..30u8)
         .map(|n| {
             let mut nals = Vec::new();
-            if n == 0 {
+            if n == 0 || n == 20 {
                 nals.extend([hevc_sps(4, 1, 0), hevc_pps()]);
             }
             nals.push(caption_sei(&[0x4e, 0x01], n));
             nals.push(match n {
                 0 => hevc_slice(19, 0, &[], false),
+                20 => hevc_slice(20, 0, &[], true),
+                21.. => hevc_slice(1, u32::from(n - 20), &[-1], false),
                 _ => hevc_slice(1, u32::from(n), &[-1], false),
             });
             annex_b(&nals)
@@ -275,6 +278,10 @@ fn a_refused_hevc_access_unit_leaves_the_extractor_as_it_was() {
     ];
     let coding = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
     let expected = extract(coding, 1 << 20, &packets, &[]);
-    assert_eq!(expected.len(), 30);
+    // The second IDR picture discards picture 19, still waiting: its SPS
+    // repeats the one stored, so it changes nothing, also after the refused
+    // packet's replacing SPS was put back.
+    assert_eq!(expected.len(), 29);
+    assert!(expected.iter().all(|(_, _, data)| data[1] & 0x7f != 19));
     assert_eq!(extract(coding, 1 << 20, &packets, &refused), expected);
 }

@@ -146,25 +146,13 @@ fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
         u32::try_from(track.time_base.denominator())?,
     );
     let video = coding(codec, &track.configuration)?;
-    // The configuration's parameter sets go before the first packet's NAL
-    // units, as a decoder takes them before the stream.
-    let sets = match video {
-        VideoCoding::Nal(codec, Framing::Lengths(size)) => {
-            configuration_units(codec, &track.configuration, size)
-        }
-        _ => Vec::new(),
-    };
     let mut extraction = Extraction::new(video, time_base)?;
-    for (at, p) in track.packets.iter().enumerate() {
-        let first;
-        let data = if at == 0 && !sets.is_empty() {
-            first = [sets.as_slice(), &p.data].concat();
-            &first[..]
-        } else {
-            &p.data[..]
-        };
+    if matches!(video, VideoCoding::Nal(_, Framing::Lengths(_))) {
+        extraction.configure(&track.configuration)?;
+    }
+    for p in &track.packets {
         extraction.push(VideoPacket {
-            data,
+            data: &p.data,
             pts: p.pts,
             dts: p.dts,
             duration: p.duration,
@@ -173,64 +161,18 @@ fn video_track(file: &Path, ordinal: usize) -> Result<Track> {
     extraction.finish()
 }
 
-/// The parameter-set NAL units of an `avcC` or `hvcC` configuration, each
-/// behind a `size`-byte length.
-fn configuration_units(codec: Codec, configuration: &[u8], size: u8) -> Vec<u8> {
-    let mut units = Vec::new();
-    let mut put = |nal: &[u8]| {
-        let len = u32::try_from(nal.len()).unwrap_or(u32::MAX).to_be_bytes();
-        units.extend_from_slice(&len[4 - usize::from(size)..]);
-        units.extend_from_slice(nal);
-    };
-    // A list of `count` units, each behind a 16-bit length, from `at`.
-    let list = |at: &mut usize, count: usize, put: &mut dyn FnMut(&[u8])| {
-        for _ in 0..count {
-            let Some(len) = configuration.get(*at..*at + 2) else {
-                return;
-            };
-            let len = usize::from(u16::from_be_bytes([len[0], len[1]]));
-            let Some(nal) = configuration.get(*at + 2..*at + 2 + len) else {
-                return;
-            };
-            put(nal);
-            *at += 2 + len;
-        }
-    };
-    match codec {
-        Codec::H264 => {
-            let mut at = 6;
-            let sps = configuration.get(5).map_or(0, |b| usize::from(b & 0x1f));
-            list(&mut at, sps, &mut put);
-            if let Some(&pps) = configuration.get(at) {
-                at += 1;
-                list(&mut at, usize::from(pps), &mut put);
-            }
-        }
-        Codec::Hevc => {
-            let mut at = 23;
-            for _ in 0..configuration.get(22).copied().unwrap_or(0) {
-                let Some(count) = configuration.get(at + 1..at + 3) else {
-                    break;
-                };
-                let count = usize::from(u16::from_be_bytes([count[0], count[1]]));
-                at += 3;
-                list(&mut at, count, &mut put);
-            }
-        }
-    }
-    units
-}
-
 /// How the extractor reads a video stream of `codec`.
 fn coding(codec: Option<CodecId<'_>>, configuration: &[u8]) -> Result<VideoCoding> {
     Ok(match codec {
         Some(CodecId::Mpeg2Video) => VideoCoding::Mpeg2Pes,
-        Some(CodecId::H264) => {
-            VideoCoding::Nal(Codec::H264, length_framing(Codec::H264, configuration))
-        }
-        Some(CodecId::Hevc) => {
-            VideoCoding::Nal(Codec::Hevc, length_framing(Codec::Hevc, configuration))
-        }
+        Some(CodecId::H264) => VideoCoding::Nal(
+            Codec::H264,
+            Framing::of_configuration(Codec::H264, configuration),
+        ),
+        Some(CodecId::Hevc) => VideoCoding::Nal(
+            Codec::Hevc,
+            Framing::of_configuration(Codec::Hevc, configuration),
+        ),
         _ => return Err("cc: captions are read from MPEG-2, H.264 or HEVC video".into()),
     })
 }
@@ -251,6 +193,10 @@ impl Extraction {
             extractor: CaptionExtractor::new(&pool, coding, time_base),
             frames: Vec::new(),
         })
+    }
+
+    fn configure(&mut self, record: &[u8]) -> Result<()> {
+        Ok(self.extractor.configure(record, &mut self.work)?)
     }
 
     fn push(&mut self, packet: VideoPacket<'_>) -> Result<()> {
@@ -355,18 +301,6 @@ fn mp4_boxes(mut data: &[u8]) -> impl Iterator<Item = ([u8; 4], &[u8])> {
         data = &data[size..];
         Some((kind, payload))
     })
-}
-
-/// The NAL unit length size of an `avcC` or `hvcC` configuration; start codes
-/// without one.
-fn length_framing(codec: Codec, configuration: &[u8]) -> Framing {
-    let at = match codec {
-        Codec::H264 => 4,
-        Codec::Hevc => 21,
-    };
-    configuration
-        .get(at)
-        .map_or(Framing::StartCodes, |b| Framing::Lengths((b & 3) + 1))
 }
 
 /// The decoder's storage limit.
