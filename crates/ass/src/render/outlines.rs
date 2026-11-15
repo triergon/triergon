@@ -285,6 +285,8 @@ impl Outlines {
         let metrics = sized.outline_into(glyph, scratch)?;
         // Synthesis, decoration and the conversion pass over its points.
         charge(work, scratch.points().len())?;
+        // An outline FreeType refuses to embolden is drawn as it is
+        // (`decorations-orientation.ass`).
         sized.synthesize(scratch, source.synthesis(font.weight(), font.slant()))?;
         // A glyph an `@` font draws rotated advances by its linear vertical
         // advance (`d16_to_d6`, in `int`).

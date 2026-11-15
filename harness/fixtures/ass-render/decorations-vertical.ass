@@ -1,0 +1,23 @@
+;@attach NotoSansJP-Regular.otf
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs of `@` fonts, whose glyphs libass draws rotated:
+; a CID-keyed CFF face with ideographs and Latin letters, and a TrueType face.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Vertical,@Noto Sans JP,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,10,10,10,128
+Style: VerticalArimo,@Arimo,48,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,0,100,100,0,0,1,0,0,7,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Vertical,,0,0,0,,{\pos(100,100)}縦書きabc
+Dialogue: 0,0:00:00.00,0:00:01.00,Vertical,,0,0,0,,{\pos(400,100)\s0\b1}縦書き{\i1}斜
+Dialogue: 0,0:00:00.00,0:00:01.00,VerticalArimo,,0,0,0,,{\pos(100,400)}Rotated {\s1}Arimo

@@ -1,0 +1,25 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs under scaling, spacing and rotation: \fscx and
+; \fscy each way, \fsp positive and negative, \frz, \frx, \fry and \fax.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)\fscx200}wide {\fscx50}narrow {\fscx100\fscy250}tall {\fscy30}flat
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,160)\fsp12}spaced out {\fsp-6}squeezed in {\fsp0}none
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,260)\fsp30\fscx150}both at once
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(640,450)\an5\frz30}rotated
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(320,600)\an5\frx40\fry30}tilted in 3D
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(960,600)\an5\fax0.3\fscx0}sheared

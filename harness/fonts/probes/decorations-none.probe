@@ -1,0 +1,16 @@
+# A face without decorations: post's underline thickness and OS/2's
+# strike-out size are zero, so neither band is drawn.
+family Triergon Decorations None
+units-per-em 1000
+metrics 800 -200
+underline 0 0
+strikeout 0 0
+heights 16384
+modes outlines
+glyph advance 500
+end
+glyph advance 600 char 0x41
+  contour 100 0, 100 700, 500 700, 500 0
+end
+glyph advance 250 char 0x20
+end

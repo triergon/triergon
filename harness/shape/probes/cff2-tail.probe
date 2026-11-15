@@ -1,0 +1,27 @@
+# How a CFF2 charstring may end, which needs no endchar: after an escape
+# byte, inside a number, with return, or with endchar's accented form. Each
+# draws `100 100 rmoveto 10 20 rlineto` first.
+format cff2
+glyph
+end
+glyph # 1: an escape byte at the end
+  100 100 rmoveto 10 20 rlineto byte:12
+end
+glyph # 2: a three-byte number cut after its second byte
+  100 100 rmoveto 10 20 rlineto byte:28 byte:1
+end
+glyph # 3: a 16.16 number cut after its third byte
+  100 100 rmoveto 10 20 rlineto byte:255 byte:0 byte:1
+end
+glyph # 4: a two-byte number cut after its first byte
+  100 100 rmoveto 10 20 rlineto byte:247
+end
+glyph # 5: return outside a subroutine
+  100 100 rmoveto 10 20 rlineto return 30 30 rlineto
+end
+glyph # 6: endchar with four operands (CFF's accented form) after a line
+  100 100 rmoveto 10 20 rlineto 50 20 65 194 endchar
+end
+glyph # 7: a number left on the stack at the end
+  100 100 rmoveto 10 20 rlineto 5
+end

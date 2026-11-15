@@ -1,0 +1,70 @@
+# Subroutine calls other than their depth: indexes out of range, a
+# subroutine without return, return outside one, operands across calls.
+# Local subroutines: 0 draws `0 10 rlineto` and returns; 1 draws `10 0
+# rlineto` and ends without return; 2 pushes `30 40` and returns; 3 is empty.
+# One global subroutine: draws `-20 0 rlineto` and returns.
+global
+  -20 0 rlineto return
+end
+local
+  0 10 rlineto return
+end
+local
+  10 0 rlineto
+end
+local
+  30 40 return
+end
+local
+end
+glyph
+  endchar
+end
+glyph # 1: a call, then a line
+  100 100 rmoveto -107 callsubr 5 5 rlineto endchar
+end
+glyph # 2: a subroutine without return, then a line after the call
+  100 100 rmoveto -106 callsubr 5 5 rlineto endchar
+end
+glyph # 3: a subroutine that pushes the line's operands
+  100 100 rmoveto -105 callsubr rlineto endchar
+end
+glyph # 4: an empty subroutine
+  100 100 rmoveto -104 callsubr 5 5 rlineto endchar
+end
+glyph # 5: a local index past the last (4)
+  100 100 rmoveto 5 5 rlineto -103 callsubr 5 5 rlineto endchar
+end
+glyph # 6: a local index below the first (-108)
+  100 100 rmoveto 5 5 rlineto -108 callsubr 5 5 rlineto endchar
+end
+glyph # 7: a global call, then a line
+  100 100 rmoveto -107 callgsubr 5 5 rlineto endchar
+end
+glyph # 8: a global index past the last (1)
+  100 100 rmoveto 5 5 rlineto -106 callgsubr 5 5 rlineto endchar
+end
+glyph # 9: return outside a subroutine
+  100 100 rmoveto 5 5 rlineto return 5 5 rlineto endchar
+end
+glyph # 10: callsubr with an empty stack
+  100 100 rmoveto 5 5 rlineto callsubr 5 5 rlineto endchar
+end
+glyph # 11: a fractional index, -105.5: subroutine 2 if truncated, 1 if floored or rounded
+  100 100 rmoveto 5 5 rlineto fixed:-105.5 callsubr 5 5 rlineto endchar
+end
+glyph # 12: a fractional index, -104.75: subroutine 3 if truncated, 2 if floored or rounded
+  100 100 rmoveto 5 5 rlineto fixed:-104.75 callsubr 5 5 rlineto endchar
+end
+glyph # 13: operands below the index survive the call: `7 8 -107 callsubr`, whose `0 10 rlineto` draws two lines
+  100 100 rmoveto 7 8 -107 callsubr endchar
+end
+glyph # 14: a subroutine called by a charstring that never ends with endchar
+  100 100 rmoveto -107 callsubr
+end
+glyph # 15: a moveto inside a subroutine, then a line
+  -105 callsubr rmoveto 5 5 rlineto endchar
+end
+glyph # 16: a fractional index, -105.25: subroutine 2 if truncated or rounded, 1 if floored
+  100 100 rmoveto 5 5 rlineto fixed:-105.25 callsubr 5 5 rlineto endchar
+end

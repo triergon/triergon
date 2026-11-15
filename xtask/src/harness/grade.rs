@@ -1459,7 +1459,7 @@ mod tests {
             ("isobmff-seek", 476),
             ("font-outlines", 53),
             ("font-hinting-none", 159),
-            ("font-hinting-default", 53),
+            ("font-hinting-default", 159),
             ("font-hinting-modes", 954),
             ("matroska-audio-clocks", 10),
             ("mp4-forward", 46),

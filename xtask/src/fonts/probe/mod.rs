@@ -4,9 +4,11 @@
 //! workers to establish and check how a face's programs run.
 //!
 //! A probe is a description file `NAME.probe`; its leading comment says what it
-//! shows. Next to it, `NAME.dump` records the reference's default load of every
-//! glyph at each of the probe's heights (`font-sized-dump FILE default
-//! HEIGHT`), as the reference gives it on 32-bit ARMv7. `probe` compares the
+//! shows. Next to it, `NAME.dump` records what the reference reads at each of
+//! the probe's heights in each of its modes (`font-sized-dump FILE MODE
+//! HEIGHT`, by default the default load of every glyph), each height in a
+//! process of its own or a sequence of them in one, as the reference gives
+//! it on 32-bit ARMv7. `probe` compares the
 //! reference with that record and the candidate with the reference.
 
 mod asm;
@@ -20,11 +22,12 @@ use crate::process::{Stop, run_text};
 use font::Description;
 
 pub(super) const ASSEMBLE_USAGE: &str =
-    "usage: cargo xtask fonts assemble DESCRIPTION OUTPUT [FONTS]
+    "usage: cargo xtask fonts assemble [--embed NAME] DESCRIPTION OUTPUT [FONTS]
 
   Write the TrueType font DESCRIPTION describes (see xtask/src/fonts/probe/font.rs)
   to OUTPUT, taking the parts of fonts it names from the directory FONTS
-  (default .research/fonts/files).";
+  (default .research/fonts/files). With --embed, write it as the lines of a
+  script's [Fonts] section that embed it under the file name NAME.";
 
 pub(super) const PROBE_USAGE: &str =
     "usage: cargo xtask fonts probe --reference WORKER [--candidate WORKER]
@@ -32,7 +35,9 @@ pub(super) const PROBE_USAGE: &str =
 
   Assemble each PROBE (a .probe description, or a directory of them, such as
   harness/fonts/probes) into DIR (default target/probes) and load it with the
-  font workers at each of its heights (`font-sized-dump FONT default HEIGHT`).
+  font workers at each of its heights in each of its modes (`font-sized-dump
+  FONT MODE HEIGHT`, MODE default unless the probe names others), and at each
+  of its sequences of heights in one process (HEIGHT,HEIGHT...).
   The reference must match the probe's recorded .dump, which --record rewrites
   (record on 32-bit ARMv7); the candidate must match the reference. Fails on any
   difference. Probes that take parts of corpus fonts find them in --fonts
@@ -42,6 +47,10 @@ pub(super) const PROBE_USAGE: &str =
 const TIMEOUT: Duration = Duration::from_secs(60);
 
 pub(super) fn assemble_command(root: &Path, args: &[String]) -> Result<(), String> {
+    let (embed, args) = match args {
+        [flag, name, rest @ ..] if flag == "--embed" => (Some(name), rest),
+        _ => (None, args),
+    };
     let (description, output, fonts) = match args {
         [d, o] => (d, o, root.join(super::CORPUS_FILES)),
         [d, o, f] => (d, o, PathBuf::from(f)),
@@ -51,7 +60,35 @@ pub(super) fn assemble_command(root: &Path, args: &[String]) -> Result<(), Strin
     let font = Description::parse(&text)
         .and_then(|mut d| d.borrow_parts(&fonts).and_then(|()| d.build()))
         .map_err(|e| format!("{description}: {e}"))?;
+    let font = match embed {
+        Some(name) => embedded(name, &font)?.into_bytes(),
+        None => font,
+    };
     fs::write(output, font).map_err(|e| format!("{output}: {e}"))
+}
+
+/// The `[Fonts]` section lines that embed `font` as the file `name`: a
+/// `fontname:` line, then the font in the script format's encoding, each
+/// three bytes as four characters of six bits plus 33 (a last one or two
+/// bytes as two or three characters), 80 characters to a line.
+fn embedded(name: &str, font: &[u8]) -> Result<String, String> {
+    if name.is_empty() || name.contains(['\n', '\r']) {
+        return Err(format!("`{name}` is not a font file name"));
+    }
+    let mut encoded: Vec<u8> = Vec::with_capacity(font.len().div_ceil(3) * 4);
+    for group in font.chunks(3) {
+        let mut word = [0; 3];
+        word[..group.len()].copy_from_slice(group);
+        let bits = u32::from(word[0]) << 16 | u32::from(word[1]) << 8 | u32::from(word[2]);
+        let characters = [18, 12, 6, 0].map(|shift| (bits >> shift & 0x3F) as u8 + 33);
+        encoded.extend(&characters[..=group.len()]);
+    }
+    let mut out = format!("fontname: {name}\n");
+    for line in encoded.chunks(80) {
+        out.extend(line.iter().map(|&c| char::from(c)));
+        out.push('\n');
+    }
+    Ok(out)
 }
 
 struct Options {
@@ -125,7 +162,7 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
         let font_path = o.output.join(format!("{name}.ttf"));
         let font = description.build().map_err(|e| format!("{name}: {e}"))?;
         fs::write(&font_path, font).map_err(|e| format!("{}: {e}", font_path.display()))?;
-        let mut reference = dump(&o.reference, &font_path, &description.heights)?;
+        let mut reference = dump(&o.reference, &font_path, &description)?;
         let record = probe.with_extension("dump");
         let mut differences = Vec::new();
         let mut note = "";
@@ -149,7 +186,7 @@ pub(super) fn probe_command(root: &Path, args: &[String]) -> Result<(), String> 
             }
         }
         if let Some(candidate) = &o.candidate {
-            let candidate = dump(candidate, &font_path, &description.heights)?;
+            let candidate = dump(candidate, &font_path, &description)?;
             differences.extend(compare("reference", &reference, &candidate));
         }
         if differences.is_empty() {
@@ -185,31 +222,72 @@ fn is_64_bit(worker: &str) -> Result<bool, String> {
     })
 }
 
-/// The worker's default-load dump of `font` at each height, each after a line
-/// `height H`; a failing run is recorded as its exit code and error output.
-fn dump(worker: &str, font: &Path, heights: &[i32]) -> Result<String, String> {
+/// The worker's dump of `font` for each of the description's runs in each of
+/// its modes, each after a line `height H` (or `heights H,H...` for a sequence
+/// loaded in one process), followed by the mode for a mode other than
+/// `default`; a failing run is recorded as its exit code and error output.
+fn dump(worker: &str, font: &Path, description: &Description) -> Result<String, String> {
     let mut out = String::new();
-    for height in heights {
-        let argv = [
-            worker.to_owned(),
-            "font-sized-dump".to_owned(),
-            font.display().to_string(),
-            "default".to_owned(),
-            height.to_string(),
-        ];
-        out.push_str(&format!("height {height}\n"));
-        match run_text(&argv, TIMEOUT) {
-            Ok(done) if done.code == 0 => out.push_str(&done.stdout),
-            Ok(done) => {
-                out.push_str(&done.stdout);
-                let error = done.stderr.lines().next().unwrap_or("").trim();
-                out.push_str(&format!("exit {} {error}\n", done.code));
+    for run in &description.runs {
+        let heights = run.iter().map(i32::to_string).collect::<Vec<_>>().join(",");
+        let key = if run.len() == 1 { "height" } else { "heights" };
+        for mode in &description.modes {
+            out.push_str(&format!("{key} {heights}"));
+            if mode != "default" {
+                out.push_str(&format!(" {mode}"));
             }
-            Err(Stop::Timeout(_)) => out.push_str("timeout\n"),
-            Err(Stop::Fatal(message)) => return Err(format!("{worker}: {message}")),
+            out.push('\n');
+            load(worker, font, mode, &heights, &mut out)?;
         }
     }
     Ok(out)
+}
+
+/// The first line a worker wrote to `stderr`, with the path of the assembled
+/// `font` (under the run's output directory) given as its file name, so
+/// records compare wherever they were made.
+pub(crate) fn first_error(stderr: &str, font: &Path) -> String {
+    let line = stderr.lines().next().unwrap_or("").trim();
+    match font.file_name() {
+        Some(name) => line.replace(&font.display().to_string(), &name.to_string_lossy()),
+        None => line.to_owned(),
+    }
+}
+
+/// One worker run: `font-sized-dump FONT MODE HEIGHTS`, appended to `out`.
+fn load(
+    worker: &str,
+    font: &Path,
+    mode: &str,
+    heights: &str,
+    out: &mut String,
+) -> Result<(), String> {
+    let argv = [
+        worker.to_owned(),
+        "font-sized-dump".to_owned(),
+        font.display().to_string(),
+        mode.to_owned(),
+        heights.to_owned(),
+    ];
+    match run_text(&argv, TIMEOUT) {
+        Ok(done) if done.code == 0 => out.push_str(&done.stdout),
+        Ok(done) => {
+            out.push_str(&done.stdout);
+            out.push_str(&format!(
+                "exit {} {}\n",
+                done.code,
+                first_error(&done.stderr, font)
+            ));
+        }
+        Err(Stop::Timeout(_)) => {
+            return Err(format!(
+                "{worker}: {} timed out after {TIMEOUT:?}",
+                font.display()
+            ));
+        }
+        Err(Stop::Fatal(message)) => return Err(format!("{worker}: {message}")),
+    }
+    Ok(())
 }
 
 /// The lines in which `actual` differs from `expected`; for two records of
@@ -254,7 +332,20 @@ fn value_differences(a: &str, b: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{compare, is_64_bit};
+    use super::{compare, embedded, is_64_bit};
+
+    #[test]
+    fn embedded_fonts_take_six_bits_a_character() {
+        let font: Vec<u8> = (0..60).map(|i| i * 4).chain([0xFF]).collect();
+        let text = embedded("probe.ttf", &font).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines[0], "fontname: probe.ttf");
+        // 61 bytes: 20 groups of four characters, then two for the last byte.
+        assert_eq!(lines[1].len(), 80);
+        assert!(lines[1].starts_with("!!1)"));
+        assert_eq!(lines[2], "`Q");
+        assert!(embedded("a\nb", &font).is_err());
+    }
 
     #[test]
     fn the_reference_width_is_read_from_its_executable() {
