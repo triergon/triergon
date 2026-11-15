@@ -494,6 +494,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Gate run, Linux AArch64 and ARMv7: packet framing | `79e0ae138c71ffc57c73decc88d29ae86b1153d4` | `5bfaaaf0dc18f27473bff810c9eb5d895bd787bda9a4df5942c27f2370844e76` |
 | Packet framing, Linux AArch64 | `6ce7109cd2929a7057498769768cbb2e6eb2a301` | `caa4fd0af30391d0f73dbcd255704c3a5dfe4228e034f373bb958127c50ed2ad` |
 | Packet framing, Linux ARMv7 | `6ce7109cd2929a7057498769768cbb2e6eb2a301` | `4375d33f486c45d75338de3f1b493c9217ae3686710793e268a04cd68185e618` |
+| Packet framing, Linux AArch64 | `3f07dcc4c596cf387ce307458db0aaa88b77d14d` | `d960dc53a15ba7657a6fa63f0a44ec2d95dcbcc3dcc90eb2c8701a0d7887ccb8` |
+| Packet framing, Linux ARMv7 | `3f07dcc4c596cf387ce307458db0aaa88b77d14d` | `8bb3458c1ac6af0b8527a76617cd0a7e250b44a8dfe6671b28093e8b05da92e6` |
+| Packet framing, Linux AArch64 | `b3d01267428a2bf318bb05a9c02f0b9435c5f61f` | `0afb50e86cde3238b372ea31bfc248eedaf7895c4206bc8d5a7d82f0d26d2f92` |
+| Packet framing, Linux ARMv7 | `b3d01267428a2bf318bb05a9c02f0b9435c5f61f` | `db1d8f73b7fb8b36d8868a78bbe56bc3c82f599d2bb7a430eff1bb520da57265` |
 | Packet framing, Linux AArch64 | `2b997c87727e542fa8b92d3dc791976ee9c75f99` | `5fc70ab69e6bbaa2eadcd41e69f750973644d9bc44393292a0d72515c04c08aa` |
 | Packet framing, Linux ARMv7 | `2b997c87727e542fa8b92d3dc791976ee9c75f99` | `9dafe9cb860e783ad45d25cc5fc383c5a7c8d73667fb83f8cb99775c24aade2b` |
 | Packet framing, Linux AArch64 | `839938804f297a06ce40c9ff6c0f59ea30cc8863` | `94612c1c766917359cecc21162a8a9dc2a5d1830dc0518b05c5681d5ba95ab43` |
