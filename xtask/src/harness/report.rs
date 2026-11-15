@@ -1016,7 +1016,7 @@ pub(crate) fn collect(
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(&identity, &pinned));
-    let refusals = gate_build::refusals(&identity, &pinned);
+    let refusals = gate_build::identity_refusals(root, &identity, &pinned);
     if !refusals.is_empty() && (options.require_acceptance || options.require_slice_acceptance) {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }

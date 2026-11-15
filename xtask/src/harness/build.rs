@@ -284,16 +284,26 @@ fn which(program: &str) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
-/// Measurement workers a contract may name as its candidate besides
-/// `media-worker`, with the command that builds each.
+/// A measurement worker and how `cargo` builds it: its name, package, example (none
+/// for a binary of the same name) and features.
 #[derive(Debug, PartialEq, Eq)]
-struct Candidate {
-    name: &'static str,
-    package: &'static str,
-    example: Option<&'static str>,
-    features: &'static [&'static str],
+pub struct Candidate {
+    pub name: &'static str,
+    pub package: &'static str,
+    pub example: Option<&'static str>,
+    pub features: &'static [&'static str],
 }
 
+/// The worker every contract names unless it names another.
+const MEDIA_WORKER: Candidate = Candidate {
+    name: "media-worker",
+    package: "media-worker",
+    example: None,
+    features: &[],
+};
+
+/// Measurement workers a contract may name as its candidate besides
+/// `media-worker`.
 const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
     Candidate {
         name: "playback-worker",
@@ -378,6 +388,40 @@ const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
     },
 ];
 
+/// Every measurement worker, `media-worker` first.
+pub fn workers() -> impl Iterator<Item = &'static Candidate> {
+    std::iter::once(&MEDIA_WORKER).chain(ADDITIONAL_CANDIDATES.iter())
+}
+
+/// The `cargo rustc` command line that builds `spec` into `target_dir`, in the
+/// release profile for the worker target or the dev profile for this host, up to
+/// and including the `--` before the worker's own compiler arguments.
+pub fn cargo_rustc(spec: &Candidate, target_dir: &Path, release: bool) -> R<Vec<String>> {
+    let mut command: Vec<String> = ["cargo", "rustc", "-p", spec.package]
+        .map(String::from)
+        .to_vec();
+    if release {
+        command.push("--release".into());
+    }
+    command.extend([
+        "--locked".into(),
+        "--target-dir".into(),
+        target_dir.display().to_string(),
+    ]);
+    if release {
+        command.extend(gate_build::target_args()?);
+    }
+    match spec.example {
+        Some(example) => command.extend(["--example".into(), example.into()]),
+        None => command.extend(["--bin".into(), spec.name.into()]),
+    }
+    if !spec.features.is_empty() {
+        command.extend(["--features".into(), spec.features.join(",")]);
+    }
+    command.push("--".into());
+    Ok(command)
+}
+
 pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let spec = ADDITIONAL_CANDIDATES
         .iter()
@@ -461,62 +505,128 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
     }
 }
 
-fn additional_candidates(
+/// How a worker's trained order laid it out: the SHA-256 of the committed trained
+/// order, how many names it lists and how many of them the binary holds, and the
+/// SHA-256 of the ordering file the link used.
+pub struct LinkOrder {
+    trained_sha256: String,
+    trained: usize,
+    held: usize,
+    ordering_sha256: String,
+}
+
+impl LinkOrder {
+    fn record(order: Option<&Self>) -> Value {
+        order.map_or(Value::Null, |order| {
+            Value::object([
+                ("trained_sha256", Value::str(&order.trained_sha256)),
+                ("trained", Value::int(order.trained as i128)),
+                ("held", Value::int(order.held as i128)),
+                ("ordering_sha256", Value::str(&order.ordering_sha256)),
+            ])
+        })
+    }
+}
+
+/// Builds the worker `name` with `command`, a `cargo rustc` command line that ends
+/// with its link arguments. A worker the training manifest orders for the worker
+/// target ([`super::link_training::trained_order`]) is linked by the pinned
+/// toolchain's `lld`, then linked again with its functions in its trained order, the
+/// rest in module order; `command` then holds the second build. `binary` is where
+/// the build puts the worker. The ordering file is written to
+/// `target/harness/link-order/NAME-HASH.txt`, HASH the first 16 hex digits of its
+/// SHA-256, so the second build's link arguments change whenever the order does and
+/// cargo never reuses a link made with another order. The build fails when the
+/// binary holds fewer than [`super::link_order::MIN_HELD_PERCENT`] of the trained
+/// names, or when the second build's own ordering file differs. Returns how the
+/// order laid the worker out, none for a worker linked as its toolchain links it.
+fn build_in_link_order(
     root: &Path,
-    selected: &[&Candidate],
-) -> R<Vec<(&'static str, Vec<String>)>> {
-    let mut built = Vec::new();
-    for spec in selected {
-        let mut command: Vec<String> = [
-            "cargo",
-            "rustc",
-            "-p",
-            spec.package,
-            "--release",
-            "--locked",
-        ]
-        .map(String::from)
-        .to_vec();
-        command.extend([
-            "--target-dir".into(),
-            root.join("target").display().to_string(),
-        ]);
-        command.extend(gate_build::target_args()?);
-        match spec.example {
-            Some(example) => command.extend(["--example".into(), example.into()]),
-            None => command.extend(["--bin".into(), spec.name.into()]),
-        }
-        if !spec.features.is_empty() {
-            command.extend(["--features".into(), spec.features.join(",")]);
-        }
-        command.push("--".into());
-        command.extend(gate_build::worker_link_arguments()?);
+    command: &mut Vec<String>,
+    binary: &Path,
+    name: &str,
+) -> R<Option<LinkOrder>> {
+    let cargo = |command: &[String]| -> R<()> {
         let status = Command::new("cargo")
             .args(&command[1..])
             .env("CARGO_INCREMENTAL", "0")
             .current_dir(root)
             .status()
             .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err(format!("{} build failed: {status}", spec.name));
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("{name} build failed: {status}"))
         }
-        if let Some(example) = spec.example {
-            fs::copy(
-                root.join(gate_build::release_dir()?)
-                    .join("examples")
-                    .join(example),
-                root.join(gate_build::release_dir()?).join(spec.name),
-            )
-            .map_err(|error| format!("{}: {error}", spec.name))?;
+    };
+    let linker = gate_build::ordered_link_arguments(root, None)?;
+    let trained = if linker.is_empty() {
+        None
+    } else {
+        super::link_training::trained_order(root, gate_build::worker_target()?, name)?
+    };
+    let Some(trained) = trained else {
+        cargo(command)?;
+        return Ok(None);
+    };
+    let first: Vec<String> = command.iter().cloned().chain(linker).collect();
+    cargo(&first)?;
+    let order = super::link_order::symbol_order(binary, &trained.names)?;
+    if !super::link_order::holds_enough(order.held, trained.names.len()) {
+        return Err(format!(
+            "{name} holds {} of the {} functions of its trained order; retrain it \
+             (cargo xtask link-order train)",
+            order.held,
+            trained.names.len()
+        ));
+    }
+    let hash = crate::sha256::hex(order.text.as_bytes());
+    let directory = root.join("target/harness/link-order");
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let path = directory.join(format!("{name}-{}.txt", &hash[..16]));
+    fs::write(&path, &order.text).map_err(|e| format!("{}: {e}", path.display()))?;
+    command.extend(gate_build::ordered_link_arguments(root, Some(&path))?);
+    cargo(command)?;
+    if super::link_order::symbol_order(binary, &trained.names)?.text != order.text {
+        return Err(format!(
+            "{name}: the ordered link holds other functions than the first link"
+        ));
+    }
+    Ok(Some(LinkOrder {
+        trained_sha256: trained.sha256,
+        trained: trained.names.len(),
+        held: order.held,
+        ordering_sha256: hash,
+    }))
+}
+
+/// A built worker: its name, the command that built it and how its trained order
+/// laid it out, none when it links as its toolchain does.
+type Built = (&'static str, Vec<String>, Option<LinkOrder>);
+
+fn additional_candidates(root: &Path, selected: &[&Candidate]) -> R<Vec<Built>> {
+    let mut built = Vec::new();
+    for spec in selected {
+        let mut command = cargo_rustc(spec, &root.join("target"), true)?;
+        command.extend(gate_build::worker_link_arguments()?);
+        let release = root.join(gate_build::release_dir()?);
+        let binary = match spec.example {
+            Some(example) => release.join("examples").join(example),
+            None => release.join(spec.name),
+        };
+        let order = build_in_link_order(root, &mut command, &binary, spec.name)?;
+        if spec.example.is_some() {
+            fs::copy(&binary, release.join(spec.name))
+                .map_err(|error| format!("{}: {error}", spec.name))?;
         }
-        built.push((spec.name, command));
+        built.push((spec.name, command, order));
     }
     Ok(built)
 }
 
-fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
+fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
     let mut candidates = Vec::new();
-    for (name, command) in built {
+    for (name, command, order) in built {
         let path = format!("{}/{name}", gate_build::release_dir()?);
         candidates.push((
             *name,
@@ -524,6 +634,7 @@ fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
                 ("path", Value::str(&path)),
                 ("sha256", Value::str(sha(&root.join(&path))?)),
                 ("command", strings(command)),
+                ("link_order", LinkOrder::record(order.as_ref())),
                 ("selected_graph", candidate_graph(root, name)?),
             ]),
         ));
@@ -850,32 +961,14 @@ fn build_selected(
     let selected = selected_candidates(only)?;
     gate_build::admit(root, comparison_build)?;
     let linux = cfg!(target_os = "linux");
-    let mut candidate_command: Vec<String> = [
-        "cargo",
-        "rustc",
-        "-p",
-        "media-worker",
-        "--release",
-        "--locked",
-    ]
-    .map(String::from)
-    .to_vec();
-    candidate_command.extend([
-        "--target-dir".into(),
-        root.join("target").display().to_string(),
-    ]);
-    candidate_command.extend(gate_build::target_args()?);
-    candidate_command.extend(["--bin".into(), "media-worker".into(), "--".into()]);
+    let mut candidate_command = cargo_rustc(&MEDIA_WORKER, &root.join("target"), true)?;
     candidate_command.extend(gate_build::worker_link_arguments()?);
-    let status = Command::new("cargo")
-        .args(&candidate_command[1..])
-        .env("CARGO_INCREMENTAL", "0")
-        .current_dir(root)
-        .status()
-        .map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err(format!("candidate build failed: {status}"));
-    }
+    let candidate_order = build_in_link_order(
+        root,
+        &mut candidate_command,
+        &root.join(gate_build::release_dir()?).join("media-worker"),
+        "media-worker",
+    )?;
     let additional = additional_candidates(root, &selected)?;
     let out = root.join("target/harness");
     fs::create_dir_all(&out).map_err(|e| e.to_string())?;
@@ -1245,6 +1338,10 @@ fn build_selected(
             }),
         ),
         ("candidate_command", strings(&candidate_command)),
+        (
+            "candidate_link_order",
+            LinkOrder::record(candidate_order.as_ref()),
+        ),
         ("selected_graph", graph.clone()),
         ("additional_candidates", candidates),
         (

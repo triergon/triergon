@@ -45,6 +45,14 @@ pub fn run_text(argv: &[String], timeout: Duration) -> Result<Text, Stop> {
     }
 }
 
+/// The JSON `program` prints on standard output for `args`.
+pub fn check_json(program: &std::path::Path, args: &[&str]) -> Result<crate::json::Value, String> {
+    let mut argv = vec![program.display().to_string()];
+    argv.extend(args.iter().map(|arg| (*arg).to_owned()));
+    let output = check_output(&argv)?;
+    crate::json::parse(&output).map_err(|error| format!("{}: {error}", program.display()))
+}
+
 /// `subprocess.run(argv, check=True, capture_output=True, text=True)`: stdout
 /// of a successful run; any failure is fatal.
 pub fn check_output(argv: &[String]) -> Result<String, String> {
