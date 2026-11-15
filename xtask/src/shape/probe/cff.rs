@@ -252,6 +252,25 @@ impl Description {
         if d.glyphs.is_empty() {
             return Err("a description needs a glyph".into());
         }
+        if d.glyphs.len() > usize::from(u16::MAX) {
+            return Err(format!(
+                "{} glyphs: a face holds at most 65535",
+                d.glyphs.len()
+            ));
+        }
+        // A name-keyed face names glyph g by the string 390 + g.
+        if !d.cff2 && !d.cid_keyed() && d.glyphs.len() > usize::from(u16::MAX - 390) {
+            return Err(format!(
+                "{} glyphs: a name-keyed face names at most 65145",
+                d.glyphs.len()
+            ));
+        }
+        if !(16..=16384).contains(&d.units_per_em) {
+            return Err(format!(
+                "units-per-em {}: the format allows 16 to 16384",
+                d.units_per_em
+            ));
+        }
         if let Some(g) = d
             .glyphs
             .iter()
@@ -862,7 +881,7 @@ fn hhea(glyphs: u16, units_per_em: u16) -> Vec<u8> {
     let mut t = 0x0001_0000_u32.to_be_bytes().to_vec();
     t.extend(u16s(&[
         ascender,
-        (ascender as i16 - units_per_em as i16) as u16,
+        (i32::from(ascender) - i32::from(units_per_em)).cast_unsigned() as u16,
         0,
     ]));
     t.extend(u16s(&[units_per_em, 0, 0, units_per_em, 1, 0, 0]));

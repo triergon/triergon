@@ -155,11 +155,16 @@ fn dump(worker: &str, font: &Path) -> Result<String, String> {
     ];
     match run_text(&argv, TIMEOUT) {
         Ok(done) if done.code == 0 => Ok(done.stdout),
-        Ok(done) => {
-            let error = done.stderr.lines().next().unwrap_or("").trim();
-            Ok(format!("{}exit {} {error}\n", done.stdout, done.code))
-        }
-        Err(Stop::Timeout(_)) => Ok("timeout\n".into()),
+        Ok(done) => Ok(format!(
+            "{}exit {} {}\n",
+            done.stdout,
+            done.code,
+            crate::fonts::probe::first_error(&done.stderr, font)
+        )),
+        Err(Stop::Timeout(_)) => Err(format!(
+            "{worker}: {} timed out after {TIMEOUT:?}",
+            font.display()
+        )),
         Err(Stop::Fatal(message)) => Err(format!("{worker}: {message}")),
     }
 }

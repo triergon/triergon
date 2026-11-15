@@ -9,7 +9,7 @@
 //! flags, as the FFmpeg references are.
 
 mod manifest;
-mod probe;
+pub(crate) mod probe;
 mod tables;
 
 pub use manifest::GENERATOR;

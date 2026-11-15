@@ -243,6 +243,17 @@ fn dump(worker: &str, font: &Path, description: &Description) -> Result<String, 
     Ok(out)
 }
 
+/// The first line a worker wrote to `stderr`, with the path of the assembled
+/// `font` (under the run's output directory) given as its file name, so
+/// records compare wherever they were made.
+pub(crate) fn first_error(stderr: &str, font: &Path) -> String {
+    let line = stderr.lines().next().unwrap_or("").trim();
+    match font.file_name() {
+        Some(name) => line.replace(&font.display().to_string(), &name.to_string_lossy()),
+        None => line.to_owned(),
+    }
+}
+
 /// One worker run: `font-sized-dump FONT MODE HEIGHTS`, appended to `out`.
 fn load(
     worker: &str,
@@ -262,10 +273,18 @@ fn load(
         Ok(done) if done.code == 0 => out.push_str(&done.stdout),
         Ok(done) => {
             out.push_str(&done.stdout);
-            let error = done.stderr.lines().next().unwrap_or("").trim();
-            out.push_str(&format!("exit {} {error}\n", done.code));
+            out.push_str(&format!(
+                "exit {} {}\n",
+                done.code,
+                first_error(&done.stderr, font)
+            ));
         }
-        Err(Stop::Timeout(_)) => out.push_str("timeout\n"),
+        Err(Stop::Timeout(_)) => {
+            return Err(format!(
+                "{worker}: {} timed out after {TIMEOUT:?}",
+                font.display()
+            ));
+        }
         Err(Stop::Fatal(message)) => return Err(format!("{worker}: {message}")),
     }
     Ok(())
