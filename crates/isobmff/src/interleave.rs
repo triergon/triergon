@@ -81,6 +81,14 @@ impl<'a> TrackSampleCursor<'a> {
             failed: None,
         }
     }
+    /// The cursor whose regular samples continue from `regular`, a cursor over
+    /// the track's table.
+    pub(crate) fn from_regular(source: SourceTrack<'a>, regular: SampleCursor<'a>) -> Self {
+        Self {
+            regular: Some(regular),
+            ..Self::new(source)
+        }
+    }
     /// Container-local append unit that produced the last fragment Sample:
     /// ordinal in the supplied fragment slice, then run ordinal in that index.
     /// This borrows existing cursor state in O(1), without an input token, epoch,

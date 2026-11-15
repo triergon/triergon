@@ -94,6 +94,10 @@ impl SampleTable {
     pub(crate) fn has_dependency_table(&self) -> bool {
         self.dependency.is_some()
     }
+    /// Whether a partial sync table marks any sample.
+    pub(crate) fn has_partial_sync_samples(&self) -> bool {
+        self.partial.as_ref().is_some_and(|table| table.count != 0)
+    }
     /// Whether the regular sample table declares composition offsets.
     pub fn has_composition_offsets(&self) -> bool {
         self.ctts.is_some()
@@ -918,7 +922,14 @@ fn sequential_contains(
 #[cfg(test)]
 mod advancing_sync_tests;
 
-impl SampleCursor<'_> {
+impl<'a> SampleCursor<'a> {
+    pub(crate) fn table(&self) -> &'a SampleTable {
+        self.table
+    }
+    /// How many samples the cursor has produced.
+    pub(crate) fn ordinal(&self) -> u64 {
+        self.ordinal
+    }
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         if self.ordinal == self.table.sample_count() {
             return Ok(SampleStep::End);
@@ -932,20 +943,7 @@ impl SampleCursor<'_> {
         Ok(SampleStep::Sample(sample))
     }
     fn advance(&mut self) -> Result<Sample> {
-        if self.stts_left == 0 {
-            self.stts_left = self.table.stts.word(self.stts_run, 0)?;
-            self.delta = self.table.stts.word(self.stts_run, 4)?;
-            self.stts_run = self.stts_run.checked_add(1).ok_or(Error::Overflow)?;
-        }
-        if let Some(ctts) = &self.table.ctts
-            && self.ctts_left == 0
-        {
-            self.ctts_left = ctts.word(self.ctts_run, 0)?;
-            self.offset = ctts.word(self.ctts_run, 4)?;
-            self.ctts_run = self.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
-        }
-        self.chunks.enter(self.table)?;
-        let ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
+        let ordinal = self.enter()?;
         let table = self.table;
         let sample = table.sample_with_access(
             SamplePosition {
@@ -968,6 +966,55 @@ impl SampleCursor<'_> {
                 Ok((sync, partial))
             },
         )?;
+        self.leave(ordinal, sample.range.end)?;
+        Ok(sample)
+    }
+    /// Steps past the next sample without building it: its decode time, whether
+    /// it is a sync sample, and where its bytes start and how many there are. The
+    /// cursor then stands where [`poll`](Self::poll) would leave it.
+    pub(crate) fn skip(&mut self) -> Result<SkippedSample> {
+        let ordinal = self.enter()?;
+        let start = self.chunks.byte;
+        let size = self.table.sizes.get(ordinal - 1)?;
+        let end = start.checked_add(u64::from(size)).ok_or(Error::Overflow)?;
+        let sync =
+            sequential_contains(self.table.sync.as_ref(), &mut self.sync_row, ordinal, true)?;
+        sequential_contains(
+            self.table.partial.as_ref(),
+            &mut self.partial_row,
+            ordinal,
+            false,
+        )?;
+        let dts = self.dts;
+        self.leave(ordinal, end)?;
+        Ok(SkippedSample {
+            ordinal,
+            dts,
+            sync,
+            start,
+            size,
+        })
+    }
+    /// Loads the time runs and the chunk that hold the next sample, and returns
+    /// its ordinal.
+    fn enter(&mut self) -> Result<u64> {
+        if self.stts_left == 0 {
+            self.stts_left = self.table.stts.word(self.stts_run, 0)?;
+            self.delta = self.table.stts.word(self.stts_run, 4)?;
+            self.stts_run = self.stts_run.checked_add(1).ok_or(Error::Overflow)?;
+        }
+        if let Some(ctts) = &self.table.ctts
+            && self.ctts_left == 0
+        {
+            self.ctts_left = ctts.word(self.ctts_run, 0)?;
+            self.offset = ctts.word(self.ctts_run, 4)?;
+            self.ctts_run = self.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
+        }
+        self.chunks.enter(self.table)?;
+        self.ordinal.checked_add(1).ok_or(Error::Overflow)
+    }
+    /// Steps past sample `ordinal`, which ends at byte `end`.
+    fn leave(&mut self, ordinal: u64, end: u64) -> Result<()> {
         self.dts = self
             .dts
             .checked_add(i128::from(self.delta))
@@ -983,9 +1030,18 @@ impl SampleCursor<'_> {
                 .checked_sub(1)
                 .ok_or(Error::Invalid("composition run exhausted"))?;
         }
-        self.chunks.consume(sample.range.end)?;
-        Ok(sample)
+        self.chunks.consume(end)
     }
+}
+
+/// A sample [`SampleCursor::skip`] stepped past.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SkippedSample {
+    pub(crate) ordinal: u64,
+    pub(crate) dts: i128,
+    pub(crate) sync: bool,
+    pub(crate) start: u64,
+    pub(crate) size: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

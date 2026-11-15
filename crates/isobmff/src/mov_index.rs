@@ -2,7 +2,11 @@
 //! Original Samples and clock/config/edit provenance travel with every entry.
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
+use crate::SampleCursor;
 use crate::mov_cursor::{TrackProjection, TrackResume};
+use plain_scan::{PlainChoice, PlainScan, PlainStep, PlainTrack};
+
+mod plain_scan;
 use crate::{
     BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
     OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
@@ -417,6 +421,28 @@ impl<'a> IndexCursor<'a> {
         self.ready = None;
         self.cursor.discard_occurrence();
     }
+
+    /// A prepared index over a plain regular track, before its first entry.
+    fn plain_track(&self) -> Option<PlainTrack<'a>> {
+        if self.next != 0 || self.ready.is_some() || self.dependency_table {
+            return None;
+        }
+        let (table, shift) = self.cursor.plain_regular_track()?;
+        Some(PlainTrack {
+            table,
+            shift,
+            allow_initial_nonkey: self.allow_initial_nonkey,
+            max_entries: self.max_entries,
+        })
+    }
+
+    /// Continue a [`plain_track`](Self::plain_track) index from `cursor`, whose
+    /// next sample is entry `ordinal`.
+    fn start_plain_at(&mut self, cursor: SampleCursor<'a>, ordinal: u64) -> Result<()> {
+        self.cursor.start_regular_at(cursor)?;
+        self.next = ordinal;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -466,12 +492,24 @@ pub struct SeekJob<'a> {
     first_resume: Option<TrackResume<'a>>,
     best_resume: Option<TrackResume<'a>>,
     keep_resume: bool,
+    plain: Plain<'a>,
     previous: Option<i64>,
     unordered_minimum: Option<i64>,
     scanned: u64,
     allow_initial_prefix: bool,
     ready: bool,
     failed: Option<Error>,
+}
+/// Where a seek stands with reading a plain regular track from its table.
+#[derive(Debug)]
+enum Plain<'a> {
+    /// The index has not been prepared yet.
+    Untried,
+    Scanning(PlainScan<'a>),
+    /// The scan chose this entry, which the index produces next.
+    Selecting(PlainChoice<'a>),
+    /// The seek reads every entry.
+    Off,
 }
 #[derive(Debug)]
 pub struct SeekPlan<'a> {
@@ -546,6 +584,7 @@ impl<'a> SeekJob<'a> {
             first_resume: None,
             best_resume: None,
             keep_resume: false,
+            plain: Plain::Untried,
             previous: None,
             unordered_minimum: None,
             scanned: 0,
@@ -568,6 +607,12 @@ impl<'a> SeekJob<'a> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
+            }
+            if self.ready {
+                return Ok(BuildStatus::Ready);
+            }
+            if !matches!(self.plain, Plain::Off) && self.poll_plain(work, cancel)? {
+                return Ok(BuildStatus::Yield);
             }
             if self.ready {
                 return Ok(BuildStatus::Ready);
@@ -658,6 +703,73 @@ impl<'a> SeekJob<'a> {
                     }
                     self.ready = true;
                     return Ok(BuildStatus::Ready);
+                }
+            }
+        }
+    }
+    /// Seeks a plain regular track from its table where it can. `true` when the
+    /// work is spent; otherwise the seek is ready or reads every entry.
+    fn poll_plain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        loop {
+            match &mut self.plain {
+                Plain::Off => return Ok(false),
+                Plain::Untried => {
+                    match self.index.cursor.prepare(work, cancel)? {
+                        CursorStatus::Yield => return Ok(true),
+                        CursorStatus::End => {
+                            self.plain = Plain::Off;
+                            continue;
+                        }
+                        CursorStatus::Ready => {}
+                    }
+                    // As the first entry does, take a fragment edit's media start
+                    // from the query.
+                    let target =
+                        self.index_timestamp - i128::from(self.index.cursor.index_edit_offset());
+                    self.plain = match self.index.plain_track() {
+                        Some(track) => {
+                            PlainScan::new(track, target).map_or(Plain::Off, Plain::Scanning)
+                        }
+                        None => Plain::Off,
+                    };
+                }
+                Plain::Scanning(scan) => match scan.poll(work) {
+                    PlainStep::Yield => return Ok(true),
+                    PlainStep::GiveUp => self.plain = Plain::Off,
+                    PlainStep::Done(choice) => {
+                        self.index.start_plain_at(choice.cursor, choice.ordinal)?;
+                        self.plain = Plain::Selecting(choice);
+                    }
+                },
+                Plain::Selecting(choice) => {
+                    let choice = *choice;
+                    match self.index.poll(work, cancel)? {
+                        CursorStatus::Yield => return Ok(true),
+                        CursorStatus::End => {
+                            return Err(Error::Invalid("plain seek selection vanished"));
+                        }
+                        CursorStatus::Ready => {}
+                    }
+                    let resume = if self.keep_resume {
+                        Some(self.index.cursor.ready_track_resume(choice.ordinal, None)?)
+                    } else {
+                        None
+                    };
+                    let entry = self.index.take_entry()?;
+                    if entry.ordinal != choice.ordinal || entry.flags & 1 == 0 {
+                        return Err(Error::Invalid("plain seek selection disagreement"));
+                    }
+                    if choice.first_fallback {
+                        self.first = Some(entry);
+                        self.first_resume = resume;
+                    } else {
+                        self.best = Some(entry);
+                        self.best_resume = resume;
+                    }
+                    self.scanned = choice.scanned;
+                    self.plain = Plain::Off;
+                    self.ready = true;
+                    return Ok(false);
                 }
             }
         }
