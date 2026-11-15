@@ -720,7 +720,7 @@ impl PacketSegmentStorage {
     }
     fn try_push<'a>(
         &mut self,
-        pool: impl FnOnce() -> Result<&'a Budget>,
+        spill_budget: impl FnOnce() -> Result<(&'a Budget, usize)>,
         planned: Option<usize>,
         segment: NalPacketSegment,
     ) -> Result<()> {
@@ -730,7 +730,8 @@ impl PacketSegmentStorage {
                 *len += 1;
             }
             Self::Inline { data, .. } => {
-                *self = Self::Heap(Self::spill(pool()?, planned, data, segment)?);
+                let (pool, capacity) = spill_budget()?;
+                *self = Self::Heap(Self::spill(pool, planned, capacity, data, segment)?);
             }
             Self::Heap(parts) => parts.try_push(segment).map_err(|e| e.error)?,
         }
@@ -741,6 +742,7 @@ impl PacketSegmentStorage {
     fn spill(
         pool: &Budget,
         planned: Option<usize>,
+        max_capacity: usize,
         data: &[NalPacketSegment; INLINE_PACKET_SEGMENTS],
         segment: NalPacketSegment,
     ) -> Result<BudgetVec<NalPacketSegment>> {
@@ -752,19 +754,19 @@ impl PacketSegmentStorage {
         }
         let needed = INLINE_PACKET_SEGMENTS + 1;
         if parts.capacity() < needed {
-            // Try the first heap capacity, then the exact size if necessary.
-            parts
-                .try_reserve_exact(needed.next_power_of_two())
-                .or_else(|error| {
-                    if matches!(
+            let capacity = needed.next_power_of_two().min(max_capacity).max(needed);
+            parts.try_reserve_exact(capacity).or_else(|error| {
+                if capacity != needed
+                    && matches!(
                         error,
                         Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
-                    ) {
-                        parts.try_reserve_exact(needed)
-                    } else {
-                        Err(error)
-                    }
-                })?;
+                    )
+                {
+                    parts.try_reserve_exact(needed)
+                } else {
+                    Err(error)
+                }
+            })?;
         }
         parts.try_extend_from_slice(data)?;
         parts.try_push(segment).map_err(|e| e.error)?;
@@ -1184,9 +1186,26 @@ impl PacketPlan {
             self.check_storage_bound(state, count, total)?;
         }
         let source = &state.source;
-        state
-            .segments
-            .try_push(|| packet_pool(source.as_ref()), self.segment_hint, segment)?;
+        state.segments.try_push(
+            || {
+                let pool = packet_pool(source.as_ref())?;
+                // Spare slots must leave room for output at the pool's limit.
+                // Other reservations can be released before publication.
+                let capacity = if self.live_base == Self::LIMITS_FIT {
+                    maximum_parts
+                } else {
+                    let output = total.saturating_add(Bytes::owner_overhead_bytes());
+                    let room = pool
+                        .limit()
+                        .saturating_sub(self.live_base)
+                        .saturating_sub(output);
+                    (room / size_of::<NalPacketSegment>()).min(maximum_parts)
+                };
+                Ok((pool, capacity))
+            },
+            self.segment_hint,
+            segment,
+        )?;
         state.total = total;
         Ok(())
     }
@@ -1381,14 +1400,18 @@ mod inline_packet_segments {
             let mut parts = PacketSegmentStorage::new();
             for index in 0..INLINE_PACKET_SEGMENTS {
                 parts
-                    .try_push(|| Ok(&pool), Some(hint), segment(index))
+                    .try_push(|| Ok((&pool, usize::MAX)), Some(hint), segment(index))
                     .unwrap();
                 assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
                 assert_eq!(pool.used(), base);
                 assert_eq!(pool.peak(), base);
             }
             parts
-                .try_push(|| Ok(&pool), Some(hint), segment(INLINE_PACKET_SEGMENTS))
+                .try_push(
+                    || Ok((&pool, usize::MAX)),
+                    Some(hint),
+                    segment(INLINE_PACKET_SEGMENTS),
+                )
                 .unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
                 panic!("descriptor did not spill");
@@ -1410,12 +1433,16 @@ mod inline_packet_segments {
         let mut parts = PacketSegmentStorage::new();
         assert!(parts.as_slice().is_empty());
         for index in 0..INLINE_PACKET_SEGMENTS {
-            parts.try_push(|| Ok(&pool), None, segment(index)).unwrap();
+            parts
+                .try_push(|| Ok((&pool, usize::MAX)), None, segment(index))
+                .unwrap();
             assert_eq!(pool.used(), base);
             assert_eq!(parts.len(), index + 1);
         }
         for index in INLINE_PACKET_SEGMENTS..9 {
-            parts.try_push(|| Ok(&pool), None, segment(index)).unwrap();
+            parts
+                .try_push(|| Ok((&pool, usize::MAX)), None, segment(index))
+                .unwrap();
             let PacketSegmentStorage::Heap(heap) = &parts else {
                 panic!("descriptor did not spill");
             };
@@ -1445,7 +1472,7 @@ mod inline_packet_segments {
         assert_eq!(pool.used(), charge);
         for index in 0..INLINE_PACKET_SEGMENTS {
             parts
-                .try_push(|| Ok(&pool), Some(9), segment(index))
+                .try_push(|| Ok((&pool, usize::MAX)), Some(9), segment(index))
                 .unwrap();
             assert_eq!(parts.len(), index + 1);
             assert_eq!(parts.as_slice()[index], segment(index));
@@ -1454,7 +1481,11 @@ mod inline_packet_segments {
         let before = parts.as_slice().to_vec();
         for _ in 0..2 {
             assert!(matches!(
-                parts.try_push(|| Ok(&pool), Some(9), segment(INLINE_PACKET_SEGMENTS)),
+                parts.try_push(
+                    || Ok((&pool, usize::MAX)),
+                    Some(9),
+                    segment(INLINE_PACKET_SEGMENTS)
+                ),
                 Err(Error::Backpressure { .. })
             ));
             assert!(matches!(parts, PacketSegmentStorage::Inline { .. }));
@@ -1467,7 +1498,11 @@ mod inline_packet_segments {
             .reserve(pool.available() - needed * size_of::<NalPacketSegment>())
             .unwrap();
         parts
-            .try_push(|| Ok(&pool), Some(9), segment(INLINE_PACKET_SEGMENTS))
+            .try_push(
+                || Ok((&pool, usize::MAX)),
+                Some(9),
+                segment(INLINE_PACKET_SEGMENTS),
+            )
             .unwrap();
         let PacketSegmentStorage::Heap(heap) = &parts else {
             panic!("retry did not spill");
@@ -1510,7 +1545,7 @@ mod inline_packet_segments {
             let mut parts = PacketSegmentStorage::new();
             for index in 0..actual {
                 parts
-                    .try_push(|| Ok(&pool), Some(hint), segment(index))
+                    .try_push(|| Ok((&pool, usize::MAX)), Some(hint), segment(index))
                     .unwrap();
                 assert_eq!(parts.len(), index + 1);
                 assert_eq!(parts.as_slice()[index], segment(index));

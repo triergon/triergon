@@ -952,42 +952,76 @@ fn avc_parameter_set_counts_preserve_tight_budget_admission() {
 }
 #[test]
 fn avc_first_spill_leaves_room_for_the_exact_output() {
-    let nals = [NON; 7];
+    let segment_count = 7;
+    let mut nals = [NON; 8];
+    nals[segment_count] = &[];
     let mut expected = framed(4, NON);
-    for _ in 1..nals.len() {
+    for _ in 1..segment_count {
         expected.extend(framed(3, NON));
     }
+    let spare = segment_count * size_of::<NalPacketSegment>()
+        + expected.len()
+        + Bytes::owner_overhead_bytes();
+    let exact = NalPacketLimits {
+        maximum_segments: segment_count,
+        maximum_output_bytes: expected.len(),
+        ..limits()
+    };
+
+    for nals in [&nals[..segment_count], &nals[..]] {
+        let base = {
+            let p = pool();
+            let _inputs = (session(&p), packet(&p, nals));
+            p.used()
+        };
+        for l in [limits(), exact] {
+            for quantum in [1, 4096] {
+                let p = Budget::new(base + spare).unwrap();
+                let config = NalPacketConfiguration::Avc(avc(&p, 128));
+                let mut session = NalPacketSession::new(&p, config, l).unwrap();
+                let source = packet(&p, nals);
+                assert_eq!(p.available(), spare);
+                let out = run(&mut session, source, None, quantum)
+                    .expect("the exact descriptor and output storage fit");
+                assert_eq!(out.bytes().as_ref(), expected);
+                assert_eq!(out.segments().len(), segment_count);
+                assert_eq!(p.used(), p.limit());
+                drop(session);
+                assert_eq!(out.bytes().as_ref(), expected);
+                drop(out);
+                assert_eq!(p.used(), Budget::control_storage_bytes());
+            }
+        }
+    }
+}
+
+#[test]
+fn avc_first_spill_reuses_room_released_before_publication() {
+    let nals = [NON; 8];
+    let expected_bytes = 4 + NON.len() + (nals.len() - 1) * (3 + NON.len());
+    let spare =
+        nals.len() * size_of::<NalPacketSegment>() + expected_bytes + Bytes::owner_overhead_bytes();
     let base = {
         let p = pool();
         let _inputs = (session(&p), packet(&p, &nals));
         p.used()
     };
-    let spare =
-        nals.len() * size_of::<NalPacketSegment>() + expected.len() + Bytes::owner_overhead_bytes();
-    let exact = NalPacketLimits {
-        maximum_segments: nals.len(),
-        maximum_output_bytes: expected.len(),
-        ..limits()
+    let p = Budget::new(base + spare).unwrap();
+    let mut session = session(&p);
+    let source = packet(&p, &nals);
+    let blocker = p.reserve(8).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut job = session.packet(source, None).unwrap();
+    assert!(matches!(
+        job.step(&mut WorkBudget::new(4096), &cancel),
+        Err(Error::Backpressure { .. })
+    ));
+    drop(blocker);
+    let BuildStep::Ready(out) = job.step(&mut WorkBudget::new(4096), &cancel).unwrap() else {
+        panic!("expected publication after backpressure");
     };
-
-    for l in [limits(), exact] {
-        for quantum in [1, 4096] {
-            let p = Budget::new(base + spare).unwrap();
-            let config = NalPacketConfiguration::Avc(avc(&p, 128));
-            let mut session = NalPacketSession::new(&p, config, l).unwrap();
-            let source = packet(&p, &nals);
-            assert_eq!(p.available(), spare);
-            let out = run(&mut session, source, None, quantum)
-                .expect("the exact descriptor and output storage fit");
-            assert_eq!(out.bytes().as_ref(), expected);
-            assert_eq!(out.segments().len(), nals.len());
-            assert_eq!(p.used(), p.limit());
-            drop(session);
-            assert_eq!(out.bytes().as_ref(), expected);
-            drop(out);
-            assert_eq!(p.used(), Budget::control_storage_bytes());
-        }
-    }
+    assert_eq!(out.segments().len(), nals.len());
+    assert_eq!(out.bytes().len(), expected_bytes);
 }
 
 #[test]
