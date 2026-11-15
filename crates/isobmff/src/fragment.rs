@@ -197,21 +197,26 @@ impl Run {
         if index >= self.count {
             return Err(Error::Invalid("fragment sample index"));
         }
-        let mut at = usize::try_from(index)
+        let at = usize::try_from(index)
             .map_err(|_| Error::Overflow)?
             .checked_mul(self.stride)
             .and_then(|v| v.checked_add(self.start))
             .ok_or(Error::Overflow)?;
-        let mut read = |bit: u32, fallback: u32| -> Result<u32> {
+        // The row's present fields in their wire order: duration, size, flags,
+        // composition offset.
+        let row = fields::slice(self.raw.payload(), at, self.stride)?;
+        let mut words = row
+            .chunks_exact(4)
+            .map(|word| u32::from_be_bytes([word[0], word[1], word[2], word[3]]));
+        let mut read = |bit: u32, fallback: u32| {
             if self.fields & bit == 0 {
-                return Ok(fallback);
+                fallback
+            } else {
+                words.next().unwrap_or(fallback)
             }
-            let value = fields::u32_at(self.raw.payload(), at)?;
-            at += 4;
-            Ok(value)
         };
-        let duration = read(0x100, defaults.duration)?;
-        let size = read(0x200, defaults.size)?;
+        let duration = read(0x100, defaults.duration);
+        let size = read(0x200, defaults.size);
         let flags = read(
             0x400,
             if index == 0 {
@@ -219,8 +224,8 @@ impl Run {
             } else {
                 defaults.flags
             },
-        )?;
-        let raw_cto = read(0x800, 0)?;
+        );
+        let raw_cto = read(0x800, 0);
         let cto = if self.fields & 0x800 != 0 {
             Some(crate::CompositionOffset::from_wire(self.version, raw_cto)?)
         } else {
