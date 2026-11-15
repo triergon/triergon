@@ -827,6 +827,19 @@ all 956 cases the same peak heap sample for sample, moves no case's median resid
 by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread, and
 passes every case either way; the collection took 82 instead of 252 minutes on AArch64
 and 96 instead of 296 on ARMv7.
+Capture, collected at `4b43bf74` from one timing run's records serially on five cases and
+in parallel on all fifteen (evidence sets `gate-parallel-memory-capture-codecs-aarch64`
+and `gate-parallel-memory-capture-codecs-armv7`), gives those five cases the same peak
+heap sample for sample on both targets, keeps every resident median inside the serial
+spread, and grades them the same; the fifteen took 10 minutes on AArch64 and 11 on ARMv7,
+where the five took 31 serially. The codec workloads, collected in parallel at the same
+revision, grade every workload as the serial collection of the same worker bytes at
+`8154812e` does, with the reference's heap identical sample for sample. The candidate's
+heap is identical in 21 of 30 workloads on AArch64 and 25 of 30 on ARMv7, and 8 or 16
+bytes apart in the others, in every sample: the codec worker keeps its own path, which a
+slot's copy lengthens. Collected serially, those workloads give the serial collection's
+heaps when measured from the workers' own paths and the parallel collection's when
+measured from a slot's copies.
 
 Each collection records the number of slots (`memory_slots`) and what the host's memory
 did over it (`host_memory`): `MemAvailable` at its start and end and the change of the
