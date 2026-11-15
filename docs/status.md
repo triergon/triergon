@@ -91,8 +91,9 @@ changes left in place of the one measured at `79e0ae13`.
 The rows and cells at `4d31df88` come from one partial gate run per target, each on one
 c6g.4xlarge (Graviton2) from the gate image, kernel `7.0.0-1014-aws`, under the same link
 policy and the same stages: the codecs' parity, both codec workload lists' timing and
-memory, the three ISO BMFF open and index parts, the ISO BMFF reader comparison and the
-Ogg reader comparison, with the `ogg-reader-inputs` set unpacked at the repository root.
+memory, the ISO BMFF reader comparison and the Ogg reader comparison, with the
+`ogg-reader-inputs` set unpacked at the repository root; the run also measured the three
+ISO BMFF open and index parts, whose rows cite the later run at `e2d4a6a3`.
 Sets `gate-run-aarch64-4d31df88` and `gate-run-armv7-4d31df88` hold each run's outputs,
 summary and host log.
 The ISO BMFF open and index and seek rows at `e2d4a6a3` come from one partial run per
@@ -101,10 +102,7 @@ worker links the ISO BMFF crate (the three ISO BMFF parts, the seek suite, the r
 comparison, MP4 forward and range, DVD subtitles and closed captions, and the codecs'
 parity); sets `gate-run-TARGET-e2d4a6a3-*-shard-1` hold them. The playback and subtitle
 rows keep their later runs at `9be327a2` and earlier, whose playback worker this run
-predates; in it each keeps its row's verdicts. The earlier seek runs at `00159785`,
-before the reader's sample-table walks, failed runtime on the eight authored movies
-(≤6.3190 on AArch64, ≤10.7024 on ARMv7) and heap on `fragmented-1200` (≤1.2031); sets
-`gate-run-TARGET-00159785-*-shard-1` hold them.
+predates; in it each keeps its row's verdicts.
 
 Most Linux AArch64 rows were measured before on c8g (Graviton4) hosts, not on the
 qualified c6g.4xlarge. On each such row's worst Linux AArch64 case the candidate's
@@ -518,10 +516,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Partial gate run, Linux AArch64 and ARMv7: the memory of both codec workload lists | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `6ad80f90b4784bea932beae4bab944354a42d34dec581faa97d3b74e5cd2e56f` |
 | Partial gate run, ARMv7: the font, shaping, rasterising and ASS comparisons | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `e3561dfe596482134846bf8f629844fc0e1314fd7b8ca3ed9077eb3269b36fb6` |
 | Partial gate run, Linux AArch64: plans, step records, logs, summary and host times | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `1a6d1206380ad9b81fb67352d1d90775fa301182b14e7a66d74172434fc8173d` |
-| Partial gate run, Linux AArch64: codecs, codec workloads, ISO BMFF open and index, ISO BMFF reader, Ogg readers | `4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c` | `6a55a3b0db8d15f45346510df0dde777d1aef60fab5c473f68116fe25c2c4ba5` |
-| Partial gate run, ARMv7: codecs, codec workloads, ISO BMFF open and index, ISO BMFF reader, Ogg readers | `4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c` | `840ad51a537eb0b05aea13fa2597836c4b1e5301f6eb01e884399f6003b128cb` |
-| Partial gate run, Linux AArch64: ISO BMFF seek and range plans | `001597859a0faf2508d29773627116ee33689cda` | `f4bbd658d24164f76bee744ed119f7ff8fda400f04da071e3667d8f24a05dc0e` |
-| Partial gate run, ARMv7: ISO BMFF seek and range plans | `001597859a0faf2508d29773627116ee33689cda` | `fcf9a2a4dffb550368cae52927cde3b08fd8693e48639a53c2498f120f21f339` |
+| Partial gate run, Linux AArch64: codecs, codec workloads, ISO BMFF reader, Ogg readers (and ISO BMFF open and index, superseded) | `4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c` | `6a55a3b0db8d15f45346510df0dde777d1aef60fab5c473f68116fe25c2c4ba5` |
+| Partial gate run, ARMv7: codecs, codec workloads, ISO BMFF reader, Ogg readers (and ISO BMFF open and index, superseded) | `4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c` | `840ad51a537eb0b05aea13fa2597836c4b1e5301f6eb01e884399f6003b128cb` |
+| Earlier: partial gate run, Linux AArch64: ISO BMFF seek and range plans, before the sample-table walks | `001597859a0faf2508d29773627116ee33689cda` | `f4bbd658d24164f76bee744ed119f7ff8fda400f04da071e3667d8f24a05dc0e` |
+| Earlier: partial gate run, ARMv7: ISO BMFF seek and range plans, before the sample-table walks | `001597859a0faf2508d29773627116ee33689cda` | `fcf9a2a4dffb550368cae52927cde3b08fd8693e48639a53c2498f120f21f339` |
 | Partial gate run, Linux AArch64: ISO BMFF open and index, seeks and range plans, reader comparison, MP4 forward and range, DVD subtitles, closed captions, codec parity | `e2d4a6a372409412afb3e99eaab11f384796ebb2` | `633c9f5d3b7637c9f229e09a3a2995587e83225495203c4120d76699bc575d50` |
 | Partial gate run, ARMv7: ISO BMFF open and index, seeks and range plans, reader comparison, MP4 forward and range, DVD subtitles, closed captions, codec parity | `e2d4a6a372409412afb3e99eaab11f384796ebb2` | `5a8ee161c466c84044abb9efaa1771c685585ee5e7a75d9a030428c86e09a924` |
 | Partial gate run, ARMv7: plans, step records, logs, summary and host times | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `b3abda80845d0876416a37361b5b4f90204cf3107793d405a82e2d59fd5641e7` |
