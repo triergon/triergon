@@ -270,7 +270,11 @@ under its documented policy (4 reads by two kinds):
 
 `examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
 comparison runs and needs the `reference-trace` feature. When it retains no packets
-it reads each payload as a view of the input window, and copies it otherwise.
+it reads each payload as a view of the input window, and copies it otherwise. At a
+seek or a range plan it resets its input to the landing's byte position, as the
+playback engine does when it begins a seek: the reads that follow start in a new
+input generation, with no window kept from before. Within one generation, each
+sample read continues from the current window where it holds the sample's start.
 
 The comparison worker's `--recover-regular-tables` profile uses the bounded
 regular recovery cursors for a single local, unedited track. Use it alone

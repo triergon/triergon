@@ -1058,9 +1058,11 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             while job.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
             {
             }
-            // Each packet read requests its own range and keeps using the
-            // current window where it holds the bytes, so the seek needs no reset.
             let plan = job.finish()?;
+            // As the playback engine does when it begins a seek, read on from
+            // the landing in a new input generation, with no window kept.
+            self.input
+                .reset(plan.landing().selected.occurrence.source.range.start)?;
             protocol::fold(&mut stats.digest, 0x51);
             protocol::fold(&mut stats.digest, 0);
             Some(plan)
@@ -1822,6 +1824,8 @@ impl<T: Read + Seek> Driver<'_, T> {
             }
             let mut complete = false;
             if let Some(plan) = &result.plan {
+                // From the plan's decode start, as after a seek.
+                driver.input.reset(plan.landing().decode_start.range.start)?;
                 let mut cursor = plan.cursor();
                 loop {
                     match cursor.poll(&mut WorkBudget::new(driver.quantum), &driver.cancel)? {
