@@ -16923,6 +16923,17 @@
    }
   },
   {
+   "name": "packet-framing-6ce7109c-aarch64",
+   "retention": "retained",
+   "reason": "AArch64 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-6ce7109c-aarch64/caa4fd0af30391d0f73dbcd255704c3a5dfe4228e034f373bb958127c50ed2ad.tar.zst",
+   "sha256": "caa4fd0af30391d0f73dbcd255704c3a5dfe4228e034f373bb958127c50ed2ad",
+   "bytes": 26866761,
+   "source_revisions": {
+    "candidate": "6ce7109cd2929a7057498769768cbb2e6eb2a301"
+   }
+  },
+  {
    "name": "packet-framing-2b997c87-armv7",
    "retention": "retained",
    "reason": "ARMv7 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
@@ -16931,6 +16942,17 @@
    "bytes": 24595242,
    "source_revisions": {
     "candidate": "2b997c87727e542fa8b92d3dc791976ee9c75f99"
+   }
+  },
+  {
+   "name": "packet-framing-6ce7109c-armv7",
+   "retention": "retained",
+   "reason": "ARMv7 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+   "key": "evidence/packet-framing-6ce7109c-armv7/4375d33f486c45d75338de3f1b493c9217ae3686710793e268a04cd68185e618.tar.zst",
+   "sha256": "4375d33f486c45d75338de3f1b493c9217ae3686710793e268a04cd68185e618",
+   "bytes": 22732412,
+   "source_revisions": {
+    "candidate": "6ce7109cd2929a7057498769768cbb2e6eb2a301"
    }
   },
   {
