@@ -511,8 +511,10 @@ pub fn train(root: &Path, directory: Option<&Path>, only: Option<&str>) -> R<()>
 /// with the manifest ([`all_committed`]), no training file's pin is the SHA-256 of a
 /// file the gate reads, as far as it is known without a prepared host, and, where the
 /// policy orders the link, each order lays out the worker built for this host: the
-/// worker holds at least [`link_order::MIN_HELD_PERCENT`] of its names, and linking
-/// it with its ordering file and again gives the same file.
+/// worker holds at least [`link_order::MIN_HELD_PERCENT`] of the names of its order
+/// for this host's target, and [`link_order::MIN_HELD_PERCENT_ACROSS_TARGETS`] of an
+/// order for another, and linking it with its ordering file and again gives the same
+/// file.
 pub fn check(root: &Path) -> R<()> {
     let training = Training::load(root)?;
     let trained = all_committed(root, &training)?;
@@ -532,6 +534,7 @@ pub fn check(root: &Path) -> R<()> {
         );
         return Ok(());
     }
+    let host = gate_build::worker_target()?;
     let directory = root.join("target/link-order-check");
     fs::create_dir_all(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
     for worker in workers() {
@@ -547,7 +550,12 @@ pub fn check(root: &Path) -> R<()> {
                 ordering.held,
                 order.names.len()
             );
-            if !link_order::holds_enough(ordering.held, order.names.len()) {
+            let percent = if *target == host {
+                link_order::MIN_HELD_PERCENT
+            } else {
+                link_order::MIN_HELD_PERCENT_ACROSS_TARGETS
+            };
+            if !link_order::holds_percent(ordering.held, order.names.len(), percent) {
                 return Err(format!(
                     "{} holds {} of the {} functions of its {target} order; retrain it",
                     worker.name,

@@ -590,7 +590,8 @@ may override that count for diagnostic comparisons.
     or null for a worker linked without one. `cargo xtask check` runs `cargo xtask
     link-order check`, which checks the committed orders against the manifest in the
     same way and, on GNU/Linux, that the worker built for the checking host holds 95%
-    of each of its orders and links in it. The linker arguments, after the policy's
+    of the names of its order for that host's target, and 90% of an order for another
+    target, since some functions exist on one architecture only, and links in each. The linker arguments, after the policy's
     own, are
 
     ```text

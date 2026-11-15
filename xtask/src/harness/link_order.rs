@@ -132,10 +132,19 @@ pub struct Ordering {
     pub held: usize,
 }
 
+/// The least share, in percent, of a trained order's names a worker built for another
+/// target must hold: some functions exist on one architecture only.
+pub const MIN_HELD_PERCENT_ACROSS_TARGETS: usize = 90;
+
 /// Whether a binary that holds `held` of a trained order's `trained` names is laid out
 /// by it.
 pub fn holds_enough(held: usize, trained: usize) -> bool {
-    held * 100 >= trained * MIN_HELD_PERCENT
+    holds_percent(held, trained, MIN_HELD_PERCENT)
+}
+
+/// Whether `held` of `trained` is at least `percent`.
+pub fn holds_percent(held: usize, trained: usize, percent: usize) -> bool {
+    held * 100 >= trained * percent
 }
 
 /// The symbol ordering file of `binary`: one symbol per line, those `trained` names
