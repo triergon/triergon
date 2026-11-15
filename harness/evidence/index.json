@@ -31447,6 +31447,30 @@
    "source_revisions": {
     "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
    }
+  },
+  {
+   "name": "gate-run-aarch64-75f35bac-20261115-144423-shard-1",
+   "path": "gate-run-aarch64-75f35bac-20261115-144423-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 75f35bac on Linux AArch64, one c6g.4xlarge from the gate image built with ogg-reader-inputs, item ogg-readers: the shard's outputs as tools/gate-aws.sh packs them, archived from the host after the run's own upload failed, with the index entry written on it; 45 files and 26 seeks, none failing, the chained seeks past the first link graded under their reviewed disposition; for the Ogg row",
+   "key": "evidence/gate-runs/75f35bac8f53be59861ddb02b1f3212aaa45d4b6-aarch64-20261115-144423/shard-1/da8a9bc4c6680c73abb48c0f4d8284a55d962dbdf8b9f1a3cd483cc36c3d59b1.tar.zst",
+   "sha256": "da8a9bc4c6680c73abb48c0f4d8284a55d962dbdf8b9f1a3cd483cc36c3d59b1",
+   "bytes": 341164,
+   "source_revisions": {
+    "candidate": "75f35bac8f53be59861ddb02b1f3212aaa45d4b6"
+   }
+  },
+  {
+   "name": "gate-run-armv7-75f35bac-20261115-144432-shard-1",
+   "path": "gate-run-armv7-75f35bac-20261115-144432-shard-1",
+   "retention": "retained",
+   "reason": "A partial gate run at 75f35bac on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image built with ogg-reader-inputs, item ogg-readers: the shard's outputs as tools/gate-aws.sh packs them, archived from the host after the run's own upload failed, with the index entry written on it; 45 files and 26 seeks, none failing, the chained seeks past the first link graded under their reviewed disposition; for the Ogg row",
+   "key": "evidence/gate-runs/75f35bac8f53be59861ddb02b1f3212aaa45d4b6-armv7-20261115-144432/shard-1/dd7d2d2ea490b26d455061cda86111f477c03e80d057d0966145aabbcfd7a676.tar.zst",
+   "sha256": "dd7d2d2ea490b26d455061cda86111f477c03e80d057d0966145aabbcfd7a676",
+   "bytes": 341756,
+   "source_revisions": {
+    "candidate": "75f35bac8f53be59861ddb02b1f3212aaa45d4b6"
+   }
   }
  ]
 }
