@@ -27,6 +27,7 @@ fn options(root: &Path, args: &[String]) -> Result<Options, String> {
     options.manifest = root.join("harness/features/packet-framing/corpus.json");
     options.corpus = root.join(".research/fixtures-packet-framing");
     options.output = root.join(".research/harness-packet-framing");
+    options.early_stop = false;
     let mut rest = args.iter();
     while let Some(flag) = rest.next() {
         let mut value = || rest.next().ok_or_else(|| format!("{flag} needs a value"));
@@ -262,6 +263,7 @@ mod tests {
         )
         .unwrap();
         assert!(o.benchmark && o.memory && o.require_slice_acceptance);
+        assert!(!o.early_stop);
         assert_eq!(o.pairs, 100);
         assert_eq!(o.iterations, Some(50));
         assert_eq!(o.seed, 281);

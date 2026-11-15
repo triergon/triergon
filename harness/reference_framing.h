@@ -196,17 +196,18 @@ static void packet(Digest *h, unsigned kind, int input, unsigned output, const A
         blob(h, p->side_data[i].data, p->side_data[i].size);
     }
 }
-static int receive_all(AVBSFContext *ctx, AVPacket **kept, unsigned *count, int input,
-                       Outcome *out) {
+static int receive_all(AVBSFContext *ctx, AVPacket **slot, AVPacket **kept,
+                       unsigned *count, int input, Outcome *out) {
     for (;;) {
         if (*count >= OUTPUTS)
             return -1;
-        AVPacket *p = av_packet_alloc();
+        if (!*slot)
+            *slot = av_packet_alloc();
+        AVPacket *p = *slot;
         if (!p)
             return -1;
         int rc = av_bsf_receive_packet(ctx, p);
         if (rc < 0) {
-            av_packet_free(&p);
             if (rc == AVERROR(ENOMEM))
                 return -1;
             if (rc != AVERROR(EAGAIN) && rc != AVERROR_EOF) {
@@ -216,14 +217,13 @@ static int receive_all(AVBSFContext *ctx, AVPacket **kept, unsigned *count, int 
             }
             return 0;
         }
-        if (p->size < 0 || p->size > (int)CAP) {
-            av_packet_free(&p);
+        if (p->size < 0 || p->size > (int)CAP)
             return -1;
-        }
         packet(&out->hash, 2, input, *count, p);
         out->packets++;
         out->bytes += (unsigned)p->size;
         kept[(*count)++] = p;
+        *slot = NULL;
     }
 }
 static int operation(const Case *c, Outcome *out) {
@@ -232,7 +232,8 @@ static int operation(const Case *c, Outcome *out) {
     if (!filter)
         return -1;
     AVBSFContext *ctx = NULL;
-    AVPacket *kept[OUTPUTS] = {0};
+    AVPacket *send = NULL, *receive = NULL;
+    AVPacket *kept[OUTPUTS];
     unsigned count = 0;
     int failed = 0;
     if (av_bsf_alloc(filter, &ctx) < 0)
@@ -249,6 +250,10 @@ static int operation(const Case *c, Outcome *out) {
     ctx->par_in->extradata_size = (int)c->config_n;
     ctx->time_base_in = (AVRational){1, 90000};
     int rc = av_bsf_init(ctx);
+    if (rc == AVERROR(ENOMEM)) {
+        av_bsf_free(&ctx);
+        return -1;
+    }
     if (rc < 0) {
         word(&out->hash, 4);
         word(&out->hash, (uint64_t)(int64_t)rc);
@@ -266,21 +271,26 @@ static int operation(const Case *c, Outcome *out) {
             if (e->type == 2)
                 rc = av_bsf_send_packet(ctx, NULL);
             else {
-                AVPacket *p = av_packet_clone(e->packet);
-                if (!p) {
+                if (!send)
+                    send = av_packet_alloc();
+                if (!send || av_packet_ref(send, e->packet) < 0) {
                     failed = 1;
                     break;
                 }
-                rc = av_bsf_send_packet(ctx, p);
-                av_packet_free(&p);
+                rc = av_bsf_send_packet(ctx, send);
+                if (rc < 0)
+                    av_packet_unref(send);
             }
-            if (rc == AVERROR(ENOMEM) || (rc >= 0 && receive_all(ctx, kept, &count, (int)i, out))) {
+            if (rc == AVERROR(ENOMEM) ||
+                (rc >= 0 && receive_all(ctx, &receive, kept, &count, (int)i, out))) {
                 failed = 1;
                 break;
             }
         }
     }
     av_bsf_free(&ctx);
+    av_packet_free(&send);
+    av_packet_free(&receive);
     word(&out->hash, 6);
     word(&out->hash, count);
     for (unsigned i = 0; i < count; ++i) {

@@ -306,12 +306,12 @@ fn operation(case: &Case) -> Result<Outcome> {
         }
     }
     drop(session);
+    drop(configured);
     outcome.digest.word(6);
     outcome.digest.word(outcome.packets);
     for (index, packet) in kept.as_slice().iter().enumerate() {
         packet_digest(&mut outcome.digest, 5, -1, index as u64, packet);
     }
-    drop(configured);
     Ok(outcome)
 }
 
