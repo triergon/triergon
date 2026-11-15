@@ -38,10 +38,11 @@ core::fmt::write
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
 <std::io::stdio::Stdout as core::io::write::Write>::flush
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
-<std::sys::pal::unix::time::Timespec>::now
 framing_worker::worker::execute
 framing_worker::worker::operation::run
 framing_worker::worker::operation::avc
+<triergon_framing::nal_receiver_config::ReceiverAvcConfigParser>::new
+<triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
 <triergon_core::bytes::BudgetVec<triergon_framing::avc_config::AvcNalDescriptor>>::reallocate
 triergon_core::bytes::charge_replacement
 triergon_core::bytes::settle_replacement
@@ -50,7 +51,6 @@ triergon_core::bytes::settle_replacement
 <triergon_core::bytes::BudgetVec<u8>>::freeze
 <framing_worker::worker::model::Digest>::blob
 <triergon_framing::nal_packet::NalPacketConfiguration>::width
-<triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
 <triergon_framing::nal_packet::NalPacketJob>::append
 <triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketSegment>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketSegment>>::reallocate

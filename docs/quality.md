@@ -541,10 +541,12 @@ may override that count for diagnostic comparisons.
 - On GNU/Linux the policy also links each Rust worker that commits a trained order with
   its functions in that order, then module order, with the pinned toolchain's own
   `lld`. These media workers do: `media-worker`, `playback-worker`,
-  `playback-matroska-worker`, `transport-worker`, `codec-worker` and `framing-worker`.
-  The ISO BMFF worker, whose operations read only the raw-video and timed-text movies
-  of its comparison, the font, shaping, rasterising, ASS, subtitle and capture
-  workers, and the references link with their toolchain's default linker as before. The code
+  `playback-matroska-worker`, `transport-worker` and `framing-worker`. The ISO BMFF
+  worker, whose operations read only the raw-video and timed-text movies of its
+  comparison, the codec worker, whose decoder workloads took more resident memory with
+  an order trained on the corpus's few codecs, the font, shaping, rasterising, ASS,
+  subtitle and capture workers, and the references link with their toolchain's default
+  linker as before. The code
   one operation runs is a fraction of a worker's, and the kernel faults code in 64 KiB
   windows, so how much of a worker becomes resident depends on how its functions lie
   among those windows.
@@ -561,11 +563,11 @@ may override that count for diagnostic comparisons.
   - The training corpus is its own, apart from everything the gate reads.
     `harness/link-order/training.json` lists its files by SHA-256 and the operations,
     each a worker's command line with `@NAME` for a training file; the files are kept
-    as an evidence set and unpacked at `.research/link-order-training`. `cargo xtask
-    link-order corpus OUT` made them with `ffmpeg` and `ffprobe` from FFmpeg's own
-    video and audio generators (libx264, libx265 and FFmpeg's AAC, AC-3, E-AC-3 and
-    Opus encoders); the playback capsules, AAC access units and packet-framing scripts
-    are made from those files. `cargo xtask link-order separate`, which `train` runs
+    as an evidence set and unpacked at `.research/link-order-training` (the set also
+    holds an AAC access-unit file that no operation reads). `cargo xtask link-order
+    corpus OUT` made them with `ffmpeg` and `ffprobe` from FFmpeg's own video and audio
+    generators (libx264, libx265 and FFmpeg's AAC, AC-3, E-AC-3 and Opus encoders); the
+    playback capsules and packet-framing scripts are made from those files. `cargo xtask link-order separate`, which `train` runs
     first, fails when a training file has the SHA-256 of a file any gate item reads on
     either target or of a committed file, or when an operation runs a gate case's
     operation family on inputs of the same content with the same other arguments. The

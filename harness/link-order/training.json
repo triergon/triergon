@@ -19,10 +19,6 @@
    "sha256": "5a5eaca4806acb341948145d20791d0ac83ad151c43df5b32953d3ac7942a0a0"
   },
   {
-   "file": "avc-aac.aac-access-units",
-   "sha256": "09c850cea59444b7d9017040d36dfd29f0c8915d82d475336dab0eebceda141d"
-  },
-  {
    "file": "avc-aac.mp4",
    "sha256": "96911abbdb195738f18576649bb977d3c2033823f643c93ac7ed80b99b3b840c"
   },
@@ -485,30 +481,6 @@
     "@audio-6.ts",
     "188",
     "6"
-   ]
-  },
-  {
-   "worker": "codec-worker",
-   "arguments": [
-    "audio-aac-access-units-memory",
-    "@avc-aac.aac-access-units"
-   ]
-  },
-  {
-   "worker": "codec-worker",
-   "arguments": [
-    "packets",
-    "mov",
-    "@avc-aac.mp4",
-    "1@1300000"
-   ]
-  },
-  {
-   "worker": "codec-worker",
-   "arguments": [
-    "packets",
-    "mov",
-    "@hevc-aac-fragmented.mp4"
    ]
   },
   {

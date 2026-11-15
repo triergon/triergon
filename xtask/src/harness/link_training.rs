@@ -855,14 +855,6 @@ pub fn corpus(out: &Path) -> R<()> {
             fs::write(&path, capsule).map_err(|e| format!("{}: {e}", path.display()))?;
         }
     }
-    let source = out.join("avc-aac.mp4");
-    let data = fs::read(&source).map_err(|e| format!("{}: {e}", source.display()))?;
-    let (units, ..) = crate::codecs::aac_access_units::access_units(
-        &data,
-        &probe(&source, &crate::codecs::aac_access_units::PROBE)?,
-    )?;
-    fs::write(out.join("avc-aac.aac-access-units"), units)
-        .map_err(|e| format!("access units: {e}"))?;
     for (source, script) in [
         ("avc-aac.mp4", "avc.bsf"),
         ("hevc-aac-fragmented.mp4", "hevc.bsf"),
