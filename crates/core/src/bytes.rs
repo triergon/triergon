@@ -482,7 +482,7 @@ impl<T> BudgetVec<T> {
         if target <= self.capacity() {
             return Ok(());
         }
-        self.reallocate(target)
+        self.reallocate(target, target)
     }
     /// Gives back the capacity beyond `min_capacity` elements, or beyond the
     /// length if that is more: the elements move to an allocation of that
@@ -493,39 +493,25 @@ impl<T> BudgetVec<T> {
         if target >= self.capacity() {
             return Ok(());
         }
-        self.reallocate(target)
+        self.reallocate(target, target)
     }
-    /// Moves the elements to an allocation of exactly `target` elements, at
-    /// least the length.
+    /// Moves the elements to an allocation of exactly `preferred` elements, or
+    /// of `minimum` where the pool refuses `preferred`; both are at least the
+    /// length. Only the allocation and the move depend on `T`.
     #[cold]
     #[inline(never)]
-    fn reallocate(&mut self, target: usize) -> Result<()> {
-        let size = target.checked_mul(size_of::<T>()).ok_or(Error::Overflow)?;
-        // The replacement is charged on top of the current allocation's charge
-        // for the whole copy, and the old part is returned only after the old
-        // allocation drops: the same pool totals as a separate reservation,
-        // without another pool handle.
+    fn reallocate(&mut self, preferred: usize, minimum: usize) -> Result<()> {
         let old = self.charge.bytes();
-        self.charge.grow_by(size)?;
+        let (target, size) =
+            charge_replacement(&mut self.charge, preferred, minimum, size_of::<T>())?;
         let mut replacement = Vec::new();
-        let charged = replacement
+        let capacity = replacement
             .try_reserve_exact(target)
-            .map_err(|_| Error::Allocation)
-            .and_then(|()| {
-                replacement
-                    .capacity()
-                    .checked_mul(size_of::<T>())
-                    .ok_or(Error::Overflow)
-            })
-            .and_then(|bytes| self.charge.grow_by(bytes - size));
-        if let Err(error) = charged {
-            drop(replacement);
-            self.charge.shrink_by(size);
-            return Err(error);
-        }
+            .ok()
+            .map(|()| replacement.capacity());
+        settle_replacement(&mut self.charge, size, capacity, size_of::<T>())?;
         replacement.append(&mut self.data);
-        let previous = std::mem::replace(&mut self.data, replacement);
-        drop(previous);
+        drop(std::mem::replace(&mut self.data, replacement));
         self.charge.shrink_by(old);
         Ok(())
     }
@@ -560,21 +546,12 @@ impl<T> BudgetVec<T> {
         self.grow_amortized(needed)
     }
 
-    /// Grows to at least `needed`, geometrically where the budget allows.
+    /// Grows to at least `needed`, more than the capacity, geometrically where
+    /// the budget allows.
+    #[inline]
     fn grow_amortized(&mut self, needed: usize) -> Result<()> {
-        let target = needed.max(self.capacity().saturating_mul(2).max(4));
-        self.grow_to(target).or_else(|error| {
-            if target != needed
-                && matches!(
-                    error,
-                    Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
-                )
-            {
-                self.grow_to(needed)
-            } else {
-                Err(error)
-            }
-        })
+        let preferred = needed.max(self.capacity().saturating_mul(2).max(4));
+        self.reallocate(preferred, needed)
     }
     #[inline]
     pub fn try_extend_from_slice(&mut self, values: &[T]) -> Result<()>
@@ -613,6 +590,53 @@ impl<T> BudgetVec<T> {
         self.data.resize(new_len, value);
         Ok(())
     }
+}
+
+/// Charges a replacement allocation of `preferred` elements of `element` bytes
+/// on top of the current allocation's charge, or of `minimum` elements where the
+/// pool refuses `preferred` or its size overflows. The old part is returned only
+/// after the old allocation drops: the same pool totals as a separate
+/// reservation, without another pool handle. Returns the elements and bytes
+/// charged.
+#[inline(never)]
+fn charge_replacement(
+    charge: &mut Reservation,
+    preferred: usize,
+    minimum: usize,
+    element: usize,
+) -> Result<(usize, usize)> {
+    let charge_for = |charge: &mut Reservation, target: usize| {
+        let size = target.checked_mul(element).ok_or(Error::Overflow)?;
+        charge.grow_by(size).map(|()| (target, size))
+    };
+    match charge_for(charge, preferred) {
+        Err(Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow)
+            if minimum != preferred =>
+        {
+            charge_for(charge, minimum)
+        }
+        charged => charged,
+    }
+}
+
+/// Charges whatever capacity a replacement allocation holds beyond the `size`
+/// bytes charged for it. When the allocation failed (`capacity` is `None`) or
+/// that charge is refused, returns the `size` bytes and the error.
+#[inline(never)]
+fn settle_replacement(
+    charge: &mut Reservation,
+    size: usize,
+    capacity: Option<usize>,
+    element: usize,
+) -> Result<()> {
+    let settled = capacity
+        .ok_or(Error::Allocation)
+        .and_then(|capacity| capacity.checked_mul(element).ok_or(Error::Overflow))
+        .and_then(|bytes| charge.grow_by(bytes - size));
+    if settled.is_err() {
+        charge.shrink_by(size);
+    }
+    settled
 }
 
 impl<T> std::ops::Deref for BudgetVec<T> {
