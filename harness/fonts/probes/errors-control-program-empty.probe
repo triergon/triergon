@@ -1,0 +1,20 @@
+# Glyphs without points after an error in the control value program: glyph
+# 0 has no points, glyph 1 a contour and no program, glyph 2 no points and a
+# program.
+heights 16384
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  PUSH 0; SMD; BYTES 0x28
+end
+glyph advance 1100
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+end
+glyph advance 1100
+  program
+    SVTCA[0]
+  end
+end

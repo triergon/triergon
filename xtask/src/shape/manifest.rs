@@ -1,6 +1,7 @@
 //! The shaping features' manifests, generated. Text cases are a font of the font
 //! corpus (`harness/fonts/corpus.json`) with the texts of one script and one set of
-//! segment properties and features; bidi, simple and Unicode cases are generated
+//! segment properties and features; extents cases a CFF, CFF2 or collection font of
+//! the corpus; bidi, simple and Unicode cases are generated
 //! text files (`.research/shape/texts`) with the settings of each feature. The
 //! work each case must fold is pinned in `harness/features/<id>/pins.json`: the
 //! HarfBuzz and FriBidi reference's folds (see [`crate::generators`]).
@@ -209,6 +210,9 @@ enum Load {
     Libass {
         size: u32,
     },
+    /// Every glyph's extents of every face of the corpus's CFF, CFF2 and
+    /// collection files.
+    Extents,
     Bidi,
     Simple,
     Unicode,
@@ -241,6 +245,7 @@ fn load(id: &str) -> R<Load> {
         "shape-bidi" => Ok(Load::Bidi),
         "shape-simple" => Ok(Load::Simple),
         "shape-unicode" => Ok(Load::Unicode),
+        "shape-extents" => Ok(Load::Extents),
         _ => Err(format!("{id}: not a shaping feature")),
     }
 }
@@ -333,24 +338,62 @@ fn covers(name: &str, script: &str) -> bool {
 
 /// The text case rows of a feature, in corpus order; with a `size`, each row's
 /// arguments start with it.
+/// The rights fields of a case whose file comes from corpus `source`.
+fn rights(source: &Value) -> R<Vec<(&'static str, Value)>> {
+    if source.get("generator").and_then(Value::as_str) == Some("authored-fonts") {
+        return Ok(vec![("rights", Value::str("authored-synthetic"))]);
+    }
+    let licence = source
+        .get("licence")
+        .and_then(Value::as_str)
+        .ok_or("corpus source without licence")?;
+    Ok(vec![
+        ("rights", Value::str("reviewed-licence")),
+        ("licence", Value::str(licence)),
+    ])
+}
+
+/// One case per CFF, CFF2 and collection file of the corpus, its profile the
+/// file's format.
+fn extents_rows(root: &Path) -> R<Vec<Value>> {
+    let mut rows = Vec::new();
+    for (source, files) in crate::fonts::corpus(root)? {
+        if !crate::fonts::serves(&source, "shape") {
+            continue;
+        }
+        for file in files {
+            if !EXTENTS_FORMATS.contains(&file.format.as_str()) {
+                continue;
+            }
+            let name = file.path.rsplit('/').next().unwrap_or(&file.path);
+            let mut fields = vec![
+                (
+                    "id",
+                    Value::str(format!("{}-extents", name.replace('.', "-").to_lowercase())),
+                ),
+                ("profile", Value::str(&file.format)),
+                ("file", Value::str(&file.path)),
+                ("sha256", Value::str(&file.sha256)),
+            ];
+            fields.extend(rights(&source)?);
+            fields.push(("arguments", Value::strings(Vec::<String>::new())));
+            rows.push(Value::object(fields));
+        }
+    }
+    Ok(rows)
+}
+
+/// The corpus formats whose files `shape-extents` reads: every CFF and CFF2
+/// face, and the collections, among them CFF faces.
+const EXTENTS_FORMATS: [&str; 4] = ["cff", "cff-cid", "cff2", "collection"];
+
 fn text_rows(root: &Path, all: bool, size: Option<u32>) -> R<Vec<Value>> {
     let mut rows = Vec::new();
     for (source, files) in crate::fonts::corpus(root)? {
         if !crate::fonts::serves(&source, "shape") {
             continue;
         }
-        let rights = if source.get("generator").and_then(Value::as_str) == Some("authored-fonts") {
-            vec![("rights", Value::str("authored-synthetic"))]
-        } else {
-            let licence = source
-                .get("licence")
-                .and_then(Value::as_str)
-                .ok_or("corpus source without licence")?;
-            vec![
-                ("rights", Value::str("reviewed-licence")),
-                ("licence", Value::str(licence)),
-            ]
-        };
+        let rights = rights(&source)?;
         for file in files {
             let name = file.path.rsplit('/').next().unwrap_or(&file.path);
             let stem = name.replace('.', "-").to_lowercase();
@@ -527,6 +570,7 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
     match load(id)? {
         Load::Text { all } => text_rows(root, all, None),
         Load::Libass { size } => text_rows(root, false, Some(size)),
+        Load::Extents => extents_rows(root),
         load => Ok(text_file_rows(load)),
     }
 }
@@ -548,12 +592,18 @@ fn note(id: &str) -> &'static str {
         "shape-simple" => {
             "The Arabic texts and 1000 random Arabic strings with each base direction."
         }
+        "shape-extents" => {
+            "Every CFF, CFF2 and collection file of the font corpus: every glyph's extents of every face through HarfBuzz's OpenType font functions at units per em."
+        }
         _ => "Every Unicode scalar value.",
     }
 }
 
 fn directory(id: &str) -> &'static str {
-    if matches!(load(id), Ok(Load::Text { .. } | Load::Libass { .. })) {
+    if matches!(
+        load(id),
+        Ok(Load::Text { .. } | Load::Libass { .. } | Load::Extents)
+    ) {
         FONT_DIRECTORY
     } else {
         TEXT_DIRECTORY

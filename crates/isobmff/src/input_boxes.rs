@@ -161,7 +161,8 @@ impl BoxReader {
                 return Ok(());
             }
             if input.capabilities().random_access {
-                input.request_range(end)?;
+                // A box that ends inside the current window continues from it.
+                input.request_range_reusing_window(end)?;
                 self.token = input.token();
                 self.position = input.position();
                 self.phase = Phase::Skipped;

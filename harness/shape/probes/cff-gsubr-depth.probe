@@ -1,0 +1,321 @@
+# Global subroutine calls: as cff-subr-depth, with global subroutines and
+# callgsubr, and glyphs nesting local and global calls alternately (glyphs 22
+# on: glyph 21 + d alternates d calls, starting with a local one).
+global
+  -106 callgsubr 0 10 rlineto return
+end
+global
+  -105 callgsubr 0 10 rlineto return
+end
+global
+  -104 callgsubr 0 10 rlineto return
+end
+global
+  -103 callgsubr 0 10 rlineto return
+end
+global
+  -102 callgsubr 0 10 rlineto return
+end
+global
+  -101 callgsubr 0 10 rlineto return
+end
+global
+  -100 callgsubr 0 10 rlineto return
+end
+global
+  -99 callgsubr 0 10 rlineto return
+end
+global
+  -98 callgsubr 0 10 rlineto return
+end
+global
+  -97 callgsubr 0 10 rlineto return
+end
+global
+  -96 callgsubr 0 10 rlineto return
+end
+global
+  -95 callgsubr 0 10 rlineto return
+end
+global
+  -94 callgsubr 0 10 rlineto return
+end
+global
+  -93 callgsubr 0 10 rlineto return
+end
+global
+  -92 callgsubr 0 10 rlineto return
+end
+global
+  -91 callgsubr 0 10 rlineto return
+end
+global
+  -90 callgsubr 0 10 rlineto return
+end
+global
+  -89 callgsubr 0 10 rlineto return
+end
+global
+  -88 callgsubr 0 10 rlineto return
+end
+global
+  -87 callgsubr 0 10 rlineto return
+end
+global
+  50 0 rlineto return
+end
+global
+  -106 callsubr 0 10 rlineto return
+end
+global
+  -105 callsubr 0 10 rlineto return
+end
+global
+  -104 callsubr 0 10 rlineto return
+end
+global
+  -103 callsubr 0 10 rlineto return
+end
+global
+  -102 callsubr 0 10 rlineto return
+end
+global
+  -101 callsubr 0 10 rlineto return
+end
+global
+  -100 callsubr 0 10 rlineto return
+end
+global
+  -99 callsubr 0 10 rlineto return
+end
+global
+  -98 callsubr 0 10 rlineto return
+end
+global
+  -97 callsubr 0 10 rlineto return
+end
+global
+  -96 callsubr 0 10 rlineto return
+end
+global
+  -95 callsubr 0 10 rlineto return
+end
+global
+  -94 callsubr 0 10 rlineto return
+end
+global
+  -93 callsubr 0 10 rlineto return
+end
+global
+  -92 callsubr 0 10 rlineto return
+end
+global
+  -91 callsubr 0 10 rlineto return
+end
+global
+  -90 callsubr 0 10 rlineto return
+end
+global
+  -89 callsubr 0 10 rlineto return
+end
+global
+  -88 callsubr 0 10 rlineto return
+end
+global
+  -87 callsubr 0 10 rlineto return
+end
+global
+  50 0 rlineto return
+end
+local
+  -85 callgsubr 0 10 rlineto return
+end
+local
+  -84 callgsubr 0 10 rlineto return
+end
+local
+  -83 callgsubr 0 10 rlineto return
+end
+local
+  -82 callgsubr 0 10 rlineto return
+end
+local
+  -81 callgsubr 0 10 rlineto return
+end
+local
+  -80 callgsubr 0 10 rlineto return
+end
+local
+  -79 callgsubr 0 10 rlineto return
+end
+local
+  -78 callgsubr 0 10 rlineto return
+end
+local
+  -77 callgsubr 0 10 rlineto return
+end
+local
+  -76 callgsubr 0 10 rlineto return
+end
+local
+  -75 callgsubr 0 10 rlineto return
+end
+local
+  -74 callgsubr 0 10 rlineto return
+end
+local
+  -73 callgsubr 0 10 rlineto return
+end
+local
+  -72 callgsubr 0 10 rlineto return
+end
+local
+  -71 callgsubr 0 10 rlineto return
+end
+local
+  -70 callgsubr 0 10 rlineto return
+end
+local
+  -69 callgsubr 0 10 rlineto return
+end
+local
+  -68 callgsubr 0 10 rlineto return
+end
+local
+  -67 callgsubr 0 10 rlineto return
+end
+local
+  -66 callgsubr 0 10 rlineto return
+end
+local
+  50 0 rlineto return
+end
+glyph
+  endchar
+end
+glyph # 1 deep, global
+  100 100 rmoveto -87 callgsubr endchar
+end
+glyph # 2 deep, global
+  100 100 rmoveto -88 callgsubr endchar
+end
+glyph # 3 deep, global
+  100 100 rmoveto -89 callgsubr endchar
+end
+glyph # 4 deep, global
+  100 100 rmoveto -90 callgsubr endchar
+end
+glyph # 5 deep, global
+  100 100 rmoveto -91 callgsubr endchar
+end
+glyph # 6 deep, global
+  100 100 rmoveto -92 callgsubr endchar
+end
+glyph # 7 deep, global
+  100 100 rmoveto -93 callgsubr endchar
+end
+glyph # 8 deep, global
+  100 100 rmoveto -94 callgsubr endchar
+end
+glyph # 9 deep, global
+  100 100 rmoveto -95 callgsubr endchar
+end
+glyph # 10 deep, global
+  100 100 rmoveto -96 callgsubr endchar
+end
+glyph # 11 deep, global
+  100 100 rmoveto -97 callgsubr endchar
+end
+glyph # 12 deep, global
+  100 100 rmoveto -98 callgsubr endchar
+end
+glyph # 13 deep, global
+  100 100 rmoveto -99 callgsubr endchar
+end
+glyph # 14 deep, global
+  100 100 rmoveto -100 callgsubr endchar
+end
+glyph # 15 deep, global
+  100 100 rmoveto -101 callgsubr endchar
+end
+glyph # 16 deep, global
+  100 100 rmoveto -102 callgsubr endchar
+end
+glyph # 17 deep, global
+  100 100 rmoveto -103 callgsubr endchar
+end
+glyph # 18 deep, global
+  100 100 rmoveto -104 callgsubr endchar
+end
+glyph # 19 deep, global
+  100 100 rmoveto -105 callgsubr endchar
+end
+glyph # 20 deep, global
+  100 100 rmoveto -106 callgsubr endchar
+end
+glyph # 21 deep, global
+  100 100 rmoveto -107 callgsubr endchar
+end
+glyph # 1 deep, alternating
+  100 100 rmoveto -87 callsubr endchar
+end
+glyph # 2 deep, alternating
+  100 100 rmoveto -88 callsubr endchar
+end
+glyph # 3 deep, alternating
+  100 100 rmoveto -89 callsubr endchar
+end
+glyph # 4 deep, alternating
+  100 100 rmoveto -90 callsubr endchar
+end
+glyph # 5 deep, alternating
+  100 100 rmoveto -91 callsubr endchar
+end
+glyph # 6 deep, alternating
+  100 100 rmoveto -92 callsubr endchar
+end
+glyph # 7 deep, alternating
+  100 100 rmoveto -93 callsubr endchar
+end
+glyph # 8 deep, alternating
+  100 100 rmoveto -94 callsubr endchar
+end
+glyph # 9 deep, alternating
+  100 100 rmoveto -95 callsubr endchar
+end
+glyph # 10 deep, alternating
+  100 100 rmoveto -96 callsubr endchar
+end
+glyph # 11 deep, alternating
+  100 100 rmoveto -97 callsubr endchar
+end
+glyph # 12 deep, alternating
+  100 100 rmoveto -98 callsubr endchar
+end
+glyph # 13 deep, alternating
+  100 100 rmoveto -99 callsubr endchar
+end
+glyph # 14 deep, alternating
+  100 100 rmoveto -100 callsubr endchar
+end
+glyph # 15 deep, alternating
+  100 100 rmoveto -101 callsubr endchar
+end
+glyph # 16 deep, alternating
+  100 100 rmoveto -102 callsubr endchar
+end
+glyph # 17 deep, alternating
+  100 100 rmoveto -103 callsubr endchar
+end
+glyph # 18 deep, alternating
+  100 100 rmoveto -104 callsubr endchar
+end
+glyph # 19 deep, alternating
+  100 100 rmoveto -105 callsubr endchar
+end
+glyph # 20 deep, alternating
+  100 100 rmoveto -106 callsubr endchar
+end
+glyph # 21 deep, alternating
+  100 100 rmoveto -107 callsubr endchar
+end

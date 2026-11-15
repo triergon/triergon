@@ -9,7 +9,17 @@
 //!   the baseline and the rest below it, so the ascender to descender span is
 //!   the em);
 //! - `heights H...`: the 26.6 pixel heights a probe loads the face at, as
-//!   libass sizes a face (default 16384);
+//!   libass sizes a face, each in a process of its own (default 16384 when
+//!   the probe names no heights or sequences);
+//! - `sequence H...`: heights requested in turn in one process, on the same
+//!   face, as libass resizes a face; a probe may give several sequences;
+//! - `modes M...`: the `font-sized` modes a probe reads at each height
+//!   (default `default`; also `outlines` for the unhinted outlines, their
+//!   synthetic styles and orientations, `advances` and `vertical`);
+//! - `family NAME`: the family name in `name` (default `Triergon Probe`), so
+//!   faces embedded in one script are told apart;
+//! - `underline POSITION THICKNESS`: `post`'s underline (default -100 50);
+//! - `strikeout POSITION SIZE`: `OS/2`'s strike-out (default 0 0);
 //! - `wraps-at-32-bits`: the probe's results depend on the reference's
 //!   integer width; its record, from 32-bit ARMv7, stands for a 64-bit
 //!   reference that differs from it (a 32-bit reference must match it);
@@ -83,8 +93,15 @@ const UNSCALED_COMPONENT_OFFSET: u16 = 0x1000;
 /// A parsed description.
 #[derive(Debug, Default)]
 pub(super) struct Description {
-    pub(super) heights: Vec<i32>,
+    /// The heights loaded in each worker process, in order.
+    pub(super) runs: Vec<Vec<i32>>,
+    pub(super) modes: Vec<String>,
     pub(super) wraps_at_32_bits: bool,
+    family: String,
+    /// `post`'s underline position and thickness.
+    underline: (i16, i16),
+    /// `OS/2`'s strike-out position and size.
+    strikeout: (i16, i16),
     units_per_em: u16,
     head_flags: u16,
     metrics: Option<(i16, i16)>,
@@ -123,7 +140,9 @@ struct Component {
 impl Description {
     pub(super) fn parse(text: &str) -> Result<Self, String> {
         let mut d = Self {
-            heights: vec![16384],
+            modes: vec!["default".to_owned()],
+            family: "Triergon Probe".into(),
+            underline: (-100, 50),
             units_per_em: 2048,
             ..Self::default()
         };
@@ -143,7 +162,27 @@ impl Description {
                     [ascender, descender] => d.metrics = Some((ascender, descender)),
                     _ => return Err(fail("metrics ASCENDER DESCENDER".into())),
                 },
-                "heights" => d.heights = numbers(&args).map_err(fail)?,
+                "heights" => {
+                    let heights: Vec<i32> = numbers(&args).map_err(fail)?;
+                    d.runs.extend(heights.into_iter().map(|h| vec![h]));
+                }
+                "sequence" => match numbers(&args).map_err(fail)? {
+                    heights if heights.len() >= 2 => d.runs.push(heights),
+                    _ => return Err(fail("sequence H H...".into())),
+                },
+                "modes" => {
+                    let known = ["default", "outlines", "advances", "vertical"];
+                    if args.is_empty() || args.iter().any(|m| !known.contains(m)) {
+                        return Err(fail("modes default|outlines|advances|vertical...".into()));
+                    }
+                    d.modes = args.iter().map(|&m| m.to_owned()).collect();
+                }
+                "family" if !rest.is_empty() && rest.is_ascii() => rest.clone_into(&mut d.family),
+                "underline" | "strikeout" => match numbers::<i16>(&args).map_err(fail)?[..] {
+                    [position, size] if key == "underline" => d.underline = (position, size),
+                    [position, size] => d.strikeout = (position, size),
+                    _ => return Err(fail(format!("{key} POSITION SIZE"))),
+                },
                 "wraps-at-32-bits" if args.is_empty() => d.wraps_at_32_bits = true,
                 "maxp" => {
                     if !args.len().is_multiple_of(2) {
@@ -192,6 +231,9 @@ impl Description {
         }
         if d.glyphs.is_empty() {
             return Err("a description needs at least one glyph".into());
+        }
+        if d.runs.is_empty() {
+            d.runs.push(vec![16384]);
         }
         if d.units_per_em == 0 {
             return Err("units-per-em must not be zero".into());
@@ -322,13 +364,13 @@ impl Description {
             (*b"head", self.head(face_box)),
             (*b"hhea", self.hhea(ascender, descender, &boxes)),
             (*b"maxp", self.maxp()?),
-            (*b"OS/2", os2(ascender, descender)),
+            (*b"OS/2", os2(ascender, descender, self.strikeout)),
             (*b"hmtx", self.hmtx(&boxes)),
             (*b"cmap", self.cmap()?),
             (*b"loca", loca),
             (*b"glyf", glyf),
-            (*b"name", name()),
-            (*b"post", post()),
+            (*b"name", name(&self.family)),
+            (*b"post", post(self.underline)),
         ];
         if !self.cvt.is_empty() {
             let cvt = self.cvt.iter().flat_map(|v| v.to_be_bytes()).collect();
@@ -667,13 +709,16 @@ fn bounds(points: &[(i32, i32)]) -> Result<Option<[i16; 4]>, String> {
     ]))
 }
 
-fn os2(ascender: i16, descender: i16) -> Vec<u8> {
+fn os2(ascender: i16, descender: i16, (strikeout, strikeout_size): (i16, i16)) -> Vec<u8> {
     let mut t = Vec::with_capacity(96);
     t.extend(4_u16.to_be_bytes()); // version
     t.extend([0, 0]); // xAvgCharWidth
     t.extend(400_u16.to_be_bytes()); // usWeightClass
     t.extend(5_u16.to_be_bytes()); // usWidthClass
-    t.extend([0; 24]); // fsType, sub- and superscripts, strikeout, sFamilyClass
+    t.extend([0; 18]); // fsType, sub- and superscripts
+    t.extend(strikeout_size.to_be_bytes()); // yStrikeoutSize
+    t.extend(strikeout.to_be_bytes()); // yStrikeoutPosition
+    t.extend([0; 2]); // sFamilyClass
     t.extend([0; 10]); // panose
     t.extend([0; 16]); // ulUnicodeRange1..4
     t.extend(*b"TRGN");
@@ -689,12 +734,12 @@ fn os2(ascender: i16, descender: i16) -> Vec<u8> {
     t
 }
 
-fn name() -> Vec<u8> {
-    let records: [(u16, &str); 4] = [
-        (1, "Triergon Probe"),
-        (2, "Regular"),
-        (4, "Triergon Probe Regular"),
-        (6, "TriergonProbe-Regular"),
+fn name(family: &str) -> Vec<u8> {
+    let records: [(u16, String); 4] = [
+        (1, family.to_owned()),
+        (2, "Regular".into()),
+        (4, format!("{family} Regular")),
+        (6, format!("{}-Regular", family.replace(' ', ""))),
     ];
     let mut strings = Vec::new();
     let mut t = Vec::new();
@@ -713,11 +758,11 @@ fn name() -> Vec<u8> {
     t
 }
 
-fn post() -> Vec<u8> {
+fn post((position, thickness): (i16, i16)) -> Vec<u8> {
     let mut t = vec![0, 3, 0, 0]; // version 3.0: no glyph names
     t.extend([0; 4]); // italicAngle
-    t.extend((-100_i16).to_be_bytes()); // underlinePosition
-    t.extend(50_i16.to_be_bytes()); // underlineThickness
+    t.extend(position.to_be_bytes()); // underlinePosition
+    t.extend(thickness.to_be_bytes()); // underlineThickness
     t.extend([0; 20]); // isFixedPitch, memory hints
     t
 }
@@ -969,6 +1014,8 @@ mod tests {
         # A square with a program, and a composite of it.
         units-per-em 1000
         heights 16384 640
+        sequence 1000 640 1000
+        modes default vertical
         maxp twilight 4 storage 8
         cvt 100 -20
         gasp 65535 0x000F
@@ -997,7 +1044,14 @@ mod tests {
     #[test]
     fn a_description_builds_a_consistent_face() {
         let d = Description::parse(SQUARE).unwrap();
-        assert_eq!(d.heights, [16384, 640]);
+        assert_eq!(d.runs, [vec![16384], vec![640], vec![1000, 640, 1000]]);
+        assert!(Description::parse("sequence 1000\nglyph\nend").is_err());
+        assert_eq!(
+            Description::parse("glyph\nend").unwrap().runs,
+            [vec![16384]]
+        );
+        assert_eq!(d.modes, ["default", "vertical"]);
+        assert!(Description::parse("modes hinted\nglyph\nend").is_err());
         let font = d.build().unwrap();
         assert_eq!(font.len() % 4, 0);
         assert_eq!(checksum(&font), 0xB1B0_AFBA);

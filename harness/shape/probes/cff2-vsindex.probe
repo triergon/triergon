@@ -1,0 +1,36 @@
+# vsindex more than once and inside subroutines. ItemVariationData 0 has 2
+# regions, 1 has 3. Local 0 runs `1 vsindex`; local 1 blends with k = 3.
+format cff2
+variation-data 2 3
+local
+  1 vsindex
+end
+local
+  10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph
+end
+glyph # 1: vsindex twice before a blend
+  0 vsindex 1 vsindex 100 100 rmoveto 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph # 2: vsindex in a subroutine, then a blend with k = 3
+  -107 callsubr 100 100 rmoveto 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph # 3: vsindex 1, then the blend in a subroutine
+  1 vsindex 100 100 rmoveto -106 callsubr
+end
+glyph # 4: vsindex after drawing, before any blend
+  100 100 rmoveto 10 20 rlineto 1 vsindex 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph # 5: a negative vsindex
+  -1 vsindex 100 100 rmoveto 10 20 1 2 3 4 2 blend rlineto
+end
+glyph # 6: vsindex without an operand
+  vsindex 100 100 rmoveto 10 20 1 2 3 4 2 blend rlineto
+end
+glyph # 7: a fractional vsindex (1.5)
+  fixed:1.5 vsindex 100 100 rmoveto 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph # 8: two blends
+  100 100 rmoveto 10 20 1 2 3 4 2 blend 30 40 5 6 7 8 2 blend rlineto
+end

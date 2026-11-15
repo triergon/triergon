@@ -123,12 +123,13 @@ resource limit becomes an explicit, reviewed rule for that case.
   random strings as libass does, through FreeType-backed font functions at 256
   pixels (`shape-libass`) and through HarfBuzz's own at units per em
   (`shape-text`), resolve bidi paragraphs and lines (`shape-bidi`), run libass's
-  simple shaping level (`shape-simple`) and read every code point's properties
-  (`shape-unicode`), all required by `cargo xtask check`; `shape-text-all`, every
-  corpus face with every script at units per em, runs on demand. Acceptance of
-  the shaper rests on `shape-libass`, `shape-bidi`, `shape-simple` and
-  `shape-unicode`. `cargo xtask shape compare` reports the required five, with
-  `--all` all six.
+  simple shaping level (`shape-simple`), read every code point's properties
+  (`shape-unicode`) and every glyph's extents of the corpus's CFF, CFF2 and
+  collection faces at units per em (`shape-extents`), all required by `cargo
+  xtask check`; `shape-text-all`, every corpus face with every script at units
+  per em, runs on demand. Acceptance of the shaper rests on `shape-libass`,
+  `shape-bidi`, `shape-simple` and `shape-unicode`. `cargo xtask shape compare`
+  reports the required six, with `--all` all seven.
 - **libass pin.** `cargo xtask raster prepare` builds the libass 0.17.5 release
   tarball (hash-checked, tree verified after the build) as a static library
   without a system font provider (`--disable-fontconfig --disable-coretext
@@ -1014,9 +1015,10 @@ repository does not generate, with repository-relative paths: evidence set
 `gate-media-inputs` holds the FATE samples, the codec workload inputs and the
 subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
 [file-workloads.json](../harness/codecs/file-workloads.json), and set
-`ogg-reader-inputs` the inputs of the Ogg reader comparison
+`ogg-reader-inputs` the inputs of the Ogg reader comparison, and set
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/index.json)); a gate image is built with all three. The image
+[index](../harness/evidence/index.json)); a gate image is built with all four. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.

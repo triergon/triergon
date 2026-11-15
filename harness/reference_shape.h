@@ -39,13 +39,16 @@
  *            ASS_SHAPING_SIMPLE over one paragraph: levels, joining types,
  *            fribidi_join_arabic, fribidi_shape with FRIBIDI_FLAGS_DEFAULT |
  *            FRIBIDI_FLAGS_ARABIC: the shaped code points.
+ *   extents  FILE is a font; no ARGUMENTs. Every face of the file gets the font of shape,
+ *            and every glyph of the face (hb_face_get_glyph_count) is measured with
+ *            hb_font_get_glyph_extents: whether it succeeds and the four extents.
  *   unicode  FILE holds code point ranges, FIRST and LAST in hexadecimal per line:
  *            for every code point HarfBuzz's default Unicode functions (general
  *            category, combining class, script, mirroring, decomposition) and
  *            FriBidi's bidi type, bracket, mirror and joining type.
  *
  * Each group of values starts with a tag and folds as crates/shape-worker/src/
- * record.rs folds it; `packets` counts glyphs (shape), lines (bidi, simple) or code
+ * record.rs folds it; `packets` counts glyphs (shape, extents), lines (bidi, simple) or code
  * points (unicode) and `bytes` the code points shaped or resolved. The file is read
  * before the operation; faces, fonts and buffers are created inside it. `-dump`
  * prints the same values as lines, identical to shape-worker's.
@@ -81,6 +84,8 @@ enum {
     SHAPE_TEXT,
     SHAPE_GLYPH,
     SHAPE_TEXT_ERROR,
+    SHAPE_GLYPHS = 7,
+    SHAPE_EXTENTS,
     BIDI_LINE = 10,
     BIDI_PARAGRAPH,
     BIDI_LEVEL,
@@ -94,10 +99,17 @@ enum {
     UNICODE_RANGE_ERROR,
 };
 
-typedef enum { SHAPE_SHAPE, SHAPE_BIDI, SHAPE_SIMPLE, SHAPE_UNICODE, SHAPE_LIBASS } ShapeOperation;
+typedef enum {
+    SHAPE_SHAPE,
+    SHAPE_BIDI,
+    SHAPE_SIMPLE,
+    SHAPE_UNICODE,
+    SHAPE_LIBASS,
+    SHAPE_EXTENTS_OPERATION
+} ShapeOperation;
 
-static const char *const shape_operation_names[] = {"shape-text", "shape-bidi", "shape-simple",
-                                                    "shape-unicode", "shape-libass"};
+static const char *const shape_operation_names[] = {
+    "shape-text", "shape-bidi", "shape-simple", "shape-unicode", "shape-libass", "shape-extents"};
 
 typedef struct {
     uint64_t packets, bytes, digest;
@@ -332,6 +344,32 @@ static int shape_text(hb_blob_t *blob, const ShapeSettings *s, uint32_t *text, S
     }
     hb_buffer_destroy(buffer);
     return status;
+}
+
+/* ---------------------------------------------------------------- extents */
+
+/* Every glyph's extents from HarfBuzz's OpenType font functions at the default
+ * scale, the font `shape` makes for every face: whether hb_font_get_glyph_extents
+ * succeeds and the extents it gives (zero before the call). */
+static int shape_extents(hb_blob_t *blob, ShapeWork *w) {
+    unsigned faces = hb_face_count(blob);
+    for (unsigned i = 0; i < faces; i++) {
+        hb_face_t *face = hb_face_create(blob, i);
+        hb_font_t *font = hb_font_create(face);
+        unsigned glyphs = hb_face_get_glyph_count(face);
+        shape_record1(w, SHAPE_FACE, "face", i);
+        shape_record1(w, SHAPE_GLYPHS, "glyphs", glyphs);
+        for (unsigned g = 0; g < glyphs; g++) {
+            hb_glyph_extents_t e = {0, 0, 0, 0};
+            hb_bool_t ok = hb_font_get_glyph_extents(font, g, &e);
+            int64_t v[6] = {g, ok ? 1 : 0, e.x_bearing, e.y_bearing, e.width, e.height};
+            shape_record(w, SHAPE_EXTENTS, "extents", v, 6);
+        }
+        w->packets += glyphs;
+        hb_font_destroy(font);
+        hb_face_destroy(face);
+    }
+    return 0;
 }
 
 /* ----------------------------------------------------------- shape-libass */
@@ -803,6 +841,8 @@ static int shape_run(const ShapeCase *c, const char *data, size_t size, hb_blob_
         return shape_simple(data, size, c->base, text, b, w);
     case SHAPE_UNICODE:
         return shape_unicode(data, size, w);
+    case SHAPE_EXTENTS_OPERATION:
+        return shape_extents(blob, w);
     }
     return 2;
 }
@@ -813,15 +853,16 @@ int main(int argc, char **argv) {
                         "       | OPERATION-memory FILE ARGUMENT... | OPERATION-dump FILE ARGUMENT...\n"
                         "  OPERATION: shape (DIRECTION SCRIPT LANGUAGE FEATURES TEXT...),\n"
                         "  shape-libass (SIZE DIRECTION SCRIPT LANGUAGE FEATURES TEXT...),\n"
-                        "  bidi (BASE BRACKETS), simple (BASE) or unicode\n";
+                        "  bidi (BASE BRACKETS), simple (BASE), unicode or extents\n";
     const char *mode = argc > 1 ? argv[1] : "";
     const char *action = strrchr(mode, '-');
     size_t prefix = action ? (size_t)(action - mode) : 0;
-    static const char *const names[] = {"shape", "bidi", "simple", "unicode", "shape-libass"};
+    static const char *const names[] = {"shape",        "bidi",   "simple", "unicode",
+                                        "shape-libass", "extents"};
     ShapeCase c;
     memset(&c, 0, sizeof c);
     int known = 0;
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 6; i++)
         if (prefix == strlen(names[i]) && !strncmp(mode, names[i], prefix)) {
             c.operation = (ShapeOperation)i;
             known = 1;
@@ -895,7 +936,7 @@ int main(int argc, char **argv) {
         free(b);
         return 2;
     }
-    hb_blob_t *blob = c.operation == SHAPE_SHAPE
+    hb_blob_t *blob = c.operation == SHAPE_SHAPE || c.operation == SHAPE_EXTENTS_OPERATION
                           ? hb_blob_create(data, (unsigned)size, HB_MEMORY_MODE_READONLY, NULL, NULL)
                           : NULL;
     int status = 0;
