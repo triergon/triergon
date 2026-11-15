@@ -1,0 +1,16 @@
+# Decoration values of the signs libass refuses: an underline above the
+# baseline and a strike-out below it.
+family Triergon Decorations Signs
+units-per-em 1000
+metrics 800 -200
+underline 100 50
+strikeout -50 40
+heights 16384
+modes outlines
+glyph advance 500
+end
+glyph advance 600 char 0x41
+  contour 100 0, 100 700, 500 700, 500 0
+end
+glyph advance 250 char 0x20
+end

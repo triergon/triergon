@@ -1,0 +1,39 @@
+# IUP with untouched points whose scaled original positions equal a touched
+# point's, though they lie between the touched points in font units, or at
+# the high one's font units. Observed: the touched point lower in font units
+# is the low one; a point whose scaled original position is at or below the
+# low one's moves with it, else one at or above the high one's moves with
+# that; only a point strictly between them in scaled positions is
+# interpolated.
+heights 16384 1000 640
+head-flags 8
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+# At 1000 (half a 26.6 unit per font unit), 311 scales as 312 does.
+glyph advance 600
+  contour 0 200, 10 311, 20 312, 30 500
+  program
+    SVTCA[0]; PUSH 0; MDAP[0]; PUSH 2; MDAP[0]; PUSH 0 5; SHPIX; PUSH 2 -7; SHPIX; IUP[0]
+  end
+end
+glyph advance 600
+  contour 0 311, 10 312, 20 312, 30 500
+  program
+    SVTCA[0]; PUSH 0; MDAP[0]; PUSH 2; MDAP[0]; PUSH 0 5; SHPIX; PUSH 2 -7; SHPIX; IUP[0]
+  end
+end
+# The touched points in the other order along the contour.
+glyph advance 600
+  contour 0 312, 10 312, 20 311, 30 500
+  program
+    SVTCA[0]; PUSH 0; MDAP[0]; PUSH 2; MDAP[0]; PUSH 0 -7; SHPIX; PUSH 2 5; SHPIX; IUP[0]
+  end
+end
+# In x, unmoved: at 640, 312 scales as 314 does.
+glyph advance 600
+  contour 142 0, 312 10, 314 20, 500 30
+  program
+    SVTCA[1]; PUSH 0; MDAP[0]; PUSH 2; MDAP[0]; IUP[1]
+  end
+end

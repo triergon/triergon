@@ -1,0 +1,29 @@
+# Long CFF2 charstrings, whose end counts like an operator: glyph 1 runs
+# 199999 operators and operands, glyph 2 200000, glyph 3 200000 through 66665
+# calls of a subroutine that only returns (an index, callsubr and return
+# each); glyphs 4 and 5 call a subroutine without return 49998 and 49999
+# times (an index, callsubr, one operator and the subroutine's end each).
+format cff2
+local
+  return
+end
+local
+  op:0
+end
+glyph
+end
+glyph # 1
+  100 100 rmoveto op:0*199996
+end
+glyph # 2
+  100 100 rmoveto op:0*199997
+end
+glyph # 3
+  100 100 rmoveto [ -107 callsubr ]*66665 op:0*1
+end
+glyph # 4
+  100 100 rmoveto [ -106 callsubr ]*49998
+end
+glyph # 5
+  100 100 rmoveto [ -106 callsubr ]*49999
+end

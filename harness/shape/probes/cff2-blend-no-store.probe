@@ -1,0 +1,10 @@
+# blend and vsindex in a CFF2 table without a VariationStore.
+format cff2
+glyph
+end
+glyph # 1: blend with k = 0: n + 1 operands
+  100 100 rmoveto 10 20 2 blend rlineto
+end
+glyph # 2: vsindex 0
+  0 vsindex 100 100 rmoveto 10 20 rlineto
+end

@@ -1,0 +1,32 @@
+# The argument stack in CFF2: 513 operands. Glyph n (1 to 6) pushes
+# 510 + n operands, 1 each, after `100 100 rmoveto`, then rlineto.
+format cff2
+glyph
+end
+glyph # 511 operands
+  100 100 rmoveto 1*511 rlineto
+end
+glyph # 512 operands
+  100 100 rmoveto 1*512 rlineto
+end
+glyph # 513 operands
+  100 100 rmoveto 1*513 rlineto
+end
+glyph # 514 operands
+  100 100 rmoveto 1*514 rlineto
+end
+glyph # 515 operands
+  100 100 rmoveto 1*515 rlineto
+end
+glyph # 516 operands
+  100 100 rmoveto 1*516 rlineto
+end
+glyph # 7: 48 operands
+  100 100 rmoveto 1*48 rlineto
+end
+glyph # 8: 49 operands
+  100 100 rmoveto 1*49 rlineto
+end
+glyph # 9: 100 operands
+  100 100 rmoveto 1*100 rlineto
+end

@@ -1,0 +1,24 @@
+# Emboldening outlines without an orientation at the smallest emboldening
+# strengths: 0 (heights 40 and 63, below one pixel per em, x_ppem 1), 1
+# (64 and 127) and 2 (128), with a clockwise square beside a single point,
+# a figure eight with equal lobes and two squares whose areas cancel.
+family Triergon Zero Strength
+units-per-em 1000
+metrics 800 -200
+heights 40 63 64 127 128
+modes outlines
+glyph advance 500
+end
+glyph advance 600 char 0x41
+  contour 100 0, 100 700, 500 700, 500 0
+end
+glyph advance 600 char 0x46
+  contour 300 300
+end
+glyph advance 600 char 0x48
+  contour 100 0, 500 700, 500 0, 100 700
+end
+glyph advance 900 char 0x45
+  contour 100 0, 100 400, 400 400, 400 0
+  contour 500 0, 800 0, 800 400, 500 400
+end
