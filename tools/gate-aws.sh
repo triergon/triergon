@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Gate hosts on AWS, driven from a workstation with the aws CLI. The hosts hold no
 # AWS credentials: they download through presigned addresses, and what they upload
 # streams through this workstation.
@@ -15,7 +15,8 @@
 #       the full gate of REVISION on SHARDS hosts from the target's image, in
 #       parallel: each takes the references of REVISION from its image or the
 #       archive, gets ready, and runs its shard (tools/gate-host.sh); the
-#       shards' outputs are archived under qualification/gate-runs/, their logs
+#       shards' outputs are archived under qualification/gate-runs/, each
+#       archive's index entry written to OUT/shard-I/entry.json, their logs
 #       and records copied to OUT, and joined by `cargo xtask gate summary`
 #       into OUT/summary.json. Each host is terminated as soon as its shard's
 #       outputs are archived and checked. It launches nothing unless this
@@ -36,6 +37,12 @@
 # timer on disk shuts each down 72 hours after it boots, whatever happens. Each
 # command removes its hosts, security group and key pair when it ends, and exits
 # non-zero when a shard did not finish or the summary fails.
+# Bash 4 or later: under macOS's /bin/bash 3.2 a shard's EXIT trap never runs, so
+# nothing is archived and the session's teardown removes the host.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "tools/gate-aws.sh needs bash 4 or later, not $BASH_VERSION: put a newer bash first on PATH, or run it as /opt/homebrew/bin/bash tools/gate-aws.sh" >&2
+    exit 2
+fi
 set -euo pipefail
 
 : "${AWS_PROFILE:?}" "${AWS_REGION:?}" "${TRIERGON_SUBNET:?}" "${TRIERGON_SSH_CIDR:?}"
@@ -77,6 +84,7 @@ systemctl enable --now triergon-expire.timer
 POLL=60
 STATE=
 RUN_OBJECT=
+RUN_NAME=
 NAME=
 SG=
 INSTANCES=()
@@ -369,22 +377,27 @@ shard() {
 }
 
 # Collect what host I holds of its shard: its outputs archived whole as
-# RUN_OBJECT/shard-I.tar.zst and checked by downloading them back on the host
-# (OUT/shard-I/verified on a match), their logs and records copied to OUT/shard-I,
-# and the packs of reference builds it made uploaded. Best effort: a host that
-# failed or hangs gives what it can.
+# RUN_OBJECT/shard-I/SHA.tar.zst and checked by downloading them back on the host
+# (OUT/shard-I/verified on a match), with the index entry of that archive in
+# OUT/shard-I/entry.json, listing the gate results it holds; their logs and records
+# copied to OUT/shard-I, and the packs of reference builds it made uploaded. Best
+# effort: a host that failed or hangs gives what it can.
 collect() {
     local i=$1 target=$2 revision=$3 out=$4
-    local inside repository run=".research/gate/$revision" object="$RUN_OBJECT/shard-$i.tar.zst"
+    local inside repository run=".research/gate/$revision" pack=.research/gate/shard.tar.zst object
     set +e
     inside=$(inside_command "$target"); repository=$(repository_path "$target")
     on "$i" "cat ~/gate-host.log" > "$out/shard-$i/gate-host.log" < /dev/null
     local packed
-    packed=$(on "$i" "cd $repository/$run && tar -cf - . | zstd -q -T0 > ~/shard.tar.zst && sha256sum < ~/shard.tar.zst | cut -c1-64" < /dev/null)
+    packed=$(on "$i" "cd $repository/$run && tar -cf - . | zstd -q -T0 > $repository/$pack && sha256sum < $repository/$pack | cut -c1-64" < /dev/null)
+    object="$RUN_OBJECT/shard-$i/$packed.tar.zst"
     if [ -n "$packed" ] &&
-        on "$i" "cat ~/shard.tar.zst" < /dev/null | aws s3 cp --only-show-errors - "$ARCHIVE/$object" &&
+        on "$i" "cat $repository/$pack" < /dev/null | aws s3 cp --only-show-errors - "$ARCHIVE/$object" &&
         [ "$(on "$i" "curl -fsS --retry 3 '$(presign "$object")' | sha256sum | cut -c1-64" < /dev/null)" = "$packed" ]; then
         echo "$packed" > "$out/shard-$i/verified"
+        on "$i" "$inside 'cd ~/triergon && . ~/.cargo/env && cargo xtask evidence entry $RUN_NAME-shard-$i $pack --key $object'" \
+            < /dev/null > "$out/shard-$i/entry.json" ||
+            { rm -f "$out/shard-$i/entry.json"; say "host $i: no index entry for its outputs"; }
     else
         say "host $i: its outputs are not archived"
     fi
@@ -485,6 +498,7 @@ run() {
     session "triergon-gate-run-$target-$stamp"
     POLL=300
     RUN_OBJECT="qualification/gate-runs/$revision-$target-$stamp"
+    RUN_NAME="gate-run-$target-${revision:0:8}-$stamp"
     mkdir -p "$out"
     rm -f "$out/ended" "$out/summary-host" "$out"/terminated-* "$out"/shard-*/finished "$out"/shard-*/verified
     rmdir "$out/.release" 2>/dev/null || true
