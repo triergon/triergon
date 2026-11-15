@@ -574,7 +574,7 @@ pub struct PacketCursor<'a> {
     checking: Option<Range<u64>>,
     /// The track whose sample extents are being checked.
     spans: Option<TrackSpans<'a>>,
-    /// Samples left to check one at a time.
+    /// Samples of a span outside one extent left to check one at a time.
     stepping: u64,
     low: usize,
     high: usize,
@@ -1564,7 +1564,12 @@ impl<'a> PacketCursor<'a> {
                         None => self.spans.insert(TrackSpans::new(slot.source()?)),
                     };
                     let before = *spans;
-                    let maximum = if self.stepping == 0 { u64::MAX } else { 1 };
+                    // A terminal mdat or a forward regular source checks every
+                    // sample on its own, so its spans are one sample long.
+                    let whole = self.stepping == 0
+                        && self.terminal.is_none()
+                        && self.forward_regular.is_none();
+                    let maximum = if whole { u64::MAX } else { 1 };
                     let span = match spans.poll(maximum, work)? {
                         SpanStep::Yield => return Ok(CursorStatus::Yield),
                         SpanStep::End => {
@@ -1585,13 +1590,11 @@ impl<'a> PacketCursor<'a> {
                         }
                         SpanStep::Span(span) => span,
                     };
-                    if self.stepping == 0 {
+                    if whole {
                         // A span that lies in one extent passes every sample's
                         // check at once. Any other is checked a sample at a time,
                         // which reports the first failure.
-                        let fits = self.terminal.is_none()
-                            && self.forward_regular.is_none()
-                            && span.first > self.previous_ordinal
+                        let fits = span.first > self.previous_ordinal
                             && self
                                 .validated
                                 .checked_add(span.count)
@@ -1613,12 +1616,12 @@ impl<'a> PacketCursor<'a> {
                                 slot.fragment_cto_minimum.min(i64::from(minimum));
                         }
                     }
-                    if self.stepping == 0 {
+                    if whole {
                         self.validated += span.count;
                         self.previous_ordinal = span.first + (span.count - 1);
                         continue;
                     }
-                    self.stepping -= 1;
+                    self.stepping = self.stepping.saturating_sub(1);
                     let (ordinal, range) = (span.first, span.range);
                     self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
                     count(self.validated, self.limits.max_source_samples)?;
