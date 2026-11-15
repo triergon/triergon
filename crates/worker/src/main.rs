@@ -402,7 +402,43 @@ fn main() {
         std::process::exit(1);
     }
 }
-fn entry() -> Result<(), Box<dyn std::error::Error>> {
+
+type Outcome = Result<(), Box<dyn std::error::Error>>;
+
+/// What a demux fold or trace carries beyond the default view: only the packets a
+/// decoder receives (`codec-`), track colour (`metadata-`, 1) or the catalogue
+/// (`catalogue-`, 2).
+#[derive(Clone, Copy)]
+struct View {
+    codec_packets: bool,
+    metadata: u8,
+}
+
+impl View {
+    const PLAIN: Self = Self {
+        codec_packets: false,
+        metadata: 0,
+    };
+
+    /// The view a mode's prefix names, and the mode without it.
+    fn of(mode: &str) -> (Self, &str) {
+        let view = |codec_packets, metadata| Self {
+            codec_packets,
+            metadata,
+        };
+        if let Some(rest) = mode.strip_prefix("codec-") {
+            (view(true, 0), rest)
+        } else if let Some(rest) = mode.strip_prefix("metadata-") {
+            (view(false, 1), rest)
+        } else if let Some(rest) = mode.strip_prefix("catalogue-") {
+            (view(false, 2), rest)
+        } else {
+            (Self::PLAIN, mode)
+        }
+    }
+}
+
+fn entry() -> Outcome {
     let a: Vec<_> = std::env::args().collect();
     let mode = a.get(1).ok_or(
         "usage: media-worker trace|trace-short|seek|bench|baseline FILE [iterations/chunk/ns]",
@@ -413,171 +449,186 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
     if data.len() > 64 * 1024 * 1024 {
         return Err("input limit: 64 MiB".into());
     }
+    let words = &a[3..];
     match mode.as_str() {
-        "trace" | "codec-trace" | "metadata-trace" | "catalogue-trace" => trace(
-            open_owned(std::mem::take(&mut data), Limits::default())?,
-            true,
-            mode == "codec-trace",
-            if mode == "catalogue-trace" {
-                2
-            } else {
-                u8::from(mode == "metadata-trace")
-            },
-        )?,
-        "catalogue-source" => {
-            catalogue::source(open_owned(std::mem::take(&mut data), Limits::default())?)?;
-        }
-        "metadata-source" => {
-            trace_colour_source(open_owned(std::mem::take(&mut data), Limits::default())?)?;
-        }
-        "trace-source" => trace_source(open_owned(std::mem::take(&mut data), Limits::default())?)?,
-        "trace-source-short" => {
-            let n: usize = a.get(3).ok_or("missing chunk")?.parse()?;
-            if n == 0 {
-                return Err("zero chunk".into());
-            }
-            trace_source(open_shared(
-                Short {
-                    inner: Cursor::new(&data),
-                    maximum: n,
-                },
-                Limits::default(),
-            )?)?;
-        }
-        "trace-short" | "codec-trace-short" | "metadata-trace-short" | "catalogue-trace-short" => {
-            let n: usize = a.get(3).ok_or("missing chunk")?.parse()?;
-            if n == 0 {
-                return Err("zero chunk".into());
-            }
-            trace(
-                open_shared(
-                    Short {
-                        inner: Cursor::new(&data),
-                        maximum: n,
-                    },
-                    Limits::default(),
-                )?,
-                true,
-                mode == "codec-trace-short",
-                if mode == "catalogue-trace-short" {
-                    2
-                } else {
-                    u8::from(mode == "metadata-trace-short")
-                },
-            )?;
+        "catalogue-source" | "metadata-source" | "trace-source" | "trace-source-short" => {
+            source(mode, data, words)
         }
         "baseline" => {
             std::hint::black_box(&data);
             println!("{{\"input_bytes\":{}}}", data.len());
+            Ok(())
         }
-        "bench" | "seek-bench" | "codec-bench" | "metadata-bench" | "catalogue-bench" => {
-            let n: u32 = a.get(3).ok_or("missing iterations")?.parse()?;
-            if n == 0 || n > 1_000_000 {
-                return Err("invalid iteration count".into());
-            }
-            let start = Instant::now();
-            let seek = if mode == "seek-bench" {
-                Some(a.get(4).ok_or("missing seek target")?.parse()?)
+        "seek-trace" => seek_trace(data, words),
+        "inflate" => inflate(&data, words),
+        "seek" => seek(data, words),
+        "seek-bench" => bench(data, words, true, View::PLAIN),
+        "seek-memory" => memory(data, words, Some(true), View::PLAIN),
+        "memory-baseline" => memory(data, words, None, View::PLAIN),
+        other => match View::of(other) {
+            (view, "trace") => traced(data, None, view),
+            (view, "trace-short") => traced(data, Some(words), view),
+            (view, "bench") => bench(data, words, false, view),
+            (view, "memory") => memory(data, words, Some(false), view),
+            _ => Err("unknown operation".into()),
+        },
+    }
+}
+
+// Every mode below runs out of line, so that the dispatch's frame holds none of
+// their state and the measured `memory` mode's stack only its own operation's.
+
+/// `[VIEW-]trace FILE`, or with `short` (`[VIEW-]trace-short FILE CHUNK`) read
+/// through CHUNK-byte reads.
+#[inline(never)]
+fn traced(data: Vec<u8>, short: Option<&[String]>, view: View) -> Outcome {
+    let (codec_packets, metadata) = (view.codec_packets, view.metadata);
+    match short {
+        None => trace(
+            open_owned(data, Limits::default())?,
+            true,
+            codec_packets,
+            metadata,
+        ),
+        Some(words) => trace(
+            open_shared(self::short(&data, words)?, Limits::default())?,
+            true,
+            codec_packets,
+            metadata,
+        ),
+    }
+}
+
+/// The source-frame views: `trace-source FILE`, `trace-source-short FILE CHUNK`,
+/// `catalogue-source FILE` and `metadata-source FILE`.
+#[inline(never)]
+fn source(mode: &str, data: Vec<u8>, words: &[String]) -> Outcome {
+    match mode {
+        "catalogue-source" => catalogue::source(open_owned(data, Limits::default())?),
+        "metadata-source" => trace_colour_source(open_owned(data, Limits::default())?),
+        "trace-source-short" => trace_source(open_shared(short(&data, words)?, Limits::default())?),
+        _ => trace_source(open_owned(data, Limits::default())?),
+    }
+}
+
+/// The input read at most `CHUNK` bytes per call (the first word).
+fn short<'a>(
+    data: &'a Vec<u8>,
+    words: &[String],
+) -> Result<Short<Cursor<&'a Vec<u8>>>, Box<dyn std::error::Error>> {
+    let n: usize = words.first().ok_or("missing chunk")?.parse()?;
+    if n == 0 {
+        return Err("zero chunk".into());
+    }
+    Ok(Short {
+        inner: Cursor::new(data),
+        maximum: n,
+    })
+}
+
+fn seek_target(words: &[String], at: usize) -> Result<i64, Box<dyn std::error::Error>> {
+    Ok(words.get(at).ok_or("missing seek target")?.parse()?)
+}
+
+/// `[VIEW-]bench FILE ITERATIONS` and `seek-bench FILE ITERATIONS NS`.
+#[inline(never)]
+fn bench(mut data: Vec<u8>, words: &[String], seek: bool, view: View) -> Outcome {
+    let n: u32 = words.first().ok_or("missing iterations")?.parse()?;
+    if n == 0 || n > 1_000_000 {
+        return Err("invalid iteration count".into());
+    }
+    let start = Instant::now();
+    let seek = if seek {
+        Some(seek_target(words, 1)?)
+    } else {
+        None
+    };
+    let (packets, bytes, digest) = run(&mut data, n, seek, view.codec_packets, view.metadata)?;
+    let ns = start.elapsed().as_nanos();
+    println!(
+        "{{\"schema\":1,\"iterations\":{n},\"elapsed_ns\":{ns},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest}}}"
+    );
+    Ok(())
+}
+
+/// One operation inside the allocation-window markers: `[VIEW-]memory FILE`,
+/// `seek-memory FILE NS` (`Some(true)`), or `memory-baseline FILE` (`None`),
+/// which runs nothing.
+#[inline(never)]
+fn memory(mut data: Vec<u8>, words: &[String], seek: Option<bool>, view: View) -> Outcome {
+    use std::io::Write;
+    let mut output = io::stdout().lock();
+    output.write_all(b"TRIERGON_BEGIN_V1\n")?;
+    output.flush()?;
+    let result = match seek {
+        None => (0, 0, 0),
+        Some(seek) => {
+            let seek = if seek {
+                Some(seek_target(words, 0)?)
             } else {
                 None
             };
-            let (packets, bytes, digest) = run(
-                &mut data,
-                n,
-                seek,
-                mode == "codec-bench",
-                if mode == "catalogue-bench" {
-                    2
-                } else {
-                    u8::from(mode == "metadata-bench")
-                },
-            )?;
-            let ns = start.elapsed().as_nanos();
-            println!(
-                "{{\"schema\":1,\"iterations\":{n},\"elapsed_ns\":{ns},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest}}}"
-            );
+            run(&mut data, 1, seek, view.codec_packets, view.metadata)?
         }
-        "memory" | "memory-baseline" | "seek-memory" | "codec-memory" | "metadata-memory"
-        | "catalogue-memory" => {
-            use std::io::Write;
-            let mut output = io::stdout().lock();
-            output.write_all(b"TRIERGON_BEGIN_V1\n")?;
-            output.flush()?;
-            let result = if mode == "memory"
-                || mode == "seek-memory"
-                || mode == "codec-memory"
-                || mode == "metadata-memory"
-                || mode == "catalogue-memory"
-            {
-                let seek = if mode == "seek-memory" {
-                    Some(a.get(3).ok_or("missing seek target")?.parse()?)
-                } else {
-                    None
-                };
-                run(
-                    &mut data,
-                    1,
-                    seek,
-                    mode == "codec-memory",
-                    if mode == "catalogue-memory" {
-                        2
-                    } else {
-                        u8::from(mode == "metadata-memory")
-                    },
-                )?
-            } else {
-                (0, 0, 0)
-            };
-            output.write_all(b"TRIERGON_END_V1\n")?;
-            output.flush()?;
-            writeln!(
-                output,
-                "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
-                result.0, result.1, result.2
-            )?;
-        }
-        "seek-trace" => {
-            let target = a.get(3).ok_or("missing seek target")?.parse()?;
-            let mut demux = open_owned(std::mem::take(&mut data), Limits::default())?;
-            if a.get(4).is_some_and(|value| value == "after-eof") {
-                while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
-            }
-            let receipt = demux.seek_for_playback(0, target, &AtomicBool::new(false))?;
-            trace(demux, receipt.replays_from_start, false, 0)?;
-        }
-        "inflate" => {
-            let limits = triergon_matroska::zlib::InflateLimits {
-                output_bytes: a.get(3).map_or(Ok(16 * 1024 * 1024), |s| s.parse())?,
-                expansion_ratio: a.get(4).map_or(Ok(1024), |s| s.parse())?,
-                work: a.get(5).map_or(Ok(128 * 1024 * 1024), |s| s.parse())?,
-            };
-            let bytes =
-                triergon_matroska::zlib::decompress(&data, limits, &AtomicBool::new(false))?;
-            println!("{}", quoted(&hex(&bytes)));
-        }
-        "seek" => {
-            let target: i64 = a.get(3).ok_or("missing seek time")?.parse()?;
-            let mut d = open_owned(std::mem::take(&mut data), Limits::default())?;
-            let cancel = AtomicBool::new(false);
-            while d.next_packet(&cancel)?.is_some() {} // Deliberately seek after EOF.
-            let track = d
-                .tracks()
-                .iter()
-                .position(|t| t.kind == 1)
-                .ok_or("no video")?;
-            let receipt = d.seek_previous(track, target, &cancel)?;
-            let p = d.next_packet(&cancel)?.ok_or("EOF after seek")?;
-            println!(
-                "{{\"actual_ns\":{},\"track\":{},\"pts_ns\":{},\"key\":{},\"payload\":{}}}",
-                receipt.actual_ns,
-                p.track,
-                p.pts_ns.map_or("null".into(), |v| v.to_string()),
-                p.keyframe,
-                quoted(&hex(&p.data))
-            );
-        }
-        _ => return Err("unknown operation".into()),
+    };
+    output.write_all(b"TRIERGON_END_V1\n")?;
+    output.flush()?;
+    writeln!(
+        output,
+        "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
+        result.0, result.1, result.2
+    )?;
+    Ok(())
+}
+
+/// `seek-trace FILE NS [after-eof]`.
+#[inline(never)]
+fn seek_trace(data: Vec<u8>, words: &[String]) -> Outcome {
+    let target = seek_target(words, 0)?;
+    let mut demux = open_owned(data, Limits::default())?;
+    if words.get(1).is_some_and(|value| value == "after-eof") {
+        while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
     }
+    let receipt = demux.seek_for_playback(0, target, &AtomicBool::new(false))?;
+    trace(demux, receipt.replays_from_start, false, 0)
+}
+
+/// `inflate FILE [OUTPUT_BYTES [EXPANSION_RATIO [WORK]]]`.
+#[inline(never)]
+fn inflate(data: &[u8], words: &[String]) -> Outcome {
+    let limits = triergon_matroska::zlib::InflateLimits {
+        output_bytes: words.first().map_or(Ok(16 * 1024 * 1024), |s| s.parse())?,
+        expansion_ratio: words.get(1).map_or(Ok(1024), |s| s.parse())?,
+        work: words.get(2).map_or(Ok(128 * 1024 * 1024), |s| s.parse())?,
+    };
+    let bytes = triergon_matroska::zlib::decompress(data, limits, &AtomicBool::new(false))?;
+    println!("{}", quoted(&hex(&bytes)));
+    Ok(())
+}
+
+/// `seek FILE NS`: after the end of file, seek the first video track to the
+/// key frame before NS and print the packet there.
+#[inline(never)]
+fn seek(data: Vec<u8>, words: &[String]) -> Outcome {
+    let target: i64 = words.first().ok_or("missing seek time")?.parse()?;
+    let mut d = open_owned(data, Limits::default())?;
+    let cancel = AtomicBool::new(false);
+    while d.next_packet(&cancel)?.is_some() {} // Deliberately seek after EOF.
+    let track = d
+        .tracks()
+        .iter()
+        .position(|t| t.kind == 1)
+        .ok_or("no video")?;
+    let receipt = d.seek_previous(track, target, &cancel)?;
+    let p = d.next_packet(&cancel)?.ok_or("EOF after seek")?;
+    println!(
+        "{{\"actual_ns\":{},\"track\":{},\"pts_ns\":{},\"key\":{},\"payload\":{}}}",
+        receipt.actual_ns,
+        p.track,
+        p.pts_ns.map_or("null".into(), |v| v.to_string()),
+        p.keyframe,
+        quoted(&hex(&p.data))
+    );
     Ok(())
 }
 
