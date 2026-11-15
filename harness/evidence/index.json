@@ -28555,6 +28555,167 @@
    }
   },
   {
+   "name": "gate-parallel-memory-capture-codecs-aarch64",
+   "path": "gate-parallel-memory-capture-codecs-aarch64",
+   "retention": "retained",
+   "reason": "Memory collection in parallel on Linux AArch64 on a c6g.4xlarge at 4b43bf74: capture qualify --stage timing on all 15 capture cases on CPU 1 with the RSS module unloaded, then --stage memory with the kernel RSS bound from those records, serially on CPU 1 on c05, c06, c10, c14 and c15 and in parallel on CPUs 1-15 on all 15 with per-case input copies; codecs memory of both workload lists in parallel on CPUs 1-15 under the kernel bound; and serial codecs memory of a few workloads from slot copies and, at 03cc8d3f, from the workers' own paths. Capture: heaps identical sample for sample, resident medians within the serial spread, verdicts equal. Codecs against gate-codecs-memory-8154812e (same worker hashes): verdicts equal, reference heaps identical, candidate heaps shifted 8-16 bytes by the slot copy's path in 9 of 30 workloads, as the serial runs show. With the comparisons, step logs, timing records and correctness outputs (generated inputs left out, their hashes recorded), the measured worker hashes and the scripts",
+   "key": "evidence/gate-parallel-memory-capture-codecs-aarch64/9ab07659f5433d4c615368a893edece4f31c0ed3073f36d130c531decb3aa1a9.tar.zst",
+   "sha256": "9ab07659f5433d4c615368a893edece4f31c0ed3073f36d130c531decb3aa1a9",
+   "bytes": 846863147,
+   "results": [
+    {
+     "path": "capture-memory-parallel/gate-result.json",
+     "command": "capture qualify",
+     "key": "512e2ee6b4e4f82fa77949a57e7f2f46f902e0836b7b5fc94cfb58e8e8367cb7",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "capture-memory-serial/gate-result.json",
+     "command": "capture qualify",
+     "key": "f7a3f642978fc775e9cb2dd5b1c6270e23e7db8988d373c2028c87c4c796bd55",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "capture-timing/gate-result.json",
+     "command": "capture qualify",
+     "key": "dd232533cfc24a5a03fd32f3821ca18ebb4eb29c6f4dfb7bec54c8ea97289e41",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "codecs-memory-file-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "1f70edf27c188587e2ea16677cdd9bb0c9dda97ff0e2291ce8cb2a397ad67746",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "codecs-memory-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "b7c3e1e6e20eb29a2f22ab0f1ecbbaf68c40360172b49cd302941e4928db72e3",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/main-file-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "d422dc018910dcdf275b76aca5a4211f95a9f728004101257c7b39de2064acd0",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/main-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "c1aa943055c5389b0fa04ccdd3b8d3d8d5269cf95c6af7196f782c176755ae63",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/pr-file-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "d09b5635121cfe338f720427432762253ec4d31cee6a530f8cb8173b4df0fa10",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/pr-serial-aac-lc-5.1/gate-result.json",
+     "command": "codecs memory",
+     "key": "4d960b2975946a87c5adf86f4807544ea3a23de15c75c5635fc225668cdffaa8",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/pr-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "16e6e39687cf36d102ec058c684e327ee7feda02eacce45abcd859f722065960",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "4b43bf7497c18822e96ca224fa5ba0e367088f93"
+   }
+  },
+  {
+   "name": "gate-parallel-memory-capture-codecs-armv7",
+   "path": "gate-parallel-memory-capture-codecs-armv7",
+   "retention": "retained",
+   "reason": "Memory collection in parallel on the 32-bit ARMv7 gate target in the armhf user space on a c6g.4xlarge at 4b43bf74: capture qualify --stage timing on all 15 capture cases on CPU 1 with the RSS module unloaded, then --stage memory with the kernel RSS bound from those records, serially on CPU 1 on c05, c06, c10, c14 and c15 and in parallel on CPUs 1-15 on all 15 with per-case input copies; codecs memory of both workload lists in parallel on CPUs 1-15 under the kernel bound; and serial codecs memory of a few workloads from slot copies and, at 03cc8d3f, from the workers' own paths. Capture: heaps identical sample for sample, resident medians within the serial spread, verdicts equal; all 15 cases pass every gate, heap upper bounds 0.39-0.61 and total RSS 0.934-0.977, for the capture ARMv7 row's kernel-bound memory. Codecs against gate-codecs-memory-8154812e (same worker hashes): verdicts equal, reference heaps identical, candidate heaps shifted 8 bytes by the slot copy's path in 5 of 30 workloads, as the serial runs show. With the comparisons, step logs, timing records and correctness outputs (generated inputs left out, their hashes recorded), the measured worker hashes and the scripts",
+   "key": "evidence/gate-parallel-memory-capture-codecs-armv7/6429b9987bcf25b09b19e6fbf7aa8af0c7e76ae54a4b73117145e5fc3c0d3040.tar.zst",
+   "sha256": "6429b9987bcf25b09b19e6fbf7aa8af0c7e76ae54a4b73117145e5fc3c0d3040",
+   "bytes": 851984501,
+   "results": [
+    {
+     "path": "capture-memory-parallel/gate-result.json",
+     "command": "capture qualify",
+     "key": "be5dc40bfc479597f61db94f38895e85e2f13b8330823ea00cc8f73c40fb4b42",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "capture-memory-serial/gate-result.json",
+     "command": "capture qualify",
+     "key": "1a2eb324912f65272c65d9d1108f146ed814d98a0e8e1598f118869c9853bd28",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "capture-timing/gate-result.json",
+     "command": "capture qualify",
+     "key": "595051094112cf56bd8f50b425b68494e2829c99a3de0e652d24c264f9ae2c5c",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "codecs-memory-file-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "5c2cfd38acdf11432f6b6db557828aeae1afde00549efb3ee248273249abd63b",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "codecs-memory-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "28ac7edfe64167cf6a87ab1757d2dbb1fe71cbede421a1b072fdd9314ea6ba73",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/main-file-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "34778cb3f3a18e061dd15154438e6de49599d59b6783cfb6c484aeaf1f67ada5",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/main-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "f656730238aec21946127f4d574ecb5349f8cd7f24c2f7fd69f72eacfd7ede30",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/pr-file-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "fd9f72a202ca941a599292992bc9e3f937519303cf9515bac452b0e608ecd007",
+     "status": 0,
+     "report_sha256": null
+    },
+    {
+     "path": "diag/pr-workloads/gate-result.json",
+     "command": "codecs memory",
+     "key": "6fe651fc6e296f54d4db81ce034eadff37bd9bafd2602c64bb55718daa84c72d",
+     "status": 0,
+     "report_sha256": null
+    }
+   ],
+   "source_revisions": {
+    "candidate": "4b43bf7497c18822e96ca224fa5ba0e367088f93"
+   }
+  },
+  {
    "name": "gate-run-aarch64-6414f184-20261115-012558-shard-1",
    "path": "gate-run-aarch64-6414f184-20261115-012558-shard-1",
    "retention": "retained",
