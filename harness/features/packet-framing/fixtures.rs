@@ -36,7 +36,7 @@ pub(super) fn load() -> Result<Vec<Case>, String> {
         || profiles.len() < ORIGINAL_CASE_COUNT
         || scripts.len() != ORIGINAL_CASE_COUNT
     {
-        return Err("packet framing requires all 125 cases".into());
+        return Err("packet framing is missing its original inputs".into());
     }
     if contract.get("work_fields")
         != Some(&Value::strings(["packets", "bytes", "digest", "digest_b"]))
@@ -104,36 +104,58 @@ pub(super) fn load() -> Result<Vec<Case>, String> {
     Ok(cases)
 }
 
-pub(super) fn extension_inputs() -> Result<Vec<(String, Vec<u8>)>, String> {
-    let inputs = json::parse_strict(include_str!("avc-profile-extension-inputs.json"))
-        .map_err(|e| e.to_string())?;
+pub(super) struct AdditionalInput {
+    pub id: String,
+    pub bytes: Vec<u8>,
+    pub group: &'static str,
+}
+
+pub(super) fn additional_inputs() -> Result<Vec<AdditionalInput>, String> {
+    let groups = [
+        (
+            "avc-profile-extension",
+            "avc-profile-extension-",
+            include_str!("avc-profile-extension-inputs.json"),
+        ),
+        (
+            "avc-receiver",
+            "avc-",
+            include_str!("avc-receiver-inputs.json"),
+        ),
+    ];
     let mut ids = BTreeSet::new();
-    oracle::array(&inputs, "cases")?
-        .iter()
-        .map(|row| {
+    let mut inputs = Vec::new();
+    for (group, prefix, source) in groups {
+        let document = json::parse_strict(source).map_err(|e| e.to_string())?;
+        for row in oracle::array(&document, "cases")? {
             let id = oracle::text(row, "id")?;
-            if !id.starts_with("avc-profile-extension-")
+            if !id.starts_with(prefix)
                 || !id
                     .bytes()
                     .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-                || !ids.insert(id)
+                || !ids.insert(id.to_owned())
             {
-                return Err(format!("invalid AVC profile extension case: {id}"));
+                return Err(format!("invalid additional AVC case: {id}"));
             }
-            Ok((id.to_owned(), oracle::hex(oracle::text(row, "hex")?)?))
-        })
-        .collect()
+            inputs.push(AdditionalInput {
+                id: id.to_owned(),
+                bytes: oracle::hex(oracle::text(row, "hex")?)?,
+                group,
+            });
+        }
+    }
+    Ok(inputs)
 }
 
-pub(super) struct ExtensionCase {
+pub(super) struct AdditionalCase {
     pub id: String,
     pub bytes: Vec<u8>,
     #[cfg(test)]
     pub expected: oracle::Work,
 }
 
-pub(super) fn load_extensions() -> Result<Vec<ExtensionCase>, String> {
-    let inputs = extension_inputs()?;
+pub(super) fn load_additional() -> Result<Vec<AdditionalCase>, String> {
+    let inputs = additional_inputs()?;
     let corpus = json::parse_strict(include_str!("corpus.json")).map_err(|e| e.to_string())?;
     let contract = json::parse_strict(include_str!("contract.json")).map_err(|e| e.to_string())?;
     let rows = oracle::array(&corpus, "cases")?;
@@ -142,30 +164,29 @@ pub(super) fn load_extensions() -> Result<Vec<ExtensionCase>, String> {
         || rows.len() != ORIGINAL_CASE_COUNT + inputs.len()
         || rows.len() != profiles.len()
     {
-        return Err("AVC profile extension case membership differs from the contract".into());
+        return Err("additional AVC case membership differs from the contract".into());
     }
     inputs
         .into_iter()
         .zip(&rows[ORIGINAL_CASE_COUNT..])
         .zip(&profiles[ORIGINAL_CASE_COUNT..])
-        .map(|(((id, bytes), row), profile)| {
+        .map(|((AdditionalInput { id, bytes, group }, row), profile)| {
             if oracle::text(row, "id")? != id
                 || profile.as_str() != Some(id.as_str())
                 || oracle::text(row, "profile")? != id
                 || oracle::text(row, "file")? != format!("{id}.bsf")
                 || oracle::text(row, "sha256")? != sha256::hex(&bytes)
+                || oracle::text(row, "group")? != group
                 || oracle::text(row, "rights")? != "authored-synthetic"
                 || row.get("required") != Some(&Value::Bool(true))
             {
-                return Err(format!(
-                    "AVC profile extension input differs from its pin: {id}"
-                ));
+                return Err(format!("additional AVC input differs from its pin: {id}"));
             }
             let expected = oracle::Work::parse(row.get("expected").ok_or("expected missing")?)?;
             if expected.packets == 0 || expected.bytes == 0 {
                 return Err(format!("{id}: reference must frame at least one packet"));
             }
-            Ok(ExtensionCase {
+            Ok(AdditionalCase {
                 id,
                 bytes,
                 #[cfg(test)]

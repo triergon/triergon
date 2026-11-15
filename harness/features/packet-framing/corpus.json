@@ -2840,6 +2840,66 @@
         "digest": 12250666434438874969,
         "digest_b": 17993043491084337333
       }
+    },
+    {
+      "id": "avc-profile-extension-missing-entry",
+      "profile": "avc-profile-extension-missing-entry",
+      "file": "avc-profile-extension-missing-entry.bsf",
+      "sha256": "c74c9e70f7c37b8233aa34c9d67e9e2cb768b543a2a80320dfd8e14aa8b11f05",
+      "rights": "authored-synthetic",
+      "group": "avc-profile-extension",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 3771063309789483034,
+        "digest_b": 14619438228978557346
+      }
+    },
+    {
+      "id": "avc-buffering-period-in-band",
+      "profile": "avc-buffering-period-in-band",
+      "file": "avc-buffering-period-in-band.bsf",
+      "sha256": "71fb25bac39fda8991fc40e29cc6439469713c3e052a168d7efe9bfe52ec6cc2",
+      "rights": "authored-synthetic",
+      "group": "avc-receiver",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 40,
+        "digest": 3764693735072781552,
+        "digest_b": 13917163623262780404
+      }
+    },
+    {
+      "id": "avc-buffering-period-across-flush",
+      "profile": "avc-buffering-period-across-flush",
+      "file": "avc-buffering-period-across-flush.bsf",
+      "sha256": "8c2292d94480f21bd7a475bb82bc0fcec736286e7e5c381aa9a3888903d4add8",
+      "rights": "authored-synthetic",
+      "group": "avc-receiver",
+      "required": true,
+      "expected": {
+        "packets": 4,
+        "bytes": 60,
+        "digest": 14690651383539242742,
+        "digest_b": 13207376584646940794
+      }
+    },
+    {
+      "id": "avc-header-only-idr",
+      "profile": "avc-header-only-idr",
+      "file": "avc-header-only-idr.bsf",
+      "sha256": "5dccbd1c3bf36d07cd161f2d1643586924f46c3bd3c84fbf825923a0b2df9a7b",
+      "rights": "authored-synthetic",
+      "group": "avc-receiver",
+      "required": true,
+      "expected": {
+        "packets": 1,
+        "bytes": 21,
+        "digest": 2910801584676073699,
+        "digest_b": 15388170394160856503
+      }
     }
   ]
 }

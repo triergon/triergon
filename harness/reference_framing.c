@@ -1,6 +1,7 @@
 /* Public-API reference for the complete packet-framing operation. */
 #define _POSIX_C_SOURCE 200809L
 #include "reference_framing.h"
+#include <fcntl.h>
 #include <unistd.h>
 
 static void quote(const char *text) {
@@ -15,6 +16,39 @@ static void quote(const char *text) {
             putchar(*p);
     }
     putchar('"');
+}
+
+static int read_exact(int fd, uint8_t *data, size_t length) {
+    while (length) {
+        ssize_t n = read(fd, data, length);
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            return -1;
+        data += (size_t)n;
+        length -= (size_t)n;
+    }
+    return 0;
+}
+
+static int read_case(Case *c, const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return 66;
+    off_t length = lseek(fd, 0, SEEK_END);
+    if (length < 0 || length > (off_t)CAP || lseek(fd, 0, SEEK_SET) < 0) {
+        close(fd);
+        return 65;
+    }
+    size_t n = (size_t)length;
+    uint8_t small[SCRIPT_STACK_BYTES] = {0};
+    uint8_t *data = n <= sizeof(small) ? small : calloc(n, 1);
+    int read_failed = !data || read_exact(fd, data, n);
+    close(fd);
+    int result = read_failed ? 74 : case_load(c, data, n) ? 65 : 0;
+    if (data != small)
+        free(data);
+    return result;
 }
 
 int main(int argc, char **argv) {
@@ -42,31 +76,14 @@ int main(int argc, char **argv) {
     unsigned long long iterations = timing ? strtoull(argv[3], &end, 10) : 1;
     if (!iterations || iterations > 1000000 || (timing && (!end || *end)))
         return 64;
-    FILE *file = fopen(argv[2], "rb");
-    if (!file)
-        return 66;
-    if (fseek(file, 0, SEEK_END) || ftell(file) < 0 || ftell(file) > (long)CAP) {
-        fclose(file);
-        return 65;
-    }
-    size_t n = (size_t)ftell(file);
-    rewind(file);
-    uint8_t *data = malloc(n ? n : 1);
-    if (!data || fread(data, 1, n, file) != n) {
-        free(data);
-        fclose(file);
-        return 74;
-    }
-    fclose(file);
     Case c = {0};
-    if (case_load(&c, data, n)) {
+    int load = read_case(&c, argv[2]);
+    if (load) {
         case_free(&c);
-        free(data);
-        return 65;
+        return load;
     }
     if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) {
         case_free(&c);
-        free(data);
         return 74;
     }
     uint64_t start = timing ? now_ns() : 0;
@@ -86,11 +103,9 @@ int main(int argc, char **argv) {
     uint64_t elapsed = timing ? now_ns() - start : 0;
     if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) {
         case_free(&c);
-        free(data);
         return 74;
     }
     case_free(&c);
-    free(data);
     if (failed)
         return 70;
     printf("{\"schema\":1,\"operation\":\"NalPacketWholeFoldV1\",\"iterations\":%llu,\"packets\":"
