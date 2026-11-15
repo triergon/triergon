@@ -487,6 +487,10 @@ pub struct Driver<'a, T> {
     window: usize,
     quantum: u64,
     cancel: AtomicBool,
+    /// Read payloads as views of the input window where it holds the whole
+    /// sample, for packets dropped once folded. Retained packets are copied,
+    /// so that they do not keep windows alive.
+    pub shared_payloads: bool,
 }
 struct Scanned {
     movie: BoxView,
@@ -546,6 +550,7 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             window,
             quantum,
             cancel: AtomicBool::new(false),
+            shared_payloads: false,
         })
     }
     // The sample readers' polling loops call this once per window.
@@ -713,7 +718,11 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             .find(|r| sample.require_within((*r).clone()).is_ok())
             .cloned()
             .ok_or(Error::Invalid("consumer sample outside media extents"))?;
-        let mut reader = SampleReader::new(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?;
+        let mut reader = if self.shared_payloads {
+            SampleReader::new_with_shared_window(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?
+        } else {
+            SampleReader::new(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?
+        };
         loop {
             match reader.poll(
                 &mut self.input,
