@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Gate hosts on AWS, driven from a workstation with the aws CLI. The hosts hold no
 # AWS credentials: they download through presigned addresses, and what they upload
 # streams through this workstation.
@@ -37,6 +37,12 @@
 # timer on disk shuts each down 72 hours after it boots, whatever happens. Each
 # command removes its hosts, security group and key pair when it ends, and exits
 # non-zero when a shard did not finish or the summary fails.
+# Bash 4 or later: under macOS's /bin/bash 3.2 a shard's EXIT trap never runs, so
+# nothing is archived and the session's teardown removes the host.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "tools/gate-aws.sh needs bash 4 or later, not $BASH_VERSION: put a newer bash first on PATH, or run it as /opt/homebrew/bin/bash tools/gate-aws.sh" >&2
+    exit 2
+fi
 set -euo pipefail
 
 : "${AWS_PROFILE:?}" "${AWS_REGION:?}" "${TRIERGON_SUBNET:?}" "${TRIERGON_SSH_CIDR:?}"

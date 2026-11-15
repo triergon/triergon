@@ -978,6 +978,11 @@ is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
 
+`tools/gate-aws.sh` needs bash 4 or later and refuses to start under an older one,
+such as macOS's `/bin/bash` 3.2, where a shard's exit handler never runs and its
+outputs would be lost; on macOS run it with Homebrew's bash first on `PATH`, or as
+`/opt/homebrew/bin/bash tools/gate-aws.sh`.
+
 `tools/gate-aws.sh run TARGET N REVISION OUT`, in a checkout at REVISION without
 changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
 start when it fails. Then it launches N hosts from the image,
