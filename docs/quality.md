@@ -589,9 +589,11 @@ may override that count for diagnostic comparisons.
     names it lists and how many the worker holds, and the SHA-256 of the ordering file,
     or null for a worker linked without one. `cargo xtask check` runs `cargo xtask
     link-order check`, which checks the committed orders against the manifest in the
-    same way and, on GNU/Linux, that the worker built for the checking host holds 95%
-    of the names of its order for that host's target, and 90% of an order for another
-    target, since some functions exist on one architecture only, and links in each. The linker arguments, after the policy's
+    same way and, on GNU/Linux, that the worker built for the checking host links in
+    each of its orders and holds 95% of the names of its order for that host's target.
+    Of an order for another target it holds fewer, as some functions exist on one
+    architecture only (64 of the 76 of the AArch64 framing worker's order on ARMv7), so
+    that share is printed and not checked; the gate build checks it on each target. The linker arguments, after the policy's
     own, are
 
     ```text
