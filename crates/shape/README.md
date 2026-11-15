@@ -171,14 +171,14 @@ does.
 - `stch` stretching (refused when it would apply) and the Windows-1256 Arabic
   fallback lookups.
 - What libass reads from FreeType's hinted load of glyphs the auto-hinter gives
-  an Indic style: `SizedMetrics` takes glyph extents and contour points from the
+  an Indic style. `SizedMetrics` takes glyph extents and contour points from the
   font crate's default load (`SizedFont::load` with `Load::Default`), which
   hints CFF, CFF2 and CID-keyed glyphs, instructed TrueType glyphs, and TrueType
   glyphs without bytecode in the auto-hinter's Latin, CJK and dummy styles as
-  FreeType does, but not those of an Indic style (`Unsupported`), but for the
-  empty extents of a glyph without points, which every FreeType load gives it.
-  So mark positioning that reads such a glyph with an outline (a GPOS anchor on
-  a contour point, or fallback positioning in a font without GPOS marks) fails.
+  FreeType does. For a glyph of an Indic style it is `Unsupported`, unless the
+  glyph has no points, whose extents every FreeType load gives as empty. So mark
+  positioning that reads such a glyph's outline (a GPOS anchor on a contour
+  point, or fallback positioning in a font without GPOS marks) fails.
   Faces whose character map libass would convert (Windows multibyte encodings)
   are refused.
 - Variable font instances other than the default; the 24-bit "beyond 64K"
@@ -274,12 +274,16 @@ Paragraphs are limited to 2³² characters.
   - `shape-simple`: 6 cases of libass's simple shaping level.
   - `shape-unicode`: every Unicode scalar value's properties as HarfBuzz and
     FriBidi report them.
+  - `shape-extents`: 9 cases, every CFF, CID-keyed CFF, CFF2 and collection
+    file of the corpus; every glyph's extents of every face through HarfBuzz's
+    OpenType font functions at units per em against `OtMetrics`.
 
   `cargo xtask check` requires `shape-libass`, `shape-text`, `shape-bidi`,
-  `shape-simple` and `shape-unicode` (`cargo xtask shape compare`);
+  `shape-simple`, `shape-unicode` and `shape-extents` (`cargo xtask shape compare`);
   `shape-text-all` runs on demand (`cargo xtask shape compare --all`). The
   crate's acceptance rests on `shape-libass`, `shape-bidi`, `shape-simple` and
-  `shape-unicode`; the units-per-em features are additional coverage. `check`
+  `shape-unicode`; the units-per-em features, `shape-extents` among them, are
+  additional coverage. `check`
   still runs and reports every open case.
   The case rows are
   generated (`cargo xtask shape manifest`) from the font corpus in
@@ -287,13 +291,12 @@ Paragraphs are limited to 2³² characters.
   case's expected output is pinned from the reference in `pins.json`.
   `cargo xtask report` runs each feature on its own and with `--benchmark` and
   `--memory` measures runtime and memory against the reference; `shape-dump`,
-  `bidi-dump`, `simple-dump` and `unicode-dump` print the folded values as lines
+  `bidi-dump`, `simple-dump`, `unicode-dump` and `extents-dump` print the folded values as lines
   in both workers, for diffing a failing case.
 - `cargo xtask shape probe` assembles the CFF and CFF2 faces described under
   `harness/shape/probes` and requires both workers' `extents` operation, every
   glyph's extents through HarfBuzz's OpenType font functions, to match each
-  probe's record from 32-bit ARMv7; the extents of every CFF and CFF2 corpus
-  face match HarfBuzz's on both targets.
+  probe's record from 32-bit ARMv7.
 - `cargo xtask shape ucd --check` regenerates the Unicode and language tables from
   the pinned files and fails if they would change.
 - `cargo xtask fuzz --contract harness/features/<feature>/contract.json` mutates
