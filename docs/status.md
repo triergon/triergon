@@ -91,8 +91,11 @@ link policy `static-toolchain-runtime-trained-order-v1`: each item timed alone o
 the RSS module unloaded, its memory then collected under the kernel RSS proof on CPUs 1–15,
 and graded with the module loaded; no result was reused. Linux AArch64 ran 153 steps and
 ARMv7 150; 3 and 2 failed, each only on its contract's or list's listed open cases. A grade
-fails on parity alone, so the memory bounds above 1.0 of packet framing and of the four
-`long-movie` PGS cases are in the graded reports' acceptance, not in the step results. AAC
+then failed on parity alone, so the memory bounds above 1.0 of packet framing and of the
+four `long-movie` PGS cases were in the graded reports' acceptance, not in the step results.
+A grade now fails on a case whose bound fails ([bounds](quality.md#reference-and-corpus)): graded
+again, the PGS grades fail on both targets, and packet framing's total RSS fails as listed
+in its contract's `open_bounds`. AAC
 in MOV, which the gate does not run, was measured at the same revision on one more
 c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 `gate-run-TARGET-a73350ca-*-shard-1` to `-8` hold the shards' outputs, build identities,
@@ -992,8 +995,8 @@ three collections. At `79e0ae13` both features are lower than the reference in t
 every case. At `a73350ca` the four `long-movie` PGS cases are above it on both targets:
 total RSS 1.1903 to 1.4305 on Linux AArch64 and 1.3049 to 1.5305 here, with heap at most
 0.9563 and no memory reclaimed on either host during the collections. The cause of the rise
-is not established. Their grade steps pass: a grade fails on parity alone and records a
-failed memory bound in its report's acceptance.
+is not established. They fail their grade steps, as any case whose bound fails without
+being listed in its contract's `open_bounds`.
 
 The DVD decoder gives the numbers of a VobSub configuration and of the `palette` option the
 values observed in FFmpeg built for ARMv7: a colour list's numbers (the `palette` option and
