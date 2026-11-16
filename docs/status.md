@@ -685,6 +685,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Partial gate run, ARMv7: MP4 forward and range, ISO BMFF seeks and range plans | `d7a6d8f78c7d9963455f3a0872ca935b79fa14b4` | `46d6e06cb79d76d0bc2eeb9cbfed97e045b66620645097a1c2921bdb19fbed09` |
 | Partial gate run, ARMv7: plans, step records, logs, summary and host times | `8154812e05da374a0f7c173bfd01770d5bd0ca85` | `b3abda80845d0876416a37361b5b4f90204cf3107793d405a82e2d59fd5641e7` |
 | Partial gate run, Linux AArch64 and ARMv7: codecs, FATE parity, the timing and memory of `workloads.json`, and the workspace tests, checked and release, with each run's plans, step records, logs and summary | `8d6f278949aed417290058f1212dee0fc2a97243` | `db33a447578b4eaa7615e55318dbd13307826de18c4a720db64b515d19a6c69e` |
+| Partial gate run, ARMv7: the timing and memory of both codec workload lists, shard 1 of 3 | `4cbd1e8623fea61bad5139c63daf78938ecf18a5` | `b48c34422ff83174bb79051f7876dd4c3b4be9ef237835e66bb95c1cd8b8c7dd` |
+| Partial gate run, ARMv7: the timing and memory of both codec workload lists, shard 2 of 3 | `4cbd1e8623fea61bad5139c63daf78938ecf18a5` | `38e339510fd6e78b09bb79b1eb56b7d5754e906de10876073c0d5cd10db401f1` |
+| Partial gate run, ARMv7: the timing and memory of both codec workload lists, shard 3 of 3 | `4cbd1e8623fea61bad5139c63daf78938ecf18a5` | `dcb35289bd2de6bd15fc319a8aae0b37c8a22684c3fed28b678d354726cfe7fe` |
+| ARMv7: the causes of the codec timing failures (A32 with NEON timing, instruction and cycle counts, profiles) | `4cbd1e8623fea61bad5139c63daf78938ecf18a5` | `464ed3a644ca440687ffd3ad7fcbf48db0657378a903faeb04ee343d651adcee` |
 | Partial gate run, Linux AArch64: closed captions, `subtitle-cc`, the shard's outputs | `6d5145d7f31b002c72f9815130b522964d2abb64` | `7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497` |
 | Partial gate run, ARMv7: closed captions, `subtitle-cc`, the shard's outputs | `6d5145d7f31b002c72f9815130b522964d2abb64` | `284603aa021f0ac4123d4d581e3e1804ae8ee17ce928262a69a6607c3eea7277` |
 | Partial gate run, Linux AArch64: the workspace tests, checked and release | `f9b3f13839e31b8a1c97cb299902e9748acaf9ec` | `07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479` |
@@ -868,7 +872,7 @@ depend on), on AWS c6g.4xlarge hosts (Graviton2, Neoverse N1 r3p1), kernel
 `7.0.0-1014-aws`. Unless a row names another revision, its runtime and memory come from the gate run at
 `79e0ae13` under the link policy `static-toolchain-runtime-v1`, the codec memory from the
 partial run at `8154812e`, the font, shaping and ASS rendering rows from the partial run
-at `69d4d0f8`, the codec rows from the partial run at `8d6f2789` and the closed caption row
+at `69d4d0f8`, the codec rows from the partial run at `4cbd1e86` and the closed caption row
 from the partial run at `6d5145d7` ([measured revisions](#measured-revisions)): each feature timed on CPU 1, then its memory
 collected in parallel on CPUs 1–15 ([memory in parallel](quality.md#memory-in-parallel)).
 The earlier rows were measured on c6g.4xlarge hosts with the same user space and kernel,
@@ -882,8 +886,9 @@ Memory is kernel-bound in every row: measured under the kernel RSS bound, throug
 ([quality](quality.md#measuring-performance)), so total RSS is the candidate's proven
 resident peak over the reference's observed peak. The capture row's memory comes from
 `4b43bf74`: all 15 cases collected in parallel on CPUs 1–15 from the records of a timing
-run on CPU 1 on the same host (`capture qualify --stage memory`). The codec timings are
-diagnostics: no codec contract is gated on this target.
+run on CPU 1 on the same host (`capture qualify --stage memory`). The codec bounds are
+gated as on AArch64; the workloads above the ceiling are open on this target, each with its
+measured cause in its list's `open_workloads`.
 
 | Area | Verified against the reference | Runtime | Memory |
 |---|---|---|---|
@@ -894,8 +899,8 @@ diagnostics: no codec contract is gated on this target.
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals); the neutral reader's 648 comparison cases, as on AArch64 | 0.9709 (972/972 pass) at `e2d4a6a3` | heap ≤0.2736, total RSS ≤0.8577 (972/972 lower) at `e2d4a6a3` |
 | ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0303 (472/472 pass) at `d7a6d8f7` | heap ≤0.8541, total RSS ≤0.8737 (472/472 lower) at `d7a6d8f7` |
 | Packet framing | 135/135 AVC/HEVC reference comparisons | 1.2689 (133/135 within the ceiling) at `f4f1c7ad` | heap ≤0.7694 (135/135 lower), total RSS fails at 1.0813 (0/135 lower) at `f4f1c7ad` |
-| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision (on AArch64 at `4d31df88` the lane's 39 vectors, with the three crafted Parametric Stereo streams, pass 38/39; the lane was not run on this target there); the six video timing workloads decode to FFmpeg's digests | diagnostic, not gated: the six video workloads 0.6169 to 1.1439 at `8d6f2789` (6/6 within the ceiling); the 14 others at `4d31df88` (that run: 10/20 within the ceiling, worst 1.7584). At `8d6f2789` `dts-core-7.1-master` measured 2.0917, though the DTS decoder is the same there; the rise is not explained | diagnostic, not gated: the video workloads heap ≤0.9262, total RSS ≤0.8359 (6/6 lower) at `8d6f2789`; the others at `4d31df88` (that run: heap ≤0.9566, total RSS ≤0.8388, 20/20 lower) |
-| Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | diagnostic, not gated, at `4d31df88`: 1.7868 (7/10 within the ceiling) | diagnostic, not gated, at `4d31df88`: heap ≤0.8993, total RSS ≤0.7751 (10/10 lower) |
+| Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the AAC lane's 36 FATE and conformance vectors pass 35/36, as on AArch64, at the Parametric Stereo revision (on AArch64 at `4d31df88` the lane's 39 vectors, with the three crafted Parametric Stereo streams, pass 38/39; the lane was not run on this target there); the six video timing workloads decode to FFmpeg's digests | 10/20 pass at `4cbd1e86`: the six video workloads 0.5954 to 1.1289, `aac-lc-5.1` 1.1259, `ac3-4.0` 1.1142, `aac-lc-stereo` 0.9941 and `eac3-5.1-1536` 0.9742; 10 open on this target (below), worst `dts-core-7.1-master` 1.8930 | heap ≤0.9566, total RSS ≤0.8399 (20/20 lower) at `4cbd1e86` |
+| Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | 7/10 pass at `4cbd1e86`, ≤1.1595; 3 open on this target (below): `mp2-256-48k` 1.8121, `mp3-vbr-v2` 1.7945 and `mp3-cbr-128-joint` 1.7564 | heap ≤0.8993, total RSS ≤0.7716 (10/10 lower) at `4cbd1e86` |
 | Capture | 15/15 at `dcf51398`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1536 at `dcf51398` (15/15 pass; worst `c13-motion-960-6m`, then `c14-motion-960-rate255` 1.1528) | at `4b43bf74`: heap ≤0.6086, total RSS ≤0.9765 (15/15 lower) |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7838 (10/10 pass) at `6dc6440d` | heap ≤0.7323, total RSS ≤0.9380 (10/10 lower) at `6dc6440d`, on `playback-matroska-worker` |
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.8523 (97/97 pass) at `d2c391b8` | heap ≤0.0902, total RSS ≤0.8574 (97/97 lower) at `d2c391b8` |
@@ -988,9 +993,17 @@ and `c14-motion-960-rate255` 1.1528 at `dcf51398`, then Matroska 1.1466, MP4
 forward 1.0811 and DVD 1.0360.
 Each feature's evidence set lists every case's bound.
 
-The codec timings are not gated. At `79e0ae13`, 10 of the 20 workloads of
-`workloads.json` (worst 1.9223) and 7 of the 10 of `file-workloads.json` (worst 1.8584) are
-within the ceiling. Earlier, on a c6g.4xlarge pinned to CPU 1, in the same user
+The codec bounds are gated on this target. At `4cbd1e86`, 10 of the 20 workloads of
+`workloads.json` and 7 of the 10 of `file-workloads.json` are within the ceiling, and the
+13 others are open here, each with its measured cause in its list. Built as A32 with NEON
+(`armv7-unknown-linux-gnueabihf`, `-C target-feature=+neon`) and timed against the same
+reference, the three E-AC-3 workloads are within the ceiling (1.1231 to 1.1821): their
+cause is the Thumb-2 encoding. The two AC-3 (1.2190 and 1.2657), three HE-AAC (1.4763 to
+1.5747), two DTS (1.6030 and 1.6343) and three MPEG audio workloads (1.5358 to 1.6114)
+stay above it. Those decoders run 1.6 to 2.3 times the reference's user-mode
+instructions: SBR and its QMF synthesis take 47% of HE-AAC's cycles, the polyphase
+synthesis 61 to 72% of MPEG audio's, the library `floor` 12% of AC-3's and the library
+integer division 7.6% of DTS's (evidence set `codec-armv7-causes`). Earlier, on a c6g.4xlarge pinned to CPU 1, in the same user
 space and against the same pinned reference, the AC-3, E-AC-3 and DTS workloads were
 timed at `ddb02a59` and the five AAC workloads at `0b3c2db5`. Ten of the fourteen audio
 workloads were above the ceiling: `dts-core-7.1-master` 2.0698, `dts-core-es-6.1` 2.0338,

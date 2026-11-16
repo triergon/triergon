@@ -1,0 +1,39 @@
+{
+ "name": "codec-armv7-causes",
+ "path": "codec-armv7-causes",
+ "retention": "retained",
+ "reason": "Causes of the 32-bit ARMv7 codec timing failures at 4cbd1e86, one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws: the 13 workloads above the ceiling timed on CPU 1 with the gate build and with an A32-with-NEON build of codec-worker (armv7-unknown-linux-gnueabihf, -C target-feature=+neon) against the same reference, with both ledgers; perf stat user-mode cycles, instructions and branch misses of both builds and the reference on one workload per decoder, and perf records of the gate build with their symbol reports; the workers' SHA-256; for the ARMv7 open workloads of harness/codecs/workloads.json and file-workloads.json",
+ "key": "evidence/codec-armv7-causes/464ed3a644ca440687ffd3ad7fcbf48db0657378a903faeb04ee343d651adcee.tar.zst",
+ "sha256": "464ed3a644ca440687ffd3ad7fcbf48db0657378a903faeb04ee343d651adcee",
+ "bytes": 826288,
+ "results": [
+  {
+   "path": "time-a32-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "3f22876bbbc16f022ae0909bbabc09231949f3de9e4532e7ebb86c0f1b811792",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "time-a32-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "da9a8bcea6c7a0ed39896650f6ae4f4735c26e27d7ecc981c162262598d511ae",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "time-gate-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "faef66bfd5829b6ff035c4e58c3caf003b562e4264e47b8cef17e6ce5ea7c0e2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "time-gate-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "a552e671b6d4e57de8d5d6f578d0d92cec48c1008b230d1f8cc6d827f61b70f9",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
