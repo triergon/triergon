@@ -197,10 +197,13 @@ mod tests {
                 };
                 let (mut m, mut a) = ([mv], [av]);
                 decouple(&mut m, &mut a);
-                assert_eq!(
-                    (m[0].to_bits(), a[0].to_bits()),
-                    (want.0.to_bits(), want.1.to_bits()),
-                    "{mv} {av}"
+                // Which NaN arithmetic returns is not specified: a NaN only has to stay one.
+                let same = |got: f32, want: f32| {
+                    got.to_bits() == want.to_bits() || (got.is_nan() && want.is_nan())
+                };
+                assert!(
+                    same(m[0], want.0) && same(a[0], want.1),
+                    "{mv} {av}: {m:?} {a:?} {want:?}"
                 );
             }
         }
