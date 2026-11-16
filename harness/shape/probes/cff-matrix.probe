@@ -1,0 +1,10 @@
+# A FontMatrix that doubles and offsets every glyph, 500 units per em: the
+# extents are in font units as the charstrings draw them, or after it.
+units-per-em 500
+font-matrix 0.004 0 0.001 0.002 0.1 0.2
+glyph
+  endchar
+end
+glyph
+  100 100 rmoveto 200 0 rlineto 0 300 rlineto endchar
+end

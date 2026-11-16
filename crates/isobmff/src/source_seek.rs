@@ -105,6 +105,32 @@ impl<'a> IndexedLookup<'a> {
             active,
         })
     }
+    /// Sets `lookup` to one for `ordinal`: the same lookup while it looks for
+    /// `ordinal`, the same one continued where `ordinal` follows its located
+    /// sample in the same fragment, or else a fresh one.
+    fn locate(lookup: &mut Option<Self>, source: SourceTrack<'a>, ordinal: u64) -> Result<()> {
+        if let Some(current) = lookup {
+            if current.ordinal == ordinal {
+                return Ok(());
+            }
+            if let Some(LocatedIn::Fragment(locator)) = &mut current.active
+                && locator.continue_to(ordinal)
+            {
+                current.ordinal = ordinal;
+                return Ok(());
+            }
+        }
+        *lookup = Some(Self::new(source, ordinal)?);
+        Ok(())
+    }
+    /// The last sync sample before a located fragment sample in its run, where
+    /// locating it stepped past one.
+    fn passed_sync(&self) -> Option<u64> {
+        match &self.active {
+            Some(LocatedIn::Fragment(locator)) => locator.passed_sync(),
+            _ => None,
+        }
+    }
     fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         loop {
             if let Some(active) = &mut self.active {
@@ -316,7 +342,10 @@ impl<'a> SourceSeekPlanner<'a> {
                             return Err(Error::Invalid("seek sync lookup exhausted"));
                         }
                         SampleStep::Sample(sample) => {
-                            self.lookup = None;
+                            let located = self
+                                .lookup
+                                .take()
+                                .ok_or(Error::Invalid("missing seek sync lookup"))?;
                             if sample.access == Access::ContainerSync {
                                 let preceding = sample
                                     .ordinal
@@ -348,16 +377,31 @@ impl<'a> SourceSeekPlanner<'a> {
                                     .ok_or(Error::Unsupported(
                                         "no preceding container sync sample",
                                     ))?;
+                                // Locating this sample passed the run's samples
+                                // before it: probe its last sync directly, counting
+                                // the non-sync probes in between.
+                                if let Some(sync) = located.passed_sync() {
+                                    let between = self.sync_ordinal - sync;
+                                    let probes = self
+                                        .sync_probes
+                                        .checked_add(between)
+                                        .ok_or(Error::Overflow)?;
+                                    sample_limit(
+                                        probes.min(
+                                            self.limits.max_sync_scan_samples.saturating_add(1),
+                                        ),
+                                        self.limits.max_sync_scan_samples,
+                                    )?;
+                                    self.sync_probes = probes;
+                                    self.sync_ordinal = sync;
+                                }
                             }
                         }
                     }
                 }
                 Phase::Ranges => {
                     if self.pending.is_none() {
-                        if self.lookup.is_none() {
-                            self.lookup =
-                                Some(IndexedLookup::new(self.source, self.range_ordinal)?);
-                        }
+                        IndexedLookup::locate(&mut self.lookup, self.source, self.range_ordinal)?;
                         match self
                             .lookup
                             .as_mut()
@@ -369,8 +413,8 @@ impl<'a> SourceSeekPlanner<'a> {
                                 return Err(Error::Invalid("seek range lookup exhausted"));
                             }
                             SampleStep::Sample(sample) => {
+                                // The lookup stays to continue to the next sample.
                                 self.pending = Some(sample);
-                                self.lookup = None;
                                 self.extent = 0;
                             }
                         }
@@ -496,9 +540,7 @@ impl SourceSeekSamples<'_> {
         if self.done {
             return Ok(SampleStep::End);
         }
-        if self.lookup.is_none() {
-            self.lookup = Some(IndexedLookup::new(self.source, self.next)?);
-        }
+        IndexedLookup::locate(&mut self.lookup, self.source, self.next)?;
         match self
             .lookup
             .as_mut()
@@ -509,7 +551,7 @@ impl SourceSeekSamples<'_> {
                 if sample.ordinal != self.next {
                     return Err(Error::Invalid("planned sample ordinal changed"));
                 }
-                self.lookup = None;
+                // The lookup stays to continue to the next sample.
                 if self.next == self.last {
                     self.done = true;
                 } else {

@@ -8,9 +8,12 @@
 //! appending a run.
 //! No demux implementation code, expanded sample array, I/O or payload storage.
 use crate::{
-    CursorStatus, DurationBasis, EditCursor, EditLimits, EditList, FragmentIndex, MediaClock,
-    PacketProjector, PacketView, Sample, SampleStep, SampleTable, SchedulingClock, SourceTrack,
-    TrackSampleCursor,
+    CursorStatus, DurationBasis, EditCursor, EditLimits, EditList, FragmentCursor, FragmentIndex,
+    MediaClock, PacketProjector, PacketView, Sample, SampleCursor, SampleStep, SampleTable,
+    SchedulingClock, SourceTrack, SpanStep, TrackSampleCursor,
+    interleave::TrackSpans,
+    mov_edits::{EmitPrepare, EmitStart},
+    require_range_within,
 };
 use std::{
     ops::Range,
@@ -19,7 +22,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TickScale, TimeBase, WorkBudget};
 
 mod range_seek;
 use range_seek::Checkpoints;
@@ -295,15 +298,18 @@ impl<'a> Slot<'a> {
             "native first origin needs complete-source context",
         ))
     }
+    /// Project the next occurrence into `head`. `micros`, when given, converts
+    /// the demux base to the microseconds of a global schedule.
     fn fill(
         &mut self,
         work: &mut WorkBudget,
         complete_source: bool,
         global_schedule: bool,
         front_source: bool,
+        micros: Option<&TickScale>,
     ) -> Result<CursorStatus> {
         let clock = self.clock()?;
-        let mut occurrence = if let Some(plan) = self.encoded_edit {
+        let (source, demux, edit, clock_origin) = if let Some(plan) = self.encoded_edit {
             let sample = match self.cursor.poll(work)? {
                 SampleStep::Yield => return Ok(CursorStatus::Yield),
                 SampleStep::End => return Ok(CursorStatus::End),
@@ -317,33 +323,22 @@ impl<'a> Slot<'a> {
                 edit_ordinal: plan.edit_ordinal(),
                 duration_basis: DurationBasis::OriginalDecodeTableOrdinal,
             };
-            PacketOccurrence {
-                track_id: self.track.track_id,
-                source: sample,
-                demux,
-                edit: Some(edit),
-                clock_origin: ClockOrigin::SourceClock,
-                media_clock: clock,
-                scheduling_clock: SchedulingClock::SingleTrack,
-            }
+            (sample, demux, Some(edit), ClockOrigin::SourceClock)
         } else if let Some(edited) = &mut self.edited {
             let cursor = &mut edited.as_mut_slice()[0];
             match cursor.poll(work)? {
                 CursorStatus::Ready => {
                     let occurrence = cursor.take_occurrence()?;
-                    PacketOccurrence {
-                        track_id: self.track.track_id,
-                        source: occurrence.source,
-                        demux: occurrence.demux,
-                        edit: Some(EditIdentity {
+                    (
+                        occurrence.source,
+                        occurrence.demux,
+                        Some(EditIdentity {
                             sequence: occurrence.sequence,
                             edit_ordinal: occurrence.edit_ordinal,
                             duration_basis: occurrence.duration_basis,
                         }),
-                        clock_origin: ClockOrigin::SourceClock,
-                        media_clock: clock,
-                        scheduling_clock: SchedulingClock::SingleTrack,
-                    }
+                        ClockOrigin::SourceClock,
+                    )
                 }
                 other => return Ok(other),
             }
@@ -414,26 +409,88 @@ impl<'a> Slot<'a> {
                 });
             }
             let edit = self.fragment_edit.map(|edit| edit.identity(sample.ordinal));
-            PacketOccurrence {
-                track_id: self.track.track_id,
-                source: sample,
-                demux,
-                edit,
-                clock_origin,
-                media_clock: clock,
-                scheduling_clock: SchedulingClock::SingleTrack,
-            }
+            (sample, demux, edit, clock_origin)
         };
-        occurrence.scheduling_clock = if front_source {
-            SchedulingClock::NonseekableSourcePosition(occurrence.demux.source_range.start)
+        let scheduling_clock = if front_source {
+            SchedulingClock::NonseekableSourcePosition(demux.source_range.start)
         } else if global_schedule {
-            SchedulingClock::from_demux_clock(occurrence.demux.dts_field, clock.demux_base)?
+            match micros {
+                Some(micros) => SchedulingClock::from_scaled_clock(demux.dts_field, micros)?,
+                None => SchedulingClock::from_demux_clock(demux.dts_field, clock.demux_base)?,
+            }
         } else {
             SchedulingClock::SingleTrack
         };
-        self.head = Some(occurrence);
+        self.head = Some(PacketOccurrence {
+            track_id: self.track.track_id,
+            source,
+            demux,
+            edit,
+            clock_origin,
+            media_clock: clock,
+            scheduling_clock,
+        });
         Ok(CursorStatus::Ready)
     }
+}
+
+/// A track whose occurrences are its samples in order, each once; see
+/// [`PacketCursor::prepare_plain`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PlainSource<'a> {
+    /// A regular table, projected with its composition shift.
+    Regular { table: &'a SampleTable, shift: i64 },
+    /// Fragments alone, whose decode times the fragment edit offsets.
+    Fragments {
+        track_id: u32,
+        fragments: &'a [FragmentIndex],
+        edit_offset: i64,
+    },
+    /// A regular table under one media edit, after at most an empty one.
+    Edited(EmitStart<'a>),
+}
+
+/// One step of [`PacketCursor::prepare_plain`].
+#[derive(Debug)]
+pub(crate) enum PlainPrepare<'a> {
+    Ready(Option<PlainSource<'a>>),
+    Yield,
+}
+
+/// Where a [`PlainSource`] track continues from.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum PlainStart<'a> {
+    Regular(SampleCursor<'a>),
+    /// The sample with this ordinal, under the track's edit.
+    Edited(u64),
+    /// The cursor over fragment `next_fragment - 1` that produces the sample,
+    /// the sample before it, if any, and the discard boundary of its run.
+    Fragment {
+        next_fragment: usize,
+        cursor: FragmentCursor<'a>,
+        previous: Option<PreviousSample>,
+        discard_boundary: Option<i128>,
+    },
+}
+
+/// A fragment sample's clock and the run that holds it.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PreviousSample {
+    pub(crate) clock: PreviousClock,
+    pub(crate) run: (usize, usize),
+}
+
+/// One track's packet state at an occurrence its index produced: what a
+/// complete-source cursor over the same tracks holds for this track once a
+/// resume point has replayed it to that occurrence.
+#[derive(Debug)]
+pub(crate) struct TrackResume<'a> {
+    /// The occurrence's position in the track, from zero.
+    occurrence: u64,
+    /// The samples whose extents the index checked.
+    validated: u64,
+    /// The track's slot, with the occurrence as its head.
+    slot: Slot<'a>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -497,7 +554,8 @@ impl TrackProjection {
 }
 
 /// One charged slot/head per track (including the existing edit cursor's bounded
-/// lookahead), plus one pending validation sample and one ready occurrence.
+/// lookahead), plus one pending validation sample. The ready occurrence stays in
+/// its track's slot until it is taken.
 /// Polling is cancellable/work-bounded, with sticky failures.
 /// Preflight validates *all* source sample extents before demux policy refusals.
 /// Backward source addresses remain legal: the consumer performs checked ranges.
@@ -513,11 +571,16 @@ pub struct PacketCursor<'a> {
     previous_ordinal: u64,
     validated: u64,
     generated: u64,
-    checking: Option<Sample>,
+    checking: Option<Range<u64>>,
+    /// The track whose sample extents are being checked.
+    spans: Option<TrackSpans<'a>>,
+    /// Samples of a span outside one extent left to check one at a time.
+    stepping: u64,
     low: usize,
     high: usize,
     best: Option<usize>,
-    ready: Option<PacketOccurrence>,
+    /// The slot whose head is the ready occurrence.
+    ready: Option<usize>,
     failed: Option<Error>,
     complete_source: bool,
     front_source: bool,
@@ -530,6 +593,27 @@ pub struct PacketCursor<'a> {
     projection: TrackProjection,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
+    /// The demux base of each of the first tracks in microseconds, for the
+    /// scheduling clock and the checked duration of every packet; prepared on
+    /// first use. Slots and their checkpoint copies stay as they are.
+    micros: [Option<TickScale>; SCALED_TRACKS],
+}
+
+/// How many tracks keep a prepared microsecond scale; later tracks convert
+/// through [`TimeBase::rescale`] per packet.
+const SCALED_TRACKS: usize = 4;
+
+impl PacketCursor<'_> {
+    /// Prepare track `at`'s demux base in microseconds, for the first
+    /// [`SCALED_TRACKS`] tracks once they have a projected clock; read it from
+    /// `micros`.
+    fn prepare_micros(&mut self, at: usize) {
+        if let Some(cached @ None) = self.micros.get_mut(at)
+            && let Some(clock) = &self.slots.as_slice()[at].clock
+        {
+            *cached = Some(TickScale::new(clock.demux_base, TimeBase::MICROSECONDS));
+        }
+    }
 }
 
 pub(crate) fn fragment_media_start(edits: &EditList) -> Result<i64> {
@@ -714,6 +798,8 @@ impl<'a> PacketCursor<'a> {
             validated: 0,
             generated: 0,
             checking: None,
+            spans: None,
+            stepping: 0,
             low: 0,
             high: 0,
             best: None,
@@ -730,6 +816,7 @@ impl<'a> PacketCursor<'a> {
             projection: TrackProjection::default(),
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
+            micros: [None; SCALED_TRACKS],
         }
     }
     /// The caller establishes one complete original media source and all its
@@ -914,15 +1001,9 @@ impl<'a> PacketCursor<'a> {
         Ok(())
     }
     pub fn ready_encoded_skip(&self) -> Result<Option<[u8; 10]>> {
-        let item = self.ready.as_ref().ok_or(Error::Invalid(
+        let (slot, item) = self.ready_slot().ok_or(Error::Invalid(
             "encoded skip requires ready source occurrence",
         ))?;
-        let slot = self
-            .slots
-            .as_slice()
-            .iter()
-            .find(|s| s.track.track_id == item.track_id)
-            .ok_or(Error::Invalid("encoded occurrence track"))?;
         match slot.encoded_edit {
             Some(plan) => plan.skip_samples(&item.source),
             None => Ok(None),
@@ -1051,19 +1132,12 @@ impl<'a> PacketCursor<'a> {
     /// Provenance of the currently held source run, accessed before take. O(1)
     /// in the selected single-track index cursor; no run/sample array expansion.
     pub(crate) fn ready_source_run(&self) -> Result<Option<(usize, usize, u32)>> {
-        let ready = self
-            .ready
-            .as_ref()
+        let (slot, ready) = self
+            .ready_slot()
             .ok_or(Error::Invalid("no ready native occurrence"))?;
         if ready.source.fragment_flags.is_none() {
             return Ok(None);
         }
-        let slot = self
-            .slots
-            .as_slice()
-            .iter()
-            .find(|s| s.track.track_id == ready.track_id)
-            .ok_or(Error::Invalid("native source slot absent"))?;
         let (fragment, run) = slot
             .append_run
             .ok_or(Error::Invalid("native source run absent"))?;
@@ -1077,7 +1151,235 @@ impl<'a> PacketCursor<'a> {
     /// Inspect the current occurrence without consuming its place in the
     /// demux schedule.
     pub fn occurrence(&self) -> Option<&PacketOccurrence> {
-        self.ready.as_ref()
+        self.ready_slot().map(|(_, occurrence)| occurrence)
+    }
+
+    fn ready_slot(&self) -> Option<(&Slot<'a>, &PacketOccurrence)> {
+        let slot = self.slots.as_slice().get(self.ready?)?;
+        Some((slot, slot.head.as_ref()?))
+    }
+
+    /// Drop the ready occurrence without moving it out of its slot.
+    pub(crate) fn discard_occurrence(&mut self) {
+        if let Some(at) = self.ready.take() {
+            self.slots.as_mut_slice()[at].head = None;
+        }
+    }
+
+    /// This one-track complete-source cursor's state at its ready occurrence,
+    /// the `occurrence`-th from zero. `previous`, a state this method returned
+    /// earlier, lends its edit cursor storage.
+    pub(crate) fn ready_track_resume(
+        &self,
+        occurrence: u64,
+        previous: Option<TrackResume<'a>>,
+    ) -> Result<TrackResume<'a>> {
+        let ([slot], Some(0), true) = (self.slots.as_slice(), self.ready, self.complete_source)
+        else {
+            return Err(Error::Invalid(
+                "track resume needs a ready one-track complete cursor",
+            ));
+        };
+        Ok(TrackResume {
+            occurrence,
+            validated: self.validated,
+            slot: slot.try_clone_with_edit_storage(previous.and_then(|p| p.slot.edited))?,
+        })
+    }
+
+    /// The slot of a prepared one-track complete-source cursor that has produced
+    /// nothing yet.
+    fn prepared_slot(&self) -> Option<&Slot<'a>> {
+        let [slot] = self.slots.as_slice() else {
+            return None;
+        };
+        let prepared = matches!(self.phase, Phase::Fill)
+            && self.at == 0
+            && self.generated == 0
+            && self.ready.is_none()
+            && self.complete_source
+            && !self.front_source
+            && self.terminal.is_none()
+            && self.forward_regular.is_none()
+            && self.forward_encoded_end.is_none()
+            && !self.check_projections
+            && !self.recording_seek_checkpoints
+            && self.checked_duration_us.is_none()
+            && self.projection.is_all()
+            && slot.head.is_none()
+            && slot.resume_remaining == 0
+            && slot.clock.is_some()
+            && slot.encoded_edit.is_none()
+            && !slot.front_fragment
+            && slot.previous_clock.is_none()
+            && slot.append_run.is_none()
+            && self.validated != 0
+            && self.validated <= self.limits.max_occurrences;
+        prepared.then_some(slot)
+    }
+
+    /// A prepared one-track cursor's track when its occurrences are its samples
+    /// in order with unedited clocks: a regular table with no edit list, partial
+    /// sync or dependency samples, or fragments alone.
+    fn plain_track(&self) -> Option<PlainSource<'a>> {
+        let slot = self.prepared_slot().filter(|slot| slot.edited.is_none())?;
+        let table = slot.track.table;
+        if !slot.saw_fragment
+            && slot.track.edits.is_none()
+            && slot.fragment_edit.is_none()
+            && !table.has_partial_sync_samples()
+            && !table.has_dependency_table()
+        {
+            return Some(PlainSource::Regular {
+                table,
+                shift: slot.shift,
+            });
+        }
+        (slot.saw_fragment && table.sample_count() == 0).then_some(PlainSource::Fragments {
+            track_id: slot.track.track_id,
+            fragments: slot.track.fragments,
+            edit_offset: slot.fragment_edit_offset(),
+        })
+    }
+
+    /// Prepares a one-track complete-source cursor and finds whether its
+    /// occurrences can be read from its tables: those of a [`PlainSource`].
+    pub(crate) fn prepare_plain(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<PlainPrepare<'a>> {
+        match self.prepare(work, cancel)? {
+            CursorStatus::Yield => return Ok(PlainPrepare::Yield),
+            CursorStatus::End => return Ok(PlainPrepare::Ready(None)),
+            CursorStatus::Ready => {}
+        }
+        if let Some(source) = self.plain_track() {
+            return Ok(PlainPrepare::Ready(Some(source)));
+        }
+        // A regular track under a media edit emits each sample once.
+        if self.prepared_slot().is_none_or(|slot| slot.saw_fragment) {
+            return Ok(PlainPrepare::Ready(None));
+        }
+        let Some(edited) = self.slots.as_mut_slice()[0].edited.as_mut() else {
+            return Ok(PlainPrepare::Ready(None));
+        };
+        Ok(match edited.as_mut_slice()[0].prepare_emit(work)? {
+            EmitPrepare::Ready(start) => PlainPrepare::Ready(Some(PlainSource::Edited(start))),
+            EmitPrepare::Yield => PlainPrepare::Yield,
+            EmitPrepare::Unsuited => PlainPrepare::Ready(None),
+        })
+    }
+
+    /// Continue a cursor that [`prepare_plain`](Self::prepare_plain) found plain
+    /// from `start`, as though the occurrences before it had been produced.
+    /// `false` when the work is spent.
+    pub(crate) fn start_plain_at(
+        &mut self,
+        start: PlainStart<'a>,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        if let PlainStart::Edited(ordinal) = start {
+            if self.prepared_slot().is_none() {
+                return Err(Error::Invalid("plain start needs a prepared edited track"));
+            }
+            let edited = self.slots.as_mut_slice()[0]
+                .edited
+                .as_mut()
+                .ok_or(Error::Invalid("plain start needs a prepared edited track"))?;
+            return edited.as_mut_slice()[0].skip_to(ordinal, work);
+        }
+        let source = self
+            .plain_track()
+            .ok_or(Error::Invalid("plain start needs a prepared plain track"))?;
+        let slot = &mut self.slots.as_mut_slice()[0];
+        match (source, start) {
+            (PlainSource::Regular { table, .. }, PlainStart::Regular(cursor))
+                if std::ptr::eq(cursor.table(), table) =>
+            {
+                slot.cursor = TrackSampleCursor::from_regular(slot.source()?, cursor);
+            }
+            (
+                PlainSource::Fragments { fragments, .. },
+                PlainStart::Fragment {
+                    next_fragment,
+                    cursor,
+                    previous,
+                    discard_boundary,
+                },
+            ) if next_fragment > 0 && next_fragment <= fragments.len() => {
+                slot.cursor =
+                    TrackSampleCursor::from_fragment(slot.source()?, next_fragment, cursor);
+                slot.previous_clock = previous.map(|previous| previous.clock);
+                slot.append_run = previous.map(|previous| previous.run);
+                slot.discard_boundary = discard_boundary;
+            }
+            _ => return Err(Error::Invalid("plain start from another track")),
+        }
+        Ok(true)
+    }
+
+    /// The complete-source cursor over these tracks, in catalogue order, that
+    /// [`with_resume_points`](Self::with_resume_points) reaches by replaying each
+    /// track to its resumed occurrence. Every track's extents were checked when
+    /// its state was kept.
+    pub(crate) fn from_track_resumes(
+        budget: &Budget,
+        resumes: &[TrackResume<'a>],
+        media: &'a [Range<u64>],
+        limits: PacketLimits,
+    ) -> Result<Self> {
+        let max_tracks = limits.max_tracks.min(64);
+        if resumes.len() > max_tracks {
+            return Err(Error::Limit {
+                requested: resumes.len(),
+                maximum: max_tracks,
+            });
+        }
+        if media.len() > limits.max_media_extents {
+            return Err(Error::Limit {
+                requested: media.len(),
+                maximum: limits.max_media_extents,
+            });
+        }
+        let total = |value: fn(&TrackResume<'_>) -> u64| {
+            resumes.iter().try_fold(0u64, |sum, resume| {
+                sum.checked_add(value(resume)).ok_or(Error::Overflow)
+            })
+        };
+        count(
+            total(|resume| resume.slot.track.table.sample_count())?,
+            limits.max_source_samples,
+        )?;
+        count(total(|resume| resume.occurrence)?, limits.max_occurrences)?;
+        for resume in resumes {
+            count(resume.occurrence, limits.max_occurrences)?;
+        }
+        // A replay checks the extents again, failing at the first sample past the limit.
+        let validated = total(|resume| resume.validated)?;
+        count(
+            validated.min(limits.max_source_samples.saturating_add(1)),
+            limits.max_source_samples,
+        )?;
+        let mut slots = BudgetVec::new(budget);
+        slots.try_reserve_exact(resumes.len())?;
+        for resume in resumes {
+            let mut slot = resume.slot.try_clone()?;
+            // The index scheduled its one track alone.
+            if resumes.len() > 1 {
+                let base = slot.clock()?.demux_base;
+                if let Some(head) = &mut slot.head {
+                    head.scheduling_clock =
+                        SchedulingClock::from_demux_clock(head.demux.dts_field, base)?;
+                }
+            }
+            slots.try_push(slot).map_err(|error| error.error)?;
+        }
+        let mut cursor = Self::from_slots(slots, media, limits);
+        cursor.complete_source = true;
+        cursor.validated = validated;
+        cursor.phase = Phase::Fill;
+        Ok(cursor)
     }
 
     /// Start a separate replay of these immutable complete-source tables.
@@ -1189,20 +1491,42 @@ impl<'a> PacketCursor<'a> {
         }
         self.ready
             .take()
+            .and_then(|at| self.slots.as_mut_slice()[at].head.take())
             .ok_or(Error::Invalid("no ready native packet"))
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+        self.poll_until::<false>(work, cancel)
+    }
+    /// Runs the checks that precede the first occurrence: the sample extents,
+    /// the clocks and the edit setup. `Ready` once the cursor would fill.
+    pub(crate) fn prepare(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<CursorStatus> {
+        self.poll_until::<true>(work, cancel)
+    }
+    /// Polls; with `PREPARE`, only up to the first fill.
+    fn poll_until<const PREPARE: bool>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let result = self.poll_inner(work, cancel);
+        let result = self.poll_inner::<PREPARE>(work, cancel);
         if let Err(error) = result {
             self.failed = Some(error);
             self.ready = None;
         }
         result
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
+    fn poll_inner<const PREPARE: bool>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<CursorStatus> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -1235,9 +1559,20 @@ impl<'a> PacketCursor<'a> {
                         continue;
                     }
                     let slot = &mut self.slots.as_mut_slice()[self.at];
-                    match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(CursorStatus::Yield),
-                        SampleStep::End => {
+                    let spans = match &mut self.spans {
+                        Some(spans) => spans,
+                        None => self.spans.insert(TrackSpans::new(slot.source()?)),
+                    };
+                    let before = *spans;
+                    // A terminal mdat or a forward regular source checks every
+                    // sample on its own, so its spans are one sample long.
+                    let whole = self.stepping == 0
+                        && self.terminal.is_none()
+                        && self.forward_regular.is_none();
+                    let maximum = if whole { u64::MAX } else { 1 };
+                    let span = match spans.poll(maximum, work)? {
+                        SpanStep::Yield => return Ok(CursorStatus::Yield),
+                        SpanStep::End => {
                             if !work.try_charge(1) {
                                 return Ok(CursorStatus::Yield);
                             }
@@ -1249,72 +1584,97 @@ impl<'a> PacketCursor<'a> {
                             }
                             self.at += 1;
                             self.previous_ordinal = 0;
+                            self.spans = None;
+                            self.stepping = 0;
+                            continue;
                         }
-                        SampleStep::Sample(sample) => {
-                            self.validated =
-                                self.validated.checked_add(1).ok_or(Error::Overflow)?;
-                            count(self.validated, self.limits.max_source_samples)?;
-                            if sample.ordinal <= self.previous_ordinal {
-                                return Err(Error::Invalid("native source ordinal order"));
-                            }
-                            self.previous_ordinal = sample.ordinal;
-                            slot.saw_fragment |= sample.fragment_flags.is_some();
-                            if let Some(offset) = sample
-                                .composition_offset
-                                .filter(|_| sample.fragment_flags.is_some())
-                            {
-                                let signed = i32::from_be_bytes(offset.raw_bits().to_be_bytes());
-                                slot.fragment_cto_minimum =
-                                    slot.fragment_cto_minimum.min(i64::from(signed));
-                            }
-                            if let [extent] = self.media
-                                && self.terminal.is_none()
-                                && self.forward_regular.is_none()
-                                && work.try_charge(2)
-                            {
-                                // A single extent needs no search state. Charge the same
-                                // lookup and bounds check as the resumable path.
-                                if sample.range.start < extent.start {
-                                    return Err(Error::Invalid("native sample outside mdat"));
-                                }
-                                sample.require_within(extent.clone())?;
-                                continue;
-                            }
-                            if self.media.len() > 1
-                                && self.terminal.is_none()
-                                && self.forward_regular.is_none()
-                                && work.try_charge(u64::from(self.media.len().ilog2()) + 3)
-                            {
-                                // Reserve the full partition search and bounds check.
-                                // Small grants use the resumable search below.
-                                let end = self
-                                    .media
-                                    .partition_point(|extent| extent.start <= sample.range.start);
-                                let extent = end
-                                    .checked_sub(1)
-                                    .and_then(|at| self.media.get(at))
-                                    .ok_or(Error::Invalid("native sample outside mdat"))?;
-                                sample.require_within(extent.clone())?;
-                                continue;
-                            }
-                            self.checking = Some(sample);
-                            self.low = 0;
-                            self.high = self.media.len();
-                            self.phase = Phase::Bounds;
+                        SpanStep::Span(span) => span,
+                    };
+                    if whole {
+                        // A span that lies in one extent passes every sample's
+                        // check at once. Any other is checked a sample at a time,
+                        // which reports the first failure.
+                        let fits = span.first > self.previous_ordinal
+                            && self
+                                .validated
+                                .checked_add(span.count)
+                                .is_some_and(|total| total <= self.limits.max_source_samples)
+                            && work.try_charge(u64::from(
+                                self.media.len().checked_ilog2().unwrap_or(0),
+                            ))
+                            && within_one_extent(self.media, &span.range);
+                        if !fits {
+                            *spans = before;
+                            self.stepping = span.count;
+                            continue;
                         }
                     }
+                    if span.fragment {
+                        slot.saw_fragment = true;
+                        if let Some(minimum) = span.offset_minimum {
+                            slot.fragment_cto_minimum =
+                                slot.fragment_cto_minimum.min(i64::from(minimum));
+                        }
+                    }
+                    if whole {
+                        self.validated += span.count;
+                        self.previous_ordinal = span.first + (span.count - 1);
+                        continue;
+                    }
+                    self.stepping = self.stepping.saturating_sub(1);
+                    let (ordinal, range) = (span.first, span.range);
+                    self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
+                    count(self.validated, self.limits.max_source_samples)?;
+                    if ordinal <= self.previous_ordinal {
+                        return Err(Error::Invalid("native source ordinal order"));
+                    }
+                    self.previous_ordinal = ordinal;
+                    if let [extent] = self.media
+                        && self.terminal.is_none()
+                        && self.forward_regular.is_none()
+                        && work.try_charge(2)
+                    {
+                        // A single extent needs no search state. Charge the same
+                        // lookup and bounds check as the resumable path.
+                        if range.start < extent.start {
+                            return Err(Error::Invalid("native sample outside mdat"));
+                        }
+                        require_range_within(&range, extent.clone())?;
+                        continue;
+                    }
+                    if self.media.len() > 1
+                        && self.terminal.is_none()
+                        && self.forward_regular.is_none()
+                        && work.try_charge(u64::from(self.media.len().ilog2()) + 3)
+                    {
+                        // Reserve the full partition search and bounds check.
+                        // Small grants use the resumable search below.
+                        let end = self
+                            .media
+                            .partition_point(|extent| extent.start <= range.start);
+                        let extent = end
+                            .checked_sub(1)
+                            .and_then(|at| self.media.get(at))
+                            .ok_or(Error::Invalid("native sample outside mdat"))?;
+                        require_range_within(&range, extent.clone())?;
+                        continue;
+                    }
+                    self.checking = Some(range);
+                    self.low = 0;
+                    self.high = self.media.len();
+                    self.phase = Phase::Bounds;
                 }
                 Phase::Bounds => {
                     if !work.try_charge(1) {
                         return Ok(CursorStatus::Yield);
                     }
-                    let sample = self
+                    let range = self
                         .checking
                         .as_ref()
                         .ok_or(Error::Invalid("native pending validation"))?;
                     if self.low < self.high {
                         let mid = self.low + (self.high - self.low) / 2;
-                        if self.media[mid].start <= sample.range.start {
+                        if self.media[mid].start <= range.start {
                             self.low = mid + 1;
                         } else {
                             self.high = mid;
@@ -1322,19 +1682,19 @@ impl<'a> PacketCursor<'a> {
                     } else {
                         if let Some(terminal) = self
                             .terminal
-                            .filter(|tail| sample.range.start >= tail.payload_start())
+                            .filter(|tail| range.start >= tail.payload_start())
                         {
-                            terminal.require_sample(sample)?;
+                            terminal.require_range(range)?;
                         } else if !self
                             .forward_regular
-                            .is_some_and(|bounds| bounds.can_defer(sample))
+                            .is_some_and(|bounds| bounds.can_defer(range))
                         {
                             let extent = self
                                 .low
                                 .checked_sub(1)
                                 .and_then(|at| self.media.get(at))
                                 .ok_or(Error::Invalid("native sample outside mdat"))?;
-                            sample.require_within(extent.clone())?;
+                            require_range_within(range, extent.clone())?;
                         }
                         self.checking = None;
                         self.phase = Phase::Validate;
@@ -1446,9 +1806,11 @@ impl<'a> PacketCursor<'a> {
                         continue;
                     }
                     let global_schedule = self.slots.len() > 1;
+                    self.prepare_micros(self.at);
+                    let micros = self.micros.get(self.at).and_then(Option::as_ref);
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.head.is_none() {
-                        match slot.fill(work, true, global_schedule, false)? {
+                        match slot.fill(work, true, global_schedule, false, micros)? {
                             CursorStatus::Yield => return Ok(CursorStatus::Yield),
                             CursorStatus::Ready => {}
                             CursorStatus::End => {
@@ -1470,7 +1832,7 @@ impl<'a> PacketCursor<'a> {
                             .head
                             .as_ref()
                             .ok_or(Error::Invalid("missing projected packet"))?;
-                        record_duration(duration, row)?;
+                        record_duration(duration, row, micros)?;
                     }
                     if self.recording_seek_checkpoints {
                         self.record_seek_checkpoint(self.at);
@@ -1478,6 +1840,9 @@ impl<'a> PacketCursor<'a> {
                     self.slots.as_mut_slice()[self.at].head = None;
                 }
                 Phase::Fill => {
+                    if PREPARE {
+                        return Ok(CursorStatus::Ready);
+                    }
                     if self.at == self.slots.len() {
                         self.at = 0;
                         self.best = None;
@@ -1485,6 +1850,10 @@ impl<'a> PacketCursor<'a> {
                         continue;
                     }
                     let global_schedule = self.slots.len() > 1;
+                    if global_schedule {
+                        self.prepare_micros(self.at);
+                    }
+                    let micros = self.micros.get(self.at).and_then(Option::as_ref);
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.ended {
                         if !work.try_charge(1) {
@@ -1510,6 +1879,7 @@ impl<'a> PacketCursor<'a> {
                         self.complete_source,
                         global_schedule,
                         self.front_source,
+                        micros,
                     )? {
                         CursorStatus::Yield => return Ok(CursorStatus::Yield),
                         CursorStatus::End => {
@@ -1521,6 +1891,12 @@ impl<'a> PacketCursor<'a> {
                             slot.ended = true;
                         }
                         CursorStatus::Ready => {
+                            // A lone track's next occurrence is the selection.
+                            if !global_schedule && slot.resume_remaining == 0 {
+                                self.at = 1;
+                                self.best = Some(0);
+                                self.phase = Phase::Select;
+                            }
                             continue;
                         }
                     }
@@ -1543,9 +1919,11 @@ impl<'a> PacketCursor<'a> {
                         if self.recording_seek_checkpoints {
                             self.record_seek_checkpoint(best);
                         }
-                        let occurrence = self.slots.as_mut_slice()[best].head.take();
+                        self.prepare_micros(best);
+                        let micros = self.micros.get(best).and_then(Option::as_ref);
+                        let slot = &mut self.slots.as_mut_slice()[best];
                         if let Some(end) = &mut self.forward_encoded_end
-                            && let Some(packet) = &occurrence
+                            && let Some(packet) = &slot.head
                         {
                             if *end > packet.source.range.start {
                                 return Err(Error::Unsupported(
@@ -1555,15 +1933,17 @@ impl<'a> PacketCursor<'a> {
                             *end = packet.source.range.end;
                         }
                         if let Some(duration) = &mut self.checked_duration_us {
-                            let row = occurrence
-                                .as_ref()
+                            let row = slot
+                                .head
+                                .take()
                                 .ok_or(Error::Invalid("missing projected packet"))?;
-                            record_duration(duration, row)?;
+                            record_duration(duration, &row, micros)?;
                             self.at = 0;
                             self.phase = Phase::Fill;
                             continue;
                         }
-                        self.ready = occurrence;
+                        // The occurrence stays in its slot until it is taken.
+                        self.ready = slot.head.is_some().then_some(best);
                         self.at = 0;
                         self.phase = Phase::Fill;
                         continue;
@@ -1599,16 +1979,33 @@ impl<'a> PacketCursor<'a> {
     }
 }
 
-fn record_duration(duration: &mut i64, packet: &PacketOccurrence) -> Result<()> {
+/// Whether `range` lies in the extent that holds its start.
+fn within_one_extent(media: &[Range<u64>], range: &Range<u64>) -> bool {
+    let end = media.partition_point(|extent| extent.start <= range.start);
+    end.checked_sub(1)
+        .and_then(|at| media.get(at))
+        .is_some_and(|extent| require_range_within(range, extent.clone()).is_ok())
+}
+
+/// Raise `duration` to the end of `packet` in microseconds; `micros`, when
+/// given, is the packet's demux base in microseconds.
+fn record_duration(
+    duration: &mut i64,
+    packet: &PacketOccurrence,
+    micros: Option<&TickScale>,
+) -> Result<()> {
     if let Some(pts) = packet.demux.pts {
         let end = pts
             .checked_add(packet.demux.duration)
             .ok_or(Error::Overflow)?;
-        let micros = packet.media_clock.demux_base.rescale(
-            end,
-            TimeBase::MICROSECONDS,
-            Rounding::NearestAway,
-        )?;
+        let micros = match micros {
+            Some(micros) => micros.rescale(end, Rounding::NearestAway)?,
+            None => packet.media_clock.demux_base.rescale(
+                end,
+                TimeBase::MICROSECONDS,
+                Rounding::NearestAway,
+            )?,
+        };
         *duration = (*duration).max(micros);
     }
     Ok(())

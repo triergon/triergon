@@ -1,0 +1,28 @@
+# What the font program reads: control value 0 (100 units) and storage 0, by
+# the functions it defines (function 1 pushes 1 where the control value it
+# reads is 0, else 2; function 2 pushes 1 where the storage value is 0, else
+# 2), written into the y of points 0 and 1.
+heights 1000
+cvt 100
+fpgm
+  PUSH 0; RCVT; PUSH 0; EQ
+  IF
+    PUSH 1; FDEF; PUSH 1; ENDF
+  ELSE
+    PUSH 1; FDEF; PUSH 2; ENDF
+  EIF
+  PUSH 0; RS; PUSH 0; EQ
+  IF
+    PUSH 2; FDEF; PUSH 1; ENDF
+  ELSE
+    PUSH 2; FDEF; PUSH 2; ENDF
+  EIF
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]
+    PUSH 0 1; CALL; SCFS
+    PUSH 1 2; CALL; SCFS
+  end
+end

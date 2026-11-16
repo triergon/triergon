@@ -5,7 +5,7 @@
 //! address order. It does not claim the reference MOV reader's default interleaving.
 use crate::{
     BoxHeader, FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable,
-    TimingRunPolicy, TimingRunSurplus,
+    SpanStep, TimingRunPolicy, TimingRunSurplus, fragment::RunPosition, regular::SampleRanges,
 };
 use std::{
     ops::Range,
@@ -81,6 +81,30 @@ impl<'a> TrackSampleCursor<'a> {
             failed: None,
         }
     }
+    /// The cursor whose regular samples continue from `regular`, a cursor over
+    /// the track's table.
+    pub(crate) fn from_regular(source: SourceTrack<'a>, regular: SampleCursor<'a>) -> Self {
+        Self {
+            regular: Some(regular),
+            ..Self::new(source)
+        }
+    }
+    /// The cursor whose next sample comes from `current`, a cursor over
+    /// fragment `next_fragment - 1` of the track's fragments, after the regular
+    /// samples have ended.
+    pub(crate) fn from_fragment(
+        source: SourceTrack<'a>,
+        next_fragment: usize,
+        current: FragmentCursor<'a>,
+    ) -> Self {
+        Self {
+            source,
+            regular: None,
+            next_fragment,
+            current: Some(current),
+            failed: None,
+        }
+    }
     /// Container-local append unit that produced the last fragment Sample:
     /// ordinal in the supplied fragment slice, then run ordinal in that index.
     /// This borrows existing cursor state in O(1), without an input token, epoch,
@@ -92,6 +116,7 @@ impl<'a> TrackSampleCursor<'a> {
                 .map(|fragment| (fragment, cursor.run_index()))
         })
     }
+    #[inline]
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -125,6 +150,56 @@ impl<'a> TrackSampleCursor<'a> {
             self.next_fragment += 1;
             if fragment.track_id() == self.source.track_id {
                 self.current = Some(fragment.cursor());
+            }
+        }
+    }
+}
+
+/// The byte ranges of one track's samples in source order, as spans of
+/// consecutive samples with contiguous bytes: its regular samples a chunk at a
+/// time, then each fragment run. They are the ranges [`TrackSampleCursor`]
+/// reports, with the same errors.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TrackSpans<'a> {
+    source: SourceTrack<'a>,
+    regular: Option<SampleRanges<'a>>,
+    next_fragment: usize,
+    current: Option<(&'a FragmentIndex, RunPosition)>,
+}
+impl<'a> TrackSpans<'a> {
+    pub(crate) fn new(source: SourceTrack<'a>) -> Self {
+        Self {
+            source,
+            regular: source.regular.map(SampleTable::ranges),
+            next_fragment: 0,
+            current: None,
+        }
+    }
+    /// The next span of at most `maximum` samples, charging a work unit for each
+    /// sample and for each run and fragment index passed.
+    pub(crate) fn poll(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<SpanStep> {
+        loop {
+            if let Some(regular) = &mut self.regular {
+                match regular.next_span(maximum, work)? {
+                    SpanStep::End => self.regular = None,
+                    other => return Ok(other),
+                }
+            }
+            if let Some((index, position)) = &mut self.current {
+                match index.next_span(position, maximum, work)? {
+                    SpanStep::End => self.current = None,
+                    other => return Ok(other),
+                }
+            }
+            let Some(fragment) = self.source.fragments.get(self.next_fragment) else {
+                return Ok(SpanStep::End);
+            };
+            if !work.try_charge(1) {
+                return Ok(SpanStep::Yield);
+            }
+            self.next_fragment += 1;
+            if fragment.track_id() == self.source.track_id {
+                self.current = Some((fragment, RunPosition::default()));
             }
         }
     }
@@ -248,10 +323,10 @@ impl ForwardRegularMdat {
         }
         Err(Error::Invalid("forward regular initial media extent"))
     }
-    pub(crate) fn can_defer(self, sample: &Sample) -> bool {
-        sample.range.start >= self.first_end
-            && sample.range.end > self.first_end
-            && self.source_length.is_none_or(|end| sample.range.end <= end)
+    pub(crate) fn can_defer(self, range: &Range<u64>) -> bool {
+        range.start >= self.first_end
+            && range.end > self.first_end
+            && self.source_length.is_none_or(|end| range.end <= end)
     }
 }
 
@@ -544,7 +619,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         .ok_or(Error::Invalid("sample outside self-contained mdat"))?;
                     if self
                         .forward_media
-                        .is_some_and(|bounds| bounds.can_defer(sample))
+                        .is_some_and(|bounds| bounds.can_defer(&sample.range))
                     {
                         self.deferred_media = true;
                     } else {

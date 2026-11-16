@@ -44,14 +44,7 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "pending_module_requirements": [
-    "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
-  ],
-  "open_cases": [
-    {
-      "id": "authored-cff-features-otf-latn-libass",
-      "requirement": "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
-    }
-  ],
+  "pending_module_requirements": [],
+  "open_cases": [],
   "parity_timeout_seconds": 120
 }

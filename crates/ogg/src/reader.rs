@@ -4,12 +4,12 @@ use crate::mapping::{Configuration, HeaderStep, Headers, Mapping, Previous};
 use crate::packets::{Assembler, Completed, Continuity};
 use crate::page::{MAX_PAGE, Page, PageHeader, PageReader, PageStep};
 use crate::queue::Queue;
-use crate::seek::{Bisection, Landing, Output, Probe};
+use crate::seek::{Bisection, Landing, Offer, Output, Probe};
 use crate::timing::{Clock, PageClock, Slot};
 use crate::track::{Packet, Track};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    ContainerReader, Event, ReaderStep, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
+    ContainerReader, Event, ReaderStep, SeekMethod, SeekRequest, TrackInfo,
 };
 use triergon_core::{
     Backpressure, Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken,
@@ -178,6 +178,8 @@ pub struct Reader {
     pending: Queue<Output>,
     phase: Phase,
     landing: Option<Landing>,
+    /// The landing moved to a link being read: search it once its first media page is.
+    follow: bool,
     end_scanned: bool,
     failed: Option<Error>,
 }
@@ -209,6 +211,7 @@ impl Reader {
             pending: Queue::new(pool),
             phase: Phase::Pages,
             landing: None,
+            follow: false,
             end_scanned: false,
             failed: None,
         })
@@ -391,7 +394,10 @@ impl Reader {
             let Some(index) = stream.track else { continue };
             let track = &mut self.tracks[index];
             track.reference_end = stream.reference.end();
-            let ticks = stream.clock.end().map(|ticks| ticks + track.offset);
+            let ticks = stream
+                .clock
+                .end()
+                .and_then(|ticks| ticks.checked_add(track.offset));
             if let Some(time) =
                 ticks.and_then(|t| Time::from_ticks(i128::from(t), track.time_base).ok())
                 && track.timeline().timed()
@@ -557,11 +563,25 @@ impl Reader {
                 .to_i64_ticks(track.time_base, Rounding::NearestAway)
                 .unwrap_or(0);
         }
+        // A seek that has not landed by the end of its link continues in this one.
+        let track = &self.tracks[index];
+        if let Some(landing) = self.landing.as_mut()
+            && track.timeline().timed()
+            && let Some(previous) = self.tracks.get(landing.track)
+            && previous.link + 1 == track.link
+            && previous.position == track.position
+        {
+            landing.retarget(index, track)?;
+            self.follow = true;
+        }
         self.pending.push(Event::Other(ReaderEvent::Track(index)))
     }
 
     /// Time the page's media packets and deliver them.
     fn finish_page(&mut self, stream: usize, page: &Page) -> Result<()> {
+        // The landing needs delivery to start again: earlier, or in a later link.
+        let mut again = false;
+        let delivered = !self.media.is_empty();
         let s = &mut self.streams[stream];
         if let Some(index) = s.track {
             let track = &self.tracks[index];
@@ -589,28 +609,38 @@ impl Reader {
                     &mut self.media,
                 );
                 let offset = track.offset;
-                let timed = timeline.timed();
+                // Only Theora's random access depends on the packet.
+                let keyed = timeline.keyframes();
+                let uniform = timeline.random_access(&[]);
                 let template = |media: Media| Packet {
                     track: track.id(),
                     index,
+                    random_access: if keyed {
+                        timeline.random_access(&media.payload)
+                    } else {
+                        uniform
+                    },
                     payload: media.payload,
                     time_base: track.time_base,
-                    pts: media.slot.pts.map(|pts| pts + offset),
+                    // A time out of range is unknown.
+                    pts: media.slot.pts.and_then(|pts| pts.checked_add(offset)),
                     duration: media.slot.durations.exact.map(i64::from),
                     trim: media.slot.trim,
                     granule: media.last_on_page.then_some(header.granule),
                     page: page.offset,
-                    timed,
                     reference: media.slot.reference,
                 };
                 for media in self.media.drain(..) {
                     let packet = template(media);
                     match self.landing.as_mut() {
-                        Some(landing) => {
-                            if landing.offer(packet, &mut self.pending)? {
-                                self.landing = None;
+                        Some(landing) => match landing.offer(packet, &mut self.pending)? {
+                            Offer::Skipped => {}
+                            Offer::Landed => self.landing = None,
+                            Offer::Rewind => {
+                                again = true;
+                                break;
                             }
-                        }
+                        },
                         None => self.pending.push(Event::Packet(packet))?,
                     }
                 }
@@ -619,6 +649,12 @@ impl Reader {
         self.media.clear();
         if let Some(index) = self.streams[stream].track {
             self.tracks[index].reference_shift = self.streams[stream].reference.shift();
+            // A landing followed into this link searches it once the track's first page
+            // of media has fixed where its reference clock starts.
+            if self.follow && delivered && self.landing.as_ref().is_some_and(|l| l.track == index) {
+                self.follow = false;
+                again = true;
+            }
         }
         let configured = self.streams.iter().all(Stream::configured);
         if let Some(link) = self.links.get_mut(self.link)
@@ -627,6 +663,11 @@ impl Reader {
         {
             link.data = Some(page.offset + page.bytes.len() as u64);
             self.start_end_scan()?;
+        }
+        if again && let Some(landing) = self.landing.take() {
+            let searched = self.search(&landing);
+            self.landing = Some(landing);
+            searched?;
         }
         Ok(())
     }
@@ -683,7 +724,7 @@ impl Reader {
                         .find(|track| track.link == 0 && track.serial == header.serial)
                     && track.timeline().timed()
                 {
-                    track.end = Some(track.timeline().ticks(granule) + track.offset);
+                    track.end = track.timeline().ticks(granule).checked_add(track.offset);
                 }
                 return Ok(None);
             }
@@ -713,7 +754,7 @@ impl Reader {
             } else {
                 let resume = bisection.resume();
                 if let Some(landing) = self.landing.as_mut() {
-                    landing.scanned = bisection.scanned;
+                    landing.scanned += bisection.scanned;
                 }
                 self.resume(resume)?;
             }
@@ -773,6 +814,49 @@ impl Reader {
         }
         self.phase = Phase::Pages;
         Ok(request)
+    }
+
+    /// Start delivery toward `landing`: bisect the link of its track for its threshold
+    /// on a random-access source of known length, or read the source again from its
+    /// start.
+    fn search(&mut self, landing: &Landing) -> Result<InputRequest> {
+        let track = &self.tracks[landing.track];
+        let capabilities = self.input.capabilities();
+        let link = track.link as usize;
+        let bounds = capabilities
+            .length
+            .filter(|_| capabilities.random_access)
+            .zip(self.links.get(link).copied());
+        let Some((length, start)) = bounds else {
+            return self.restart();
+        };
+        let end = self.links.get(link + 1).map_or(length, |next| next.start);
+        let timeline = *track.timeline();
+        // The bisection's goal only bounds the search, so it saturates.
+        let goal = landing
+            .threshold
+            .saturating_sub(track.offset)
+            .saturating_sub(timeline.longest_overlap());
+        let mut bisection = Bisection::new(
+            track.serial,
+            timeline,
+            goal,
+            start.start,
+            start.data.unwrap_or(end),
+            end,
+            self.limits.seek_probe_bytes,
+        );
+        self.link = link;
+        self.link_start = None;
+        match bisection.next_probe() {
+            Some(probe) => {
+                let request = self.input.request_range(probe)?;
+                self.pages.clear();
+                self.phase = Phase::Bisect(bisection);
+                Ok(request)
+            }
+            None => self.resume(bisection.resume()),
+        }
     }
 
     /// Forget every stream and read again from the source start.
@@ -836,78 +920,53 @@ impl ContainerReader for Reader {
             .or_else(|error| pressure(error).inspect_err(|error| self.failed = Some(*error)))
     }
     /// Seek a configured, timed track. The target is on the physical stream's timeline;
-    /// see [`crate::seek`] for the landing. Packets of other tracks resume after the
-    /// landing in source order. The receipt arrives before the first packet.
+    /// see [`crate::seek`] for the landing, and for the track of another chain link a
+    /// target outside the track's link lands on. Packets of other tracks resume after
+    /// the landing in source order. The receipt arrives before the first packet.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let index = self
+        let requested = self
             .tracks
             .iter()
             .position(|track| track.id() == request.track)
             .ok_or(Error::Invalid("seek track is not in the source"))?;
-        let track = &self.tracks[index];
-        let timeline = *track.timeline();
-        if !track.configured || !timeline.timed() {
+        let track = &self.tracks[requested];
+        if !track.configured || !track.timeline().timed() {
             return Err(Error::Unsupported("seek on a track without packet times"));
         }
-        let target = request
-            .target
-            .to_i64_ticks(track.time_base, Rounding::Floor)?;
-        let preroll = match request.policy {
-            SeekPolicy::PlaybackPreroll => timeline.preroll(),
-            SeekPolicy::PreviousRandomAccess => 0,
-        };
-        let threshold = target.saturating_sub(preroll);
+        // The track at the same position of the last known link starting by the target.
+        let position = track.position;
+        let index = self
+            .tracks
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, t)| {
+                t.position == position
+                    && t.configured
+                    && t.timeline().timed()
+                    && Time::from_ticks(i128::from(t.offset), t.time_base)
+                        .is_ok_and(|start| start <= request.target)
+            })
+            .map_or(requested, |(index, _)| index);
+        let track = &self.tracks[index];
         let capabilities = self.input.capabilities();
-        let link = track.link as usize;
-        let bounds = capabilities
-            .length
-            .filter(|_| capabilities.random_access)
-            .zip(self.links.get(link).copied());
-        let (serial, offset, base) = (track.serial, track.offset, track.time_base);
+        let method = if capabilities.random_access && capabilities.length.is_some() {
+            SeekMethod::BoundedScan
+        } else {
+            SeekMethod::Restart
+        };
+        let landing = Landing::new(index, track, request.target, request.policy, method)?;
         self.pending
             .retain(|output| matches!(output, Event::Other(_)));
         self.current = None;
         self.media.clear();
-        let (method, request_next) = match bounds {
-            Some((length, start)) => {
-                let end = self.links.get(link + 1).map_or(length, |next| next.start);
-                let local = threshold - offset - timeline.longest_overlap();
-                let mut bisection = Bisection::new(
-                    serial,
-                    timeline.granule(local),
-                    start.start,
-                    start.data.unwrap_or(end),
-                    end,
-                    self.limits.seek_probe_bytes,
-                );
-                self.link = link;
-                self.link_start = None;
-                let request = match bisection.next_probe() {
-                    Some(probe) => {
-                        let request = self.input.request_range(probe)?;
-                        self.pages.clear();
-                        self.phase = Phase::Bisect(bisection);
-                        request
-                    }
-                    None => self.resume(bisection.resume())?,
-                };
-                (SeekMethod::BoundedScan, request)
-            }
-            None => (SeekMethod::Restart, self.restart()?),
-        };
-        self.landing = Some(Landing::new(
-            index,
-            request.target,
-            request.policy,
-            threshold,
-            timeline.primes(),
-            method,
-            base,
-        ));
-        Ok(request_next)
+        self.follow = false;
+        let next = self.search(&landing)?;
+        self.landing = Some(landing);
+        Ok(next)
     }
     fn track_count(&self) -> usize {
         self.tracks.len()

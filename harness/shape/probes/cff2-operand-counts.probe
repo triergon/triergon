@@ -1,0 +1,1742 @@
+# Every path operator with 0 to 16 operands, the counts the format allows
+# and those it does not. Glyph 1 + 2 * (17 * OP + N) runs OP with N operands
+# after a moveto to (100, 100); the glyph after it then draws lines of
+# 3000 right and 3000 down, so its box shows the current point the
+# operator leaves. Operators, in order: rlineto, hlineto, vlineto, rrcurveto, hhcurveto, hvcurveto, vhcurveto, vvcurveto, rcurveline, rlinecurve, flex, hflex, hflex1, flex1, rmoveto, hmoveto, vmoveto.
+format cff2
+glyph
+end
+glyph # rlineto 0
+  100 100 rmoveto  rlineto
+end
+glyph # rlineto 0, then the current point
+  100 100 rmoveto  rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 1
+  100 100 rmoveto 11 rlineto
+end
+glyph # rlineto 1, then the current point
+  100 100 rmoveto 11 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 2
+  100 100 rmoveto 11 14 rlineto
+end
+glyph # rlineto 2, then the current point
+  100 100 rmoveto 11 14 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 3
+  100 100 rmoveto 11 14 -33 rlineto
+end
+glyph # rlineto 3, then the current point
+  100 100 rmoveto 11 14 -33 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 4
+  100 100 rmoveto 11 14 -33 28 rlineto
+end
+glyph # rlineto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 5
+  100 100 rmoveto 11 14 -33 28 55 rlineto
+end
+glyph # rlineto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 rlineto
+end
+glyph # rlineto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rlineto
+end
+glyph # rlineto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rlineto
+end
+glyph # rlineto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rlineto
+end
+glyph # rlineto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rlineto
+end
+glyph # rlineto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rlineto
+end
+glyph # rlineto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rlineto
+end
+glyph # rlineto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rlineto
+end
+glyph # rlineto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rlineto
+end
+glyph # rlineto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rlineto
+end
+glyph # rlineto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlineto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rlineto
+end
+glyph # rlineto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 0
+  100 100 rmoveto  hlineto
+end
+glyph # hlineto 0, then the current point
+  100 100 rmoveto  hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 1
+  100 100 rmoveto 11 hlineto
+end
+glyph # hlineto 1, then the current point
+  100 100 rmoveto 11 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 2
+  100 100 rmoveto 11 14 hlineto
+end
+glyph # hlineto 2, then the current point
+  100 100 rmoveto 11 14 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 3
+  100 100 rmoveto 11 14 -33 hlineto
+end
+glyph # hlineto 3, then the current point
+  100 100 rmoveto 11 14 -33 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 4
+  100 100 rmoveto 11 14 -33 28 hlineto
+end
+glyph # hlineto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 5
+  100 100 rmoveto 11 14 -33 28 55 hlineto
+end
+glyph # hlineto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 hlineto
+end
+glyph # hlineto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hlineto
+end
+glyph # hlineto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hlineto
+end
+glyph # hlineto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hlineto
+end
+glyph # hlineto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hlineto
+end
+glyph # hlineto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hlineto
+end
+glyph # hlineto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hlineto
+end
+glyph # hlineto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hlineto
+end
+glyph # hlineto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hlineto
+end
+glyph # hlineto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hlineto
+end
+glyph # hlineto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hlineto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hlineto
+end
+glyph # hlineto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 0
+  100 100 rmoveto  vlineto
+end
+glyph # vlineto 0, then the current point
+  100 100 rmoveto  vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 1
+  100 100 rmoveto 11 vlineto
+end
+glyph # vlineto 1, then the current point
+  100 100 rmoveto 11 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 2
+  100 100 rmoveto 11 14 vlineto
+end
+glyph # vlineto 2, then the current point
+  100 100 rmoveto 11 14 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 3
+  100 100 rmoveto 11 14 -33 vlineto
+end
+glyph # vlineto 3, then the current point
+  100 100 rmoveto 11 14 -33 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 4
+  100 100 rmoveto 11 14 -33 28 vlineto
+end
+glyph # vlineto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 5
+  100 100 rmoveto 11 14 -33 28 55 vlineto
+end
+glyph # vlineto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 vlineto
+end
+glyph # vlineto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vlineto
+end
+glyph # vlineto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vlineto
+end
+glyph # vlineto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vlineto
+end
+glyph # vlineto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vlineto
+end
+glyph # vlineto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vlineto
+end
+glyph # vlineto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vlineto
+end
+glyph # vlineto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vlineto
+end
+glyph # vlineto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vlineto
+end
+glyph # vlineto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vlineto
+end
+glyph # vlineto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vlineto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vlineto
+end
+glyph # vlineto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vlineto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 0
+  100 100 rmoveto  rrcurveto
+end
+glyph # rrcurveto 0, then the current point
+  100 100 rmoveto  rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 1
+  100 100 rmoveto 11 rrcurveto
+end
+glyph # rrcurveto 1, then the current point
+  100 100 rmoveto 11 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 2
+  100 100 rmoveto 11 14 rrcurveto
+end
+glyph # rrcurveto 2, then the current point
+  100 100 rmoveto 11 14 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 3
+  100 100 rmoveto 11 14 -33 rrcurveto
+end
+glyph # rrcurveto 3, then the current point
+  100 100 rmoveto 11 14 -33 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 4
+  100 100 rmoveto 11 14 -33 28 rrcurveto
+end
+glyph # rrcurveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 5
+  100 100 rmoveto 11 14 -33 28 55 rrcurveto
+end
+glyph # rrcurveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 rrcurveto
+end
+glyph # rrcurveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rrcurveto
+end
+glyph # rrcurveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rrcurveto
+end
+glyph # rrcurveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rrcurveto
+end
+glyph # rrcurveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rrcurveto
+end
+glyph # rrcurveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rrcurveto
+end
+glyph # rrcurveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rrcurveto
+end
+glyph # rrcurveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rrcurveto
+end
+glyph # rrcurveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rrcurveto
+end
+glyph # rrcurveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rrcurveto
+end
+glyph # rrcurveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rrcurveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rrcurveto
+end
+glyph # rrcurveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rrcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 0
+  100 100 rmoveto  hhcurveto
+end
+glyph # hhcurveto 0, then the current point
+  100 100 rmoveto  hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 1
+  100 100 rmoveto 11 hhcurveto
+end
+glyph # hhcurveto 1, then the current point
+  100 100 rmoveto 11 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 2
+  100 100 rmoveto 11 14 hhcurveto
+end
+glyph # hhcurveto 2, then the current point
+  100 100 rmoveto 11 14 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 3
+  100 100 rmoveto 11 14 -33 hhcurveto
+end
+glyph # hhcurveto 3, then the current point
+  100 100 rmoveto 11 14 -33 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 4
+  100 100 rmoveto 11 14 -33 28 hhcurveto
+end
+glyph # hhcurveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 5
+  100 100 rmoveto 11 14 -33 28 55 hhcurveto
+end
+glyph # hhcurveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 hhcurveto
+end
+glyph # hhcurveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hhcurveto
+end
+glyph # hhcurveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hhcurveto
+end
+glyph # hhcurveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hhcurveto
+end
+glyph # hhcurveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hhcurveto
+end
+glyph # hhcurveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hhcurveto
+end
+glyph # hhcurveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hhcurveto
+end
+glyph # hhcurveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hhcurveto
+end
+glyph # hhcurveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hhcurveto
+end
+glyph # hhcurveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hhcurveto
+end
+glyph # hhcurveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hhcurveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hhcurveto
+end
+glyph # hhcurveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 0
+  100 100 rmoveto  hvcurveto
+end
+glyph # hvcurveto 0, then the current point
+  100 100 rmoveto  hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 1
+  100 100 rmoveto 11 hvcurveto
+end
+glyph # hvcurveto 1, then the current point
+  100 100 rmoveto 11 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 2
+  100 100 rmoveto 11 14 hvcurveto
+end
+glyph # hvcurveto 2, then the current point
+  100 100 rmoveto 11 14 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 3
+  100 100 rmoveto 11 14 -33 hvcurveto
+end
+glyph # hvcurveto 3, then the current point
+  100 100 rmoveto 11 14 -33 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 4
+  100 100 rmoveto 11 14 -33 28 hvcurveto
+end
+glyph # hvcurveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 5
+  100 100 rmoveto 11 14 -33 28 55 hvcurveto
+end
+glyph # hvcurveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 hvcurveto
+end
+glyph # hvcurveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hvcurveto
+end
+glyph # hvcurveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hvcurveto
+end
+glyph # hvcurveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hvcurveto
+end
+glyph # hvcurveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hvcurveto
+end
+glyph # hvcurveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hvcurveto
+end
+glyph # hvcurveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hvcurveto
+end
+glyph # hvcurveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hvcurveto
+end
+glyph # hvcurveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hvcurveto
+end
+glyph # hvcurveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hvcurveto
+end
+glyph # hvcurveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hvcurveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hvcurveto
+end
+glyph # hvcurveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 0
+  100 100 rmoveto  vhcurveto
+end
+glyph # vhcurveto 0, then the current point
+  100 100 rmoveto  vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 1
+  100 100 rmoveto 11 vhcurveto
+end
+glyph # vhcurveto 1, then the current point
+  100 100 rmoveto 11 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 2
+  100 100 rmoveto 11 14 vhcurveto
+end
+glyph # vhcurveto 2, then the current point
+  100 100 rmoveto 11 14 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 3
+  100 100 rmoveto 11 14 -33 vhcurveto
+end
+glyph # vhcurveto 3, then the current point
+  100 100 rmoveto 11 14 -33 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 4
+  100 100 rmoveto 11 14 -33 28 vhcurveto
+end
+glyph # vhcurveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 5
+  100 100 rmoveto 11 14 -33 28 55 vhcurveto
+end
+glyph # vhcurveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 vhcurveto
+end
+glyph # vhcurveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vhcurveto
+end
+glyph # vhcurveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vhcurveto
+end
+glyph # vhcurveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vhcurveto
+end
+glyph # vhcurveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vhcurveto
+end
+glyph # vhcurveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vhcurveto
+end
+glyph # vhcurveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vhcurveto
+end
+glyph # vhcurveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vhcurveto
+end
+glyph # vhcurveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vhcurveto
+end
+glyph # vhcurveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vhcurveto
+end
+glyph # vhcurveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vhcurveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vhcurveto
+end
+glyph # vhcurveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vhcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 0
+  100 100 rmoveto  vvcurveto
+end
+glyph # vvcurveto 0, then the current point
+  100 100 rmoveto  vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 1
+  100 100 rmoveto 11 vvcurveto
+end
+glyph # vvcurveto 1, then the current point
+  100 100 rmoveto 11 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 2
+  100 100 rmoveto 11 14 vvcurveto
+end
+glyph # vvcurveto 2, then the current point
+  100 100 rmoveto 11 14 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 3
+  100 100 rmoveto 11 14 -33 vvcurveto
+end
+glyph # vvcurveto 3, then the current point
+  100 100 rmoveto 11 14 -33 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 4
+  100 100 rmoveto 11 14 -33 28 vvcurveto
+end
+glyph # vvcurveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 5
+  100 100 rmoveto 11 14 -33 28 55 vvcurveto
+end
+glyph # vvcurveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 vvcurveto
+end
+glyph # vvcurveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vvcurveto
+end
+glyph # vvcurveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vvcurveto
+end
+glyph # vvcurveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vvcurveto
+end
+glyph # vvcurveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vvcurveto
+end
+glyph # vvcurveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vvcurveto
+end
+glyph # vvcurveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vvcurveto
+end
+glyph # vvcurveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vvcurveto
+end
+glyph # vvcurveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vvcurveto
+end
+glyph # vvcurveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vvcurveto
+end
+glyph # vvcurveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vvcurveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vvcurveto
+end
+glyph # vvcurveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vvcurveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 0
+  100 100 rmoveto  rcurveline
+end
+glyph # rcurveline 0, then the current point
+  100 100 rmoveto  rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 1
+  100 100 rmoveto 11 rcurveline
+end
+glyph # rcurveline 1, then the current point
+  100 100 rmoveto 11 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 2
+  100 100 rmoveto 11 14 rcurveline
+end
+glyph # rcurveline 2, then the current point
+  100 100 rmoveto 11 14 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 3
+  100 100 rmoveto 11 14 -33 rcurveline
+end
+glyph # rcurveline 3, then the current point
+  100 100 rmoveto 11 14 -33 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 4
+  100 100 rmoveto 11 14 -33 28 rcurveline
+end
+glyph # rcurveline 4, then the current point
+  100 100 rmoveto 11 14 -33 28 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 5
+  100 100 rmoveto 11 14 -33 28 55 rcurveline
+end
+glyph # rcurveline 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 6
+  100 100 rmoveto 11 14 -33 28 55 -42 rcurveline
+end
+glyph # rcurveline 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rcurveline
+end
+glyph # rcurveline 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rcurveline
+end
+glyph # rcurveline 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rcurveline
+end
+glyph # rcurveline 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rcurveline
+end
+glyph # rcurveline 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rcurveline
+end
+glyph # rcurveline 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rcurveline
+end
+glyph # rcurveline 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rcurveline
+end
+glyph # rcurveline 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rcurveline
+end
+glyph # rcurveline 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rcurveline
+end
+glyph # rcurveline 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rcurveline 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rcurveline
+end
+glyph # rcurveline 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rcurveline 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 0
+  100 100 rmoveto  rlinecurve
+end
+glyph # rlinecurve 0, then the current point
+  100 100 rmoveto  rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 1
+  100 100 rmoveto 11 rlinecurve
+end
+glyph # rlinecurve 1, then the current point
+  100 100 rmoveto 11 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 2
+  100 100 rmoveto 11 14 rlinecurve
+end
+glyph # rlinecurve 2, then the current point
+  100 100 rmoveto 11 14 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 3
+  100 100 rmoveto 11 14 -33 rlinecurve
+end
+glyph # rlinecurve 3, then the current point
+  100 100 rmoveto 11 14 -33 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 4
+  100 100 rmoveto 11 14 -33 28 rlinecurve
+end
+glyph # rlinecurve 4, then the current point
+  100 100 rmoveto 11 14 -33 28 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 5
+  100 100 rmoveto 11 14 -33 28 55 rlinecurve
+end
+glyph # rlinecurve 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 6
+  100 100 rmoveto 11 14 -33 28 55 -42 rlinecurve
+end
+glyph # rlinecurve 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rlinecurve
+end
+glyph # rlinecurve 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rlinecurve
+end
+glyph # rlinecurve 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rlinecurve
+end
+glyph # rlinecurve 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rlinecurve
+end
+glyph # rlinecurve 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rlinecurve
+end
+glyph # rlinecurve 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rlinecurve
+end
+glyph # rlinecurve 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rlinecurve
+end
+glyph # rlinecurve 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rlinecurve
+end
+glyph # rlinecurve 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rlinecurve
+end
+glyph # rlinecurve 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rlinecurve 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rlinecurve
+end
+glyph # rlinecurve 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rlinecurve 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 0
+  100 100 rmoveto  flex
+end
+glyph # flex 0, then the current point
+  100 100 rmoveto  flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 1
+  100 100 rmoveto 11 flex
+end
+glyph # flex 1, then the current point
+  100 100 rmoveto 11 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 2
+  100 100 rmoveto 11 14 flex
+end
+glyph # flex 2, then the current point
+  100 100 rmoveto 11 14 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 3
+  100 100 rmoveto 11 14 -33 flex
+end
+glyph # flex 3, then the current point
+  100 100 rmoveto 11 14 -33 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 4
+  100 100 rmoveto 11 14 -33 28 flex
+end
+glyph # flex 4, then the current point
+  100 100 rmoveto 11 14 -33 28 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 5
+  100 100 rmoveto 11 14 -33 28 55 flex
+end
+glyph # flex 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 6
+  100 100 rmoveto 11 14 -33 28 55 -42 flex
+end
+glyph # flex 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 flex
+end
+glyph # flex 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 flex
+end
+glyph # flex 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 flex
+end
+glyph # flex 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 flex
+end
+glyph # flex 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 flex
+end
+glyph # flex 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 flex
+end
+glyph # flex 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 flex
+end
+glyph # flex 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 flex
+end
+glyph # flex 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 flex
+end
+glyph # flex 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 flex
+end
+glyph # flex 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 flex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 0
+  100 100 rmoveto  hflex
+end
+glyph # hflex 0, then the current point
+  100 100 rmoveto  hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 1
+  100 100 rmoveto 11 hflex
+end
+glyph # hflex 1, then the current point
+  100 100 rmoveto 11 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 2
+  100 100 rmoveto 11 14 hflex
+end
+glyph # hflex 2, then the current point
+  100 100 rmoveto 11 14 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 3
+  100 100 rmoveto 11 14 -33 hflex
+end
+glyph # hflex 3, then the current point
+  100 100 rmoveto 11 14 -33 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 4
+  100 100 rmoveto 11 14 -33 28 hflex
+end
+glyph # hflex 4, then the current point
+  100 100 rmoveto 11 14 -33 28 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 5
+  100 100 rmoveto 11 14 -33 28 55 hflex
+end
+glyph # hflex 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 6
+  100 100 rmoveto 11 14 -33 28 55 -42 hflex
+end
+glyph # hflex 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hflex
+end
+glyph # hflex 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hflex
+end
+glyph # hflex 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hflex
+end
+glyph # hflex 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hflex
+end
+glyph # hflex 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hflex
+end
+glyph # hflex 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hflex
+end
+glyph # hflex 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hflex
+end
+glyph # hflex 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hflex
+end
+glyph # hflex 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hflex
+end
+glyph # hflex 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hflex
+end
+glyph # hflex 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hflex 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 0
+  100 100 rmoveto  hflex1
+end
+glyph # hflex1 0, then the current point
+  100 100 rmoveto  hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 1
+  100 100 rmoveto 11 hflex1
+end
+glyph # hflex1 1, then the current point
+  100 100 rmoveto 11 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 2
+  100 100 rmoveto 11 14 hflex1
+end
+glyph # hflex1 2, then the current point
+  100 100 rmoveto 11 14 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 3
+  100 100 rmoveto 11 14 -33 hflex1
+end
+glyph # hflex1 3, then the current point
+  100 100 rmoveto 11 14 -33 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 4
+  100 100 rmoveto 11 14 -33 28 hflex1
+end
+glyph # hflex1 4, then the current point
+  100 100 rmoveto 11 14 -33 28 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 5
+  100 100 rmoveto 11 14 -33 28 55 hflex1
+end
+glyph # hflex1 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 6
+  100 100 rmoveto 11 14 -33 28 55 -42 hflex1
+end
+glyph # hflex1 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hflex1
+end
+glyph # hflex1 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hflex1
+end
+glyph # hflex1 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hflex1
+end
+glyph # hflex1 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hflex1
+end
+glyph # hflex1 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hflex1
+end
+glyph # hflex1 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hflex1
+end
+glyph # hflex1 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hflex1
+end
+glyph # hflex1 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hflex1
+end
+glyph # hflex1 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hflex1
+end
+glyph # hflex1 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hflex1 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hflex1
+end
+glyph # hflex1 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hflex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 0
+  100 100 rmoveto  flex1
+end
+glyph # flex1 0, then the current point
+  100 100 rmoveto  flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 1
+  100 100 rmoveto 11 flex1
+end
+glyph # flex1 1, then the current point
+  100 100 rmoveto 11 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 2
+  100 100 rmoveto 11 14 flex1
+end
+glyph # flex1 2, then the current point
+  100 100 rmoveto 11 14 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 3
+  100 100 rmoveto 11 14 -33 flex1
+end
+glyph # flex1 3, then the current point
+  100 100 rmoveto 11 14 -33 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 4
+  100 100 rmoveto 11 14 -33 28 flex1
+end
+glyph # flex1 4, then the current point
+  100 100 rmoveto 11 14 -33 28 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 5
+  100 100 rmoveto 11 14 -33 28 55 flex1
+end
+glyph # flex1 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 6
+  100 100 rmoveto 11 14 -33 28 55 -42 flex1
+end
+glyph # flex1 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 flex1
+end
+glyph # flex1 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 flex1
+end
+glyph # flex1 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 flex1
+end
+glyph # flex1 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 flex1
+end
+glyph # flex1 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 flex1
+end
+glyph # flex1 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 flex1
+end
+glyph # flex1 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 flex1
+end
+glyph # flex1 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 flex1
+end
+glyph # flex1 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 flex1
+end
+glyph # flex1 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # flex1 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 flex1
+end
+glyph # flex1 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 flex1 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 0
+  100 100 rmoveto  rmoveto
+end
+glyph # rmoveto 0, then the current point
+  100 100 rmoveto  rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 1
+  100 100 rmoveto 11 rmoveto
+end
+glyph # rmoveto 1, then the current point
+  100 100 rmoveto 11 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 2
+  100 100 rmoveto 11 14 rmoveto
+end
+glyph # rmoveto 2, then the current point
+  100 100 rmoveto 11 14 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 3
+  100 100 rmoveto 11 14 -33 rmoveto
+end
+glyph # rmoveto 3, then the current point
+  100 100 rmoveto 11 14 -33 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 4
+  100 100 rmoveto 11 14 -33 28 rmoveto
+end
+glyph # rmoveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 5
+  100 100 rmoveto 11 14 -33 28 55 rmoveto
+end
+glyph # rmoveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 rmoveto
+end
+glyph # rmoveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rmoveto
+end
+glyph # rmoveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rmoveto
+end
+glyph # rmoveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rmoveto
+end
+glyph # rmoveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rmoveto
+end
+glyph # rmoveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rmoveto
+end
+glyph # rmoveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rmoveto
+end
+glyph # rmoveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rmoveto
+end
+glyph # rmoveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rmoveto
+end
+glyph # rmoveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rmoveto
+end
+glyph # rmoveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # rmoveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rmoveto
+end
+glyph # rmoveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 rmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 0
+  100 100 rmoveto  hmoveto
+end
+glyph # hmoveto 0, then the current point
+  100 100 rmoveto  hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 1
+  100 100 rmoveto 11 hmoveto
+end
+glyph # hmoveto 1, then the current point
+  100 100 rmoveto 11 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 2
+  100 100 rmoveto 11 14 hmoveto
+end
+glyph # hmoveto 2, then the current point
+  100 100 rmoveto 11 14 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 3
+  100 100 rmoveto 11 14 -33 hmoveto
+end
+glyph # hmoveto 3, then the current point
+  100 100 rmoveto 11 14 -33 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 4
+  100 100 rmoveto 11 14 -33 28 hmoveto
+end
+glyph # hmoveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 5
+  100 100 rmoveto 11 14 -33 28 55 hmoveto
+end
+glyph # hmoveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 hmoveto
+end
+glyph # hmoveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hmoveto
+end
+glyph # hmoveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hmoveto
+end
+glyph # hmoveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hmoveto
+end
+glyph # hmoveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hmoveto
+end
+glyph # hmoveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hmoveto
+end
+glyph # hmoveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hmoveto
+end
+glyph # hmoveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hmoveto
+end
+glyph # hmoveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hmoveto
+end
+glyph # hmoveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hmoveto
+end
+glyph # hmoveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # hmoveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hmoveto
+end
+glyph # hmoveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 hmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 0
+  100 100 rmoveto  vmoveto
+end
+glyph # vmoveto 0, then the current point
+  100 100 rmoveto  vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 1
+  100 100 rmoveto 11 vmoveto
+end
+glyph # vmoveto 1, then the current point
+  100 100 rmoveto 11 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 2
+  100 100 rmoveto 11 14 vmoveto
+end
+glyph # vmoveto 2, then the current point
+  100 100 rmoveto 11 14 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 3
+  100 100 rmoveto 11 14 -33 vmoveto
+end
+glyph # vmoveto 3, then the current point
+  100 100 rmoveto 11 14 -33 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 4
+  100 100 rmoveto 11 14 -33 28 vmoveto
+end
+glyph # vmoveto 4, then the current point
+  100 100 rmoveto 11 14 -33 28 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 5
+  100 100 rmoveto 11 14 -33 28 55 vmoveto
+end
+glyph # vmoveto 5, then the current point
+  100 100 rmoveto 11 14 -33 28 55 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 6
+  100 100 rmoveto 11 14 -33 28 55 -42 vmoveto
+end
+glyph # vmoveto 6, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 7
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vmoveto
+end
+glyph # vmoveto 7, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 8
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vmoveto
+end
+glyph # vmoveto 8, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 9
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vmoveto
+end
+glyph # vmoveto 9, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 10
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vmoveto
+end
+glyph # vmoveto 10, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 11
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vmoveto
+end
+glyph # vmoveto 11, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 12
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vmoveto
+end
+glyph # vmoveto 12, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 13
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vmoveto
+end
+glyph # vmoveto 13, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 14
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vmoveto
+end
+glyph # vmoveto 14, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 15
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vmoveto
+end
+glyph # vmoveto 15, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end
+glyph # vmoveto 16
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vmoveto
+end
+glyph # vmoveto 16, then the current point
+  100 100 rmoveto 11 14 -33 28 55 -42 77 56 -99 70 121 -84 143 98 -165 112 vmoveto 3000 0 rlineto 0 -3000 rlineto
+end

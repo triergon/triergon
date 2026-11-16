@@ -1,0 +1,29 @@
+# Function and instruction definitions the font program makes by the size it
+# runs at, when one face is requested at several sizes in turn: below 12 ppem
+# function 1 and opcode 0x91 push 111, from 12 ppem 222. The glyph writes
+# what each pushes into the y of points 0 and 1. Requests at zero pixels per
+# em (heights 0 and 20) load nothing hinted.
+sequence 1000 640 1000
+sequence 640 1000 640
+sequence 0 1000
+sequence 20 1000 640
+heights 1000 640
+maxp instruction-defs 1
+fpgm
+  MPPEM; PUSH 12; LT
+  IF
+    PUSH 1; FDEF; PUSH 111; ENDF
+    PUSH 0x91; IDEF; PUSH 111; ENDF
+  ELSE
+    PUSH 1; FDEF; PUSH 222; ENDF
+    PUSH 0x91; IDEF; PUSH 222; ENDF
+  EIF
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]
+    PUSH 0 1; CALL; SCFS
+    PUSH 1; BYTES 0x91; SCFS
+  end
+end

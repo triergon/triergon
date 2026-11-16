@@ -45,11 +45,13 @@ fn parsed(pool: &Budget, raw: Bytes, quantum: u64) -> HvcConfiguration {
 }
 
 #[test]
-fn packet_segment_fits_four_machine_words() {
-    assert!(
-        size_of::<NalPacketSegment>() <= 4 * size_of::<usize>(),
-        "source-range segment descriptor retains a separate index/tag word"
+fn packet_segment_keeps_two_full_offsets_and_two_wire_fields() {
+    assert_eq!(
+        size_of::<NalPacketSegment>(),
+        2 * size_of::<usize>() + 2 * size_of::<u32>(),
+        "source-range segment descriptor retains a redundant end offset"
     );
+    assert!(!std::mem::needs_drop::<NalPacketSegment>());
 }
 
 #[test]

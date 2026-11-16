@@ -1,11 +1,11 @@
 //! The packet receiver's configuration acceptance ([`crate::compat::nal`]).
-//! The ordinary ISO source parsers stay strict. In particular a three-byte
-//! declaration remains a source refusal; its unchanged wire bytes can still drive
-//! this separately typed receiver.
+//! Carries strict source refusals alongside receiver-accepted wire bytes.
+use crate::avc_config::profile_extension_required;
+use crate::nal_packet::NalConfigurationRefusal;
 use crate::{
     AvcConfigArray, AvcConfigFields, AvcConfigLimits, AvcConfigNal, AvcConfigParser,
-    AvcConfigSource, AvcConfiguration, BuildStep, HvcConfigArray, HvcConfigFields, HvcConfigLimits,
-    HvcConfigNal, HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
+    AvcConfigSource, AvcConfiguration, BuildStep, ConfigProgress, HvcConfigArray, HvcConfigFields,
+    HvcConfigLimits, HvcConfigNal, HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
@@ -43,10 +43,34 @@ impl ReceiverAvcUpdateRejection {
 
 pub struct ReceiverAvcConfiguration {
     inner: AvcConfiguration,
+    refusal: NalConfigurationRefusal,
 }
 impl ReceiverAvcConfiguration {
+    fn from_record(inner: AvcConfiguration) -> Self {
+        let fields = inner.fields();
+        let refusal = if fields.length_size_minus_one() == 2 {
+            NalConfigurationRefusal::AvcWidthThree
+        } else if profile_extension_required(fields.profile_indication())
+            && fields.raw_extension().is_none_or(|header| {
+                let parsed = inner
+                    .arrays()
+                    .next_back()
+                    .map_or(0, |array| array.nal_indices().len());
+                usize::from(header[3]) != parsed
+            })
+        {
+            NalConfigurationRefusal::AvcExtensionTruncated
+        } else {
+            NalConfigurationRefusal::None
+        };
+        Self { inner, refusal }
+    }
+
     pub(crate) fn record(&self) -> &AvcConfiguration {
         &self.inner
+    }
+    pub(crate) const fn refusal(&self) -> NalConfigurationRefusal {
+        self.refusal
     }
     pub fn arrays(
         &self,
@@ -87,8 +111,7 @@ impl ReceiverAvcConfiguration {
         self.inner.nals()
     }
     pub fn strict_source_refusal(&self) -> Option<Error> {
-        (self.fields().length_size_minus_one() == 2)
-            .then_some(Error::Invalid("AVC three-byte sample length"))
+        self.refusal.error()
     }
 }
 
@@ -146,8 +169,7 @@ impl ReceiverHevcConfiguration {
 pub struct ReceiverAvcConfigParser {
     inner: AvcConfigParser,
     raw: Bytes,
-    source: AvcConfigSource,
-    failure: Option<Error>,
+    refusal: NalConfigurationRefusal,
     update_role: bool,
     rejection_taken: bool,
 }
@@ -158,13 +180,29 @@ impl ReceiverAvcConfigParser {
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
-        let inner = AvcConfigParser::new_observed_width(pool, source, raw.clone(), limits)?;
+        Self::with_role(pool, source, raw, limits, false)
+    }
+
+    // Initial configuration and updates have the same construction checks.
+    #[inline(never)]
+    fn with_role(
+        pool: &Budget,
+        source: AvcConfigSource,
+        raw: Bytes,
+        limits: AvcConfigLimits,
+        update_role: bool,
+    ) -> Result<Self> {
+        let inner = AvcConfigParser::new_receiver(pool, source, raw.clone(), limits)?;
+        let refusal = if raw.len() >= 6 && raw[0] == 1 && raw[4] & 3 == 2 {
+            NalConfigurationRefusal::AvcWidthThree
+        } else {
+            NalConfigurationRefusal::None
+        };
         Ok(Self {
             inner,
             raw,
-            source,
-            failure: None,
-            update_role: false,
+            refusal,
+            update_role,
             rejection_taken: false,
         })
     }
@@ -176,34 +214,45 @@ impl ReceiverAvcConfigParser {
         raw: Bytes,
         limits: AvcConfigLimits,
     ) -> Result<Self> {
-        let mut parser = Self::new(pool, source, raw, limits)?;
-        parser.update_role = true;
-        Ok(parser)
+        Self::with_role(pool, source, raw, limits, true)
     }
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
+    /// The strict refusal established so far, including extension truncation
+    /// once the receiver publishes a record.
     pub fn strict_source_refusal(&self) -> Option<Error> {
-        (self.raw.len() >= 6 && self.raw[0] == 1 && self.raw[4] & 3 == 2)
-            .then_some(Error::Invalid("AVC three-byte sample length"))
+        self.refusal.error()
     }
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
-        let result = self.inner.step(work, cancel);
-        match result {
-            Ok(BuildStep::Ready(inner)) => Ok(BuildStep::Ready(ReceiverAvcConfiguration { inner })),
-            Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
-            Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
-            Err(error) => {
-                if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                    self.failure = Some(error);
-                }
-                Err(error)
-            }
+        let mut ready = None;
+        match self.step_into(work, cancel, &mut ready)? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(
+                ready.ok_or(Error::Invalid("missing published configuration"))?,
+            )),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
         }
+    }
+
+    /// Publishes into an empty caller-provided slot. Occupied slots are rejected
+    /// before any state, work or retained storage changes, including update rejections.
+    /// Yield, completion and errors leave an initially empty slot empty.
+    pub fn step_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<ReceiverAvcConfiguration>,
+    ) -> Result<ConfigProgress> {
+        self.inner.step_into_with(work, cancel, ready, |inner| {
+            let record = ReceiverAvcConfiguration::from_record(inner);
+            self.refusal = record.refusal();
+            record
+        })
     }
     pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
         // A complete AVC record requires the six-byte prefix and a PPS count.
@@ -212,14 +261,14 @@ impl ReceiverAvcConfigParser {
         if !self.update_role || self.rejection_taken || self.raw.len() >= 7 {
             return None;
         }
-        let error = self.failure?;
+        let error = self.inner.failure()?;
         if error != Error::Truncated || self.raw.first().copied() != Some(1) {
             return None;
         }
         self.rejection_taken = true;
         Some(ReceiverAvcUpdateRejection {
             raw: self.raw.clone(),
-            source: self.source,
+            source: self.inner.source(),
             error,
             strict_source_refusal: self.strict_source_refusal(),
         })
@@ -245,10 +294,28 @@ impl ReceiverHevcConfigParser {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<ReceiverHevcConfiguration>> {
-        match self.inner.step(work, cancel)? {
-            BuildStep::Ready(inner) => Ok(BuildStep::Ready(ReceiverHevcConfiguration { inner })),
-            BuildStep::Yield => Ok(BuildStep::Yield),
-            BuildStep::Complete => Ok(BuildStep::Complete),
+        let mut ready = None;
+        match self.step_into(work, cancel, &mut ready)? {
+            ConfigProgress::Ready => Ok(BuildStep::Ready(
+                ready.ok_or(Error::Invalid("missing published configuration"))?,
+            )),
+            ConfigProgress::Yield => Ok(BuildStep::Yield),
+            ConfigProgress::Complete => Ok(BuildStep::Complete),
         }
+    }
+
+    /// Publishes into an empty caller-provided slot. Occupied slots are rejected
+    /// before any state, work or retained storage changes. Yield, completion and errors
+    /// leave an initially empty slot empty.
+    pub fn step_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<ReceiverHevcConfiguration>,
+    ) -> Result<ConfigProgress> {
+        self.inner
+            .step_into_with(work, cancel, ready, |inner| ReceiverHevcConfiguration {
+                inner,
+            })
     }
 }

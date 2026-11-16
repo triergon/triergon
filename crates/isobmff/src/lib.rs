@@ -195,15 +195,41 @@ impl Sample {
     }
     /// The caller supplies the actual self-contained mdat extent, not just a file length.
     pub fn require_within(&self, media: Range<u64>) -> Result<()> {
-        if self.range.start > self.range.end
-            || media.start > media.end
-            || self.range.start < media.start
-            || self.range.end > media.end
-        {
-            return Err(Error::Invalid("sample outside media extent"));
-        }
-        Ok(())
+        require_range_within(&self.range, media)
     }
+}
+
+/// [`Sample::require_within`] for a sample's byte range.
+pub(crate) fn require_range_within(range: &Range<u64>, media: Range<u64>) -> Result<()> {
+    if range.start > range.end
+        || media.start > media.end
+        || range.start < media.start
+        || range.end > media.end
+    {
+        return Err(Error::Invalid("sample outside media extent"));
+    }
+    Ok(())
+}
+
+/// Consecutive samples of one track whose bytes are contiguous: the first
+/// one's ordinal, how many there are, the bytes they cover together and, for
+/// fragment samples that state composition offsets, the least of those read as
+/// signed 32-bit values.
+#[derive(Clone, Debug)]
+pub(crate) struct SampleSpan {
+    pub(crate) first: u64,
+    pub(crate) count: u64,
+    pub(crate) range: Range<u64>,
+    pub(crate) fragment: bool,
+    pub(crate) offset_minimum: Option<i32>,
+}
+
+/// One step of a walk over sample spans.
+#[derive(Debug)]
+pub(crate) enum SpanStep {
+    Span(SampleSpan),
+    Yield,
+    End,
 }
 
 #[derive(Debug, PartialEq, Eq)]

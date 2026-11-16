@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "matroska-startup-seek",
   "operation": "matroska-video-session",
-  "candidate": "playback-worker",
+  "candidate": "playback-matroska-worker",
   "worker_operation": "feed-",
   "reference": "ffmpeg-video-native",
   "contract": [

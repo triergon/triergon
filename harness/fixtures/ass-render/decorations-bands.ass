@@ -1,0 +1,78 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs of faces whose bands are missing or out of
+; range, embedded, each assembled with
+;   cargo xtask fonts assemble --embed decorations-NAME.ttf
+;     harness/fonts/probes/decorations-NAME.probe OUTPUT
+; none (zero underline thickness and strike-out size), signs (an underline
+; above the baseline and a strike-out below it) and extremes (the largest
+; positions and sizes), at ordinary, large and very large sizes; and Arimo
+; beside them.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)}Arimo {\fnTriergon Decorations None}A A{\fnArimo} Arimo
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,100)}Arimo {\fnTriergon Decorations Signs}A A{\fnArimo} Arimo
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,180)\fnTriergon Decorations Extremes}A A
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,300)\fnTriergon Decorations Extremes\fs300}A
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(400,300)\fnTriergon Decorations Extremes\fs5000}A
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,600)\fnTriergon Decorations None\b1\i1\bord2}A A
+
+[Fonts]
+fontname: decorations-none.ttf
+!!%!!!!+!)!!!Q!A4V-P-ET-6OY!!!#M!!!!9'.N98!!>1!\!!!"$!!!!$2H<(FG!\Y&5!!!!5!!!!!C
+;'6B:'&L1[)!!!&E!!!!.GBI:7%$)A'5!!!"H!!!!#2I<82Y"59!:!!!!=!!!!!-<'^D91!!!%1!!!(-
+!!!!%'VB?(!"61"'!!!"X!!!!#"O97VF&&-D(A!!!@Q!!!$W='^T>!!$!!!!!!,U!!!!)!!%!!!"E!!&
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"55E>/!%!!!0``
+!S$`/!!!!S!!S!!!!!!!!!!!!!!!!!!!!!!!!!!!!!%!!Q!"!!!!$!!%!#A!!!!'!!1!!1!#!#!!1@``
+!!!!)!""````YP`!!!%!!!!!!!!!!1"E!!!"^!+]!!-!!!%"!1%!:!!!!:!!!!!!!LQ!!0V%!!!!!1!!
+!!%!!!3>$Q.@$TTV!!!$[!!!!!!!!!!!!!!!!!!!!!!!:!!!!@1#P!!!!!A!!A!"!!!!!!!"!!!$)0]Y
+!!!#7!!!!!!!!!!"!!!!!!!!!!!!!!!!!!!!!Q(U!!!#7!"E!0I!!!!!!!!!!!!!!!!!)A!!!#)!!1!!
+!!-!"!!"!!!!!!!#!"!!1!"!!!!"!!!!!!!!!!!!!!1!.A!$!!%%#1!"!$)!!!!$!!%%#1!#!!Y!-A!$
+!!%%#1!%!%)!1!!$!!%%#1!'!$Y!AA"5!()!;1"F!()!:Q"P!'Y!)!"%!'5!9Q"P!()!91"U!'E!<Q"O
+!(-!)!"/!']!<A"F!&)!:1"H!(5!<!"B!()!6!"S!'E!:1"S!'=!<Q"O!#!!2!"F!'-!<Q"S!'%!>!"J
+!']!<A"T!#!!4A"P!'Y!:1!A!&)!:1"H!(5!<!"B!()!6!"S!'E!:1"S!'=!<Q"O!%1!:1"D!']!=A"B
+!(1!;1"P!'Y!=Q"/!']!<A"F!#U!5A"F!'=!>1"M!'%!=A!!!!-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!
+fontname: decorations-signs.ttf
+!!%!!!!+!)!!!Q!A4V-P-ES;6R9!!!#M!!!!9'.N98!!>1!\!!!"$!!!!$2H<(FG!\Y&5!!!!5!!!!!C
+;'6B:'&L1[)!!!&E!!!!.GBI:7%$)A'5!!!"H!!!!#2I<82Y"59!:!!!!=!!!!!-<'^D91!!!%1!!!(-
+!!!!%'VB?(!"61"'!!!"X!!!!#"O97VF&#YEL1!!!@Q!!!$]='^T>!"H!$)!!!,Y!!!!)!!%!!!"E!!&
+!!!!!!!!!!!!!!!!!!!!!!!!!#D`TA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"55E>/!%!!!0``
+!S$`/!!!!S!!S!!!!!!!!!!!!!!!!!!!!!!!!!!!!!%!!Q!"!!!!$!!%!#A!!!!'!!1!!1!#!#!!1@``
+!!!!)!""````YP`!!!%!!!!!!!!!!1"E!!!"^!+]!!-!!!%"!1%!:!!!!:!!!!!!!LQ!!0V%!!!!!1!!
+!!%!!!3$#S>@$TTV!!!$[!!!!!!!!!!!!!!!!!!!!!!!:!!!!@1#P!!!!!A!!A!"!!!!!!!"!!!$)0]Y
+!!!#7!!!!!!!!!!"!!!!!!!!!!!!!!!!!!!!!Q(U!!!#7!"E!0I!!!!!!!!!!!!!!!!!)A!!!#)!!1!!
+!!-!"!!"!!!!!!!#!"!!1!"!!!!"!!!!!!!!!!!!!!1!.A!$!!%%#1!"!$1!!!!$!!%%#1!#!!Y!.!!$
+!!%%#1!%!%1!1A!$!!%%#1!'!%!!BA"5!()!;1"F!()!:Q"P!'Y!)!"%!'5!9Q"P!()!91"U!'E!<Q"O
+!(-!)!"4!'E!:Q"O!(-!5A"F!'=!>1"M!'%!=A"5!()!;1"F!()!:Q"P!'Y!)!"%!'5!9Q"P!()!91"U
+!'E!<Q"O!(-!)!"4!'E!:Q"O!(-!)!"3!'5!:Q"V!'Q!91"S!&1!=A"J!'5!=A"H!']!<A"%!'5!9Q"P
+!()!91"U!'E!<Q"O!(-!5Q"J!'=!<A"T!#U!5A"F!'=!>1"M!'%!=A!$!!!!!!!!!'1!-A!!!!!!!!!!
+!!!!!!!!!!!!!!!!
+fontname: decorations-extremes.ttf
+!!%!!!!+!)!!!Q!A4V-P-MDTV*]!!!#M!!!!9'.N98!!>1!\!!!"$!!!!$2H<(FG!1U"&1!!!5!!!!!C
+;'6B:&]=02E!!!&E!!!!.GBI:7%!$Q!,!!!"H!!!!#2I<82Y!"9!!1!!!=!!!!!-<'^D91!!!%1!!!(-
+!!!!%'VB?(!"61"'!!!"X!!!!#"O97VF&P=F[1!!!@Q!!!%/='^T>)!$@`]!!!--!!!!)!!%!!!"E!!&
+!!!!!!!!!!!!!!!!!!!!!!!!@`^``Q!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"55E>/!%!!!0``
+!!X``1!!!!U!!Q!!!!!!!!!!!!!!!!!!!!!!!!!!!!%!!Q!"!!!!$!!%!#A!!!!'!!1!!1!#!#!!1@``
+!!!!)!""````YP`!!!%!!!!!!!!!!1!"!!!!#!!,!!-!!!%"!1%!!1!!!!=!!!!!!!M!!0`V!!!!!1!!
+!!%!!#',*TV@$TTV!!!!%!!!!!!!!!!!!!!!!!!!!!!!!1!!!!A!#Q!!!!A!!A!"!!!!!!!"!!!!$@`^
+!!!!#A!!!!!!!!!"!!!!!!!!!!!!!!!!!!!!!Q!)!!!!#A!"!!1!!!!!!!!!!!!!!!!!)A!!!#)!!1!!
+!!-!"!!"!!!!!!!#!"!!1!"!!!!"!!!!!!!!!!!!!!1!.A!$!!%%#1!"!$I!!!!$!!%%#1!#!!Y!/A!$
+!!%%#1!%!%I!3!!$!!%%#1!'!%9!EA"5!()!;1"F!()!:Q"P!'Y!)!"%!'5!9Q"P!()!91"U!'E!<Q"O
+!(-!)!"&!(A!>!"S!'5!<1"F!(-!5A"F!'=!>1"M!'%!=A"5!()!;1"F!()!:Q"P!'Y!)!"%!'5!9Q"P
+!()!91"U!'E!<Q"O!(-!)!"&!(A!>!"S!'5!<1"F!(-!)!"3!'5!:Q"V!'Q!91"S!&1!=A"J!'5!=A"H
+!']!<A"%!'5!9Q"P!()!91"U!'E!<Q"O!(-!21"Y!(1!=A"F!'U!:1"T!#U!5A"F!'=!>1"M!'%!=A!!
+!!-!!!!!!!#!!(``!!!!!!!!!!!!!!!!!!!!!!!!!!!

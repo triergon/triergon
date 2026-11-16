@@ -1,0 +1,280 @@
+# Each operator other than a path operator, alone between operands. Glyph
+# 1 + 2 * K runs `100 100 rmoveto 10 20 OP 30 40 rlineto`: a line to (130, 140)
+# shows OP cleared the stack, lines to (110, 120) and (140, 160) that it left
+# its operands, and other boxes what it computed. Glyph 2 + 2 * K runs
+# `100 100 rmoveto 50 50 rlineto 10 20 OP 30 40 rlineto`, so a failure shows
+# whether what was drawn before it counts. Operators, in order: dotsection, and, or, not, abs, add, sub, div, neg, eq, drop, put, get, ifelse, random, mul, sqrt, dup, exch, index, roll, then the
+# one-byte codes 0, 2, 9, 13, 15, 16, 17 and the escaped codes 12 1, 12 2, 12 6, 12 7, 12 8, 12 13, 12 16, 12 17, 12 19, 12 25, 12 31, 12 32, 12 33, 12 38, 12 39, 12 100, 12 255.
+glyph
+  endchar
+end
+glyph # dotsection
+  100 100 rmoveto 10 20 dotsection 30 40 rlineto endchar
+end
+glyph # dotsection after a line
+  100 100 rmoveto 50 50 rlineto 10 20 dotsection 30 40 rlineto endchar
+end
+glyph # and
+  100 100 rmoveto 10 20 and 30 40 rlineto endchar
+end
+glyph # and after a line
+  100 100 rmoveto 50 50 rlineto 10 20 and 30 40 rlineto endchar
+end
+glyph # or
+  100 100 rmoveto 10 20 or 30 40 rlineto endchar
+end
+glyph # or after a line
+  100 100 rmoveto 50 50 rlineto 10 20 or 30 40 rlineto endchar
+end
+glyph # not
+  100 100 rmoveto 10 20 not 30 40 rlineto endchar
+end
+glyph # not after a line
+  100 100 rmoveto 50 50 rlineto 10 20 not 30 40 rlineto endchar
+end
+glyph # abs
+  100 100 rmoveto 10 20 abs 30 40 rlineto endchar
+end
+glyph # abs after a line
+  100 100 rmoveto 50 50 rlineto 10 20 abs 30 40 rlineto endchar
+end
+glyph # add
+  100 100 rmoveto 10 20 add 30 40 rlineto endchar
+end
+glyph # add after a line
+  100 100 rmoveto 50 50 rlineto 10 20 add 30 40 rlineto endchar
+end
+glyph # sub
+  100 100 rmoveto 10 20 sub 30 40 rlineto endchar
+end
+glyph # sub after a line
+  100 100 rmoveto 50 50 rlineto 10 20 sub 30 40 rlineto endchar
+end
+glyph # div
+  100 100 rmoveto 10 20 div 30 40 rlineto endchar
+end
+glyph # div after a line
+  100 100 rmoveto 50 50 rlineto 10 20 div 30 40 rlineto endchar
+end
+glyph # neg
+  100 100 rmoveto 10 20 neg 30 40 rlineto endchar
+end
+glyph # neg after a line
+  100 100 rmoveto 50 50 rlineto 10 20 neg 30 40 rlineto endchar
+end
+glyph # eq
+  100 100 rmoveto 10 20 eq 30 40 rlineto endchar
+end
+glyph # eq after a line
+  100 100 rmoveto 50 50 rlineto 10 20 eq 30 40 rlineto endchar
+end
+glyph # drop
+  100 100 rmoveto 10 20 drop 30 40 rlineto endchar
+end
+glyph # drop after a line
+  100 100 rmoveto 50 50 rlineto 10 20 drop 30 40 rlineto endchar
+end
+glyph # put
+  100 100 rmoveto 10 20 put 30 40 rlineto endchar
+end
+glyph # put after a line
+  100 100 rmoveto 50 50 rlineto 10 20 put 30 40 rlineto endchar
+end
+glyph # get
+  100 100 rmoveto 10 20 get 30 40 rlineto endchar
+end
+glyph # get after a line
+  100 100 rmoveto 50 50 rlineto 10 20 get 30 40 rlineto endchar
+end
+glyph # ifelse
+  100 100 rmoveto 10 20 ifelse 30 40 rlineto endchar
+end
+glyph # ifelse after a line
+  100 100 rmoveto 50 50 rlineto 10 20 ifelse 30 40 rlineto endchar
+end
+glyph # random
+  100 100 rmoveto 10 20 random 30 40 rlineto endchar
+end
+glyph # random after a line
+  100 100 rmoveto 50 50 rlineto 10 20 random 30 40 rlineto endchar
+end
+glyph # mul
+  100 100 rmoveto 10 20 mul 30 40 rlineto endchar
+end
+glyph # mul after a line
+  100 100 rmoveto 50 50 rlineto 10 20 mul 30 40 rlineto endchar
+end
+glyph # sqrt
+  100 100 rmoveto 10 20 sqrt 30 40 rlineto endchar
+end
+glyph # sqrt after a line
+  100 100 rmoveto 50 50 rlineto 10 20 sqrt 30 40 rlineto endchar
+end
+glyph # dup
+  100 100 rmoveto 10 20 dup 30 40 rlineto endchar
+end
+glyph # dup after a line
+  100 100 rmoveto 50 50 rlineto 10 20 dup 30 40 rlineto endchar
+end
+glyph # exch
+  100 100 rmoveto 10 20 exch 30 40 rlineto endchar
+end
+glyph # exch after a line
+  100 100 rmoveto 50 50 rlineto 10 20 exch 30 40 rlineto endchar
+end
+glyph # index
+  100 100 rmoveto 10 20 index 30 40 rlineto endchar
+end
+glyph # index after a line
+  100 100 rmoveto 50 50 rlineto 10 20 index 30 40 rlineto endchar
+end
+glyph # roll
+  100 100 rmoveto 10 20 roll 30 40 rlineto endchar
+end
+glyph # roll after a line
+  100 100 rmoveto 50 50 rlineto 10 20 roll 30 40 rlineto endchar
+end
+glyph # op:0
+  100 100 rmoveto 10 20 op:0 30 40 rlineto endchar
+end
+glyph # op:0 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:0 30 40 rlineto endchar
+end
+glyph # op:2
+  100 100 rmoveto 10 20 op:2 30 40 rlineto endchar
+end
+glyph # op:2 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:2 30 40 rlineto endchar
+end
+glyph # op:9
+  100 100 rmoveto 10 20 op:9 30 40 rlineto endchar
+end
+glyph # op:9 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:9 30 40 rlineto endchar
+end
+glyph # op:13
+  100 100 rmoveto 10 20 op:13 30 40 rlineto endchar
+end
+glyph # op:13 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:13 30 40 rlineto endchar
+end
+glyph # op:15
+  100 100 rmoveto 10 20 op:15 30 40 rlineto endchar
+end
+glyph # op:15 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:15 30 40 rlineto endchar
+end
+glyph # op:16
+  100 100 rmoveto 10 20 op:16 30 40 rlineto endchar
+end
+glyph # op:16 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:16 30 40 rlineto endchar
+end
+glyph # op:17
+  100 100 rmoveto 10 20 op:17 30 40 rlineto endchar
+end
+glyph # op:17 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 op:17 30 40 rlineto endchar
+end
+glyph # esc:1
+  100 100 rmoveto 10 20 esc:1 30 40 rlineto endchar
+end
+glyph # esc:1 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:1 30 40 rlineto endchar
+end
+glyph # esc:2
+  100 100 rmoveto 10 20 esc:2 30 40 rlineto endchar
+end
+glyph # esc:2 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:2 30 40 rlineto endchar
+end
+glyph # esc:6
+  100 100 rmoveto 10 20 esc:6 30 40 rlineto endchar
+end
+glyph # esc:6 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:6 30 40 rlineto endchar
+end
+glyph # esc:7
+  100 100 rmoveto 10 20 esc:7 30 40 rlineto endchar
+end
+glyph # esc:7 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:7 30 40 rlineto endchar
+end
+glyph # esc:8
+  100 100 rmoveto 10 20 esc:8 30 40 rlineto endchar
+end
+glyph # esc:8 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:8 30 40 rlineto endchar
+end
+glyph # esc:13
+  100 100 rmoveto 10 20 esc:13 30 40 rlineto endchar
+end
+glyph # esc:13 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:13 30 40 rlineto endchar
+end
+glyph # esc:16
+  100 100 rmoveto 10 20 esc:16 30 40 rlineto endchar
+end
+glyph # esc:16 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:16 30 40 rlineto endchar
+end
+glyph # esc:17
+  100 100 rmoveto 10 20 esc:17 30 40 rlineto endchar
+end
+glyph # esc:17 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:17 30 40 rlineto endchar
+end
+glyph # esc:19
+  100 100 rmoveto 10 20 esc:19 30 40 rlineto endchar
+end
+glyph # esc:19 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:19 30 40 rlineto endchar
+end
+glyph # esc:25
+  100 100 rmoveto 10 20 esc:25 30 40 rlineto endchar
+end
+glyph # esc:25 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:25 30 40 rlineto endchar
+end
+glyph # esc:31
+  100 100 rmoveto 10 20 esc:31 30 40 rlineto endchar
+end
+glyph # esc:31 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:31 30 40 rlineto endchar
+end
+glyph # esc:32
+  100 100 rmoveto 10 20 esc:32 30 40 rlineto endchar
+end
+glyph # esc:32 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:32 30 40 rlineto endchar
+end
+glyph # esc:33
+  100 100 rmoveto 10 20 esc:33 30 40 rlineto endchar
+end
+glyph # esc:33 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:33 30 40 rlineto endchar
+end
+glyph # esc:38
+  100 100 rmoveto 10 20 esc:38 30 40 rlineto endchar
+end
+glyph # esc:38 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:38 30 40 rlineto endchar
+end
+glyph # esc:39
+  100 100 rmoveto 10 20 esc:39 30 40 rlineto endchar
+end
+glyph # esc:39 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:39 30 40 rlineto endchar
+end
+glyph # esc:100
+  100 100 rmoveto 10 20 esc:100 30 40 rlineto endchar
+end
+glyph # esc:100 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:100 30 40 rlineto endchar
+end
+glyph # esc:255
+  100 100 rmoveto 10 20 esc:255 30 40 rlineto endchar
+end
+glyph # esc:255 after a line
+  100 100 rmoveto 50 50 rlineto 10 20 esc:255 30 40 rlineto endchar
+end

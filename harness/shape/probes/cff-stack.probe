@@ -1,0 +1,73 @@
+# The argument stack: 48 operands in CFF (TN 5177 Appendix B). Glyph n
+# (1 to 6) pushes 46 + n operands, 1 each, after `100 100 rmoveto`, then
+# rlineto: as many lines of (1, 1) as pairs it kept. Glyphs 7 to 15 push them
+# inside a subroutine or around one; 16 on push 512 to 514.
+glyph
+  endchar
+end
+glyph # 47 operands
+  100 100 rmoveto 1*47 rlineto endchar
+end
+glyph # 48 operands
+  100 100 rmoveto 1*48 rlineto endchar
+end
+glyph # 49 operands
+  100 100 rmoveto 1*49 rlineto endchar
+end
+glyph # 50 operands
+  100 100 rmoveto 1*50 rlineto endchar
+end
+glyph # 51 operands
+  100 100 rmoveto 1*51 rlineto endchar
+end
+glyph # 52 operands
+  100 100 rmoveto 1*52 rlineto endchar
+end
+glyph # 7: 40 operands, then a call that pushes 10 more
+  100 100 rmoveto 1*40 -107 callsubr rlineto endchar
+end
+glyph # 8: 47 operands, then a call index: 48 on the stack
+  100 100 rmoveto 1*47 -106 callsubr rlineto endchar
+end
+glyph # 9: 48 operands, then a call index: 49
+  100 100 rmoveto 1*48 -106 callsubr rlineto endchar
+end
+glyph # 10: 48 operands then rrcurveto
+  100 100 rmoveto 1*48 rrcurveto endchar
+end
+glyph # 11: 49 operands then rrcurveto
+  100 100 rmoveto 1*49 rrcurveto endchar
+end
+glyph # 12: 50 operands then hlineto
+  100 100 rmoveto 1*50 hlineto endchar
+end
+glyph # 13: 60 operands then hlineto
+  100 100 rmoveto 1*60 hlineto endchar
+end
+glyph # 14: 48 operands, the first a width, then rmoveto
+  1*46 5 5 rmoveto 10 10 rlineto endchar
+end
+glyph # 15: 49 operands, then rmoveto
+  1*47 5 5 rmoveto 10 10 rlineto endchar
+end
+glyph # 16: 512 operands
+  100 100 rmoveto 1*512 rlineto endchar
+end
+glyph # 17: 513 operands
+  100 100 rmoveto 1*513 rlineto endchar
+end
+glyph # 18: 514 operands
+  100 100 rmoveto 1*514 rlineto endchar
+end
+glyph # 19: 513 operands, then a call index
+  100 100 rmoveto 1*513 -106 callsubr rlineto endchar
+end
+glyph # 20: 512 operands, then a call index
+  100 100 rmoveto 1*512 -106 callsubr rlineto endchar
+end
+local
+  2*10 return
+end
+local
+  return
+end
