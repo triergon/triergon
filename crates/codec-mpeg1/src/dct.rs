@@ -73,10 +73,28 @@ fn idct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
 
 /// Forward DCT of an 8×8 block of samples or residuals in raster order.
 pub(crate) fn fdct(block: &mut [i32; 64]) {
+    // The transposed row pass vectorises more effectively on 32-bit ARM.
+    #[cfg(target_arch = "arm")]
+    {
+        transpose(block);
+        columns_in_place(block, BITS - PASS, fdct_1d);
+        transpose(block);
+    }
+    #[cfg(not(target_arch = "arm"))]
     for row in block.as_chunks_mut::<8>().0 {
         *row = fdct_1d(*row, BITS - PASS);
     }
     columns_in_place(block, BITS + PASS, fdct_1d);
+}
+
+#[cfg(target_arch = "arm")]
+#[inline(always)]
+fn transpose(block: &mut [i32; 64]) {
+    for r in 0..8 {
+        for c in r + 1..8 {
+            block.swap(r * 8 + c, c * 8 + r);
+        }
+    }
 }
 
 /// Apply a 1-D transform down every column, in place. The loop body touches
