@@ -610,7 +610,8 @@ impl SliceDecoder<'_> {
             ));
         }
         let cur = self.cur;
-        let w = self.pic.w;
+        let w = self.pic.w.get();
+        let (cur_x, cur_y) = self.pic.w.split(cur);
         let cur_poc = self.pic.pic_poc();
         // Select colPic motion, mbAddrCol, yM, vertMvScale (Tables 8-6, 8-8).
         let (motion, mb_col, ym, vs): (&Motion, usize, i32, VertScale);
@@ -630,7 +631,7 @@ impl SliceDecoder<'_> {
                 }
                 Coding::Frame => {
                     motion = &st.motion[0];
-                    mb_col = 2 * w * (cur / w) + (cur % w) + w * (ycol as usize / 8);
+                    mb_col = 2 * w * cur_y + cur_x + w * (ycol as usize / 8);
                     ym = (2 * ycol) % 16;
                     vs = VertScale::FrmToFld;
                 }
@@ -652,8 +653,8 @@ impl SliceDecoder<'_> {
             match st.coding {
                 Coding::Fields => {
                     motion = &st.motion[if top_closer { 0 } else { 1 }];
-                    mb_col = w * (cur / (2 * w)) + (cur % w);
-                    ym = 8 * ((cur / w) % 2) as i32 + 4 * (ycol / 8);
+                    mb_col = w * (cur_y / 2) + cur_x;
+                    ym = 8 * (cur_y % 2) as i32 + 4 * (ycol / 8);
                     vs = VertScale::FldToFrm;
                 }
                 _ => {

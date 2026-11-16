@@ -1,0 +1,46 @@
+{
+ "name": "gate-run-armv7-7f32411b-20261116-112546-shard-1",
+ "path": "gate-run-armv7-7f32411b-20261116-112546-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 7f32411b on three c6g.4xlarge hosts, ARMv7, shard 1 of the codec items (codecs, codecs-audio, ogg-readers, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release, isobmff-reader) with the codec-derived streams input, the codec worker and the AAC decode example built by the pinned nightly with codec-aac's simd feature: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md. Its tests/checked step fails on one xtask unit test of the build identity, fixed and rerun at a later revision.",
+ "key": "evidence/gate-runs/7f32411b5519e7fb0cae303ae8eea73450b24c03-armv7-20261116-112546/shard-1/67c992456f5f77a91cc12fbe1faa931365276cc24141747f2dc14bde6d7f435b.tar.zst",
+ "sha256": "67c992456f5f77a91cc12fbe1faa931365276cc24141747f2dc14bde6d7f435b",
+ "bytes": 7681282,
+ "results": [
+  {
+   "path": "memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "bb7396b9c2502ec730dd417f44ccd1e1fe3375a0fb05d1e7e2bdaea03127e905",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "3c36a5d35a2ae70a0fe70e83a01a25d972fab8314d44283ca7db1813143dfbef",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "825a498b7789d537f2b326a298e54bad6a3415fafb8f6ea686849b2bac7389c0",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "b3332d290ba87d8d33859d742dcfb67681b3049318738329ca0283a7d1a44503",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "8f4f29efd861a8936faff45245966525df69bf05f861417a6a06c7931a61179d",
+   "status": 101,
+   "report_sha256": null
+  }
+ ]
+}

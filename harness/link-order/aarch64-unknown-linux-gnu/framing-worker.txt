@@ -58,6 +58,7 @@ framing_worker::worker::operation::packet_digest
 <triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketOutput>>::reallocate
 core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketSession>
 <alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
+core::ptr::drop_glue::<framing_worker::worker::operation::Retained>
 core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketOutput>
 framing_worker::worker::write_report::<std::io::stdio::StdoutLock>
 core::ptr::drop_glue::<framing_worker::worker::model::Case>

@@ -58,7 +58,7 @@ commands:
                  docs runs only the steps that read the documents and evidence sets
                  (format, check-design, check-links, check-revisions and the evidence
                  index tests), all a pull request that changes nothing else needs
-  check-simd     clippy and tests of the opt-in HEVC SIMD path on the pinned nightly
+  check-simd     clippy and tests of the std::simd paths (HEVC, AAC) on the pinned nightly
   prepare-check  [PART]   once before `check`: the pinned FFmpeg, FreeType, HarfBuzz,
                  FriBidi and libass references, the fixtures, the required vectors, the font
                  corpus and the workers (built with the reference first on PATH); with
@@ -969,8 +969,9 @@ fn run(command: &mut Command) -> Task {
     }
 }
 
-/// The nightly toolchain of the opt-in HEVC `std::simd` path, pinned so that lints
-/// and code generation do not change underneath the checks and measurements.
+/// The nightly toolchain of the `std::simd` paths, pinned so that lints and code
+/// generation do not change underneath the checks and measurements: the opt-in HEVC
+/// path, and the AAC decoder's, which the gate build's codec worker uses.
 pub(crate) const NIGHTLY: &str = "nightly-2026-10-17";
 
 /// Everything `check` needs once, or what one part of it reads: each step runs as
@@ -1002,8 +1003,9 @@ fn prepare_check(part: Option<Part>) -> Task {
     Ok(())
 }
 
-/// The pinned nightly with clippy, for the opt-in `std::simd` path.
-fn simd_toolchain() -> Task {
+/// The pinned nightly with clippy, for the `std::simd` paths and the workers the gate
+/// build compiles with it.
+pub(crate) fn simd_toolchain() -> Task {
     run(Command::new("rustup")
         .args([
             "toolchain",
@@ -1017,7 +1019,7 @@ fn simd_toolchain() -> Task {
         .args(harness::gate_build::target_args()?))
 }
 
-/// Clippy over the opt-in nightly `std::simd` path of the HEVC decoder.
+/// Clippy over the nightly `std::simd` paths of the HEVC and AAC decoders.
 fn simd_lints(root: &Path) -> Task {
     simd_toolchain()?;
     cargo(
@@ -1028,9 +1030,11 @@ fn simd_lints(root: &Path) -> Task {
             "-p",
             "triergon-codec-hevc",
             "-p",
+            "triergon-codec-aac",
+            "-p",
             "codec-worker",
             "--features",
-            "triergon-codec-hevc/simd,codec-worker/simd",
+            "triergon-codec-hevc/simd,triergon-codec-aac/simd,codec-worker/simd,codec-worker/aac-simd",
             "--all-targets",
             "--locked",
             "--",
@@ -1040,8 +1044,9 @@ fn simd_lints(root: &Path) -> Task {
     )
 }
 
-/// The opt-in nightly `std::simd` path of the HEVC decoder must decode exactly as
-/// the scalar default does (the conformance tests compare both with FFmpeg digests).
+/// The nightly `std::simd` paths must decode exactly as the scalar defaults do: the
+/// HEVC conformance tests compare both with FFmpeg digests, and the AAC tests hold the
+/// SBR kernels to the scalar arithmetic bit for bit.
 fn simd_tests(root: &Path) -> Task {
     simd_toolchain()?;
     cargo_for_workers(
@@ -1051,8 +1056,10 @@ fn simd_tests(root: &Path) -> Task {
             "test",
             "-p",
             "triergon-codec-hevc",
+            "-p",
+            "triergon-codec-aac",
             "--features",
-            "simd",
+            "triergon-codec-hevc/simd,triergon-codec-aac/simd",
             "--release",
             "--locked",
         ],
