@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-576f088f-20261116-052543-shard-1",
+ "path": "gate-run-armv7-576f088f-20261116-052543-shard-1",
+ "retention": "retained",
+ "reason": "Capture on armv7 with the pinned reference and kernel-bound resident memory.",
+ "key": "evidence/gate-runs/576f088fa2d463585adf87d471ba2ccc22c72c67-armv7-20261116-052543/shard-1/94919c7b26a6413a6ea544f54f2dafc9b5b51bed0753b6ed530f666cf0b77920.tar.zst",
+ "sha256": "94919c7b26a6413a6ea544f54f2dafc9b5b51bed0753b6ed530f666cf0b77920",
+ "bytes": 360898274,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "f1e144d7a6d7fe009d7a2fd35c42da845e301f57fd88c09bd586b73596d9c714",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2f88bad09616a074ada57a270dd9cc18b8c627c620540ab2fd816087f2492701",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "576f088fa2d463585adf87d471ba2ccc22c72c67"
+ ]
+}

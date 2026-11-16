@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-9ce47662-20261116-033329-shard-3",
+ "path": "gate-run-armv7-9ce47662-20261116-033329-shard-3",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory in 32-bit ARMv7 Linux user space.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-armv7-20261116-033329/shard-3/8e996f012c6f7448af11ca22e35d37b90c83e54aa3565dc824e41a8d3ebbeae3.tar.zst",
+ "sha256": "8e996f012c6f7448af11ca22e35d37b90c83e54aa3565dc824e41a8d3ebbeae3",
+ "bytes": 316933942,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "511228fc8b1cbe1855932aaa00d07ecc00a5793470a7a7d9754f248e9b22b8d7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "b9310584c487e2d3ee560015cc8138e61a9209a26f828fe8a3c86b284c4ec52a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "1f3c253ac00b72dcfd073afea5bc7ebff92a4969b8890bf2bfcc030f8d31b2fe",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "838cc07c9f6b79cb4b1a6438000d35a97ce2a41e9e14b3f401d2414147aec14c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "8428e2a9d2482902b10d4ec0807124f2560aaae32d55655f1ef1c2caf24b1a15",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5418ae8d1c5b321fcb94d15bc180e013b8781a8366f7e9c08e5f54f63bcebdfe",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}

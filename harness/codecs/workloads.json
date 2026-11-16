@@ -19,21 +19,21 @@
    "targets": [
     "thumbv7neon-unknown-linux-gnueabihf"
    ],
-   "cause": "Runtime: the HE-AAC decoder runs 2.12 times the reference's user-mode instructions on aac-he-stereo (59.29 G against 28.01 G), and SBR is most of it: Sbr::process 26.9% and the QMF synthesis 20.3% of cycles, the FFT about 30%. Built as A32 with NEON the workload is still above the ceiling (aac-he-stereo 1.5402, aac-he-5.1 1.5747, aac-hev2-stereo 1.4763), so the Thumb-2 encoding is not the cause. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
+   "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
   },
   {
    "id": "aac-he-5.1",
    "targets": [
     "thumbv7neon-unknown-linux-gnueabihf"
    ],
-   "cause": "Runtime: the HE-AAC decoder runs 2.12 times the reference's user-mode instructions on aac-he-stereo (59.29 G against 28.01 G), and SBR is most of it: Sbr::process 26.9% and the QMF synthesis 20.3% of cycles, the FFT about 30%. Built as A32 with NEON the workload is still above the ceiling (aac-he-stereo 1.5402, aac-he-5.1 1.5747, aac-hev2-stereo 1.4763), so the Thumb-2 encoding is not the cause. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
+   "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
   },
   {
    "id": "aac-hev2-stereo",
    "targets": [
     "thumbv7neon-unknown-linux-gnueabihf"
    ],
-   "cause": "Runtime: the HE-AAC decoder runs 2.12 times the reference's user-mode instructions on aac-he-stereo (59.29 G against 28.01 G), and SBR is most of it: Sbr::process 26.9% and the QMF synthesis 20.3% of cycles, the FFT about 30%. Built as A32 with NEON the workload is still above the ceiling (aac-he-stereo 1.5402, aac-he-5.1 1.5747, aac-hev2-stereo 1.4763), so the Thumb-2 encoding is not the cause. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
+   "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
   },
   {
    "id": "dts-core-es-6.1",

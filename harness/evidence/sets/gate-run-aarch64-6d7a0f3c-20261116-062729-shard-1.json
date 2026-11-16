@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-6d7a0f3c-20261116-062729-shard-1",
+ "path": "gate-run-aarch64-6d7a0f3c-20261116-062729-shard-1",
+ "retention": "retained",
+ "reason": "AArch64 capture of the noisy 960-by-540 case with the capture session timeout.",
+ "key": "evidence/gate-runs/6d7a0f3c888c9cba8e6be7eddb760b5ea28b9c30-aarch64-20261116-062729/shard-1/592b2aa3785d0eda4be492ecdc6fbc6a666906835c31c328abcaf944357bc3cb.tar.zst",
+ "sha256": "592b2aa3785d0eda4be492ecdc6fbc6a666906835c31c328abcaf944357bc3cb",
+ "bytes": 359146349,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "dc9043163e223d2ccf70aa8302e358e9d208ed396f7664356eaed4caa8b2853d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "14c6a9e1f74dc4ee09622d8d3f97ecce51b1bc01a8c59cee9c20ccfb331ba14f",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "6d7a0f3c888c9cba8e6be7eddb760b5ea28b9c30"
+ ]
+}

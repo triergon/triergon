@@ -56,7 +56,7 @@ triergon_framing::nal_packet::freeze_annex_b_output
 <triergon_framing::nal_packet::PacketState>::config
 framing_worker::worker::operation::packet_digest
 <triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketOutput>>::reallocate
-core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketJob>
+core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketSession>
 <alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
 core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketOutput>
 framing_worker::worker::write_report::<std::io::stdio::StdoutLock>

@@ -1,0 +1,39 @@
+{
+ "name": "gate-run-aarch64-4213d042-20261116-061706-shard-2",
+ "path": "gate-run-aarch64-4213d042-20261116-061706-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at 4213d042 under static-toolchain-runtime-trained-order-v1, shard 2 of 3, items codec-workloads-5, codec-file-workloads-3, codec-workloads-3, codec-file-workloads-1, on one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws, Linux AArch64: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grades, with the build identities, plan, step records and logs; for the docs/status.md AAC and codec rows after the AAC decoder's speed work",
+ "key": "evidence/gate-runs/4213d0422df8d9caae433f9340287b8a342e2824-aarch64-20261116-061706/shard-2/d1aef6d60dfc5011bf5051d384ab145c5211964e74d3a253c323a0d7bfd85160.tar.zst",
+ "sha256": "d1aef6d60dfc5011bf5051d384ab145c5211964e74d3a253c323a0d7bfd85160",
+ "bytes": 1224658,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "cdcb09cd41b188900e399aaad2c9e3f01f18be2a9a7483ef72852b2791a73cbb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "ed78fb7f4d1d585941d5f7a49d127216fb25ee7a858b2b387aa9e8613878cb00",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "81647f5a625e49b71784812fc025e6177bc1df1c1331c16d71a4cb45c559ef6b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "392847f22c54403b1a35169276933b566782dcf9390b8036a232171a69e77451",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

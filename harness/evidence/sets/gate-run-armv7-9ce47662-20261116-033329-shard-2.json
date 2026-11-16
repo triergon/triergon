@@ -1,0 +1,70 @@
+{
+ "name": "gate-run-armv7-9ce47662-20261116-033329-shard-2",
+ "path": "gate-run-armv7-9ce47662-20261116-033329-shard-2",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory in 32-bit ARMv7 Linux user space.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-armv7-20261116-033329/shard-2/8ff434aa1fbd4fb846fb462c13dc45fba9c60ed5491c46d225bb66c9ea6f3fdd.tar.zst",
+ "sha256": "8ff434aa1fbd4fb846fb462c13dc45fba9c60ed5491c46d225bb66c9ea6f3fdd",
+ "bytes": 417993547,
+ "results": [
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "53b7aa4db143450fe9853338576dedbab323b317883e1c536d91cdc40900f374",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "93188e4e7d64a517e1b54f5f3a812ba595421838e0ae2cb2ac18f45c5f03a93f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "4d720e1e78238951700f980ac30591ee504b20582fb8cb60625254ced44939ec",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "39011ff7c676a18ce561cf35034a494695a787e07faef41bd8679b39a098e8bd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "c42c9fe4e5585aec2e68ef0fc53f6f8369e20be7cabdbeb2b150632dfd3ecceb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b0fff996d5287ed06c6d402364ee0d0b1be42a27ea1f4c50f04ceb1c3af2a329",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "cbfbe607eec9ad657849e44692fa10bf5812c45513da9a9b0ebe850bfedf7128",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "fcf95d2f2d1a1943431cca704776d3fa0728b8cb5181e044747f911ad4f8b284",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}

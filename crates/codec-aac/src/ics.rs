@@ -146,15 +146,21 @@ fn pow43_table() -> &'static [f32] {
     })
 }
 
-/// 2^((i - 300) / 4) for i in 0..512: covers scalefactors, noise energies and IS positions.
+/// 2^((i - 300) / 4) for i in 0..600: covers scalefactors, noise energies and IS positions.
+fn pow2_quarter_table() -> &'static [f32; 600] {
+    static T: OnceLock<[f32; 600]> = OnceLock::new();
+    T.get_or_init(|| std::array::from_fn(|i| 2f64.powf((i as f64 - 300.0) / 4.0) as f32))
+}
+
+/// 2^(i / 4), clamped to the table.
+#[inline(always)]
+fn quarter(table: &[f32; 600], i: i32) -> f32 {
+    table[(i + 300).clamp(0, 599) as usize]
+}
+
+/// 2^(i / 4), for i in -300..300.
 pub(crate) fn pow2_quarter(i: i32) -> f32 {
-    static T: OnceLock<Vec<f32>> = OnceLock::new();
-    let t = T.get_or_init(|| {
-        (0..600)
-            .map(|i| 2f64.powf((i as f64 - 300.0) / 4.0) as f32)
-            .collect()
-    });
-    t[(i + 300).clamp(0, 599) as usize]
+    quarter(pow2_quarter_table(), i)
 }
 
 pub(crate) fn parse_ics_info(
@@ -506,10 +512,10 @@ fn pow43_signed() -> &'static [f32; 33] {
 fn band<const N: usize, const UNSIGNED: bool>(
     br: &mut CachedBitReader<'_>,
     book: &SpectralBook,
+    p43: &[f32; 33],
     gain: f32,
     out: &mut [f32],
 ) -> Result<()> {
-    let p43 = pow43_signed();
     for o in out.chunks_exact_mut(N) {
         let e = book.fast[(br.peek32() >> (32 - FAST_BITS)) as usize];
         if e != 0 {
@@ -564,6 +570,7 @@ fn dequant(q: i32, pow43: &[f32], gain: f32) -> f32 {
 }
 
 /// One band of codebook 11 (pairs, unsigned, escapes), decoded and inverse quantised.
+#[inline(always)]
 fn band_esc(
     br: &mut CachedBitReader<'_>,
     book: &SpectralBook,
@@ -595,6 +602,7 @@ fn band_esc(
 }
 
 /// One band decoded to quantised integers (used when pulse data follows).
+#[inline(always)]
 fn band_int(
     br: &mut CachedBitReader<'_>,
     book: &SpectralBook,
@@ -623,7 +631,26 @@ fn band_int(
     Ok(())
 }
 
+/// The spectral data of one channel, decoded and inverse quantised into `ch.coef`;
+/// every coefficient no band codes is zero.
 fn decode_spectrum(
+    br: &mut CachedBitReader<'_>,
+    ch: &mut ChannelData,
+    pulse: &[(usize, i32)],
+    random: &mut u32,
+) -> Result<()> {
+    // A copy of the reader that no other reference reaches, so that its state can stay in
+    // registers through the band loops.
+    let mut reader = *br;
+    let decoded = decode_bands(&mut reader, ch, pulse, random);
+    *br = reader;
+    if decoded.is_err() {
+        ch.coef.fill(0.0);
+    }
+    decoded
+}
+
+fn decode_bands(
     br: &mut CachedBitReader<'_>,
     ch: &mut ChannelData,
     pulse: &[(usize, i32)],
@@ -631,12 +658,13 @@ fn decode_spectrum(
 ) -> Result<()> {
     let bk = books();
     let pow43 = pow43_table();
+    let p43 = pow43_signed();
+    let quarters = pow2_quarter_table();
     let info = &ch.info;
     let swb = info.swb;
+    let window_len = 1024 / info.num_windows;
+    let coded_end = swb[info.max_sfb] as usize;
     let coef = &mut ch.coef[..];
-    for c in coef.iter_mut() {
-        *c = 0.0;
-    }
     // pulse data modifies the quantised integers: only then keep them before dequantisation
     // (only bands with a spectral codebook are read back, so no clearing is needed)
     let need_int = !pulse.is_empty();
@@ -651,9 +679,14 @@ fn decode_spectrum(
             let end = swb[sfb + 1] as usize;
             let width = end - start;
             match cb {
-                ZERO_HCB | INTENSITY_HCB | INTENSITY_HCB2 => {}
+                ZERO_HCB | INTENSITY_HCB | INTENSITY_HCB2 => {
+                    for w in win..win + glen {
+                        let off = w * 128 + start;
+                        coef[off..off + width].fill(0.0);
+                    }
+                }
                 NOISE_HCB => {
-                    let scale0 = pow2_quarter(ch.sf[bi]);
+                    let scale0 = quarter(quarters, ch.sf[bi]);
                     for w in win..win + glen {
                         let off = w * 128 + start;
                         let band = &mut coef[off..off + width];
@@ -671,7 +704,7 @@ fn decode_spectrum(
                 }
                 1..=11 => {
                     let book = &bk.spectral[cb as usize - 1];
-                    let gain = pow2_quarter(ch.sf[bi] - 100);
+                    let gain = quarter(quarters, ch.sf[bi] - 100);
                     for w in win..win + glen {
                         let off = w * 128 + start;
                         if need_int {
@@ -680,10 +713,10 @@ fn decode_spectrum(
                         }
                         let out = &mut coef[off..off + width];
                         match cb {
-                            1 | 2 => band::<4, false>(br, book, gain, out)?,
-                            3 | 4 => band::<4, true>(br, book, gain, out)?,
-                            5 | 6 => band::<2, false>(br, book, gain, out)?,
-                            7..=10 => band::<2, true>(br, book, gain, out)?,
+                            1 | 2 => band::<4, false>(br, book, p43, gain, out)?,
+                            3 | 4 => band::<4, true>(br, book, p43, gain, out)?,
+                            5 | 6 => band::<2, false>(br, book, p43, gain, out)?,
+                            7..=10 => band::<2, true>(br, book, p43, gain, out)?,
                             _ => band_esc(br, book, gain, pow43, out)?,
                         }
                     }
@@ -693,6 +726,9 @@ fn decode_spectrum(
             if br.overrun() {
                 return Err(DecodeError::InvalidData("spectral data overrun"));
             }
+        }
+        for w in win..win + glen {
+            coef[w * 128 + coded_end..w * 128 + window_len].fill(0.0);
         }
         win += glen;
     }
@@ -708,7 +744,7 @@ fn decode_spectrum(
         for sfb in 0..info.max_sfb {
             let cb = ch.band_type[sfb];
             if (1..=11).contains(&cb) {
-                let gain = pow2_quarter(ch.sf[sfb] - 100);
+                let gain = quarter(quarters, ch.sf[sfb] - 100);
                 for k in swb[sfb] as usize..swb[sfb + 1] as usize {
                     coef[k] = dequant(qbuf[k], pow43, gain);
                 }

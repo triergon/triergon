@@ -1,0 +1,12 @@
+{
+ "name": "capture-short-narrow-armv7",
+ "path": "capture-short-narrow-armv7",
+ "retention": "retained",
+ "reason": "Short filtered capture conversion on 32-bit ARMv7 at even widths from 2 to 14.",
+ "key": "evidence/capture-short-narrow-armv7/f8ef3f3b0a5a3361079650e4bc3597f59caa9c2b08f2ba9bebcbfa2ccd0e4c94.tar.zst",
+ "sha256": "f8ef3f3b0a5a3361079650e4bc3597f59caa9c2b08f2ba9bebcbfa2ccd0e4c94",
+ "bytes": 436187,
+ "source_revisions": [
+  "a62c8eab90b2ce87b15d8319c695f40d6c66a7be"
+ ]
+}

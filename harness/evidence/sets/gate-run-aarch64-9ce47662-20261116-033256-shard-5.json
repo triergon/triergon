@@ -1,0 +1,70 @@
+{
+ "name": "gate-run-aarch64-9ce47662-20261116-033256-shard-5",
+ "path": "gate-run-aarch64-9ce47662-20261116-033256-shard-5",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory on AArch64 Linux.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-aarch64-20261116-033256/shard-5/148cea20cd4e70520438e6caef597f66c583d29210fb3f19ab5b480f94412ebf.tar.zst",
+ "sha256": "148cea20cd4e70520438e6caef597f66c583d29210fb3f19ab5b480f94412ebf",
+ "bytes": 423568158,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "81c6ef0bd12308478e6cbb1da593a8a95b35aebb42a81c04dd63c5b587a59045",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "468331d89dfb6fdaf9928cb5de36616898eb58ccf5e8980470a5383286efd111",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "9dca8aafd1c57ffdfd73f94898a4ea18d541d8c439044fe6ff533c2aef49c6d6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "1475f648c731993a370735c545df3695a7730a350a02252892dd722e0e6ce97d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "d1969cae8a0fdd3fd9b5943b36909c894323b12e56a9aa1df60755e738eec6d5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "742fd3874b7382178751d5712e2fe85028865363a82c595e67a9ea95f3714c2b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "d3799c860a75e5eead361c77ce355f96c0533fd04a324a00e771e3592f708439",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "3ea37d42f7288d96c8dd45d31c44bcedffd7fdec03feb856f46e238e205b27fe",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}

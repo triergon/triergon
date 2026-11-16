@@ -6,10 +6,10 @@ pub(crate) mod ps;
 mod qmf;
 pub(crate) mod tables;
 
-pub(crate) use qmf::synthesis_dct;
+pub(crate) use qmf::Modulation;
 
 use crate::error::{DecodeError, Result};
-use crate::fft::{Cpx, Dct4};
+use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
 use freq::FreqTables;
 use tables::NOISE;
@@ -127,7 +127,6 @@ pub(crate) struct Chan {
     /// kx / M used for the previous frame's high band
     kx_prev: usize,
     m_prev: usize,
-    xa: BudgetVec<[Cpx; 32]>,
     xh: BudgetVec<[Cpx; 40]>,
     y: BudgetVec<[Cpx; 64]>,
 }
@@ -172,7 +171,6 @@ impl Chan {
             index_sine: 0,
             kx_prev: 32,
             m_prev: 0,
-            xa: BudgetVec::try_filled(budget, [Cpx::default(); 32], rows(32))?,
             xh: BudgetVec::try_filled(budget, [Cpx::default(); 40], rows(64))?,
             y: BudgetVec::try_filled(budget, [Cpx::default(); 64], rows(40))?,
         })
@@ -236,7 +234,6 @@ impl Chan {
             index_sine: _,
             kx_prev: _,
             m_prev: _,
-            xa,
             xh,
             y,
         } = self; // the fields set to `_` are reset_signal's
@@ -258,7 +255,6 @@ impl Chan {
         *q_orig = [[0.0; 5]; 2];
         *g_hist = [[0.0; 64]; 4];
         *q_hist = [[0.0; 64]; 4];
-        xa.fill([Cpx::default(); 32]);
         xh.fill([Cpx::default(); 40]);
         y.fill([Cpx::default(); 64]);
     }
@@ -554,7 +550,7 @@ impl Sbr {
         nch: usize,
         ps: bool,
         _cpe: bool,
-        dct: &mut Dct4,
+        qmf: &mut Modulation,
     ) {
         let ready = self.have_header && self.data_ok;
         let reset = self.reset && ready;
@@ -567,11 +563,12 @@ impl Sbr {
             let buf: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
             let ch = &mut self.ch[c];
             // QMF analysis of the core output (float scale -> 16-bit domain)
-            for t in 0..32 {
-                let mut tmp = [Cpx::default(); 32];
-                ch.analysis
-                    .run(&buf[t * 32..t * 32 + 32], 32768.0, &mut tmp);
-                ch.xa[t] = tmp;
+            for (t, input) in buf[..1024].chunks_exact(32).enumerate() {
+                let mut bands = [Cpx::default(); 32];
+                ch.analysis.run(qmf, input, 32768.0, &mut bands);
+                for (xl, band) in ch.xl.iter_mut().zip(bands) {
+                    xl[T_HFGEN + t] = band;
+                }
             }
             let (kx, m) = if ready {
                 (self.ft.kx, self.ft.m)
@@ -579,14 +576,12 @@ impl Sbr {
                 (32, 0)
             };
             // low band buffer: history (previous frame, k < kx_prev) + current (k < kx)
-            for k in 0..32 {
-                for t in 0..T_HFGEN {
-                    if k >= ch.kx_prev {
-                        ch.xl[k][t] = Cpx::default();
-                    }
+            for (k, xl) in ch.xl.iter_mut().enumerate() {
+                if k >= ch.kx_prev {
+                    xl[..T_HFGEN].fill(Cpx::default());
                 }
-                for t in 0..32 {
-                    ch.xl[k][T_HFGEN + t] = if k < kx { ch.xa[t][k] } else { Cpx::default() };
+                if k >= kx {
+                    xl[T_HFGEN..T_HFGEN + 32].fill(Cpx::default());
                 }
             }
             if ready {
@@ -597,16 +592,17 @@ impl Sbr {
             let i_temp = (2 * ch.prev_t_env_last).saturating_sub(32).min(8);
             for i in 0..32 {
                 let row = &mut self.x[i];
-                *row = [Cpx::default(); 64];
                 let (kxi, mi) = if i < i_temp {
                     (ch.kx_prev, ch.m_prev)
                 } else {
                     (kx, m)
                 };
-                for (r, xl) in row.iter_mut().zip(&ch.xl[..kxi.min(32)]) {
+                let low = kxi.min(32);
+                for (r, xl) in row.iter_mut().zip(&ch.xl[..low]) {
                     *r = xl[i + T_HFADJ];
                 }
-                let hf = kxi..(kxi + mi).min(64);
+                let hf = kxi.min(64)..(kxi + mi).min(64);
+                row[low..hf.start].fill(Cpx::default());
                 // slots before i_temp take the previous frame's high band, whose last
                 // envelope ended after the frame border; a frame without its SBR element
                 // has no high band, that one included (observed behaviour, HE-AAC v1 and v2
@@ -614,8 +610,11 @@ impl Sbr {
                 // frames)
                 if ready {
                     let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
-                    row[hf.clone()].copy_from_slice(&high[hf]);
+                    row[hf.clone()].copy_from_slice(&high[hf.clone()]);
+                } else {
+                    row[hf.clone()].fill(Cpx::default());
                 }
+                row[hf.end..].fill(Cpx::default());
             }
             // keep state for the next frame
             for xl in ch.xl.iter_mut() {
@@ -674,26 +673,18 @@ impl Sbr {
                         self.x_r[i] = self.x[i];
                     }
                 }
-                for i in 0..32 {
-                    let x = self.x[i];
-                    self.ch[0]
-                        .synthesis
-                        .run(dct, &x, 1.0 / 32768.0, &mut l[i * 64..i * 64 + 64]);
+                for (x, out) in self.x[..32].iter().zip(l.chunks_exact_mut(64)) {
+                    self.ch[0].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
-                for i in 0..32 {
-                    let x = self.x_r[i];
-                    self.ch[1]
-                        .synthesis
-                        .run(dct, &x, 1.0 / 32768.0, &mut r[i * 64..i * 64 + 64]);
+                for (x, out) in self.x_r[..32].iter().zip(r.chunks_exact_mut(64)) {
+                    self.ch[1].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
                 continue;
             }
             let chn = &mut self.ch[c];
             let out: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
-            for i in 0..32 {
-                let x = self.x[i];
-                chn.synthesis
-                    .run(dct, &x, 1.0 / 32768.0, &mut out[i * 64..i * 64 + 64]);
+            for (x, out) in self.x[..32].iter().zip(out.chunks_exact_mut(64)) {
+                chn.synthesis.run(qmf, x, 1.0 / 32768.0, out);
             }
         }
         if ready {
@@ -1380,9 +1371,6 @@ mod tests {
                 (c.num_env, c.l_a, c.kx_prev, c.index_sine) = (2, 1, 9, 3);
                 c.g_hist[1][3] = 1.0;
                 // a single channel element's second channel only synthesises
-                if let Some(row) = c.xa.get_mut(3) {
-                    row[4] = Cpx { re: 1.0, im: -1.0 };
-                }
                 if let Some(row) = c.xl.get_mut(0) {
                     row[0].re = 2.0;
                 }
