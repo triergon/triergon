@@ -333,8 +333,8 @@ pub fn run(options: &Options) -> Result<(), String> {
         &name,
         "timing",
         &bounds,
-        super::memory::gate_platform(),
-    );
+        super::memory::gate_target()?,
+    )?;
     for line in &lines {
         println!("{line}");
     }

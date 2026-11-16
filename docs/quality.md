@@ -749,11 +749,12 @@ they did not measure, after writing every record. `gate run` writes its verdict 
 step's `gate-result.json` (its `status`, with `"cases_checked": true`), so a step that
 [reuses](#reuse) the result takes the verdict; a reused result that no gate run checked
 fails the step, which `--full` measures again. Where the codec gates apply (native
-Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
-does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
-are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
-diagnostics, which they print as such and fail nothing. So no feature measures nothing in
-silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
+Linux with glibc on either gate target, the gate build) they also fail on a workload
+whose runtime or memory bound does not hold, and print a grade's verdict lines, so
+`gate summary` tells failures that are only a list's `open_workloads` on that target
+from others. Each open workload names its measured `cause`, and one with `targets` is
+open on those targets alone; elsewhere the codec bounds are diagnostics, which they
+print as such and fail nothing. So no feature measures nothing in silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
 run limit per target triple (30 s when absent), and every memory observation records how
 long its run took (`process_elapsed_ns`). Each list sets four times its slowest observed
 run on each target, rounded up, from a run at `8154812e`: `workloads.json` 221 s on Linux
