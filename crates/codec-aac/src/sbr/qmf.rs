@@ -145,16 +145,11 @@ impl Analysis {
         for n in 0..32 {
             self.x[p + 31 - n] = input[n] * scale;
         }
-        let x = &self.x[p..p + 320];
+        let x: &[f32; 320] = self.x[p..p + 320].try_into().expect("320 samples");
         let w = &self.t.analysis_win;
-        let mut u = [0f32; 64];
-        for j in 0..5 {
-            let xs = &x[64 * j..64 * j + 64];
-            let ws = &w[64 * j..64 * j + 64];
-            for n in 0..64 {
-                u[n] += xs[n] * ws[n];
-            }
-        }
+        // each sum in a register over its five taps, in tap order
+        let u: [f32; 64] =
+            std::array::from_fn(|n| (0..5).fold(0.0, |u, j| u + x[64 * j + n] * w[64 * j + n]));
         // the DST-IV as a DCT-IV of the reversed input, u[31 - n] + u[32 + n]
         let d: [f32; 32] = std::array::from_fn(|n| u[n] - u[63 - n]);
         let r: [f32; 32] = std::array::from_fn(|n| u[31 - n] + u[32 + n]);
@@ -232,20 +227,14 @@ impl Synthesis {
             v[127 - 2 * k] = co - so;
             v[2 * k] = co + so;
         }
-        let v = &self.v[p..p + 1280];
+        let v: &[f32; 1280] = self.v[p..p + 1280].try_into().expect("1280 samples");
         let w = &self.t.synthesis_win;
-        let mut acc = [0f32; 64];
-        for i in 0..5 {
-            let v0 = &v[256 * i..256 * i + 64];
-            let w0 = &w[128 * i..128 * i + 64];
-            let v1 = &v[256 * i + 192..256 * i + 256];
-            let w1 = &w[128 * i + 64..128 * i + 128];
-            for n in 0..64 {
-                acc[n] += v0[n] * w0[n] + v1[n] * w1[n];
-            }
-        }
-        for n in 0..64 {
-            out[n] = acc[n] * scale;
+        // each sum in a register over its ten taps, in tap order
+        for (n, out) in out[..64].iter_mut().enumerate() {
+            let acc = (0..5).fold(0.0, |acc, i| {
+                acc + (v[256 * i + n] * w[128 * i + n] + v[256 * i + 192 + n] * w[128 * i + 64 + n])
+            });
+            *out = acc * scale;
         }
     }
 }
