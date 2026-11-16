@@ -1,0 +1,69 @@
+{
+ "name": "gate-run-armv7-f8e1c4d9-20261116-084029-shard-2",
+ "path": "gate-run-armv7-f8e1c4d9-20261116-084029-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at f8e1c4d9 under static-toolchain-runtime-trained-order-v1 of the 33 capture, Matroska, subtitle, test and external-vector items, shard 2 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, 32-bit ARMv7: the shard's items (tests-release, capture-c11-motion-960-rate1, capture-c06-ui-scroll-960-bottomup, tests, capture-c08-ui-scroll-480-bottomup, matroska-colour), timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md capture, Matroska and subtitle rows on 32-bit ARMv7; its capture-c06, c08 and c11 timings ran after the release tests had rebuilt the capture worker outside the gate build, their memory steps refused them, and the gate run of those three items at f8e1c4d9 replaces them",
+ "key": "evidence/gate-runs/f8e1c4d9136d5a43661d8f069ca0908e07cb2acc-armv7-20261116-084029/shard-2/1bbb3710a27b8b8d245327724edb5d9763380df3f7387749c9d15206c096d566.tar.zst",
+ "sha256": "1bbb3710a27b8b8d245327724edb5d9763380df3f7387749c9d15206c096d566",
+ "bytes": 285651716,
+ "results": [
+  {
+   "path": "memory/matroska-colour/gate-result.json",
+   "command": "report --memory",
+   "key": "64d42a0df1fcd30a2fa9e34463a0a6b1ff788343ea99552ef29ac8ce28d734a4",
+   "status": 0,
+   "report_sha256": "4ff50aefdfb4f06f182df01a50139b485fdc2fdd3c793e47cfd85b4766f3318e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-colour/gate-result.json",
+   "command": "report --benchmark",
+   "key": "85405b42150684c68b2521558472ad034cae5cfd6402164e614456eeb96d5524",
+   "status": 0,
+   "report_sha256": "fe079ccff75ed37340b20fd0cf42b09d83e4d5fe70ffc4eb7fae5c6f5904e288",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-colour/gate-result.json",
+   "command": "grade",
+   "key": "ad360d9210f1a56e271fff708dd7cf15459b16e6caaff4a549143314709da753",
+   "status": 0,
+   "report_sha256": "32f5a791612132e89b108fe523d51e2cbc166de44ff6392e0ac54d1eb1b79d8e"
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "0b810e7acb524f68450cc3f8f41ccaca102ccacc19b125529f05cdbc03fed85d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "107cf69ddf8d5c106f3e941b066c7056714b29d449e58affb62c1636cf9b9f86",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "b1b9c927884d99b97ad96add38949ab943c97da5808447f9b163c6aafb46306b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "974d7f24ccb02f7757747e7e0032b8af0f557458a6a58ac8d1fc81da83b886d5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "50a724edcfc1bb2da1ac26924646d7a3789eef1fbcc2dc4200a7dd8c1094d662",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

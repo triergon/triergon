@@ -96,7 +96,9 @@ case the harness requires:
 
 Unit tests cover the VLC tables (prefix-free and complete), DC differentials, escape
 levels, reconstruction oddification and saturation, half-sample rounding, motion
-search and bounds, the zero-residual shortcut against the complete transform, and
+search and bounds, the zero-residual shortcut against the complete transform, the
+inverse transform over a block's nonzero coefficients and the forward rows against a
+butterfly transform, and
 skips reused for a repeated picture against the computed path;
 `tests/encoder.rs` covers configuration and geometry refusal. Gates:
 [docs/quality.md](../../docs/quality.md).
