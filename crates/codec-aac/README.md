@@ -92,7 +92,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
   (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 318 KiB each, the
   largest element with SBR and Main prediction (a single channel element holds PS's stereo
   synthesis instead of a second analysed SBR channel), 16 coupling channels of 53 KiB and
-  93 planes of four SBR raw data blocks (2.9 MiB): 18.7 MiB in all.
+  93 planes of four SBR raw data blocks (2.9 MiB): 18.6 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
@@ -156,7 +156,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
 - Gate item `codecs-audio` grades the 39 vectors of the aac lane on Linux AArch64 and 32-bit
-  ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`): 38/39 pass on both at `bbdefa70`; the open
+  ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`): 38/39 pass on both at `4213d042`; the open
   case `aac-sce-in-stereo` differs only in the FR plane FFmpeg leaves unwritten in
   single-SCE frames.
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).

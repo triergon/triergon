@@ -211,31 +211,54 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
         }
         return;
     }
-    // Block by block, one plane at a time: the same additions in the same order as a
-    // per-sample loop over the planes, but each pass over a plane vectorises. A plane
-    // with no gain on either side adds only zeros and is skipped.
-    const BLOCK: usize = 256;
-    let (mut left, mut right) = ([0.0_f32; BLOCK], [0.0_f32; BLOCK]);
-    for (block, frames) in frames.chunks_mut(2 * BLOCK).enumerate() {
-        let start = block * BLOCK;
-        let len = frames.len() / 2;
-        let (left, right) = (&mut left[..len], &mut right[..len]);
-        left.fill(0.0);
-        right.fill(0.0);
+    // Eight frames at a time, the planes in order: each sum starts at zero and adds every
+    // plane's product in plane order, as a per-sample loop would, while the sums stay in
+    // registers (one vector per side where the target has float vectors) across the
+    // planes. A plane with no gain on either side adds only zeros and is skipped.
+    const LANES: usize = 8;
+    let whole = samples - samples % LANES;
+    let (body, tail) = frames.split_at_mut(2 * whole);
+    for (block, frames) in body
+        .as_chunks_mut::<{ 2 * LANES }>()
+        .0
+        .iter_mut()
+        .enumerate()
+    {
+        let start = block * LANES;
+        let (mut left, mut right) = ([0.0_f32; LANES], [0.0_f32; LANES]);
         for (plane, &[gl, gr]) in planes.iter().zip(&matrix.gains) {
             if gl == 0.0 && gr == 0.0 {
                 continue;
             }
-            let plane = &plane[start..start + len];
-            for ((l, r), &v) in left.iter_mut().zip(right.iter_mut()).zip(plane) {
+            let block: &[f32; LANES] = plane[start..start + LANES].try_into().expect("block");
+            for (l, &v) in left.iter_mut().zip(block) {
                 *l += v * gl;
+            }
+            for (r, &v) in right.iter_mut().zip(block) {
                 *r += v * gr;
             }
         }
-        for ((frame, &l), &r) in frames.chunks_exact_mut(2).zip(&*left).zip(&*right) {
-            frame[0] = to_s16(l);
-            frame[1] = to_s16(r);
+        for ((frame, l), r) in frames
+            .as_chunks_mut::<2>()
+            .0
+            .iter_mut()
+            .zip(left)
+            .zip(right)
+        {
+            *frame = [to_s16(l), to_s16(r)];
         }
+    }
+    for (i, frame) in (whole..samples).zip(tail.chunks_exact_mut(2)) {
+        let (mut l, mut r) = (0.0_f32, 0.0_f32);
+        for (plane, &[gl, gr]) in planes.iter().zip(&matrix.gains) {
+            if gl == 0.0 && gr == 0.0 {
+                continue;
+            }
+            l += plane[i] * gl;
+            r += plane[i] * gr;
+        }
+        frame[0] = to_s16(l);
+        frame[1] = to_s16(r);
     }
 }
 
@@ -535,6 +558,47 @@ mod tests {
                 .all(|(pair, &x)| pair == [(x * 32768.0) as i16; 2]),
             "a 16-bit stereo pair passes through exactly"
         );
+    }
+
+    #[test]
+    fn float_mix_adds_the_planes_in_order_for_every_frame() {
+        let five_one = [
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackLeft,
+            BackRight,
+        ];
+        let matrix = StereoMatrix::for_layout(&five_one);
+        let mut seed = 7_u32;
+        for samples in [0, 1, 3, 4, 5, 1023, 1024] {
+            let planes: Vec<Vec<f32>> = (0..6)
+                .map(|_| {
+                    (0..samples)
+                        .map(|_| {
+                            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                            (seed as i32) as f32 / 2_147_483_648.0
+                        })
+                        .collect()
+                })
+                .collect();
+            let mut out = vec![9];
+            mix_into(&matrix, &planes, samples, &mut out);
+            let mut want = vec![9];
+            for i in 0..samples {
+                for side in 0..2 {
+                    let mut sum = 0.0_f32;
+                    for (plane, gain) in planes.iter().zip(&matrix.gains) {
+                        if gain[0] != 0.0 || gain[1] != 0.0 {
+                            sum += plane[i] * gain[side];
+                        }
+                    }
+                    want.push(to_s16(sum));
+                }
+            }
+            assert_eq!(out, want, "{samples} frames");
+        }
     }
 
     #[test]
