@@ -99,8 +99,8 @@ c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 plans, step records and logs, `aac-access-units-a73350ca-TARGET` the AAC in MOV
 measurements, and `closing-run-ratios-a73350ca` every timed case's paired median and 95%
 bounds with, per feature and target, the cases whose median or bound is above 1.0 and whose
-bound is above 1.20, 1.10 and 1.05, and the median of the case medians. The run predates
-the `codecs-audio` item, graded at `bbdefa70`.
+bound is above the [ceiling](quality.md#gates), 1.10 and 1.05, and the median of the case
+medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
 
 The rows at `79e0ae13` come from one full sharded gate run per target
 ([running the gates](quality.md#running-the-gates)), each on ten c6g.4xlarge hosts
