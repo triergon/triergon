@@ -721,10 +721,8 @@ I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, the
 tests, and the font, shaping, rasterising and ASS comparisons. Every registered feature
 is either one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated
 (an on-demand or
-diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
-target leaves out an item that cannot measure there, with the reason `gate plan --target
-TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback worker runs
-its numeric modes only on native Linux AArch64. `cargo xtask gate plan --shards N`
+diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. Both
+targets run every item. `cargo xtask gate plan --shards N`
 splits the items into N shards of about equal planning weight, each for its own host;
 the weights are the minutes each item took on a c6g.4xlarge, the more of the two
 targets. `--items NAME,...`, given to every gate command of a run, narrows the plan to

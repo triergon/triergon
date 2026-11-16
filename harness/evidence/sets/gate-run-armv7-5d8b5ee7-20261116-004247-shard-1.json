@@ -1,0 +1,27 @@
+{
+ "name": "gate-run-armv7-5d8b5ee7-20261116-004247-shard-1",
+ "path": "gate-run-armv7-5d8b5ee7-20261116-004247-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run of progressive at 5d8b5ee7 under static-toolchain-runtime-trained-order-v1, one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws, 32-bit ARMv7: parity and the five functional controls, timing on CPU 1 and kernel-bound memory on CPUs 1-15, 3 of 3 cases on each; the shard outputs, build identities, plan, step records and logs; for the docs/status.md ARMv7 progressive row",
+ "key": "evidence/gate-runs/5d8b5ee7cfc90a0e21696a242a48cbabaf342651-armv7-20261116-004247/shard-1/fe3019ef8bac2fcb9bd08008a66658c22eb3cd9b185085250ddb32fdf5e836b8.tar.zst",
+ "sha256": "fe3019ef8bac2fcb9bd08008a66658c22eb3cd9b185085250ddb32fdf5e836b8",
+ "bytes": 4752111,
+ "results": [
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "ff5b554e05e3d3a48c633323c38756e59023dcac4b21e5fba8e482e8910d2ff2",
+   "status": 0,
+   "report_sha256": "a861c3b3f3c2ba76728a3c6edf0d041926fb07544dee619a2ab4359bad4e7636",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b48dcc5a0d9af0ad8c8425bcc990a9b05575863769860c7b8445ea5cce6e469c",
+   "status": 0,
+   "report_sha256": "cbec7c8f3875d8c2b4495beff3818d30779fb90049e02af7a29c005c0264154a",
+   "cases_checked": true
+  }
+ ]
+}

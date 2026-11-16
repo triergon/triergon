@@ -34,7 +34,7 @@ pub const USAGE: &str = "usage: cargo xtask gate plan [--shards N] [--target TAR
 
   plan       print the gate's items and their planning weights (minutes on a
              32-bit ARMv7 c6g.4xlarge), split into N shards (default 1), for
-             TARGET (default: every item), and the items a target leaves out
+             TARGET (default: every item)
   check      on any machine, before a host is launched: every file the preflight
              of each of N shards reads, resolved as the shard resolves it, is
              committed, generated from committed sources by a host's prepare,
@@ -245,14 +245,6 @@ fn coverage_problems(root: &Path) -> R<Vec<String>> {
     }
     Ok(problems)
 }
-/// Items a target leaves out of its plan, with the reason `gate plan` gives: what
-/// they measure cannot run there, so a run would only record nothing measured.
-const NOT_ON_TARGET: [(&str, &str, &str); 1] = [(
-    "progressive",
-    "thumbv7neon-unknown-linux-gnueabihf",
-    "the playback worker's progressive numeric modes run only on native Linux AArch64",
-)];
-
 /// Each capture case's planning weight, as [`FEATURES`] gives the features'; a case
 /// not listed weighs [`CAPTURE_WEIGHT`].
 const CAPTURE_WEIGHTS: [(&str, u32); 15] = [
@@ -901,11 +893,6 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         ],
         preflight: Vec::new(),
     });
-    items.retain(|item| {
-        !NOT_ON_TARGET
-            .iter()
-            .any(|(name, on, _)| item.name == *name && target == *on)
-    });
     items
 }
 
@@ -1398,9 +1385,6 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                     options.shards,
                     names.join(" ")
                 );
-            }
-            for (item, on, reason) in NOT_ON_TARGET {
-                println!("{item}: not run on {on}, {reason}");
             }
             for (id, coverage) in COVERED {
                 match coverage {
@@ -2769,19 +2753,6 @@ mod tests {
     }
 
     #[test]
-    fn armv7_leaves_progressive_out_of_its_plan_and_aarch64_keeps_it() {
-        let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
-        let names = |target: &str| -> Vec<String> {
-            items("/o", false, target, "target/release", &capture)
-                .into_iter()
-                .map(|item| item.name)
-                .collect()
-        };
-        assert!(!names("thumbv7neon-unknown-linux-gnueabihf").contains(&"progressive".to_owned()));
-        assert!(names("aarch64-unknown-linux-gnu").contains(&"progressive".to_owned()));
-    }
-
-    #[test]
     fn a_selection_narrows_the_plan_and_refuses_names_it_lacks() {
         let names = |selection: &[&str]| {
             let selection: Vec<String> = selection.iter().map(|&s| s.to_owned()).collect();
@@ -2795,8 +2766,21 @@ mod tests {
                 "font-shape-raster-ass".to_owned()
             ])
         );
-        assert!(names(&["progressive"]).is_err());
+        assert_eq!(
+            names(&["no-such-item"]),
+            Err("--items no-such-item: not an item of this target's plan".to_owned())
+        );
         assert_eq!(select(plan(), None).unwrap().len(), plan().len());
+        // Both targets plan every item, the progressive suite among them.
+        let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
+        for target in TARGETS {
+            let release = format!("target/{target}/release");
+            let selected = select(
+                items("/o", false, target, &release, &capture),
+                Some(&["progressive".to_owned()]),
+            );
+            assert_eq!(selected.map(|items| items.len()), Ok(1), "{target}");
+        }
     }
 
     #[test]

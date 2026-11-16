@@ -415,14 +415,8 @@ pub(super) fn run(args: &[String]) -> Result<()> {
         "at-eof" => false,
         _ => return Err("expected before-eof or at-eof progress requirement".into()),
     };
-    match invocation.mode {
-        Mode::Bench if invocation.iterations != 50 => {
-            return Err("progressive-bench runs 50 sessions".into());
-        }
-        Mode::Bench | Mode::Memory if !cfg!(all(target_os = "linux", target_arch = "aarch64")) => {
-            return Err("numeric modes require native Linux AArch64".into());
-        }
-        _ => {}
+    if invocation.mode == Mode::Bench && invocation.iterations != 50 {
+        return Err("progressive-bench runs 50 sessions".into());
     }
     let path = Path::new(invocation.path);
     let trace = invocation.mode == Mode::Trace;
