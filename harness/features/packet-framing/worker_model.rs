@@ -159,21 +159,39 @@ fn group_eight<const BASE: u32>(first: [u8; 4], last: [u8; 4]) -> u64 {
         + u64::from(group_four::<BASE>(last))
 }
 
+// Fold each polynomial in its own call on 32-bit ARM. Folded together, the
+// compiler pairs the two sums in vector lanes there, and every group then
+// moves between vector and general registers: the fold took 1.5 times the
+// cycles of the reference's identical C fold. On AArch64 the paired form is
+// the faster one.
+const SEPARATE_FOLDS: bool = cfg!(target_arch = "arm");
+
+// One polynomial over words, each one eight-byte group of its little-endian
+// bytes, and then over bytes, in eight-byte groups and then single bytes.
+#[inline(never)]
+fn fold<const BASE: u32>(mut sum: u64, words: &[u64], bytes: &[u8]) -> u64 {
+    let group = |sum: u64, [c0, c1, c2, c3, c4, c5, c6, c7]: [u8; 8]| {
+        sum.wrapping_mul(u64::from(BASE).pow(8))
+            .wrapping_add(group_eight::<BASE>([c0, c1, c2, c3], [c4, c5, c6, c7]))
+    };
+    for word in words {
+        sum = group(sum, word.to_le_bytes());
+    }
+    let (chunks, rest) = bytes.as_chunks::<8>();
+    for &chunk in chunks {
+        sum = group(sum, chunk);
+    }
+    for &byte in rest {
+        sum = sum
+            .wrapping_mul(u64::from(BASE))
+            .wrapping_add(u64::from(byte));
+    }
+    sum
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Digest(pub u64, pub u64);
 impl Digest {
-    /// Same wrapping polynomial fold as one byte at a time. Eight-byte groups use
-    /// h*k^8 + sum(b[i]*k^(7-i)), which is equal modulo 2^64 and shortens the chain.
-    pub fn raw(&mut self, bytes: &[u8]) {
-        let (chunks, rest) = bytes.as_chunks::<8>();
-        for chunk in chunks {
-            self.group(chunk);
-        }
-        for &b in rest {
-            self.0 = self.0.wrapping_mul(31).wrapping_add(u64::from(b));
-            self.1 = self.1.wrapping_mul(131).wrapping_add(u64::from(b));
-        }
-    }
     #[inline(always)]
     fn group(&mut self, chunk: &[u8; 8]) {
         let &[a, b, c, d, e, f, g, h] = chunk;
@@ -191,21 +209,36 @@ impl Digest {
     /// A word is exactly one eight-byte group of its little-endian bytes.
     // Initialization, packet metadata, and teardown all emit the same word.
     pub fn word(&mut self, n: u64) {
-        self.group(&n.to_le_bytes());
-    }
-    /// Append consecutive metadata words with a single fold call.
-    pub fn words(&mut self, words: &[u64]) {
-        for &word in words {
-            self.group(&word.to_le_bytes());
-        }
+        self.fold(&[n], &[]);
     }
     #[inline]
     pub fn signed(&mut self, n: i64) {
         self.word(n as u64);
     }
     pub fn blob(&mut self, bytes: &[u8]) {
-        self.word(bytes.len() as u64);
-        self.raw(bytes);
+        self.fold(&[bytes.len() as u64], bytes);
+    }
+    /// Words, then bytes, in one fold call. The same wrapping polynomial fold
+    /// as one byte at a time: eight-byte groups use h*k^8 + sum(b[i]*k^(7-i)),
+    /// which is equal modulo 2^64 and shortens the chain.
+    #[inline(always)]
+    pub fn fold(&mut self, words: &[u64], bytes: &[u8]) {
+        if SEPARATE_FOLDS {
+            self.0 = fold::<31>(self.0, words, bytes);
+            self.1 = fold::<131>(self.1, words, bytes);
+            return;
+        }
+        for &word in words {
+            self.group(&word.to_le_bytes());
+        }
+        let (chunks, rest) = bytes.as_chunks::<8>();
+        for chunk in chunks {
+            self.group(chunk);
+        }
+        for &b in rest {
+            self.0 = self.0.wrapping_mul(31).wrapping_add(u64::from(b));
+            self.1 = self.1.wrapping_mul(131).wrapping_add(u64::from(b));
+        }
     }
 }
 
@@ -245,13 +278,20 @@ mod digest_tests {
                 for offset in 0..3 {
                     let bytes = &data[offset..offset + len.min(data.len() - offset)];
                     let mut grouped = start;
-                    grouped.raw(bytes);
+                    grouped.fold(&[], bytes);
                     assert_eq!(grouped, serial(start, bytes));
                 }
             }
             let mut grouped = start;
-            grouped.raw(&[0xff; 64]);
+            grouped.fold(&[], &[0xff; 64]);
             assert_eq!(grouped, serial(start, &[0xff; 64]));
+            // Words fold as their little-endian bytes, before the bytes.
+            let words = [seed, u64::MAX, 0, 90000];
+            let mut joined: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
+            joined.extend_from_slice(&data[..13]);
+            let mut grouped = start;
+            grouped.fold(&words, &data[..13]);
+            assert_eq!(grouped, serial(start, &joined));
         }
     }
 }
