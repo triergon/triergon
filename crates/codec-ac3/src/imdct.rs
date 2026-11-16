@@ -39,13 +39,14 @@ impl<const N: usize> Fft<N> {
         Fft { cos, sin }
     }
 
-    /// Transforms the points `z(k)`, k = 0..N, into `re`/`im` in natural order with output n
-    /// multiplied by `post` (cos, sin) at n.
+    /// Transforms the points `z(k)`, k = 0..N, and passes output n multiplied by `post`
+    /// (cos, sin) at n to `emit`. `re` and `im` are the work space.
     #[inline(always)]
     fn run(
         &self,
-        z: impl Fn(usize) -> (f32, f32),
+        z: impl Fn(usize) -> Complex,
         post: (&[f32; N], &[f32; N]),
+        emit: impl FnMut(usize, Complex),
         re: &mut [f32; N],
         im: &mut [f32; N],
     ) {
@@ -55,7 +56,7 @@ impl<const N: usize> Fft<N> {
             dft4_pass(z, re, im);
         }
         self.radix4_pass(N / 4, re, im);
-        self.last_pass(post, re, im);
+        self.last_pass(post, emit, re, im);
     }
 
     /// Combines four DFTs of length L/4 at each multiple of L into one of length L.
@@ -81,7 +82,13 @@ impl<const N: usize> Fft<N> {
 
     /// The final radix-4 pass (length N) with the post-twiddle of every output.
     #[inline(always)]
-    fn last_pass(&self, (pc, ps): (&[f32; N], &[f32; N]), re: &mut [f32; N], im: &mut [f32; N]) {
+    fn last_pass(
+        &self,
+        (pc, ps): (&[f32; N], &[f32; N]),
+        mut emit: impl FnMut(usize, Complex),
+        re: &mut [f32; N],
+        im: &mut [f32; N],
+    ) {
         let q = N / 4;
         let (c, s) = (&self.cos, &self.sin);
         let [r0, r1, r2, r3] = quarters(re, q);
@@ -93,10 +100,10 @@ impl<const N: usize> Fft<N> {
             let a2 = cmul((r2[k], i2[k]), (c[1][q + k], s[1][q + k]));
             let a3 = cmul((r3[k], i3[k]), (c[2][q + k], s[2][q + k]));
             let x = dft4((r0[k], i0[k]), a1, a2, a3);
-            (r0[k], i0[k]) = cmul(x[0], (pc0[k], ps0[k]));
-            (r1[k], i1[k]) = cmul(x[1], (pc1[k], ps1[k]));
-            (r2[k], i2[k]) = cmul(x[2], (pc2[k], ps2[k]));
-            (r3[k], i3[k]) = cmul(x[3], (pc3[k], ps3[k]));
+            emit(k, cmul(x[0], (pc0[k], ps0[k])));
+            emit(q + k, cmul(x[1], (pc1[k], ps1[k])));
+            emit(2 * q + k, cmul(x[2], (pc2[k], ps2[k])));
+            emit(3 * q + k, cmul(x[3], (pc3[k], ps3[k])));
         }
     }
 }
@@ -203,7 +210,10 @@ pub(crate) struct Imdct {
     s2: [f32; 64],
     /// 2 * w[n], n = 0..256 (first half of the symmetric 512-point window).
     w: [f32; 256],
-    /// Post-twiddled IFFT output y[n] (two 64-point halves for the short transforms).
+    /// Work space of the IFFT.
+    re: [f32; 128],
+    im: [f32; 128],
+    /// Post-twiddled IFFT output y[n] (y1 and y2 for the short transforms).
     yr: [f32; 128],
     yi: [f32; 128],
 }
@@ -237,6 +247,8 @@ impl Imdct {
             c2,
             s2,
             w,
+            re: [0.0; 128],
+            im: [0.0; 128],
             yr: [0.0; 128],
             yi: [0.0; 128],
         })
@@ -251,8 +263,37 @@ impl Imdct {
             let (xr, xi) = (x[255 - 2 * k], x[2 * k]);
             (xr * c1[k] - xi * s1[k], xi * c1[k] + xr * s1[k])
         };
-        self.fft128.run(z, (c1, s1), &mut self.yr, &mut self.yi);
-        window_overlap(&self.yr, &self.yi, &self.w, delay, out);
+        let w = &self.w;
+        if cfg!(target_arch = "arm") {
+            // Without f32 vectors (ARMv7), windowing, de-interleaving and overlap-add
+            // (steps 5 and 6) of each output as the transform produces it save a pass over
+            // memory: y[m] lands at samples 127 - 2m and 128 + 2m of both halves, y[64 + m]
+            // at 2m and 255 - 2m. Each delay sample is read before it is replaced.
+            let emit = |n: usize, (yr, yi): Complex| {
+                if n < 64 {
+                    let (a, b) = (127 - 2 * n, 128 + 2 * n);
+                    out[a] = yr * w[a] + delay[a];
+                    out[b] = -yr * w[b] + delay[b];
+                    delay[a] = yi * w[b];
+                    delay[b] = yi * w[a];
+                } else {
+                    let (a, b) = (2 * (n - 64), 255 - 2 * (n - 64));
+                    out[a] = -yi * w[a] + delay[a];
+                    out[b] = yi * w[b] + delay[b];
+                    delay[a] = -yr * w[b];
+                    delay[b] = -yr * w[a];
+                }
+            };
+            self.fft128
+                .run(z, (c1, s1), emit, &mut self.re, &mut self.im);
+        } else {
+            // Elsewhere the separate loops vectorise.
+            let (yr, yi) = (&mut self.yr, &mut self.yi);
+            let emit = |n: usize, y: Complex| (yr[n], yi[n]) = y;
+            self.fft128
+                .run(z, (c1, s1), emit, &mut self.re, &mut self.im);
+            window_overlap(&self.yr, &self.yi, w, delay, out);
+        }
     }
 
     /// Two interleaved 256-sample transforms (blksw = 1).
@@ -260,16 +301,16 @@ impl Imdct {
         let out = &mut out[..256];
         let (c2, s2) = (&self.c2, &self.s2);
         // The even coefficients give y1 in yr/yi[0..64], the odd ones y2 in [64..128].
-        let (y1r, y2r) = self.yr.split_at_mut(64);
-        let (y1i, y2i) = self.yi.split_at_mut(64);
-        for (half, yr, yi) in [(0, y1r, y1i), (1, y2r, y2i)] {
+        let re: &mut [f32; 64] = (&mut self.re[..64]).try_into().expect("64 points");
+        let im: &mut [f32; 64] = (&mut self.im[..64]).try_into().expect("64 points");
+        for half in 0..2 {
             let z = |k: usize| {
                 let (xr, xi) = (x[2 * (127 - 2 * k) + half], x[4 * k + half]);
                 (xr * c2[k] - xi * s2[k], xi * c2[k] + xr * s2[k])
             };
-            let yr: &mut [f32; 64] = yr.try_into().expect("64 points");
-            let yi: &mut [f32; 64] = yi.try_into().expect("64 points");
-            self.fft64.run(z, (c2, s2), yr, yi);
+            let (yr, yi) = (&mut self.yr, &mut self.yi);
+            let emit = |n: usize, y: Complex| (yr[64 * half + n], yi[64 * half + n]) = y;
+            self.fft64.run(z, (c2, s2), emit, re, im);
         }
         let (y1r, y2r) = self.yr.split_at(64);
         let (y1i, y2i) = self.yi.split_at(64);
