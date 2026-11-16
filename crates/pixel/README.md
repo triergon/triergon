@@ -94,8 +94,8 @@ on the width:
   does, within 1 of that build's output.
 
 On the filtered path, a 2-row picture takes chroma from the lower row. A 4-row
-picture averages each pair of rows. In a 6-row picture, the top chroma sample
-uses the first three rows with weights 3/7, 3/7 and 1/7. The other two samples
+picture averages each pair of rows. In a 6-row picture, the top chroma row
+uses the first three rows with weights 3/7, 3/7 and 1/7. The other two rows
 use the usual four taps.
 
 FFmpeg built for AArch64 takes the filtered path at every width. Input shorter than
