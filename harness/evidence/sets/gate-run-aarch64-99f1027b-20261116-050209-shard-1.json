@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-99f1027b-20261116-050209-shard-1",
+ "path": "gate-run-aarch64-99f1027b-20261116-050209-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run of item subtitle-pgs at 99f1027b under static-toolchain-runtime-trained-order-v1 on one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws, Linux AArch64: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grade, with the build identities, plan, step records and logs; for the docs/status.md PGS rows after the PGS worker stopped copying its input for the input digest",
+ "key": "evidence/gate-runs/99f1027b1e6a4bddb0b1a99b84cc79756116d8cb-aarch64-20261116-050209/shard-1/4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1.tar.zst",
+ "sha256": "4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1",
+ "bytes": 32432794,
+ "results": [
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "953cfb180f565c2197a9359f8fb05dd9ba5f434b7b19abdbef089772ffbf3e0e",
+   "status": 0,
+   "report_sha256": "61d7286bb829cc75be902259298d4379e5b6988928c2f309d3a9e47e795020ad",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a7398461282d0e3f03a8c28a62fd8ec495786e60d452684bcf1b0588c0d90e3f",
+   "status": 0,
+   "report_sha256": "1255880efea187c0dadc1bd55882ffed15b22c5714b0e7120b735ac68ee204ab",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "019e2e5c2919c9881b56197d231a4e61e6fe4fd2326b283a339b750acd720e33",
+   "status": 0,
+   "report_sha256": "28a6b9442ac845c828972ed441416c19172f24d4a9692cf4b214009eaf0a314e"
+  }
+ ]
+}

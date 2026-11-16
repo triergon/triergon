@@ -59,7 +59,7 @@ worker's operations read only the raw-video and timed-text movies of its compari
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.8026 (71/71 pass) | heap ≤0.0207, total RSS ≤0.7318 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.1873 (135/135 pass for AVC/HEVC) | heap ≤0.9367 (135/135 lower), total RSS fails at 1.0267 (134/135 lower; `avc-bad-update`) | AArch64 total RSS, ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 1.0271 (367/367 pass; worst `charset-windows-1251-text`) | heap ≤0.3360, total RSS ≤0.9311 (367/367 lower) | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; FATE coverage |
-| Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7799 (319/319 pass) | heap ≤0.9654 (319/319 lower), total RSS fails at 1.4305 (315/319 lower: the four `long-movie` cases, 1.1903 to 1.4305) | total RSS of the four `long-movie` cases on both targets ([32-bit ARMv7](#32-bit-armv7)); FATE coverage |
+| Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8098 (319/319 pass) at `99f1027b` | heap ≤0.9654, total RSS ≤0.9596 (319/319 lower) at `99f1027b` | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7248 (229/229 pass) | heap ≤0.5788, total RSS ≤0.7373 (229/229 lower) | — |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` (−2 keeps a region's first automatic palette until a new epoch) | 241/241 cases (`subtitle-dvb`: TS and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.9036 (241/241 pass; worst `long-text-mkv`) | heap ≤0.7116, total RSS ≤0.8029 (241/241 lower) | FATE coverage |
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 233 cases: `subtitle-dvd` 228/228 on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), and `subtitle-dvd-host`'s 5, pinned per target, 5/5 on ARMv7 and 1/5 on AArch64 | 0.7898 (228/228 pass) | heap ≤0.9590, total RSS ≤0.8565 (228/228 lower) | FATE coverage; on AArch64, `subtitle-dvd-host`'s 4 open cases, target-dependent by design: FFmpeg there reads numbers of a VobSub configuration and of the `palette` option beyond 32 bits with 64, and the decoder follows FFmpeg on 32-bit ARM |
@@ -95,7 +95,8 @@ then failed on parity alone, so the memory bounds above 1.0 of packet framing an
 four `long-movie` PGS cases were in the graded reports' acceptance, not in the step results.
 A grade now fails on a case whose bound fails ([bounds](quality.md#reference-and-corpus)): graded
 again, the PGS grades fail on both targets, and packet framing's total RSS fails as listed
-in its contract's `open_bounds`. AAC
+in its contract's `open_bounds`. The PGS rows have since been measured again at `99f1027b`
+(below). AAC
 in MOV, which the gate does not run, was measured at the same revision on one more
 c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 `gate-run-TARGET-a73350ca-*-shard-1` to `-8` hold the shards' outputs, build identities,
@@ -104,6 +105,15 @@ measurements, and `closing-run-ratios-a73350ca` every timed case's paired median
 bounds with, per feature and target, the cases whose median or bound is above 1.0 and whose
 bound is above the [ceiling](quality.md#gates), 1.10 and 1.05, and the median of the case
 medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
+
+The PGS rows at `99f1027b` come from one partial gate run of the `subtitle-pgs` item per
+target, each on one c6g.4xlarge (Graviton2) from the gate image, kernel `7.0.0-1014-aws`,
+under the link policy `static-toolchain-runtime-trained-order-v1`: timed alone on CPU 1,
+memory collected under the kernel RSS proof on CPUs 1–15, and graded with the module
+loaded; every step passes 319 of 319 cases. Sets
+`gate-run-aarch64-99f1027b-20261116-050209-shard-1` and
+`gate-run-armv7-99f1027b-20261116-050516-shard-1` hold each target's outputs, build
+identities, plan, step records and logs.
 
 The rows at `79e0ae13` come from one full sharded gate run per target
 ([running the gates](quality.md#running-the-gates)), each on ten c6g.4xlarge hosts
@@ -633,6 +643,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Full gate run, ARMv7, shard 8 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`2154275af63ffe7e42974a6576f416a8e8bdbe130728b24ed3670ba4a001f49d`](../harness/evidence/sets/gate-run-armv7-a73350ca-20261116-022908-shard-8.json) |
 | AAC in MOV, ARMv7 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`ac664cca8d09697977201d5538a7542e925bdc4bd4ac75b106af4ee94872b698`](../harness/evidence/sets/aac-access-units-a73350ca-armv7.json) |
 | Per-case runtime ratios of the full gate runs and AAC in MOV, both targets | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`74bd0b90c8f4697c0e624136fcc511808a33d57158aaa27aa8a25e734ffcb3bb`](../harness/evidence/sets/closing-run-ratios-a73350ca.json) |
+| Subtitles, PGS, Linux AArch64 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1`](../harness/evidence/sets/gate-run-aarch64-99f1027b-20261116-050209-shard-1.json) |
+| Subtitles, PGS, ARMv7 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4c93b0902098f445ae645b18cc1df079177e3ae6bd45876e1f643f18b163b2de`](../harness/evidence/sets/gate-run-armv7-99f1027b-20261116-050516-shard-1.json) |
 | ISO BMFF open and index, AArch64 part 1 of 3 | `d315f73c3b7d944442d465bed89908f230be286f` | [`e580e786653f5f4647b325ab16f4295d526814103f34fbba8e4a31fade86afa7`](../harness/evidence/sets/gate-run-aarch64-d315f73c-20261116-010313-shard-1.json) |
 | ISO BMFF open and index, AArch64 part 2 of 3 | `d315f73c3b7d944442d465bed89908f230be286f` | [`997a310b2595a8490854a01a75444f78428dddc1665b61eb4ac8361f3b42919c`](../harness/evidence/sets/gate-run-aarch64-d315f73c-20261116-010313-shard-2.json) |
 | ISO BMFF open and index, AArch64 part 3 of 3 | `d315f73c3b7d944442d465bed89908f230be286f` | [`a537ace87a00dfbcdbbe1b89a5d8ccd8098867d7064e15d6ab74992ed5edba67`](../harness/evidence/sets/gate-run-aarch64-d315f73c-20261116-010313-shard-3.json) |
@@ -961,7 +973,7 @@ measured cause in its list's `open_workloads`.
 | Shaping | `shape-libass` 209/209 and `shape-text` 209/209 at `69d4d0f8`, `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1, `shape-extents` 9/9 | not measured | not measured |
 | ASS rendering | `ass-render` 100/100 and `ass-render-host` 4/4 pass; the crate's tests pass | `ass-render` 0.7987 (100/100 pass), `ass-render-host` 0.7431 (4/4 pass) | heap ≤0.9754, total RSS ≤0.9979 (104/104 lower) |
 | Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 0.9948 (367/367 pass); `subtitle-text-host` 0.0758 (23/23 pass) | `subtitle-text` heap ≤0.3358, total RSS ≤0.9983 (367/367 lower); `subtitle-text-host` heap ≤0.0075, total RSS ≤0.9351 (23/23 lower) |
-| Subtitles, PGS | 319/319 (`subtitle-pgs`) | 1.0033 (319/319 pass) | heap ≤0.9678 (319/319 lower), total RSS fails at 1.5305 (315/319 lower: the four `long-movie` cases, 1.3049 to 1.5305) |
+| Subtitles, PGS | 319/319 (`subtitle-pgs`) | 1.0109 (319/319 pass) at `99f1027b` | heap ≤0.9678, total RSS ≤0.9926 (319/319 lower) at `99f1027b` |
 | Subtitles, PGS capsules | 229/229 (`subtitle-pgs-capsules`) | 0.6940 (229/229 pass) | heap ≤0.5966, total RSS ≤0.8108 (229/229 lower) |
 | Subtitles, DVB | 241/241 (`subtitle-dvb`) | 0.8663 (241/241 pass) | heap ≤0.7118, total RSS ≤0.8589 (241/241 lower) |
 | Subtitles, DVD | 228/228 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | `subtitle-dvd` 1.0869 (228/228 pass); `subtitle-dvd-host` 0.7825 (5/5 pass) | `subtitle-dvd` heap ≤0.9657, total RSS ≤0.8831 (228/228 lower); `subtitle-dvd-host` heap ≤0.2037, total RSS ≤0.8003 (5/5 lower) |
@@ -994,9 +1006,16 @@ closed captions on the third host, they give 0.9713 (above in 4 pairs) and 0.990
 three collections. At `79e0ae13` both features are lower than the reference in total RSS in
 every case. At `a73350ca` the four `long-movie` PGS cases are above it on both targets:
 total RSS 1.1903 to 1.4305 on Linux AArch64 and 1.3049 to 1.5305 here, with heap at most
-0.9563 and no memory reclaimed on either host during the collections. The cause of the rise
-is not established. They fail their grade steps, as any case whose bound fails without
-being listed in its contract's `open_bounds`.
+0.9563 and no memory reclaimed on either host during the collections. The reference's
+figures were unchanged; the worker started the operation with about 3.8 MB more resident
+memory (10.0 to 10.4 MB against 6.2 to 6.7 MB at `79e0ae13` on Linux AArch64), one
+allocation more per packet. Every timed and measured run had begun to report the prepared
+packets' input digest, and the PGS worker worked it out from its `sub-input` view, which
+copies every packet payload out of the pool and was kept for the rest of the process: a
+second copy of the 3.77 MB input. The worker now folds the digest from the packets' clocks
+(`99f1027b`), its output unchanged, and starts the operation with 6.3 to 6.9 MB on Linux
+AArch64 and 5.7 to 6.3 MB here. All four cases are lower again on both targets: 0.7723 to
+0.9596 on Linux AArch64 and 0.8450 to 0.9926 here.
 
 The DVD decoder gives the numbers of a VobSub configuration and of the `palette` option the
 values observed in FFmpeg built for ARMv7: a colour list's numbers (the `palette` option and

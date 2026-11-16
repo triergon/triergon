@@ -169,6 +169,13 @@ impl Prepared for Pgs {
             }
         }))
     }
+
+    fn input_digest(&self) -> Option<u64> {
+        // The `input` view's clocks: each packet's PTS and no duration.
+        Some(crate::input_digest(
+            self.packets.iter().map(|(_, clock)| (clock.pts, None)),
+        ))
+    }
 }
 
 /// One rectangle as the reference's API presents it: 256 palette words and
