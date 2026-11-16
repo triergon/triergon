@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
+#![cfg_attr(feature = "simd", feature(portable_simd))]
 #![warn(
     missing_debug_implementations,
     unreachable_pub,

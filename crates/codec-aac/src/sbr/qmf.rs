@@ -142,23 +142,37 @@ impl Analysis {
         }
         self.pos -= 32;
         let p = self.pos;
-        for n in 0..32 {
-            self.x[p + 31 - n] = input[n] * scale;
-        }
-        // each sum in a register over its five taps x[64j + n] w[64j + n], in tap order, four
-        // sums a block
-        let x = &self.x[p..p + 320];
-        let w = &self.t.analysis_win;
-        let x: [&[[f32; 4]]; 5] = std::array::from_fn(|j| x[64 * j..][..64].as_chunks().0);
-        let w: [&[[f32; 4]]; 5] = std::array::from_fn(|j| w[64 * j..][..64].as_chunks().0);
-        let mut u = [[0f32; 4]; 16];
-        for (b, u) in u.iter_mut().enumerate() {
-            *u = std::array::from_fn(|i| (0..5).fold(0.0, |u, j| u + x[j][b][i] * w[j][b][i]));
-        }
-        let u = u.as_flattened();
-        // the DST-IV as a DCT-IV of the reversed input, u[31 - n] + u[32 + n]
-        let d: [f32; 32] = std::array::from_fn(|n| u[n] - u[63 - n]);
-        let r: [f32; 32] = std::array::from_fn(|n| u[31 - n] + u[32 + n]);
+        #[cfg(feature = "simd")]
+        let (d, r) = {
+            let u = super::simd::analysis_window(
+                &mut self.x[p..p + 320],
+                input,
+                scale,
+                &self.t.analysis_win,
+            );
+            super::simd::analysis_fold(&u)
+        };
+        #[cfg(not(feature = "simd"))]
+        let (d, r) = {
+            for n in 0..32 {
+                self.x[p + 31 - n] = input[n] * scale;
+            }
+            // each sum in a register over its five taps x[64j + n] w[64j + n], in tap order,
+            // four sums a block
+            let x = &self.x[p..p + 320];
+            let w = &self.t.analysis_win;
+            let x: [&[[f32; 4]]; 5] = std::array::from_fn(|j| x[64 * j..][..64].as_chunks().0);
+            let w: [&[[f32; 4]]; 5] = std::array::from_fn(|j| w[64 * j..][..64].as_chunks().0);
+            let mut u = [[0f32; 4]; 16];
+            for (b, u) in u.iter_mut().enumerate() {
+                *u = std::array::from_fn(|i| (0..5).fold(0.0, |u, j| u + x[j][b][i] * w[j][b][i]));
+            }
+            let u = u.as_flattened();
+            // the DST-IV as a DCT-IV of the reversed input, u[31 - n] + u[32 + n]
+            let d: [f32; 32] = std::array::from_fn(|n| u[n] - u[63 - n]);
+            let r: [f32; 32] = std::array::from_fn(|n| u[31 - n] + u[32 + n]);
+            (d, r)
+        };
         let (mut c, mut s) = ([0f32; 32], [0f32; 32]);
         let (ce, co) = c.split_at_mut(16);
         m.analysis.run_split(&d, ce, co);
@@ -213,6 +227,9 @@ impl Synthesis {
         self.pos -= 128;
         let p = self.pos;
         let x = &x[..64];
+        #[cfg(feature = "simd")]
+        super::simd::synthesis_inputs(x, &mut self.a, &mut self.b);
+        #[cfg(not(feature = "simd"))]
         for k in 0..64 {
             let sgn = if k & 1 == 0 { 1.0 } else { -1.0 };
             self.a[k] = sgn * x[k].im;
@@ -227,6 +244,9 @@ impl Synthesis {
         let v: &mut [f32; 128] = (&mut self.v[p..p + 128]).try_into().expect("128");
         // v[64 + m] = C[m] + (-1)^m S[m] and v[63 - m] = C[m] - (-1)^m S[m], for the even
         // m = 2k and the odd m = 63 - 2k
+        #[cfg(feature = "simd")]
+        super::simd::synthesis_butterflies(ce, co, se, so, v);
+        #[cfg(not(feature = "simd"))]
         for (k, (((&ce, &co), &se), &so)) in ce.iter().zip(&*co).zip(&*se).zip(&*so).enumerate() {
             v[64 + 2 * k] = ce + se;
             v[63 - 2 * k] = ce - se;
@@ -236,19 +256,24 @@ impl Synthesis {
         // Each output's sum in a register over its ten taps, in tap order, four outputs a
         // block: tap 2i reads v[256i + n] and w[128i + n], tap 2i + 1 v[256i + 192 + n] and
         // w[128i + 64 + n].
-        let v = &self.v[p..p + 1280];
-        let w = &self.t.synthesis_win;
-        let v: [&[[f32; 4]]; 10] =
-            std::array::from_fn(|t| v[256 * (t / 2) + 192 * (t % 2)..][..64].as_chunks().0);
-        let w: [&[[f32; 4]]; 10] =
-            std::array::from_fn(|t| w[128 * (t / 2) + 64 * (t % 2)..][..64].as_chunks().0);
-        for (b, out) in out[..64].as_chunks_mut::<4>().0.iter_mut().enumerate() {
-            for (j, out) in out.iter_mut().enumerate() {
-                let acc = (0..5).fold(0.0, |acc, i| {
-                    acc + (v[2 * i][b][j] * w[2 * i][b][j]
-                        + v[2 * i + 1][b][j] * w[2 * i + 1][b][j])
-                });
-                *out = acc * scale;
+        #[cfg(feature = "simd")]
+        super::simd::synthesis_window(&self.v[p..p + 1280], &self.t.synthesis_win, scale, out);
+        #[cfg(not(feature = "simd"))]
+        {
+            let v = &self.v[p..p + 1280];
+            let w = &self.t.synthesis_win;
+            let v: [&[[f32; 4]]; 10] =
+                std::array::from_fn(|t| v[256 * (t / 2) + 192 * (t % 2)..][..64].as_chunks().0);
+            let w: [&[[f32; 4]]; 10] =
+                std::array::from_fn(|t| w[128 * (t / 2) + 64 * (t % 2)..][..64].as_chunks().0);
+            for (b, out) in out[..64].as_chunks_mut::<4>().0.iter_mut().enumerate() {
+                for (j, out) in out.iter_mut().enumerate() {
+                    let acc = (0..5).fold(0.0, |acc, i| {
+                        acc + (v[2 * i][b][j] * w[2 * i][b][j]
+                            + v[2 * i + 1][b][j] * w[2 * i + 1][b][j])
+                    });
+                    *out = acc * scale;
+                }
             }
         }
     }

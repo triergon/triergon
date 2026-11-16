@@ -21,6 +21,8 @@ triergon-session = { path = "../session", features = ["codecs"] }
 [features]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
 simd = ["triergon-session/simd"]
+# Nightly-only explicit SIMD forms of the AAC decoder's SBR loops.
+aac-simd = ["triergon-session/aac-simd"]
 
 [lints]
 workspace = true
