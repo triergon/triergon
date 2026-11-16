@@ -1,0 +1,9 @@
+{
+ "name": "mpegts-finite-recovery",
+ "path": "mpegts-finite-recovery",
+ "retention": "retained",
+ "reason": "finite PES fault-recovery host comparisons cited by docs/status.md",
+ "key": "evidence/mpegts-finite-recovery/69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f.tar.gz",
+ "sha256": "69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f",
+ "bytes": 39685608
+}

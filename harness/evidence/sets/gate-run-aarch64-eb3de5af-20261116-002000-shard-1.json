@@ -1,0 +1,60 @@
+{
+ "name": "gate-run-aarch64-eb3de5af-20261116-002000-shard-1",
+ "path": "gate-run-aarch64-eb3de5af-20261116-002000-shard-1",
+ "retention": "retained",
+ "reason": "AArch64 MP4 forward and range playback parity, timing and kernel-bound memory, including leading empty AVC edits.",
+ "key": "evidence/gate-runs/eb3de5af730ce00ec0dda1d4ea937470b7b5d074-aarch64-20261116-002000/shard-1/d059bad42f84ab99acaf1ed9c1db42fd98132167abf2f451b357af0f44e7dd74.tar.zst",
+ "sha256": "d059bad42f84ab99acaf1ed9c1db42fd98132167abf2f451b357af0f44e7dd74",
+ "bytes": 17553812,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "e92e37dee7a20eae19d40db40353cb0a200d007100f8a003ed2a7917308f3185",
+   "status": 0,
+   "report_sha256": "2d0352320ea1f7597e7cce54eb147df9c53846a0252c75e3a6c9070cfd510e96",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "ca9728abb2cf1bae585d5221c475c338a2fa4180e9ebd086020d628850d5f6cd",
+   "status": 0,
+   "report_sha256": "57d5bb86dadbd4ecad5c7993388fc9410ee08f2ecb6a4fc9b0a4c199bd8d1cba",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c94aeaf1b990094e2254638df32f3a17911cba2e488a43e5af54701cb01b23f4",
+   "status": 0,
+   "report_sha256": "54f02fdf73bda54586b94da677167e9704d98d656f703436df095dbae2f44934",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "65488152834867d49d28d0e15da8589f6edf6c010e3e329932bbe91c4093783f",
+   "status": 0,
+   "report_sha256": "a54ad906a82fd98cdeb4747614792154a79d7ec88a34c2e17109311fe60a76a3",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "95f642cd13332392647247299e4c5ea72bacd86c18d9887909459cc7a04f880b",
+   "status": 0,
+   "report_sha256": "af7fa23fdcaf73f89274266663c16fc12fb9dc2b495886909c2b771a1959c095"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "dda862ec73c748af1665814dca4b228b4c5d9dc7836bd470b7be056e22788208",
+   "status": 0,
+   "report_sha256": "ffc90c7b8f65d7c4d63e9739ce9e7d001f797c19b4a588026ed9989cd7a09050"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "eb3de5af730ce00ec0dda1d4ea937470b7b5d074"
+ }
+}

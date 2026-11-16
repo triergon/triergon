@@ -1,0 +1,56 @@
+{
+ "name": "gate-mp4-forward-79e0ae13",
+ "path": "gate-mp4-forward-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mp4-forward's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-mp4-forward-79e0ae13/f90b882997199ec4f145bf40726100507f6533beb74479889638457629499104.tar.zst",
+ "sha256": "f90b882997199ec4f145bf40726100507f6533beb74479889638457629499104",
+ "bytes": 3578654,
+ "results": [
+  {
+   "path": "gate-mp4-forward-79e0ae13/aarch64/shard-6/benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "5b693d8e6360befaecc1ce8e37fad46df63db278394fd53e895c46b6077c2f42",
+   "status": 0,
+   "report_sha256": "88bf7e3053b6813b05eecb493d6a76d6e86ade7d0dad2fd976c1f230bde17b91"
+  },
+  {
+   "path": "gate-mp4-forward-79e0ae13/aarch64/shard-6/graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "bb3fd98cafc2269f4b5d14e94e7e63f35b3135266f94583367ee7e340eb83eb0",
+   "status": 0,
+   "report_sha256": "6a9cf1721b5450867ad8087dc512e82ab6765c1c47d7da77091dfff49a0d1c8a"
+  },
+  {
+   "path": "gate-mp4-forward-79e0ae13/aarch64/shard-6/memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "727b38fed0c1f77e077e305b65ad047361d3cf03f574707fa42efec6291172af",
+   "status": 0,
+   "report_sha256": "9b5575b5dd05cceaf420c91198479bc5f5c96e6e271b68cd6b5342fe855c38fe"
+  },
+  {
+   "path": "gate-mp4-forward-79e0ae13/armv7/shard-6/benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "cd7226cc2cb914546ffa932b7b9541b170326a162436caa3f852d95eef5ae75d",
+   "status": 0,
+   "report_sha256": "5140bddf5725665b0daa1cec7fdf67a557e0b483bf59c365d4cebb264340fb92"
+  },
+  {
+   "path": "gate-mp4-forward-79e0ae13/armv7/shard-6/graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "335757f2195a3c32ed1ee7b6f1e97c62bb565bc398f6005478351f3522e789b1",
+   "status": 0,
+   "report_sha256": "701ee02dae1a73ccde7ab71290ec479702b833ddfb48d6fcd965184faf4cd0a7"
+  },
+  {
+   "path": "gate-mp4-forward-79e0ae13/armv7/shard-6/memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "2249f62b85563adca708c33a9d4085f595134635f91337bc83e8136fc1c7ac4a",
+   "status": 0,
+   "report_sha256": "647299e3ee6a049dd9ba8ebc3d0ceb01a1e560f0482b847ea0b1103dffb3a191"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

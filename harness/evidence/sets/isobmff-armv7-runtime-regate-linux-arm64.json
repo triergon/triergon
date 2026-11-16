@@ -1,0 +1,10 @@
+{
+ "name": "isobmff-armv7-runtime-regate-linux-arm64",
+ "path": "isobmff-armv7-runtime-regate-linux-arm64",
+ "retention": "retained",
+ "reason": "ISO BMFF open and index, AArch64: the 30-pair timing collection, the memory collection under the kernel RSS bound with its proof and review, instruction counts and binary sizes against the earlier revision, and a per-output comparison with the earlier gate, with the CPU, kernel and user-space package list",
+ "key": "evidence/isobmff-armv7-runtime-regate-linux-arm64/806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b.tar.gz",
+ "sha256": "806f2f996b19370bb23350ae4a166f3b7688b3e0e499352d77c3b2610c90aa7b",
+ "bytes": 2195600995,
+ "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+}

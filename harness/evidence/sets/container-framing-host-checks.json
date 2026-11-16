@@ -1,0 +1,6 @@
+{
+ "name": "container-framing-host-checks",
+ "retention": "90 days",
+ "key": "qualification/repository/container-framing-host-checks/d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9.tar.gz",
+ "sha256": "d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9"
+}

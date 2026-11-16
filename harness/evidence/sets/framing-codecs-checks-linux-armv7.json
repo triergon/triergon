@@ -1,0 +1,10 @@
+{
+ "name": "framing-codecs-checks-linux-armv7",
+ "path": "framing-codecs-checks-linux-armv7",
+ "retention": "retained",
+ "reason": "32-bit ARMv7 status rows: packet framing timing and memory for all 125 cases, the H.264 and HEVC conformance grading, the workspace and worker test logs, with the CPU, kernel and user-space package list",
+ "key": "evidence/framing-codecs-checks-linux-armv7/9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e.tar.gz",
+ "sha256": "9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e",
+ "bytes": 467039557,
+ "source_revision": "9621f6063a2e517fecc1c28757e6bed50b5228a8"
+}

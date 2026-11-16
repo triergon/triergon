@@ -1,0 +1,10 @@
+{
+ "name": "aac-access-units",
+ "path": "aac-access-units",
+ "retention": "retained",
+ "reason": "Configured AAC speaker and sample parity, paired runtime, and peak memory",
+ "key": "evidence/aac-access-units/b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0.tar.gz",
+ "sha256": "b56b7978e2b3824d95d71828ff8020ef87fb0f213d1ae83f5d4b3380e5688af0",
+ "bytes": 69596368,
+ "source_revision": "907ac3dce61c98bd05f52bfa3ff92497efdd141d"
+}

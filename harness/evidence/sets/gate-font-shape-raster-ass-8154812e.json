@@ -1,0 +1,12 @@
+{
+ "name": "gate-font-shape-raster-ass-8154812e",
+ "path": "gate-font-shape-raster-ass-8154812e",
+ "retention": "retained",
+ "reason": "Partial sharded gate run at 8154812e under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), kernel 7.0.0-1014-aws: the font, shaping, rasterising and ASS comparisons on 32-bit ARMv7, under the 120 s parity-run limit, every reference run's elapsed time recorded, with each shard's build identities, plan, step records and step logs; for the docs/status.md fonts row on ARMv7",
+ "key": "evidence/gate-font-shape-raster-ass-8154812e/e3561dfe596482134846bf8f629844fc0e1314fd7b8ca3ed9077eb3269b36fb6.tar.zst",
+ "sha256": "e3561dfe596482134846bf8f629844fc0e1314fd7b8ca3ed9077eb3269b36fb6",
+ "bytes": 344539,
+ "source_revisions": {
+  "candidate": "8154812e05da374a0f7c173bfd01770d5bd0ca85"
+ }
+}

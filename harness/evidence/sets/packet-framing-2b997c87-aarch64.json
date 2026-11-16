@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-2b997c87-aarch64",
+ "retention": "retained",
+ "reason": "AArch64 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+ "key": "evidence/packet-framing-2b997c87-aarch64/5fc70ab69e6bbaa2eadcd41e69f750973644d9bc44393292a0d72515c04c08aa.tar.zst",
+ "sha256": "5fc70ab69e6bbaa2eadcd41e69f750973644d9bc44393292a0d72515c04c08aa",
+ "bytes": 28097935,
+ "source_revisions": {
+  "candidate": "2b997c87727e542fa8b92d3dc791976ee9c75f99"
+ }
+}

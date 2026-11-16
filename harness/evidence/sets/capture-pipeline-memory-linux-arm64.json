@@ -1,0 +1,7 @@
+{
+ "name": "capture-pipeline-memory-linux-arm64",
+ "retention": "retained",
+ "reason": "Capture correctness, runtime, peak heap and total resident peak across 15 cases before the gate build",
+ "key": "evidence/capture-pipeline-memory-linux-arm64/11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983.tar.gz",
+ "sha256": "11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983"
+}

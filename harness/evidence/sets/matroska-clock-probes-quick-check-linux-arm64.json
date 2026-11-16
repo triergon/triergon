@@ -1,0 +1,12 @@
+{
+ "name": "matroska-clock-probes-quick-check-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited same-code listings, instruction counts and the paired hls-segments and matroska-startup-seek timing screen of the shared Matroska clock probe, measured as merged against its parent",
+ "key": "evidence/matroska-clock-probes-quick-check-linux-arm64/a61b0ad7c42cbbf0aa34dfa010e1e3d2cc703835448b287f0ad3ae15d2c40bc4.tar.gz",
+ "sha256": "a61b0ad7c42cbbf0aa34dfa010e1e3d2cc703835448b287f0ad3ae15d2c40bc4",
+ "bytes": 166386089,
+ "source_revisions": {
+  "candidate": "912628d9726be2fbed8f0718b11f5ff4d150102a",
+  "baseline": "ce925b1e7523a8cbc9d5ed3f0fc9c22cdedbd65b"
+ }
+}

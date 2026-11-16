@@ -1,0 +1,10 @@
+{
+ "name": "mp4-forward-range-rss-comparison",
+ "path": "mp4-forward-range-rss-comparison",
+ "retention": "retained",
+ "reason": "Earlier MP4 forward and range comparison, with two forward cases equal to reference total RSS.",
+ "key": "evidence/mp4-forward-range-rss-comparison/23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87.tar.gz",
+ "sha256": "23cf7cdb3de800c1ca0d03dfe937ce6fda6cc768bef5933370223a88cda78c87",
+ "bytes": 31931290,
+ "source_revision": "733ee1582e4fce4af1d89c91171e29e41a16d294"
+}

@@ -592,7 +592,7 @@ impl<'a> RangeSeekJob<'a> {
             }
             // A query below the signed index range still lands at its first
             // key. Every checkpoint has a defined DTS above the null value.
-            let target = target.saturating_sub(points[0].slot.fragment_seek_offset());
+            let target = target.saturating_sub(points[0].slot.seek_offset());
             self.scan = Some(TrackSeek::new(points, target)?);
         }
     }

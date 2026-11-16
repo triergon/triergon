@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-demux-79e0ae13",
+ "path": "gate-matroska-demux-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-demux's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-demux-79e0ae13/2ad4e9706184a803da2e6ca2fb567c915e223a9da692da801cf6c0c0dc646f79.tar.zst",
+ "sha256": "2ad4e9706184a803da2e6ca2fb567c915e223a9da692da801cf6c0c0dc646f79",
+ "bytes": 3517572,
+ "results": [
+  {
+   "path": "gate-matroska-demux-79e0ae13/aarch64/shard-8/benchmark/matroska-demux/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0602f21ee8552585af4a1c0108e052c08ffe6ad0b12579be08dbe59dd27405b3",
+   "status": 0,
+   "report_sha256": "1bbda035f9ab05ae2efd18d0eb30a2e9876a71d719f87e94250c3008b690af80"
+  },
+  {
+   "path": "gate-matroska-demux-79e0ae13/aarch64/shard-8/graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "5e548cdeb220ec547b595a079b244d90e9dafad392b2df1498735c675a2bd617",
+   "status": 0,
+   "report_sha256": "29e59e77fde65884139d30a733787a65ce3cf3888a77aa108edc122728fda522"
+  },
+  {
+   "path": "gate-matroska-demux-79e0ae13/aarch64/shard-8/memory/matroska-demux/gate-result.json",
+   "command": "report --memory",
+   "key": "fd1dddbd397b1f3ba72b0ccc7f65313f371edaaee11a22e83f5633af11cda702",
+   "status": 0,
+   "report_sha256": "b44f4e83183d9a3b32186d3c92dc5d0d47c9c63d9c1adedc735c98f99f3a928b"
+  },
+  {
+   "path": "gate-matroska-demux-79e0ae13/armv7/shard-8/benchmark/matroska-demux/gate-result.json",
+   "command": "report --benchmark",
+   "key": "779c46a47e0a237b49550035945b8b4b138d6fff368b4d17fc4af4b4399199b9",
+   "status": 0,
+   "report_sha256": "fe0bcb7bf31feafdc48f6216e73baf730a42b3750a8d91c04cb3484db00a9438"
+  },
+  {
+   "path": "gate-matroska-demux-79e0ae13/armv7/shard-8/graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "6015808f13916b03a1ce990f4fbf939307ba155046132e019b1526b33bbe797d",
+   "status": 0,
+   "report_sha256": "7c83e0cb7ac30504beadb7623be4613e0757af28a82f27e6282ef4cdf0ad0fe2"
+  },
+  {
+   "path": "gate-matroska-demux-79e0ae13/armv7/shard-8/memory/matroska-demux/gate-result.json",
+   "command": "report --memory",
+   "key": "8cbadb0bdf3dea18ce2fb59622cba05989d80f17522da5f195db9165d2dcaca7",
+   "status": 0,
+   "report_sha256": "557a26bf56495c563d87162074784ca27120e5c257d3aa467b600a6d0b84099a"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

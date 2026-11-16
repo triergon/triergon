@@ -1,0 +1,6 @@
+{
+ "name": "mp4-seek-checkpoint-comparison",
+ "retention": "90 days",
+ "key": "qualification/repository/mp4-seek-checkpoint-comparison/c61a612a85e692e30b0dc4d7c165dcec794e0248ef5d177ac77b712cc1aa2728.tar.gz",
+ "sha256": "c61a612a85e692e30b0dc4d7c165dcec794e0248ef5d177ac77b712cc1aa2728"
+}
