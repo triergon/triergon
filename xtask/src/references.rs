@@ -13,11 +13,12 @@
 //! A prepare command whose directory already records the key does nothing. One
 //! whose key is packed in `.research/reference-cache/NAME/KEY.tar.zst` unpacks that
 //! pack instead of building: the directory is restored as the build left it, so
-//! `build-workers` links the same libraries and records the same identity. Only
-//! on a miss does it build. `cargo xtask references` lists the keys, packs current
-//! builds into the cache, and moves packs to and from the evidence archive, under
-//! `qualification/reference-builds/`, which expires 90 days after upload like
-//! every uncited upload.
+//! `build-workers` links the same libraries and records the same identity. A pack
+//! that records another key, or whose installed tree is not the one its build
+//! recorded, is removed. Only then, or on a miss, does it build. `cargo xtask
+//! references` lists the keys, packs current builds into the cache, and moves packs
+//! to and from the evidence archive, under `qualification/reference-builds/`, which
+//! expires 90 days after upload like every uncited upload.
 
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -242,9 +243,18 @@ impl Build {
         }
         let pack = self.pack_path(root, &key);
         if pack.is_file() {
-            self.restore(root, &key, &pack)?;
-            println!("{}: restored from {}", self.name, pack.display());
-            return Ok(built);
+            // A pack that does not hold the build its name says is removed and the
+            // build made from source, so a damaged cache never stands in for it.
+            match self.restore(root, &key, &pack) {
+                Ok(()) => {
+                    println!("{}: restored from {}", self.name, pack.display());
+                    return Ok(built);
+                }
+                Err(error) => {
+                    println!("{}: {error}; removing it and building", self.name);
+                    fs::remove_file(&pack).map_err(|e| format!("{}: {e}", pack.display()))?;
+                }
+            }
         }
         // A miss builds from nothing: no configure state, objects or prefix of an
         // earlier build survives into this one, only the pinned source archives.
@@ -644,13 +654,15 @@ mod tests {
             b"archive"
         );
         assert!(freetype.holds(&root, &key));
-        // A pack of another build is refused and leaves the directory alone.
+        // A pack of another build is removed, and the build made from source.
         fs::write(root.join("xtask/src/fonts/mod.rs"), b"changed").unwrap();
         let other = freetype.key(&root).unwrap();
-        fs::create_dir_all(freetype.pack_path(&root, &other).parent().unwrap()).unwrap();
-        fs::copy(&pack, freetype.pack_path(&root, &other)).unwrap();
-        assert!(freetype.prepare(&root, unused).is_err());
-        assert!(dir.join("install/lib/libfreetype.a").is_file());
+        let mislabelled = freetype.pack_path(&root, &other);
+        fs::create_dir_all(mislabelled.parent().unwrap()).unwrap();
+        fs::copy(&pack, &mislabelled).unwrap();
+        assert_eq!(freetype.prepare(&root, make).unwrap(), "made");
+        assert!(!mislabelled.exists());
+        assert!(freetype.holds(&root, &other));
         fs::remove_dir_all(root).unwrap();
     }
 
