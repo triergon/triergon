@@ -157,3 +157,4 @@ performance gates where it touches hot code.
    specification by choice will follow the compat-policy convention above.
    The renderer offers no hinting option until libass's hinting-enabled modes and
    FreeType's auto-hinter pass the reference and are gated.
+
