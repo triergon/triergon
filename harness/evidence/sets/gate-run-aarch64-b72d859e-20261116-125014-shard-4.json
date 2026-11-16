@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-aarch64-b72d859e-20261116-125014-shard-4",
+ "path": "gate-run-aarch64-b72d859e-20261116-125014-shard-4",
+ "retention": "retained",
+ "reason": "Capture comparison on Linux AArch64.",
+ "key": "evidence/gate-runs/b72d859ebbba238897107b7285d350bd004376a7-aarch64-20261116-125014/shard-4/f5634f6b80b7e6aeca987deac17c0d85fa116a65c267775cbf57b2c9d33bdc71.tar.zst",
+ "sha256": "f5634f6b80b7e6aeca987deac17c0d85fa116a65c267775cbf57b2c9d33bdc71",
+ "bytes": 420266610,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "8c6a1de627730fd6bb5e16a349829ee70829e0de941bda8229e7fea6cc9b04bb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6b3139c1dc5dab70e1dba3f9ad91db3a49fcf8a14ea2c8a358c953cbbc87d9bb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "a6e9a9d3142feaa13b6d3c3ee419ed5f382f6fb667f638cfc40e12b0e673e0a0",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "41ca2d54c2bb39a9754c48a5da9dcdd6a9a01ee914ee8093788afa33259df9f9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e3a826363b63d6808c1160c92e3c97820952d5376e9f1ed9bd73ed734ba14ecd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "c4743b5b176249fe5e30597b27352fb931fbf06599c2dbf00ff67e59e74aaaec",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "b72d859ebbba238897107b7285d350bd004376a7"
+ ]
+}
