@@ -59,11 +59,15 @@ caller's reserved PCM planes and reuses them on the next access unit.
 
 | Feature | Default | Effect |
 |---|---|---|
-| `simd` | off | `std::simd` forms of the SBR QMF analysis and synthesis windowing and shuffles. Requires a nightly toolchain (`portable_simd`). |
+| `simd` | off | `std::simd` forms of the SBR QMF analysis and synthesis windowing and shuffles. Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
 
 Without `simd` the crate builds on stable and uses the scalar code. Each vector lane
 performs the scalar code's operations in the same order, so output is identical where the
-vector unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormal values to zero.
+vector unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormal values to zero. On
+32-bit ARM (`thumbv7neon`) LLVM emits no NEON float code from the scalar loops, and the
+feature cuts HE-AAC decoding by about a fifth of its instructions there. The gate build
+builds the codec worker and the AAC decode example with the pinned nightly and this
+feature, on both targets.
 
 ## Supported
 

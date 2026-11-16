@@ -538,15 +538,24 @@ may override that count for diagnostic comparisons.
 
 - Gate results come from the gate build: workers compiled by the toolchain in
   `rust-toolchain.toml` with no extra compiler configuration, and nothing else counts.
+  One exception is pinned too: `codec-worker` and the AAC decode example that
+  `codecs-audio` grades are built by the dated nightly xtask pins (`NIGHTLY`, the one
+  `cargo xtask check-simd` uses) with the AAC decoder's `simd` feature. On the 32-bit
+  ARM target LLVM emits no NEON float code from scalar loops, and explicit `std::simd`
+  vectors are nightly-only; the decoder's SBR QMF banks need them there. Every other
+  worker stays on the stable pin.
   One revision built by a newer compiler or with `-C target-cpu` differs from it by up
   to 0.04 on a worst bound, more than a case's margin to the ceiling, so results from
   different builds are not comparable. `cargo xtask build-workers` refuses a `rustc`
   that differs from the pin, however it was found, and `RUSTFLAGS`,
   `CARGO_ENCODED_RUSTFLAGS`, `RUSTC`, `RUSTC_WRAPPER`, target or profile overrides and
   Cargo configuration with the same effect. The grader refuses a report that records
-  any of these, or doesn't say. `--comparison-build` builds workers for paired
-  comparisons and quick checks only. Those name their build and produce no gate
-  result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+  any of these, or doesn't say. Each worker's record in `identity.json` names its
+  toolchain and that compiler's `rustc -vV`, and a worker built by another toolchain
+  than the gate build gives it is refused the same way. `--comparison-build` builds
+  workers for paired comparisons and quick checks only. Those name their build and
+  produce no gate result. The opt-in HEVC `simd` lane uses the same nightly and is not
+  a gate build.
 - Workers and references follow one link policy, `static-toolchain-runtime-trained-order-v1`:
   on GNU/Linux each side links its toolchain's runtime support libraries from their static
   archives, libgcc's unwinder (`libgcc_eh`) for the Rust workers and libgcc, libstdc++
