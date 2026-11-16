@@ -13,29 +13,7 @@
   "aarch64-unknown-linux-gnu": 221,
   "thumbv7neon-unknown-linux-gnueabihf": 208
  },
- "open_workloads": [
-  {
-   "id": "aac-he-stereo",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
-  },
-  {
-   "id": "aac-he-5.1",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
-  },
-  {
-   "id": "aac-hev2-stereo",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
-  }
- ],
+ "open_workloads": [],
  "workloads": [
   {
    "id": "h264-high-1080p",
