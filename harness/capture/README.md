@@ -44,9 +44,8 @@ total resident peak RSS. It also reports resident growth as a diagnostic.
 The conversion probe checks every luma and chroma sample at the seven even
 widths below 16, in both row orientations, at heights 2, 4 and 6. Each size and
 orientation uses a red impulse in each source row and 32 pseudo-random pictures.
-The AArch64 Linux probe also checks widths 18, 22, 34, 66, 258, 958 and 4094,
-where the converter uses the filtered fallback. Both probes require exact
-sample equality. The AArch64 resolution probe also checks one 480×270 and one
+The AArch64 probe also checks widths 18, 22, 34, 66, 258, 958 and 4094 using
+`Converter::filtered`. Both probes require exact sample equality. The AArch64 resolution probe also checks one 480×270 and one
 960×540 picture in both row orientations. Its parameter recovery test uses
 two-row frames to recover the chroma coefficients and six-row frames to
 recover the first vertical filter row. Build the capture reference for the

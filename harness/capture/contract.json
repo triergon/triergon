@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "capture contract v1",
   "frozen_utc": "2026-11-02",
-  "status": "frozen v1 contract with encoder comparison rule v2 (see comparison_rules.encoder_revision_reason). The reference is the pinned FFmpeg 9.0.2 gating build; its conversion follows the target it is built for (conversion.reference_target): on ARMv7 the candidate's conversion is byte-identical in all 15 cases, and the AArch64 build's conversion of the 15 cases is listed in open_cases. Mux, encoder and timing observations: PAT bytes equal, PMT equal apart from the stream_type decision, SDT apart from the SDT decision, per-frame PTS/DTS/PCR and table cadence as stated, and the reference's one-frame output delay (89 reference pictures for 90 inputs) in all 15 cases.",
+  "status": "The comparison covers RGBA conversion, MPEG-1 encoding and MPEG-TS muxing against FFmpeg 9.0.2. Both targets require all 15 cases. The reference emits one fewer picture in each case because it delays output by one frame.",
   "operation_source": "The capture call sequence of an application that streams its interface as MPEG-1 video in MPEG-TS: RGBA converted to NV12 by swscale (SWS_BILINEAR, negative stride for bottom-up rows), NV12 split into YUV420P planes, mpeg1video with time base 1/30, GOP 30, no B-pictures and fastint DCT, frame pts 0, 1, 2, ..., mpegts muxed through a 32,768-byte custom AVIO, av_write_frame and avio_flush per frame, no trailer. A rate byte times 100 kbps selects the bit rate (0 selects 2.5 Mbps); a width of at least 720 (or 0) selects 960x540, otherwise 480x270. harness/reference_capture.h reproduces this sequence.",
   "reference": {
     "ffmpeg_release": "9.0.2",

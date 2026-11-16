@@ -115,7 +115,12 @@ pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, 
     if let Some(small) = &a.reference_small {
         workers.push(("reference-small", Path::new(small)));
     }
-    let mut files = vec![a.cases.clone(), generator, PathBuf::from(&a.observer)];
+    let mut files = vec![
+        a.cases.clone(),
+        root.join("harness/capture/contract.json"),
+        generator,
+        PathBuf::from(&a.observer),
+    ];
     if let Stage::Memory { timing } = &a.stage {
         // A memory run measures what its timing run recorded.
         let mut recorded = vec![timing.join("identity.json")];
@@ -837,15 +842,18 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             ))
         }
     };
-    if matches!(a.stage, Stage::Timing) {
-        return still_open();
+    let mut failing: Vec<_> = measured_cases
+        .iter()
+        .flat_map(|case| failing_parity(&case.id, case.correctness(), open.contains(&case.id)))
+        .collect();
+    if !matches!(a.stage, Stage::Timing) {
+        let summary = memory_stage(root, a, &refusals, &open, measured_cases)?;
+        failing.extend(failing_bounds(&summary));
+        write(
+            &a.out.join("summary.json"),
+            json::to_python(&Value::Array(summary), Some(1)),
+        )?;
     }
-    let summary = memory_stage(root, a, &refusals, &open, measured_cases)?;
-    let failing = failing_bounds(&summary);
-    write(
-        &a.out.join("summary.json"),
-        json::to_python(&Value::Array(summary), Some(1)),
-    )?;
     for line in &failing {
         println!("{line}");
     }
@@ -853,8 +861,24 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     if failing.is_empty() {
         Ok(())
     } else {
-        Err(format!("{} capture bounds fail", failing.len()))
+        Err(format!("{} capture requirements fail", failing.len()))
     }
+}
+
+/// A listed open conversion still requires mux and encoder parity.
+fn failing_parity<'a>(
+    id: &'a str,
+    correctness: &'a Value,
+    open_conversion: bool,
+) -> impl Iterator<Item = String> + 'a {
+    ["conversion", "mux", "encoder"]
+        .into_iter()
+        .filter(move |part| {
+            let passes = matches!(correctness.get(part), Some(Value::Bool(true)));
+            let exception = open_conversion && *part == "conversion";
+            !(passes || exception)
+        })
+        .map(move |part| format!("capture: {id}: {part} parity fails"))
 }
 
 /// One line per bound a case of `summary` fails, but for the cases open on this
@@ -923,6 +947,27 @@ fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_an_open_conversion_may_fail_capture_parity() {
+        let verdict =
+            json::parse(r#"{"conversion": false, "mux": true, "encoder": true}"#).unwrap();
+        assert_eq!(
+            failing_parity("picture", &verdict, false).collect::<Vec<_>>(),
+            ["capture: picture: conversion parity fails"]
+        );
+        assert_eq!(failing_parity("picture", &verdict, true).count(), 0);
+
+        let invalid =
+            json::parse(r#"{"conversion": false, "mux": false, "encoder": false}"#).unwrap();
+        assert_eq!(
+            failing_parity("picture", &invalid, true).collect::<Vec<_>>(),
+            [
+                "capture: picture: mux parity fails",
+                "capture: picture: encoder parity fails",
+            ]
+        );
+    }
 
     #[test]
     fn a_failing_capture_bound_fails_unless_its_case_is_open_on_the_target() {
