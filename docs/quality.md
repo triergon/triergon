@@ -714,8 +714,10 @@ may override that count for diagnostic comparisons.
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the codecs'
-parity, a codec workload list's timing, a part of its memory (`codecs memory --part
+measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the video
+codecs' parity (`codecs`), the audio codecs' correctness lanes (`codecs-audio`: AAC,
+AC-3, E-AC-3 and DTS, failing on any vector that fails and is not a listed open case),
+a codec workload list's timing, a part of its memory (`codecs memory --part
 I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, then
 `--stage memory` from its records under the kernel bound), the checked or the release
 tests, and the font, shaping, rasterising and ASS comparisons. Every registered feature
@@ -786,7 +788,7 @@ On one host, a shard's run is:
    built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
    everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
    `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--isobmff-seek`, `--codecs` for each
-   workload list, `--external-vector`, `--capture` for the capture cases), with the
+   workload list, `--correctness` for the codec correctness lanes, `--external-vector`, `--capture` for the capture cases), with the
    [committed RSS module review](../harness/rss-bound/README.md#proof) of the tree's
    module source for the running kernel (`cargo xtask preflight` also takes
    `--reference NAME` for any other reference a run names by path, `--review FILE`
@@ -1098,9 +1100,11 @@ repository does not generate, with repository-relative paths: evidence set
 subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
 [file-workloads.json](../harness/codecs/file-workloads.json), and set
 `ogg-reader-inputs` the inputs of the Ogg reader comparison, set
-`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks, and set
+`codec-derived-streams` the 71 elementary streams of the audio correctness lanes that
+`cargo xtask codecs derive` makes from FATE samples
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/sets/)); a gate image is built with all four. The image
+[index](../harness/evidence/sets/)); a gate image is built with all five. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
@@ -1114,8 +1118,11 @@ outputs would be lost; on macOS run it with Homebrew's bash first on `PATH`, or 
 changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
 start when it fails. Then it launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
-archive's packs (building and uploading the others), gets each host ready and runs
-shard I of N on host I. When a shard ends, finished or not, its host's outputs are
+archive's packs (building and uploading the others), unpacks each `--input s3:KEY` (a
+media inputs archive in the evidence archive, for a kept input set the image lacks) at
+the repository root, gets each host ready and runs shard I of N on host I. `gate check`
+counts the files of a kept set unpacked at the repository root as present whether or
+not the image holds them. When a shard ends, finished or not, its host's outputs are
 archived under `qualification/gate-runs/RUN/shard-I/`, where they expire after 90 days
 unless promoted, and checked by downloading them back on the host;
 `OUT/shard-I/entry.json` holds the archive's index entry, which lists the [gate
