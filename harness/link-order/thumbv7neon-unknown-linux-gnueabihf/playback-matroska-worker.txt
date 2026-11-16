@@ -1,0 +1,317 @@
+# The functions the link-order training runs in playback-matroska-worker on thumbv7neon-unknown-linux-gnueabihf, in first-use order.
+# Recorded from operations 4bdd1d4bc8e6a00bed46f21e9419a0d1a723be52e9524ccc16c919413879f3bb of harness/link-order/training.json.
+# Written by `cargo xtask link-order train`; see docs/quality.md.
+std::sys::args::unix::imp::ARGV_INIT_ARRAY::init_wrapper
+main
+__aeabi_read_tp
+__aeabi_uidivmod
+__udivmodsi4
+std::sys::pal::unix::stack_overflow::imp::make_handler
+std::sys::pal::unix::stack_overflow::thread_info::set_current_info
+std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> std::process::ExitCode, std::process::ExitCode>
+playback_matroska_worker::main
+std::env::args
+<std::env::Args as core::iter::traits::iterator::Iterator>::nth
+core::str::converts::from_utf8
+playback_worker::matroska_video::run
+<triergon_harness_runner::Invocation>::parse
+std::fs::read::inner
+<std::sys::fs::unix::File>::open_c
+<std::fs::File>::metadata
+std::sys::fs::unix::try_statx
+alloc::io::read::default_read_to_end::small_probe_read::<std::fs::File>
+<triergon_core::bytes::Bytes>::copy_from_slice
+triergon_harness_runner::measure_dyn
+<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
+<std::sys::sync::once::futex::Once>::call
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
+<std::io::stdio::StdoutLock as core::io::write::Write>::write_all
+<std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
+<alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
+playback_worker::matroska_video::run::{closure#0}
+<triergon_playback::matroska_feed::discovery::MatroskaCompactDiscovery<triergon_playback::input::ByteSource>>::new
+<triergon_playback::matroska_feed::discovery::MatroskaDiscovery<triergon_playback::input::ByteSource>>::poll
+<triergon_playback::player::Player<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>::read_output_inner
+<triergon_playback::engines::MkvEngine>::step
+<triergon_matroska::typed::reader::Reader>::step_demux_after_health_check::<triergon_matroska::typed::reader::projection::TypedProjection>
+<triergon_matroska::incremental::ElementReader>::step_typed_compact_after_input_health
+<triergon_matroska::incremental::ElementReader>::take_buffered_header
+core::ptr::drop_glue::<triergon_matroska::incremental::Phase>
+<triergon_matroska::typed::reader::Reader>::canonical_input_hint
+<triergon_matroska::incremental::ElementReader>::exact_header_request
+<triergon_matroska::incremental::ElementReader>::bounded_header_refill
+<triergon_matroska::incremental::ElementReader>::expanded_refill
+<triergon_playback::io::SourceOwner<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>::poll
+<triergon_playback::input::ByteSource as triergon_playback::input::Source>::poll
+<triergon_playback::player::Player<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>::provide
+<triergon_core::input::InputCursor>::provide
+<triergon_matroska::incremental::ElementReader>::begin::<triergon_matroska::incremental::typed_bridge::CompactDelivery>
+<triergon_core::input::InputCursor>::buffered
+<triergon_core::input::InputCursor>::read_discard
+<triergon_matroska::incremental::typed_bridge::CompactDelivery as triergon_matroska::incremental::EnvelopeDelivery>::leaf
+core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::cues::Cue>>>
+<triergon_matroska::typed::reader::Reader>::start_leaf_projected::<triergon_matroska::typed::reader::projection::TypedProjection>
+core::ptr::drop_glue::<triergon_matroska::typed::reader::State>
+<triergon_matroska::matroska::typed::header::EbmlJob>::step
+<triergon_matroska::matroska::typed::syntax::ChildCursor>::step
+<triergon_matroska::storage::SharedBytes as core::ops::deref::Deref>::deref
+<triergon_playback::player::Player<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>::accept_event::<true>
+<triergon_playback::player::Player<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>::admit
+<triergon_playback::player::Output>::into_matroska_replay
+<triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>::reallocate
+triergon_core::bytes::charge_replacement
+<alloc::raw_vec::RawVecInner>::finish_grow
+triergon_core::bytes::settle_replacement
+<triergon_core::input::InputCursor>::advance
+<triergon_matroska::incremental::ElementReader>::check_input_cancel
+<triergon_matroska::matroska::typed::copy_vec::CopyVec<(u64, u64)>>::step
+<triergon_core::bytes::BudgetVec<(u64, u64)>>::reallocate
+<triergon_matroska::matroska::typed::header::SeekHeadJob>::step
+<triergon_core::bytes::Bytes as core::convert::AsRef<[u8]>>::as_ref
+<triergon_matroska::typed::reader::Reader>::commit_metadata
+<triergon_core::input::InputCursor>::check_cancel
+<triergon_matroska::metadata::typed_document::CataloguePrepareJob>::step
+<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>::reallocate
+core::ptr::drop_glue::<alloc::vec::Vec<triergon_matroska::metadata::SharedDocument>>
+<triergon_matroska::metadata::typed_document::CatalogueJob>::step
+<triergon_matroska::metadata::typed_document::CatalogueJob>::advance
+<triergon_matroska::metadata::typed_document::CatalogueJob>::start_document
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::metadata::typed_document::DocumentJob>>
+<triergon_core::budget::Budget>::reserve
+<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::Node>>::reallocate
+<triergon_matroska::storage::text_job::TextJob>::step
+triergon_matroska::metadata::typed_document::bit
+<triergon_matroska::storage::StorageVec<triergon_matroska::metadata::SharedDocument>>::push
+<triergon_matroska::matroska::typed::tracks::TracksJob>::step
+<triergon_core::bytes::BudgetVec<triergon_matroska::matroska::Track>>::reallocate
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::tracks::TrackJob>>
+<triergon_matroska::matroska::typed::tracks::TrackJob>::advance
+<triergon_matroska::storage::SharedBytes>::slice
+<triergon_matroska::matroska::typed::mapping::TrackExtensionsJob>::new
+<triergon_matroska::matroska::typed::mapping::TrackExtensionsJob>::step
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::mapping::TrackExtensionsJob>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::matroska::typed::mapping::Mapping>>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::matroska::typed::mapping::Unknown>>
+<alloc::sync::Arc<triergon_matroska::matroska::typed::mapping::Data>>::drop_slow
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::mapping::Data>
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::content_encoding::typed::EncodingsJob>>
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::zlib::typed_restore::RestoreJob>>
+alloc::boxed::box_new_uninit
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::configuration::Configuration>>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::configuration::ConfigurationJob>
+<triergon_matroska::matroska::typed::tracks::TracksJob>::metadata_bytes
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::typed::reader::seeking::ScanBoundary>>
+core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::matroska::Track>>>
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::configuration::ConfigurationJob>>
+<triergon_playback::player::Selection>::validate
+<triergon_playback::matroska_feed::discovery::Readiness>::new
+<triergon_matroska::storage::SharedText>::as_str
+core::ptr::drop_glue::<core::option::Option<triergon_playback::matroska_feed::discovery::Readiness>>
+<triergon_matroska::incremental::ElementReader>::cluster_checkpoint
+<triergon_matroska::typed::reader::Reader>::step_opening
+<alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
+<triergon_core::input::InputCursor>::read_span
+<triergon_core::bytes::BudgetVec<u8>>::reallocate
+<triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
+<triergon_core::bytes::BudgetVec<u8>>::freeze
+<triergon_matroska::typed::reader::projection::TypedProjection as triergon_matroska::typed::reader::projection::PacketProjection>::simple
+<triergon_matroska::matroska::typed::packet::simple::SimplePacketJob>::step_compact_borrowing
+<triergon_matroska::storage::SharedBytes>::into_slice
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::SharedBytes>>
+<triergon_matroska::matroska::typed::packet::FrameParameters>::fields
+<triergon_matroska::typed::reader::projection::TypedProjection as triergon_matroska::typed::reader::projection::PacketProjection>::take_simple
+<triergon_matroska::typed::reader::seek_index::ImmutableSeekIndex>::observe
+<triergon_core::bytes::BudgetVec<triergon_matroska::typed::reader::seek_index::IndexedKeyframe>>::try_reserve_exact
+<triergon_core::bytes::BudgetVec<triergon_matroska::typed::reader::seek_index::IndexedKeyframe>>::reallocate
+<triergon_playback::matroska_feed::discovery::Readiness>::observe
+<triergon_playback::matroska_feed::discovery::video::VideoProbe>::poll
+<triergon_matroska::matroska::typed::configuration::Configuration>::initialization_bytes
+<triergon_framing::avc_config::AvcConfigParser>::new
+<triergon_framing::avc_config::AvcConfigParser>::step
+<triergon_core::bytes::BudgetVec<triergon_framing::avc_config::AvcNalDescriptor>>::reallocate
+<triergon_framing::avc_config::AvcConfigParser>::publish
+triergon_playback::hls_avc::syntax::startup_sps
+<triergon_bitstream::rbsp::Rbsp as triergon_bitstream::checked::BitSource>::exp_golomb
+<triergon_playback::hls_avc::syntax::Rbsp>::bounded
+<triergon_playback::hls_avc::syntax::Rbsp>::bit
+triergon_framing::nal_syntax::skip_avc_scaling_matrix::<triergon_bitstream::rbsp::Rbsp>
+<triergon_playback::hls_avc::syntax::Rbsp>::ue
+triergon_framing::nal_syntax::skip_vui_to_timing::<triergon_bitstream::rbsp::Rbsp>
+triergon_playback::hls_avc::syntax::read_hrd
+core::ptr::drop_glue::<triergon_framing::avc_config::AvcConfiguration>
+triergon_matroska::packet_clock::packet_timing
+__aeabi_uldivmod
+__udivmoddi4
+compiler_builtins::int::specialized_div_rem::u64_div_rem
+__aeabi_uidiv
+__udivsi3
+triergon_playback::matroska_feed::video_clock::picture_nal
+<triergon_matroska::matroska::PacketData as core::ops::deref::Deref>::deref
+<triergon_playback::matroska_feed::discovery::audio::AudioProbe>::poll
+<triergon_playback::player::Output>::pool
+<triergon_framing::aac_config::AacAscParser>::new
+<triergon_playback::matroska_feed::discovery::audio::AudioProbe>::poll_aac
+<triergon_framing::aac_config::AacAscParser>::step
+<triergon_framing::aac_config::Bits>::object_type
+core::ptr::drop_glue::<triergon_framing::aac_config::AacAscParser>
+<triergon_playback::matroska_feed::discovery::MatroskaCompactDiscovery<triergon_playback::input::ByteSource>>::finish
+<triergon_playback::matroska_feed::MatroskaFeedSetup>::new
+<triergon_playback::matroska_feed::MatroskaFeedSetup>::step
+core::ptr::drop_glue::<triergon_framing::avc_config::AvcConfigParser>
+core::ptr::drop_glue::<triergon_playback::matroska_feed::MatroskaFeedSetup>
+playback_worker::matroska_video::session::{closure#6}
+core::ptr::drop_glue::<triergon_playback::engines::RawEvent>
+core::ptr::drop_glue::<triergon_matroska::typed::Event>
+<triergon_playback::matroska_feed::MatroskaTrackFeed>::packet
+<triergon_matroska::matroska::PacketData as core::convert::AsRef<[u8]>>::as_ref
+<triergon_playback::matroska_feed::MatroskaFeedJob>::step
+<triergon_matroska::timing::ExactTime>::rounded_duration_ns
+<triergon_playback::matroska_feed::video_clock::DecodeClock>::push_pts
+core::ptr::drop_glue::<core::iter::adapters::map::Map<triergon_core::bytes::BudgetVecIntoIter<triergon_playback::player::MatroskaReplayOutput>, <triergon_playback::player::MatroskaReplayOutput>::into_output>>
+<triergon_matroska::typed::reader::Reader>::start_group_batch
+<triergon_matroska::matroska::typed::side_data::GroupJob>::new
+<triergon_matroska::matroska::typed::packet::PacketBatchJob>::step_ready
+<triergon_matroska::matroska::typed::side_data::GroupJob>::step
+<triergon_matroska::metadata::typed_document::Heap>::step
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::packet::BatchWork>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::side_data::GroupJob>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::matroska::typed::side_data::Addition>>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<i64>>
+<triergon_core::bytes::Bytes>::into_slice
+<triergon_matroska::timing::BlockTiming>::source
+<alloc::sync::Arc<triergon_matroska::matroska::typed::side_data::Data>>::drop_slow
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::side_data::Data>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::packet::PacketBatchJob>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::packet::Staged>
+<triergon_matroska::matroska::typed::cues::CuesJob>::step
+<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::matroska::typed::cues::Position>>::reset
+<triergon_core::bytes::BudgetVec<triergon_matroska::matroska::typed::cues::Position>>::reallocate
+<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::cues::Cue>>::step
+<triergon_core::bytes::BudgetVec<triergon_matroska::cues::Cue>>::reallocate
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::cues::Cue>>>
+core::ptr::drop_glue::<triergon_playback::matroska_feed::MatroskaTrackFeed>
+core::ptr::drop_glue::<triergon_playback::player::Player<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>
+<triergon_playback::player::Player<triergon_playback::matroska_feed::discovery::MatroskaStartupSource<triergon_playback::input::ByteSource>>>::shutdown
+core::ptr::drop_glue::<triergon_playback::engines::Engine>
+<alloc::sync::Arc<triergon_matroska::matroska::typed::configuration::Data>>::drop_slow
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::configuration::Data>
+core::ptr::drop_glue::<triergon_matroska::matroska::Track>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>
+<alloc::sync::Arc<triergon_matroska::metadata::Document>>::drop_slow
+core::ptr::drop_glue::<triergon_matroska::metadata::Document>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<(u64, u64)>>
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::typed::reader::resolving::Resolver>>
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::typed::reader::seeking::ScanState>>
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::usage::Pressure>>
+core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_matroska::typed::reader::seek_index::ImmutableSeekIndex>>>
+core::ptr::drop_glue::<alloc::vec::Vec<core::option::Option<triergon_playback::player::Output>>>
+alloc::fmt::format::format_inner
+core::fmt::write
+<alloc::string::String as core::fmt::Write>::write_str
+<&str as core::fmt::Display>::fmt
+<core::fmt::Formatter>::pad
+<u64 as core::fmt::Display>::fmt
+<core::fmt::Formatter>::pad_integral
+<core::fmt::Formatter>::pad_integral::write_prefix
+<u128 as core::fmt::Display>::fmt
+<bool as core::fmt::Display>::fmt
+<alloc::string::String as core::fmt::Display>::fmt
+<core::io::write::default_write_fmt::Adapter<std::io::stdio::StdoutLock> as core::fmt::Write>::write_str
+<alloc::sync::Arc<triergon_core::budget::Inner>>::drop_slow
+<std::sync::once::Once>::call_once::<std::rt::cleanup::{closure#0}>::{closure#0}
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>
+<triergon_playback::engines::Engine>::facts
+<triergon_core::bytes::BudgetVec<triergon_playback::engines::TrackFact>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_playback::engines::TrackFact>>::reallocate
+<triergon_core::time::Time>::to_ticks
+<triergon_matroska::typed::reader::Reader>::seek_for_playback
+<triergon_core::input::InputCursor>::reset
+<triergon_matroska::typed::reader::seek_index::ImmutableSeekIndex>::discard
+<triergon_playback::player::Output>::event_budget
+core::ptr::drop_glue::<core::option::Option<triergon_playback::player::Output>>
+<triergon_core::bytes::BudgetVec<i64>>::reallocate
+core::ptr::drop_glue::<core::option::Option<triergon_matroska::matroska::typed::range::RangeLeafJob>>
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::copy_vec::CopyVec<triergon_matroska::matroska::typed::cues::Position>>
+<triergon_matroska::typed::reader::Reader>::start_seek_plan
+core::ptr::drop_glue::<triergon_matroska::typed::reader::resolving::Resolver>
+<triergon_matroska::typed::reader::Reader>::step_seeking
+<triergon_core::time::Time>::combine
+<triergon_matroska::incremental::ElementReader>::begin_internal_cluster_range
+<triergon_core::input::InputCursor>::request_range
+<triergon_matroska::incremental::ElementReader>::step_mode::<triergon_matroska::incremental::PublicDelivery>
+<triergon_matroska::incremental::ElementReader>::begin::<triergon_matroska::incremental::PublicDelivery>
+<triergon_matroska::matroska::typed::seek_validate::CueValidationJob>::step_batch
+core::ptr::drop_glue::<triergon_matroska::matroska::typed::packet::TypedPacket>
+core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep>
+<triergon_matroska::matroska::typed::seek_validate::ValidatedCue as core::clone::Clone>::clone
+<triergon_matroska::typed::reader::Reader>::finish_seek
+<triergon_matroska::matroska::typed::packet::FrameParameters>::scan_fields
+<triergon_matroska::typed::reader::seeking::ScanSimple>::context_matches
+<triergon_matroska::incremental::ElementReader>::finish_scanned_leaf
+core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep<triergon_matroska::typed::Event>>
+<triergon_matroska::typed::reader::seeking::ScanBoundary>::validate
+<triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::new
+<triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::step
+core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanState>
+core::ptr::drop_glue::<triergon_matroska::incremental::ParseStep<triergon_matroska::matroska::typed::epoch::RestoredEpoch>>
+<triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::start_copy
+<triergon_matroska::matroska::typed::epoch::EpochRestoreJob>::after_group
+<triergon_matroska::matroska::typed::epoch::RestoredEpoch as core::clone::Clone>::clone
+core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
+<triergon_playback::matroska_feed::video_seek::MatroskaVideoSeekGate>::admits
+<triergon_matroska::incremental::ElementReader>::admit_typed_leaf
+<triergon_framing::hevc_config::HvcConfigParser>::new
+<triergon_framing::hevc_config::HvcConfigParser>::step
+<triergon_core::bytes::BudgetVec<triergon_framing::hevc_config::HvcArrayDescriptor>>::reallocate
+triergon_playback::raw_video::config::hevc::startup_sps
+triergon_playback::raw_video::config::hevc::sps_prefix
+triergon_playback::raw_video::config::hevc::skip_profile_tier_level
+<triergon_playback::raw_video::config::hevc::Rbsp>::id
+<triergon_playback::raw_video::config::hevc::Rbsp>::ue
+<triergon_playback::raw_video::config::hevc::Rbsp>::fixed
+<triergon_playback::raw_video::config::hevc::Rbsp>::flag
+<triergon_playback::raw_video::config::hevc::Rbsp>::bounded
+triergon_playback::raw_video::config::hevc::vps
+core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>
+core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
+<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::new
+<triergon_matroska::matroska::typed::configuration::Configuration>::initialization
+<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::step
+core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>
+<triergon_bitstream::rbsp::Rbsp>::skip
+<triergon_bitstream::rbsp::Rbsp>::refill
+triergon_playback::raw_video::config::hevc::sps_timing
+triergon_playback::raw_video::config::hevc::skip_short_term_sets
+core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>
+core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::FeedCodec>
+playback_worker::matroska_audio::run
+std::sys::fs::metadata
+playback_worker::packet_fold::drive::<playback_worker::matroska_audio::operate>::{closure#1}
+__rustc::__rust_alloc
+<triergon_matroska::matroska::Track as triergon_core::container::TrackInfo>::codec
+core::ptr::drop_glue::<triergon_framing::aac_config::AacAudioSpecificConfig>
+<usize as alloc::vec::spec_from_elem::SpecFromElem>::from_elem::<alloc::alloc::Global>
+<alloc::raw_vec::RawVecInner>::try_allocate_in
+<triergon_playback::matroska_feed::discovery::MatroskaReplayPrefix>::feed_packet
+<triergon_framing::aac_adts::AacAdtsParameters>::header_for_payload
+<triergon_playback::matroska_feed::probe_clock::MatroskaClockProbe<triergon_playback::matroska_feed::MatroskaTrackFeed>>::push
+<triergon_playback::matroska_feed::MatroskaTrackFeed>::aac_timing
+<triergon_playback::matroska_feed::probe_clock::NativePacketTiming>::demux
+<triergon_core::bytes::BudgetVec<triergon_playback::matroska_feed::probe_clock::PacketClock>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_playback::matroska_feed::probe_clock::PacketClock>>::reallocate
+<triergon_playback::matroska_feed::probe_clock::MatroskaClockProbe<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>>::push_source
+<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>::dolby_source_timing
+triergon_playback::matroska_feed::hevc_dolby::dolby_final_syncframe
+triergon_framing::ac3::probe_ac3_header
+triergon_playback::matroska_feed::probe_clock::syncframe_duration_ns
+<triergon_playback::matroska_feed::probe_clock::MatroskaClockPrefix<triergon_playback::matroska_feed::MatroskaTrackFeed>>::timing
+playback_worker::matroska_audio::fold
+<triergon_playback::matroska_feed::probe_clock::MatroskaClockPrefix<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>>::timing
+alloc::vec::in_place_collect::from_iter_in_place::<core::iter::adapters::map::Map<alloc::vec::into_iter::IntoIter<core::option::Option<playback_worker::matroska_audio::Prefix>>, playback_worker::matroska_audio::operation::{closure#3}>, core::option::Option<playback_worker::matroska_audio::Clock>>
+core::ptr::drop_glue::<core::iter::adapters::map::Map<alloc::vec::into_iter::IntoIter<core::option::Option<playback_worker::matroska_audio::Prefix>>, playback_worker::matroska_audio::operation::{closure#3}>>
+playback_worker::matroska::ready::<triergon_playback::matroska_feed::MatroskaFeedPacket, playback_worker::matroska_audio::operation::{closure#4}>
+<triergon_playback::matroska_feed::probe_clock::MatroskaClock<triergon_playback::matroska_feed::MatroskaTrackFeed>>::observe
+core::ptr::drop_glue::<triergon_playback::player::Output>
+<triergon_playback::matroska_feed::probe_clock::MatroskaClock<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>>::observe_source
+core::ptr::drop_glue::<alloc::vec::Vec<core::option::Option<playback_worker::matroska_audio::Feed>>>

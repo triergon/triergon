@@ -6,6 +6,7 @@
 //! other feature.
 
 mod manifest;
+mod probe;
 mod reference;
 mod texts;
 mod ucd;
@@ -21,6 +22,9 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
        cargo xtask shape compare [--all] [REPORT OPTION]...
        cargo xtask shape ucd [--check]
        cargo xtask shape conformance
+       cargo xtask shape assemble DESCRIPTION OUTPUT
+       cargo xtask shape probe --reference WORKER [--candidate WORKER] [--record]
+                               [--output DIR] PROBE...
 
   prepare   build the pinned FriBidi and HarfBuzz releases into .research/harfbuzz;
             then `cargo xtask build-workers` builds their reference worker
@@ -42,7 +46,10 @@ pub const USAGE: &str = "usage: cargo xtask shape prepare [--jobs N]
   conformance
             fetch Unicode 14.0.0's hash-pinned BidiTest.txt and
             BidiCharacterTest.txt into .research/ucd and run the bidi_conformance
-            example on them; fails unless every case passes";
+            example on them; fails unless every case passes
+  assemble  write the CFF or CFF2 font a probe description describes
+  probe     measure assembled probe faces (harness/shape/probes) with the
+            shaping workers' extents operation; see `cargo xtask shape probe`";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
@@ -58,8 +65,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
                 }
                 _ => return Err(USAGE.into()),
             };
-            let built = reference::prepare(root, jobs, &fetch::Network)?;
-            println!("{}", built.display());
+            let built = crate::references::build("harfbuzz")?.prepare(root, || {
+                reference::prepare(root, jobs, &fetch::Network).map(|p| p.display().to_string())
+            })?;
+            println!("{built}");
             Ok(())
         }
         [command, rest @ ..] if command == "manifest" => {
@@ -67,6 +76,8 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         }
         [command, rest @ ..] if command == "ucd" => ucd::main(root, rest),
         [command, rest @ ..] if command == "conformance" => ucd::conformance(root, rest),
+        [command, rest @ ..] if command == "assemble" => probe::assemble_command(rest),
+        [command, rest @ ..] if command == "probe" => probe::probe_command(root, rest),
         _ => Err(USAGE.into()),
     }
 }

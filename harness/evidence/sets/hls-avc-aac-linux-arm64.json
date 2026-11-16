@@ -1,0 +1,31 @@
+{
+ "name": "hls-avc-aac-linux-arm64",
+ "path": "research/qualification/hls-avc-aac-linux-arm64",
+ "retention": "90 days",
+ "reason": "superseded by the cited HLS segment run",
+ "key": "qualification/repository/hls-avc-aac-linux-arm64/d9219bec67e43e5a4649480cd23e880d8ec66d338b89c8023c9613384fa34b2c.tar.gz",
+ "sha256": "d9219bec67e43e5a4649480cd23e880d8ec66d338b89c8023c9613384fa34b2c",
+ "bytes": 25111,
+ "files": [
+  {
+   "path": "research/qualification/hls-avc-aac-linux-arm64/README.md",
+   "sha256": "cf627838cf967989b1b1759586e1d22115387233f28136ca06aeafa6f9f81954"
+  },
+  {
+   "path": "research/qualification/hls-avc-aac-linux-arm64/e499beac-results.json",
+   "sha256": "9f3978aaf120a80a4945e6f0840a4491d0d86211b755fea068c2a8474db8f8db"
+  },
+  {
+   "path": "research/qualification/hls-avc-aac-linux-arm64/historical.json",
+   "sha256": "0e9071668d51c9e5f6bf0e00b1c3dd8cee3de1a45b3ba96cea8da9786d5e2000"
+  },
+  {
+   "path": "research/qualification/hls-avc-aac-linux-arm64/protocol.md",
+   "sha256": "a78dfd67276e944ac74a30a63dc45362a99f64d8f91cebfef3b8ff5db2362ad1"
+  },
+  {
+   "path": "research/qualification/hls-avc-aac-linux-arm64/results.json",
+   "sha256": "070fd05d097cf975edfa6bf6814fd5cf40db4c243674599e15562945ccff8ae6"
+  }
+ ]
+}

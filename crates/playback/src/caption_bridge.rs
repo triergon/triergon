@@ -91,7 +91,8 @@ enum End {
 }
 
 /// The selected video track's captions for one source and generation. A seek,
-/// track switch or configuration change needs a new bridge.
+/// track switch or configuration change needs a new bridge, made with the
+/// track's configuration again.
 pub struct CaptionBridge {
     pool: Budget,
     source: SourceId,
@@ -113,11 +114,18 @@ pub struct CaptionBridge {
 }
 
 impl CaptionBridge {
+    /// A bridge for `video`. `configuration` is the decoder configuration
+    /// record of an H.264 or HEVC track whose samples carry their NAL units
+    /// behind lengths (MP4 `avcC` or `hvcC`, Matroska `CodecPrivate`), empty
+    /// for other video; its parameter sets are taken before the first packet
+    /// ([`CaptionExtractor::configure`]), and without them the pictures of
+    /// samples that carry none lose their captions.
     pub fn new(
         pool: &Budget,
         source: SourceId,
         generation: u64,
         video: CaptionVideo,
+        configuration: &[u8],
         options: Options,
     ) -> Result<Self> {
         let part = |value: u64| u32::try_from(value).map_err(|_| Error::Overflow);
@@ -125,7 +133,9 @@ impl CaptionBridge {
             part(video.time_base.numerator())?,
             part(video.time_base.denominator())?,
         );
-        let extractor = CaptionExtractor::new(pool, video.coding, time_base);
+        let mut extractor = CaptionExtractor::new(pool, video.coding, time_base);
+        let work = u64::try_from(configuration.len()).map_err(|_| Error::Overflow)?;
+        extractor.configure(configuration, &mut WorkBudget::new(work))?;
         let (numerator, denominator) = extractor.time_base();
         let decoder = Decoder::new(pool, options);
         Ok(Self {

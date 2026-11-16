@@ -21,22 +21,31 @@ use crate::json::Value;
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
-       [--manifest ID=FILE]... [--isobmff] [--codecs WORKLOADS]... [--external-vector]
-       [--capture CASES] [--reference NAME]... (--review FILE | --standard-memory) [--kernel]
+       [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--isobmff-reader]
+       [--codecs WORKLOADS]...
+       [--readers LANE,...]
+       [--external-vector] [--capture CASES] [--reference NAME]...
+       [--review FILE | --standard-memory] [--kernel]
 
 Check, before a gate run measures anything, that the build identity's workers and
 references are current and the gate build; that each --feature's cases name known
 references and have every input with its pinned hash (in --corpus, else the
 manifest's recorded directory, else .research/fixtures; --manifest replaces the
-contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with --codecs
-each workload list's inputs, with --external-vector the mandatory external vector
-and with --capture the capture cases, their input generator and its numpy Python;
-that each named reference was built and is current: those --isobmff, --codecs and
---capture measure against, and any --reference; that the RSS module review covers
-this module source and kernel (--review), unless
-the run's memory uses the standard bounds (--standard-memory); and that the RSS
-module is unloaded, or with --kernel loaded under a current proof on a host with at
-least 30 GiB of memory, the class kernel-bound memory is qualified on. A feature
+contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with
+--isobmff-seek the ISO BMFF seek suite's, with --isobmff-reader the ISO BMFF reader
+comparison's, with --codecs each workload list's inputs,
+with --readers the reader comparison's inputs of those lanes
+(harness/codecs/reader-manifest.json; reader-ogg-seek is reader-ogg's seek cases,
+harness/codecs/reader-seeks.json), with --external-vector the mandatory external
+vector and with --capture the capture cases, their input generator and its numpy
+Python; that each named reference was built and is current: those --isobmff,
+--isobmff-seek, --codecs, --readers and --capture measure against, and any
+--reference; that the RSS module review covers
+this module source and kernel (the committed review,
+harness/rss-bound/reviews/SOURCE-RELEASE.json, or --review FILE), unless the run's
+memory uses the standard bounds (--standard-memory); and that the RSS module is
+unloaded, or with --kernel loaded under a current proof on a host with at least
+30 GiB of memory, the class kernel-bound memory is qualified on. A feature
 without cases or a workload list without workloads fails. Prints every check and
 exits 1 if any fails.";
 
@@ -48,7 +57,11 @@ struct Options {
     corpora: BTreeMap<String, PathBuf>,
     manifests: BTreeMap<String, PathBuf>,
     isobmff: bool,
+    isobmff_seek: bool,
+    isobmff_reader: bool,
     codecs: Vec<PathBuf>,
+    /// Reader comparison lanes.
+    readers: Vec<String>,
     external_vector: bool,
     capture: Option<PathBuf>,
     references: Vec<String>,
@@ -82,7 +95,12 @@ impl Options {
                 "--corpus" => pair(&mut options.corpora, value()?)?,
                 "--manifest" => pair(&mut options.manifests, value()?)?,
                 "--isobmff" => options.isobmff = true,
+                "--isobmff-seek" => options.isobmff_seek = true,
+                "--isobmff-reader" => options.isobmff_reader = true,
                 "--codecs" => options.codecs.push(root.join(value()?)),
+                "--readers" => options
+                    .readers
+                    .extend(value()?.split(',').map(str::to_owned)),
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
                 "--reference" => options.references.push(value()?),
@@ -92,8 +110,11 @@ impl Options {
                 _ => return Err(USAGE.to_owned()),
             }
         }
-        if options.review.is_some() == options.standard_memory {
-            return Err("give the RSS module review with --review, or --standard-memory for a run without the kernel bound".into());
+        if options.review.is_some() && options.standard_memory {
+            return Err("--review names the RSS module review of a kernel-bound run; --standard-memory is a run without it".into());
+        }
+        if !options.standard_memory && options.review.is_none() {
+            options.review = Some(committed_review(root));
         }
         for id in options.corpora.keys().chain(options.manifests.keys()) {
             if !options.features.contains(id) {
@@ -156,10 +177,28 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     if options.isobmff {
         checks.check("isobmff inputs", crate::isobmff_bench::verify_inputs(root));
     }
+    if options.isobmff_seek {
+        checks.check(
+            "isobmff seek inputs",
+            crate::isobmff_seek::verify_inputs(root),
+        );
+    }
+    if options.isobmff_reader {
+        checks.check(
+            "isobmff reader inputs",
+            crate::codecs::isobmff_reader::verify_inputs(root),
+        );
+    }
     for workloads in &options.codecs {
         checks.check(
             format!("codec workloads {}", workloads.display()),
             codec_inputs(root, workloads),
+        );
+    }
+    if !options.readers.is_empty() {
+        checks.check(
+            format!("reader inputs {}", options.readers.join(",")),
+            reader_inputs(root, &options.readers),
         );
     }
     if options.external_vector {
@@ -224,14 +263,33 @@ fn qualified_memory(meminfo: &str) -> R<String> {
 }
 
 impl Options {
+    /// The manifest feature `id`'s cases come from: --manifest, else the
+    /// contract's corpus.json.
+    fn manifest(&self, root: &Path, id: &str) -> PathBuf {
+        self.manifests
+            .get(id)
+            .cloned()
+            .unwrap_or_else(|| root.join("harness/features").join(id).join("corpus.json"))
+    }
+
+    /// The directory feature `id`'s case files are in: --corpus, else the
+    /// manifest's recorded directory, else .research/fixtures.
+    fn corpus(&self, root: &Path, id: &str, manifest: &Value) -> PathBuf {
+        match self.corpora.get(id) {
+            Some(corpus) => corpus.clone(),
+            None => super::report::recorded_corpus(root, manifest)
+                .unwrap_or_else(|| root.join(".research/fixtures")),
+        }
+    }
+
     /// The references the selected runs other than features measure against,
     /// which name them by path rather than through a contract.
     fn measured_references(&self) -> Vec<String> {
         let mut names = Vec::new();
-        if self.isobmff {
+        if self.isobmff || self.isobmff_seek {
             names.push(crate::isobmff_bench::REFERENCE.to_owned());
         }
-        if !self.codecs.is_empty() {
+        if !self.codecs.is_empty() || !self.readers.is_empty() {
             names.push("ffmpeg-decode-native".to_owned());
         }
         if self.capture.is_some() {
@@ -264,7 +322,8 @@ fn built_reference(root: &Path, identity: &Value, name: &str) -> R<String> {
 
 /// The gate build's workers and every comparison reference match the identity.
 fn workers(root: &Path, identity: &Value) -> R<String> {
-    let refusals = gate_build::refusals(identity, &gate_build::pinned_release(root)?);
+    let refusals =
+        gate_build::identity_refusals(root, identity, &gate_build::pinned_release(root)?);
     if !refusals.is_empty() {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
@@ -284,19 +343,10 @@ fn workers(root: &Path, identity: &Value) -> R<String> {
 /// Every case of a feature names references the identity holds and has every
 /// input it reads with its pinned hash.
 fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<String> {
-    let directory = root.join("harness/features").join(id);
-    let contract = read_json(&directory.join("contract.json"))?;
-    let manifest_path = options
-        .manifests
-        .get(id)
-        .cloned()
-        .unwrap_or_else(|| directory.join("corpus.json"));
+    let contract = read_json(&root.join("harness/features").join(id).join("contract.json"))?;
+    let manifest_path = options.manifest(root, id);
     let (manifest, _) = super::manifest::read(root, &manifest_path)?;
-    let corpus = match options.corpora.get(id) {
-        Some(corpus) => corpus.clone(),
-        None => super::report::recorded_corpus(root, &manifest)
-            .unwrap_or_else(|| root.join(".research/fixtures")),
-    };
+    let corpus = options.corpus(root, id, &manifest);
     let prefix = contract.get("worker_operation").and_then(Value::as_str);
     let cases = manifest
         .get("cases")
@@ -331,28 +381,35 @@ fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<Stri
     }
 }
 
+/// Each workload of a list: its id, and its input's repository-relative path and
+/// pinned hash, or none when it lacks either.
+fn workloads(list: &Value) -> Vec<(&str, Option<(&str, &str)>)> {
+    list.get("workloads")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .map(|workload| {
+            let text = |key| workload.get(key).and_then(Value::as_str);
+            (
+                text("id").unwrap_or_default(),
+                text("path").zip(text("sha256")),
+            )
+        })
+        .collect()
+}
+
 /// Every workload's input exists with its pinned hash.
 fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
     let list = read_json(workloads)?;
-    let entries = list
-        .get("workloads")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
+    let entries = self::workloads(&list);
     let mut problems = Vec::new();
-    for workload in entries {
-        let id = workload
-            .get("id")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let (Some(path), Some(pin)) = (
-            workload.get("path").and_then(Value::as_str),
-            workload.get("sha256").and_then(Value::as_str),
-        ) else {
+    for (id, input) in &entries {
+        let Some((path, pin)) = input else {
             problems.push(format!("{id}: no path or hash"));
             continue;
         };
         match sha256::file_hex(&root.join(path)) {
-            Ok(actual) if actual == pin => {}
+            Ok(actual) if actual == *pin => {}
             Ok(_) => problems.push(format!("{id}: {path} differs from its pin")),
             Err(error) => problems.push(format!("{id}: {path}: {error}")),
         }
@@ -366,10 +423,70 @@ fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
     }
 }
 
-/// The mandatory external vector is in the sample cache with its pinned hash.
-fn external_vector(root: &Path) -> R<String> {
-    let contract =
-        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
+/// The reader comparison's manifest and seek cases.
+const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
+const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
+/// The lane of the seek cases, which read reader-ogg's vectors.
+const SEEK_LANE: &str = "reader-ogg-seek";
+
+/// The reader comparison's vectors of `lanes`, as paths with their pins, after the
+/// manifests that list them.
+fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = vec![(root.join(READER_MANIFEST), None)];
+    let mut wanted: Vec<&str> = lanes.iter().map(String::as_str).collect();
+    if wanted.contains(&SEEK_LANE) {
+        files.push((root.join(READER_SEEKS), None));
+        wanted.push("reader-ogg");
+    }
+    let manifest = read_json(&root.join(READER_MANIFEST))?;
+    let mut vectors = 0;
+    for vector in manifest
+        .get("vectors")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let text = |key| vector.get(key).and_then(Value::as_str);
+        if !text("lane").is_some_and(|lane| wanted.contains(&lane)) {
+            continue;
+        }
+        let path = text("path").ok_or("a reader vector without a path")?;
+        let pin = text("sha256").ok_or("a reader vector without a hash")?;
+        files.push((root.join(path), Some(pin.to_owned())));
+        vectors += 1;
+    }
+    if vectors == 0 {
+        return Err(format!("no reader vectors of {}", lanes.join(",")));
+    }
+    Ok(files)
+}
+
+/// Every reader vector of `lanes` exists with its pinned hash.
+fn reader_inputs(root: &Path, lanes: &[String]) -> R<String> {
+    let files = reader_files(root, lanes)?;
+    let mut problems = Vec::new();
+    let mut vectors = 0;
+    for (path, pin) in &files {
+        let Some(pin) = pin else { continue };
+        vectors += 1;
+        match sha256::file_hex(path) {
+            Ok(actual) if actual == *pin => {}
+            Ok(_) => problems.push(format!("{} differs from its pin", path.display())),
+            Err(error) => problems.push(format!("{}: {error}", path.display())),
+        }
+    }
+    if problems.is_empty() {
+        Ok(format!("{vectors} inputs"))
+    } else {
+        Err(problems.join("; "))
+    }
+}
+
+/// The contract that names the mandatory external vectors.
+const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
+
+/// The mandatory external vectors: each path in the sample cache with its pin.
+fn external_vectors(root: &Path) -> R<Vec<(PathBuf, String)>> {
+    let contract = read_json(&root.join(VECTOR_CONTRACT))?;
     let specs = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -377,22 +494,122 @@ fn external_vector(root: &Path) -> R<String> {
     if specs.is_empty() {
         return Err("the contract names no external vector".into());
     }
-    for spec in specs {
-        let file = spec
-            .get("file")
-            .and_then(Value::as_str)
-            .ok_or("vector without a file")?;
-        let pin = spec
-            .get("sha256")
-            .and_then(Value::as_str)
-            .ok_or("vector without a hash")?;
-        let path = root.join(".research/fate-samples").join(file);
-        if sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))? != pin {
+    specs
+        .iter()
+        .map(|spec| {
+            let text = |key| spec.get(key).and_then(Value::as_str);
+            let file = text("file").ok_or("vector without a file")?;
+            let pin = text("sha256").ok_or("vector without a hash")?;
+            Ok((
+                root.join(".research/fate-samples").join(file),
+                pin.to_owned(),
+            ))
+        })
+        .collect()
+}
+
+/// The mandatory external vector is in the sample cache with its pinned hash.
+fn external_vector(root: &Path) -> R<String> {
+    let vectors = external_vectors(root)?;
+    for (path, pin) in &vectors {
+        if sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))? != *pin {
             return Err(format!("{} differs from its pin", path.display()));
         }
     }
-    Ok(format!("{} vectors", specs.len()))
+    Ok(format!("{} vectors", vectors.len()))
 }
+
+/// A file a preflight check reads, with the SHA-256 the check pins it to, if any.
+#[derive(Debug)]
+pub struct Input {
+    pub path: PathBuf,
+    pub sha256: Option<String>,
+}
+
+/// Every file the checks of `preflight ARGS` read, resolved as those checks
+/// resolve them, with `manifest` reading a feature's manifest. The build identity,
+/// the references and the RSS module review are the host's and are left out.
+pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>) -> R<Vec<Input>> {
+    let options = Options::parse(root, args)?;
+    let mut inputs = Vec::new();
+    let mut add = |path: PathBuf, sha256: Option<&str>| {
+        inputs.push(Input {
+            path,
+            sha256: sha256.map(str::to_owned),
+        });
+    };
+    for id in &options.features {
+        add(
+            root.join("harness/features").join(id).join("contract.json"),
+            None,
+        );
+        let path = options.manifest(root, id);
+        let document = manifest(&path).map_err(|e| format!("feature {id}: {e}"))?;
+        let corpus = options.corpus(root, id, &document);
+        add(path, None);
+        for case in document
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            // The pins in the order `case_files` lists the files: the input, then
+            // its ordered entities, then its companions.
+            let mut pins = vec![case.get("sha256").and_then(Value::as_str)];
+            for key in ["entities", "companions"] {
+                for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {
+                    pins.push(input.get("sha256").and_then(Value::as_str));
+                }
+            }
+            let files = super::report::case_files(&corpus, case)
+                .map_err(|e| format!("feature {id}: {e}"))?;
+            for (file, pin) in files.into_iter().zip(pins) {
+                add(file, pin);
+            }
+        }
+    }
+    if options.isobmff {
+        for (path, pin) in crate::isobmff_bench::inputs(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    if options.isobmff_seek {
+        for (path, pin) in crate::isobmff_seek::inputs(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    if options.isobmff_reader {
+        for (path, pin) in crate::codecs::isobmff_reader::inputs(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    for list in &options.codecs {
+        add(list.clone(), None);
+        for (id, input) in workloads(&read_json(list)?) {
+            let (path, pin) =
+                input.ok_or_else(|| format!("{}: {id}: no path or hash", list.display()))?;
+            add(root.join(path), Some(pin));
+        }
+    }
+    if !options.readers.is_empty() {
+        for (path, pin) in reader_files(root, &options.readers)? {
+            add(path, pin.as_deref());
+        }
+    }
+    if options.external_vector {
+        add(root.join(VECTOR_CONTRACT), None);
+        for (path, pin) in external_vectors(root)? {
+            add(path, Some(&pin));
+        }
+    }
+    if let Some(cases) = &options.capture {
+        add(cases.clone(), None);
+        add(root.join(CAPTURE_GENERATOR), None);
+    }
+    Ok(inputs)
+}
+
+/// The capture inputs' generator.
+const CAPTURE_GENERATOR: &str = "harness/capture/generate_inputs.py";
 
 /// The capture cases exist, and the Python that generates their inputs has numpy.
 fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
@@ -404,7 +621,7 @@ fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
     if count == 0 {
         return Err(format!("{} lists no cases", cases.display()));
     }
-    let generator = root.join("harness/capture/generate_inputs.py");
+    let generator = root.join(CAPTURE_GENERATOR);
     if !generator.is_file() {
         return Err(format!("{} missing", generator.display()));
     }
@@ -418,8 +635,27 @@ fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
     Ok(format!("{count} cases, Python and numpy {identity}"))
 }
 
+/// The committed review of the module source in the tree for the running kernel:
+/// `harness/rss-bound/reviews/SOURCE-RELEASE.json`, by the first 12 hexadecimal
+/// digits of the source's SHA-256 and the kernel release. `prove.sh` takes the same.
+pub fn committed_review(root: &Path) -> PathBuf {
+    let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))
+        .unwrap_or_else(|_| "unreadable-module".into());
+    let prefix = source.get(..12).unwrap_or(&source);
+    root.join(format!(
+        "harness/rss-bound/reviews/{prefix}-{}.json",
+        linux::kernel_release()
+    ))
+}
+
 /// The review names this module source and kernel release as a reviewed upper bound.
 fn module_review(root: &Path, review: &Path) -> R<String> {
+    if !review.is_file() {
+        return Err(format!(
+            "no review of this module source for this kernel: {}",
+            review.display()
+        ));
+    }
     let document = read_json(review)?;
     let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
     let text = |key: &str| document.get(key).and_then(Value::as_str);
@@ -504,9 +740,34 @@ mod tests {
     #[test]
     fn a_run_names_its_rss_review_or_its_standard_bounds() {
         let root = Path::new("/repo");
-        assert!(Options::parse(root, &args(&["--feature", "a"])).is_err());
+        let committed = Options::parse(root, &args(&["--feature", "a"])).unwrap();
+        assert_eq!(committed.review, Some(committed_review(root)));
+        assert!(committed_review(root).starts_with(root.join("harness/rss-bound/reviews")));
+        let standard = Options::parse(root, &args(&["--standard-memory"])).unwrap();
+        assert_eq!(standard.review, None);
         assert!(Options::parse(root, &args(&["--review", "r.json"])).is_ok());
         assert!(Options::parse(root, &args(&["--review", "r.json", "--standard-memory"])).is_err());
+    }
+
+    #[test]
+    fn the_module_source_in_the_tree_has_a_committed_review() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
+        let reviews = std::fs::read_dir(root.join("harness/rss-bound/reviews")).unwrap();
+        let reviewed = reviews.flatten().any(|entry| {
+            let review = read_json(&entry.path()).unwrap();
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with(&source[..12])
+                && review.get("module_source_sha256").and_then(Value::as_str)
+                    == Some(source.as_str())
+        });
+        assert!(
+            reviewed,
+            "commit the review of module source {}",
+            &source[..12]
+        );
     }
 
     #[test]

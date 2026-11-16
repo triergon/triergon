@@ -1,0 +1,128 @@
+# Nested calls: function 0 calls itself while storage 0 counts down, then
+# moves point 1; the glyph program calls it with the count N - 1, so N calls
+# are in progress at the deepest, and moves point 2 after the call returns.
+# N runs from 1 to 100.
+# Observed: up to 32 calls in progress run; a 33rd ends the program.
+heights 16384
+fpgm
+  PUSH 0; FDEF; PUSH 0; RS; IF; PUSH 0 0; RS; PUSH 1; SUB; WS; PUSH 0; CALL; ELSE; SVTCA[0]; PUSH 1 640; SCFS; EIF; ENDF
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 0; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 1; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 7; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 15; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 29; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 30; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 31; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 32; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 33; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 39; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 49; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 61; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 62; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 63; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 64; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 65; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end
+glyph advance 600
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off
+  contour 203 97, 397 97, 397 597, 203 597
+  program
+    PUSH 0 99; WS; PUSH 0; CALL; SVTCA[0]; PUSH 2 1280; SCFS
+  end
+end

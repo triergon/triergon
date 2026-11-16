@@ -1,0 +1,6 @@
+{
+ "name": "tooling-worktree-checks",
+ "retention": "90 days",
+ "key": "qualification/repository/tooling-worktree-checks/0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202.tar.gz",
+ "sha256": "0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202"
+}

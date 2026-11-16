@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-zlib-79e0ae13",
+ "path": "gate-matroska-zlib-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-zlib's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-zlib-79e0ae13/169ab805e391d16caddd4bb447b5c30d57f8e6278f87b04bd2bbe683eff9e9f9.tar.zst",
+ "sha256": "169ab805e391d16caddd4bb447b5c30d57f8e6278f87b04bd2bbe683eff9e9f9",
+ "bytes": 2390751,
+ "results": [
+  {
+   "path": "gate-matroska-zlib-79e0ae13/aarch64/shard-1/benchmark/matroska-zlib/gate-result.json",
+   "command": "report --benchmark",
+   "key": "55f0e5abfe8d5cb5abc5a8159fd4d4c24be0f1bc5b02ca4b830db45140fb0e59",
+   "status": 0,
+   "report_sha256": "1934349857204da1a585213f10085e7f689c50a63f65a7bd812ba8910ab54869"
+  },
+  {
+   "path": "gate-matroska-zlib-79e0ae13/aarch64/shard-1/graded/matroska-zlib/gate-result.json",
+   "command": "grade",
+   "key": "1afa1aa8f6a7a70a07bb853ffb819a4f66712c9fa6658edf7621498f204ddbe8",
+   "status": 0,
+   "report_sha256": "fc98eb7bedddf904487c5f1ce6e4faa51abef7fc61b870e7b21a1dbdb4bb30e0"
+  },
+  {
+   "path": "gate-matroska-zlib-79e0ae13/aarch64/shard-1/memory/matroska-zlib/gate-result.json",
+   "command": "report --memory",
+   "key": "db820cfc56d46ed8795e224e8323a9a440a0047d3e4e014daf91cbc745b94415",
+   "status": 0,
+   "report_sha256": "6bcb228cc676c6149b808e2747edc316feb18637bbdaab032ee28a72ecbce284"
+  },
+  {
+   "path": "gate-matroska-zlib-79e0ae13/armv7/shard-1/benchmark/matroska-zlib/gate-result.json",
+   "command": "report --benchmark",
+   "key": "45d527bd679fb978ff6941d33d5e88067a78504baa4c00ebd35f548ff43ed7da",
+   "status": 0,
+   "report_sha256": "3d25c933ac340a256d45825ae0a764126a9f057f3cb044930fe4a16cbbcc941c"
+  },
+  {
+   "path": "gate-matroska-zlib-79e0ae13/armv7/shard-1/graded/matroska-zlib/gate-result.json",
+   "command": "grade",
+   "key": "39eeca706a9b82e74d5fcb22329c7612d3ae4215be1b8c5534959f59f0500532",
+   "status": 0,
+   "report_sha256": "0e89872d928b340479d4057ed6609aa5348606676f896def1b37952324dee26c"
+  },
+  {
+   "path": "gate-matroska-zlib-79e0ae13/armv7/shard-1/memory/matroska-zlib/gate-result.json",
+   "command": "report --memory",
+   "key": "73143aada7b7c335754f5709716d7d3b52c507839479d8a867a7325c384cc55e",
+   "status": 0,
+   "report_sha256": "bfbe3e1d7b59b784a239a47784b77102302f06672cb366212de961b4d5bddecd"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

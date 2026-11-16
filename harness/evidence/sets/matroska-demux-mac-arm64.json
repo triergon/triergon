@@ -1,0 +1,79 @@
+{
+ "name": "matroska-demux-mac-arm64",
+ "path": "research/qualification/k0-mac-arm64",
+ "retention": "90 days",
+ "reason": "superseded macOS receipts",
+ "key": "qualification/repository/matroska-demux-mac-arm64/935b875198778f3eecd133fbf1b39b1caa39eee4b8711350e53bdf73666ab0e1.tar.gz",
+ "sha256": "935b875198778f3eecd133fbf1b39b1caa39eee4b8711350e53bdf73666ab0e1",
+ "bytes": 2007725,
+ "files": [
+  {
+   "path": "research/qualification/k0-mac-arm64/fate-lacing.json",
+   "sha256": "80549f43bd4765b0d3e793500737817e16c99ce4830aaa032319ca8a4454f189"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/pause-receipt.json",
+   "sha256": "925c646bfb6a10bbf898b7629da543d369ce49415b7d4d443d0d652fef1f046d"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/report.json",
+   "sha256": "4e14fdd6966ec1ca8ec19dc0480b167d1e96ed895da167de5050699617e146c4"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/run.log",
+   "sha256": "5ed6373e2b04d9ace37639bad020b690651d6556fcf57bfca59c04538215c808"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/Cargo.lock",
+   "sha256": "6e23bc62d90a460380b116aefaad34438a8d8c637b5d048dae9f01da3bf2ab68"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/Cargo.toml",
+   "sha256": "24e239225c72d21cc99242ec60ac8be9303f5552b9cae041edcc7e8c9d8e0cb2"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/src/ebml.rs",
+   "sha256": "7b0e5a071cd1210c83b65a20bbc27763763c8921994d5265fd628a4206eba466"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/src/error.rs",
+   "sha256": "589443832d4f7ce05e403739731928bd206464886c5d6a0ed66f2954e04f2573"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/src/lib.rs",
+   "sha256": "e2a78a2117f40841cd417038e50045e8edc18b93bcbd99a7d08776c3a5a41efc"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/src/matroska.rs",
+   "sha256": "8f5d12c7821070d51fcdf58e5ff3318e7c8784d5884b2028488d5b0064c4dff6"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/src/time.rs",
+   "sha256": "f78844b2905ea19144ebe7c698c5f6db8c8fa7017657759d23afc24d1fe6eb94"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/src/timing.rs",
+   "sha256": "2920479b49658eccc359f4efb927092654d8e55067f6b3211ea40ea21c83e7d1"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/media/tests/matroska.rs",
+   "sha256": "202ea5d5e5cb1661e0b3c0e0770a1efcdad298a61f1545a4f79efea760248e19"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/crates/worker/src/main.rs",
+   "sha256": "d9e5d3ee410f97449b13f67127951c6dcac3864e434cec317fd0832ad6b6c331"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/harness/corpus.json",
+   "sha256": "6763146d864e92085034359c8a013ebfa9486249aad5b1fc9ab75754cc7eed80"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/source/harness/slice.json",
+   "sha256": "1958e3942f2e7235d66935f319ad2c9a62e80f0d6e47daeb6c23cd4bbc1add10"
+  },
+  {
+   "path": "research/qualification/k0-mac-arm64/timing-boundaries.json",
+   "sha256": "0a922ae16e6aaf61a72bf66e85256ef722ff65cfccaf8e73852cce49c53ea162"
+  }
+ ]
+}

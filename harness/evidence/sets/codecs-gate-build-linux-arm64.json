@@ -1,0 +1,58 @@
+{
+ "name": "codecs-gate-build-linux-arm64",
+ "retention": "retained",
+ "reason": "Codecs and decode sessions runtime at ceb5076: 17 workloads, two passes on the gate build",
+ "key": "evidence/codecs-gate-build-linux-arm64/12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed.tar.gz",
+ "sha256": "12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed",
+ "bytes": 1322107,
+ "files": [
+  {
+   "path": "codecs-gate-build-linux-arm64/PLATFORM",
+   "sha256": "d5a9cea8ee1794cd306c6d3224e00f74d2a722cf8f84d638512290da30afc213"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/REV",
+   "sha256": "399b49db2b3cdfc031d4f7b0ac5358ae4b51a0722b7bc1bda494f1c436e3ea3d"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/RSS-PROOF.json",
+   "sha256": "b99cfb0e01babcb1bd7d61e6d37c47a2610947cf282303737c4d6e845cd52a89"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/binaries-memory.sha256",
+   "sha256": "339fa8556072d19ff33f2ba65da6d96016fd1e1b5df673918c90b003d479bdea"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/build-memory.log",
+   "sha256": "b9cb68a5302c008d7ae766f44e5b7f79c33d9a5fdc0dbb000697cc22e91e7403"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/identity.json",
+   "sha256": "c994db85668fbe8182031dde675b76130b1b7ad70249f88dfe6c1315f8a731ca"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/measure.log",
+   "sha256": "dece56de1c40e9d8bb374d7a570cd69b2e6edd13bbce443a3435b7292a9b8f51"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/measure.sh",
+   "sha256": "6f0f09bfc1f3e67ee099022f27440cf03dcefa19c39e606b9a9cf58e30ba9d68"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/p1-codecs.tar.gz",
+   "sha256": "d16ad6bedad7f7d10b94520f30b33e36558b0bc21d3bf78d2c17b2899b56380a"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/p2-codecs.tar.gz",
+   "sha256": "b6fa02d61c4e4f9e83ffb4ddd9b9ef7b7e60eb48d806834908fa542c81b2f7c0"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/prove.log",
+   "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+  },
+  {
+   "path": "codecs-gate-build-linux-arm64/setup.sh",
+   "sha256": "b3f9c2dd40138ce3efc90e702c1b95907a2f7b3971e19b9ebe54c96301973aea"
+  }
+ ]
+}

@@ -37,6 +37,8 @@ pub struct Options {
     pub pairs: usize,
     pub seed: u64,
     pub only: Option<String>,
+    /// Part I of N (zero-based I): every Nth workload from the Ith.
+    pub part: Option<(usize, usize)>,
     /// Let a gate session stop at an early look (`--no-early-stop` clears it).
     pub early_stop: bool,
 }
@@ -67,7 +69,7 @@ fn work(worker: &Path, operation: &str, input: &Path) -> Result<Value, String> {
 }
 
 /// Whether the platform can produce a memory gate result.
-fn gate_platform() -> bool {
+pub fn gate_platform() -> bool {
     cfg!(all(
         target_os = "linux",
         target_arch = "aarch64",
@@ -112,9 +114,36 @@ fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("workload without {key}"))
 }
 
+/// How long one observer run of `manifest`'s workloads may take on `target`: its
+/// `memory_timeout_seconds` for the target, a whole number of seconds from 1 to
+/// [`worker::MAXIMUM_TIMEOUT_SECONDS`], else [`worker::DEFAULT_TIMEOUT`].
+pub fn run_limit(manifest: &Value, target: &str) -> Result<Duration, String> {
+    let Some(declared) = manifest
+        .get("memory_timeout_seconds")
+        .and_then(|limits| limits.get(target))
+    else {
+        return Ok(worker::DEFAULT_TIMEOUT);
+    };
+    match declared {
+        Value::Number(number) => number.as_i128(),
+        _ => None,
+    }
+    .and_then(|seconds| u64::try_from(seconds).ok())
+    .filter(|seconds| (1..=worker::MAXIMUM_TIMEOUT_SECONDS).contains(seconds))
+    .map(Duration::from_secs)
+    .ok_or_else(|| {
+        format!(
+            "memory_timeout_seconds for {target} must be a whole number of seconds \
+                 from 1 to {}",
+            worker::MAXIMUM_TIMEOUT_SECONDS
+        )
+    })
+}
+
 pub fn run(options: &Options) -> Result<(), String> {
     let manifest = crate::checks::read_json(&options.workloads)
         .map_err(|e| format!("{}: {e}", options.workloads.display()))?;
+    let limit = run_limit(&manifest, &crate::harness::report::gate_target()?)?;
     let workloads = manifest
         .get("workloads")
         .and_then(Value::as_array)
@@ -155,6 +184,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("cpus", gate_build::cpus()),
         ("pairs", Value::int(options.pairs as i128)),
         ("seed", Value::int(options.seed)),
+        ("run_limit_seconds", Value::int(i128::from(limit.as_secs()))),
         ("utc", Value::str(python::utc_now())),
     ]);
     if let Some(parity) = &parity
@@ -163,10 +193,13 @@ pub fn run(options: &Options) -> Result<(), String> {
         fields.push(("parity_sha256".into(), Value::str(&parity.sha256)));
     }
     write(&options.out.join("identity.json"), &identity)?;
-    let mut summary = Vec::new();
-    for w in &workloads {
+    // Every workload's unobserved work first, then the memory of all of them in one
+    // collection, side by side, each slot measuring its own copies of the gate
+    // build's workers.
+    let mut planned = Vec::new();
+    for (index, w) in workloads.iter().enumerate() {
         let id = text(w, "id")?;
-        if only.as_ref().is_some_and(|o| !o.contains(&id)) {
+        if only.as_ref().is_some_and(|o| !o.contains(&id)) || !in_part(index, options.part) {
             continue;
         }
         let operation = text(w, "operation")?;
@@ -179,53 +212,83 @@ pub fn run(options: &Options) -> Result<(), String> {
                 w.get("sha256").cloned().unwrap_or(Value::Null),
             ),
         ];
-        let measured =
-            if Some(file_sha(&input)?.as_str()) != w.get("sha256").and_then(Value::as_str) {
-                Value::object([("status", Value::str("input-hash-mismatch"))])
-            } else {
-                match (
-                    work(&options.candidate, operation, &input),
-                    work(&options.reference, operation, &input),
-                ) {
-                    (Ok(candidate), Ok(reference))
-                        if crate::harness::diff::equal(&candidate, &reference) =>
-                    {
-                        let expected =
-                            Value::object([("candidate", candidate), ("reference", reference)]);
-                        record.push(("expected_outputs".into(), expected.clone()));
-                        let arguments = [format!("{operation}-memory"), python::path(&input)];
-                        let workers = memory::WorkerPaths {
-                            candidate: &options.candidate,
-                            reference: &options.reference,
-                            registered: false,
-                        };
-                        memory::collect_one(memory::Job::new(&workers, [input.clone()], |slot| {
-                            memory::collect_command(
-                                slot,
-                                &options.repository,
-                                &options.candidate,
-                                &options.reference,
-                                &input,
-                                memory::Pairs::gate(options.pairs, memory::CEILING)
-                                    .early_stop(options.early_stop),
-                                options.seed,
-                                &arguments,
-                                &expected,
-                            )
-                        }))?
-                    }
-                    (Ok(candidate), Ok(reference)) => Value::object([
-                        ("status", Value::str("unequal-memory-work")),
-                        ("candidate_work", candidate),
-                        ("reference_work", reference),
-                    ]),
-                    (candidate, reference) => Value::object([
-                        ("status", Value::str("worker-failure")),
-                        ("candidate", candidate.err().map_or(Value::Null, Value::str)),
-                        ("reference", reference.err().map_or(Value::Null, Value::str)),
-                    ]),
+        let ready = if Some(file_sha(&input)?.as_str()) != w.get("sha256").and_then(Value::as_str) {
+            Err(Value::object([(
+                "status",
+                Value::str("input-hash-mismatch"),
+            )]))
+        } else {
+            match (
+                work(&options.candidate, operation, &input),
+                work(&options.reference, operation, &input),
+            ) {
+                (Ok(candidate), Ok(reference))
+                    if crate::harness::diff::equal(&candidate, &reference) =>
+                {
+                    let expected =
+                        Value::object([("candidate", candidate), ("reference", reference)]);
+                    record.push(("expected_outputs".into(), expected.clone()));
+                    Ok((
+                        expected,
+                        [format!("{operation}-memory"), python::path(&input)],
+                    ))
                 }
-            };
+                (Ok(candidate), Ok(reference)) => Err(Value::object([
+                    ("status", Value::str("unequal-memory-work")),
+                    ("candidate_work", candidate),
+                    ("reference_work", reference),
+                ])),
+                (candidate, reference) => Err(Value::object([
+                    ("status", Value::str("worker-failure")),
+                    ("candidate", candidate.err().map_or(Value::Null, Value::str)),
+                    ("reference", reference.err().map_or(Value::Null, Value::str)),
+                ])),
+            }
+        };
+        planned.push((w, id, record, input, ready));
+    }
+    let workers = memory::WorkerPaths {
+        candidate: &options.candidate,
+        reference: &options.reference,
+        registered: refusals.is_empty(),
+    };
+    let pairs = memory::Pairs::gate(options.pairs, memory::CEILING).early_stop(options.early_stop);
+    let mut jobs = Vec::new();
+    let mut collected = Vec::new();
+    for (index, (_, _, _, input, ready)) in planned.iter().enumerate() {
+        let Ok((expected, arguments)) = ready else {
+            continue;
+        };
+        jobs.push(memory::Job::new(&workers, [input.clone()], move |slot| {
+            memory::collect_command(
+                slot,
+                &options.repository,
+                workers,
+                input,
+                pairs,
+                options.seed,
+                arguments,
+                expected,
+                limit,
+            )
+        }));
+        collected.push(index);
+    }
+    let mut memories: Vec<Option<Value>> = vec![None; planned.len()];
+    for (index, memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
+        memories[index] = Some(memory?);
+    }
+    let mut summary = Vec::new();
+    let mut unmeasured = Vec::new();
+    let mut bounds = Vec::new();
+    for ((w, id, mut record, _, ready), memory) in planned.into_iter().zip(memories) {
+        let measured = match ready {
+            Err(refused) => refused,
+            Ok(_) => memory.ok_or("a codec memory collection did not run")?,
+        };
+        if measured.get("status").and_then(Value::as_str) != Some("qualified") {
+            unmeasured.push(id.to_owned());
+        }
         let parity_matches = parity.as_ref().is_none_or(|parity| {
             parity.matches(
                 measured
@@ -244,6 +307,10 @@ pub fn run(options: &Options) -> Result<(), String> {
             gate_platform(),
             refusals.is_empty() && parity_matches,
         );
+        if measured.get("status").and_then(Value::as_str) == Some("qualified") {
+            let held = verdict.get("memory_gate").is_some_and(Value::truthy);
+            bounds.push((id.to_owned(), held));
+        }
         let bound = |key: &str| measured.get(key).cloned().unwrap_or(Value::Null);
         let mut line = vec![("id".to_owned(), Value::str(id))];
         line.extend(match &verdict {
@@ -270,8 +337,45 @@ pub fn run(options: &Options) -> Result<(), String> {
         summary.push(line);
     }
     write(&options.out.join("summary.json"), &Value::Array(summary))?;
+    let name = list_name(&options.workloads);
+    let (lines, failed) = super::bounds(&manifest, &name, "memory", &bounds, gate_platform());
+    for line in &lines {
+        println!("{line}");
+    }
     println!("DONE");
+    measured_all("memory", &unmeasured)?;
+    if failed {
+        return Err(format!("{name} memory: a gated bound failed"));
+    }
     Ok(())
+}
+
+/// A workload list's name, from its file: `workloads` or `file-workloads`.
+pub fn list_name(workloads: &Path) -> String {
+    workloads.file_stem().map_or_else(
+        || "workloads".into(),
+        |stem| stem.to_string_lossy().into_owned(),
+    )
+}
+
+/// Whether the workload at `index` is in `part` (zero-based I of N): every Nth
+/// workload from the Ith; every workload without a part.
+pub fn in_part(index: usize, part: Option<(usize, usize)>) -> bool {
+    part.is_none_or(|(i, n)| index % n == i)
+}
+
+/// A collection measures every workload it selects, or it fails naming those it did
+/// not, after writing every record.
+pub fn measured_all(what: &str, unmeasured: &[String]) -> Result<(), String> {
+    if unmeasured.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{what} not measured for {} workloads: {}",
+            unmeasured.len(),
+            unmeasured.join(", ")
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -289,6 +393,82 @@ mod tests {
     fn gates(value: &Value) -> (bool, bool, bool) {
         let flag = |k: &str| value.get(k).is_some_and(Value::truthy);
         (flag("heap_gate"), flag("rss_gate"), flag("memory_gate"))
+    }
+
+    #[test]
+    fn parts_take_every_nth_workload_and_together_take_each_once() {
+        let taken: Vec<Vec<usize>> = (0..3)
+            .map(|i| (0..8).filter(|&w| in_part(w, Some((i, 3)))).collect())
+            .collect();
+        assert_eq!(taken, vec![vec![0, 3, 6], vec![1, 4, 7], vec![2, 5]]);
+        assert!((0..8).all(|w| in_part(w, None)));
+    }
+
+    #[test]
+    fn a_failed_bound_fails_where_gated_and_open_failures_read_as_listed() {
+        let results = |held: &[(&str, bool)]| -> Vec<(String, bool)> {
+            held.iter().map(|(id, h)| ((*id).to_owned(), *h)).collect()
+        };
+        let list =
+            json::parse(r#"{"open_workloads": ["hevc-main10-2160p"], "workloads": []}"#).unwrap();
+        let all = results(&[("aac-lc-stereo", true), ("hevc-main10-2160p", true)]);
+        assert_eq!(
+            super::super::bounds(&list, "workloads", "timing", &all, true),
+            (
+                vec!["workloads timing: 2 of 2 cases pass".to_owned()],
+                false
+            )
+        );
+        let open = results(&[("aac-lc-stereo", true), ("hevc-main10-2160p", false)]);
+        assert_eq!(
+            super::super::bounds(&list, "workloads", "timing", &open, true),
+            (
+                vec![
+                    "workloads timing: 1 of 2 cases pass".to_owned(),
+                    "workloads timing: 1 open failures, as listed: hevc-main10-2160p".to_owned(),
+                ],
+                true
+            )
+        );
+        let other = results(&[("aac-lc-stereo", false), ("hevc-main10-2160p", true)]);
+        let (lines, failed) = super::super::bounds(&list, "workloads", "memory", &other, true);
+        assert!(failed);
+        assert_eq!(lines[1], "workloads memory: failing: aac-lc-stereo");
+        // A target the gate does not apply to reports its bounds and fails nothing.
+        let (lines, failed) = super::super::bounds(&list, "workloads", "memory", &other, false);
+        assert!(!failed);
+        assert_eq!(
+            lines,
+            vec!["workloads memory: diagnostic on this target, not gated: 1 of 2 within the bound"]
+        );
+    }
+
+    #[test]
+    fn a_collection_fails_when_any_workload_is_not_measured() {
+        assert_eq!(measured_all("memory", &[]), Ok(()));
+        assert_eq!(
+            measured_all("memory", &["hevc-main10-2160p".into()]),
+            Err("memory not measured for 1 workloads: hevc-main10-2160p".into())
+        );
+    }
+
+    #[test]
+    fn the_run_limit_is_the_workload_list_s_for_the_target() {
+        let manifest = json::parse(
+            r#"{"memory_timeout_seconds": {"aarch64-unknown-linux-gnu": 300}, "workloads": []}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            run_limit(&manifest, "aarch64-unknown-linux-gnu"),
+            Ok(Duration::from_secs(300))
+        );
+        assert_eq!(
+            run_limit(&manifest, "thumbv7neon-unknown-linux-gnueabihf"),
+            Ok(worker::DEFAULT_TIMEOUT)
+        );
+        let invalid =
+            json::parse(r#"{"memory_timeout_seconds": {"aarch64-unknown-linux-gnu": 0}}"#).unwrap();
+        assert!(run_limit(&invalid, "aarch64-unknown-linux-gnu").is_err());
     }
 
     #[test]

@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-f40c8eb0-armv7",
+ "retention": "retained",
+ "reason": "ARMv7 parity, timing and kernel-bound memory for 131 AVC/HEVC packet-framing comparisons",
+ "key": "evidence/packet-framing-f40c8eb0-armv7/3a49c9567e82e878e8e031c0a0252198db3f1ae98cee25e3eff3cb6a7df6c925.tar.zst",
+ "sha256": "3a49c9567e82e878e8e031c0a0252198db3f1ae98cee25e3eff3cb6a7df6c925",
+ "bytes": 15485321,
+ "source_revisions": {
+  "candidate": "f40c8eb009c15b812f131c935c6cfdfee1660df0"
+ }
+}

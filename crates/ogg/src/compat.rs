@@ -26,10 +26,14 @@
 ///   it negative). Opus pre-skip is reported as skip samples on the first packet.
 /// - A chained link continues where the previous link's last packet ended, without
 ///   its own start offset.
+/// - Speex is timed like Vorbis and Opus, except that its first page is timed
+///   backwards from its granule position even when it is the last page, its last
+///   packet's duration shrinks without discard padding, and a duration that shrinks to
+///   nothing stays whole.
 ///
 /// Reference: the `ogg` demuxer of FFmpeg 9.0.2, observed through `ffprobe
-/// -show_packets` on the FATE Vorbis samples and on generated Vorbis, Opus and FLAC
-/// files (`cargo xtask codecs readers`).
+/// -show_packets` on the FATE Vorbis and Theora samples and on generated Vorbis, Opus,
+/// FLAC and Speex files (`cargo xtask codecs readers`).
 pub mod clock {
     pub use crate::compat::{ReferenceTiming, packet_timing};
 }
@@ -114,7 +118,9 @@ impl ReferenceClock {
         end_of_stream: bool,
         slots: &mut [S],
     ) {
-        let backwards = matches!(timeline, Timeline::Vorbis { .. } | Timeline::Opus { .. });
+        let speex = matches!(timeline, Timeline::Speex { .. });
+        let backwards =
+            speex || matches!(timeline, Timeline::Vorbis { .. } | Timeline::Opus { .. });
         let trims = timeline.trims();
         let last = slots.len().saturating_sub(1);
         // Durations from each packet to the page end, the packet itself counted alone.
@@ -132,7 +138,7 @@ impl ReferenceClock {
             let mut duration = slot.durations.carried.map(i64::from);
             let mut pts = None;
             if backwards
-                && !end_of_stream
+                && (!end_of_stream || speex)
                 && let Some(granule) = granule
                 && self.anchor.is_none_or(|anchor| anchor == 0)
             {
@@ -140,6 +146,9 @@ impl ReferenceClock {
                 pts = from_here[index].map(|rest| granule - rest);
                 if raw_zero && from_here[index].is_some_and(|rest| rest != 0) {
                     pts = None;
+                }
+                if end_of_stream && index == 0 {
+                    self.last_page = Some((self.anchor.unwrap_or(0), 0));
                 }
                 self.anchor = None;
             } else if let Some(anchor) = self.anchor.take() {
@@ -156,6 +165,10 @@ impl ReferenceClock {
                     let excess = first + sum + own - granule;
                     padding = u32::try_from(excess.max(0)).unwrap_or(u32::MAX);
                     duration = Some(granule - first - sum);
+                    if speex {
+                        padding = 0;
+                        duration = duration.filter(|&d| d > 0).or(Some(own));
+                    }
                 }
                 if let (Some((first, sum)), Some(own)) = (self.last_page, duration) {
                     self.last_page = Some((first, sum + own));

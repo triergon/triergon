@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-cc-79e0ae13",
+ "path": "gate-subtitle-cc-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-cc's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-subtitle-cc-79e0ae13/76b7df1d34359f58a0fa967d02db6061c0470c30d663b697c69a3eb57856195d.tar.zst",
+ "sha256": "76b7df1d34359f58a0fa967d02db6061c0470c30d663b697c69a3eb57856195d",
+ "bytes": 7674719,
+ "results": [
+  {
+   "path": "gate-subtitle-cc-79e0ae13/aarch64/shard-2/benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "414397478314a0e217b5f40ff9393f812ebf0758aad8d381d2c1032857597dc6",
+   "status": 0,
+   "report_sha256": "2239e6f340893a9139f8d39aacaee6a1524d1e0761cece06a648e23077f22398"
+  },
+  {
+   "path": "gate-subtitle-cc-79e0ae13/aarch64/shard-2/graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "b95050541c507986f43c03ecb775b61519532801ac4623017a1f84928431b911",
+   "status": 1,
+   "report_sha256": "82078990f564b61aa27963438c1e3af767698d50cee4abedcd1fd76272ba1bb0"
+  },
+  {
+   "path": "gate-subtitle-cc-79e0ae13/aarch64/shard-2/memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "b9da615bbf6fe7ea38910a2555a01cfef048bbcc7ea7dcc60795fcaf307b41f2",
+   "status": 0,
+   "report_sha256": "d82f55b5bd2eea5662a15b806a6b812ef8d5d65022f1819be3c1562920f7429e"
+  },
+  {
+   "path": "gate-subtitle-cc-79e0ae13/armv7/shard-2/benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "211dfbfe4d74c59eba6d0ec05bbb6c041b079f388ce67fa89fa2d7712b7b050e",
+   "status": 0,
+   "report_sha256": "305bf9b48fcc56822747e40f453f3e0b69208e6be2760cb776cf91fcc35e938e"
+  },
+  {
+   "path": "gate-subtitle-cc-79e0ae13/armv7/shard-2/graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "6daa4539e7e5191aa42bddfe166267fef7c2464fbd6a96aa297b2a7e01eabb05",
+   "status": 1,
+   "report_sha256": "909ce16554d6831d331c3c1f69136ab8ccac385e0d2c0ba9b17f9cb20eefdd6c"
+  },
+  {
+   "path": "gate-subtitle-cc-79e0ae13/armv7/shard-2/memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "9625661d9aed508c7313f8493ab1cc076d310ed965f128ae1b7504ee8a901783",
+   "status": 0,
+   "report_sha256": "3d265d772f76e72fb658e3b4e6a6faeb24b70e5f44549b26eb3c659b13427400"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

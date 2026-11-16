@@ -3,8 +3,8 @@
 //! measurement is the same.
 //!
 //! Every gate command ([`super::report`]'s timing and memory collections, `grade`,
-//! `isobmff-bench`, `codecs time`, `capture qualify` and `external-vector`) derives a
-//! [`Key`] before it measures: its command and settings, the files that define its
+//! `isobmff-bench`, `isobmff-seek`, `codecs time`, `capture qualify` and
+//! `external-vector`) derives a [`Key`] before it measures: its command and settings, the files that define its
 //! cases, the bytes of every worker it runs and of their shared libraries, the
 //! allocation observer and probe, the measuring and grading code, the
 //! toolchains, the gate target and the host class. It records the key and its
@@ -105,6 +105,7 @@ impl Key {
                 ]),
             ),
             ("target", Value::str(super::report::gate_target()?)),
+            ("environment", build_environment()),
             ("host", host()?),
         ]);
         Ok(Self {
@@ -153,15 +154,11 @@ impl Key {
     }
 }
 
-/// The result a cited set holds for `key`: the newest kept set whose index entry
-/// lists a result with this key.
+/// The result a cited set holds for `key`: the kept set whose index entry lists a
+/// result with this key. The index lists each result in one kept set at most.
 pub fn cited(root: &Path, key: &Key) -> R<Option<Value>> {
-    let index = crate::checks::read_json(&root.join(crate::evidence::INDEX))?;
-    let sets = index
-        .get("sets")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
-    Ok(sets.iter().rev().find_map(|set| {
+    let sets = crate::evidence::sets(root)?;
+    Ok(sets.iter().find_map(|set| {
         if set.get("retention").and_then(Value::as_str) != Some("retained") {
             return None;
         }
@@ -189,6 +186,10 @@ pub fn cited(root: &Path, key: &Key) -> R<Option<Value>> {
             (
                 "report_sha256",
                 result.get("report_sha256").cloned().unwrap_or(Value::Null),
+            ),
+            (
+                "cases_checked",
+                result.get("cases_checked").cloned().unwrap_or(Value::Null),
             ),
         ]))
     }))
@@ -255,6 +256,32 @@ pub fn was_reused(directory: &Path) -> bool {
     read(directory).is_ok_and(|result| result.get("reused").is_some_and(|r| *r != Value::Null))
 }
 
+/// Record in the measured result in `directory` that `gate run` checked every case
+/// of it was measured, with the step's verdict as its status: a later run that
+/// reuses the result takes that verdict.
+pub fn checked(directory: &Path, status: i32) -> R<()> {
+    let Value::Object(mut fields) = read(directory)? else {
+        return Err(format!(
+            "{}: not a gate result",
+            directory.join(RESULT).display()
+        ));
+    };
+    fields.retain(|(key, _)| key != "status" && key != "cases_checked");
+    fields.push(("status".into(), Value::int(status)));
+    fields.push(("cases_checked".into(), Value::Bool(true)));
+    crate::corpus::write_json(&directory.join(RESULT), &Value::Object(fields))
+}
+
+/// Whether the reused result in `directory` is one whose cases a gate run checked.
+pub fn reused_checked(directory: &Path) -> bool {
+    read(directory).is_ok_and(|result| {
+        result
+            .get("reused")
+            .and_then(|cited| cited.get("cases_checked"))
+            == Some(&Value::Bool(true))
+    })
+}
+
 /// The fresh gate results among an evidence set's files, as its index entry
 /// lists them.
 pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
@@ -291,6 +318,11 @@ pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
                 result.get("report_sha256").cloned().unwrap_or(Value::Null),
             ),
         ]));
+        if result.get("cases_checked") == Some(&Value::Bool(true))
+            && let Some(Value::Object(fields)) = results.last_mut()
+        {
+            fields.push(("cases_checked".into(), Value::Bool(true)));
+        }
     }
     Ok(results)
 }
@@ -406,6 +438,36 @@ fn code(root: &Path) -> R<Value> {
     ]))
 }
 
+/// The environment variables that change how cargo, rustc or the C compiler build
+/// what a gate command runs, as they are set.
+fn build_environment() -> Value {
+    const NAMES: [&str; 12] = [
+        "RUSTFLAGS",
+        "CARGO_ENCODED_RUSTFLAGS",
+        "RUSTDOCFLAGS",
+        "RUSTC",
+        "RUSTC_WRAPPER",
+        "RUSTC_WORKSPACE_WRAPPER",
+        "CARGO_INCREMENTAL",
+        "CC",
+        "CXX",
+        "CFLAGS",
+        "CXXFLAGS",
+        "LDFLAGS",
+    ];
+    const PREFIXES: [&str; 3] = ["CARGO_PROFILE_", "CARGO_BUILD_", "CARGO_TARGET_"];
+    // How many jobs build it changes nothing that is built.
+    let mut set: Vec<(String, Value)> = std::env::vars()
+        .filter(|(name, _)| {
+            (NAMES.contains(&name.as_str()) || PREFIXES.iter().any(|p| name.starts_with(p)))
+                && name != "CARGO_BUILD_JOBS"
+        })
+        .map(|(name, value)| (name, Value::str(value)))
+        .collect();
+    set.sort_by(|a, b| a.0.cmp(&b.0));
+    Value::Object(set)
+}
+
 /// The host class: architecture and personality, kernel, CPU model, machine
 /// type, page size, CPUs online and the CPUs this process may use.
 fn host() -> R<Value> {
@@ -450,7 +512,6 @@ mod tests {
     use super::*;
 
     fn index(root: &Path, retention: &str, key: &str) {
-        fs::create_dir_all(root.join("harness/evidence")).unwrap();
         let set = Value::object([
             ("name", Value::str("run")),
             ("retention", Value::str(retention)),
@@ -464,11 +525,9 @@ mod tests {
                 ])]),
             ),
         ]);
-        crate::corpus::write_json(
-            &root.join(crate::evidence::INDEX),
-            &Value::object([("sets", Value::Array(vec![set]))]),
-        )
-        .unwrap();
+        let file = root.join(crate::evidence::SETS).join("run.json");
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        crate::corpus::write_json(&file, &set).unwrap();
     }
 
     #[test]
@@ -559,6 +618,16 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].get("command"), Some(&Value::str("grade")));
         assert_eq!(listed[0].get("status"), Some(&Value::int(0)));
+        assert_eq!(listed[0].get("cases_checked"), None);
+        // A result whose cases a gate run checked lists that, with the verdict.
+        checked(&root.join("fresh"), 1).unwrap();
+        let entry = [(
+            format!("fresh/{RESULT}"),
+            fs::read(root.join("fresh").join(RESULT)).unwrap(),
+        )];
+        let listed = super::listed(&entry).unwrap();
+        assert_eq!(listed[0].get("status"), Some(&Value::int(1)));
+        assert_eq!(listed[0].get("cases_checked"), Some(&Value::Bool(true)));
         fs::remove_dir_all(root).unwrap();
     }
 }

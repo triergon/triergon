@@ -1,0 +1,48 @@
+# Orientation where the area of 26.6 coordinates passes the range of 64-bit
+# integers: a face of 16 units per em with squares of +-32767 units, loaded
+# at 256 pixels, at 400000, where a unit is 25000 26.6 units and a square's
+# points are +-819175000, and at 491520, where a unit is 30720 and they are
+# +-1006602240. One square's doubled area stays below 2^63; at 400000 two
+# of them pass 2^63 and three stay below 2^64, at 491520 two pass 2^63 and
+# three pass 2^64.
+family Triergon Orientation Limits
+units-per-em 16
+metrics 13 -3
+heights 16384 400000 491520
+modes outlines
+glyph advance 8
+end
+# A: the largest square, clockwise
+glyph advance 16 char 0x41
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+end
+# B: the square reversed
+glyph advance 16 char 0x42
+  contour -32767 -32767, 0 -32767, 32767 -32767, 32767 0, 32767 32767, 0 32767, -32767 32767, -32767 0
+end
+# C: two clockwise squares
+glyph advance 16 char 0x43
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+end
+# D: two reversed squares
+glyph advance 16 char 0x44
+  contour -32767 -32767, 0 -32767, 32767 -32767, 32767 0, 32767 32767, 0 32767, -32767 32767, -32767 0
+  contour -32767 -32767, 0 -32767, 32767 -32767, 32767 0, 32767 32767, 0 32767, -32767 32767, -32767 0
+end
+# E: three clockwise squares
+glyph advance 16 char 0x45
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+end
+# F: the square and its reverse, cancelling
+glyph advance 16 char 0x46
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+  contour -32767 -32767, 0 -32767, 32767 -32767, 32767 0, 32767 32767, 0 32767, -32767 32767, -32767 0
+end
+# G: the square around a reversed one a unit smaller on each side
+glyph advance 16 char 0x47
+  contour -32767 -32767, -32767 0, -32767 32767, 0 32767, 32767 32767, 32767 0, 32767 -32767, 0 -32767
+  contour -32766 -32766, 0 -32766, 32766 -32766, 32766 0, 32766 32766, 0 32766, -32766 32766, -32766 0
+end

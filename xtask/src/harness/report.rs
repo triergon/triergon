@@ -623,7 +623,7 @@ impl PrefixFeature {
         Ok((candidate, self.reference_worker(root, &identity)?))
     }
 
-    pub(super) fn reference_worker(
+    pub(crate) fn reference_worker(
         &self,
         root: &Path,
         identity: &Value,
@@ -730,7 +730,7 @@ pub(super) fn input_problem(
 }
 
 /// Every corpus file a case reads: its input, ordered entities and companions.
-fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
     let mut files = vec![corpus.join(s(case, "file").ok_or("case without input path")?)];
     for key in ["entities", "companions"] {
         for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {
@@ -1016,7 +1016,7 @@ pub(crate) fn collect(
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(&identity, &pinned));
-    let refusals = gate_build::refusals(&identity, &pinned);
+    let refusals = gate_build::identity_refusals(root, &identity, &pinned);
     if !refusals.is_empty() && (options.require_acceptance || options.require_slice_acceptance) {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
@@ -1024,6 +1024,7 @@ pub(crate) fn collect(
     let contract = read_json(&options.contract)?;
     let work_fields = super::comparison::work_fields(&contract)?;
     let timeout = worker::contract_timeout(&contract)?;
+    let parity_timeout = worker::contract_parity_timeout(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
@@ -1196,7 +1197,7 @@ pub(crate) fn collect(
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
-                timeout,
+                timeout: parity_timeout,
             };
             timed = Some((
                 measured.clone(),
@@ -1242,7 +1243,7 @@ pub(crate) fn collect(
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
-                timeout,
+                timeout: parity_timeout,
             };
             let comparison = rule.map(|rule| Comparison {
                 rule,
@@ -1756,34 +1757,44 @@ mod prefix_tests {
     #[test]
     fn registered_prefix_features_use_supplied_corpus_directories() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let mut corpora = BTreeMap::from([
-            ("hls-segments".to_owned(), root.join("harness/fixtures/hls")),
+        for (candidate, corpora) in [
             (
-                "matroska-startup-seek".to_owned(),
-                root.join(".research/startup-seek-fixtures"),
+                "playback-worker",
+                vec![
+                    ("hls-segments", root.join("harness/fixtures/hls")),
+                    ("mp4-range", root.join(".research/mp4-range-fixtures")),
+                    (
+                        "progressive-ts188",
+                        root.join("harness/features/progressive-ts188/inputs"),
+                    ),
+                ],
             ),
             (
-                "mp4-range".to_owned(),
-                root.join(".research/mp4-range-fixtures"),
+                "playback-matroska-worker",
+                vec![(
+                    "matroska-startup-seek",
+                    root.join(".research/startup-seek-fixtures"),
+                )],
             ),
-            (
-                "progressive-ts188".to_owned(),
-                root.join("harness/features/progressive-ts188/inputs"),
-            ),
-        ]);
-        let features = PrefixFeature::registered(root, "playback-worker", &corpora).unwrap();
-        for (id, directory) in &corpora {
-            let feature = features.iter().find(|feature| feature.id == *id).unwrap();
-            assert_eq!(&feature.corpus, directory);
-            assert!(!feature.cases.is_empty());
+        ] {
+            let mut corpora: BTreeMap<String, std::path::PathBuf> = corpora
+                .into_iter()
+                .map(|(id, directory)| (id.to_owned(), directory))
+                .collect();
+            let features = PrefixFeature::registered(root, candidate, &corpora).unwrap();
+            for (id, directory) in &corpora {
+                let feature = features.iter().find(|feature| feature.id == *id).unwrap();
+                assert_eq!(&feature.corpus, directory);
+                assert!(!feature.cases.is_empty());
+            }
+            corpora.insert("unused".to_owned(), root.to_path_buf());
+            assert!(
+                PrefixFeature::registered(root, candidate, &corpora)
+                    .err()
+                    .unwrap()
+                    .contains("no registered prefix feature unused")
+            );
         }
-        corpora.insert("unused".to_owned(), root.to_path_buf());
-        assert!(
-            PrefixFeature::registered(root, "playback-worker", &corpora)
-                .err()
-                .unwrap()
-                .contains("no registered prefix feature unused")
-        );
     }
 
     #[test]
@@ -1832,7 +1843,7 @@ mod prefix_tests {
         assert_eq!(
             found,
             [
-                ("font-hinting-default", "font-sized-", 53),
+                ("font-hinting-default", "font-sized-", 159),
                 ("font-hinting-modes", "font-sized-", 954),
                 ("font-hinting-none", "font-sized-", 159),
                 ("font-outlines", "font-", 53),

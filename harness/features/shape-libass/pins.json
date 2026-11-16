@@ -4,34 +4,34 @@
   "note": "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
   "pins": {
     "arimo-regular-ttf-latn-libass": {
-      "packets": 1705,
-      "bytes": 1766,
-      "digest": 15826907573828959828
+      "packets": 1727,
+      "bytes": 1789,
+      "digest": 3820976580330798206
     },
     "arimo-regular-ttf-latn-no-kerning": {
-      "packets": 794,
-      "bytes": 823,
-      "digest": 14860307258028557843
+      "packets": 806,
+      "bytes": 836,
+      "digest": 11047213037887724944
     },
     "arimo-regular-ttf-latn-no-ligatures": {
-      "packets": 794,
-      "bytes": 823,
-      "digest": 4458675674879434431
+      "packets": 806,
+      "bytes": 836,
+      "digest": 5714867755335905852
     },
     "arimo-regular-ttf-latn-opposite": {
-      "packets": 794,
-      "bytes": 823,
-      "digest": 11503284465512629338
+      "packets": 806,
+      "bytes": 836,
+      "digest": 808851660651746001
     },
     "arimo-regular-ttf-latn-c": {
-      "packets": 794,
-      "bytes": 823,
-      "digest": 4458675674879434431
+      "packets": 806,
+      "bytes": 836,
+      "digest": 5714867755335905852
     },
     "arimo-regular-ttf-latn-plain": {
-      "packets": 794,
-      "bytes": 823,
-      "digest": 4458675674879434431
+      "packets": 806,
+      "bytes": 836,
+      "digest": 5714867755335905852
     },
     "arimo-regular-ttf-latn-language-tr": {
       "packets": 19,
@@ -144,9 +144,44 @@
       "digest": 12115754293217406245
     },
     "dejavumathtexgyre-ttf-latn-libass": {
-      "packets": 1736,
-      "bytes": 1766,
-      "digest": 15971653519928280666
+      "packets": 1758,
+      "bytes": 1789,
+      "digest": 1573706856175447650
+    },
+    "dejavusans-ttf-latn-libass": {
+      "packets": 1692,
+      "bytes": 1789,
+      "digest": 14037987106110923758
+    },
+    "dejavusans-ttf-latn-no-kerning": {
+      "packets": 790,
+      "bytes": 836,
+      "digest": 3944378841761215100
+    },
+    "dejavusans-ttf-latn-no-ligatures": {
+      "packets": 806,
+      "bytes": 836,
+      "digest": 13358493969031358379
+    },
+    "dejavusans-ttf-latn-opposite": {
+      "packets": 798,
+      "bytes": 836,
+      "digest": 13832263770158366767
+    },
+    "dejavusans-ttf-latn-c": {
+      "packets": 790,
+      "bytes": 836,
+      "digest": 13242313411256072327
+    },
+    "dejavusans-ttf-latn-plain": {
+      "packets": 790,
+      "bytes": 836,
+      "digest": 13242313411256072327
+    },
+    "dejavusans-ttf-latn-language-tr": {
+      "packets": 18,
+      "bytes": 19,
+      "digest": 18227399321051739452
     },
     "dejavusans-ttf-arab-libass": {
       "packets": 828,
@@ -219,34 +254,34 @@
       "digest": 6998606775105352801
     },
     "notosans-regular-otf-latn-libass": {
-      "packets": 1670,
-      "bytes": 1766,
-      "digest": 161870066834395583
+      "packets": 1692,
+      "bytes": 1789,
+      "digest": 17895512759954224422
     },
     "notosans-regular-otf-latn-no-kerning": {
-      "packets": 778,
-      "bytes": 823,
-      "digest": 3516239848810961301
+      "packets": 790,
+      "bytes": 836,
+      "digest": 4719100003282286842
     },
     "notosans-regular-otf-latn-no-ligatures": {
-      "packets": 794,
-      "bytes": 823,
-      "digest": 14737858807690165123
+      "packets": 806,
+      "bytes": 836,
+      "digest": 12962113051498304382
     },
     "notosans-regular-otf-latn-opposite": {
-      "packets": 785,
-      "bytes": 823,
-      "digest": 9286746415429695126
+      "packets": 797,
+      "bytes": 836,
+      "digest": 3515702024527709621
     },
     "notosans-regular-otf-latn-c": {
-      "packets": 778,
-      "bytes": 823,
-      "digest": 15022961325119080679
+      "packets": 790,
+      "bytes": 836,
+      "digest": 12590489658263762764
     },
     "notosans-regular-otf-latn-plain": {
-      "packets": 778,
-      "bytes": 823,
-      "digest": 15022961325119080679
+      "packets": 790,
+      "bytes": 836,
+      "digest": 12590489658263762764
     },
     "notosans-regular-otf-latn-language-tr": {
       "packets": 18,
@@ -993,20 +1028,25 @@
       "bytes": 218,
       "digest": 12188330319446786308
     },
+    "vera-ttf-latn-libass": {
+      "packets": 1750,
+      "bytes": 1789,
+      "digest": 7195974406733135616
+    },
     "authored-cff-features-otf-latn-libass": {
-      "packets": 1703,
-      "bytes": 1766,
-      "digest": 11204946758136946502
+      "packets": 1726,
+      "bytes": 1789,
+      "digest": 2361897987288883131
     },
     "authored-cmap-formats-ttf-latn-libass": {
-      "packets": 1703,
-      "bytes": 1766,
-      "digest": 2643349886622647399
+      "packets": 1726,
+      "bytes": 1789,
+      "digest": 15667653297862766664
     },
     "authored-charmaps-otf-latn-libass": {
-      "packets": 1703,
-      "bytes": 1766,
-      "digest": 14996261304910813611
+      "packets": 1726,
+      "bytes": 1789,
+      "digest": 3871465390673724523
     }
   }
 }

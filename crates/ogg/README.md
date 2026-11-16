@@ -1,8 +1,9 @@
 # triergon-ogg
 
-An Ogg (RFC 3533) reader with the Vorbis, Opus (RFC 7845) and FLAC mappings, implementing
-the core `ContainerReader`. It reads multiplexed and chained physical streams from
-incremental input, times packets from granule positions, and seeks by bisection.
+An Ogg (RFC 3533) reader with the Vorbis, Opus (RFC 7845), FLAC, Theora and Speex
+mappings, implementing the core `ContainerReader`. It reads multiplexed and chained
+physical streams from incremental input, times packets from granule positions, and seeks
+by bisection.
 
 ## Usage
 
@@ -50,19 +51,28 @@ charges its storage to the caller's `Budget`.
   | Vorbis | `\x01vorbis` | identification, comment and setup headers, Xiph-laced |
   | Opus | `OpusHead` | the `OpusHead` packet (`OpusTags` is `Track::comments`) |
   | FLAC | `\x7fFLAC` | `fLaC` with STREAMINFO and every further metadata block |
-  | anything else | its known magic (Theora, Speex, Skeleton, ...) or first 8 bytes | the first packet |
+  | Theora | `\x80theora` | identification, comment and setup headers, Xiph-laced |
+  | Speex | `Speex   ` | the Speex header packet (the comment header is `Track::comments`) |
+  | anything else | its known magic (Daala, VP8, Skeleton, ...) or first 8 bytes | the first packet |
 
-  Header packets are never delivered as packets. Other mappings are `CodecId::Other`;
+  Header packets are never delivered as packets (Speex: the header, the comment header
+  and as many more as its `extra_headers` says). Other mappings are `CodecId::Other`;
   their packets carry no time.
 
 ## Timing
 
-Packet times are ticks of 1/sample rate (Opus 1/48000). Each page's packets are timed
-backwards from its granule position with the samples each packet completes: Vorbis from
-the block sizes the setup header's modes give (the first packet completes none), Opus
-from its TOC, FLAC from its frame header. The last page is timed forwards; samples its
-granule position leaves out are the last packets' `Trim::end`. Samples before time zero
-(Opus pre-skip, a Vorbis or Opus start offset) are `Trim::start`. DTS equals PTS.
+Packet times are ticks of 1/sample rate (Opus 1/48000), and for Theora of one frame
+(FRD/FRN seconds, `Track::frame_rate`). Each page's packets are timed backwards from its
+granule position with the samples each packet completes: Vorbis from the block sizes
+the setup header's modes give (the first packet completes none), Opus from its TOC,
+FLAC from its frame header, Speex from the header's frame size times its frames per
+packet; a Theora packet is one frame, and its granule position is split at the
+identification header's KFGSHIFT into the frame count up to the last keyframe and the
+frames since (Theora I appendix A.2.3; bitstreams before 3.2.1 count from 0). The last
+page is timed forwards; for Vorbis, Opus and Speex the samples its granule position
+leaves out are the last packets' `Trim::end`, and samples before time zero (Opus
+pre-skip, a start offset) are `Trim::start`. Every audio packet is a random-access
+point; of Theora, the intra frames. DTS equals PTS.
 `Track::end` holds the last granule position, found by reading at most
 `Limits::end_scan_bytes` at the end of a seekable source of known length.
 
@@ -72,11 +82,15 @@ padding and FFmpeg's Vorbis durations); its documentation lists the differences.
 ## Seeking
 
 `request_seek` lands on the packet containing the target (Vorbis: the packet before
-it), or for `PlaybackPreroll` on the one containing the target less the preroll (Opus
-80 ms), discarding output up to the target. Seekable sources of known length are
-bisected by granule position within the track's link, each probe reading at most
-`Limits::seek_probe_bytes`; other sources are read again from the start
-(`SeekMethod::Restart`).
+it; Theora: the keyframe the target frame is decoded from), or for `PlaybackPreroll` on
+the one containing the target less the preroll (Opus 80 ms), discarding output up to
+the target. The target is on the physical stream's timeline: in a chained source the
+seek lands in the link holding it, on the track at the requested track's position in
+that link, following into links reading has not reached yet. Seekable sources of known
+length are bisected by granule position within that link, each probe reading at most
+`Limits::seek_probe_bytes` (a Theora target that is not a keyframe is bisected again
+for the keyframe its granule positions name); other sources are read again from the
+start (`SeekMethod::Restart`).
 
 ## Limits
 
@@ -96,19 +110,36 @@ pinned `ffprobe -show_packets` of FFmpeg 9.0.2 in two views: the reader's own ti
 of the same packets. The rules, the reviewed dispositions and their frozen difference
 lists are [harness/codecs/reader-rules.json](../../harness/codecs/reader-rules.json) and
 [reader-differences.json](../../harness/codecs/reader-differences.json); gates:
-[docs/quality.md](../../docs/quality.md#gates). On the 21 FATE Vorbis samples and 13
-generated Opus, Vorbis, FLAC, multiplexed, chained, corrupted and truncated files:
+[docs/quality.md](../../docs/quality.md#gates) (gate item `ogg-readers`). On 45 files:
+the 21 FATE Vorbis samples, the FATE Theora samples (`bear.ogv` with Vorbis,
+`empty_theora_packets.ogv`, `offset_test.ogv`) and chained Opus, Vorbis and FLAC
+samples, 13 generated Opus, Vorbis, FLAC, multiplexed, chained, corrupted and truncated
+files, and 5 generated Speex files (narrowband, wideband, ultra-wideband stereo, with
+Skeleton, chained):
 
-- `compat::clock`: 31/34 pass. FFmpeg prints a negative last duration modulo 2^32
-  (`b_vorbis.ogg`, `chain_vorbis.ogg`), and times the first packet after a page that
-  fails its CRC from its own page where `compat::clock` times it from the stream start
-  (`crc_bad.opus`).
-- The reader's own timing: 7/34 pass; 25 differ only where `compat::clock` reproduces
-  FFmpeg, and 2 by the negative last duration. The differences are FFmpeg's: it starts
-  the first Vorbis packet as many samples before zero as it states alone, where this
-  reader times the overlap it primes as no output; it starts a short Vorbis block after
-  a long one late by the difference of their quarter blocks; and it times chained links'
-  starts and packets after a lost page from the page rather than the granule position.
+- `compat::clock`: 40/45 pass. FFmpeg prints a negative last duration modulo 2^32
+  (`b_vorbis.ogg`, `chain_vorbis.ogg`); times the first packet after a page that fails
+  its CRC from its own page where `compat::clock` times it from the stream start
+  (`crc_bad.opus`); in `bear.ogv` times the Vorbis packets of the leading pages stating
+  granule position 0 from the next page's; and reads a chained link that reuses the
+  previous link's serial number as the same stream, its headers as packets
+  (`chain_speex.spx`).
+- The reader's own timing: 10/45 pass; 31 differ only where `compat::clock` reproduces
+  FFmpeg, and 4 by the behaviours above. The differences are FFmpeg's: it starts the
+  first Vorbis packet as many samples before zero as it states alone, where this reader
+  times the overlap it primes as no output; it starts a short Vorbis block after a long
+  one late by the difference of their quarter blocks; it times chained links' starts and
+  packets after a lost page from the page rather than the granule position; and it
+  reports no Speex trims, shortening the last packet instead.
+
+Its seek cases ([reader-seeks.json](../../harness/codecs/reader-seeks.json)) seek a track
+with either policy and compare the packets from the landing to the end of the file with
+`ffprobe -read_intervals`, into each link of the chained files, on each track of the
+multiplexed ones, and in single-link Opus, Vorbis, FLAC, Speex and Theora files: 11/26
+pass in `compat::clock` (7 in the reader's own timing, 4 more where `compat::clock`
+reproduces FFmpeg), and the 15 chained cases differ by FFmpeg's seek in a chained file,
+which delivers one link only: Vorbis and FLAC from the first link's start to its end,
+Opus and Speex from the last link's start, timed from that link's own zero.
 
 The `read_packets` helper reads every packet of a whole file in memory, headers
 included, for tests and tools.

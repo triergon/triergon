@@ -406,6 +406,7 @@ fn observe(
         argv.push(input.map_or_else(OsString::new, |p| p.as_os_str().to_owned()));
     }
     argv.extend(arguments.iter().map(OsString::from));
+    let started = std::time::Instant::now();
     let result = (|| -> Result<Value, String> {
         let Some(Finished {
             code,
@@ -497,13 +498,22 @@ fn observe(
             ("instrument_sha256", Value::str(sha)),
         ]))
     })();
+    let elapsed = started.elapsed();
     let _ = fs::remove_dir_all(&directory);
-    result.unwrap_or_else(|error| {
+    let mut observation = result.unwrap_or_else(|error| {
         obj(vec![
             ("status", Value::str("observer-failed")),
             ("error", Value::str(error)),
         ])
-    })
+    });
+    // How long the observer run took, against its limit.
+    if let Value::Object(fields) = &mut observation {
+        fields.push((
+            "process_elapsed_ns".into(),
+            Value::int(elapsed.as_nanos() as i128),
+        ));
+    }
+    observation
 }
 
 fn file_sha(path: &Path) -> R<String> {
@@ -1322,9 +1332,25 @@ fn interval_value(interval: &stats::Interval) -> Value {
     super::timing::interval_value(interval)
 }
 
-fn work_valid(samples: &[Value], fields: &[String], expected: Option<&Value>) -> bool {
+/// Every observation reports complete work; with `expected`, the same as it in
+/// each field outside `own`, the fields each role reports of its own output.
+fn work_valid(
+    samples: &[Value],
+    fields: &[String],
+    expected: Option<&Value>,
+    own: &[String],
+) -> bool {
+    let shared = |work: Value| match work {
+        Value::Object(members) => Value::Object(
+            members
+                .into_iter()
+                .filter(|(key, _)| !own.contains(key))
+                .collect(),
+        ),
+        other => other,
+    };
     let Ok(expected) = expected
-        .map(|v| super::comparison::work_summary(v, fields))
+        .map(|v| super::comparison::work_summary(v, fields).map(shared))
         .transpose()
     else {
         return false;
@@ -1339,7 +1365,9 @@ fn work_valid(samples: &[Value], fields: &[String], expected: Option<&Value>) ->
                     observed
                         .get("work")
                         .and_then(|work| super::comparison::work_summary(work, fields).ok())
-                        .is_some_and(|work| expected.as_ref().is_none_or(|e| equal(&work, e)))
+                        .is_some_and(|work| {
+                            expected.as_ref().is_none_or(|e| equal(&shared(work), e))
+                        })
                 })
         })
 }
@@ -1490,7 +1518,7 @@ fn measure(
     }
     let mut result = if invocation
         .work_fields
-        .is_some_and(|fields| !work_valid(&samples, fields, None))
+        .is_some_and(|fields| !work_valid(&samples, fields, None, &[]))
     {
         obj(vec![
             ("status", Value::str("invalid-memory-work")),
@@ -1764,7 +1792,8 @@ fn shared_file_groups(jobs: &[Job<'_>]) -> Vec<Vec<usize>> {
 pub(crate) struct WorkerPaths<'a> {
     pub candidate: &'a Path,
     pub reference: &'a Path,
-    /// Both executables come from the runner's registered build.
+    /// Both executables come from the runner's registered build, so each slot may
+    /// measure its own copies of them.
     pub registered: bool,
 }
 
@@ -1848,22 +1877,18 @@ pub fn collect(
 pub(crate) fn collect_command(
     slot: &Slot,
     root: &Path,
-    candidate: &Path,
-    reference: &Path,
+    workers: WorkerPaths<'_>,
     input: &Path,
     pairs: Pairs,
     seed: u64,
     arguments: &[String],
     expected_outputs: &Value,
+    timeout: Duration,
 ) -> R<Value> {
     collect_invocation(
         slot,
         root,
-        WorkerPaths {
-            candidate,
-            reference,
-            registered: false,
-        },
+        workers,
         pairs,
         seed,
         Invocation {
@@ -1873,7 +1898,7 @@ pub(crate) fn collect_command(
             candidate_arguments: None,
             expected_outputs: Some(expected_outputs),
             work_fields: None,
-            timeout: worker::DEFAULT_TIMEOUT,
+            timeout,
         },
     )
 }
@@ -2112,8 +2137,10 @@ pub fn evidence_valid_with_outputs(
             },
         };
         let fields = super::comparison::work_fields(contract).ok()?;
+        // `evaluate` below holds each role to its own expected outputs.
+        let own = super::comparison::own_fields(expected_outputs, &fields);
         let expected = row.get("parity").and_then(|p| p.get("expected"));
-        if !work_valid(raw, &fields, expected) {
+        if !work_valid(raw, &fields, expected, &own) {
             return Some(false);
         }
         for sample in raw {
@@ -2410,7 +2437,8 @@ mod command_tests {
         assert!(work_valid(
             std::slice::from_ref(&sample),
             &fields,
-            Some(&expected)
+            Some(&expected),
+            &[]
         ));
         for bad in [Some(Value::int(5)), None] {
             for roles in [
@@ -2445,7 +2473,8 @@ mod command_tests {
                 assert!(!work_valid(
                     &[Value::Object(entries)],
                     &fields,
-                    Some(&expected)
+                    Some(&expected),
+                    &[]
                 ));
             }
         }

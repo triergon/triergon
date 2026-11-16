@@ -253,7 +253,10 @@ Teletext pages and closed captions become opaque ASS `TextSource`s, which
 teletext page is a clear. A teletext decode needs the decoder's whole packet
 work in one budget. `CaptionBridge` takes H.264 or HEVC access units or MPEG-2
 PES payloads in decode order and decodes the caption frames FFmpeg's
-extraction settles, in its order. It charges one unit per packet byte and,
+extraction settles, in its order. It is made with the track's `avcC` or `hvcC`
+record when its samples are length-prefixed, again after a seek: samples often
+carry no parameter sets, and pictures without them lose their captions. It
+charges one unit per packet byte and,
 per frame, the receiver's packet work for its size, each paid over as many
 polls as needed.
 

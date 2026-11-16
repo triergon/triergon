@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-armv7-cd7d9d7c-20261115-191630-shard-1",
+ "path": "gate-run-armv7-cd7d9d7c-20261115-191630-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at cd7d9d7c on 32-bit ARMv7 in the armhf user space, one c6g.4xlarge from the gate image, item framing, whose framing worker links in module order on this target, byte for byte as main's at 7c4057c5: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; for the ARMv7 packet framing row",
+ "key": "evidence/gate-runs/cd7d9d7caf433db115f0c3bec8768b4f6fab311e-armv7-20261115-191630/shard-1/56474beae98ef1738d20260fc8daa542b8baf3541d9c610ccba496f78ba366d6.tar.zst",
+ "sha256": "56474beae98ef1738d20260fc8daa542b8baf3541d9c610ccba496f78ba366d6",
+ "bytes": 14895908,
+ "results": [
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "d032657fc1509de28940eeed92f923e56b3a998d8b03fe665260143f42cb828b",
+   "status": 0,
+   "report_sha256": "faaec3bd748ae6aa85381d715f33f308a6bc7ece8003dc2ca16a1e6dbe0a33e7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7c096dea3ad6988a713d9f48f5cf8b4c40769f74a85a6df01515c04c648c2dad",
+   "status": 0,
+   "report_sha256": "a672f25bcdbd30bf77f11bd3d50f6ff1dd1ce925778fd876d9e46348e1b7d8d8",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "72370a66d4a74cb947b72293c24567b80fe52039b4b3cd503d8c7b8e319d4827",
+   "status": 0,
+   "report_sha256": "9d99cc40f14955b9acb565781477019eafc7d831c5d156262a64e78c959cb5a8"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "cd7d9d7caf433db115f0c3bec8768b4f6fab311e"
+ }
+}

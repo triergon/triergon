@@ -1,0 +1,134 @@
+# Subroutine calls. Local subroutine k (biased index k - 107) of 0..19 calls
+# k + 1 and then draws `0 10 rlineto`; subroutine 20 draws `50 0 rlineto`. Glyph
+# d calls subroutine 20 - d + 1 after `100 100 rmoveto`, nesting d calls deep
+# (glyphs 1 to 21), so the box shows how deep calls go and what a call too deep
+# does.
+local
+  -106 callsubr 0 10 rlineto return
+end
+local
+  -105 callsubr 0 10 rlineto return
+end
+local
+  -104 callsubr 0 10 rlineto return
+end
+local
+  -103 callsubr 0 10 rlineto return
+end
+local
+  -102 callsubr 0 10 rlineto return
+end
+local
+  -101 callsubr 0 10 rlineto return
+end
+local
+  -100 callsubr 0 10 rlineto return
+end
+local
+  -99 callsubr 0 10 rlineto return
+end
+local
+  -98 callsubr 0 10 rlineto return
+end
+local
+  -97 callsubr 0 10 rlineto return
+end
+local
+  -96 callsubr 0 10 rlineto return
+end
+local
+  -95 callsubr 0 10 rlineto return
+end
+local
+  -94 callsubr 0 10 rlineto return
+end
+local
+  -93 callsubr 0 10 rlineto return
+end
+local
+  -92 callsubr 0 10 rlineto return
+end
+local
+  -91 callsubr 0 10 rlineto return
+end
+local
+  -90 callsubr 0 10 rlineto return
+end
+local
+  -89 callsubr 0 10 rlineto return
+end
+local
+  -88 callsubr 0 10 rlineto return
+end
+local
+  -87 callsubr 0 10 rlineto return
+end
+local
+  50 0 rlineto return
+end
+glyph
+  endchar
+end
+glyph # 1 deep
+  100 100 rmoveto -87 callsubr endchar
+end
+glyph # 2 deep
+  100 100 rmoveto -88 callsubr endchar
+end
+glyph # 3 deep
+  100 100 rmoveto -89 callsubr endchar
+end
+glyph # 4 deep
+  100 100 rmoveto -90 callsubr endchar
+end
+glyph # 5 deep
+  100 100 rmoveto -91 callsubr endchar
+end
+glyph # 6 deep
+  100 100 rmoveto -92 callsubr endchar
+end
+glyph # 7 deep
+  100 100 rmoveto -93 callsubr endchar
+end
+glyph # 8 deep
+  100 100 rmoveto -94 callsubr endchar
+end
+glyph # 9 deep
+  100 100 rmoveto -95 callsubr endchar
+end
+glyph # 10 deep
+  100 100 rmoveto -96 callsubr endchar
+end
+glyph # 11 deep
+  100 100 rmoveto -97 callsubr endchar
+end
+glyph # 12 deep
+  100 100 rmoveto -98 callsubr endchar
+end
+glyph # 13 deep
+  100 100 rmoveto -99 callsubr endchar
+end
+glyph # 14 deep
+  100 100 rmoveto -100 callsubr endchar
+end
+glyph # 15 deep
+  100 100 rmoveto -101 callsubr endchar
+end
+glyph # 16 deep
+  100 100 rmoveto -102 callsubr endchar
+end
+glyph # 17 deep
+  100 100 rmoveto -103 callsubr endchar
+end
+glyph # 18 deep
+  100 100 rmoveto -104 callsubr endchar
+end
+glyph # 19 deep
+  100 100 rmoveto -105 callsubr endchar
+end
+glyph # 20 deep
+  100 100 rmoveto -106 callsubr endchar
+end
+glyph # 21 deep
+  100 100 rmoveto -107 callsubr endchar
+end

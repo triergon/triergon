@@ -1,0 +1,9 @@
+{
+ "name": "packet-framing-cycles-ee052323-aarch64",
+ "path": "packet-framing-cycles-ee052323-aarch64",
+ "retention": "90 days",
+ "reason": "Samples packet framing cycles on six configuration and packet cases.",
+ "key": "qualification/packet-framing-cycles-ee052323-aarch64/646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e.tar.zst",
+ "sha256": "646e5c3e8967e3618eeee301848f3b4b5de7e23d4d1774ed30cf2c3462b9bf6e",
+ "bytes": 366419
+}

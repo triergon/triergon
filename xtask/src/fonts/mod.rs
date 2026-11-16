@@ -9,7 +9,7 @@
 //! flags, as the FFmpeg references are.
 
 mod manifest;
-mod probe;
+pub(crate) mod probe;
 mod tables;
 
 pub use manifest::GENERATOR;
@@ -28,7 +28,7 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts tables [--check]
        cargo xtask fonts manifest [--record] [--output DIR]
        cargo xtask fonts compare [--all] [REPORT OPTION]...
-       cargo xtask fonts assemble DESCRIPTION OUTPUT
+       cargo xtask fonts assemble [--embed NAME] DESCRIPTION OUTPUT
        cargo xtask fonts probe --reference WORKER [--candidate WORKER] [--record]
                                [--output DIR] PROBE...
 
@@ -50,7 +50,8 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
             font-hinting-modes; further report options pass through, and each
             report goes to OUTPUT/<feature> (OUTPUT: --output, default
             .research/font-report)
-  assemble  write the TrueType font a probe description describes
+  assemble  write the TrueType font a probe description describes, or with
+            --embed the [Fonts] lines that embed it in a script
   probe     load assembled probe faces (harness/fonts/probes) with the
             reference and candidate font workers and compare their default
             loads with the recorded reference dumps and with each other";
@@ -78,7 +79,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
                 }
                 _ => return Err(USAGE.into()),
             };
-            println!("{}", prepare(root, jobs, &fetch::Network)?.display());
+            let built = crate::references::build("freetype")?.prepare(root, || {
+                prepare(root, jobs, &fetch::Network).map(|p| p.display().to_string())
+            })?;
+            println!("{built}");
             Ok(())
         }
         [command] if command == "fetch" => {
@@ -92,7 +96,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             GENERATOR.manifest_command(root, rest, USAGE)
         }
         [command, rest @ ..] if command == "tables" => tables::main(root, rest),
-        [command, rest @ ..] if command == "assemble" => probe::assemble_command(rest),
+        [command, rest @ ..] if command == "assemble" => probe::assemble_command(root, rest),
         [command, rest @ ..] if command == "probe" => probe::probe_command(root, rest),
         _ => Err(USAGE.into()),
     }

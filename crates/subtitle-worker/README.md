@@ -38,7 +38,8 @@ stream, the default) or `source=packets` (608 byte pairs, such as an SCC file).
 Preparation is outside the timed interval and the memory window: reading the file
 through the Triergon container readers, selecting the stream, copying its packets
 in demux order, for captions extracting the caption data of every picture in
-output order, and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet with
+output order (H.264 and HEVC in Matroska or MP4 with the parameter sets of the
+track's configuration before the first packet's), and creating the pool the decoder is charged to. The operation creates the decoder, decodes every prepared packet with
 one call each, drains it, folds every output subtitle (`src/sink.rs`) and frees
 everything.
 
@@ -49,7 +50,12 @@ leaves storage charged to the pool, and print the harness protocol's one JSON li
 subtitle's packet index, times, and per rectangle its geometry, flags, palette,
 pixels, text and ASS line. A decoder error, such as memory the pool refuses, ends
 the operation: the line counts what was folded before it and carries the error as
-its `refusal`, with the packet it stopped at as its `cause`. The bench mode adds the
+its `refusal`, with the packet it stopped at as its `cause`. The fold, bench and
+memory modes also print `input_digest`, worked out outside the operation from the
+prepared packets as the reference works it out: their count, then per packet whether it has a PTS,
+the PTS and the duration, in order, folded word by word (d = 31d + w, wrapping); the
+`subtitle-cc` contract compares it, so the prepared packets' order and times must
+match the reference's exactly. The bench mode adds the
 elapsed time of the timed loop and the memory mode brackets one operation with the
 allocation-window markers. The
 trace mode prints the same values as lines, identical to the reference's trace, so a

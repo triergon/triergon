@@ -183,6 +183,116 @@
       "bytes": 5398830,
       "digest": 13148359243360822480
     },
+    "decorations-bands-ass-1080p": {
+      "packets": 16,
+      "bytes": 122592,
+      "digest": 16367091700439133398
+    },
+    "decorations-bands-ass-720p": {
+      "packets": 18,
+      "bytes": 227520,
+      "digest": 8620777467537975286
+    },
+    "decorations-borders-ass-1080p": {
+      "packets": 41,
+      "bytes": 657724,
+      "digest": 5828748239694426261
+    },
+    "decorations-borders-ass-720p": {
+      "packets": 41,
+      "bytes": 458848,
+      "digest": 18094690371192214502
+    },
+    "decorations-cff-ass-1080p": {
+      "packets": 14,
+      "bytes": 219072,
+      "digest": 16568406159941534294
+    },
+    "decorations-cff-ass-720p": {
+      "packets": 14,
+      "bytes": 148600,
+      "digest": 8858170340704011126
+    },
+    "decorations-cff2-ass-1080p": {
+      "packets": 14,
+      "bytes": 159938,
+      "digest": 16017085227323713354
+    },
+    "decorations-cff2-ass-720p": {
+      "packets": 14,
+      "bytes": 111626,
+      "digest": 3719310516961223642
+    },
+    "decorations-glyphless-ass-1080p": {
+      "packets": 12,
+      "bytes": 228890,
+      "digest": 5771934811953072312
+    },
+    "decorations-glyphless-ass-720p": {
+      "packets": 12,
+      "bytes": 163160,
+      "digest": 1460701595407252534
+    },
+    "decorations-orientation-ass-1080p": {
+      "packets": 34,
+      "bytes": 794792,
+      "digest": 4525945804912313302
+    },
+    "decorations-orientation-ass-720p": {
+      "packets": 34,
+      "bytes": 541454,
+      "digest": 8358456839182145590
+    },
+    "decorations-scaling-ass-1080p": {
+      "packets": 20,
+      "bytes": 395902,
+      "digest": 17268037632892361304
+    },
+    "decorations-scaling-ass-720p": {
+      "packets": 20,
+      "bytes": 249198,
+      "digest": 4266249303824730452
+    },
+    "decorations-sizes-ass-1080p": {
+      "packets": 16,
+      "bytes": 1886480,
+      "digest": 16816898659974019126
+    },
+    "decorations-sizes-ass-720p": {
+      "packets": 16,
+      "bytes": 1191530,
+      "digest": 4350503123795088612
+    },
+    "decorations-synthetic-ass-1080p": {
+      "packets": 22,
+      "bytes": 184612,
+      "digest": 1033321352355554966
+    },
+    "decorations-synthetic-ass-720p": {
+      "packets": 22,
+      "bytes": 128386,
+      "digest": 9979369251953726970
+    },
+    "decorations-truetype-ass-1080p": {
+      "packets": 30,
+      "bytes": 408486,
+      "digest": 10510281254343573500
+    },
+    "decorations-truetype-ass-720p": {
+      "packets": 30,
+      "bytes": 281558,
+      "digest": 5527251835302412296
+    },
+    "decorations-vertical-ass-1080p": {
+      "packets": 10,
+      "bytes": 121128,
+      "digest": 9344991407538838998
+    },
+    "decorations-vertical-ass-720p": {
+      "packets": 10,
+      "bytes": 87408,
+      "digest": 13004103910195788534
+    },
     "drawing-ass-1080p": {
       "packets": 192,
       "bytes": 8295800,

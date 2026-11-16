@@ -32,7 +32,7 @@ const USAGE: &str = "usage: shape-worker OPERATION-fold FILE ARGUMENT...
        | OPERATION-memory FILE ARGUMENT... | OPERATION-dump FILE ARGUMENT...
   OPERATION: shape (DIRECTION SCRIPT LANGUAGE FEATURES TEXT...),
   shape-libass (SIZE DIRECTION SCRIPT LANGUAGE FEATURES TEXT...), bidi (BASE BRACKETS),
-  simple (BASE) or unicode";
+  simple (BASE), unicode or extents";
 
 /// What one operation does with its file.
 enum Operation {
@@ -44,6 +44,8 @@ enum Operation {
     Simple(BaseDirection),
     /// The properties of every code point of the file's ranges.
     Unicode,
+    /// Every glyph's extents from every face of the font file.
+    Extents,
 }
 
 impl Operation {
@@ -56,6 +58,7 @@ impl Operation {
             Self::Bidi(..) => "shape-bidi",
             Self::Simple(_) => "shape-simple",
             Self::Unicode => "shape-unicode",
+            Self::Extents => "shape-extents",
         }
     }
 }
@@ -298,6 +301,33 @@ fn shape_texts(
     Ok(())
 }
 
+/// Every glyph's extents through [`OtMetrics`] at units per em, the font
+/// functions `shape` uses, for every face of the file.
+fn shape_extents(file: &Bytes, budget: &Budget, sink: &mut impl Sink) -> Result<()> {
+    let faces = Font::face_count(file.as_ref()).unwrap_or(0);
+    for index in 0..faces {
+        let Ok(font) = Font::new(file.clone(), index, budget, Limits::default()) else {
+            sink.record(Record::FaceError(index))?;
+            continue;
+        };
+        sink.record(Record::Face(index))?;
+        sink.record(Record::Glyphs(font.glyph_count()))?;
+        let metrics = OtMetrics::new(&font, Scale::units(font.units_per_em()));
+        for glyph in font.glyphs() {
+            let record = match metrics.extents(glyph) {
+                Ok(extents) => Record::Extents {
+                    id: glyph.0,
+                    extents: extents.map(|e| [e.x_bearing, e.y_bearing, e.width, e.height]),
+                },
+                Err(_) => Record::ExtentsError(glyph.0),
+            };
+            sink.record(record)?;
+        }
+        sink.count(usize::from(font.glyph_count()), 0);
+    }
+    Ok(())
+}
+
 /// Levels per paragraph, then each line reordered with its paragraph's
 /// direction, as libass resolves a whole event.
 fn resolve(
@@ -421,6 +451,7 @@ fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Si
         }
         Operation::Simple(base) => shape_simple(file.as_ref(), budget, *base, sink),
         Operation::Unicode => shape_unicode(file.as_ref(), sink),
+        Operation::Extents => shape_extents(file, budget, sink),
     }
 }
 
@@ -457,6 +488,7 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         }
         ("simple", [base]) => Operation::Simple(self::base(base).ok_or(USAGE)?),
         ("unicode", []) => Operation::Unicode,
+        ("extents", []) => Operation::Extents,
         _ => return Err(USAGE.into()),
     };
     Ok((action, operation, path))

@@ -14,12 +14,15 @@ mod ebml;
 mod evidence;
 mod fate;
 mod fetch;
+mod ffprobe;
 mod fonts;
 mod framing_bench;
 mod fuzz;
+mod gate;
 mod generators;
 mod harness;
 mod isobmff_bench;
+mod isobmff_seek;
 mod json;
 mod numpy;
 mod playback_golds;
@@ -29,6 +32,7 @@ mod progressive_bench;
 mod pyrandom;
 mod python;
 mod raster;
+mod references;
 mod sha256;
 mod shape;
 mod stats;
@@ -63,6 +67,10 @@ commands:
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
                  matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
                  decode, capture, capture-small (the 9.0.2 release)
+  references     keys|pack|fetch|upload   the keys of the pinned reference builds, and
+                 their packs in .research/reference-cache and the evidence archive, which
+                 the prepare commands restore instead of building (see `cargo xtask
+                 references --help`)
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
@@ -75,7 +83,7 @@ commands:
                  through a worker operation prefix otherwise
   evidence pack DIR OUT       deterministic .tar.gz or .tar.zst of DIR; prints its SHA-256
   evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
-                              (harness/evidence/index.json; TRIERGON_EVIDENCE_ARCHIVE)
+                              (harness/evidence/sets/SET.json; TRIERGON_EVIDENCE_ARCHIVE)
   playback-golds DIR [--check]
                  convert the FFprobe captures of evidence set playback-terminal-matrix-ffprobe,
                  unpacked in DIR, into the playback terminal-media records; --check compares
@@ -90,7 +98,9 @@ commands:
                  its reference; the bound on input size is raised to the largest case
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
-  framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
+  isobmff-seek    [fixtures --out DIR] compare every ISO BMFF seek and range-plan case;
+                 optionally time and measure them; use --help for options
+  framing        compare the whole-packet framing corpus; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance] [--full]
                  join complete reports, recompute runtime and memory bounds, then apply gates
@@ -98,12 +108,20 @@ commands:
                  [--kernel]
                  before a gate run measures: workers, references, inputs, RSS module review
                  and state; see `cargo xtask preflight --help`
+  gate           plan|preflight|run|summary   the full gate as one plan of steps, split
+                 into shards that run on separate hosts, and their joined result (see
+                 `cargo xtask gate --help`)
   build-workers  [--comparison-build] [--only WORKER] [--all-references]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
                  gate build is refused unless it is for paired comparisons only; a profile
                  reference whose profile is not prepared is skipped and printed, and with
                  --all-references it fails the build
+  link-order     BINARY [OUT] [--trained FILE]   the symbol ordering file that lays a
+                 program's functions out in a trained order, then module order, as the
+                 workers are linked (docs/quality.md); corpus OUT, separate, train and
+                 check generate the training corpus, check it is apart from the gate,
+                 record the workers' trained orders and check the committed ones
   memory-admission CANDIDATE REFERENCE
                  check the native Linux memory observer (AArch64 or 32-bit ARMv7)
                  for two built workers and print the certificate
@@ -176,6 +194,7 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
+        Some("link-order") => link_order(&root, &args[1..]),
         Some("same-code") => match &args[1..] {
             [candidate, reference] => {
                 return passing(harness::screen::same_code(
@@ -212,6 +231,9 @@ fn main() -> ExitCode {
         Some("isobmff-bench") => {
             return failing(isobmff_bench::main(&root, &args[1..]), isobmff_bench::USAGE);
         }
+        Some("isobmff-seek") => {
+            return failing(isobmff_seek::main(&root, &args[1..]), isobmff_seek::USAGE);
+        }
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),
         Some("graph") => graph(&root, &args[1..]),
@@ -221,6 +243,7 @@ fn main() -> ExitCode {
             playback_golds::main(&root, &args[1..]).map(|summary| println!("{summary}"))
         }
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("gate") => return failing(gate::main(&root, &args[1..]), gate::USAGE),
         Some("preflight") => {
             return failing(
                 harness::preflight::main(&root, &args[1..]),
@@ -244,6 +267,7 @@ fn main() -> ExitCode {
             _ => Err(USAGE.to_owned()),
         },
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
+        Some("references") => references::main(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
             [flag] if flag == "--record" => {
@@ -336,13 +360,22 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             println!("{}", evidence::upload(set, Path::new(archive))?);
             Ok(())
         }
+        [command, set, archive, rest @ ..] if command == "entry" => {
+            let key = match rest {
+                [] => None,
+                [flag, key] if flag == "--key" => Some(key.as_str()),
+                _ => return Err("usage: evidence entry SET ARCHIVE [--key KEY]".into()),
+            };
+            println!("{}", evidence::entry(set, Path::new(archive), key)?.1);
+            Ok(())
+        }
         [command, set] if command == "promote" => {
             println!("{}", evidence::promote(root, set)?);
             Ok(())
         }
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence promote SET | evidence fetch SET [DIR]"
+                  | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR]"
                 .into(),
         ),
     }
@@ -773,10 +806,10 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
             _ => return Err(USAGE.to_owned()),
         }
     }
-    println!(
-        "{}",
-        prepare::prepare(root, jobs, profile, &fetch::Network)?
-    );
+    let built = references::ffmpeg_build(profile).prepare(root, || {
+        prepare::prepare(root, jobs, profile, &fetch::Network)
+    })?;
+    println!("{built}");
     Ok(())
 }
 
@@ -921,7 +954,7 @@ fn run(command: &mut Command) -> Task {
 
 /// The nightly toolchain of the opt-in HEVC `std::simd` path, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
-const NIGHTLY: &str = "nightly-2026-10-17";
+pub(crate) const NIGHTLY: &str = "nightly-2026-10-17";
 
 /// Everything `check` needs once: each step runs as its own `cargo xtask`
 /// command with the pinned reference first on `PATH`, so the worker build
@@ -1144,6 +1177,74 @@ fn smoke_campaigns<'a>(
     Ok(())
 }
 
+const LINK_ORDER_USAGE: &str = "usage: cargo xtask link-order BINARY [OUT] [--trained FILE]
+       cargo xtask link-order corpus OUT
+       cargo xtask link-order separate [--corpus DIR]
+       cargo xtask link-order train [--corpus DIR] [--only WORKER]
+       cargo xtask link-order check";
+
+fn link_order(root: &Path, args: &[String]) -> Task {
+    let option = |name: &str| -> Result<Option<&Path>, String> {
+        match args.iter().position(|argument| argument == name) {
+            Some(at) => args
+                .get(at + 1)
+                .map(|value| Some(Path::new(value.as_str())))
+                .ok_or_else(|| format!("{name} needs a value\n{LINK_ORDER_USAGE}")),
+            None => Ok(None),
+        }
+    };
+    match args.first().map(String::as_str) {
+        Some("corpus") => match args {
+            [_, out] => harness::link_corpus::corpus(Path::new(out)),
+            _ => Err(LINK_ORDER_USAGE.into()),
+        },
+        Some("separate") => harness::link_training::separate(root, option("--corpus")?),
+        Some("train") => harness::link_training::train(
+            root,
+            option("--corpus")?,
+            match args.iter().position(|argument| argument == "--only") {
+                Some(at) => Some(
+                    args.get(at + 1)
+                        .map(String::as_str)
+                        .ok_or_else(|| format!("--only needs a value\n{LINK_ORDER_USAGE}"))?,
+                ),
+                None => None,
+            },
+        ),
+        Some("check") => harness::link_training::check(root),
+        Some(_) => {
+            let trained = match option("--trained")? {
+                Some(path) => {
+                    let text = std::fs::read_to_string(path)
+                        .map_err(|error| format!("{}: {error}", path.display()))?;
+                    harness::link_order::parse_trained(&text)
+                        .map_err(|error| format!("{}: {error}", path.display()))?
+                }
+                None => Vec::new(),
+            };
+            let positional: Vec<&String> = args
+                .iter()
+                .enumerate()
+                .filter(|(at, _)| {
+                    args[..*at].last().map(String::as_str) != Some("--trained")
+                        && args[*at] != "--trained"
+                })
+                .map(|(_, argument)| argument)
+                .collect();
+            match positional[..] {
+                [binary] => harness::link_order::symbol_order(Path::new(binary), &trained)
+                    .map(|order| print!("{}", order.text)),
+                [binary, out] => harness::link_order::symbol_order(Path::new(binary), &trained)
+                    .and_then(|order| {
+                        std::fs::write(out, order.text).map_err(|error| format!("{out}: {error}"))
+                    }),
+                _ => Err(LINK_ORDER_USAGE.into()),
+            }
+        }
+        None => Err(LINK_ORDER_USAGE.into()),
+    }
+}
+
 fn check(root: &Path) -> Task {
     cargo(root, None, &["fmt", "--all", "--check"])?;
     cargo_for_workers(root, None, &["test", "--workspace", "--locked"])?;
@@ -1242,6 +1343,8 @@ fn check(root: &Path) -> Task {
     check_design(root)?;
     check_links(root)?;
     check_revisions(root)?;
+    println!("$ cargo xtask link-order check");
+    harness::link_training::check(root)?;
     let mut core_time = Command::new("python3");
     core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
     let target = harness::gate_build::worker_target()?;

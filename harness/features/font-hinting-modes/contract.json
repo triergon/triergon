@@ -9,7 +9,7 @@
   "compare_order": 2,
   "contract": [
     "the sizes libass requests when hinting is on (ASS_HINTING_NATIVE, LIGHT and NORMAL): every face of one font file read from memory and loaded at each of nine 26.6 pixel heights, after libass's GDI face metrics, with a REAL_DIM size request",
-    "outlines cases: the size metrics, libass's ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands; the kerning at the size (FT_KERNING_DEFAULT) of every pair the kern table lists, nonzero values only; every glyph's FT_LOAD_NO_HINTING outline and advance, then that outline emboldened, slanted, and both",
+    "outlines cases: the size metrics, libass's ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands; the kerning at the size (FT_KERNING_DEFAULT) of every pair the kern table lists, nonzero values only; every glyph's FT_LOAD_NO_HINTING outline and advance, then that outline emboldened, slanted, and both, each outline with its orientation (FT_Outline_Get_Orientation), a style FreeType refuses as absent",
     "advances cases: every glyph's FT_LOAD_DEFAULT advance at that size; an advance the candidate cannot give ends its operation with an error, so the case fails",
     "the file is read before each timed and memory operation; the reference library is created once, outside it"
   ],
@@ -29,5 +29,6 @@
   "pending_module_requirements": [
     "FreeType auto-hinter for FT_LOAD_DEFAULT advances",
     "hinted outlines and extents for NATIVE, LIGHT and NORMAL hinting"
-  ]
+  ],
+  "parity_timeout_seconds": 120
 }

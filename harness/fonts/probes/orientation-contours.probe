@@ -1,0 +1,80 @@
+# The orientation of unhinted outlines (FT_Outline_Get_Orientation) and of
+# their emboldened, slanted and both variants, for contours a font engine
+# may meet: clockwise (TrueType's direction) and reversed squares, an outer
+# contour with a hole, a pair whose areas cancel, a single point, a zero-area
+# contour, figure eights with equal and unequal lobes, off-curve points that
+# turn the curve against its control polygon, a glyph without points and one
+# with zero advance. The face draws underlines and strike-outs (post and OS/2
+# bands present), and its glyphs are mapped to A..O for render fixtures.
+family Triergon Orientation
+units-per-em 1000
+metrics 800 -200
+underline -120 60
+strikeout 280 60
+heights 16384 853
+modes outlines
+glyph advance 500
+end
+# A: clockwise square
+glyph advance 600 char 0x41
+  contour 100 0, 100 700, 500 700, 500 0
+end
+# B: the square reversed
+glyph advance 600 char 0x42
+  contour 100 0, 500 0, 500 700, 100 700
+end
+# C: a clockwise outer contour with a counter-clockwise hole
+glyph advance 600 char 0x43
+  contour 100 0, 100 700, 500 700, 500 0
+  contour 200 100, 400 100, 400 600, 200 600
+end
+# D: the same with both contours reversed
+glyph advance 600 char 0x44
+  contour 100 0, 500 0, 500 700, 100 700
+  contour 200 100, 200 600, 400 600, 400 100
+end
+# E: two equal squares, one each way: the areas cancel
+glyph advance 900 char 0x45
+  contour 100 0, 100 400, 400 400, 400 0
+  contour 500 0, 800 0, 800 400, 500 400
+end
+# F: a single point
+glyph advance 600 char 0x46
+  contour 300 300
+end
+# G: a zero-area contour, out along a line and back
+glyph advance 600 char 0x47
+  contour 100 0, 500 700, 300 350
+end
+# H: a figure eight with equal lobes
+glyph advance 600 char 0x48
+  contour 100 0, 500 700, 500 0, 100 700
+end
+# I: a figure eight with a larger clockwise lobe
+glyph advance 600 char 0x49
+  contour 100 0, 100 700, 500 0, 500 200
+end
+# J: a figure eight with a larger counter-clockwise lobe
+glyph advance 600 char 0x4A
+  contour 100 0, 500 200, 500 0, 100 700
+end
+# K: a clockwise control polygon whose off-curve points fold the curve back
+glyph advance 600 char 0x4B
+  contour 100 0, 100 700 off, 500 700, 500 0 off, 300 -400 off
+end
+# L: counter-clockwise, all off-curve points
+glyph advance 600 char 0x4C
+  contour 100 300 off, 300 0 off, 500 300 off, 300 700 off
+end
+# M: a large counter-clockwise contour around a small clockwise one
+glyph advance 600 char 0x4D
+  contour 0 -100, 600 -100, 600 800, 0 800
+  contour 250 300, 250 400, 350 400, 350 300
+end
+# N: no points, with an advance
+glyph advance 400 char 0x4E
+end
+# O: a clockwise square with zero advance
+glyph advance 0 char 0x4F
+  contour 100 0, 100 700, 500 700, 500 0
+end

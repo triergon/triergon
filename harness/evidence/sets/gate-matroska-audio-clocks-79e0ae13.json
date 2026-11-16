@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-audio-clocks-79e0ae13",
+ "path": "gate-matroska-audio-clocks-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-audio-clocks's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-audio-clocks-79e0ae13/44291f259f00e429f54f2fffb7a75534cb72d54216d53ae1f49afa91a5eff47e.tar.zst",
+ "sha256": "44291f259f00e429f54f2fffb7a75534cb72d54216d53ae1f49afa91a5eff47e",
+ "bytes": 2039643,
+ "results": [
+  {
+   "path": "gate-matroska-audio-clocks-79e0ae13/aarch64/shard-3/benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a3eca0376f936ff27ab55d8798ecd00b24b95c8fe6ff05e2fea3128a5ada4b8a",
+   "status": 0,
+   "report_sha256": "bbca2e9e2f2101761b180a78be1e86d0756d4c6a5bf4823660dfd3330502d5a5"
+  },
+  {
+   "path": "gate-matroska-audio-clocks-79e0ae13/aarch64/shard-3/graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "dee92456e6ee67ecab42dd133296123e92405abcc73ff8636b60765b68ff7c27",
+   "status": 0,
+   "report_sha256": "d6876e3ebc9743b3ba103b1ae5a98bcd3e94dbbb5549ec21b7ed8b3dfa758edf"
+  },
+  {
+   "path": "gate-matroska-audio-clocks-79e0ae13/aarch64/shard-3/memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "9a3b4c06fcffc529d317b239ffd377e19bdd45b6a340fa3f86caec215f10f192",
+   "status": 0,
+   "report_sha256": "c211b878cff19ef218637382cafe41429f436f479c7694bd0d07752464d23b5c"
+  },
+  {
+   "path": "gate-matroska-audio-clocks-79e0ae13/armv7/shard-3/benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "165692c42d6ac2683dfb88789db58cac0a3aed47d73c8c3226e99c134f1ac8f0",
+   "status": 0,
+   "report_sha256": "a752622bdd2214937ea5b670f649581e0ebb65d7e46a304dbd349aa329cd5fb7"
+  },
+  {
+   "path": "gate-matroska-audio-clocks-79e0ae13/armv7/shard-3/graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "3a6a239e710930aa40d8deba1518d45e02e41203972266e54fbd82820b8befee",
+   "status": 0,
+   "report_sha256": "32f5fbd959939f5587d1f6a1bfad5d7b6ceb1c26cd820e3dcb59c20be04a227d"
+  },
+  {
+   "path": "gate-matroska-audio-clocks-79e0ae13/armv7/shard-3/memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "9f3f0fd795d20e5ea8e867e7b9e415add530485492a67bdfaf09138d417e10a7",
+   "status": 0,
+   "report_sha256": "b2103508eea2c6cbaa62f7b57bc7ed5d876e3764b9abe2fe92b4b3162e33d3b8"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}
