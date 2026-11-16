@@ -671,11 +671,10 @@ pub(super) fn candidate(name: &str) -> R<&'static Candidate> {
 }
 
 fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
-    let pinned = gate_build::pinned_release(root)?;
     let mut candidates = Vec::new();
     for (name, command, order) in built {
         let path = format!("{}/{name}", gate_build::release_dir()?);
-        let toolchain = candidate(name)?.toolchain(&pinned);
+        let toolchain = candidate(name)?.toolchain(&gate_build::pinned_release(root)?);
         candidates.push((
             *name,
             Value::object([
