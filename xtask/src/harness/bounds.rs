@@ -91,7 +91,8 @@ pub fn case_bounds(row: &Value) -> Option<CaseBounds> {
 /// The contract's `open_bounds` on `target`: each entry names a `bound` (`runtime`,
 /// `heap` or `total_rss`), the `cases` whose bound fails there today and the measured
 /// `cause`; an entry with `targets` is open on those of the gate's targets only. Every
-/// case must be a case of the manifest, and a bound of a case is listed once.
+/// case must be a case of the manifest, and a bound of a case is listed once for each
+/// target.
 pub fn open_bounds(
     contract: &Value,
     manifest: &Value,
@@ -122,20 +123,22 @@ pub fn open_bounds(
         if ids.is_empty() {
             return Err(format!("open {bound} bound: it lists no cases"));
         }
-        let scoped = match entry.get("targets") {
-            None => true,
+        let targets: Vec<&str> = match entry.get("targets") {
+            None => crate::gate::TARGETS.to_vec(),
             Some(scope) => {
-                let scope = scope.as_array().unwrap_or_default();
-                let known = |t: &Value| {
-                    t.as_str()
-                        .is_some_and(|t| crate::gate::TARGETS.contains(&t))
-                };
-                if scope.is_empty() || !scope.iter().all(known) {
+                let names: Vec<Option<&str>> = scope
+                    .as_array()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(Value::as_str)
+                    .collect();
+                let known = |t: Option<&str>| t.is_some_and(|t| crate::gate::TARGETS.contains(&t));
+                if names.is_empty() || !names.iter().copied().all(known) {
                     return Err(format!(
                         "open {bound} bound: its targets must be some of the gate's targets"
                     ));
                 }
-                scope.iter().any(|t| t.as_str() == Some(target))
+                names.into_iter().flatten().collect()
             }
         };
         for id in &ids {
@@ -147,10 +150,12 @@ pub fn open_bounds(
                     "open {bound} bound of {id}: not a case of the manifest"
                 ));
             }
-            if !listed.insert((bound, id.to_owned())) {
-                return Err(format!("open {bound} bound of {id}: listed twice"));
+            for on in &targets {
+                if !listed.insert((bound, id.to_owned(), (*on).to_owned())) {
+                    return Err(format!("open {bound} bound of {id}: listed twice on {on}"));
+                }
             }
-            if scoped {
+            if targets.contains(&target) {
                 open.insert((bound, id.to_owned()));
             }
         }
@@ -344,6 +349,19 @@ mod tests {
             open_bounds(&scoped, &manifest(), "aarch64-unknown-linux-gnu"),
             Ok(BTreeSet::new())
         );
+        // A case may be open on each target through an entry of its own, with its cause.
+        let per_target = contract(&format!(
+            r#"{{"bound": "total_rss", "cases": ["a"], "targets": ["aarch64-unknown-linux-gnu"], "cause": "x"}},
+               {{"bound": "total_rss", "cases": ["a", "b"], "targets": ["{arm}"], "cause": "y"}}"#
+        ));
+        assert_eq!(
+            open_bounds(&per_target, &manifest(), "aarch64-unknown-linux-gnu"),
+            Ok(BTreeSet::from([(Bound::TotalRss, "a".to_owned())]))
+        );
+        assert_eq!(
+            open_bounds(&per_target, &manifest(), arm).map(|o| o.len()),
+            Ok(2)
+        );
         for (entries, error) in [
             (
                 r#"{"bound": "rss", "cases": ["a"], "cause": "x"}"#,
@@ -363,7 +381,7 @@ mod tests {
             ),
             (
                 r#"{"bound": "heap", "cases": ["a"], "cause": "x"}, {"bound": "heap", "cases": ["a"], "cause": "y"}"#,
-                "open heap bound of a: listed twice",
+                "open heap bound of a: listed twice on thumbv7neon-unknown-linux-gnueabihf",
             ),
             (
                 r#"{"bound": "runtime", "cases": ["a"], "cause": "x", "targets": ["x86_64-unknown-linux-gnu"]}"#,
