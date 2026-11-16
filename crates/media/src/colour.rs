@@ -220,7 +220,8 @@ mod tests {
         }
     }
 
-    /// The same bounded continued fraction, in 128-bit arithmetic throughout.
+    /// The same bounded continued fraction of a positive normal value, in 128-bit
+    /// arithmetic throughout.
     fn wide_bounded_rational(value: f64) -> [i64; 2] {
         const MAX: u128 = i32::MAX as u128;
         let bits = value.to_bits();
@@ -261,7 +262,7 @@ mod tests {
                 f64::from_bits(low + state % (high - low))
             })
             .collect();
-        values.extend((0..=2000).map(|k| f64::from(k) / 2000.));
+        values.extend((1..=2000).map(|k| f64::from(k) / 2000.));
         values.extend((1..=1000).map(|k| f64::from(k as f32 / 1000.)));
         for x in values {
             assert_eq!(
