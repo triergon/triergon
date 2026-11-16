@@ -5447,5 +5447,8 @@
    "bytes": 415287,
    "sha256": "53c92c27dfa01fa713e96626040c9ef66f5218a88d54c0fe369e4361ad98f6a3"
   }
+ ],
+ "open_cases": [
+  "aac-sce-in-stereo.adts"
  ]
 }

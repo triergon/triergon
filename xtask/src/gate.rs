@@ -3,8 +3,8 @@
 //!
 //! An item is the work for one measured thing: a feature's timing, memory and
 //! grade, a part of the ISO BMFF suite, the ISO BMFF seek, packet-framing or
-//! progressive suite, the codecs' parity, the Ogg reader's packets and seeks, a codec
-//! workload list, a capture case, a test profile, the reference comparisons. Its steps
+//! progressive suite, the video codecs' parity, the audio codecs' correctness lanes,
+//! the Ogg reader's packets and seeks, a codec workload list, a capture case, a test profile, the reference comparisons. Its steps
 //! run on one host, in stages:
 //! `timing` runs the parity and timing steps alone on CPU 1 with the RSS module
 //! unloaded; `memory`, after the host has proved the kernel bound and rebuilt the

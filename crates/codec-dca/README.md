@@ -106,7 +106,7 @@ files.
 
 - Specification: ETSI TS 102 114 V1.6.1 (Table D65 from V1.3.1).
 - Reference: FFmpeg 9.0.2's float decoder on the core of every core-carrying FATE `dts/`
-  vector (`-bsf:a dca_core`) and on self-authored synthetic streams for features the
+  vector (`-bsf:a dca_core`, made by `cargo xtask codecs derive`) and on self-authored synthetic streams for features the
   vectors do not reach. Every sample is compared from sample 0: exact rate, layout and
   count; per channel RMS ≤ 8.8e-6 and max |diff| ≤ 6.1035e-5
   (`harness/codecs/numeric-rules.json`).

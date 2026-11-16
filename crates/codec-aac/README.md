@@ -148,7 +148,8 @@ caller's reserved PCM planes and reuses them on the next access unit.
   but gives no form), the IPD/OPD smoothing and the behaviour over frames, including a
   frame without its SBR element; the code names the probes of each.
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
-  remuxed to ADTS) and three crafted HE-AAC v2 streams
+  remuxed to ADTS by `cargo xtask codecs derive`,
+  [derived-streams.json](../../harness/codecs/derived-streams.json)) and three crafted HE-AAC v2 streams
   ([harness/codecs/aac/ps/vectors](../../harness/codecs/aac/ps/vectors)): a 20/34-band
   change registered while PS is off, IPD/OPD across a 34 -> 20 change, and a PS frame
   without its SBR element. Every sample of every channel is compared with no delay search or gain
