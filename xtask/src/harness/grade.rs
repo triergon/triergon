@@ -143,7 +143,45 @@ fn joined_fields(row: &Value) -> R<Value> {
         put(&mut parity, "reference_run", run)?;
         put(&mut fields, "parity", parity)?;
     }
+    // The reference can log process addresses. Compare the diagnostic text
+    // outside those addresses and keep both raw traces in their collections.
+    if let Some(trace) = row.get("reference_trace")
+        && let Some(stderr) = trace.get("stderr")
+    {
+        let stderr = stderr.as_str().ok_or("reference stderr must be text")?;
+        if hash(trace, "stderr_sha256")? != sha256::hex(stderr.as_bytes()) {
+            return Err("reference diagnostic hash mismatch".into());
+        }
+        let mut stable = without(trace, &["stderr", "stderr_sha256"])?;
+        put(
+            &mut stable,
+            "stderr",
+            Value::str(reference_diagnostics(stderr)),
+        )?;
+        put(&mut fields, "reference_trace", stable)?;
+    }
     Ok(fields)
+}
+
+fn reference_diagnostics(stderr: &str) -> String {
+    let mut normalized = String::with_capacity(stderr.len());
+    for line in stderr.split_inclusive('\n') {
+        if let Some((prefix, message)) =
+            line.strip_prefix('[').and_then(|line| line.split_once(']'))
+            && let Some((header, address)) = prefix.rsplit_once(" @ 0x")
+            && !header.is_empty()
+            && !address.is_empty()
+            && address.bytes().all(|byte| byte.is_ascii_hexdigit())
+        {
+            normalized.push('[');
+            normalized.push_str(header);
+            normalized.push(']');
+            normalized.push_str(message);
+        } else {
+            normalized.push_str(line);
+        }
+    }
+    normalized
 }
 
 fn document(path: &Path) -> R<(Value, String)> {
@@ -664,6 +702,16 @@ fn join_case(
     )
     .map_err(|error| format!("timing: {error}"))?;
     memory_binding(memory, identity, &workers, linux)?;
+    if let Some(outputs) = expected.get("expected_time_outputs")
+        && !super::acceptance::timing_outputs_match(clock, outputs)
+    {
+        return Err("measurements do not match expected_time_outputs".into());
+    }
+    if let Some(outputs) = expected.get("expected_memory_outputs")
+        && !super::acceptance::memory_outputs_match(memory, outputs)
+    {
+        return Err("measurements do not match expected_memory_outputs".into());
+    }
     // The validator has shown both workers do this work in every pair.
     let timed_output = work(
         field(field(&array(clock, "samples")?[0], "reference")?, "data")?,
@@ -810,6 +858,8 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         println!("{USAGE}");
         return Ok(0);
     }
+    let root = root.canonicalize().map_err(|error| error.to_string())?;
+    let root = root.as_path();
     let options = Options::parse(root, args)?;
     super::report::create_output(&options.output)?;
     // A grade binds the gate results recorded beside the reports it joins.
@@ -1687,6 +1737,60 @@ mod tests {
     }
 
     #[test]
+    fn matching_refusals_may_log_different_diagnostic_addresses() {
+        let mut fixture = Fixture::new();
+        put(&mut fixture.expected, "outcome", Value::str("refusal")).unwrap();
+        for (row, diagnostics) in [
+            (&mut fixture.timed, "[mov,mp4 @ 0x1234] invalid box\n"),
+            (&mut fixture.measured, "[mov,mp4 @ 0x4321] invalid box\n"),
+        ] {
+            *row = without(row, &["timing", "memory"]).unwrap();
+            put(row, "outcome", Value::str("refusal")).unwrap();
+            put(
+                row,
+                "reference_trace",
+                object(&[
+                    ("exit_code", Value::int(1)),
+                    ("status", Value::str("finished")),
+                    ("stdout_sha256", Value::str(digest('0'))),
+                    ("stderr", Value::str(diagnostics)),
+                    (
+                        "stderr_sha256",
+                        Value::str(sha256::hex(diagnostics.as_bytes())),
+                    ),
+                ]),
+            )
+            .unwrap();
+        }
+        let joined = fixture.join().unwrap();
+        assert_eq!(
+            joined.get("reference_trace"),
+            fixture.timed.get("reference_trace")
+        );
+        assert_ne!(
+            reference_diagnostics("[mov,mp4 @ 0x1234] invalid box\n"),
+            reference_diagnostics("[mov,mp4 @ 0x4321] unsupported box\n")
+        );
+        assert_eq!(
+            reference_diagnostics("packet at 0x1234\n"),
+            "packet at 0x1234\n"
+        );
+        let message = "[mov,mp4] invalid offset @ 0xaaaa]\n";
+        assert_eq!(reference_diagnostics(message), message);
+        assert_ne!(
+            reference_diagnostics(message),
+            reference_diagnostics("[mov,mp4] invalid offset @ 0xbbbb]\n")
+        );
+        change(
+            &mut fixture.measured,
+            &["reference_trace"],
+            "exit_code",
+            Value::int(2),
+        );
+        assert!(fixture.join().unwrap_err().contains("case fields/parity"));
+    }
+
+    #[test]
     fn only_an_added_kernel_proof_can_differ_between_builds() {
         let timed = identity();
         let mut memory = timed.clone();
@@ -1902,6 +2006,47 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn joining_checks_role_specific_outputs_beyond_the_work_fold() {
+        for (key, section, sample_role, output_key) in [
+            ("expected_time_outputs", "timing", "candidate", "data"),
+            (
+                "expected_memory_outputs",
+                "memory",
+                "candidate_heap",
+                "work",
+            ),
+        ] {
+            let mut fixture = Fixture::new();
+            let row = if section == "timing" {
+                &fixture.timed
+            } else {
+                &fixture.measured
+            };
+            let sample = &array(field(row, section).unwrap(), "samples").unwrap()[0];
+            let output = field(field(sample, sample_role).unwrap(), output_key).unwrap();
+            let roles = object(&[("candidate", output.clone()), ("reference", output.clone())]);
+            for row in [
+                &mut fixture.expected,
+                &mut fixture.timed,
+                &mut fixture.measured,
+            ] {
+                put(row, key, roles.clone()).unwrap();
+            }
+            assert!(fixture.join().is_ok());
+            let mut altered = roles;
+            change(&mut altered, &["reference"], "input_bytes", Value::int(747));
+            for row in [
+                &mut fixture.expected,
+                &mut fixture.timed,
+                &mut fixture.measured,
+            ] {
+                put(row, key, altered.clone()).unwrap();
+            }
+            assert!(fixture.join().unwrap_err().contains(key));
+        }
     }
 
     #[test]
