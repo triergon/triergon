@@ -68,13 +68,14 @@ impl Substream {
                     if ch < 2 {
                         cplcoe0[ch] = true;
                     }
-                    let mstrcplco = br.read(2) as usize;
+                    let mstrcplco = br.read(2);
                     for bnd in 0..self.ncplbnd {
-                        let e = br.read(4) as usize;
-                        let m = br.read(4) as f32;
-                        let t = if e == 15 { m / 16.0 } else { (m + 16.0) / 32.0 };
-                        let sh = e + 3 * mstrcplco;
-                        self.cplco[ch][bnd] = t * EXP_SCALE[sh.min(31)];
+                        let e = br.read(4);
+                        let m = br.read(4) as i32;
+                        // 7.4.3: mantissa m/16 (e = 15) or (m + 16)/32, scaled by
+                        // 2^-(e + 3 * mstrcplco); in Q29 the shift is at most 24.
+                        let mant = if e == 15 { 2 * m } else { m + 16 };
+                        self.cplco[ch][bnd] = mant << (24 - (e + 3 * mstrcplco));
                     }
                 }
             } else if eac3 {

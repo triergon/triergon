@@ -210,7 +210,8 @@ pub(crate) struct Substream {
     ncplbnd: usize,
     /// Coupling band index of each coupling sub-band (relative to cplbegf).
     cpl_sb_band: [u8; 18],
-    cplco: [[f32; 18]; 5],
+    /// Coupling coordinates in Q29 (1.0 = 2^29); every coordinate is exact in it.
+    cplco: [[i32; 18]; 5],
     phsflg: [bool; 18],
     cplstrtmant: usize,
     cplendmant: usize,
@@ -338,7 +339,7 @@ impl Substream {
             ncplsubnd: 0,
             ncplbnd: 0,
             cpl_sb_band: [0; 18],
-            cplco: [[0.0; 18]; 5],
+            cplco: [[0; 18]; 5],
             phsflg: [false; 18],
             cplstrtmant: 0,
             cplendmant: 0,
@@ -469,8 +470,8 @@ mod noise_tests {
         sub.chincpl[..2].fill(true);
         sub.endmant[..2].fill(37);
         sub.dithflag[1] = true;
-        sub.cplco[0][0] = 0.125;
-        sub.cplco[1][0] = 0.125;
+        sub.cplco[0][0] = 1 << 26;
+        sub.cplco[1][0] = 1 << 26;
 
         let mut rng = Rng::new(true);
         let mut reader = BitReader::new(&[0; crate::PAD]);

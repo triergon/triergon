@@ -20,7 +20,7 @@ impl Substream {
                 let dith = self.dithflag[ch] && noise == NoiseMode::Normal && !self.aht[CPL];
                 for sb in 0..self.ncplsubnd {
                     let bnd = self.cpl_sb_band[sb] as usize;
-                    let co = self.cplco[ch][bnd] as f64 * 8.0;
+                    let co = i64::from(self.cplco[ch][bnd]);
                     // Phase flags negate after the coordinate product (matters for the
                     // rounding of the Q23 result; matches FFmpeg 9.0.2).
                     let flip = ch == 1 && self.acmod == 2 && self.phsflginu && self.phsflg[bnd];
@@ -41,7 +41,8 @@ impl Substream {
                         } else {
                             0
                         };
-                        let p = (v as f64 * co).floor() as i32;
+                        // 8 * v * cplco rounded down: Q29 * 8 is a shift by 26.
+                        let p = saturate((i64::from(v) * co) >> 26);
                         self.icoef[ch][bin] = if flip { -p } else { p };
                     }
                 }
@@ -222,6 +223,12 @@ impl Substream {
             }
         }
     }
+}
+
+/// `x` clamped to the `i32` range.
+#[inline]
+fn saturate(x: i64) -> i32 {
+    x.clamp(i32::MIN.into(), i32::MAX.into()) as i32
 }
 
 /// 2^-23: scale of the Q23 coefficient integers.
