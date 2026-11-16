@@ -562,8 +562,16 @@ impl HvcConfigParser {
                 }
                 Phase::FillInline(ref mut remaining) => {
                     *remaining -= 1;
-                    // These entries were stored during validation. Spend each
-                    // remaining fill unit at its usual cancellation boundary.
+                    // These entries were stored during validation. Spend the
+                    // remaining fill units at once when the work allows, else
+                    // each at its usual cancellation boundary.
+                    if *remaining != 0 && work.remaining() >= u64::from(*remaining) {
+                        if cancel.load(Ordering::Relaxed) {
+                            return Err(Error::Cancelled);
+                        }
+                        work.take(u64::from(*remaining));
+                        *remaining = 0;
+                    }
                     while *remaining != 0 {
                         if cancel.load(Ordering::Relaxed) {
                             return Err(Error::Cancelled);
