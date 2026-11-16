@@ -65,6 +65,26 @@ impl SubBuf {
         &mut self.data[o..o + self.stride]
     }
 
+    /// Rows `band` of two distinct slots.
+    #[inline(always)]
+    pub(crate) fn row_pair_mut(
+        &mut self,
+        slot_a: usize,
+        slot_b: usize,
+        band: usize,
+    ) -> (&mut [f32], &mut [f32]) {
+        let stride = self.stride;
+        let a = (slot_a * self.bands + band) * stride;
+        let b = (slot_b * self.bands + band) * stride;
+        if a < b {
+            let (lo, hi) = self.data.split_at_mut(b);
+            (&mut lo[a..a + stride], &mut hi[..stride])
+        } else {
+            let (lo, hi) = self.data.split_at_mut(a);
+            (&mut hi[..stride], &mut lo[b..b + stride])
+        }
+    }
+
     #[inline(always)]
     pub(crate) fn row(&self, slot: usize, band: usize) -> &[f32] {
         let o = (slot * self.bands + band) * self.stride;
@@ -309,9 +329,10 @@ pub(crate) fn decode_subframe(
     }
 
     // --- audio data arrays (Table 5-29) ---
-    // Clear this subframe's span for every band so that inactive subbands are zero.
+    // Bands below NSUBS are written in full below (quantized or VQ samples); clear this
+    // subframe's span of the others, which only joint intensity may fill.
     for ch in 0..nch {
-        for b in 0..32 {
+        for b in hdr.nsubs[ch] as usize..32 {
             let row = buf.row_mut(slot0 + ch, b);
             row[HIST + t0..HIST + t0 + nsamp]
                 .iter_mut()
