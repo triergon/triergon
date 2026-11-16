@@ -7,6 +7,14 @@
 //! `V[i] = -C[48 - i]` for `16 < i < 48` and `V[i] = -C[i - 48]` above. The DCT runs
 //! as Lee's recursive factorisation. Windowing keeps the last 16 vectors `V`; output
 //! sample `j` is `sum_a D[32a + j] V_a[32 (a mod 2) + j]` over their ages `a`.
+//!
+//! The halves of `V` that windowing reads are symmetric: `V[32 - j] = -V[j]` in the
+//! first and `V[64 - j] = V[32 + j]` in the second. So outputs `j` and `32 - j` read the
+//! same values up to sign, which the window taps absorb, and each vector is kept as
+//! the 17 values `C[16 + j]` and the 17 values `C[16 - j]` its halves are made of
+//! (K. Konstantinides, "Fast subband filtering in MPEG audio coding", IEEE Signal
+//! Processing Letters 1(2), 1994, uses the same symmetries). Each output's products and
+//! the order of its sum are those of the direct form.
 
 use core::f32::consts::FRAC_1_SQRT_2;
 use std::sync::LazyLock;
@@ -125,21 +133,65 @@ fn merge<const N: usize>(v: &mut [f32; 32]) {
     }
 }
 
-/// The filterbank state of one channel: the last 16 vectors `V`.
-#[derive(Clone, Debug)]
-pub(crate) struct Synthesis {
-    history: [[f32; 64]; 16],
-    /// Index of the newest vector in `history`.
-    newest: usize,
+/// Output lanes the window sum computes at once, for outputs `j` and `31 - j` each:
+/// their sums fit 32-bit ARM's 32 single-precision registers and fill whole vectors
+/// elsewhere.
+const LANES: usize = 8;
+
+/// The window taps of one age for one group of [`LANES`] lanes: `low[l]` weighs
+/// output `j = base + l`, `high[l]` output `31 - j`, each signed for the half of `V`
+/// it reads. The same shape holds the sums.
+#[derive(Clone, Copy)]
+struct Taps {
+    low: [f32; LANES],
+    high: [f32; LANES],
 }
 
-impl Default for Synthesis {
-    fn default() -> Self {
-        Synthesis {
-            history: [[0.0; 64]; 16],
-            newest: 0,
+/// The window in the order the sum reads it: per lane group, per age.
+const TAPS: [[Taps; 16]; 16 / LANES] = {
+    let zero = Taps {
+        low: [0.0; LANES],
+        high: [0.0; LANES],
+    };
+    let mut taps = [[zero; 16]; 16 / LANES];
+    let mut group = 0;
+    while group < 16 / LANES {
+        let mut age = 0;
+        while age < 16 {
+            let mut l = 0;
+            while l < LANES {
+                let j = group * LANES + l;
+                // An even age reads V[j] = C[16 + j] and V[31 - j] = -C[16 + j + 1],
+                // an odd one V[32 + j] = -C[16 - j] and V[63 - j] = -C[16 - j - 1].
+                let low = WINDOW[32 * age + j];
+                taps[group][age].low[l] = if age % 2 == 0 { low } else { -low };
+                taps[group][age].high[l] = -WINDOW[32 * age + 31 - j];
+                l += 1;
+            }
+            age += 1;
         }
+        group += 1;
     }
+    taps
+};
+
+/// One matrixed vector `V`, as the values its halves are made of.
+#[derive(Clone, Copy, Debug, Default)]
+struct Folded {
+    /// `C[16 + j]`, with +0 for `V[16]` at `j = 16`: the first half of `V`.
+    even: [f32; 17],
+    /// `C[16 - j]`: the second half of `V`, negated.
+    odd: [f32; 17],
+}
+
+/// The filterbank state of one channel: the last 16 vectors `V`.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct Synthesis {
+    /// Each vector at index `i` and again at `i + 16`, so the 16 from the newest on
+    /// are contiguous, newest first.
+    history: [Folded; 32],
+    /// Index of the newest vector in `history`, below 16.
+    newest: usize,
 }
 
 impl Synthesis {
@@ -150,34 +202,50 @@ impl Synthesis {
     /// Filter one time slot: 32 subband samples in, 32 output samples out.
     pub(crate) fn run(&mut self, subbands: &[f32; 32], pcm: &mut [f32; 32]) {
         let c = dct32(subbands, &LEE);
-        self.newest = (self.newest + 15) % 16;
-        let v = &mut self.history[self.newest];
-        v[..16].copy_from_slice(&c[16..]);
-        v[16] = 0.0;
-        for i in 17..48 {
-            v[i] = -c[48 - i];
-        }
-        for i in 48..64 {
-            v[i] = -c[i - 48];
-        }
-        // Rows of the window in pairs: an even age reads the first half of its vector,
-        // an odd age the second. The sum runs over the ages in order.
-        let (rows, []) = WINDOW.as_chunks::<64>() else {
-            unreachable!("the window is 8 pairs of rows of 32");
+        let folded = Folded {
+            even: core::array::from_fn(|j| if j < 16 { c[16 + j] } else { 0.0 }),
+            odd: core::array::from_fn(|j| c[16 - j]),
         };
-        let mut sum = [0.0f32; 32];
-        for (pair, row) in rows.iter().enumerate() {
-            let even = &self.history[(self.newest + 2 * pair) % 16][..32];
-            let odd = &self.history[(self.newest + 2 * pair + 1) % 16][32..];
-            let (d_even, d_odd) = row.split_at(32);
-            for (j, out) in sum.iter_mut().enumerate() {
-                *out += d_even[j] * even[j];
+        self.newest = (self.newest + 15) % 16;
+        self.history[self.newest] = folded;
+        self.history[self.newest + 16] = folded;
+        // An even age reads the first half of its vector, an odd age the second. Each
+        // sum runs over the ages in order.
+        let (ages, []) = self.history[self.newest..][..16].as_chunks::<2>() else {
+            unreachable!("16 ages are 8 pairs");
+        };
+        let (low, high) = pcm.split_at_mut(16);
+        for (group, taps) in TAPS.iter().enumerate() {
+            let base = group * LANES;
+            let (taps, []) = taps.as_chunks::<2>() else {
+                unreachable!("16 ages are 8 pairs");
+            };
+            let mut sums = Taps {
+                low: [0.0; LANES],
+                high: [0.0; LANES],
+            };
+            for ([even, odd], [even_taps, odd_taps]) in ages.iter().zip(taps) {
+                accumulate(&mut sums, even_taps, &even.even, base);
+                accumulate(&mut sums, odd_taps, &odd.odd, base);
             }
-            for (j, out) in sum.iter_mut().enumerate() {
-                *out += d_odd[j] * odd[j];
+            low[base..][..LANES].copy_from_slice(&sums.low);
+            for (l, &sum) in sums.high.iter().enumerate() {
+                high[15 - base - l] = sum;
             }
         }
-        *pcm = sum;
+    }
+}
+
+/// Add one age's products to the sums of a lane group: lane `l` of `low` reads
+/// `values[base + l]`, of `high` `values[base + l + 1]`.
+#[inline(always)]
+fn accumulate(sums: &mut Taps, taps: &Taps, values: &[f32; 17], base: usize) {
+    let Some(values) = values[base..].first_chunk::<{ LANES + 1 }>() else {
+        unreachable!("a lane group lies within the first 16 values");
+    };
+    for l in 0..LANES {
+        sums.low[l] += taps.low[l] * values[l];
+        sums.high[l] += taps.high[l] * values[l + 1];
     }
 }
 

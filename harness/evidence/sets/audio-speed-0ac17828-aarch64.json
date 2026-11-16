@@ -1,0 +1,9 @@
+{
+ "name": "audio-speed-0ac17828-aarch64",
+ "path": "audio-speed-0ac17828-aarch64",
+ "retention": "retained",
+ "reason": "Audio decoder speed work on Linux AArch64, c6g.4xlarge: user-space instruction, cycle and branch-miss counts with output digests of main and of the codec sources at 0ac17828 for the AC-3, E-AC-3, DTS, MPEG audio, FLAC, Vorbis and Opus timing workloads; per-vector RMS and maximum error against FFmpeg of main and of 0ac17828 on the pinned vectors and on regenerated MPEG audio vectors, with their comparison; per-function profiles and lane notes; cited by docs/status.md",
+ "key": "evidence/audio-speed-0ac17828-aarch64/3ab9b0d7fd520b687b4ffc52e23941f079bad20f8194ecf443f2fdeea4d6b917.tar.zst",
+ "sha256": "3ab9b0d7fd520b687b4ffc52e23941f079bad20f8194ecf443f2fdeea4d6b917",
+ "bytes": 104937
+}

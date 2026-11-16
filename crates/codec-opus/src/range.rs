@@ -1,5 +1,7 @@
 //! The range decoder of RFC 6716 section 4.1, shared by the SILK and CELT layers.
 
+use triergon_codec::divide_u32;
+
 /// Range decoder state over one Opus frame. Entropy-coded symbols are read from the
 /// front and raw bits (CELT) from the back of the same bytes.
 #[derive(Clone, Debug)]
@@ -136,8 +138,17 @@ impl<'a> RangeDecoder<'a> {
     /// (RFC 6716 section 4.1.2). Must be followed by [`Self::update`].
     #[inline(always)]
     pub(crate) fn decode(&mut self, ft: u32) -> (u32, u32) {
-        let ext = self.rng / ft;
-        let fs = self.val / ext + 1;
+        let ext = divide_u32(self.rng, ft);
+        let fs = divide_u32(self.val, ext) + 1;
+        (ft - fs.min(ft), ext)
+    }
+
+    /// `ec_decode_bin`: [`Self::decode`] with a total of `1 << bits`.
+    #[inline(always)]
+    pub(crate) fn decode_bin(&mut self, bits: u32) -> (u32, u32) {
+        let ft = 1 << bits;
+        let ext = self.rng >> bits;
+        let fs = divide_u32(self.val, ext) + 1;
         (ft - fs.min(ft), ext)
     }
 

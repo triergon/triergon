@@ -15,41 +15,45 @@ struct Quantizer {
     /// Bits of one sample, or of three samples when `grouped`.
     bits: u32,
     grouped: bool,
+    /// `ceil(2^32 / levels)`: for a grouped code `c` (at most 10 bits),
+    /// `(c reciprocal) >> 32` is `c / levels`, as the error `c (reciprocal - 2^32 /
+    /// levels) / 2^32 < c / 2^32` stays below the `1 / levels` that separates
+    /// `c / levels` from the next integer (T. Granlund and P. L. Montgomery, "Division
+    /// by invariant integers using multiplication", 1994).
+    reciprocal: u32,
 }
 
 impl Quantizer {
     const fn new(levels: u32) -> Quantizer {
-        match levels {
-            3 => Quantizer {
-                levels,
-                bits: 5,
-                grouped: true,
-            },
-            5 => Quantizer {
-                levels,
-                bits: 7,
-                grouped: true,
-            },
-            9 => Quantizer {
-                levels,
-                bits: 10,
-                grouped: true,
-            },
-            _ => Quantizer {
-                levels,
-                bits: levels.ilog2() + 1,
-                grouped: false,
-            },
+        let (bits, grouped) = match levels {
+            3 => (5, true),
+            5 => (7, true),
+            9 => (10, true),
+            _ => (levels.ilog2() + 1, false),
+        };
+        Quantizer {
+            levels,
+            bits,
+            grouped,
+            reciprocal: (1u64 << 32).div_ceil(levels as u64) as u32,
         }
+    }
+
+    /// `code / levels`, for a grouped code.
+    #[inline(always)]
+    fn quotient(self, code: u32) -> u32 {
+        ((u64::from(code) * u64::from(self.reciprocal)) >> 32) as u32
     }
 
     /// Three requantized samples.
     fn read(self, reader: &mut CachedBitReader<'_>) -> [f32; 3] {
         if self.grouped {
+            // Base `levels` digits, least significant first.
             let mut code = reader.read(self.bits);
             core::array::from_fn(|_| {
-                let sample = code % self.levels;
-                code /= self.levels;
+                let quotient = self.quotient(code);
+                let sample = code - quotient * self.levels;
+                code = quotient;
                 dequantize(sample, self.levels)
             })
         } else {
@@ -257,5 +261,15 @@ mod tests {
         assert_eq!(limits, [27, 30, 8, 12, 30]);
         assert_eq!(Quantizer::new(65535).bits, 16);
         assert_eq!(Quantizer::new(7).bits, 3);
+    }
+
+    #[test]
+    fn grouped_codes_divide_exactly() {
+        for levels in [3, 5, 9] {
+            let quantizer = Quantizer::new(levels);
+            for code in 0..1 << quantizer.bits {
+                assert_eq!(quantizer.quotient(code), code / levels, "{code} / {levels}");
+            }
+        }
     }
 }

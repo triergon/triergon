@@ -5,7 +5,7 @@
 use super::CoreFrame;
 use crate::MAX_SLOTS;
 use crate::qmf::{Qmf, QmfState};
-use crate::subframe::{self, HIST, SubBuf};
+use crate::subframe::{HIST, SubBuf};
 use crate::{AudioFrame, ChannelLayout, DecodeError, FrameDecoder, Speaker, X96Bank};
 use triergon_codec::StorageError;
 
@@ -80,32 +80,31 @@ impl FrameDecoder {
                 }
             }
         }
-        let mut cs_rows = [[0f32; subframe::MAX_T]; 32];
-        if xch {
-            for (b, dst) in cs_rows.iter_mut().enumerate() {
-                dst[..blocks].copy_from_slice(&self.sub.row(set.nch, b)[HIST..HIST + blocks]);
-            }
-        }
-        let x96buf = self.x96buf.as_mut();
-        let (src, sbands): (&mut SubBuf, usize) = match x96buf {
-            Some(xb) if have_x96 => (xb, 64),
-            _ => (&mut self.sub, 32),
-        };
-        if xch {
+        if xch && let Some((l, r)) = surround_pair(h.amode) {
             // XCh carries Cs; the core surrounds hold Ls + 0.7071 Cs and
             // Rs + 0.7071 Cs (clause 6.4.1). Remove the embedded down-mix.
-            if let Some((l, r)) = surround_pair(h.amode) {
-                for (b, cs) in cs_rows.iter().enumerate() {
-                    for (pair_ch, t) in [l, r].into_iter().zip([0, 0]) {
-                        let _ = t;
-                        let row = &mut src.row_mut(pair_ch, b)[HIST..HIST + blocks];
-                        for (v, &c) in row.iter_mut().zip(cs.iter()) {
-                            *v -= c * core::f32::consts::FRAC_1_SQRT_2;
+            for b in 0..32 {
+                for pair_ch in [l, r] {
+                    let (row, cs): (&mut [f32], &[f32]) = match self.x96buf.as_mut() {
+                        Some(xb) if have_x96 => (xb.row_mut(pair_ch, b), self.sub.row(set.nch, b)),
+                        _ => {
+                            let (row, cs) = self.sub.row_pair_mut(pair_ch, set.nch, b);
+                            (row, cs)
                         }
+                    };
+                    for (v, &c) in row[HIST..HIST + blocks]
+                        .iter_mut()
+                        .zip(&cs[HIST..HIST + blocks])
+                    {
+                        *v -= c * core::f32::consts::FRAC_1_SQRT_2;
                     }
                 }
             }
         }
+        let (src, sbands): (&mut SubBuf, usize) = match self.x96buf.as_mut() {
+            Some(xb) if have_x96 => (xb, 64),
+            _ => (&mut self.sub, 32),
+        };
         let fpair = if h.sumf || h.amode == 3 {
             front_pair(h.amode)
         } else {
@@ -114,21 +113,12 @@ impl FrameDecoder {
         let spair = if h.sums { surround_pair(h.amode) } else { None };
         for (l, r) in [fpair, spair].into_iter().flatten() {
             for b in 0..sbands {
-                let mut rr = [0f32; subframe::MAX_T];
-                rr[..blocks].copy_from_slice(&src.row(r, b)[HIST..HIST + blocks]);
-                let mut ll = [0f32; subframe::MAX_T];
-                ll[..blocks].copy_from_slice(&src.row(l, b)[HIST..HIST + blocks]);
-                for (t, v) in src.row_mut(l, b)[HIST..HIST + blocks]
+                let (ll, rr) = src.row_pair_mut(l, r, b);
+                for (a, c) in ll[HIST..HIST + blocks]
                     .iter_mut()
-                    .enumerate()
+                    .zip(&mut rr[HIST..HIST + blocks])
                 {
-                    *v = ll[t] + rr[t];
-                }
-                for (t, v) in src.row_mut(r, b)[HIST..HIST + blocks]
-                    .iter_mut()
-                    .enumerate()
-                {
-                    *v = ll[t] - rr[t];
+                    (*a, *c) = (*a + *c, *a - *c);
                 }
             }
         }
@@ -270,7 +260,7 @@ impl FrameDecoder {
 fn run_bank<const TAPS: usize, const LEN: usize>(
     qmf: &Qmf<TAPS>,
     st: &mut QmfState<LEN>,
-    tb: &mut [f32],
+    tb: &[f32],
     plane: &mut [f32],
     blocks: usize,
 ) {
@@ -278,7 +268,7 @@ fn run_bank<const TAPS: usize, const LEN: usize>(
     for t in 0..blocks {
         qmf.synth(
             st,
-            &mut tb[t * bands..t * bands + bands],
+            &tb[t * bands..t * bands + bands],
             &mut plane[t * bands..t * bands + bands],
         );
     }

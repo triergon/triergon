@@ -210,7 +210,8 @@ pub(crate) struct Substream {
     ncplbnd: usize,
     /// Coupling band index of each coupling sub-band (relative to cplbegf).
     cpl_sb_band: [u8; 18],
-    cplco: [[f32; 18]; 5],
+    /// Coupling coordinates in Q29 (1.0 = 2^29); every coordinate is exact in it.
+    cplco: [[i32; 18]; 5],
     phsflg: [bool; 18],
     cplstrtmant: usize,
     cplendmant: usize,
@@ -239,6 +240,8 @@ pub(crate) struct Substream {
     icoef: [[i32; 256]; NCH],
     /// Current block transform coefficients (float, dynamic range applied).
     coef: [[f32; 256]; NCH],
+    /// Leading bins of `coef` that may be nonzero; the bins above are zero.
+    coef_end: [usize; NCH],
     /// Overlap-add delay lines per coded channel (index CPL unused).
     pub delay: [[f32; 256]; NCH],
 
@@ -338,7 +341,7 @@ impl Substream {
             ncplsubnd: 0,
             ncplbnd: 0,
             cpl_sb_band: [0; 18],
-            cplco: [[0.0; 18]; 5],
+            cplco: [[0; 18]; 5],
             phsflg: [false; 18],
             cplstrtmant: 0,
             cplendmant: 0,
@@ -360,6 +363,7 @@ impl Substream {
             aht_coef: [[[0.0; 256]; 6]; NCH],
             icoef: [[0; 256]; NCH],
             coef: [[0.0; 256]; NCH],
+            coef_end: [0; NCH],
             delay: [[0.0; 256]; NCH],
             features: FrameFeatures::default(),
             reference_compat: true,
@@ -469,8 +473,8 @@ mod noise_tests {
         sub.chincpl[..2].fill(true);
         sub.endmant[..2].fill(37);
         sub.dithflag[1] = true;
-        sub.cplco[0][0] = 0.125;
-        sub.cplco[1][0] = 0.125;
+        sub.cplco[0][0] = 1 << 26;
+        sub.cplco[1][0] = 1 << 26;
 
         let mut rng = Rng::new(true);
         let mut reader = BitReader::new(&[0; crate::PAD]);
@@ -508,6 +512,7 @@ mod noise_tests {
         let extension_start = spx_band_start(1);
         sub.icoef[0][copy_start..extension_start].fill(1 << 23);
         sub.icoef[1][copy_start..extension_start].fill(1 << 23);
+        sub.endmant[..2].fill(extension_start);
         let mut rng = Rng::new(true);
 
         sub.reconstruct(&mut rng, NoiseMode::Normal);

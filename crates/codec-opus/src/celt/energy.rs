@@ -22,7 +22,7 @@ pub(super) const MAX_FINE_BITS: i32 = 8;
 fn laplace(rc: &mut RangeDecoder<'_>, fs0: u32, decay: u32) -> i32 {
     const MIN_P: u32 = 1;
     const MIN_BINS: u32 = 16;
-    let (fm, ext) = rc.decode(1 << 15);
+    let (fm, ext) = rc.decode_bin(15);
     let mut value = 0;
     let mut fl = 0;
     let mut fs = fs0;

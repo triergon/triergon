@@ -45,11 +45,11 @@ impl Synthesis {
         out: &mut [f32],
         overlap: &mut [f32; OVERLAP],
     ) {
-        let n = freq.len();
-        let block = n / blocks;
+        let block = super::block_len(freq.len(), blocks);
         let imdct = &mut self.imdct[if blocks > 1 { 0 } else { lm }];
         const HALF: usize = OVERLAP / 2;
-        for (b, out) in out.chunks_exact_mut(block).enumerate() {
+        for b in 0..blocks {
+            let out = &mut out[b * block..][..block];
             let d = &mut self.dct[..block];
             if blocks == 1 {
                 imdct.dct4(freq, d);

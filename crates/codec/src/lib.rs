@@ -10,10 +10,12 @@
 )]
 // Pending: `missing_docs`.
 
+mod division;
 pub mod layout;
 pub mod mdct;
 mod window;
 
+pub use division::{divide, divide_u32};
 pub use layout::{ChannelLayout, Speaker};
 pub use triergon_core::{Budget, BudgetVec, Charged, Error as StorageError, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
