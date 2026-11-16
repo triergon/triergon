@@ -116,7 +116,7 @@ impl PacketPlan {
         input: PacketInput<'_>,
         work: &mut WorkBudget,
     ) -> Result<Step> {
-        if let Some(update) = &state.update {
+        if let Some(update) = &state.session.pending_update {
             let extra = input
                 .new_extradata
                 .ok_or(Error::Invalid("missing source update"))?;
@@ -395,7 +395,7 @@ impl PacketPlan {
                     // H.264 Annex D assigns payload type zero to buffering
                     // period. The receiver reads the next byte and treats end
                     // of packet as a zero type. It does not parse the message.
-                    self.avc_buffering = Some(AvcBufferingLookahead {
+                    state.session.avc_buffering = Some(AvcBufferingLookahead {
                         offset: end,
                         length: 0,
                         prefix_read: 0,
@@ -464,7 +464,7 @@ impl PacketPlan {
             self.segment_hint = Some(self.look_nals + injected);
         } else if codec == Codec::Avc
             && end == bytes.len()
-            && !matches!(state.segments, PacketSegmentStorage::Heap(_))
+            && !matches!(state.session.segments, PacketSegmentStorage::Heap(_))
         {
             let inserted = if let Some(which) = inject
                 && let ConfigurationRef::Avc(config) = state.config()
@@ -480,7 +480,7 @@ impl PacketPlan {
             };
             // The last NAL gives the exact segment count. A first spill can
             // use it without taking capacity from the output buffer.
-            self.segment_hint = Some(state.segments.len() + 1 + inserted);
+            self.segment_hint = Some(state.session.segments.len() + 1 + inserted);
         }
         if let Some(i) = inject {
             self.injection = Some((i, 0));
@@ -506,7 +506,8 @@ impl PacketPlan {
                 .ok_or(Error::Invalid("missing packet width"))?
                 .bytes(),
         );
-        let valid = self
+        let valid = state
+            .session
             .avc_buffering
             .as_mut()
             .ok_or(Error::Invalid("missing AVC buffering lookahead"))?;
@@ -627,14 +628,15 @@ impl PacketPlan {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let lookahead = self
+        let lookahead = state
+            .session
             .avc_buffering
             .as_ref()
             .ok_or(Error::Invalid("missing AVC buffering lookahead"))?;
         let index = lookahead.insertion_index;
         let count = state.config().config_nal_count();
         if index >= count + 2 {
-            self.avc_buffering = None;
+            state.session.avc_buffering = None;
             self.phase = PlanPhase::Nal;
             return Ok(NEXT);
         }
@@ -666,7 +668,9 @@ impl PacketPlan {
         if let Some(segment) = segment {
             self.append(state, input, segment)?;
         }
-        self.avc_buffering
+        state
+            .session
+            .avc_buffering
             .as_mut()
             .ok_or(Error::Invalid("missing AVC buffering lookahead"))?
             .insertion_index += 1;
@@ -770,7 +774,7 @@ impl PacketEmission {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step> {
-        let parts = state.segments.as_slice();
+        let parts = state.session.segments.as_slice();
         let configuration = state.config().bytes();
         let buffer = self
             .output
@@ -836,13 +840,13 @@ impl PacketEmission {
         let record = state.config();
         let configuration = record.bytes().clone();
         let configuration_identity = record.source_identity();
-        let configuration_source_refusal = match &state.update {
+        let configuration_source_refusal = match &state.session.pending_update {
             Some(update) => update.refusal(),
             None => state.session.configuration.refusal(),
         };
         let forward_new_extradata = state.codec == Codec::Hevc
             || source.new_extradata.as_ref().is_some_and(Bytes::is_empty);
-        if let Some(c) = state.update.take() {
+        if let Some(c) = state.session.pending_update.take() {
             state.session.install_avc(c, state.length_width);
         }
         state.session.avc = state.avc;
@@ -862,7 +866,7 @@ impl PacketEmission {
             has_configuration_identity: configuration_identity.is_some(),
             configuration_source_refusal,
             packet_source_refusal: state.packet_source_refusal,
-            segments: std::mem::replace(&mut state.segments, empty_packet_segments()),
+            segments: std::mem::replace(&mut state.session.segments, empty_packet_segments()),
             receiver_epoch: state.epoch,
             forward_new_extradata,
         });
