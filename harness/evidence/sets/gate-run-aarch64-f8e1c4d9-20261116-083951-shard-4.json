@@ -1,0 +1,145 @@
+{
+ "name": "gate-run-aarch64-f8e1c4d9-20261116-083951-shard-4",
+ "path": "gate-run-aarch64-f8e1c4d9-20261116-083951-shard-4",
+ "retention": "retained",
+ "reason": "Partial gate run at f8e1c4d9 under static-toolchain-runtime-trained-order-v1 of the 33 capture, Matroska, subtitle, test and external-vector items, shard 4 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, Linux AArch64: the shard's items (subtitle-text, capture-c13-motion-960-6m, capture-c01-ui-static-960, subtitle-cc, capture-c09-motion-480-bottomup, subtitle-text-host, matroska-zlib), timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md capture, Matroska and subtitle rows on Linux AArch64; uploaded again by hand after a network failure and checked by downloading it back on a gate host",
+ "key": "evidence/gate-runs/f8e1c4d9136d5a43661d8f069ca0908e07cb2acc-aarch64-20261116-083951/shard-4/797fa86301fa4d9b8ac42e826c6e1fa91873bc9a7eb9ad29aa476e7c52ded730.tar.zst",
+ "sha256": "797fa86301fa4d9b8ac42e826c6e1fa91873bc9a7eb9ad29aa476e7c52ded730",
+ "bytes": 523239128,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "19aa126d7eea9b7964c1ee4f10e66f67ed993d106e45f421c5db23c4670a2596",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "10bcac609ec847ee4725923b3ad8bb97b4aef40e03c21b0af04133f9d25f59b5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5dddddcc503aeefdd07f117fc0a74c92d358a06b25ef8a2b7db9c8f92f22c742",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "f8a29663f2872d544b3f4f9708989741d28740e501f599f144206c293af22fde",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "5bb06bd44d82cc9ea28ee35784055f2d246903140f4e277827b7b1ad5cf69402",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "80aa10a192e5910cebccdb5f2bc7fad5887344b4c55bd246d107594c5b74d519",
+   "status": 0,
+   "report_sha256": "9c1955fc39d96f9d148e7a67388c3a2d3d97f5b260b6452b2399d607f57c189b",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "2dfbeb657974f919e87d958efcef504bcae165eb880205f369a61d627316a9b3",
+   "status": 0,
+   "report_sha256": "7652da4c5e006d3d6196ab2dcecbee14297940553f859e7cc3a8200404859dbe",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-zlib/gate-result.json",
+   "command": "report --memory",
+   "key": "bab5068eb09b8ec27284acf03892770dcfbd9697b275e2c65d18469ba1accc57",
+   "status": 0,
+   "report_sha256": "4691c46750f1b03104b27c303b4702e0796f15d015028bab9aad5a0b8db8a1a3",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "d792d807d200b00e71e1793b1ba15f9a8bdd8e5dda8ea18b91acafc8a1dba03a",
+   "status": 0,
+   "report_sha256": "0d634270d0a62e71d7350e42af6004ab58db048a60047b7d95a7674870470277",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4ff1202040cad1f75aa9e00fac96a881ddd20f4147553f5900f0ce4dee2391d9",
+   "status": 0,
+   "report_sha256": "f3f9e007a356a37f16824088c736b61b43bfa33f7c02a5d9498889ea7898b7c7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "27dcfde44544e26df0a8e1d8c45622ad7c272a71f16ce14ec23476a6b6b6a9ee",
+   "status": 0,
+   "report_sha256": "c95f6e52e36ac1bb125d044b8cf5c8afabc61febd46e7afd41a1aa7772b6e733",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-zlib/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4e0dc00f9bdc693b8c2d4532a4fc764e5ba9c8431277492addc0c613c502bed6",
+   "status": 0,
+   "report_sha256": "ff9ccebd593b03ccb883e21d9a7557a7ab1c524dda62c78802aca7f2fb6756da",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2d558d7ef3fddaf7932649c565dce1508529e535d47f494cb6113168452f62bd",
+   "status": 0,
+   "report_sha256": "05d9f0795b4f6a54a7aaec210f2ea7761d8a31f84af587a6100207509381de6b",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "d690b0feef14e6d0f12ad74f68cff52dc41a3c63d30f40f0858f66f12dd44aff",
+   "status": 0,
+   "report_sha256": "f987ae0514e6858c685840259c17d2ec6cfaa9a030c8c2fa4c058b572fa5e43f"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "9ffa2f03996eb572346dcdee8f2efc7de1f1532abb82d1f47bc27aabd8c9ecdf",
+   "status": 1,
+   "report_sha256": "ebb0c92b21d972c9aec2412e3a44fbd22b97334b759de9327534c0bdbd7c80cc"
+  },
+  {
+   "path": "graded/matroska-zlib/gate-result.json",
+   "command": "grade",
+   "key": "5c5b817b3922defcc7e676b6c6a14fd78c29c0f5482821c5893149ba7431ae9d",
+   "status": 0,
+   "report_sha256": "37d7bed924f91a9a5c47bb9ee0623e968fb4e2c37c60d8a9461df6a922873344"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "adc97582c904b64c211549da156745f182134dbbfe96d29675ddecd4286d70a6",
+   "status": 0,
+   "report_sha256": "93e49cb4a32b91cb6ce45c45d1060cc9bf8c662788beccdc208ce13403202adb"
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "dd841c2380ec36da9f19b880179b11bc7bdfec43b9d9c2051deae81419b1043e",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

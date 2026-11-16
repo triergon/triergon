@@ -1042,9 +1042,10 @@ static SPLATS: Splats = {
 };
 
 /// Expand the two interlaced fields into `rows` (each `width` pixels and 16
-/// more), returning the bounds of the visible pixels. A top and a bottom line
-/// are decoded together: their runs depend only on their own field, so the
-/// two dependency chains overlap.
+/// more), returning the bounds of the visible pixels. Lines are decoded one
+/// at a time, alternating between the fields: interleaving the runs of two
+/// lines mixes their run lengths in the branch history, and the stores of
+/// short and long runs then mispredict about once a run.
 fn fill_fields(
     rows: &mut [u8],
     width: usize,
@@ -1052,44 +1053,31 @@ fn fill_fields(
     mut fields: [impl Runs; 2],
 ) -> std::result::Result<Bounds, Halt> {
     let mut bounds = Bounds::default();
-    for (pair, lines) in rows.chunks_mut(2 * (width + 16)).enumerate() {
-        let (top, bottom) = lines.split_at_mut(lines.len().min(width + 16));
-        let [first, second] = &mut fields;
-        let spans = if bottom.is_empty() {
-            [fill_lines([top], width, visible, [first])?[0], None]
-        } else {
-            fill_lines([top, bottom], width, visible, [first, second])?
-        };
-        bounds.add_line(2 * pair, spans[0]);
-        bounds.add_line(2 * pair + 1, spans[1]);
+    for (y, row) in rows.chunks_mut(width + 16).enumerate() {
+        let span = fill_line(row, width, visible, &mut fields[y % 2])?;
+        bounds.add_line(y, span);
     }
     Ok(bounds)
 }
 
-/// One line of each of `N` fields, decoded in step. Returns each line's first
-/// and last column of a visible colour; a run past the end of a line fails.
+/// One line of a field. Returns its first and last column of a visible
+/// colour; a run past the end of the line fails.
 // A small function of its own keeps the loop's state in registers.
 #[inline(never)]
-fn fill_lines<R: Runs, const N: usize>(
-    rows: [&mut [u8]; N],
+fn fill_line<R: Runs>(
+    row: &mut [u8],
     width: usize,
     visible: &[bool; 256],
-    sources: [&mut R; N],
-) -> std::result::Result<[Option<(usize, usize)>; N], Halt> {
-    let mut runs: [R; N] = std::array::from_fn(|i| *sources[i]);
-    let mut lines = [Line::default(); N];
-    while lines.iter().any(|line| line.x < width) {
-        for i in 0..N {
-            if lines[i].x < width {
-                lines[i].run(rows[i], width, visible, &mut runs[i])?;
-            }
-        }
+    source: &mut R,
+) -> std::result::Result<Option<(usize, usize)>, Halt> {
+    let mut runs = *source;
+    let mut line = Line::default();
+    while line.x < width {
+        line.run(row, width, visible, &mut runs)?;
     }
-    for (source, mut runs) in sources.into_iter().zip(runs) {
-        runs.end_line();
-        *source = runs;
-    }
-    Ok(lines.map(Line::span))
+    runs.end_line();
+    *source = runs;
+    Ok(line.span())
 }
 
 /// The progress of one line.
@@ -1146,65 +1134,45 @@ impl Line {
     }
 }
 
-/// A big-endian bit cursor over a unit, reading zero past its end.
+/// A big-endian bit cursor over a unit, reading zero past its end. Every read
+/// loads the four bytes holding its bits afresh, so nothing in the cursor's
+/// path depends on how many bits the codes before it took.
 #[derive(Clone, Copy)]
 struct BitCursor<'a> {
     unit: &'a [u8],
-    /// The next byte to load.
-    next: usize,
-    /// Loaded bits, most significant first.
-    cache: u64,
-    bits: u32,
+    /// Bits consumed from the start of the unit.
+    position: usize,
 }
 
 impl<'a> BitCursor<'a> {
     fn new(unit: &'a [u8], byte: usize) -> Self {
         Self {
             unit,
-            next: byte,
-            cache: 0,
-            bits: 0,
-        }
-    }
-
-    /// At least 16 bits in the cache.
-    #[inline]
-    fn fill(&mut self) {
-        if self.bits >= 16 {
-            return;
-        }
-        if let Some(&word) = self
-            .unit
-            .get(self.next..)
-            .and_then(<[u8]>::first_chunk::<4>)
-        {
-            self.cache |= u64::from(u32::from_be_bytes(word)) << (32 - self.bits);
-            self.bits += 32;
-            self.next += 4;
-        } else {
-            self.fill_past_end();
-        }
-    }
-
-    #[cold]
-    fn fill_past_end(&mut self) {
-        while self.bits <= 56 {
-            let byte = self.unit.get(self.next).copied().unwrap_or(0);
-            self.cache |= u64::from(byte) << (56 - self.bits);
-            self.bits += 8;
-            self.next += 1;
+            position: byte * 8,
         }
     }
 
     /// The next 16 bits, not consumed.
-    fn peek(&mut self) -> u16 {
-        self.fill();
-        (self.cache >> 48) as u16
+    #[inline]
+    fn peek(&self) -> u16 {
+        let at = self.position / 8;
+        let word = match self.unit.get(at..).and_then(<[u8]>::first_chunk::<4>) {
+            Some(&word) => u32::from_be_bytes(word),
+            None => self.word_past_end(at),
+        };
+        ((word << (self.position % 8)) >> 16) as u16
+    }
+
+    /// The four bytes from `at`, those past the end of the unit read as zero.
+    #[cold]
+    fn word_past_end(&self, at: usize) -> u32 {
+        (0..4).fold(0, |word, k| {
+            word << 8 | u32::from(self.unit.get(at + k).copied().unwrap_or(0))
+        })
     }
 
     fn skip(&mut self, count: u32) {
-        self.cache <<= count;
-        self.bits -= count;
+        self.position += count as usize;
     }
 
     /// Up to 16 bits.
@@ -1216,12 +1184,12 @@ impl<'a> BitCursor<'a> {
 
     /// Bits consumed from the start of the unit.
     fn position(&self) -> usize {
-        self.next.saturating_mul(8) - self.bits as usize
+        self.position
     }
 
-    /// Skip to the next byte boundary (loads are whole bytes).
+    /// Skip to the next byte boundary.
     fn align(&mut self) {
-        self.skip(self.bits % 8);
+        self.position = self.position.next_multiple_of(8);
     }
 }
 
@@ -1239,10 +1207,10 @@ impl<'a> TwoBitRuns<'a> {
 impl Runs for TwoBitRuns<'_> {
     fn next_run(&mut self) -> std::result::Result<(usize, u8), Halt> {
         let c = &mut self.0;
-        c.fill();
+        let next = c.peek();
         // A marker bit caps the leading zeros at 6: at most four nibbles.
-        let bits = ((c.cache | 1 << 57).leading_zeros() & !1) * 2 + 4;
-        let code = (c.cache >> (64 - bits)) as u16;
+        let bits = ((u32::from(next) << 16 | 1 << 25).leading_zeros() & !1) * 2 + 4;
+        let code = next >> (16 - bits);
         c.skip(bits);
         Ok((usize::from(code >> 2), (code & 3) as u8))
     }
