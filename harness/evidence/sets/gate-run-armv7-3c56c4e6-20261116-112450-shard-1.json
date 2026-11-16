@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-3c56c4e6-20261116-112450-shard-1",
+ "path": "gate-run-armv7-3c56c4e6-20261116-112450-shard-1",
+ "retention": "retained",
+ "reason": "Capture comparison on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/3c56c4e64de39fde384b819570c0e112082f7221-armv7-20261116-112450/shard-1/68fa2c24e8238b43c363d7836251bec5f6ba358cc70734f826ed7cb8e79111da.tar.zst",
+ "sha256": "68fa2c24e8238b43c363d7836251bec5f6ba358cc70734f826ed7cb8e79111da",
+ "bytes": 360832663,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "a08d65350f8ed54c81785a1f3850e1b3e9e2a60e978d8e165de7335ebbfb095c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b1cb0f78d5f7453c9e0cac4b27e3003867be460d3ef4cfc1b850fd53e1d72be3",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "3c56c4e64de39fde384b819570c0e112082f7221"
+ ]
+}
