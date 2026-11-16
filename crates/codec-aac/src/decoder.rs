@@ -3,7 +3,6 @@
 
 use crate::compat::layout::Policy;
 use crate::error::{DecodeError, Feature, Result};
-use crate::fft::Dct4;
 use crate::filterbank::Filterbank;
 use crate::ics::*;
 use crate::pce::{Pce, parse_pce};
@@ -188,8 +187,8 @@ pub(crate) struct Core {
     pub configured: bool,
     /// Coupling channel state (one per CCE tag)
     pub cce: Vec<Charged<Box<crate::cce::CceState>>>,
-    /// DCT-IV of every SBR synthesis bank.
-    sbr_dct: Dct4,
+    /// The modulations of every SBR QMF bank.
+    qmf: sbr::Modulation,
     /// Pool of the element, SBR and coupling-channel state the stream creates.
     pub budget: Budget,
     /// Charge of the output frame the last access unit sized.
@@ -229,7 +228,7 @@ impl Core {
             unordered: false,
             configured: false,
             cce: Vec::new(),
-            sbr_dct: sbr::synthesis_dct(),
+            qmf: sbr::Modulation::new(),
             budget: budget.clone(),
             output_charge: Reservation::empty(budget),
             #[cfg(feature = "inspect")]
@@ -976,7 +975,7 @@ impl Core {
                     nch,
                     ps,
                     e.kind == ID_CPE,
-                    &mut self.sbr_dct,
+                    &mut self.qmf,
                 );
                 if ps {
                     e.nch = 2;

@@ -1,0 +1,9 @@
+{
+ "name": "aac-thumb2-speed-aarch64",
+ "path": "aac-thumb2-speed-aarch64",
+ "retention": "retained",
+ "reason": "AAC decoding speed work on Linux AArch64, one c6g.4xlarge host (Graviton2) from the gate image: the base e43f7a4f profiles of the codec worker and the FFmpeg decode reference, user-mode instruction counts of every commit of the change on the AAC workloads, the AAC crate tests and the audio correctness lanes graded as codecs-audio grades them at e43f7a4f and at bbe30b3b with each aac vector's per-channel error against FFmpeg, and the scripts; for the pull request that cites them",
+ "key": "evidence/aac-thumb2-speed-aarch64/baad4cc978b41d2ad8d9bd025f199528ec9b976122a304362cce3870587bffca.tar.zst",
+ "sha256": "baad4cc978b41d2ad8d9bd025f199528ec9b976122a304362cce3870587bffca",
+ "bytes": 164305
+}

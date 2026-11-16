@@ -12,11 +12,16 @@
 //!
 //! The buffer layout, windowing and summation steps are those printed in the flowcharts of
 //! 3GPP TS 26.404 V19.0.0 Figure 6 (64-band analysis) and TS 26.405 V19.0.0 Figure 4 (32-band
-//! synthesis), here at the decoder's band counts. Implemented with FFT / DCT-IV modulation
-//! (own derivation, checked against the direct definitions in the unit tests).
+//! synthesis), here at the decoder's band counts. Both modulations are DCT-IVs and DST-IVs of
+//! half the input length after folding the input by the basis functions' symmetries, the
+//! standard reduction of a modulated filter bank to a DCT-IV (H. S. Malvar, *Signal
+//! Processing with Lapped Transforms*, Artech House 1992, ch. 2 and 4); a DST-IV is a DCT-IV
+//! of the reversed input with alternating output signs. The derivations are in the comments
+//! of `Analysis::run` and `Synthesis::run`; the unit tests check both against the direct
+//! definitions.
 
 use super::tables::QMF_WINDOW;
-use crate::fft::{Cpx, Dct4, Fft};
+use crate::fft::{Cpx, Dct4};
 use std::sync::OnceLock;
 use triergon_codec::{Budget, BudgetVec, StorageError};
 
@@ -31,39 +36,38 @@ fn window(n: usize) -> f64 {
     QMF_WINDOW[639 - n]
 }
 
-/// Windows and the analysis modulation, shared by every bank.
+/// Windows and the analysis rotation, shared by every bank.
 #[derive(Debug)]
 pub(crate) struct Tables {
     /// analysis window c[2n], n < 320
     analysis_win: [f32; 320],
     /// synthesis window c[n], n < 640
     synthesis_win: [f32; 640],
-    // analysis modulation via a 64-point complex transform
-    pre: [Cpx; 64],
-    post: [Cpx; 32],
-    fft: Fft,
+    /// The analysis output rotation of band k, in the order the DCT-IVs return their
+    /// outputs (band 2j at j, band 31 - 2j at 16 + j): cos and sin of
+    /// phi_k = 3 pi (2k + 1) / 256, then both times (-1)^k for the DST-IV's signs.
+    rotation: [[f32; 4]; 32],
 }
 
 fn tables() -> &'static Tables {
     static T: OnceLock<Tables> = OnceLock::new();
     T.get_or_init(|| {
-        // X(k) = sum_{n<64} 2 u[n] exp(i pi (k + 1/2)(2n + A) / 64), k < 32, A = -1/2:
-        // exp(i pi (k+1/2)(2n+A)/64) = exp(i pi (2n + A)/128) * exp(i 2 pi k n / 64) * exp(i pi k A / 64)
-        // i.e. a 64-point inverse DFT between a pre- and a post-twiddle.
-        let pi = std::f64::consts::PI;
-        let aoff: f64 = -0.5;
+        let rotation = |k: usize| {
+            let phi = 3.0 * std::f64::consts::PI * (2 * k + 1) as f64 / 256.0;
+            let sign = if k.is_multiple_of(2) { 1.0 } else { -1.0 };
+            let (s, c) = phi.sin_cos();
+            [c as f32, s as f32, (sign * c) as f32, (sign * s) as f32]
+        };
         Tables {
             analysis_win: std::array::from_fn(|n| window(2 * n) as f32),
             synthesis_win: std::array::from_fn(|n| window(n) as f32),
-            pre: std::array::from_fn(|n| {
-                let a = pi * (2.0 * n as f64 + aoff) / 128.0;
-                Cpx::new((2.0 * a.cos()) as f32, (2.0 * a.sin()) as f32)
+            rotation: std::array::from_fn(|j| {
+                if j < 16 {
+                    rotation(2 * j)
+                } else {
+                    rotation(31 - 2 * (j - 16))
+                }
             }),
-            post: std::array::from_fn(|k| {
-                let a = pi * k as f64 * aoff / 64.0;
-                Cpx::new(a.cos() as f32, a.sin() as f32)
-            }),
-            fft: Fft::new(64),
         }
     })
 }
@@ -75,8 +79,6 @@ pub(crate) struct Analysis {
     x: BudgetVec<f32>,
     pos: usize,
     t: &'static Tables,
-    re: [f32; 64],
-    im: [f32; 64],
 }
 
 #[derive(Debug)]
@@ -91,10 +93,23 @@ pub(crate) struct Synthesis {
     d: [f32; 64],
 }
 
-/// The synthesis modulation: a DCT-IV with work space, which the decoder keeps one of for
-/// all its synthesis banks.
-pub(crate) fn synthesis_dct() -> Dct4 {
-    Dct4::new(64, 1.0 / 64.0)
+/// The modulations of the banks: DCT-IVs with work space, which the decoder keeps one pair
+/// of for all its banks.
+#[derive(Debug)]
+pub(crate) struct Modulation {
+    /// 32 points, scaled by 2
+    analysis: Dct4,
+    /// 64 points, scaled by 1/64
+    synthesis: Dct4,
+}
+
+impl Modulation {
+    pub(crate) fn new() -> Modulation {
+        Modulation {
+            analysis: Dct4::new(32, 2.0),
+            synthesis: Dct4::new(64, 1.0 / 64.0),
+        }
+    }
 }
 
 impl Analysis {
@@ -104,20 +119,23 @@ impl Analysis {
             x: BudgetVec::try_filled(budget, 0.0, if used { 640 } else { 0 })?,
             pos: 320,
             t: tables(),
-            re: [0.0; 64],
-            im: [0.0; 64],
         })
     }
 
     pub(crate) fn reset(&mut self) {
         self.x.fill(0.0);
         self.pos = 320;
-        self.re = [0.0; 64];
-        self.im = [0.0; 64];
     }
 
     /// Process 32 new input samples (oldest first) into 32 complex subband samples.
-    pub(crate) fn run(&mut self, input: &[f32], scale: f32, out: &mut [Cpx]) {
+    ///
+    /// X(k) = 2 sum_{n<64} u[n] exp(i pi/32 (k + 1/2)(n - 1/4)), k < 32. With
+    /// theta = pi/32 (k + 1/2)(n + 1/2) the phase is theta - phi_k, phi_k = 3 pi (2k + 1)/256,
+    /// and n -> 63 - n turns theta into 2 pi (k + 1/2) - theta, which flips the cosine's sign
+    /// and keeps the sine's. So X(k) = exp(-i phi_k) (C(k) + i S(k)), where C is the DCT-IV
+    /// of d[n] = u[n] - u[63 - n] and S the DST-IV of u[n] + u[63 - n], n < 32, both scaled
+    /// by 2.
+    pub(crate) fn run(&mut self, m: &mut Modulation, input: &[f32], scale: f32, out: &mut [Cpx]) {
         if self.pos < 32 {
             self.x.copy_within(self.pos..self.pos + 288, 640 - 288);
             self.pos = 640 - 288;
@@ -127,27 +145,34 @@ impl Analysis {
         for n in 0..32 {
             self.x[p + 31 - n] = input[n] * scale;
         }
+        // each sum in a register over its five taps x[64j + n] w[64j + n], in tap order, four
+        // sums a block
         let x = &self.x[p..p + 320];
         let w = &self.t.analysis_win;
-        let mut u = [0f32; 64];
-        for j in 0..5 {
-            let xs = &x[64 * j..64 * j + 64];
-            let ws = &w[64 * j..64 * j + 64];
-            for n in 0..64 {
-                u[n] += xs[n] * ws[n];
-            }
+        let x: [&[[f32; 4]]; 5] = std::array::from_fn(|j| x[64 * j..][..64].as_chunks().0);
+        let w: [&[[f32; 4]]; 5] = std::array::from_fn(|j| w[64 * j..][..64].as_chunks().0);
+        let mut u = [[0f32; 4]; 16];
+        for (b, u) in u.iter_mut().enumerate() {
+            *u = std::array::from_fn(|i| (0..5).fold(0.0, |u, j| u + x[j][b][i] * w[j][b][i]));
         }
-        // inverse DFT (sign +): use the forward FFT on conjugated data
-        for n in 0..64 {
-            let t = self.t.pre[n];
-            let j = self.t.fft.perm(n);
-            self.re[j] = u[n] * t.re;
-            self.im[j] = -(u[n] * t.im);
-        }
-        self.t.fft.run_permuted(&mut self.re, &mut self.im);
-        for k in 0..32 {
-            let b = Cpx::new(self.re[k], -self.im[k]);
-            out[k] = b.mul(self.t.post[k]);
+        let u = u.as_flattened();
+        // the DST-IV as a DCT-IV of the reversed input, u[31 - n] + u[32 + n]
+        let d: [f32; 32] = std::array::from_fn(|n| u[n] - u[63 - n]);
+        let r: [f32; 32] = std::array::from_fn(|n| u[31 - n] + u[32 + n]);
+        let (mut c, mut s) = ([0f32; 32], [0f32; 32]);
+        let (ce, co) = c.split_at_mut(16);
+        m.analysis.run_split(&d, ce, co);
+        let (se, so) = s.split_at_mut(16);
+        m.analysis.run_split(&r, se, so);
+        // re = C cos phi + S sin phi, im = S cos phi - C sin phi, S(k) = (-1)^k DCT-IV(r)(k)
+        let rotate = |c: f32, s: f32, [cos, sin, scos, ssin]: [f32; 4]| {
+            Cpx::new(c * cos + s * ssin, s * scos - c * sin)
+        };
+        let out: &mut [Cpx; 32] = (&mut out[..32]).try_into().expect("32 bands");
+        let t = &self.t.rotation;
+        for j in 0..16 {
+            out[2 * j] = rotate(c[j], s[j], t[j]);
+            out[31 - 2 * j] = rotate(c[16 + j], s[16 + j], t[16 + j]);
         }
     }
 }
@@ -180,7 +205,7 @@ impl Synthesis {
     /// v[64 + m] = C[m] + S[m] and v[63 - m] = C[m] - S[m], where C is the DCT-IV of
     /// (-1)^k Im X(k) and S the DST-IV of (-1)^k Re X(k), both scaled by 1/64 (the DST-IV is
     /// a DCT-IV of the reversed input with alternating output signs).
-    pub(crate) fn run(&mut self, dct: &mut Dct4, x: &[Cpx], scale: f32, out: &mut [f32]) {
+    pub(crate) fn run(&mut self, m: &mut Modulation, x: &[Cpx], scale: f32, out: &mut [f32]) {
         if self.pos < 128 {
             self.v.copy_within(self.pos..self.pos + 1152, 2560 - 1152);
             self.pos = 2560 - 1152;
@@ -194,28 +219,37 @@ impl Synthesis {
             // reversed, with (-1)^(63 - j) = -(-1)^j
             self.b[k] = -sgn * x[63 - k].re;
         }
-        dct.run(&self.a, &mut self.c);
-        dct.run(&self.b, &mut self.d);
-        let v = &mut self.v[p..p + 128];
-        for m in 0..64 {
-            let s = if m & 1 == 0 { self.d[m] } else { -self.d[m] };
-            v[64 + m] = self.c[m] + s;
-            v[63 - m] = self.c[m] - s;
+        // C and S split as `Dct4::run_split` returns them: c[2k] = ce[k], c[63 - 2k] = co[k]
+        let (ce, co) = self.c.split_at_mut(32);
+        m.synthesis.run_split(&self.a, ce, co);
+        let (se, so) = self.d.split_at_mut(32);
+        m.synthesis.run_split(&self.b, se, so);
+        let v: &mut [f32; 128] = (&mut self.v[p..p + 128]).try_into().expect("128");
+        // v[64 + m] = C[m] + (-1)^m S[m] and v[63 - m] = C[m] - (-1)^m S[m], for the even
+        // m = 2k and the odd m = 63 - 2k
+        for (k, (((&ce, &co), &se), &so)) in ce.iter().zip(&*co).zip(&*se).zip(&*so).enumerate() {
+            v[64 + 2 * k] = ce + se;
+            v[63 - 2 * k] = ce - se;
+            v[127 - 2 * k] = co - so;
+            v[2 * k] = co + so;
         }
+        // Each output's sum in a register over its ten taps, in tap order, four outputs a
+        // block: tap 2i reads v[256i + n] and w[128i + n], tap 2i + 1 v[256i + 192 + n] and
+        // w[128i + 64 + n].
         let v = &self.v[p..p + 1280];
         let w = &self.t.synthesis_win;
-        let mut acc = [0f32; 64];
-        for i in 0..5 {
-            let v0 = &v[256 * i..256 * i + 64];
-            let w0 = &w[128 * i..128 * i + 64];
-            let v1 = &v[256 * i + 192..256 * i + 256];
-            let w1 = &w[128 * i + 64..128 * i + 128];
-            for n in 0..64 {
-                acc[n] += v0[n] * w0[n] + v1[n] * w1[n];
+        let v: [&[[f32; 4]]; 10] =
+            std::array::from_fn(|t| v[256 * (t / 2) + 192 * (t % 2)..][..64].as_chunks().0);
+        let w: [&[[f32; 4]]; 10] =
+            std::array::from_fn(|t| w[128 * (t / 2) + 64 * (t % 2)..][..64].as_chunks().0);
+        for (b, out) in out[..64].as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            for (j, out) in out.iter_mut().enumerate() {
+                let acc = (0..5).fold(0.0, |acc, i| {
+                    acc + (v[2 * i][b][j] * w[2 * i][b][j]
+                        + v[2 * i + 1][b][j] * w[2 * i + 1][b][j])
+                });
+                *out = acc * scale;
             }
-        }
-        for n in 0..64 {
-            out[n] = acc[n] * scale;
         }
     }
 }
@@ -248,6 +282,7 @@ mod tests {
         // with a delay of 578 output samples; residual ripple / aliasing below -60 dB
         let mut a = Analysis::new(&budget, true).unwrap();
         let mut sy = Synthesis::new(&budget).unwrap();
+        let mut m = Modulation::new();
         let f = 0.1f64;
         let mut x = [Cpx::default(); 64];
         let mut out = vec![0f32; 0];
@@ -256,10 +291,10 @@ mod tests {
                 .map(|n| (2.0 * std::f64::consts::PI * f * (32 * slot + n) as f64).sin() as f32)
                 .collect();
             let mut w = [Cpx::default(); 32];
-            a.run(&inp, 1.0, &mut w);
+            a.run(&mut m, &inp, 1.0, &mut w);
             x[..32].copy_from_slice(&w);
             let mut o = [0f32; 64];
-            sy.run(&mut synthesis_dct(), &x, 1.0, &mut o);
+            sy.run(&mut m, &x, 1.0, &mut o);
             out.extend_from_slice(&o);
         }
         let mut max = 0f64;
@@ -274,6 +309,7 @@ mod tests {
     fn analysis_matches_definition() {
         let budget = Budget::new(1 << 20).unwrap();
         let mut a = Analysis::new(&budget, true).unwrap();
+        let mut m = Modulation::new();
         let mut s = 7u32;
         let mut rnd = || {
             s = s.wrapping_mul(1664525).wrapping_add(1013904223);
@@ -283,7 +319,7 @@ mod tests {
         let mut out = vec![Cpx::default(); 32];
         for _slot in 0..12 {
             let inp: Vec<f32> = (0..32).map(|_| rnd()).collect();
-            a.run(&inp, 1.0, &mut out);
+            a.run(&mut m, &inp, 1.0, &mut out);
             hist.copy_within(0..288, 32);
             for n in 0..32 {
                 hist[31 - n] = inp[n] as f64;
@@ -320,6 +356,7 @@ mod tests {
     fn synthesis_matches_definition() {
         let budget = Budget::new(1 << 20).unwrap();
         let mut sy = Synthesis::new(&budget).unwrap();
+        let mut m = Modulation::new();
         let mut s = 9u32;
         let mut rnd = || {
             s = s.wrapping_mul(1664525).wrapping_add(1013904223);
@@ -329,7 +366,7 @@ mod tests {
         let mut out = vec![0f32; 64];
         for _slot in 0..14 {
             let x: Vec<Cpx> = (0..64).map(|_| Cpx::new(rnd(), rnd())).collect();
-            sy.run(&mut synthesis_dct(), &x, 1.0, &mut out);
+            sy.run(&mut m, &x, 1.0, &mut out);
             v.copy_within(0..1152, 128);
             for n in 0..128 {
                 let mut acc = 0.0;
