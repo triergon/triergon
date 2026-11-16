@@ -37,9 +37,11 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
-        --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...] [--lanes LANE,...]
+        [--codec-worker-for OPERATION=W2 ...] --reference R2 --out OUT.jsonl [--scratch DIR]
+        [--only SUBSTR,...] [--lanes LANE,...]
                  grade every vector, or those of the named lanes, by
-                 harness/codecs/numeric-rules.json; appends one row each
+                 harness/codecs/numeric-rules.json; appends one row each. A lane whose
+                 operation has a --codec-worker-for worker decodes with that worker
   summarize RUN.jsonl OUT.json [--require-pass]
                  classify a grading run against the declared lane selection; with
                  --require-pass fail on any vector that fails and is not a listed open case
@@ -57,15 +59,17 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  the reviewed difference lists of its differences.json; appends one row per
                  case, writes the observed lists to OUT.differences.json and fails on a
                  failing case
-  time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
-       [--only ID,...] [--full] [--no-early-stop]
+  time --candidate W [--candidate-for OPERATION=W2 ...] --reference W --workloads F
+       --root R --ledger F --out DIR --label L [--only ID,...] [--full] [--no-early-stop]
                  paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282,
                  ending early once settled below the ceiling)
-  memory --candidate W --reference W --workloads F --root R --out DIR
-         [--pairs N] [--seed S] [--only ID,...] [--part I/N] [--full] [--no-early-stop]
+  memory --candidate W [--candidate-for OPERATION=W2 ...] --reference W --workloads F
+         --root R --out DIR [--pairs N] [--seed S] [--only ID,...] [--part I/N] [--full]
+         [--no-early-stop]
                  paired peak heap and total resident peak RSS of the decoder workloads
                  under the shared observer (30 pairs, seed 283); --part I/N takes
-                 every Nth workload from the Ith
+                 every Nth workload from the Ith. A workload whose operation has a
+                 --candidate-for worker, here and in time, is measured from that worker
                  a result a kept evidence set holds is reused unless --full
   equivalence --output F [--compare F] [--jobs N]
                  record every decoder output identity; --compare checks an earlier record
@@ -74,13 +78,14 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  codec-worker builds decode each mutation whole (4 rounds, seed 280, 30 s)";
 
 /// A measuring codec command as a gate step ([`crate::harness::reuse`]): its key
-/// binds the workload list and every input it names, and both workers.
+/// binds the workload list and every input it names, and every worker.
 struct Gate<'a> {
     command: &'static str,
     settings: Value,
     workloads: &'a Path,
     root: &'a Path,
-    workers: [&'a Path; 2],
+    candidates: &'a Candidates,
+    reference: &'a Path,
     out: &'a Path,
 }
 
@@ -104,15 +109,82 @@ impl Gate<'_> {
             }
         }
         let files: Vec<&Path> = inputs.iter().map(PathBuf::as_path).collect();
-        let [candidate, reference] = self.workers;
+        let mut workers = self.candidates.roles();
+        workers.push(("reference".to_owned(), self.reference));
+        let workers: Vec<(&str, &Path)> = workers
+            .iter()
+            .map(|(role, worker)| (role.as_str(), *worker))
+            .collect();
         let key = crate::harness::reuse::Key::new(
             repository,
             self.command,
             self.settings,
             &files,
-            &[("candidate", candidate), ("reference", reference)],
+            &workers,
         )?;
         crate::harness::reuse::step(repository, self.out, &key, full, || run().map(|()| 0))
+    }
+}
+
+/// The candidate worker of each operation: `--candidate W` (`--codec-worker W` for a
+/// grade) for every operation, and `--candidate-for OPERATION=W` for an operation
+/// measured from a worker built apart, such as the AAC decoder's nightly build.
+pub struct Candidates {
+    default: PathBuf,
+    by_operation: Vec<(String, PathBuf)>,
+}
+
+impl Candidates {
+    /// The workers of `--NAME` and `--NAME-for`; an operation may be named once.
+    fn parse(a: &Args, name: &str) -> Result<Self, String> {
+        let flag = format!("{name}-for");
+        let mut by_operation: Vec<(String, PathBuf)> = Vec::new();
+        for (key, value) in &a.values {
+            if *key != flag {
+                continue;
+            }
+            let Some((operation, worker)) = value.split_once('=') else {
+                return Err(format!("--{flag} needs OPERATION=WORKER: {value}"));
+            };
+            if operation.is_empty() || worker.is_empty() {
+                return Err(format!("--{flag} needs OPERATION=WORKER: {value}"));
+            }
+            if by_operation.iter().any(|(named, _)| named == operation) {
+                return Err(format!("--{flag}: {operation} named twice"));
+            }
+            by_operation.push((operation.to_owned(), PathBuf::from(worker)));
+        }
+        Ok(Self {
+            default: a.path(name)?,
+            by_operation,
+        })
+    }
+
+    /// The worker that measures `operation`.
+    pub fn of(&self, operation: &str) -> &Path {
+        self.by_operation
+            .iter()
+            .find(|(named, _)| named == operation)
+            .map_or(&self.default, |(_, worker)| worker)
+    }
+
+    /// The workers named for an operation, by operation.
+    pub fn by_operation(&self) -> impl Iterator<Item = (&str, &Path)> {
+        self.by_operation
+            .iter()
+            .map(|(operation, worker)| (operation.as_str(), worker.as_path()))
+    }
+
+    /// Each worker with its role: `candidate` for the default, `candidate-for
+    /// OPERATION` for the others, in the order given.
+    pub fn roles(&self) -> Vec<(String, &Path)> {
+        let mut roles = vec![("candidate".to_owned(), self.default.as_path())];
+        roles.extend(
+            self.by_operation.iter().map(|(operation, worker)| {
+                (format!("candidate-for {operation}"), worker.as_path())
+            }),
+        );
+        roles
     }
 }
 
@@ -327,6 +399,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "ffmpeg",
                     "ffprobe",
                     "codec-worker",
+                    "codec-worker-for",
                     "reference",
                     "out",
                     "scratch",
@@ -341,7 +414,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 bin: a.path("bin")?,
                 ffmpeg: a.required("ffmpeg")?.to_owned(),
                 ffprobe: a.required("ffprobe")?.to_owned(),
-                codec_worker: a.path("codec-worker")?,
+                codec_workers: Candidates::parse(&a, "codec-worker")?,
                 reference: a.required("reference")?.to_owned(),
                 out: a.path("out")?,
                 scratch: a.get("scratch").map(PathBuf::from),
@@ -396,6 +469,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 rest,
                 &[
                     "candidate",
+                    "candidate-for",
                     "reference",
                     "workloads",
                     "root",
@@ -409,7 +483,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             )?;
             let options = memory::Options {
                 repository: root.to_path_buf(),
-                candidate: a.path("candidate")?,
+                candidates: Candidates::parse(&a, "candidate")?,
                 reference: a.path("reference")?,
                 workloads: a.path("workloads")?,
                 root: a.path("root")?,
@@ -438,7 +512,8 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 settings,
                 workloads: &options.workloads,
                 root: &options.root,
-                workers: [&options.candidate, &options.reference],
+                candidates: &options.candidates,
+                reference: &options.reference,
                 out: &options.out,
             };
             return gate.run(root, a.get("full").is_some(), || memory::run(&options));
@@ -457,6 +532,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 rest,
                 &[
                     "candidate",
+                    "candidate-for",
                     "reference",
                     "workloads",
                     "root",
@@ -469,7 +545,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             )?;
             let options = timing::Options {
                 repository: root.to_path_buf(),
-                candidate: a.path("candidate")?,
+                candidates: Candidates::parse(&a, "candidate")?,
                 reference: a.path("reference")?,
                 workloads: a.path("workloads")?,
                 root: a.path("root")?,
@@ -491,7 +567,8 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 settings,
                 workloads: &options.workloads,
                 root: &options.root,
-                workers: [&options.candidate, &options.reference],
+                candidates: &options.candidates,
+                reference: &options.reference,
                 out: &options.out,
             };
             return gate.run(root, a.get("full").is_some(), || timing::run(&options));

@@ -1,11 +1,15 @@
 # codec-worker
 
-Decoder measurement worker for the harness. It decodes an elementary stream through
+Decoder measurement workers for the harness. It decodes an elementary stream through
 the [triergon-session](../session/README.md) decoders, letterboxes video with
 [`triergon_pixel::letterbox`](../pixel/README.md) and downmixes audio with
 `triergon_session::mix::Downmix`, performing the same operations as the FFmpeg
 reference decode worker in `harness/`. It is tooling (`publish = false`), not part of
-the library.
+the library. `codec-worker` serves every operation below. `codec-aac-worker` serves
+the AAC decode operations alone (`audio-aac`, `audio-aac-access-units` and
+`audio-aac-access-units-compat`), so that a build of the AAC decoder with other
+features or another compiler measures nothing else: the gate build builds it with the
+`aac-simd` feature (the AAC decoder's `simd`) by the pinned nightly.
 
 ## Command line
 
@@ -21,7 +25,7 @@ codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
 `audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`, `audio-flac`, `audio-mp3`,
 `audio-vorbis` or `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
-SIMD kernels; output is identical.
+SIMD kernels, and `aac-simd` the AAC decoder's; output is identical.
 
 Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
 `access_unit_len`, AAC by the ADTS header, DTS by the core FSIZE) the same way the

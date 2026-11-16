@@ -285,13 +285,27 @@ fn which(program: &str) -> Option<PathBuf> {
 }
 
 /// A measurement worker and how `cargo` builds it: its name, package, example (none
-/// for a binary of the same name) and features.
+/// for a binary of the same name), features and compiler.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Candidate {
     pub name: &'static str,
     pub package: &'static str,
     pub example: Option<&'static str>,
     pub features: &'static [&'static str],
+    /// Built by the pinned nightly ([`crate::NIGHTLY`]) instead of the release
+    /// `rust-toolchain.toml` pins: a worker whose measured code uses `std::simd`.
+    pub nightly: bool,
+}
+
+impl Candidate {
+    /// The toolchain that builds the worker, as rustup names it.
+    pub fn toolchain(&self, pinned: &str) -> String {
+        if self.nightly {
+            crate::NIGHTLY.to_owned()
+        } else {
+            pinned.to_owned()
+        }
+    }
 }
 
 /// The worker every contract names unless it names another.
@@ -300,16 +314,18 @@ const MEDIA_WORKER: Candidate = Candidate {
     package: "media-worker",
     example: None,
     features: &[],
+    nightly: false,
 };
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     // A second binary of the playback-worker package with the Matroska runners
     // alone, the runner families its reference build can demux.
@@ -318,54 +334,73 @@ const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
         package: "playback-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "transport-worker",
         package: "transport-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "codec-worker",
         package: "codec-worker",
         example: None,
         features: &[],
+        nightly: false,
+    },
+    // The AAC decode operations alone, with the decoder's SBR filter banks in
+    // `std::simd` form: without explicit vector types LLVM emits no NEON float code for
+    // the 32-bit ARM target. Every other operation is measured from `codec-worker`.
+    Candidate {
+        name: "codec-aac-worker",
+        package: "codec-worker",
+        example: None,
+        features: &["aac-simd"],
+        nightly: true,
     },
     Candidate {
         name: "capture-worker",
         package: "capture-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "font-worker",
         package: "font-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "shape-worker",
         package: "shape-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "raster-worker",
         package: "raster-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "ass-worker",
         package: "ass-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "subtitle-worker",
         package: "subtitle-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     // A second binary of the subtitle-worker package.
     Candidate {
@@ -373,18 +408,21 @@ const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
         package: "subtitle-worker",
         example: None,
         features: &[],
+        nightly: false,
     },
     Candidate {
         name: "isobmff-worker",
         package: "triergon-isobmff",
         example: Some("isobmff_consumer_worker"),
         features: &["reference-trace"],
+        nightly: false,
     },
     Candidate {
         name: "framing-worker",
         package: "triergon-framing",
         example: Some("framing_worker"),
         features: &["reference-trace"],
+        nightly: false,
     },
 ];
 
@@ -397,9 +435,11 @@ pub fn workers() -> impl Iterator<Item = &'static Candidate> {
 /// release profile for the worker target or the dev profile for this host, up to
 /// and including the `--` before the worker's own compiler arguments.
 pub fn cargo_rustc(spec: &Candidate, target_dir: &Path, release: bool) -> R<Vec<String>> {
-    let mut command: Vec<String> = ["cargo", "rustc", "-p", spec.package]
-        .map(String::from)
-        .to_vec();
+    let mut command = vec!["cargo".to_owned()];
+    if spec.nightly {
+        command.push(format!("+{}", crate::NIGHTLY));
+    }
+    command.extend(["rustc", "-p", spec.package].map(String::from));
     if release {
         command.push("--release".into());
     }
@@ -423,10 +463,7 @@ pub fn cargo_rustc(spec: &Candidate, target_dir: &Path, release: bool) -> R<Vec<
 }
 
 pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
-    let spec = ADDITIONAL_CANDIDATES
-        .iter()
-        .find(|spec| spec.name == name)
-        .ok_or_else(|| format!("unknown measurement worker {name}"))?;
+    let spec = candidate(name)?;
     let features: Vec<String> = spec
         .features
         .iter()
@@ -497,11 +534,7 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
     match only {
         None => Ok(ADDITIONAL_CANDIDATES.iter().collect()),
         Some("media-worker") => Ok(Vec::new()),
-        Some(name) => ADDITIONAL_CANDIDATES
-            .iter()
-            .find(|spec| spec.name == name)
-            .map(|spec| vec![spec])
-            .ok_or_else(|| format!("unknown measurement worker {name}")),
+        Some(name) => candidate(name).map(|spec| vec![spec]),
     }
 }
 
@@ -604,35 +637,62 @@ fn build_in_link_order(
 /// laid it out, none when it links as its toolchain does.
 type Built = (&'static str, Vec<String>, Option<LinkOrder>);
 
+/// Where cargo builds a worker: a nightly worker has a target directory of its own, so
+/// that changing compilers never rebuilds the other workers' dependencies.
+fn candidate_target_dir(root: &Path, spec: &Candidate) -> PathBuf {
+    if spec.nightly {
+        root.join("target/nightly")
+    } else {
+        root.join("target")
+    }
+}
+
 fn additional_candidates(root: &Path, selected: &[&Candidate]) -> R<Vec<Built>> {
     let mut built = Vec::new();
     for spec in selected {
-        let mut command = cargo_rustc(spec, &root.join("target"), true)?;
+        let target_dir = candidate_target_dir(root, spec);
+        let mut command = cargo_rustc(spec, &target_dir, true)?;
         command.extend(gate_build::worker_link_arguments()?);
-        let release = root.join(gate_build::release_dir()?);
+        let output = target_dir.join(gate_build::release_subdir()?);
         let binary = match spec.example {
-            Some(example) => release.join("examples").join(example),
-            None => release.join(spec.name),
+            Some(example) => output.join("examples").join(example),
+            None => output.join(spec.name),
         };
         let order = build_in_link_order(root, &mut command, &binary, spec.name)?;
-        if spec.example.is_some() {
-            fs::copy(&binary, release.join(spec.name))
-                .map_err(|error| format!("{}: {error}", spec.name))?;
+        let release = root.join(gate_build::release_dir()?);
+        let worker = release.join(spec.name);
+        if binary != worker {
+            fs::create_dir_all(&release).map_err(|error| format!("{}: {error}", spec.name))?;
+            fs::copy(&binary, &worker).map_err(|error| format!("{}: {error}", spec.name))?;
         }
         built.push((spec.name, command, order));
     }
     Ok(built)
 }
 
+/// The additional candidate `name`.
+pub(super) fn candidate(name: &str) -> R<&'static Candidate> {
+    ADDITIONAL_CANDIDATES
+        .iter()
+        .find(|spec| spec.name == name)
+        .ok_or_else(|| format!("unknown measurement worker {name}"))
+}
+
 fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
     let mut candidates = Vec::new();
     for (name, command, order) in built {
         let path = format!("{}/{name}", gate_build::release_dir()?);
+        let toolchain = candidate(name)?.toolchain(&gate_build::pinned_release(root)?);
         candidates.push((
             *name,
             Value::object([
                 ("path", Value::str(&path)),
                 ("sha256", Value::str(sha(&root.join(&path))?)),
+                (
+                    "rustc",
+                    Value::str(gate_build::toolchain_compiler(root, &toolchain)?),
+                ),
+                ("toolchain", Value::str(toolchain)),
                 ("command", strings(command)),
                 ("link_order", LinkOrder::record(order.as_ref())),
                 ("selected_graph", candidate_graph(root, name)?),
@@ -969,6 +1029,9 @@ fn build_selected(
         &root.join(gate_build::release_dir()?).join("media-worker"),
         "media-worker",
     )?;
+    if selected.iter().any(|spec| spec.nightly) {
+        crate::simd_toolchain()?;
+    }
     let additional = additional_candidates(root, &selected)?;
     let out = root.join("target/harness");
     fs::create_dir_all(&out).map_err(|e| e.to_string())?;

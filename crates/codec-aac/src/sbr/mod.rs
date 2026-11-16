@@ -4,6 +4,8 @@
 mod freq;
 pub(crate) mod ps;
 mod qmf;
+#[cfg(feature = "simd")]
+mod simd;
 pub(crate) mod tables;
 
 pub(crate) use qmf::Modulation;

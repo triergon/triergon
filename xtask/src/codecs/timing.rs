@@ -29,9 +29,9 @@ const KIND: &str = "codec-time-session";
 
 /// The arguments of `codecs time`.
 pub struct Options {
-    /// The repository whose recorded build the candidate is held against.
+    /// The repository whose recorded build the candidates are held against.
     pub repository: PathBuf,
-    pub candidate: PathBuf,
+    pub candidates: super::Candidates,
     pub reference: PathBuf,
     pub workloads: PathBuf,
     pub root: PathBuf,
@@ -125,7 +125,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         .to_vec();
     let parity = super::aac_access_units::measurement_parity(
         &options.repository,
-        &options.candidate,
+        &options.candidates,
         &options.reference,
         &options.workloads,
         &options.root,
@@ -144,15 +144,18 @@ pub fn run(options: &Options) -> Result<(), String> {
     };
     fs::create_dir_all(&options.out).map_err(|e| format!("{}: {e}", options.out.display()))?;
     let gate = policy::Runtime::load(&options.repository)?;
+    let candidates: Vec<&Path> = options
+        .candidates
+        .roles()
+        .into_iter()
+        .map(|(_, worker)| worker)
+        .collect();
     let refusals =
-        gate_build::pair_refusals(&options.repository, &options.candidate, &options.reference);
+        gate_build::workers_refusals(&options.repository, &candidates, &options.reference);
     for reason in &refusals {
         println!("no gate result: {reason}");
     }
-    let hashes = Value::object([
-        ("candidate", Value::str(sha(&options.candidate)?)),
-        ("reference", Value::str(sha(&options.reference)?)),
-    ]);
+    let reference_sha = sha(&options.reference)?;
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
     let mut unmeasured = Vec::new();
     let mut bounds = Vec::new();
@@ -169,6 +172,11 @@ pub fn run(options: &Options) -> Result<(), String> {
             return Err(format!("input hash differs from the workload: {id}"));
         }
         let name = get_str(w, "operation").ok_or("workload without operation")?;
+        let candidate = options.candidates.of(name);
+        let hashes = Value::object([
+            ("candidate", Value::str(sha(candidate)?)),
+            ("reference", Value::str(reference_sha.as_str())),
+        ]);
         let iterations = iterations(w).map_err(|error| format!("{id}: {error}"))?;
         let claim = Value::object([
             ("workers", hashes.clone()),
@@ -201,7 +209,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         ]);
         let mut result_file = None;
         let graded = timing_lock.measure(
-            &options.candidate,
+            candidate,
             &options.reference,
             &path,
             Pairs::gate(GATE_PAIRS, gate.ceiling).early_stop(options.early_stop),

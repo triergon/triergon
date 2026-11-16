@@ -134,7 +134,7 @@ impl MeasurementParity {
 /// Require matching PCM parity before either performance collector admits these workloads.
 pub(super) fn measurement_parity(
     root: &Path,
-    candidate: &Path,
+    candidates: &super::Candidates,
     reference: &Path,
     workload_path: &Path,
     inputs: &Path,
@@ -155,7 +155,7 @@ pub(super) fn measurement_parity(
     if *manifest != checks::read_json(&root.join(FEATURE).join("corpus.json"))? {
         return Err("AAC measurement requires the complete pinned workload set".into());
     }
-    let comparison = Comparison::load(root, Some((candidate, reference)))?;
+    let comparison = Comparison::load(root, Some((candidates.of(OPERATION), reference)))?;
     let parity_path = inputs.join(PARITY_FILE);
     let bytes = read(&parity_path)?;
     let parity = json::parse(std::str::from_utf8(&bytes).map_err(|error| error.to_string())?)
