@@ -54,7 +54,10 @@ commands:
                  (format, lints, rustdoc and the repository checks), test (the workspace
                  tests), variants (the reference-trace tests, the release build, the
                  nightly SIMD tests and the core time oracle) or parity (the worker tests,
-                 the required feature reports, the fuzz smoke rounds and the link orders)
+                 the required feature reports, the fuzz smoke rounds and the link orders);
+                 docs runs only the steps that read the documents and evidence sets
+                 (format, check-design, check-links, check-revisions and the evidence
+                 index tests), all a pull request that changes nothing else needs
   check-simd     clippy and tests of the opt-in HEVC SIMD path on the pinned nightly
   prepare-check  [PART]   once before `check`: the pinned FFmpeg, FreeType, HarfBuzz,
                  FriBidi and libass references, the fixtures, the required vectors, the font
@@ -990,6 +993,7 @@ fn prepare_check(part: Option<Part>) -> Task {
         // The table checks read the unpacked FreeType and HarfBuzz releases.
         Some(Part::Lint) => &[&["fonts", "prepare"], &["shape", "prepare"]],
         Some(Part::Test | Part::Variants) => &[&["fixtures"], &["fetch-vectors"]],
+        Some(Part::Docs) => &[],
     };
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     for step in steps {
@@ -1288,6 +1292,9 @@ enum Part {
     /// The built workers against the references: the worker tests, the required
     /// feature reports, the fuzz smoke rounds and the trained link orders.
     Parity,
+    /// Not a part of the full run but a selection from it: the steps that read the
+    /// documents and the evidence sets ([`DOCS`]).
+    Docs,
 }
 
 impl Part {
@@ -1297,8 +1304,9 @@ impl Part {
             "test" => Ok(Self::Test),
             "variants" => Ok(Self::Variants),
             "parity" => Ok(Self::Parity),
+            "docs" => Ok(Self::Docs),
             _ => Err(format!(
-                "{name}: no such part of check (lint, test, variants or parity)\n{USAGE}"
+                "{name}: no such part of check (lint, test, variants, parity or docs)\n{USAGE}"
             )),
         }
     }
@@ -1308,9 +1316,7 @@ type Step = fn(&Path) -> Task;
 
 /// Every step of `check`, in order, with the part it belongs to.
 const CHECK: &[(Part, Step)] = &[
-    (Part::Lint, |root| {
-        cargo(root, None, &["fmt", "--all", "--check"])
-    }),
+    (Part::Lint, fmt),
     (Part::Test, |root| {
         cargo_for_workers(root, None, &["test", "--workspace", "--locked"])
     }),
@@ -1412,6 +1418,11 @@ const CHECK: &[(Part, Step)] = &[
     (Part::Lint, check_design),
     (Part::Lint, check_links),
     (Part::Lint, check_revisions),
+    (Part::Lint, |root| {
+        run(Command::new("python3")
+            .arg("tools/test-ci-scope.py")
+            .current_dir(root))
+    }),
     (Part::Parity, |root| {
         println!("$ cargo xtask link-order check");
         harness::link_training::check(root)
@@ -1427,8 +1438,33 @@ const CHECK: &[(Part, Step)] = &[
     }),
 ];
 
+/// What a change to the documents or the evidence sets alone can affect: the
+/// formatting, the checks that read the documents, and the tests that read the
+/// evidence index ([`gate::INDEX_TESTS`]). Each is also run by the full check.
+const DOCS: &[Step] = &[
+    fmt,
+    check_design,
+    check_links,
+    check_revisions,
+    evidence_index_tests,
+];
+
+fn fmt(root: &Path) -> Task {
+    cargo(root, None, &["fmt", "--all", "--check"])
+}
+
+fn evidence_index_tests(root: &Path) -> Task {
+    let mut args = vec!["test", "-p", "xtask", "--bin", "xtask", "--locked"];
+    args.extend(["--", "--exact"]);
+    args.extend(gate::INDEX_TESTS);
+    cargo_for_workers(root, None, &args)
+}
+
 /// Every step of `check`, or those of one part.
 fn check(root: &Path, part: Option<Part>) -> Task {
+    if part == Some(Part::Docs) {
+        return DOCS.iter().try_for_each(|step| step(root));
+    }
     for &(owner, step) in CHECK {
         if part.is_none_or(|part| part == owner) {
             step(root)?;

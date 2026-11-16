@@ -3,6 +3,7 @@
 //! results against the feature contract. Failures are recorded, never dropped.
 
 pub mod acceptance;
+pub mod bounds;
 pub mod build;
 pub mod comparison;
 pub mod diff;

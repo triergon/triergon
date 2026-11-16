@@ -1981,7 +1981,7 @@ fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i32> {
 /// The tests that read the evidence index: the index changes when a result is
 /// promoted, so a test result's key leaves it out, and these run on every gate test
 /// instead of with the reused run.
-const INDEX_TESTS: [&str; 3] = [
+pub(crate) const INDEX_TESTS: [&str; 3] = [
     "evidence::tests::the_index_lists_every_archived_file_once",
     "gate::tests::a_feature_whose_inputs_are_neither_committed_nor_kept_is_refused",
     "gate::tests::inputs_in_a_kept_set_count_by_its_listing_and_pins",
