@@ -7,6 +7,10 @@ sits above `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
 `triergon-framing` and `triergon-subtitles`. It does not fetch over HTTP,
 parse playlists, retry transports, decode media or render.
 
+The MP4 range comparison includes two upstream samples, one with an initial
+non-sync AVC prefix and one with tracks shorter than the declared movie.
+It checks startup and backward seek through EOF for both.
+
 ## Usage
 
 ```rust
@@ -56,6 +60,11 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+Regular AVC with a leading empty edit keeps its video start delay in range and
+forward playback. A media edit can start at a later sync sample, and a backward
+seek accounts for the composition lead. A short edit retains enough of the next
+decode interval to complete its displayed pictures. An empty edit does not
+produce a packet.
 QuickTime range playback reads AAC configuration from version 1 and version 2
 sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
