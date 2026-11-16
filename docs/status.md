@@ -183,7 +183,7 @@ AArch64 link order). Every step passes 135 of 135 cases, and only the total RSS 
 listed in the contract's `open_bounds` fail. No case's runtime bound is above 1.10 on
 either target; the median of the case medians is 0.9477 on Linux AArch64 (0.9630 at
 `d915aa19`) and 0.7924 on ARMv7 (0.8100). On ARMv7, `hevc-irap_repeat` has a median of
-0.9928 and a bound of 1.0263, against 1.0464 and 1.1122 in the full gate run at `421aa659`.
+0.9928 and a bound of 1.0263, against 1.0381 and 1.0431 at `d915aa19`.
 Sets `gate-run-aarch64-d79071d4-20261116-204903-shard-1` and
 `gate-run-armv7-9870b694-20261116-202556-shard-1` hold each target's outputs, build
 identities, plan, step records and logs; the earlier runs at `d915aa19` stay in
