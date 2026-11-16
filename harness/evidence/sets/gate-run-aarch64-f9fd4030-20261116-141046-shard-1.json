@@ -1,0 +1,46 @@
+{
+ "name": "gate-run-aarch64-f9fd4030-20261116-141046-shard-1",
+ "path": "gate-run-aarch64-f9fd4030-20261116-141046-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at f9fd4030 on three c6g.4xlarge hosts, Linux AArch64, shard 1 of the codec items (codecs, codecs-audio, ogg-readers, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release, isobmff-reader) with the codec-derived streams input, codec-aac-worker and the AAC decode example built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/f9fd40300b0a14890c02ac79f14dee5aac178b03-aarch64-20261116-141046/shard-1/df3a5affd95c8ed204b011372184b3d62e5df5ba02182841fb4e7ee6c26b9322.tar.zst",
+ "sha256": "df3a5affd95c8ed204b011372184b3d62e5df5ba02182841fb4e7ee6c26b9322",
+ "bytes": 8009119,
+ "results": [
+  {
+   "path": "memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "f45b1e8517a3da9e84a6bb7a3b0416a7b3fc95a319e3e035777245741fbde5fb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "f4219b06b871ed00af45516ec4f47975b6cb8e8746b10eb8a150517b461babd9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "b33ee724eb1f1108c2c9ae18c1e1ee8dd89c5adf301b3f700000be62111ea592",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "20003536ee90b8f9462e0be03e85d5ff425f95c7d825a89783256a71de2fa067",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "971af9df05edc1830a5d3b0f84bf10d1770111a3fb28bdd2788692597673bfa8",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -10,6 +10,9 @@ publish.workspace = true
 [features]
 # Development aids (per-frame statistics, SBR fill ranges) for the research examples.
 inspect = []
+# Explicit std::simd forms of the SBR QMF banks (requires a nightly toolchain). The same
+# operations in the same order as the default code; ARMv7 NEON flushes subnormals to zero.
+simd = []
 
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }

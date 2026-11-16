@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-aarch64-f9fd4030-20261116-141046-shard-3",
+ "path": "gate-run-aarch64-f9fd4030-20261116-141046-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run at f9fd4030 on three c6g.4xlarge hosts, Linux AArch64, shard 3 of the codec items (codecs, codecs-audio, ogg-readers, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release, isobmff-reader) with the codec-derived streams input, codec-aac-worker and the AAC decode example built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/f9fd40300b0a14890c02ac79f14dee5aac178b03-aarch64-20261116-141046/shard-3/6b6c578a82bb826556708ad8ce741b0a395c2419a31fd2ad6add7b6f040d54a6.tar.zst",
+ "sha256": "6b6c578a82bb826556708ad8ce741b0a395c2419a31fd2ad6add7b6f040d54a6",
+ "bytes": 1830675,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "f4106078cfd0d5138486ab7ef6528642e2b2af7a175a8577ddcf67348c8ccd8c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "f7bab895597348e2c58fb14ff12ced5260f4f04f837493e1a3a28829be42ed7e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "d26655638158c780363549ed98d46bbc5b7a7cbef611f36054754d1fbe9e8afc",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
