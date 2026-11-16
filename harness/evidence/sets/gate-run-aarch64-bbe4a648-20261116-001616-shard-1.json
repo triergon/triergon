@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-aarch64-bbe4a648-20261116-001616-shard-1",
+ "path": "gate-run-aarch64-bbe4a648-20261116-001616-shard-1",
+ "retention": "retained",
+ "reason": "AArch64 MP4 range parity, timing and kernel-bound memory for all 53 startup and backward-seek comparisons.",
+ "key": "evidence/gate-runs/bbe4a648b5b4c30ef735b50bd3a2cb23c5b1f6ee-aarch64-20261116-001616/shard-1/a708ef538f9df4982529a16ae9d24751bc93bf79e7b98469b75f4ce0a239c79a.tar.zst",
+ "sha256": "a708ef538f9df4982529a16ae9d24751bc93bf79e7b98469b75f4ce0a239c79a",
+ "bytes": 8864792,
+ "results": [
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "85a4030081e457577c8a76b723f5a08b7940100ae2d175a6e96f17142e67e2ae",
+   "status": 0,
+   "report_sha256": "17e0c2da73e09f1f705d4ed709fe417fb0d8b02c4016ae2c117e20854a543bec",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "09a567ef3c4cf5e801db302e5970e3419403a0f910d85907f2b1bcaa885d75db",
+   "status": 0,
+   "report_sha256": "628655e9a15c8a00cb605fffeafc5e9b8eee15a864cea687d640eae51753eb66",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "1f587e186ca289afb703a6356a105c92b889ca7fa3e77ca4f7eca3100bba0782",
+   "status": 0,
+   "report_sha256": "8da92a118fe5427fa1d694a1f810e06ac38585ea56469dade179573081b2cd16"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "bbe4a648b5b4c30ef735b50bd3a2cb23c5b1f6ee"
+ }
+}
