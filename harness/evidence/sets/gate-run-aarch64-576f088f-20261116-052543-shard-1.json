@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-576f088f-20261116-052543-shard-1",
+ "path": "gate-run-aarch64-576f088f-20261116-052543-shard-1",
+ "retention": "retained",
+ "reason": "AArch64 capture noise-case timing and the 30-second memory observer timeouts.",
+ "key": "evidence/gate-runs/576f088fa2d463585adf87d471ba2ccc22c72c67-aarch64-20261116-052543/shard-1/2291de167449144eaa0f1951d2f6e352acf7d0e7549b71aa3e62bd2b0609beb0.tar.zst",
+ "sha256": "2291de167449144eaa0f1951d2f6e352acf7d0e7549b71aa3e62bd2b0609beb0",
+ "bytes": 359205656,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "8e02e007072a427b07c146b631c9486ad57691910e1a2ec8a0154d261c030857",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "f32b871bf63ecba40cbc93b5bb3e247119f9624bb5a4fa90627a9a03c48e1e7a",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "576f088fa2d463585adf87d471ba2ccc22c72c67"
+ ]
+}

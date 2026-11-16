@@ -35,7 +35,6 @@ struct Stage {
 /// inner loop contiguous so that it vectorises.
 #[derive(Debug)]
 pub(crate) struct Fft {
-    n: usize,
     bitrev: Vec<u16>,
     stages: Vec<Stage>,
     /// final radix-2 stage twiddles W_n^k, k < n/2 (odd log2(n) only)
@@ -73,7 +72,6 @@ impl Fft {
             [c, s]
         });
         Fft {
-            n,
             bitrev,
             stages,
             last,
@@ -99,8 +97,9 @@ impl Fft {
     }
 
     /// FFT of data already stored in bit-reversed order (`d[perm(i)] = x[i]`).
-    pub(crate) fn run_permuted(&self, re: &mut [f32], im: &mut [f32]) {
-        let n = self.n;
+    #[cfg(test)]
+    fn run_permuted(&self, re: &mut [f32], im: &mut [f32]) {
+        let n = self.bitrev.len();
         let (re, im) = (&mut re[..n], &mut im[..n]);
         for (r, i) in re.chunks_exact_mut(4).zip(im.chunks_exact_mut(4)) {
             let (or, oi) = bfly4([r[0], r[1], r[2], r[3]], [i[0], i[1], i[2], i[3]]);
@@ -243,20 +242,41 @@ fn radix4(r: &mut [f32; 16], i: &mut [f32; 16], p: [usize; 4], w: [f32; 6]) {
     i[p[3]] = d01i + d23r;
 }
 
+/// The slice's first `n` elements as blocks of four.
+#[inline(always)]
+fn blocks(s: &[f32], n: usize) -> &[[f32; 4]] {
+    s[..n].as_chunks::<4>().0
+}
+
+/// The slice's first `n` elements as mutable blocks of four.
+#[inline(always)]
+fn blocks_mut(s: &mut [f32], n: usize) -> &mut [[f32; 4]] {
+    s[..n].as_chunks_mut::<4>().0
+}
+
+// The twiddle loops below run over blocks of four outputs, so that on targets without
+// post-incrementing float loads each stream advances once a block and the loads use
+// immediate offsets; a block is also one vector on targets with float vectors.
+
 /// DCT-IV pre-twiddle: (x[2n] + i x[m - 1 - 2n]) * pre[n].
 #[inline(never)]
 fn pre(x: &[f32], pr: &[f32], pi: &[f32], tr: &mut [f32], ti: &mut [f32]) {
-    for (((((a, b), &cr), &ci), r), i) in x
-        .chunks_exact(2)
-        .zip(x.rchunks_exact(2))
-        .zip(pr)
-        .zip(pi)
-        .zip(tr.iter_mut())
-        .zip(ti.iter_mut())
-    {
-        let (a, b) = (a[0], b[1]);
-        *r = a * cr - b * ci;
-        *i = a * ci + b * cr;
+    let h = tr.len();
+    let (pr, pi, tr, ti) = (
+        blocks(pr, h),
+        blocks(pi, h),
+        blocks_mut(tr, h),
+        blocks_mut(ti, h),
+    );
+    // x[2n] for n = 4b + j is xs[b][2j], and x[2h - 1 - 2n] is xs[h/4 - 1 - b][7 - 2j]
+    let xs = x[..2 * h].as_chunks::<8>().0;
+    for (b, (((tr, ti), pr), pi)) in tr.iter_mut().zip(ti).zip(pr).zip(pi).enumerate() {
+        let (fwd, rev) = (&xs[b], &xs[h / 4 - 1 - b]);
+        for j in 0..4 {
+            let (x0, x1) = (fwd[2 * j], rev[7 - 2 * j]);
+            tr[j] = x0 * pr[j] - x1 * pi[j];
+            ti[j] = x0 * pi[j] + x1 * pr[j];
+        }
     }
 }
 
@@ -264,10 +284,14 @@ fn pre(x: &[f32], pr: &[f32], pi: &[f32], tr: &mut [f32], ti: &mut [f32]) {
 #[inline(never)]
 fn post(re: &[f32], im: &[f32], qr: &[f32], qi: &[f32], ye: &mut [f32], yo: &mut [f32]) {
     let h = re.len();
-    let (im, qr, qi, ye, yo) = (&im[..h], &qr[..h], &qi[..h], &mut ye[..h], &mut yo[..h]);
-    for k in 0..h {
-        ye[k] = re[k] * qr[k] - im[k] * qi[k];
-        yo[k] = -(re[k] * qi[k] + im[k] * qr[k]);
+    let (re, im, qr, qi) = (blocks(re, h), blocks(im, h), blocks(qr, h), blocks(qi, h));
+    let (ye, yo) = (blocks_mut(ye, h), blocks_mut(yo, h));
+    for (b, (ye, yo)) in ye.iter_mut().zip(yo).enumerate() {
+        let (re, im, qr, qi) = (&re[b], &im[b], &qr[b], &qi[b]);
+        for j in 0..4 {
+            ye[j] = re[j] * qr[j] - im[j] * qi[j];
+            yo[j] = -(re[j] * qi[j] + im[j] * qr[j]);
+        }
     }
 }
 
@@ -291,19 +315,30 @@ fn last_post(
     yo1: &mut [f32],
 ) {
     let q = re0.len();
-    let (re1, im0, im1, wr, wi) = (&re1[..q], &im0[..q], &im1[..q], &wr[..q], &wi[..q]);
-    let (qr0, qr1) = (&qr[..q], &qr[q..2 * q]);
-    let (qi0, qi1) = (&qi[..q], &qi[q..2 * q]);
-    let (ye0, ye1, yo0, yo1) = (&mut ye0[..q], &mut ye1[..q], &mut yo0[..q], &mut yo1[..q]);
-    for k in 0..q {
-        let tr = re1[k] * wr[k] - im1[k] * wi[k];
-        let ti = re1[k] * wi[k] + im1[k] * wr[k];
-        let (zr, zi) = (re0[k] + tr, im0[k] + ti);
-        ye0[k] = zr * qr0[k] - zi * qi0[k];
-        yo0[k] = -(zr * qi0[k] + zi * qr0[k]);
-        let (zr, zi) = (re0[k] - tr, im0[k] - ti);
-        ye1[k] = zr * qr1[k] - zi * qi1[k];
-        yo1[k] = -(zr * qi1[k] + zi * qr1[k]);
+    let (re0, re1, im0, im1) = (
+        blocks(re0, q),
+        blocks(re1, q),
+        blocks(im0, q),
+        blocks(im1, q),
+    );
+    let (wr, wi) = (blocks(wr, q), blocks(wi, q));
+    let (qr0, qr1) = (blocks(qr, q), blocks(&qr[q..], q));
+    let (qi0, qi1) = (blocks(qi, q), blocks(&qi[q..], q));
+    let (ye0, ye1) = (blocks_mut(ye0, q), blocks_mut(ye1, q));
+    let (yo0, yo1) = (blocks_mut(yo0, q), blocks_mut(yo1, q));
+    for b in 0..q / 4 {
+        let (re0, re1, im0, im1, wr, wi) = (&re0[b], &re1[b], &im0[b], &im1[b], &wr[b], &wi[b]);
+        let (qr0, qr1, qi0, qi1) = (&qr0[b], &qr1[b], &qi0[b], &qi1[b]);
+        for j in 0..4 {
+            let tr = re1[j] * wr[j] - im1[j] * wi[j];
+            let ti = re1[j] * wi[j] + im1[j] * wr[j];
+            let (zr, zi) = (re0[j] + tr, im0[j] + ti);
+            ye0[b][j] = zr * qr0[j] - zi * qi0[j];
+            yo0[b][j] = -(zr * qi0[j] + zi * qr0[j]);
+            let (zr, zi) = (re0[j] - tr, im0[j] - ti);
+            ye1[b][j] = zr * qr1[j] - zi * qi1[j];
+            yo1[b][j] = -(zr * qi1[j] + zi * qr1[j]);
+        }
     }
 }
 

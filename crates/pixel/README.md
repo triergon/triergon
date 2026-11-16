@@ -88,10 +88,15 @@ on the width:
   to zero so neutral grey maps to exactly 128, and chroma is the mean of each
   horizontal pixel pair, decimated vertically with centre-sited taps 1/8, 3/8, 3/8,
   1/8 over rows 2k−1 … 2k+2 with the edge rows replicated, rounded once. Below a
-  width of 16 this is what FFmpeg's ARMv7 build does too, within 1 for pictures of at
-  least 8 rows. At widths of 2 modulo 4 from 18 up, FFmpeg's ARMv7 build faults
-  instead of converting, and this path decimates chroma as FFmpeg's AArch64 build
-  does, within 1 of that build's output.
+  width of 16 the reference is FFmpeg's ARMv7 build. At widths of 2 modulo 4
+  from 18 up, FFmpeg's ARMv7 build faults, and the reference is its AArch64 build.
+  The [conversion probe](../../harness/capture/README.md#short-frames) compares
+  the short-frame rules at the widths each reference produces.
+
+On the filtered path, a 2-row picture takes chroma from the lower row. A 4-row
+picture averages each pair of rows. In a 6-row picture, the top chroma row
+uses the first three rows with weights 3/7, 3/7 and 1/7. The other two rows
+use the usual four taps.
 
 FFmpeg built for AArch64 takes the filtered path at every width. Input shorter than
 `width × height × 4` is `Error::InputLength`; longer input is ignored past that
@@ -157,9 +162,9 @@ impulses, ramps and constant fields through its public filter API).
   and near-tie blocks for the rounding, and random pictures at widths 16 to 4092,
   heights 2 to 540 and both orientations, all exact. Unit tests pin the path
   choice, observed block-path values and both paths' row siting.
-- Open: on the filtered path, FFmpeg gives pictures of 2, 4 and 6 rows other
-  vertical weights (2 rows: the lower row alone; 4 rows: each pair's mean; 6 rows:
-  3/7, 3/7, 1/7 for the top sample). Both of its builds agree there, and the
-  filtered path differs from them.
+- For pictures of 2, 4 and 6 rows, unit tests pin each input row's contribution
+  in both orientations. The [capture reference probe](../../harness/capture/README.md#short-frames)
+  compares every sample from row impulses and pseudo-random pictures at the
+  filtered widths below 16.
 
 Gates: [docs/quality.md](../../docs/quality.md).
