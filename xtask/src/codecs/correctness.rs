@@ -258,7 +258,8 @@ pub struct Grade {
     pub bin: PathBuf,
     pub ffmpeg: String,
     pub ffprobe: String,
-    pub codec_worker: PathBuf,
+    /// The codec worker of each lane's operation.
+    pub codec_workers: super::Candidates,
     pub reference: String,
     pub out: PathBuf,
     pub scratch: Option<PathBuf>,
@@ -774,8 +775,9 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
 }
 
 fn output_path(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, Stop> {
-    let op = format!("{}-raw", operation(lane).ok_or_else(|| unknown(lane))?);
-    let worker = python::path(&a.codec_worker);
+    let decode = operation(lane).ok_or_else(|| unknown(lane))?;
+    let op = format!("{decode}-raw");
+    let worker = python::path(a.codec_workers.of(decode));
     if video_extensions(lane).is_some() {
         let argv = |w: &str| vec![w.to_owned(), op.clone(), path.to_owned(), OUT.to_owned()];
         let mut ours = Frames::spawn(&argv(&worker), CANVAS, true)?;

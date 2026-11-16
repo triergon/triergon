@@ -622,6 +622,8 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
          cp {release}/examples/decode_hevc {bin}/codec-hevc-decode"
     ));
     let codec_worker = format!("{release}/codec-worker");
+    // The AAC decode operations are measured from the AAC decoder's nightly build.
+    let aac_worker = format!("audio-aac={release}/codec-aac-worker");
     let codecs = vec![
         step("codec-bin", Stage::Timing, Placement::Free, build_codecs),
         step(
@@ -672,8 +674,8 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     // The AAC, AC-3, E-AC-3 and DTS decoders against FFmpeg's on every vector of their
     // correctness lanes, the derived streams among them included; the summary fails on
     // any vector that fails and is not a listed open case. The AAC decoder is built as
-    // the codec worker builds it: by the pinned nightly with its `simd` feature, in the
-    // nightly workers' target directory.
+    // `codec-aac-worker` builds it: by the pinned nightly with its `simd` feature, in the
+    // nightly workers' target directory; the AAC lane's output comes from that worker.
     let audio_bin = format!("{out}/codec-audio-bin");
     let nightly_release = release.replacen("target/", "target/nightly/", 1);
     let nightly = crate::NIGHTLY;
@@ -720,6 +722,8 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                     &format!("{FFMPEG_BIN}/ffprobe"),
                     "--codec-worker",
                     &codec_worker,
+                    "--codec-worker-for",
+                    &aac_worker,
                     "--reference",
                     "target/harness/ffmpeg-decode-worker",
                     "--out",
@@ -774,21 +778,24 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     // Each list's timing is one item and its memory is in parts, each part every
     // Nth workload: a list's memory took up to 108 minutes in one piece.
     // Each part's weight is its measured minutes, as for every other item.
-    let lists: [(&str, &str, u32, &[u32]); 2] = [
+    // A list with AAC workloads measures them from the AAC worker.
+    let lists: [(&str, &str, bool, u32, &[u32]); 2] = [
         (
             "codec-workloads",
             "harness/codecs/workloads.json",
+            true,
             20,
             &[36, 12, 20, 18, 31],
         ),
         (
             "codec-file-workloads",
             "harness/codecs/file-workloads.json",
+            false,
             4,
             &[16, 29, 20],
         ),
     ];
-    for (name, workloads, timing_weight, part_weights) in lists {
+    for (name, workloads, aac, timing_weight, part_weights) in lists {
         let parts = part_weights.len();
         let codecs = |mode: &str, part: Option<usize>| {
             let mut args = xtask(&[
@@ -802,8 +809,11 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 workloads,
                 "--root",
                 ".",
-                "--out",
             ]);
+            if aac {
+                args.extend(owned(&["--candidate-for", &aac_worker]));
+            }
+            args.push("--out".to_owned());
             if mode == "time" {
                 args.push(format!("{out}/benchmark/{name}"));
                 args.extend(owned(&[

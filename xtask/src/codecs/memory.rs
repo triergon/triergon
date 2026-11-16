@@ -29,7 +29,7 @@ const WORK_TIMEOUT: Duration = Duration::from_secs(600);
 pub struct Options {
     /// The repository: observer, build identity and policy.
     pub repository: PathBuf,
-    pub candidate: PathBuf,
+    pub candidates: super::Candidates,
     pub reference: PathBuf,
     pub workloads: PathBuf,
     pub root: PathBuf,
@@ -162,15 +162,21 @@ pub fn run(options: &Options) -> Result<(), String> {
         .to_vec();
     let parity = super::aac_access_units::measurement_parity(
         &options.repository,
-        &options.candidate,
+        &options.candidates,
         &options.reference,
         &options.workloads,
         &options.root,
         &manifest,
     )?;
     fs::create_dir_all(&options.out).map_err(|e| format!("{}: {e}", options.out.display()))?;
+    let candidates: Vec<&Path> = options
+        .candidates
+        .roles()
+        .into_iter()
+        .map(|(_, worker)| worker)
+        .collect();
     let refusals =
-        gate_build::pair_refusals(&options.repository, &options.candidate, &options.reference);
+        gate_build::workers_refusals(&options.repository, &candidates, &options.reference);
     for reason in &refusals {
         println!("no gate result: {reason}");
     }
@@ -181,10 +187,7 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
     let mut identity = Value::object([
-        (
-            "candidate_sha256",
-            Value::str(file_sha(&options.candidate)?),
-        ),
+        ("candidate_sha256", Value::str(file_sha(candidates[0])?)),
         (
             "reference_sha256",
             Value::str(file_sha(&options.reference)?),
@@ -200,10 +203,21 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("run_limit_seconds", Value::int(i128::from(limit.as_secs()))),
         ("utc", Value::str(python::utc_now())),
     ]);
-    if let Some(parity) = &parity
-        && let Value::Object(fields) = &mut identity
-    {
-        fields.push(("parity_sha256".into(), Value::str(&parity.sha256)));
+    let by_operation = options
+        .candidates
+        .by_operation()
+        .map(|(operation, worker)| Ok((operation, Value::str(file_sha(worker)?))))
+        .collect::<Result<Vec<_>, String>>()?;
+    if let Value::Object(fields) = &mut identity {
+        if !by_operation.is_empty() {
+            fields.push((
+                "candidate_sha256_by_operation".into(),
+                Value::object(by_operation),
+            ));
+        }
+        if let Some(parity) = &parity {
+            fields.push(("parity_sha256".into(), Value::str(&parity.sha256)));
+        }
     }
     write(&options.out.join("identity.json"), &identity)?;
     // Every workload's unobserved work first, then the memory of all of them in one
@@ -232,7 +246,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             )]))
         } else {
             match (
-                work(&options.candidate, operation, &input),
+                work(options.candidates.of(operation), operation, &input),
                 work(&options.reference, operation, &input),
             ) {
                 (Ok(candidate), Ok(reference))
@@ -260,17 +274,17 @@ pub fn run(options: &Options) -> Result<(), String> {
         };
         planned.push((w, id, record, input, ready));
     }
-    let workers = memory::WorkerPaths {
-        candidate: &options.candidate,
-        reference: &options.reference,
-        registered: refusals.is_empty(),
-    };
     let pairs = memory::Pairs::gate(options.pairs, memory::CEILING).early_stop(options.early_stop);
     let mut jobs = Vec::new();
     let mut collected = Vec::new();
-    for (index, (_, _, _, input, ready)) in planned.iter().enumerate() {
+    for (index, (w, _, _, input, ready)) in planned.iter().enumerate() {
         let Ok((expected, arguments)) = ready else {
             continue;
+        };
+        let workers = memory::WorkerPaths {
+            candidate: options.candidates.of(text(w, "operation")?),
+            reference: &options.reference,
+            registered: refusals.is_empty(),
         };
         jobs.push(memory::Job::new(&workers, [input.clone()], move |slot| {
             memory::collect_command(

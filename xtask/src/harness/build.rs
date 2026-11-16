@@ -319,7 +319,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -343,10 +343,18 @@ const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
         features: &[],
         nightly: false,
     },
-    // The AAC decoder's SBR filter banks in `std::simd` form: without explicit vector
-    // types LLVM emits no NEON float code for the 32-bit ARM target.
     Candidate {
         name: "codec-worker",
+        package: "codec-worker",
+        example: None,
+        features: &[],
+        nightly: false,
+    },
+    // The AAC decode operations alone, with the decoder's SBR filter banks in
+    // `std::simd` form: without explicit vector types LLVM emits no NEON float code for
+    // the 32-bit ARM target. Every other operation is measured from `codec-worker`.
+    Candidate {
+        name: "codec-aac-worker",
         package: "codec-worker",
         example: None,
         features: &["aac-simd"],

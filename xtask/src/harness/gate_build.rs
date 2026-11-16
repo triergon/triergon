@@ -543,6 +543,12 @@ fn bound(records: Option<&Value>, sha: &str) -> bool {
 /// a worker and the reference a comparison reference of the gate build recorded in
 /// `target/harness/identity.json`.
 pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<String> {
+    workers_refusals(root, &[candidate], reference)
+}
+
+/// [`pair_refusals`] for a measurement whose workloads are split among `candidates`:
+/// each must be a worker of the recorded build.
+pub fn workers_refusals(root: &Path, candidates: &[&Path], reference: &Path) -> Vec<String> {
     let identity = match read_json(&root.join("target/harness/identity.json")) {
         Ok(identity) => identity,
         Err(error) => return vec![format!("no build identity: {error}")],
@@ -552,11 +558,14 @@ pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<Str
         Err(error) => vec![error],
     };
     let digest = |path: &Path| std::fs::read(path).map(|bytes| sha256::hex(&bytes)).ok();
-    if !digest(candidate).is_some_and(|sha| bound(identity.get("additional_candidates"), &sha)) {
-        reasons.push(format!(
-            "{} is not a worker of the recorded build",
-            candidate.display()
-        ));
+    for candidate in candidates {
+        if !digest(candidate).is_some_and(|sha| bound(identity.get("additional_candidates"), &sha))
+        {
+            reasons.push(format!(
+                "{} is not a worker of the recorded build",
+                candidate.display()
+            ));
+        }
     }
     if !digest(reference).is_some_and(|sha| bound(identity.get("comparison_references"), &sha)) {
         reasons.push(format!(
@@ -1023,12 +1032,13 @@ mod tests {
             None
         );
         assert_eq!(
-            toolchain_refusal("codec-worker", &worker(nightly, "1.100.0-nightly"), PIN),
+            toolchain_refusal("codec-aac-worker", &worker(nightly, "1.100.0-nightly"), PIN),
             None
         );
         for (name, record) in [
-            ("codec-worker", worker(PIN, PIN)),
-            ("codec-worker", worker(nightly, PIN)),
+            ("codec-aac-worker", worker(PIN, PIN)),
+            ("codec-aac-worker", worker(nightly, PIN)),
+            ("codec-worker", worker(nightly, "1.100.0-nightly")),
             ("font-worker", worker(nightly, "1.100.0-nightly")),
             ("font-worker", worker(PIN, "1.98.0")),
             ("font-worker", Value::object([("rustc", Value::str(PIN))])),
@@ -1043,7 +1053,7 @@ mod tests {
         if let Value::Object(fields) = &mut identity {
             fields.push((
                 "additional_candidates".into(),
-                Value::object([("codec-worker", worker(PIN, PIN))]),
+                Value::object([("codec-aac-worker", worker(PIN, PIN))]),
             ));
         }
         assert_eq!(refusals(&identity, PIN).len(), 1);
