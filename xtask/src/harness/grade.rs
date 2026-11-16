@@ -936,7 +936,9 @@ fn exit_code(verdict: &Value, rows: &[Value], requirement: Option<&str>) -> i32 
 }
 
 /// Grade already collected reports. Invalid joins are errors; a required gate
-/// that remains open returns 2, and a recorded parity failure returns 1.
+/// that remains open returns 2, and a recorded parity failure, or a case whose runtime,
+/// heap or total RSS bound fails without the contract listing it in `open_bounds`,
+/// returns 1.
 pub fn main(root: &Path, args: &[String]) -> R<i32> {
     if args.len() == 1 && matches!(args[0].as_str(), "--help" | "-h") {
         println!("{USAGE}");
@@ -1103,13 +1105,16 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         _ => return Err("fate_coverage must be an array".into()),
     };
     let mut join_error = None;
+    let mut bounded = Vec::new();
     let mut verdict = acceptance_iter(
         root,
         selected_contract,
         grade_members.iter().copied().map(|spec| {
-            combine(spec).inspect_err(|error| {
-                join_error = Some(error.clone());
-            })
+            combine(spec)
+                .inspect(|row| bounded.extend(super::bounds::case_bounds(row)))
+                .inspect_err(|error| {
+                    join_error = Some(error.clone());
+                })
         }),
         identity,
         target,
@@ -1177,7 +1182,17 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         }
     }
     let mut code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
-    if !super::report::ratchet(text(&contract, "id")?, rows(&timed, kind)?, &open) {
+    let label = text(&contract, "id")?;
+    if !super::report::ratchet(label, rows(&timed, kind)?, &open) {
+        code = code.max(1);
+    }
+    // Each case's runtime, heap and total RSS bounds, as the codec bounds are graded.
+    let open_bounds = super::bounds::open_bounds(&contract, &manifest, target)?;
+    let (lines, failed) = super::bounds::verdict(label, &bounded, &open_bounds, ceiling);
+    for line in &lines {
+        println!("{line}");
+    }
+    if failed {
         code = code.max(1);
     }
     if let Some(passed) = part_pass {
