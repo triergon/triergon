@@ -841,11 +841,47 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         return still_open();
     }
     let summary = memory_stage(root, a, &refusals, &open, measured_cases)?;
+    let failing = failing_bounds(&summary);
     write(
         &a.out.join("summary.json"),
         json::to_python(&Value::Array(summary), Some(1)),
     )?;
-    still_open()
+    for line in &failing {
+        println!("{line}");
+    }
+    still_open()?;
+    if failing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("{} capture bounds fail", failing.len()))
+    }
+}
+
+/// One line per bound a case of `summary` fails, but for the cases open on this
+/// target: their runtime, heap and total RSS gates, as a grade's bounds.
+fn failing_bounds(summary: &[Value]) -> Vec<String> {
+    let mut lines = Vec::new();
+    for line in summary {
+        let verdict = |key: &str| line.get(key).is_some_and(Value::truthy);
+        if verdict("open_on_target") {
+            continue;
+        }
+        let id = line.get("id").and_then(Value::as_str).unwrap_or_default();
+        for (gate, bound) in [
+            ("runtime_gate", "runtime"),
+            ("heap_gate", "heap"),
+            ("rss_gate", "total RSS"),
+        ] {
+            if !verdict(gate) {
+                let at = match line.get("runtime_upper95").and_then(Value::as_f64) {
+                    Some(upper) if gate == "runtime_gate" => format!(" at {upper:.4}"),
+                    _ => String::new(),
+                };
+                lines.push(format!("capture: {id}: {bound} bound fails{at}"));
+            }
+        }
+    }
+    lines
 }
 
 /// The cases `harness/capture/contract.json` lists in `open_cases` for this
@@ -887,6 +923,32 @@ fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_failing_capture_bound_fails_unless_its_case_is_open_on_the_target() {
+        let line = |id: &str, open: bool, rss: bool| {
+            json::parse(&format!(
+                r#"{{"id": "{id}", "runtime_gate": true, "heap_gate": true, "rss_gate": {rss},
+                    "open_on_target": {open}, "runtime_upper95": 1.1}}"#
+            ))
+            .unwrap()
+        };
+        assert!(failing_bounds(&[line("c01", false, true)]).is_empty());
+        assert_eq!(
+            failing_bounds(&[line("c01", false, false)]),
+            vec!["capture: c01: total RSS bound fails"]
+        );
+        assert!(failing_bounds(&[line("c01", true, false)]).is_empty());
+        let slow = json::parse(
+            r#"{"id": "c02", "runtime_gate": false, "heap_gate": true, "rss_gate": true,
+                "open_on_target": false, "runtime_upper95": 1.2345}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            failing_bounds(&[slow]),
+            vec!["capture: c02: runtime bound fails at 1.2345"]
+        );
+    }
 
     fn warmups(candidate_digest: u64) -> Value {
         let run = |digest: u64| {
