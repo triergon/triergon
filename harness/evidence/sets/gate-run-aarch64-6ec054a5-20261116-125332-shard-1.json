@@ -1,0 +1,18 @@
+{
+ "name": "gate-run-aarch64-6ec054a5-20261116-125332-shard-1",
+ "path": "gate-run-aarch64-6ec054a5-20261116-125332-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 6ec054a5 on two c6g.4xlarge hosts, Linux AArch64, shard 1 of the test items (tests, tests-release), with the codec worker built by the pinned nightly with codec-aac's simd feature: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md",
+ "key": "evidence/gate-runs/6ec054a54c3e124cfa8c293792542640f06ccd0c-aarch64-20261116-125332/shard-1/01266a1d4d7526e562b2ca200d72ad9e5b30ccafc4bcdec1d143c150f039b14b.tar.zst",
+ "sha256": "01266a1d4d7526e562b2ca200d72ad9e5b30ccafc4bcdec1d143c150f039b14b",
+ "bytes": 486158,
+ "results": [
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "aa1372cbf5be15fda35cd7d560c77dae9211418c69f1eba50a5194a443a0a5ee",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

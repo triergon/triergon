@@ -1,0 +1,18 @@
+{
+ "name": "gate-run-armv7-5705e017-20261116-131155-shard-2",
+ "path": "gate-run-armv7-5705e017-20261116-131155-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at 5705e017 on two c6g.4xlarge hosts, ARMv7, shard 2 of the test items (tests, tests-release), with the codec worker built by the pinned nightly with codec-aac's simd feature: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md",
+ "key": "evidence/gate-runs/5705e017134a979f037775f54afbb22c4d955477-armv7-20261116-131155/shard-2/0a63defb912361a39b79ef3f7fcff8318d56df4a55ac8433a6ca3dd8fcaf9853.tar.zst",
+ "sha256": "0a63defb912361a39b79ef3f7fcff8318d56df4a55ac8433a6ca3dd8fcaf9853",
+ "bytes": 6449392,
+ "results": [
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "458c125f77c9bda6ed5d67e3057547060f9d6ebf20f6efc9fb3f13d4c7a4a611",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
