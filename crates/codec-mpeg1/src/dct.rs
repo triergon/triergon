@@ -161,6 +161,15 @@ pub(crate) fn idct(block: &mut [i32; 64], support: u64) {
             *sum += x * weight;
         }
     }
+    if support >> 8 == 0 {
+        // With only the zero vertical frequency, every output row is equal.
+        let row = rows[0].map(|v| {
+            let first = (v + (1 << (BITS - PASS - 1))) >> (BITS - PASS);
+            (first * C4 + (1 << (BITS + PASS - 1))) >> (BITS + PASS)
+        });
+        block.as_chunks_mut::<8>().0.fill(row);
+        return;
+    }
     let mut occupied = [0; 8];
     let mut count = 0;
     for (r, row) in rows.iter_mut().enumerate() {
