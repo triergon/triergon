@@ -109,16 +109,15 @@ fn row16(plane: &[u8], at: usize) -> &[u8; 16] {
     plane[at..][..16].try_into().expect("16 samples")
 }
 
-/// SAD of `ROWS` rows of 16 samples.
-#[inline(always)]
-fn sad_rows<const ROWS: usize>(
-    cur: &[u8],
-    cur_stride: usize,
-    reference: &[u8],
-    ref_stride: usize,
-) -> u32 {
+/// SAD of two 16×16 blocks.
+///
+/// The SADs are kept out of line: inlined into the search, the sums of their
+/// lanes compile on 32-bit Arm to a lane move per lane and spills, and as
+/// functions of their own to vector additions.
+#[inline(never)]
+pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
     let mut acc = [0u16; 16];
-    for row in 0..ROWS {
+    for row in 0..16 {
         accumulate(
             &mut acc,
             row16(cur, row * cur_stride),
@@ -128,14 +127,21 @@ fn sad_rows<const ROWS: usize>(
     lane_sum(&acc)
 }
 
-/// SAD of two 16×16 blocks.
-///
-/// The SADs are kept out of line: inlined into the search, the sums of their
-/// lanes compile on 32-bit Arm to a lane move per lane and spills, and as
-/// functions of their own to vector additions.
-#[inline(never)]
-pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
-    sad_rows::<16>(cur, cur_stride, reference, ref_stride)
+/// SAD of a group of four rows. Accumulate across each column before reducing
+/// the 16 columns, with at most 16,320 in the 16-bit total.
+#[inline(always)]
+fn sad4(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
+    let [[a0, b0], [a1, b1], [a2, b2], [a3, b3]] =
+        std::array::from_fn(|r| [row16(cur, r * cur_stride), row16(reference, r * ref_stride)]);
+    let total = (0..16)
+        .map(|i| {
+            u16::from(a0[i].abs_diff(b0[i]))
+                + u16::from(a1[i].abs_diff(b1[i]))
+                + u16::from(a2[i].abs_diff(b2[i]))
+                + u16::from(a3[i].abs_diff(b3[i]))
+        })
+        .sum::<u16>();
+    u32::from(total)
 }
 
 /// SAD of two 16×16 blocks, abandoned once it reaches `limit`: the result is
@@ -151,7 +157,7 @@ pub(crate) fn sad16_within(
 ) -> u32 {
     let mut total = 0u32;
     for rows in [0, 4, 8, 12] {
-        total += sad_rows::<4>(
+        total += sad4(
             &cur[rows * cur_stride..],
             cur_stride,
             &reference[rows * ref_stride..],
