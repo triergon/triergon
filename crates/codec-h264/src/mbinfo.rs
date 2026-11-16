@@ -1,5 +1,31 @@
 //! Per-macroblock state kept for the whole current picture (neighbour contexts, deblocking).
 
+use triergon_codec::Divisor;
+
+/// A picture width in macroblocks, which splits macroblock addresses into column and row
+/// without a division instruction (32-bit ARM's baseline has none). The width is at most
+/// 1024 and an address below 2^20, as `ps` enforces, so the split is exact.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct MbWidth(Divisor);
+
+impl MbWidth {
+    pub(crate) fn new(w: usize) -> Self {
+        Self(Divisor::new(w as u32))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get(self) -> usize {
+        self.0.get() as usize
+    }
+
+    /// `(addr % w, addr / w)`: column and row of address `addr`.
+    #[inline(always)]
+    pub(crate) fn split(self, addr: usize) -> (usize, usize) {
+        let (row, column) = self.0.div_rem(addr as u32);
+        (column as usize, row as usize)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 #[repr(u8)]
 pub(crate) enum Kind {

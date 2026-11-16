@@ -87,6 +87,15 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   would conceal them. An unpaired field is output as a frame with the other field's lines
   unset.
 
+## Performance
+
+- Macroblock addresses split into column and row by a multiplication and a shift
+  (`triergon_codec::Divisor`), so 32-bit ARM, whose baseline has no divide instruction,
+  calls no division routine per macroblock.
+- Gate timings against FFmpeg are in [docs/status.md](../../docs/status.md): at `906d0a36`
+  the three H.264 workloads' paired 95% upper bounds are 0.81 to 1.04 on ARMv7 and 0.62 to
+  0.98 on Linux AArch64.
+
 ## Conformance
 
 - Specification: Rec. ITU-T H.264 (V15, 08/2024). Tables are transcribed from the text

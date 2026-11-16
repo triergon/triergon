@@ -150,24 +150,64 @@ fn receive_failure_words(input: usize, code: i32) -> [u64; 3] {
     [3, input as u64, i64::from(code) as u64]
 }
 
-fn retain_output<T>(kept: &mut BudgetVec<T>, value: T, following: &[Event]) -> Result<()> {
-    if kept.is_empty() {
-        // Each complete-packet action publishes at most one output. Read only
-        // action tags after an actual Ready, never codec state or golds. One
-        // reservation for every remaining packet action avoids a doubling
-        // replacement, whose old and new buffers would both be live.
-        let initial = 1 + following
-            .iter()
-            .filter(|event| matches!(event, Event::Packet { .. }))
-            .count();
-        // Keep the original minimum-slot admission when the larger bound
-        // cannot fit. Allocation failure retains its original refusal.
-        match kept.try_reserve_exact(initial) {
-            Ok(()) | Err(Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow) => (),
-            Err(error) => return Err(error),
+/// Retained outputs in order. The first `INLINE` stay in place, as the reference
+/// keeps its retained packet handles in a fixed array; only an operation with more
+/// outputs charges a vector for the rest. One heap block for every output was a
+/// large request on 32-bit glibc (from 512 bytes), which first merges every freed
+/// small chunk: about 3.6% of a four-output operation on ARMv7.
+struct Retained {
+    inline: [Option<NalPacketOutput>; Retained::INLINE],
+    inline_len: usize,
+    spilled: Option<BudgetVec<NalPacketOutput>>,
+}
+
+impl Retained {
+    // Every corpus operation but one publishes at most four outputs.
+    const INLINE: usize = 4;
+
+    fn new() -> Self {
+        Self {
+            // Element by element, so only each slot's niche is written; an array
+            // constant is zero-filled whole.
+            inline: std::array::from_fn(|_| None),
+            inline_len: 0,
+            spilled: None,
         }
     }
-    kept.try_push(value).map_err(|e| e.error)
+
+    fn push(&mut self, pool: &Budget, value: NalPacketOutput, following: &[Event]) -> Result<()> {
+        if let Some(slot) = self.inline.get_mut(self.inline_len) {
+            *slot = Some(value);
+            self.inline_len += 1;
+            return Ok(());
+        }
+        let spilled = self.spilled.get_or_insert_with(|| BudgetVec::new(pool));
+        if spilled.is_empty() {
+            // Each complete-packet action publishes at most one output. Read only
+            // action tags after an actual Ready, never codec state or golds. One
+            // reservation for every remaining packet action avoids a doubling
+            // replacement, whose old and new buffers would both be live.
+            let initial = 1 + following
+                .iter()
+                .filter(|event| matches!(event, Event::Packet { .. }))
+                .count();
+            // Keep the original minimum-slot admission when the larger bound
+            // cannot fit. Allocation failure retains its original refusal.
+            match spilled.try_reserve_exact(initial) {
+                Ok(())
+                | Err(Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        spilled.try_push(value).map_err(|e| e.error)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &NalPacketOutput> {
+        self.inline[..self.inline_len]
+            .iter()
+            .flatten()
+            .chain(self.spilled.iter().flat_map(BudgetVec::as_slice))
+    }
 }
 
 fn operation(case: &Case) -> Result<Outcome> {
@@ -216,7 +256,7 @@ fn operation(case: &Case) -> Result<Outcome> {
     outcome.digest.blob(configured.bytes());
     outcome.digest.signed(1);
     outcome.digest.signed(90000);
-    let mut kept = BudgetVec::new(&case.pool);
+    let mut kept = Retained::new();
     let mut drained = false;
     for (index, event) in case.events.iter().enumerate() {
         let Event::Packet {
@@ -293,7 +333,7 @@ fn operation(case: &Case) -> Result<Outcome> {
                         .checked_add(packet.bytes().len() as u64)
                         .ok_or(Error::Overflow)?;
                     outcome.packets = outcome.packets.checked_add(1).ok_or(Error::Overflow)?;
-                    retain_output(&mut kept, packet, &case.events[index + 1..])?;
+                    kept.push(&case.pool, packet, &case.events[index + 1..])?;
                     break;
                 }
                 Err(error) => {
@@ -311,7 +351,7 @@ fn operation(case: &Case) -> Result<Outcome> {
     drop(configured);
     outcome.digest.word(6);
     outcome.digest.word(outcome.packets);
-    for (index, packet) in kept.as_slice().iter().enumerate() {
+    for (index, packet) in kept.iter().enumerate() {
         packet_digest(&mut outcome.digest, 5, -1, index as u64, packet);
     }
     Ok(outcome)

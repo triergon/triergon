@@ -42,7 +42,7 @@ mod tables_cabac_init;
 mod tables_vlc;
 
 use dpb::{Current, NewMarking, PicNums, PocState, Stored as _};
-use mbinfo::{MbInfo, SliceDbk};
+use mbinfo::{MbInfo, MbWidth, SliceDbk};
 use nal::{parse_header, unescape};
 use picture::*;
 use ps::{Pps, Sps};
@@ -827,7 +827,7 @@ impl Decoder {
             buf,
             motion,
             mbs,
-            w,
+            w: MbWidth::new(w),
             h,
             structure,
             mbaff: sh.mbaff,

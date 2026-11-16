@@ -1,7 +1,7 @@
 //! Deblocking filter process (clause 8.7), applied to the whole decoded picture after all of
 //! its slices are reconstructed. Supports frames, field pictures and MBAFF frames.
 
-use crate::mbinfo::{Kind, MbInfo, SliceDbk};
+use crate::mbinfo::{Kind, MbInfo, MbWidth, SliceDbk};
 use crate::picture::{FrameBuf, Motion};
 use crate::slicedec::CurPic;
 use crate::tables::{ALPHA, BETA, TC0};
@@ -13,7 +13,7 @@ struct PicView<'a> {
     mbs: &'a [MbInfo],
     slices: &'a [SliceDbk],
     motion: &'a Motion,
-    w: usize,
+    w: MbWidth,
     structure: u8,
     mbaff: bool,
     chroma: bool,
@@ -30,7 +30,7 @@ struct View {
 fn mb_at_row(pic: &PicView<'_>, mbx: usize, r: usize) -> (usize, usize) {
     if pic.mbaff {
         let py = r / 32;
-        let top = 2 * (py * pic.w + mbx);
+        let top = 2 * (py * pic.w.get() + mbx);
         let rr = r % 32;
         if pic.mbs[top].field {
             (top + (rr & 1), rr >> 1)
@@ -38,7 +38,7 @@ fn mb_at_row(pic: &PicView<'_>, mbx: usize, r: usize) -> (usize, usize) {
             (top + rr / 16, rr % 16)
         }
     } else {
-        ((r / 16) * pic.w + mbx, r % 16)
+        ((r / 16) * pic.w.get() + mbx, r % 16)
     }
 }
 
@@ -46,16 +46,15 @@ fn mb_at_row(pic: &PicView<'_>, mbx: usize, r: usize) -> (usize, usize) {
 #[inline]
 fn mb_origin(pic: &PicView<'_>, addr: usize) -> (usize, usize, usize, bool) {
     if pic.mbaff {
-        let pair = addr / 2;
-        let mbx = pair % pic.w;
-        let py = pair / pic.w;
+        let (mbx, py) = pic.w.split(addr / 2);
         if pic.mbs[addr].field {
             (mbx, py * 32 + (addr & 1), 2, true)
         } else {
             (mbx, py * 32 + (addr & 1) * 16, 1, false)
         }
     } else {
-        (addr % pic.w, (addr / pic.w) * 16, 1, pic.structure != 0)
+        let (mbx, mby) = pic.w.split(addr);
+        (mbx, mby * 16, 1, pic.structure != 0)
     }
 }
 
@@ -569,8 +568,9 @@ impl Progress {
 
 /// Note that macroblock `addr` is decoded; filter the rows that became ready.
 pub(crate) fn mb_done(pic: &mut CurPic, addr: usize) {
+    // A row of macroblock pairs under MBAFF.
+    let r = pic.w.split(addr >> usize::from(pic.mbaff)).1;
     let p = &mut pic.dbk;
-    let r = addr / p.unit;
     if r >= p.left.len() || p.left[r] == 0 {
         return;
     }
@@ -764,12 +764,8 @@ fn deblock_mb(
     let a_off = sp.alpha_off;
     let b_off = sp.beta_off;
     let same_slice = |p: usize| pic.mbs[p].slice == q.slice;
-    let pair_w = pic.w;
-    let left_exists = if pic.mbaff {
-        !(addr / 2).is_multiple_of(pair_w)
-    } else {
-        !addr.is_multiple_of(pair_w)
-    };
+    let pair_w = pic.w.get();
+    let left_exists = mbx > 0;
     let top_exists = if pic.mbaff {
         let first_row = addr / 2 < pair_w;
         !(first_row && (qfield || addr & 1 == 0))
