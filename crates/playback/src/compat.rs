@@ -1,5 +1,7 @@
 //! Compatibility policies for playback.
 
+pub mod matroska;
+
 pub mod mov {
     //! MOV packet order and edit clocks using the
     //! [ISO BMFF MOV policy](triergon_isobmff::compat::mov).

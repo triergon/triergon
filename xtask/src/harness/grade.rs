@@ -1728,6 +1728,7 @@ mod tests {
             ("font-hinting-default", 159),
             ("font-hinting-modes", 954),
             ("matroska-audio-clocks", 10),
+            ("matroska-legacy-aac", 4),
             ("mp4-forward", 51),
             ("ts-program", 35),
             ("raw-annex-b", 7),
@@ -1806,7 +1807,10 @@ mod tests {
             };
             assert!(changed_binding.registered(root).is_err(), "{feature}");
             if feature.starts_with("matroska-")
-                && !matches!(feature, "matroska-startup-seek" | "matroska-audio-clocks")
+                && !matches!(
+                    feature,
+                    "matroska-startup-seek" | "matroska-audio-clocks" | "matroska-legacy-aac"
+                )
             {
                 matroska += count;
             }

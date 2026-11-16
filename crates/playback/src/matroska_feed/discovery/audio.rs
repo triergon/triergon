@@ -1,4 +1,5 @@
 //! Audio parameter observations for the admitted Matroska startup profiles.
+use crate::compat::matroska::legacy_aac_lc_parameters;
 use crate::{Output, Result};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, WorkBudget};
@@ -6,7 +7,10 @@ use triergon_framing::{
     AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, Ac3Family, Ac3FrameDetails,
     BuildStep, probe_ac3_header,
 };
-use triergon_matroska::{matroska::Track, typed::Packet};
+use triergon_matroska::{
+    matroska::{LegacyAacProfile, Track},
+    typed::Packet,
+};
 
 #[derive(Default)]
 pub(super) struct AudioProbe {
@@ -32,6 +36,7 @@ impl AudioProbe {
             "A_AAC" => None,
             "A_AC3" => Some(Ac3Family::Ac3),
             "A_EAC3" => Some(Ac3Family::Eac3),
+            _ if track.legacy_aac_profile() == Some(LegacyAacProfile::LowComplexity) => None,
             _ => return Ok(Some(false)),
         };
         if !work.try_charge(1) {
@@ -70,12 +75,16 @@ impl AudioProbe {
         if self.unavailable_aac & bit != 0 {
             return Ok(Some(false));
         }
-        let Some(raw) = packet
-            .configuration
-            .initialization_bytes(packet.packet.track)
-        else {
-            self.unavailable_aac |= bit;
-            return Ok(Some(false));
+        let configuration = &packet.configuration;
+        let Some(raw) = configuration.initialization_bytes(packet.packet.track) else {
+            let ready = matches!(
+                legacy_aac_lc_parameters(configuration, packet.packet.track),
+                Ok(Some(_))
+            );
+            if !ready {
+                self.unavailable_aac |= bit;
+            }
+            return Ok(Some(ready));
         };
         let source = AacSource {
             source: output.source_id(),

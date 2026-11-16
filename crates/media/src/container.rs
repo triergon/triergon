@@ -4,6 +4,7 @@
 //! DTS stays `None` because Matroska carries none, and random access follows
 //! the Block keyframe rule. Nothing here copies a packet.
 use crate::colour::Colour;
+use crate::matroska::LegacyAacProfile;
 use crate::matroska::{SeekReceipt as MatroskaSeek, Track};
 use crate::typed::{Event, Packet, Reader};
 use std::sync::atomic::AtomicBool;
@@ -125,6 +126,7 @@ fn codec_id(codec: &str) -> CodecId<'_> {
         "S_VOBSUB" => CodecId::VobSub,
         "S_DVBSUB" => CodecId::DvbSubtitle,
         "S_HDMV/PGS" => CodecId::Pgs,
+        other if LegacyAacProfile::from_codec_id(other).is_some() => CodecId::Aac,
         other => CodecId::Other(other.as_bytes()),
     }
 }
@@ -286,6 +288,15 @@ mod tests {
             ("V_AV1", CodecId::Av1),
             ("V_VP9", CodecId::Vp9),
             ("A_AAC", CodecId::Aac),
+            ("A_AAC/MPEG2/MAIN", CodecId::Aac),
+            ("A_AAC/MPEG2/LC", CodecId::Aac),
+            ("A_AAC/MPEG2/SSR", CodecId::Aac),
+            ("A_AAC/MPEG2/LC/SBR", CodecId::Aac),
+            ("A_AAC/MPEG4/LC", CodecId::Aac),
+            ("A_AAC/MPEG4/MAIN", CodecId::Aac),
+            ("A_AAC/MPEG4/SSR", CodecId::Aac),
+            ("A_AAC/MPEG4/LTP", CodecId::Aac),
+            ("A_AAC/MPEG4/LC/SBR", CodecId::Aac),
             ("A_AC3", CodecId::Ac3),
             ("A_AC3/BSID9", CodecId::Ac3),
             ("A_AC3/BSID10", CodecId::Ac3),
@@ -319,7 +330,7 @@ mod tests {
             "A_MPEG/L4",
             "A_MPEG",
             "A_DTS/LOSSLESS",
-            "A_AAC/MPEG4/LC",
+            "A_AAC/MPEG4/LC/UNKNOWN",
             "A_PCM/INT/BIG",
             "a_aac",
             "V_AUTHORED/OPAQUE",

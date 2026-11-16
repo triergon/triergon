@@ -112,13 +112,14 @@ pub struct Item {
 /// The features the gate measures through `report`, with their corpus
 /// directory and planning weight: the minutes their timing, memory and grade took
 /// with early stop on a c6g.4xlarge, the more of 32-bit ARMv7 and Linux AArch64.
-const FEATURES: [(&str, Option<&str>, u32); 26] = [
+const FEATURES: [(&str, Option<&str>, u32); 27] = [
     ("mp4-forward", None, 2),
     ("mp4-range", None, 4),
     ("mpegts-access-units", None, 6),
     ("subtitle-pgs-capsules", None, 9),
     ("ts-program", None, 2),
     ("matroska-audio-clocks", None, 1),
+    ("matroska-legacy-aac", None, 1),
     ("raw-annex-b", None, 1),
     ("mpegts-pes", None, 3),
     ("hls-segments", Some("harness/fixtures/hls"), 5),

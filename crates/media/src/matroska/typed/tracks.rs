@@ -83,6 +83,8 @@ impl TrackJob {
             kind: 0,
             codec: SharedText::constant(""),
             codec_private: SharedBytes::default(),
+            codec_private_present: false,
+            audio_settings_present: false,
             name: SharedText::constant(""),
             language: SharedText::constant("eng"),
             language_bcp47: None,
@@ -173,7 +175,10 @@ impl TrackJob {
                             0xd7 => t.number = ebml::uint(bytes)?,
                             0x73c5 => t.uid = ebml::uint(bytes)?,
                             0x83 => t.kind = ebml::uint(bytes)?,
-                            0x63a2 => t.codec_private = self.source.slice(child.payload)?,
+                            0x63a2 => {
+                                t.codec_private = self.source.slice(child.payload)?;
+                                t.codec_private_present = true;
+                            }
                             0x55ee | 0x41e4 => self.has_extensions = true,
                             0x86 | 0x536e | 0x22b59c | 0x22b59d => {
                                 if matches!(child.id, 0x22b59c | 0x22b59d) {
@@ -263,6 +268,7 @@ impl TrackJob {
                                 self.phase = if child.id == 0xe0 {
                                     TrackPhase::Video
                                 } else {
+                                    t.audio_settings_present = true;
                                     TrackPhase::Audio
                                 };
                             }
