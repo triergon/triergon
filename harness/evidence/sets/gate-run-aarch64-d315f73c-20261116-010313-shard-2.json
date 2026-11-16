@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-aarch64-d315f73c-20261116-010313-shard-2",
+ "path": "gate-run-aarch64-d315f73c-20261116-010313-shard-2",
+ "retention": "retained",
+ "reason": "AArch64 ISO BMFF open and index parity, timing and kernel-bound memory for part 2 of 3.",
+ "key": "evidence/gate-runs/d315f73c3b7d944442d465bed89908f230be286f-aarch64-20261116-010313/shard-2/997a310b2595a8490854a01a75444f78428dddc1665b61eb4ac8361f3b42919c.tar.zst",
+ "sha256": "997a310b2595a8490854a01a75444f78428dddc1665b61eb4ac8361f3b42919c",
+ "bytes": 46887979,
+ "results": [
+  {
+   "path": "memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "38c65a3c4486972bd2a4d040a955f3d48c9ef143e8d01d0ee787aa36be1ddd7d",
+   "status": 0,
+   "report_sha256": "8632dc7c16aae60e8506d26ac5ffe6ed462aced1f5a7dc70e7535edf6fda27cc",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "f0da051a3dfe58425d57b9d9044cfc515981a836e0ff22dd61e0a0b94866df60",
+   "status": 0,
+   "report_sha256": "d38403410ff45fb7926c9294867e953e439a65d1c6a3d5baf3e9577800abecdc",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/isobmff-2/gate-result.json",
+   "command": "grade",
+   "key": "11eacc4f068193e5d8837241c0dc967c721defe0d0107e3d4cc6fdb568fd63b1",
+   "status": 0,
+   "report_sha256": "74932890284dad20587abd610f6bda6a7d6ddbbeddc65fc348c9eff55c07475a"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "d315f73c3b7d944442d465bed89908f230be286f"
+ }
+}
