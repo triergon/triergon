@@ -1,0 +1,9 @@
+{
+ "name": "packet-framing-clock-faults-9d3d1f58-aarch64",
+ "path": "packet-framing-clock-faults-9d3d1f58-aarch64",
+ "retention": "retained",
+ "reason": "Records the AArch64 clock page-fault measurements on three packet framing cases.",
+ "key": "evidence/packet-framing-clock-faults-9d3d1f58-aarch64/3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f.tar.zst",
+ "sha256": "3c16aafc54adab485fe44fe0d06159d672244501ef8c71e10fec713259f11a5f",
+ "bytes": 2758327
+}

@@ -1,0 +1,35 @@
+{
+ "name": "cc-picture-output-aarch64-c6g",
+ "path": "cc-picture-output-aarch64-c6g",
+ "retention": "retained",
+ "reason": "subtitle-cc on Linux AArch64 on a c6g.4xlarge (kernel 7.0.0-1014-aws) at 72276346: parity 413 of 421 with the 8 open cases, timing 413/413 in 30 pairs pinned to CPU 1, kernel-bound memory on CPUs 1-15 with every observation valid, the grade, the kmem:rss_stat trace of updates by other tasks during the memory collection, the step logs, the RSS module proof and the source bundles",
+ "key": "evidence/cc-picture-output-aarch64-c6g/69518174fe4bf2ee867698786d16b618c5fb83adaf83aa24e85cca05fe8152d3.tar.zst",
+ "sha256": "69518174fe4bf2ee867698786d16b618c5fb83adaf83aa24e85cca05fe8152d3",
+ "bytes": 49989472,
+ "source_revisions": {
+  "candidate": "7227634612bde41866179e80b0dfcbb1d26cde82"
+ },
+ "results": [
+  {
+   "path": "grade/gate-result.json",
+   "command": "grade",
+   "key": "73d0ebdd46bcbdf49680e31443adb00c0a5918d8fd6cf2732a0f7b8ce0c045be",
+   "status": 1,
+   "report_sha256": "ac8612857383867fbbfd47ace783f102352bb76db8ce86ea52b48c0a22d4498c"
+  },
+  {
+   "path": "mem/gate-result.json",
+   "command": "report --memory",
+   "key": "3eadf8afc71be8d8eabfb49887c6d2ccd1ee3a001f57de2554ac0463ff555a1f",
+   "status": 0,
+   "report_sha256": "ec54cdbfcea12ba0b1045db596a22744de4ddc1933f615336f3492934a8c84ef"
+  },
+  {
+   "path": "time/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4947132e5c5843d58d133d5bb3418ba3a43d047e4d0584b962988b89cc1b9e3b",
+   "status": 0,
+   "report_sha256": "0add3a2c3e12b7e2faabe357da761fc59008a48b0cf0258a0c998364fb1bb683"
+  }
+ ]
+}

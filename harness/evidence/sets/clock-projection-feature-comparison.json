@@ -1,0 +1,46 @@
+{
+ "name": "clock-projection-feature-comparison",
+ "path": "clock-projection-feature-comparison",
+ "retention": "90 days",
+ "reason": "Clock projection feature measurements",
+ "key": "qualification/repository/clock-projection-feature-comparison/9b70162ae0b6a416520857a019a72a0bd66984c532d7dacb174c7b0c12c120ae.tar.gz",
+ "sha256": "9b70162ae0b6a416520857a019a72a0bd66984c532d7dacb174c7b0c12c120ae",
+ "files": [
+  {
+   "path": "clock-projection-feature-comparison/FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "clock-projection-feature-comparison/GUEST-PREFLIGHT.log",
+   "sha256": "2b11586ef8887f336156e13f15e9357c5b56abf530091f13235dd1e07e30c326"
+  },
+  {
+   "path": "clock-projection-feature-comparison/NATIVE-EXIT.txt",
+   "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4"
+  },
+  {
+   "path": "clock-projection-feature-comparison/NATIVE-RESULTS.sha256",
+   "sha256": "f02d6b112a99e619730ed782b908c898cdea2eecea64cc42c7e9f90923663253"
+  },
+  {
+   "path": "clock-projection-feature-comparison/NATIVE-RESULTS.tar.gz",
+   "sha256": "8f9dc4522f8ad69b002c3c774c1c0be029774174ad99d53ab804997c36a6d6f3"
+  },
+  {
+   "path": "clock-projection-feature-comparison/NATIVE.log",
+   "sha256": "b206d9ec665acb79495625050a8f50b4daf48d81aa360f7ee60e315b581ab354"
+  },
+  {
+   "path": "clock-projection-feature-comparison/PROGRESS.txt",
+   "sha256": "e7b20226481570ca2dfdf2b634d3b1bb8c82066d09c171945bcad65f590d5f96"
+  },
+  {
+   "path": "clock-projection-feature-comparison/SOURCE.bundle",
+   "sha256": "d209d39205f3ead00442e8bd359d9f608cb61636acb128be2f7271ef42e32d9e"
+  },
+  {
+   "path": "clock-projection-feature-comparison/STOP-FAILED-COLLECTION.log",
+   "sha256": "6097325ca674b947eb6b83820937459f9fc285e1b2c4b9b8cda2490b0d451f9b"
+  }
+ ]
+}

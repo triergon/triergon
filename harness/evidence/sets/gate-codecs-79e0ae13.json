@@ -1,0 +1,42 @@
+{
+ "name": "gate-codecs-79e0ae13",
+ "path": "gate-codecs-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the codecs' FATE parity grading and the timing of both codec workload lists; their memory is left out, because two workloads' candidate memory runs passed the 30 s per-run limit, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-codecs-79e0ae13/5ca320791dad42f2a8a31ba7fb182752593a44a343c736b831bd8dbd82423250.tar.zst",
+ "sha256": "5ca320791dad42f2a8a31ba7fb182752593a44a343c736b831bd8dbd82423250",
+ "bytes": 828341,
+ "results": [
+  {
+   "path": "gate-codecs-79e0ae13/aarch64/shard-4/benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "9668add655bbedd6e68e801fb5b5538ece3840424f0e2ebae93a3bb9c7618fb4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-79e0ae13/aarch64/shard-7/benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "a2239f16dce6cc29141226d054868be9235a319d698810449303c8d38da102fd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-79e0ae13/armv7/shard-4/benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "1cc7f1907ee88b4d6cf7dabf85638663093e98a32e8460377c732205a9fa6858",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-79e0ae13/armv7/shard-7/benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "2ff9858694bb477bd25df7a3cfe721743ca915439a32218c96a9a77986e1f6c5",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

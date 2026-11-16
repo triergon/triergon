@@ -1192,13 +1192,8 @@ fn generated_manifest(root: &Path, path: &Path) -> Option<R<Value>> {
 /// The files of the kept evidence sets that unpack at the repository root, by
 /// their listing in the evidence index.
 fn kept_files(root: &Path) -> R<BTreeMap<String, String>> {
-    let index = crate::checks::read_json(&root.join("harness/evidence/index.json"))?;
     let mut files = BTreeMap::new();
-    for set in index
-        .get("sets")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
+    for set in &crate::evidence::sets(root)? {
         let text = |key| set.get(key).and_then(Value::as_str);
         if text("retention") != Some("retained") || text("unpacked_at") != Some("repository") {
             continue;
@@ -2344,7 +2339,8 @@ mod tests {
         fs::write(root.join("lib.rs"), b"a").unwrap();
         assert_eq!(sources_digest(&root).unwrap(), committed);
         fs::create_dir_all(root.join("harness/evidence")).unwrap();
-        fs::write(root.join("harness/evidence/index.json"), b"{}").unwrap();
+        fs::create_dir_all(root.join("harness/evidence/sets")).unwrap();
+        fs::write(root.join("harness/evidence/sets/run.json"), b"{}").unwrap();
         assert_eq!(sources_digest(&root).unwrap(), committed);
         assert_eq!(tree_digest(&root.join("absent")).unwrap(), "absent");
         fs::remove_dir_all(root).unwrap();

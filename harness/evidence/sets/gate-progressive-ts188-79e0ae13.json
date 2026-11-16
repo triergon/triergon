@@ -1,0 +1,42 @@
+{
+ "name": "gate-progressive-ts188-79e0ae13",
+ "path": "gate-progressive-ts188-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the progressive TS suite's timing and memory (on ARMv7 its worker's numeric modes run only on Linux AArch64, so it measures nothing there), with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-progressive-ts188-79e0ae13/508da696a4781a3a1efa9340622f002f93f5184dba647472017600f993be4787.tar.zst",
+ "sha256": "508da696a4781a3a1efa9340622f002f93f5184dba647472017600f993be4787",
+ "bytes": 3308336,
+ "results": [
+  {
+   "path": "gate-progressive-ts188-79e0ae13/aarch64/shard-7/benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "3400f5fff7f78ad944b19449c617cf16d1559039e8effe4b9a3127994a041964",
+   "status": 0,
+   "report_sha256": "d416c6fd48c7fc9fac1984217358facf8123c91a57a397dcc7702fe9dc68b515"
+  },
+  {
+   "path": "gate-progressive-ts188-79e0ae13/aarch64/shard-7/memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "bed2e55fa29fe3a2648b6a2a40a4474d2e4ca5fb88c436753fc6d8a0b7ad2add",
+   "status": 0,
+   "report_sha256": "50b999d8ef5645425bdd09c5f6eea6f53221c887d92ba8d91898f020d1c93131"
+  },
+  {
+   "path": "gate-progressive-ts188-79e0ae13/armv7/shard-7/benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "eb286ab30e488e8130264e7821a876e84b5153d911b9de3f20b850e952a52757",
+   "status": 0,
+   "report_sha256": "b21f2fb9c5be15f606b2ca3e4c626b6fd81fb238e32c7b483b9dfb4d75d66e92"
+  },
+  {
+   "path": "gate-progressive-ts188-79e0ae13/armv7/shard-7/memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "518b2b7f92c49e1de29bcc6f5129a072195ace9e1a144b75ed22e991518285d0",
+   "status": 0,
+   "report_sha256": "998664cdee729b06c07a1671af40848223cd78bc4d68f0cd78b9bebd055efb9d"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

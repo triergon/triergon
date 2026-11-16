@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-header-removal-79e0ae13",
+ "path": "gate-matroska-header-removal-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-header-removal's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-header-removal-79e0ae13/51051d5173516db2f18aa374c9b2aa27583a32f69787dae96ead3a8ddac2b5af.tar.zst",
+ "sha256": "51051d5173516db2f18aa374c9b2aa27583a32f69787dae96ead3a8ddac2b5af",
+ "bytes": 1414757,
+ "results": [
+  {
+   "path": "gate-matroska-header-removal-79e0ae13/aarch64/shard-10/benchmark/matroska-header-removal/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c18fcae7e0a34691ab95606c9cbb2c416ca0cbfd30e37c37e7a0e66ffb565878",
+   "status": 0,
+   "report_sha256": "58446953990b165d22e579b5fb04432da58f231c76d704937f792f584b24a194"
+  },
+  {
+   "path": "gate-matroska-header-removal-79e0ae13/aarch64/shard-10/graded/matroska-header-removal/gate-result.json",
+   "command": "grade",
+   "key": "f733605217c666a0438a28f1a0cca1811b0a61cc96b7ca3b610b9368900bf140",
+   "status": 0,
+   "report_sha256": "f461001bfdf0e8c02994af31575231dc62bb0fe3b06b99442dadfedc6ce26f67"
+  },
+  {
+   "path": "gate-matroska-header-removal-79e0ae13/aarch64/shard-10/memory/matroska-header-removal/gate-result.json",
+   "command": "report --memory",
+   "key": "cef51b75068f205d66a630234e7423a19704f42549e1e7b69df67f3f26ee95be",
+   "status": 0,
+   "report_sha256": "ea1ab2fe28cf1492ff5daea0a9feefe27a75b208b4bdedeced5ac0fe3362a874"
+  },
+  {
+   "path": "gate-matroska-header-removal-79e0ae13/armv7/shard-10/benchmark/matroska-header-removal/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9eef4d3196ed72cfd238eda54c0aa9b4b222c24048e86fd1491bd8a71208fd93",
+   "status": 0,
+   "report_sha256": "9e469b221d0881ed54c5c80b05e4d87f128fd4677c7a7c02047e6a1fd92155cd"
+  },
+  {
+   "path": "gate-matroska-header-removal-79e0ae13/armv7/shard-10/graded/matroska-header-removal/gate-result.json",
+   "command": "grade",
+   "key": "1ed38e44dc4813a1328dbab162de1650209581100b169d9f6c30f67089d183f0",
+   "status": 0,
+   "report_sha256": "ba371dcd42b8bb89648b6334f53aeb7d8ca9cc98676e29c3178248d9e1843a26"
+  },
+  {
+   "path": "gate-matroska-header-removal-79e0ae13/armv7/shard-10/memory/matroska-header-removal/gate-result.json",
+   "command": "report --memory",
+   "key": "24eae67042da2237f69b6f067a696ad6a88dcb711bfa0f6a58fdd69d8e979f53",
+   "status": 0,
+   "report_sha256": "c160adf8332c31bbd20ad02d56c1666fefffddd5d367e8c65d960758d7f32309"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-62e1ad85-aarch64",
+ "retention": "retained",
+ "reason": "AArch64 packet-framing parity, timing and kernel-bound memory on the matched adapters",
+ "key": "evidence/packet-framing-62e1ad85-aarch64/cb21eabf713fe7d55546a55ef264698436cbae0202058787890141100c824b8c.tar.zst",
+ "sha256": "cb21eabf713fe7d55546a55ef264698436cbae0202058787890141100c824b8c",
+ "bytes": 20217167,
+ "source_revisions": {
+  "candidate": "62e1ad85011c85141ad58edfec275303a2d63b83"
+ }
+}

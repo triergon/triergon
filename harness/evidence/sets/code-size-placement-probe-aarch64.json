@@ -1,0 +1,9 @@
+{
+ "name": "code-size-placement-probe-aarch64",
+ "path": "code-size-placement-probe-aarch64",
+ "retention": "retained",
+ "reason": "Matroska audio clock total RSS on AArch64: alternating audio-clocks runs of main at f426ea65 against b438e75a and 4fc96a49, the per-commit bisect, the split of the first commit, resident pages and faults per 64 KiB fault-around window, every variant tried, subtitle-cc at b438e75a, and the scripts that ran them.",
+ "key": "evidence/code-size-placement-probe-aarch64/9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72.tar.zst",
+ "sha256": "9c11a363f6816f1f9398242a9f8a46c39b4f8a7249386f176b06f628d1b41d72",
+ "bytes": 20056214
+}

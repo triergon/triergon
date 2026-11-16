@@ -1,0 +1,7 @@
+{
+ "name": "isobmff-regular-table-recovery-linux-arm64",
+ "retention": "retained",
+ "reason": "ISO BMFF / MP4 status row",
+ "key": "evidence/isobmff-regular-table-recovery-linux-arm64/fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c.tar.gz",
+ "sha256": "fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c"
+}

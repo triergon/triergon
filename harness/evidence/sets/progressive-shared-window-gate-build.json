@@ -1,0 +1,6 @@
+{
+ "name": "progressive-shared-window-gate-build",
+ "retention": "90 days",
+ "key": "qualification/repository/progressive-shared-window-gate-build/27f3fb5e1700f9e18b375645db637b2d4726bd7a0608666f77b54252ee2151ab.tar.gz",
+ "sha256": "27f3fb5e1700f9e18b375645db637b2d4726bd7a0608666f77b54252ee2151ab"
+}

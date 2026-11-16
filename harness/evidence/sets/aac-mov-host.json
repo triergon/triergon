@@ -1,0 +1,10 @@
+{
+ "name": "aac-mov-host",
+ "path": "aac-mov-host",
+ "retention": "retained",
+ "reason": "AAC in MOV PCM and ADTS regression comparisons",
+ "key": "evidence/aac-mov-host/100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556.tar.gz",
+ "sha256": "100613a296e2f18f9631c60992057cb0debc108f1926c41a33b8c3f6f06f4556",
+ "bytes": 101185082,
+ "source_revision": "63f5e8e5626ed5dac0bbeb9c0e742e0eec6146e6"
+}

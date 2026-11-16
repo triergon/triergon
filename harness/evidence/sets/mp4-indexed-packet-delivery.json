@@ -1,0 +1,6 @@
+{
+ "name": "mp4-indexed-packet-delivery",
+ "retention": "90 days",
+ "key": "qualification/repository/mp4-indexed-packet-delivery/4c2992b765efb52b60ba6bec8425cbf4c3d1ec55967ddd6d291e1efb14a4e8e5.tar.gz",
+ "sha256": "4c2992b765efb52b60ba6bec8425cbf4c3d1ec55967ddd6d291e1efb14a4e8e5"
+}

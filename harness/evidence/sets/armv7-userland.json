@@ -1,0 +1,9 @@
+{
+ "name": "armv7-userland",
+ "path": "armv7-userland",
+ "retention": "retained",
+ "reason": "The Ubuntu 24.04 armhf user space the 32-bit ARMv7 results are measured in: a root file system image without home directories, toolchains or build output",
+ "key": "evidence/armv7-userland/f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533.tar.gz",
+ "sha256": "f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533",
+ "bytes": 161683579
+}

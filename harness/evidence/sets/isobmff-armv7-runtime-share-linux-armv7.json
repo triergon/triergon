@@ -1,0 +1,10 @@
+{
+ "name": "isobmff-armv7-runtime-share-linux-armv7",
+ "path": "isobmff-armv7-runtime-share-linux-armv7",
+ "retention": "retained",
+ "reason": "ISO BMFF ARMv7 runtime change, 32-bit ARMv7: instruction counts on the worst outputs for main, this branch's library with main's worker, this branch with the worker's per-kind child walks, and this branch, with the cross-built workers, their build recipe and their text size by crate",
+ "key": "evidence/isobmff-armv7-runtime-share-linux-armv7/65161697b5c5a79289df268d63ff79ef6e776559db48b36b9e45e1c219cf51e7.tar.gz",
+ "sha256": "65161697b5c5a79289df268d63ff79ef6e776559db48b36b9e45e1c219cf51e7",
+ "bytes": 14049861,
+ "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+}

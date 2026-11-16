@@ -1,0 +1,39 @@
+{
+ "name": "matroska-video-linux-arm64",
+ "path": "research/qualification/matroska-video-linux-arm64",
+ "retention": "90 days",
+ "reason": "superseded by the cited startup and seek runs",
+ "key": "qualification/repository/matroska-video-linux-arm64/7806674d92adbbddaf25c45971ad7157e99b9af4c16bc80c43eff00df7e28d8b.tar.gz",
+ "sha256": "7806674d92adbbddaf25c45971ad7157e99b9af4c16bc80c43eff00df7e28d8b",
+ "bytes": 96796,
+ "files": [
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/README.md",
+   "sha256": "270e91d7a26b8772584fb33486f89432850949781e2bfef12175eac81633e471"
+  },
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/results.json",
+   "sha256": "893edcb4239bfd76b7fd117fc181749533c2bb2703bd10316f20623e3d4d828a"
+  },
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/scan-replay-location/README.md",
+   "sha256": "01fc7f8312465f9e7dde6fb5739db878b0f8119cb19d05804e0f6f570ef752a1"
+  },
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/scan-replay-location/inline-attempt.json",
+   "sha256": "107045c98f5fdd87c2e0818919ef61fc08dd8246dc080ea850b8fe66177a2e23"
+  },
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/scan-replay-location/input-health-results.json",
+   "sha256": "87e6a914b7c71b9e758a7e2114335e4eadc7bc786fbfc876da82781377f2130e"
+  },
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/scan-replay-location/results.json",
+   "sha256": "8cfa8cef444703d9b061f540372bf61b94f6b514f998903da830785ad2839d95"
+  },
+  {
+   "path": "research/qualification/matroska-video-linux-arm64/scan-replay-location/short-headers-attempt.json",
+   "sha256": "b737992fa69272383b999811d407611f4988ee3f0c0e2ca6c4a22da144913c8d"
+  }
+ ]
+}

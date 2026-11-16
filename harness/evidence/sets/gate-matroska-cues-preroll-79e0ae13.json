@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-cues-preroll-79e0ae13",
+ "path": "gate-matroska-cues-preroll-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-cues-preroll's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-cues-preroll-79e0ae13/ed64a0ee179cda5453e75b807668b80d2252377226d43d06da520d3e54cff891.tar.zst",
+ "sha256": "ed64a0ee179cda5453e75b807668b80d2252377226d43d06da520d3e54cff891",
+ "bytes": 2172396,
+ "results": [
+  {
+   "path": "gate-matroska-cues-preroll-79e0ae13/aarch64/shard-5/benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "db3f53b6d5804fac50c6952c859c53990f8672b3cccdd88ac9204110f3746f8f",
+   "status": 0,
+   "report_sha256": "b660f79461d4deabee5f319d4c81b995b1403ab6448a41a5294cf8604111d01c"
+  },
+  {
+   "path": "gate-matroska-cues-preroll-79e0ae13/aarch64/shard-5/graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "38cc8f8b09134080c9c8d9f2cdc48602c17ccf791a57a9f1277f7d02788e27f1",
+   "status": 0,
+   "report_sha256": "7458f5b16c8b37330e571efbd8d1c457e1c3ac689346be4748bdc08ca9640ff8"
+  },
+  {
+   "path": "gate-matroska-cues-preroll-79e0ae13/aarch64/shard-5/memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "77fe34dec12797c7aec18cfb3605dcf1896c222edd120059187d7596dc428e9b",
+   "status": 0,
+   "report_sha256": "400ad67a42a453299e6c06e106fc28ebc8c1d184c1bbfc38b086c521fdfceb91"
+  },
+  {
+   "path": "gate-matroska-cues-preroll-79e0ae13/armv7/shard-5/benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0fe69ed7a3e498d97c97da69e4a6c551b91f459d61b4ef1628bd346069ce9969",
+   "status": 0,
+   "report_sha256": "03d238e4a9398c40c0ed51ead4f26bd97551da48de9662eae43aa7a600087f4f"
+  },
+  {
+   "path": "gate-matroska-cues-preroll-79e0ae13/armv7/shard-5/graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "19e9bff3d723a458c2f4c7e0767d46a98c41c652b7b932ace8da97b2bf01f760",
+   "status": 0,
+   "report_sha256": "d6bb0173f82c690ba780b3deaadddc64c1ade531aecf9173862e97500fe3c673"
+  },
+  {
+   "path": "gate-matroska-cues-preroll-79e0ae13/armv7/shard-5/memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "fd82d92fe5508bfe14383013234c2ec0afda6df54d47bac6e007371535027f82",
+   "status": 0,
+   "report_sha256": "864ca8d0c9473629653b8d70f858f7c56163604bcce29402bf16bd326593811e"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}
