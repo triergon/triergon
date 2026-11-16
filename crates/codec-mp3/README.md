@@ -45,7 +45,8 @@ output, without container trims. `--reset-at N` resets the decoder before access
   grouped quantizers and the joint stereo bound.
 - Layer I, joint stereo included.
 - All three layers share one polyphase synthesis filterbank (a 32-point DCT by Lee's
-  factorisation, then the 512-tap window). Mono frames give one plane (`FC`); stereo,
+  factorisation, then the 512-tap window, which uses the symmetry of the matrixed
+  vectors to read each value once for two outputs). Mono frames give one plane (`FC`); stereo,
   joint stereo and dual channel give two (`FL`, `FR`). A stream may change mode, sample
   rate or layer between frames.
 
