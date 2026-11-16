@@ -147,9 +147,7 @@ fn packet_digest(hash: &mut Digest, kind: u64, input: i64, ordinal: u64, packet:
 }
 
 fn receive_failure(hash: &mut Digest, input: usize, code: i32) {
-    hash.word(3);
-    hash.signed(input as i64);
-    hash.signed(i64::from(code));
+    hash.fold(&[3, input as u64, i64::from(code) as u64], &[]);
 }
 
 fn retain_output<T>(kept: &mut BudgetVec<T>, value: T, following: &[Event]) -> Result<()> {
