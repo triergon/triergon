@@ -3,10 +3,25 @@
 
 use triergon_framing::{MpegAudioHeader, MpegChannelMode};
 
-/// Scalefactor `index` of Table B.1: `2^(1 - index / 3)`.
+/// Scalefactor `index` of Table B.1 (a 6-bit field): `2^(1 - index / 3)`.
 pub(crate) fn scalefactor(index: u32) -> f32 {
     const THIRDS: [f32; 3] = [1.0, 0.793_700_5, 0.629_960_5];
-    2f32.powi(1 - (index / 3) as i32) * THIRDS[(index % 3) as usize]
+    const TABLE: [f32; 64] = {
+        let mut table = [0.0; 64];
+        let mut index = 0;
+        while index < 64 {
+            let mut power = 2.0f32;
+            let mut halvings = 0;
+            while halvings < index / 3 {
+                power *= 0.5;
+                halvings += 1;
+            }
+            table[index] = power * THIRDS[index % 3];
+            index += 1;
+        }
+        table
+    };
+    TABLE[index as usize & 63]
 }
 
 /// The fraction a code `code` of a quantizer with `levels` steps stands for:
