@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-armv7-906d0a36-20261116-213256-shard-2",
+ "path": "gate-run-armv7-906d0a36-20261116-213256-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at 906d0a36 (the H.264 macroblock address split without a division, with main 61978b63 merged) on four c6g.4xlarge hosts, ARMv7, shard 2 of the H.264-linked items (codecs, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/906d0a36a98d379412d43b5c24f5ecb304313450-armv7-20261116-213256/shard-2/09543c8a55753a0c97dcf9469e98af314e0cab50fae00abb5fd7d492d715b287.tar.zst",
+ "sha256": "09543c8a55753a0c97dcf9469e98af314e0cab50fae00abb5fd7d492d715b287",
+ "bytes": 1019196,
+ "results": [
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "1fb2b3db8d15c913bfaf3a6598c01a78ad9b2b79993178dfae69d0b8003a2db1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "a7d4bfa2ee48fa3968a5855b39ba7fe920433e489e15b0d41edb3920c915292e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "2840ecea532494f0e700d52af38c7fa5df3c6d3d7bd9c45aff2803db6927d169",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
