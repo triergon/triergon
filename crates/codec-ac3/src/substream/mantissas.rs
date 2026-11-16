@@ -245,9 +245,20 @@ impl Substream {
         let (start, end) = (self.strtmant[ch], self.endmant[ch]);
         let src = &self.aht_coef[ch][blk];
         for bin in start..end {
-            self.icoef[ch][bin] = (src[bin].round() as i32) >> self.exps[ch][bin];
+            self.icoef[ch][bin] = round_to_i32(src[bin]) >> self.exps[ch][bin];
         }
     }
+}
+
+/// `x.round() as i32`: nearest, halves away from zero, saturating, NaN to zero. ARMv7
+/// has no rounding instruction, so `f32::round` is a library call there; the conversion
+/// toward zero is one instruction. `x - t` is exact: for |x| < 2^23 both are multiples of
+/// the ulp of `x` and differ by less than 1, and above that `x` is an integer.
+#[inline]
+fn round_to_i32(x: f32) -> i32 {
+    let t = x as i32;
+    let f = x - t as f32;
+    t.saturating_add(i32::from(f >= 0.5) - i32::from(f <= -0.5))
 }
 
 static AHT_IDCT: std::sync::LazyLock<[[f32; 6]; 6]> =
@@ -353,6 +364,48 @@ fn gaq_mantissa(br: &mut BitReader<'_>, hebap: usize, m: u32, gain_log: u8) -> f
             } else {
                 s as f32 * EXP_SCALE[(sb - 1) as usize] * 0.25
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::round_to_i32;
+
+    #[test]
+    fn rounding_matches_the_library_round() {
+        let edges = [
+            0.0,
+            -0.0,
+            0.5,
+            -0.5,
+            1.5,
+            -1.5,
+            2.5,
+            0.499_999_97,
+            -0.499_999_97,
+            8_388_607.5,
+            -8_388_607.5,
+            8_388_608.0,
+            2_147_483_520.0,
+            2_147_483_648.0,
+            -2_147_483_648.0,
+            -2_147_483_904.0,
+            1e20,
+            -1e20,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+        ];
+        let mut bits = 0x1234_5678u32;
+        let random = (0..1 << 20).map(|_| {
+            bits ^= bits << 13;
+            bits ^= bits >> 17;
+            bits ^= bits << 5;
+            f32::from_bits(bits)
+        });
+        for x in edges.into_iter().chain(random) {
+            assert_eq!(round_to_i32(x), x.round() as i32, "{x:e}");
         }
     }
 }
