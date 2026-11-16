@@ -1,0 +1,42 @@
+{
+ "name": "gate-tests-79e0ae13",
+ "path": "gate-tests-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the workspace tests in the checked and release profiles and the core time test, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-tests-79e0ae13/46aa709c5f445b438ef94d589fd52979b5de8fb3c1c4605a036ae3445893b73b.tar.zst",
+ "sha256": "46aa709c5f445b438ef94d589fd52979b5de8fb3c1c4605a036ae3445893b73b",
+ "bytes": 10256718,
+ "results": [
+  {
+   "path": "gate-tests-79e0ae13/aarch64/shard-3/tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "23cd3faead6c87fa165eb3a813cdbb54bc1cf55043ff72d8fd8ea60eccbde54f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-tests-79e0ae13/aarch64/shard-9/tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "c3ba6b2fb71305a1458cdcf3ad761c3de73ac49b46a1f88329c907350eeffc90",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-tests-79e0ae13/armv7/shard-3/tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "1d53c0f5f03ddb180fdfde6b2b8310b395a8a83e68663222b57f3c0ceb0c5005",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-tests-79e0ae13/armv7/shard-9/tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "096f765a6c443765de90c03f6e1ec7e8ee0ec227e6c8bc3622600b590030674b",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

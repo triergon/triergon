@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-0ec6cedc-aarch64",
+ "retention": "retained",
+ "reason": "Earlier AArch64 packet-framing comparison at this revision",
+ "key": "evidence/packet-framing-0ec6cedc-aarch64/388e42387e42ce61cda1b9b81bf01adfe9f36a917a664a1cd314550f5c9d2d80.tar.zst",
+ "sha256": "388e42387e42ce61cda1b9b81bf01adfe9f36a917a664a1cd314550f5c9d2d80",
+ "bytes": 25770036,
+ "source_revisions": {
+  "candidate": "0ec6cedcc520cc67479f1adb5dab65a2fe8e2ede"
+ }
+}

@@ -1,0 +1,9 @@
+{
+ "name": "ass-rendering-58a5c202-linux-arm64-memory-libass",
+ "path": "ass-rendering-58a5c202-linux-arm64-memory-libass",
+ "retention": "retained",
+ "reason": "ASS rendering memory against libass in docs/status.md",
+ "key": "evidence/ass-rendering-58a5c202-linux-arm64-memory-libass/799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3.tar.gz",
+ "sha256": "799386520d27ae7be5eab6c827fcbe0608950ddb4c32c93be7ea3cf660d4b0e3",
+ "bytes": 210930417
+}

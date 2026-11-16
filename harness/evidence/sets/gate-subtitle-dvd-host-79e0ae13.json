@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-dvd-host-79e0ae13",
+ "path": "gate-subtitle-dvd-host-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-dvd-host's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-subtitle-dvd-host-79e0ae13/b6726eaf269f89a53d0bc34637f80d79956001487d1db25c2de9f81bf8174abf.tar.zst",
+ "sha256": "b6726eaf269f89a53d0bc34637f80d79956001487d1db25c2de9f81bf8174abf",
+ "bytes": 1158530,
+ "results": [
+  {
+   "path": "gate-subtitle-dvd-host-79e0ae13/aarch64/shard-3/benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "19e67dac36ca8af15abf218ce8285b7b17979265e2764c47e703cdf00be337e9",
+   "status": 0,
+   "report_sha256": "cc9c102dfa3f305d9ea9e8006a371ab057bfc43012dc7d2e0c971715f0bdc045"
+  },
+  {
+   "path": "gate-subtitle-dvd-host-79e0ae13/aarch64/shard-3/graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "8cd6ded3b9776da46c90266bc414df57cb2e338d505d05568067cbc66a554ddb",
+   "status": 1,
+   "report_sha256": "215e7cc4afaaceb03ff780db17395c0444899e42e17acb176e53fc9b5ec22c47"
+  },
+  {
+   "path": "gate-subtitle-dvd-host-79e0ae13/aarch64/shard-3/memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "569c99eca37a28c04cfa44a772df36f4174e7925ebeb510efe6e58ef4e97a0e3",
+   "status": 0,
+   "report_sha256": "7df25d05626113af86c37b1686adccf7c1149eb6a92c188cddf5f6d7116548b3"
+  },
+  {
+   "path": "gate-subtitle-dvd-host-79e0ae13/armv7/shard-3/benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ab02c8ceda6b911da7ab785deec3d973336d288bebdee3f2612fbb2d8e16690d",
+   "status": 0,
+   "report_sha256": "edc2b7dd4c80a027e94570da9444da6563f1a54bf81b66b19d5f388d2460c465"
+  },
+  {
+   "path": "gate-subtitle-dvd-host-79e0ae13/armv7/shard-3/graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "61f5460a6dea136fe1a102019c9ce052dfadd5f99d2e705f5f8285460b20ccc4",
+   "status": 0,
+   "report_sha256": "8925f469938c991dd4a5520657d01fc171cd0df73845994ddbad05966265438a"
+  },
+  {
+   "path": "gate-subtitle-dvd-host-79e0ae13/armv7/shard-3/memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "bfdcaacdd8f5c84fcadb8a42adee521354a0cab8beeedd19f24ad5ad43481466",
+   "status": 0,
+   "report_sha256": "378489aa0ae0e51658058785ad4fe5d4693f25ffe12b18c1d37c5ae2de52e982"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

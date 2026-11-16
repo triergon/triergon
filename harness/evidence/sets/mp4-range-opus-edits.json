@@ -1,0 +1,10 @@
+{
+ "name": "mp4-range-opus-edits",
+ "path": "mp4-range-opus-edits",
+ "retention": "retained",
+ "reason": "MP4 packet folds with Opus edit trim, unequal clocks and leading crops.",
+ "key": "evidence/mp4-range-opus-edits/cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223.tar.gz",
+ "sha256": "cfb8b1edc7592533b43cf1327be9cfd98a83598c90f3390cabd4770f147e1223",
+ "bytes": 14286932,
+ "source_revision": "63f6fe787b4f2976c339ee0548f032d21781dfb6"
+}

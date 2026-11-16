@@ -1,0 +1,56 @@
+{
+ "name": "gate-ass-render-host-79e0ae13",
+ "path": "gate-ass-render-host-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: ass-render-host's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-ass-render-host-79e0ae13/39abc38e95f0a3f6d1d72625ade9892e97fa3a87e29f9d6cd65e7cb7bed091b2.tar.zst",
+ "sha256": "39abc38e95f0a3f6d1d72625ade9892e97fa3a87e29f9d6cd65e7cb7bed091b2",
+ "bytes": 974239,
+ "results": [
+  {
+   "path": "gate-ass-render-host-79e0ae13/aarch64/shard-10/benchmark/ass-render-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b42fbda3156a4289df9d1633668c0418a6a8203abfafedb4d3772c41ae9f055d",
+   "status": 0,
+   "report_sha256": "9e83438907195506718c329dcf65726727c1c99a3f085197b16ad74ce1855c4b"
+  },
+  {
+   "path": "gate-ass-render-host-79e0ae13/aarch64/shard-10/graded/ass-render-host/gate-result.json",
+   "command": "grade",
+   "key": "183bf9f189c2567a16f6b20b3fee854982ba30486361743def66c0c8bca6d69d",
+   "status": 1,
+   "report_sha256": "5c0d0b11426f62075d0b01882a1a8aa4cbacacb14ea3da24dd94f1b8956f6418"
+  },
+  {
+   "path": "gate-ass-render-host-79e0ae13/aarch64/shard-10/memory/ass-render-host/gate-result.json",
+   "command": "report --memory",
+   "key": "d0cad716304f2b8ce0e78420725d79d70f98cc5de7f8fca61a0dc49b928aab70",
+   "status": 0,
+   "report_sha256": "3eb90dc3c25376c68dcc48086026601d04ef2311563664f4f265f043c28a7979"
+  },
+  {
+   "path": "gate-ass-render-host-79e0ae13/armv7/shard-10/benchmark/ass-render-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2fb90731041e6703d84c98b931644fd7ebb40b5e6526a7e5b8ffe5dfc7070d4c",
+   "status": 0,
+   "report_sha256": "e2f2e7fdf8374ad0fa892f66343ee3596a471c7c22cebbeb85feda7b84ca01c8"
+  },
+  {
+   "path": "gate-ass-render-host-79e0ae13/armv7/shard-10/graded/ass-render-host/gate-result.json",
+   "command": "grade",
+   "key": "293d2b6682224137f7a755f8b07735fecba9ddece3d5bc09589a45a1b3f28d39",
+   "status": 0,
+   "report_sha256": "bd57ff3e30efa689647320deb574f58b57d6de00bf9e11f38f2d652d8ae22ee8"
+  },
+  {
+   "path": "gate-ass-render-host-79e0ae13/armv7/shard-10/memory/ass-render-host/gate-result.json",
+   "command": "report --memory",
+   "key": "86fa26cc80f20f6e0d291b8e41a6710c94c77925d6353309098c321d8458c907",
+   "status": 0,
+   "report_sha256": "bd108426d2801a4ff084ec67608514829b0cabb6676ef438b4a8065ada51311d"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

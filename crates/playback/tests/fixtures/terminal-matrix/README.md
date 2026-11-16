@@ -26,7 +26,8 @@ other 8 are checked and listed in the manifest but not compared.
 ## Source
 
 The captures are in the retained evidence set
-`playback-terminal-matrix-ffprobe` (`harness/evidence/index.json`):
+`playback-terminal-matrix-ffprobe`
+([index entry](../../../../../harness/evidence/sets/playback-terminal-matrix-ffprobe.json)):
 
 | | |
 |---|---|

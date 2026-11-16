@@ -1,0 +1,83 @@
+{
+ "name": "gate-run-aarch64-6dc6440d-20261115-184229-shard-3",
+ "path": "gate-run-aarch64-6dc6440d-20261115-184229-shard-3",
+ "retention": "retained",
+ "reason": "A partial gate run at 6dc6440d on Linux AArch64, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items mp4-forward, mp4-range, ts-program; for their rows, whose workers the later trained-order revisions keep byte for byte",
+ "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-aarch64-20261115-184229/shard-3/2cef2fed47c80345d353bbc0c9d1fad33a1dde7d94bb0be514c23c806f47d289.tar.zst",
+ "sha256": "2cef2fed47c80345d353bbc0c9d1fad33a1dde7d94bb0be514c23c806f47d289",
+ "bytes": 20914414,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "7248e9fd976154627633f36c4ce75d6d0feb568d0c50cbc965ca81376384130f",
+   "status": 0,
+   "report_sha256": "9d95f754f5f9ec6564fa5de4acf72bf3577549b4928798fd76fa912798bfdd51",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "f2041a9e5c4385128b75dec5237937e6e6b5b9499267a482a3acf6300bd415c4",
+   "status": 0,
+   "report_sha256": "a7114e4cca292a9c42e7e2fe012bf5e6fab34a1fed9985820ae8fefb0aa49fd7",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "f56d268bd5bf825a91cec03887caeb0cd7b7224d9acc9b53e8575f4eb8fc4071",
+   "status": 0,
+   "report_sha256": "dc04f7c0b99c792ff7d1e66fb1891fe3d6257358281203d625eb5587c0e2f621",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a87a0c29a2881866588b0b89a4a5da3c7b7fb8a9d23fefc0057cebb5c6cbe6d4",
+   "status": 0,
+   "report_sha256": "fddc24af40110e01726521f2000e7e80adb0a4ef3ec87f8a39a0d7c89f1d74cf",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "38e60ebb4d63e19919da8234521809ea5fd6210d430564b22da7dab2348e9865",
+   "status": 0,
+   "report_sha256": "07bac37affd6c6bd05dcb102ea4840f14b8abce0c55b27bb2afe76a77d50398a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "042c3346d3444f542daef80e1e2bbbc95614bdadec95098011ba630aed78d8a6",
+   "status": 0,
+   "report_sha256": "608fc7bc54e72ed35d45d59e0f9e9683aac8ffc048292c6077e3cd1fa7586606",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "876a48b7a0a662ee0c6488957d034f35fb046d3d9f56e9e3e19fa12f3bd09ab8",
+   "status": 0,
+   "report_sha256": "10af711af876810b703dd39ee91b690e84e8f671237681853994033d7b41fa7e"
+  },
+  {
+   "path": "graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "9f9a543e605f3d34055f06bb7f22ee2b6022c3bdc9880e5a0feb2cbb1e91a927",
+   "status": 0,
+   "report_sha256": "86f48ca00993a1235c7333f848c31660875252a90d59c396ba087fa9471c9d62"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "c1a4a8239ad14379f044c9720a67eddb15e26b8bdee46648e5442843b1bdcd8c",
+   "status": 0,
+   "report_sha256": "5d8cd2457ec8648dfef3e8e084548b10f594f487dfac1d48a1e781b08bb8e6a7"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+ }
+}

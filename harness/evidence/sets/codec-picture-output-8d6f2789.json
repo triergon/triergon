@@ -1,0 +1,13 @@
+{
+ "name": "codec-picture-output-8d6f2789",
+ "path": "codec-picture-output-8d6f2789",
+ "retention": "retained",
+ "reason": "The H.264 and HEVC decoders on the shared picture output model at 8d6f2789 against 985bb4d4, on a c6g.4xlarge (Graviton2), kernel 7.0.0-1014-aws, Linux AArch64 and the armhf user space: the codecs equivalence records (byte-identical), the conformance tests with HEVC_CONFORMANCE_FULL=1, the caption sub-input of every subtitle-cc case (identical), the workspace tests, clippy, rustdoc and rustfmt logs, and instructions:u of decoding each video timing workload, three runs each, with the scripts",
+ "key": "evidence/codec-picture-output-8d6f2789/8e3485b2a0b184649f87ee5ae2bbbf1562ed3f786c3865f1c898ad4dee2f30b4.tar.zst",
+ "sha256": "8e3485b2a0b184649f87ee5ae2bbbf1562ed3f786c3865f1c898ad4dee2f30b4",
+ "bytes": 858656,
+ "source_revisions": {
+  "candidate": "8d6f278949aed417290058f1212dee0fc2a97243",
+  "baseline": "985bb4d4502743c06413812d7655d85ba15b452a"
+ }
+}

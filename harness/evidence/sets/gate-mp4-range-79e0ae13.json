@@ -1,0 +1,56 @@
+{
+ "name": "gate-mp4-range-79e0ae13",
+ "path": "gate-mp4-range-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mp4-range's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-mp4-range-79e0ae13/9e56ed4ed4e3b5f162d61c6a05680d2346c6dae2bd8e4d86a71a06b271c4f82c.tar.zst",
+ "sha256": "9e56ed4ed4e3b5f162d61c6a05680d2346c6dae2bd8e4d86a71a06b271c4f82c",
+ "bytes": 3766846,
+ "results": [
+  {
+   "path": "gate-mp4-range-79e0ae13/aarch64/shard-10/benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "92b5201efe057cde93d74efc8689dc8cc30f3da4ae7ce6c702627c4b6ed0e690",
+   "status": 0,
+   "report_sha256": "cbef9a90dde33d6e336ed9b78e080990eaf34565b1a03e775a92469616832b10"
+  },
+  {
+   "path": "gate-mp4-range-79e0ae13/aarch64/shard-10/graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "57f0a61b6e753698fcabedc4df9e66fb8aee768587f7d1dcaa37012e44c1d8d2",
+   "status": 0,
+   "report_sha256": "91dfddbbbecd75e34a35be6b873b4b07e5752f7bfcd7026a9da25b7680a69278"
+  },
+  {
+   "path": "gate-mp4-range-79e0ae13/aarch64/shard-10/memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "7dd0ff808ec7ccc9dbe971e83b117d79b83e9f836de3d963291026209c28fd9c",
+   "status": 0,
+   "report_sha256": "045893997f05ebeb0a3e4f0b4c45656d591c4b4bb49b8d499ee266887aba299f"
+  },
+  {
+   "path": "gate-mp4-range-79e0ae13/armv7/shard-10/benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "1a63486ab38e014befc660c21fffc2890efcb141fc7997cd4ed300acbe1b28ac",
+   "status": 0,
+   "report_sha256": "6cc088a3501bad76a887b72faa413fc5d6f5f62802aabbbf415a5d3aa618c9ce"
+  },
+  {
+   "path": "gate-mp4-range-79e0ae13/armv7/shard-10/graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "b3636c063383702e2c697c9192ded8c9e69647f55f07e026206ea2f587d1987a",
+   "status": 0,
+   "report_sha256": "d5bc931e5a5a96f2b6706b59c7a9fb1c9c1298e9f09bac18f08d3fdad6839a62"
+  },
+  {
+   "path": "gate-mp4-range-79e0ae13/armv7/shard-10/memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "af960c5a71d4bceffdc7a89cd2a14f1ab4b66c617c845dd5bb640f070bfaad25",
+   "status": 0,
+   "report_sha256": "70d1eafefe07787be70059d7be68311b1f1df0046771fcfdfcfa198ca64aa82e"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

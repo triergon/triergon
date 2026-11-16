@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-teletext-79e0ae13",
+ "path": "gate-subtitle-teletext-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-teletext's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-subtitle-teletext-79e0ae13/3061157c384c874ae2dec8ad092a0e2814ce1df3bee79801ee67f0d457bceefc.tar.zst",
+ "sha256": "3061157c384c874ae2dec8ad092a0e2814ce1df3bee79801ee67f0d457bceefc",
+ "bytes": 4286376,
+ "results": [
+  {
+   "path": "gate-subtitle-teletext-79e0ae13/aarch64/shard-1/benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "433a24568f3224a94058c7d92a509ee6db1c8d45b7df4cf3c24f217854af8936",
+   "status": 0,
+   "report_sha256": "020dc46dbc28a29b017d80c6ac99588563213d573b3baac0ee1c073236bc9dd3"
+  },
+  {
+   "path": "gate-subtitle-teletext-79e0ae13/aarch64/shard-1/graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "dd996dc063404c786509a171d2e864755d45360ee75fe239cd8d2747e58a237c",
+   "status": 0,
+   "report_sha256": "16d7a1d503a802290d0d62a393a60f0dc9ea5149afb0fd11626c5d711bea7297"
+  },
+  {
+   "path": "gate-subtitle-teletext-79e0ae13/aarch64/shard-1/memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "586c590ac8670bf0d3de0757536faad43196b0c16a305fd2c9cf3797a3b1632c",
+   "status": 0,
+   "report_sha256": "b7476a882a022e05bfee660e1c1c01f4b2bac81f6022ad98cbe457c7bbd9e833"
+  },
+  {
+   "path": "gate-subtitle-teletext-79e0ae13/armv7/shard-1/benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b71c5f8fc71350a933577bca7ac13608dffb788f72f5af0d6ea938ff1617abc6",
+   "status": 0,
+   "report_sha256": "cf67f984347280a2efd9ecb1d68e09cbe09c16175bb78e5fc8b3c07190f93961"
+  },
+  {
+   "path": "gate-subtitle-teletext-79e0ae13/armv7/shard-1/graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "2fa0c2bab9e6a7c8af97bb8f08b13681f2279a8884fc19938fc447cfc9b7ad88",
+   "status": 0,
+   "report_sha256": "c75796d04a061401ca327c642204eb5970b2a469adff350a6b1814a3ef2aa67c"
+  },
+  {
+   "path": "gate-subtitle-teletext-79e0ae13/armv7/shard-1/memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "32d4664255588c8a4dbc9ef6944c9179d0fcf239b6a2462201b3c71df37b1b80",
+   "status": 0,
+   "report_sha256": "fbfd20a497adceb4e35ed62615773a44736b41f7de26bcda53d267684afcd49d"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

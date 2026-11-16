@@ -1,0 +1,56 @@
+{
+ "name": "gate-mpegts-pes-79e0ae13",
+ "path": "gate-mpegts-pes-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mpegts-pes's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-mpegts-pes-79e0ae13/336971ce5b1d94a7a1b8a7d628459c69ba093586896f4d0752c37480d00b77c7.tar.zst",
+ "sha256": "336971ce5b1d94a7a1b8a7d628459c69ba093586896f4d0752c37480d00b77c7",
+ "bytes": 4929432,
+ "results": [
+  {
+   "path": "gate-mpegts-pes-79e0ae13/aarch64/shard-8/benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "dd08434dfd6ddd31be96178f6a53890e02161f70ae2b95cad9c00fae8de3774d",
+   "status": 0,
+   "report_sha256": "71bb95355246cf03b9dfb9e8e6a8640ffae438d057b878230a1f2138468086c9"
+  },
+  {
+   "path": "gate-mpegts-pes-79e0ae13/aarch64/shard-8/graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "f6caf576c1f90d4649c3aa0e235be4cac527bc8e929dc4281e93040b946bfa41",
+   "status": 0,
+   "report_sha256": "c7cdbf2ab8687ad5867fb0d4416dec204685ebdf2a38f9afe38d664b4bf887ee"
+  },
+  {
+   "path": "gate-mpegts-pes-79e0ae13/aarch64/shard-8/memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "8f619f759b6bc86e9ac37bd861970a18c827123631ea34c286557a44287f6ffb",
+   "status": 0,
+   "report_sha256": "3b2e9123c7c08fe627c221b2aca9718fe04bd7d6717ab3911721baac0dce0589"
+  },
+  {
+   "path": "gate-mpegts-pes-79e0ae13/armv7/shard-8/benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6346de38e1de22c2f8bd0f9e7bca0fd13c709105360c90447e70a558e9253f07",
+   "status": 0,
+   "report_sha256": "e39c98c33ff1734c49c61fe66cafcbea119ca1edc54611438e7403ca177a9c94"
+  },
+  {
+   "path": "gate-mpegts-pes-79e0ae13/armv7/shard-8/graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "f7f258fe59b86b640efc28b8156d36d790d0c4ef88266d5f1c781e4a644e9923",
+   "status": 0,
+   "report_sha256": "396153a1070b53a5fee8e8963b262e894b8f6844198cebcbc29b42d1c3d6cbfc"
+  },
+  {
+   "path": "gate-mpegts-pes-79e0ae13/armv7/shard-8/memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "f2fab9f84739769cad777d09fd1d547fa8b709ced3ac95a2b44756e9b72009ff",
+   "status": 0,
+   "report_sha256": "fc75e756865877bc0f3ad71e4e211d55c3361c0033e5bfb451d2634a56a31d41"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

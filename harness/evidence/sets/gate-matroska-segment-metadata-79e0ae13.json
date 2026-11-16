@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-segment-metadata-79e0ae13",
+ "path": "gate-matroska-segment-metadata-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-segment-metadata's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-segment-metadata-79e0ae13/3e0db31f1772c891af7428ddb8cdb84c6f45f8a33218cae1fd2b84784cd99b3c.tar.zst",
+ "sha256": "3e0db31f1772c891af7428ddb8cdb84c6f45f8a33218cae1fd2b84784cd99b3c",
+ "bytes": 4405702,
+ "results": [
+  {
+   "path": "gate-matroska-segment-metadata-79e0ae13/aarch64/shard-10/benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2a6c8a9762228a45e76392546bda60f4255ee88ac2996660e7e89fa4c54ab054",
+   "status": 0,
+   "report_sha256": "15970e12bd09c5055ae9c1b80dbfbfc08e1103c4e6e9ca5872429c5507bb7414"
+  },
+  {
+   "path": "gate-matroska-segment-metadata-79e0ae13/aarch64/shard-10/graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "65abffe62cbc578729ccad6efbba261a92ea2b018fabb2f0a46c3f49a3f2238f",
+   "status": 0,
+   "report_sha256": "4555de72efde5d80c1c3cff3d56aba27bd809ccfb063fc7d0b72dbfbb550e248"
+  },
+  {
+   "path": "gate-matroska-segment-metadata-79e0ae13/aarch64/shard-10/memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "1230d047820305e7049e5ccb32d49cc989ba75469b0b9ceec0c3349ae0eb9c83",
+   "status": 0,
+   "report_sha256": "d36e3d0d343b305033526baf95a40af1c16f463e408cfe45a56824140de46520"
+  },
+  {
+   "path": "gate-matroska-segment-metadata-79e0ae13/armv7/shard-10/benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "d117436ad3c8d9af69f4db3d02bb8058ed4da1a735301f7fefdc29300a23fddc",
+   "status": 0,
+   "report_sha256": "ff1f715a8408f5b4893c2f823990b5f2f7e410fa780346638c4c39b93e51157b"
+  },
+  {
+   "path": "gate-matroska-segment-metadata-79e0ae13/armv7/shard-10/graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "2c1e13e0f12716f4fce66f147b3132639bd020657264adcdc014979a7a89a87d",
+   "status": 0,
+   "report_sha256": "eea3d3156ba98d3f2af34056d531fd841598484a084175ba45530a5a6f098c17"
+  },
+  {
+   "path": "gate-matroska-segment-metadata-79e0ae13/armv7/shard-10/memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "305b946eb478e67092ee34c0bb385e7ebf2877e769c51ddbfd141c4423774521",
+   "status": 0,
+   "report_sha256": "cb2af6befdc72b6dd0252caada04113b367e9c488490c76c100befd92ccc4bf2"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

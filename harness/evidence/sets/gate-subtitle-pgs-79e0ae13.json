@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-pgs-79e0ae13",
+ "path": "gate-subtitle-pgs-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-pgs's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-subtitle-pgs-79e0ae13/a5e044f794746c06a88a18a66faf16f35766302883db8eaf7ce4dd6aea905b7b.tar.zst",
+ "sha256": "a5e044f794746c06a88a18a66faf16f35766302883db8eaf7ce4dd6aea905b7b",
+ "bytes": 11187634,
+ "results": [
+  {
+   "path": "gate-subtitle-pgs-79e0ae13/aarch64/shard-5/benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4e037f6ce9467274f45a7bb7fb56d5c58287d601bda5053d15381b6b3443d1bd",
+   "status": 0,
+   "report_sha256": "c7425c163d920c6d585d9bb3f0fd0e2f4ca7b7cd1b6c580fb378e1219c0d0ad4"
+  },
+  {
+   "path": "gate-subtitle-pgs-79e0ae13/aarch64/shard-5/graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "177344677f71e5262dd0cccfa4cef838851f1db21b5b6f9e5d8fcb7305c6f1bc",
+   "status": 0,
+   "report_sha256": "e85dc6315676e2c1563e60130382b63a52f672839206e562ebefa1c8320d7d5e"
+  },
+  {
+   "path": "gate-subtitle-pgs-79e0ae13/aarch64/shard-5/memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "6d284a5ca599c6a605faeff492a197846c9e7dc1394fb45c0fef55be65fc7552",
+   "status": 0,
+   "report_sha256": "493428c3a4f1a4b2a04980ee40f71743f101c2dab10c6b66a5d87cf65f1c61f1"
+  },
+  {
+   "path": "gate-subtitle-pgs-79e0ae13/armv7/shard-5/benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f918f7b2f2991e17e971414de4f6beec2e752e37915f20522c30765f2180dc91",
+   "status": 0,
+   "report_sha256": "f8917d9f4e49817b31109c1cbe3fd6ffc7fc5d431c7b83578f9414afb66deb5d"
+  },
+  {
+   "path": "gate-subtitle-pgs-79e0ae13/armv7/shard-5/graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "dc48fda0cf145f682d401df04e8abcf7f389ab5161c4ab0fafdc21d6a1fa832a",
+   "status": 0,
+   "report_sha256": "5146cac7bf44e2b924a956b098ae56e05413ebb7be5a063075a8dbb4787ad9ea"
+  },
+  {
+   "path": "gate-subtitle-pgs-79e0ae13/armv7/shard-5/memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "a15f07eda96ecc7cdf02ae0692c116b727a2e0de9e19f72f43230febdf06cfca",
+   "status": 0,
+   "report_sha256": "fe7cd74e5511b5714fb9c5b2eb54ad8ad3aed4042044003f1d92b60f54cc0de4"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "name": "capture-armv7-conversion-dcf51398-aarch64",
+ "path": "capture-armv7-conversion-dcf51398-aarch64",
+ "retention": "retained",
+ "reason": "Capture at dcf51398 on Linux AArch64 (c6g.4xlarge, CPU 1): parity of all 15 cases against FFmpeg 9.0.2 for AArch64 with the conversion listed open (2 timing and 2 memory pairs, not a gate), the crate and xtask tests at dcf51398 and e8e14c54 with the e8e14c54 worker's digest, user-mode instruction counts of every case against main's build at f3d4935b and against FFmpeg, the counted workers and the scripts that ran them",
+ "key": "evidence/capture-armv7-conversion-dcf51398-aarch64/016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2.tar.gz",
+ "sha256": "016c8619d9526186484f68101855e338034d3d5ff13a6bf0641d34615cde21a2",
+ "bytes": 75856048,
+ "source_revisions": {
+  "candidate": "dcf51398e97c781d517c2c577194a9d92f8c7f15",
+  "baseline": "f3d4935b3fdbd90773f1f8f67852dcb8ffc2ebb7"
+ }
+}

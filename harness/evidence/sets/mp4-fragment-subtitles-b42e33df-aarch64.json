@@ -1,0 +1,9 @@
+{
+ "name": "mp4-fragment-subtitles-b42e33df-aarch64",
+ "path": "mp4-fragment-subtitles-b42e33df-aarch64",
+ "retention": "retained",
+ "reason": "MP4 range playback with fragmented timed text and DVD subpictures",
+ "key": "evidence/mp4-fragment-subtitles-b42e33df-aarch64/5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5.tar.gz",
+ "sha256": "5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5",
+ "bytes": 50007294
+}

@@ -1,0 +1,98 @@
+{
+ "name": "gate-isobmff-79e0ae13",
+ "path": "gate-isobmff-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: the ISO BMFF suite's timing and memory in three parts, each part's comparison of all 1,020 operations, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-isobmff-79e0ae13/76c81aebbb9ca11b79abc4ab0934674d750718fdec15fa88d9b0feb5e2d24880.tar.zst",
+ "sha256": "76c81aebbb9ca11b79abc4ab0934674d750718fdec15fa88d9b0feb5e2d24880",
+ "bytes": 27884008,
+ "results": [
+  {
+   "path": "gate-isobmff-79e0ae13/aarch64/shard-4/benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "bfa9addaa066a3ea6064de696a52694ea68f7c79918e216f7065aa91d860203b",
+   "status": 0,
+   "report_sha256": "b98603a9818a7b9521ad243e7bfb1926b9752279c41815a173b22c22ea666997"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/aarch64/shard-4/memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "53b9dca5da435ac9fae7acfc997ef6620b8623412e7936e0161d6ae37519bfff",
+   "status": 0,
+   "report_sha256": "ea5c0a3b8249a3143a22819036054a0c5567056571b84e9b524bd6fe543f4367"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/aarch64/shard-5/benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "18e1c605aee7ffaaf576584dfc9e4958bb0d500d9a923eaa74369edd9d4b5174",
+   "status": 0,
+   "report_sha256": "ca4f437684c9dc1cb39683c9751a0442206f2211ba96689a3f1eb893a3ddbf4c"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/aarch64/shard-5/memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "ed96290796423a26e7aec6f6cc70b689828fb153bfbf0ecc59c369d69d7207d4",
+   "status": 0,
+   "report_sha256": "3e47cedb852bda3aa5956ef9ebacde61f0659b77cb146fba9720479315b29958"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/aarch64/shard-6/benchmark/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "30913be0dc48b5271c3370af251846ce2cc8f4f5437c0cb94fdca3dfaeac195b",
+   "status": 0,
+   "report_sha256": "5e051d1faf1fa108e44346f866d7295c38e45dcb1a90bda6bdfa8dda7007222d"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/aarch64/shard-6/memory/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "696bcd833206cf808fdf252fba4e4e844452b4943e60f2d1e3a57d505d4472d5",
+   "status": 0,
+   "report_sha256": "b78a93abe9faa8be338cad7ac7c96dc4a1717d74e635c91f5d59e264d3010030"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/armv7/shard-4/benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "ff62f753d8884584dc743adfc0241975c4fb88d40304a1c747b99d6f2825e187",
+   "status": 0,
+   "report_sha256": "0970ea9f32e803d4f53c825ced16eb0ce0f1762a82775f402712be85aecf9716"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/armv7/shard-4/memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "4804b550a4d6e608b5d3cec98010de72c229e847d6588d0506d32b66e5dd4722",
+   "status": 0,
+   "report_sha256": "32a8bf718afb1da5fcc58740cea71e3c88059557cde466ccf56e1a6c64510120"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/armv7/shard-5/benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "5e0b6ee04fbed4a8aa9aa57d58791763cd02460ef5f9b34fa736e8466fd25575",
+   "status": 0,
+   "report_sha256": "2ef776bfcddad0d92cb425593462620f30b8ca2a8deb11fe2bd2c436064219fe"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/armv7/shard-5/memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "9e5dacbf1718d3f258d2e37acfab94cddfe1f8a35af8f0279bd746720d2c3e37",
+   "status": 0,
+   "report_sha256": "3f3f0fb207bf43f6d737945644518d316739df839dfafae366e517c201c75db4"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/armv7/shard-6/benchmark/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "a417fc286d58640fab5577fa2c40a6d2776749168b2c4e7c420f7a28e87197e6",
+   "status": 0,
+   "report_sha256": "26ed9ef0a8415784ddbe8e5787669aefa0ec6914adf004a08afa8942bfa99429"
+  },
+  {
+   "path": "gate-isobmff-79e0ae13/armv7/shard-6/memory/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "2f739c04d5dc6fe52b06b114f24c9920a5f16581289c1e005027a16f5331863a",
+   "status": 0,
+   "report_sha256": "c6a349074d49df1d8c0eb63a2459040a57841803d62d6606bf260636e90f0da9"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

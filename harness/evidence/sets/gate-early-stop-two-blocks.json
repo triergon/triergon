@@ -1,0 +1,12 @@
+{
+ "name": "gate-early-stop-two-blocks",
+ "path": "gate-early-stop-two-blocks",
+ "retention": "retained",
+ "reason": "The two-block early stop of timing and memory sessions replayed on every 30-pair session of evidence sets armv7-thumb2-3df7ae6d-linux-armv7, runners-gate-build-linux-arm64, mpegts-pes-gate-build-linux-arm64 and isobmff-armv7-runtime-regate-linux-arm64, and simulated by drawing pairs from the ARMv7 sessions' own ratios with the true median at, beyond and inside each ceiling; the independence of their pairs (lag-1 autocorrelation and first-block shift against each session's shuffled ratios); a simulation of the looks after 10 and 20 pairs and of the two-block rule under autocorrelated and drifting pairs; the per-case comparisons of the real runs in gate-early-stop-runs-aarch64 and gate-early-stop-runs-armv7; and the scripts",
+ "key": "evidence/gate-early-stop-two-blocks/f6daf7ca01d2dbd71b0ac4ee41fd74ab6cf4a75e3e6f41ada937637710a4be67.tar.gz",
+ "sha256": "f6daf7ca01d2dbd71b0ac4ee41fd74ab6cf4a75e3e6f41ada937637710a4be67",
+ "bytes": 6325239,
+ "source_revisions": {
+  "candidate": "ce504ad583c0e96e33fc9b879c32ffce2a5d2f0b"
+ }
+}

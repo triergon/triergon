@@ -1,0 +1,6 @@
+{
+ "name": "container-framing-runner-host-checks",
+ "retention": "90 days",
+ "key": "qualification/repository/container-framing-runner-host-checks/e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4.tar.gz",
+ "sha256": "e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4"
+}

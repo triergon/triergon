@@ -1,0 +1,9 @@
+{
+ "name": "code-size-4fc96a49-aarch64",
+ "path": "code-size-4fc96a49-aarch64",
+ "retention": "retained",
+ "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.2xlarge): the playback, transport, media and subtitle-cc gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the release tests, worker-tests, the worker SHA-256 and .text sizes.",
+ "key": "evidence/code-size-4fc96a49-aarch64/78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29.tar.zst",
+ "sha256": "78255f4d6b7a140b9992db206fc9978716fa70457b389bd24990a5536eb3ad29",
+ "bytes": 37021601
+}

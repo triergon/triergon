@@ -1,0 +1,10 @@
+{
+ "name": "aac-program-configurations-reviewed",
+ "path": "aac-program-configurations-reviewed",
+ "retention": "retained",
+ "reason": "Configured AAC-LC parity and native comparisons with height validation and grouped rear pairs",
+ "key": "evidence/aac-program-configurations-reviewed/7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e.tar.gz",
+ "sha256": "7e7f3985d7d4c2f8e56d82aeb10b8627afb6e4a72df6bfc66bd1da4a5a7d019e",
+ "bytes": 181869637,
+ "source_revision": "7b479ad67690a7c2bc03c15f4ff8545c05bc965a"
+}

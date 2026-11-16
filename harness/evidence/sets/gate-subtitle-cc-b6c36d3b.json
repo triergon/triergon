@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-cc-b6c36d3b",
+ "path": "gate-subtitle-cc-b6c36d3b",
+ "retention": "retained",
+ "reason": "Partial gate run of subtitle-cc at b6c36d3b under static-toolchain-runtime-v1, one c6g.4xlarge host (Graviton2) per target from the gate images, which lack evidence set subtitle-cc-inputs, with that set unpacked at the repository root of each host before it got ready, kernel 7.0.0-1014-aws, Linux AArch64 and 32-bit ARMv7: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grade, 449 of 449 cases on each target; the shard outputs, build identities, plan, step records and logs, the run summary and the workstation's logs; for the docs/status.md closed caption rows",
+ "key": "evidence/gate-subtitle-cc-b6c36d3b/7052328cf69e4905a1b8146780340cabfe442aa9224e9c55af7da81e752c96a9.tar.zst",
+ "sha256": "7052328cf69e4905a1b8146780340cabfe442aa9224e9c55af7da81e752c96a9",
+ "bytes": 15820172,
+ "source_revisions": {
+  "candidate": "b6c36d3ba22e45874549e26ffeab0487cc031dba"
+ },
+ "results": [
+  {
+   "path": "aarch64/shard-1/benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c4db9f62f6ac7f2ef07cf1e0fba0b6499b288ee80b745bbbbb5f2ada0ff91c6a",
+   "status": 0,
+   "report_sha256": "83db8f4421c601e51ea6afa657afb29ad51336eb544fcce78285682acf4bfbd6"
+  },
+  {
+   "path": "aarch64/shard-1/graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "af8ef2f1c1f6d030cbb2abd29a80173f1c8fa04cfe3fd2a825ac3032c5bba44c",
+   "status": 0,
+   "report_sha256": "b9b9afe266cef0a7f2b4dfbd0a6dd7b2ce3c3dd9a1a62c29296cb6e50b8d5aca"
+  },
+  {
+   "path": "aarch64/shard-1/memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "78b6bde6b07e09a4448175c4b94f03d68ae00473568ba2a9e5bcaf8158e91e50",
+   "status": 0,
+   "report_sha256": "46be540647e247fffab0e483df91fbdfb118abf15809524052306a803c2027e6"
+  },
+  {
+   "path": "armv7/shard-1/benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "1ff8313fe330ad3be19e90d907722364943cca56236ac097855ae8fa1b62ec89",
+   "status": 0,
+   "report_sha256": "24b2d3d0e60fc342a06e7953c6f45a1a654bfdde8b49eac8e99a6d11c996b26a"
+  },
+  {
+   "path": "armv7/shard-1/graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "896b63c59652b1cd6d1eca1711bb78ee7681781aee9aca1535068b1cab94c948",
+   "status": 0,
+   "report_sha256": "c0081b1aaf702b3ea252890efbdc6656ca6841a77a63caa74dd7eaab622b6b2d"
+  },
+  {
+   "path": "armv7/shard-1/memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "b4a6ff864e7d763f57f780a119b8108c0220b4a1e57404ed1102d81ff0c0f69c",
+   "status": 0,
+   "report_sha256": "a51bdd0a0c30301c2149c4c085742e606a55def3624428d712ff7cc602311238"
+  }
+ ]
+}

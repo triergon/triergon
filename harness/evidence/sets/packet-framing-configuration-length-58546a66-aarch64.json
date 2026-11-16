@@ -1,0 +1,9 @@
+{
+ "name": "packet-framing-configuration-length-58546a66-aarch64",
+ "path": "packet-framing-configuration-length-58546a66-aarch64",
+ "retention": "retained",
+ "reason": "Records the AArch64 packet framing comparison using the validated Annex B configuration size.",
+ "key": "evidence/packet-framing-configuration-length-58546a66-aarch64/d39ec483eb8cdd99bf49145ece64421b10614e0de7a088bdc2c49ce1e56af68d.tar.zst",
+ "sha256": "d39ec483eb8cdd99bf49145ece64421b10614e0de7a088bdc2c49ce1e56af68d",
+ "bytes": 41672511
+}

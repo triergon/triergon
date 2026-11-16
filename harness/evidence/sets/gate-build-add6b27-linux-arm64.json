@@ -1,0 +1,6 @@
+{
+ "name": "gate-build-add6b27-linux-arm64",
+ "retention": "90 days",
+ "key": "qualification/gate-build-add6b27-linux-arm64/0cf93ddd1d397cf583716aef95464e8c498d0b928007239ca8a52d233b52ca94.tar.gz",
+ "sha256": "0cf93ddd1d397cf583716aef95464e8c498d0b928007239ca8a52d233b52ca94"
+}

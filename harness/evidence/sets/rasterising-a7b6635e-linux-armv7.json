@@ -1,0 +1,10 @@
+{
+ "name": "rasterising-a7b6635e-linux-armv7",
+ "path": "rasterising-a7b6635e-linux-armv7",
+ "retention": "retained",
+ "reason": "Rasterising rows, 32-bit ARMv7: raster compare --all and the raster tests at the head in the armv7-userland user space, with the dumps of the two sweep cases whose composite allocation fails, with the CPU, kernel and user-space package list",
+ "key": "evidence/rasterising-a7b6635e-linux-armv7/d328061b906a28f523eddd7aeaa778b62d13b7c7750c68347659a457497465d7.tar.gz",
+ "sha256": "d328061b906a28f523eddd7aeaa778b62d13b7c7750c68347659a457497465d7",
+ "bytes": 15433902,
+ "source_revision": "a7b6635e20cc2dc9d4592a874ba0eecab24f2870"
+}

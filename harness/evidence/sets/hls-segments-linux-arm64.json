@@ -1,0 +1,7 @@
+{
+ "name": "hls-segments-linux-arm64",
+ "retention": "retained",
+ "reason": "HLS segments status row before the gate build",
+ "key": "evidence/hls-segments-linux-arm64/de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1.tar.gz",
+ "sha256": "de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1"
+}

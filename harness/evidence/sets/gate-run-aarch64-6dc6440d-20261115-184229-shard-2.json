@@ -1,0 +1,83 @@
+{
+ "name": "gate-run-aarch64-6dc6440d-20261115-184229-shard-2",
+ "path": "gate-run-aarch64-6dc6440d-20261115-184229-shard-2",
+ "retention": "retained",
+ "reason": "A partial gate run at 6dc6440d on Linux AArch64, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items framing, matroska-startup-seek, raw-annex-b; for their rows, whose workers the later trained-order revisions keep byte for byte",
+ "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-aarch64-20261115-184229/shard-2/68babd9b4d90f0b68230e3b81065c87cb466661fa12f4ec62d3888470911524a.tar.zst",
+ "sha256": "68babd9b4d90f0b68230e3b81065c87cb466661fa12f4ec62d3888470911524a",
+ "bytes": 27785646,
+ "results": [
+  {
+   "path": "memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "fd096a80ae114bc0afee828a067603fee45a39ce2c9ae62857633c3e72103cde",
+   "status": 0,
+   "report_sha256": "cde6de92ed080e8d4d9d284de9bb6be88d72916b464033597a80811e315cc803",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "7b4355aafdd1cd6b111ff8caa32611ad362abeb815a5f00f284c6a34c7dd0ce3",
+   "status": 0,
+   "report_sha256": "1ccede4d184b98633fd2fa9fc9c96967d03d92af2b0cec8860132959966562a6",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "7dda6b8e3a88326f2510d53ea97e7d6d56aebb52f569c46510c9e54b47b88c23",
+   "status": 0,
+   "report_sha256": "310ade1fcd321374a91649eb450043e99e281781ed792932cacc0fcdafcd89c0",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "bb437ec66fd2cfd0c76e8b15b9027b5dde79db810b6b427ee3c48d9248ccefed",
+   "status": 0,
+   "report_sha256": "8807b3e42e90622ca218c3df27ee54dc7f09efeb7c4e9b9f79f49ed2dcf2d41b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7f057a8b4ab713446f17d6e6b12a7e2f0efd6fb3874a1af04d3c7284058e9c55",
+   "status": 0,
+   "report_sha256": "94bddc3a10674bfbbca202522c421bd827cdad90ded98c6876716969e7f56426",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7b25f277ef6242539c43263e351b7c94ed06125063ec75c77d2e52d9a24c5336",
+   "status": 0,
+   "report_sha256": "8576de564305d022e24c35f3c5c49a7bd1a065b0d922968c7a9931e5ec8f5fbf",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "b9577acc78935fb4e2fb0523df91559342eb7845eb4dd8e033f5952d7cdd85c0",
+   "status": 0,
+   "report_sha256": "ca49715d976cf4efa4cbf33efde5553f6b370e06a90345305ceecac6f39e5f76"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "b2b0f33d67e6e72d6d1424174ee5b67269bff9dc7fc8d436f6dbc9858a44760b",
+   "status": 0,
+   "report_sha256": "872bda7599667daafd6e6d19ae024278744fb58443fcf69e375b695f33082cb0"
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "e9040b6ecd6b9af79b13c67e1a2754734e0f0277f9411cddb3236b7f5b82925b",
+   "status": 0,
+   "report_sha256": "df7d94e940c0cdac2732fa2336ff5d4d98f0c307b764b182b38d9b5dc4b2fbfb"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "name": "capture-linux-arm64",
+ "path": "research/qualification/capture85-linux-arm64",
+ "retention": "retained",
+ "reason": "Capture status row",
+ "key": "evidence/capture-linux-arm64/f425781ee85a14c2fd6078e6a3eb0fc72765490fa35833dc73935d427ebbd6db.tar.gz",
+ "sha256": "f425781ee85a14c2fd6078e6a3eb0fc72765490fa35833dc73935d427ebbd6db",
+ "bytes": 15383,
+ "files": [
+  {
+   "path": "research/qualification/capture85-linux-arm64/README.md",
+   "sha256": "d2d0a66f885d311031c5427be51c8ff3a273d5eebe00eb661d59883a52895357"
+  },
+  {
+   "path": "research/qualification/capture85-linux-arm64/receipt.json",
+   "sha256": "59aeba186feb667d1d9f34392717cdf5208891f7e80cef53979871173f00ad45"
+  }
+ ]
+}

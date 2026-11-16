@@ -1,0 +1,27 @@
+{
+ "name": "hls-av-family-linux-arm64",
+ "path": "research/qualification/hls-av-family-linux-arm64",
+ "retention": "90 days",
+ "reason": "superseded by the cited HLS segment run",
+ "key": "qualification/repository/hls-av-family-linux-arm64/280645df2bc03a0914d6a67a25f89d4ddca0ab21c42f8e11bc0c10979c7dd152.tar.gz",
+ "sha256": "280645df2bc03a0914d6a67a25f89d4ddca0ab21c42f8e11bc0c10979c7dd152",
+ "bytes": 129052,
+ "files": [
+  {
+   "path": "research/qualification/hls-av-family-linux-arm64/README.md",
+   "sha256": "217c352f2cff0e2d818905c8dba37d94593725ebbae57fbf3cc5b31f3b2fbe6c"
+  },
+  {
+   "path": "research/qualification/hls-av-family-linux-arm64/optimization-results.json",
+   "sha256": "70a88e09f25fee4c775031e371e8edee832b4593f61586939f25cc66982d7927"
+  },
+  {
+   "path": "research/qualification/hls-av-family-linux-arm64/optimization.md",
+   "sha256": "7166f5a4157327d2c26a6eaaec9c5839d18f22f50c52bac464bb1cb2ed69aef2"
+  },
+  {
+   "path": "research/qualification/hls-av-family-linux-arm64/results.json",
+   "sha256": "a3a5b30d3abf69a11baa8b663eed3a466c36ecd5421af9ba3758cf36afe41c86"
+  }
+ ]
+}
