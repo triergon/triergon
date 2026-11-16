@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-armv7-4cbd1e86-20261116-000632-shard-3",
+ "path": "gate-run-armv7-4cbd1e86-20261116-000632-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run of both codec workload lists at 4cbd1e86 under static-toolchain-runtime-trained-order-v1, shard 3 of 3, c6g.4xlarge hosts (Graviton2) from the gate image, kernel 7.0.0-1014-aws, 32-bit ARMv7: memory of workloads.json part 4 and file-workloads.json parts 2-3, timing on CPU 1 and kernel-bound memory on CPUs 1-15; the shard outputs, build identities, plan, step records and logs; for the docs/status.md ARMv7 codec rows and the ARMv7 open workloads of harness/codecs/workloads.json and file-workloads.json",
+ "key": "evidence/gate-runs/4cbd1e8623fea61bad5139c63daf78938ecf18a5-armv7-20261116-000632/shard-3/dcb35289bd2de6bd15fc319a8aae0b37c8a22684c3fed28b678d354726cfe7fe.tar.zst",
+ "sha256": "dcb35289bd2de6bd15fc319a8aae0b37c8a22684c3fed28b678d354726cfe7fe",
+ "bytes": 893457,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "da073a63de6f0a2327d3e80199a10e7e8b0ad267b7bd7dffa2a258a996361f56",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "8bac406cf6ae52efbd83db7ee8ecef1987fbca9565b0d025428ca1a699a15079",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "e8b082814b426d188a4f59aa0dbd3d53209a35dea0a4aafce97548e206100140",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
