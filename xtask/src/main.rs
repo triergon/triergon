@@ -978,6 +978,7 @@ fn prepare_check(part: Option<Part>) -> Task {
         None | Some(Part::Parity) => &[
             &["prepare-ffmpeg"],
             &["prepare-ffmpeg", "--profile", "formats"],
+            &["prepare-ffmpeg", "--profile", "video"],
             &["fixtures"],
             &["fetch-vectors"],
             &["fonts", "prepare"],

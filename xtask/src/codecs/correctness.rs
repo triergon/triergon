@@ -263,6 +263,8 @@ pub struct Grade {
     pub out: PathBuf,
     pub scratch: Option<PathBuf>,
     pub only: Option<String>,
+    /// The lanes to grade, by exact name; all when `None`.
+    pub lanes: Option<Vec<String>>,
     pub rules: Rules,
 }
 
@@ -931,9 +933,10 @@ fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>
     Ok(open)
 }
 
-/// Grade every manifest vector (or those `--only` selects), appending one JSON
-/// row per vector to `--out` and printing one line per vector. A row of a
-/// vector the manifest lists in `open_cases` carries `"open_case": true`.
+/// Grade every manifest vector (or those of `--lanes` that `--only` selects),
+/// appending one JSON row per vector to `--out` and printing one line per vector.
+/// A row of a vector the manifest lists in `open_cases` carries `"open_case": true`.
+/// A named lane without vectors fails.
 pub fn grade(a: &Grade) -> Result<(), String> {
     let manifest = crate::checks::read_json(&a.manifest)?;
     let vectors = manifest
@@ -941,6 +944,21 @@ pub fn grade(a: &Grade) -> Result<(), String> {
         .and_then(Value::as_array)
         .ok_or("manifest has no vectors")?;
     let open = open_cases(&manifest, vectors)?;
+    let in_lanes = |v: &Value| {
+        a.lanes.as_ref().is_none_or(|lanes| {
+            v.get("lane")
+                .and_then(Value::as_str)
+                .is_some_and(|lane| lanes.iter().any(|l| l == lane))
+        })
+    };
+    for lane in a.lanes.iter().flatten() {
+        if !vectors
+            .iter()
+            .any(|v| v.get("lane").and_then(Value::as_str) == Some(lane))
+        {
+            return Err(format!("lane {lane}: no vectors in the manifest"));
+        }
+    }
     let only: Option<Vec<&str>> = a.only.as_deref().map(|o| o.split(',').collect());
     let mut out = fs::OpenOptions::new()
         .create(true)
@@ -953,7 +971,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             .map(str::to_owned)
             .ok_or_else(|| format!("vector without {key}"))
     };
-    for v in vectors {
+    for v in vectors.iter().filter(|v| in_lanes(v)) {
         let (lane, name, relative) = (text(v, "lane")?, text(v, "name")?, text(v, "path")?);
         if let Some(only) = &only
             && !only.iter().any(|o| name.contains(o) || *o == lane)

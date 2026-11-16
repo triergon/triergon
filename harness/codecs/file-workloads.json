@@ -13,6 +13,29 @@
   "aarch64-unknown-linux-gnu": 170,
   "thumbv7neon-unknown-linux-gnueabihf": 134
  },
+ "open_workloads": [
+  {
+   "id": "mp3-cbr-128-joint",
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
+   ],
+   "cause": "Runtime: the MPEG audio decoder runs 2.3 times the reference's user-mode instructions (mp3-cbr-128-joint 16.56 G against 7.18 G, mp2-256-48k 23.08 G against 10.55 G), and the polyphase synthesis (Synthesis::run) takes 61.3% and 72.0% of cycles. Built as A32 with NEON the workloads are still above the ceiling (mp3-cbr-128-joint 1.5358, mp3-vbr-v2 1.5677, mp2-256-48k 1.6114). Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
+  },
+  {
+   "id": "mp3-vbr-v2",
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
+   ],
+   "cause": "Runtime: the MPEG audio decoder runs 2.3 times the reference's user-mode instructions (mp3-cbr-128-joint 16.56 G against 7.18 G, mp2-256-48k 23.08 G against 10.55 G), and the polyphase synthesis (Synthesis::run) takes 61.3% and 72.0% of cycles. Built as A32 with NEON the workloads are still above the ceiling (mp3-cbr-128-joint 1.5358, mp3-vbr-v2 1.5677, mp2-256-48k 1.6114). Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
+  },
+  {
+   "id": "mp2-256-48k",
+   "targets": [
+    "thumbv7neon-unknown-linux-gnueabihf"
+   ],
+   "cause": "Runtime: the MPEG audio decoder runs 2.3 times the reference's user-mode instructions (mp3-cbr-128-joint 16.56 G against 7.18 G, mp2-256-48k 23.08 G against 10.55 G), and the polyphase synthesis (Synthesis::run) takes 61.3% and 72.0% of cycles. Built as A32 with NEON the workloads are still above the ceiling (mp3-cbr-128-joint 1.5358, mp3-vbr-v2 1.5677, mp2-256-48k 1.6114). Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
+  }
+ ],
  "workloads": [
   {
    "id": "flac-16-44k-stereo",

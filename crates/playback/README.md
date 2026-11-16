@@ -7,6 +7,10 @@ sits above `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
 `triergon-framing` and `triergon-subtitles`. It does not fetch over HTTP,
 parse playlists, retry transports, decode media or render.
 
+The MP4 range comparison includes two upstream samples, one with an initial
+non-sync AVC prefix and one with tracks shorter than the declared movie.
+It checks startup and backward seek through EOF for both.
+
 ## Usage
 
 ```rust
@@ -56,6 +60,11 @@ Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
 When the movie declares its duration, the range player checks source ranges and
 packet projections before merging the tracks for delivery.
+Regular AVC with a leading empty edit keeps its video start delay in range and
+forward playback. A media edit can start at a later sync sample, and a backward
+seek accounts for the composition lead. A short edit retains enough of the next
+decode interval to complete its displayed pictures. An empty edit does not
+produce a packet.
 QuickTime range playback reads AAC configuration from version 1 and version 2
 sound descriptions with `wave` extensions. The `avc-aac-quicktime-surround.mov`
 fixture contains synthetic AVC and six-channel, 48 kHz AAC. The range comparison
@@ -119,6 +128,15 @@ video and audio tracks.
 buffered AAC or AVC packet through the same selection and configuration checks
 as the live feed. A caller can inspect the prefix before delivering its events
 in order.
+
+**Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
+`A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization
+record, `compat::matroska::legacy_aac_lc_initialization` derives AAC-LC
+configuration from the Audio element's indexed sampling frequency and a count
+of one to six channels. A present Audio element can use the EBML defaults for
+its children. Larger layouts require explicit initialization. The feed
+preserves the source packet bytes.
+The legacy compatibility clock keeps a missing duration unknown.
 
 **Source protocol.** `Source::poll` must return promptly. `Pending` and empty
 data never mean end of stream; only `SourceReply::End` does, and transport

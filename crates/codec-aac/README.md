@@ -148,12 +148,17 @@ caller's reserved PCM planes and reuses them on the next access unit.
   but gives no form), the IPD/OPD smoothing and the behaviour over frames, including a
   frame without its SBR element; the code names the probes of each.
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
-  remuxed to ADTS) and three crafted HE-AAC v2 streams
+  remuxed to ADTS by `cargo xtask codecs derive`,
+  [derived-streams.json](../../harness/codecs/derived-streams.json)) and three crafted HE-AAC v2 streams
   ([harness/codecs/aac/ps/vectors](../../harness/codecs/aac/ps/vectors)): a 20/34-band
   change registered while PS is off, IPD/OPD across a 34 -> 20 change, and a PS frame
   without its SBR element. Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
+- Gate item `codecs-audio` grades the 39 vectors of the aac lane on Linux AArch64 and 32-bit
+  ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`): 38/39 pass on both at `bbdefa70`; the open
+  case `aac-sce-in-stereo` differs only in the FR plane FFmpeg leaves unwritten in
+  single-SCE frames.
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
 - `cargo test -p triergon-codec-aac` runs synthetic ADTS and raw AAC-LC tests. `tests/fate_vectors.rs`
   runs the FATE vectors when `.research/fate-samples/aac/` is present (set

@@ -6,6 +6,7 @@ mod aac_access_units;
 mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
+pub mod derived;
 pub mod equivalence;
 pub mod fuzz;
 pub mod isobmff_reader;
@@ -27,15 +28,21 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  decoder and write, or with --check compare, the generated PS tables
   aac-sources --out DIR
                  author the fixed-layout and indexed-rate AAC-LC sources
+  derive --ffmpeg FF
+                 make the derived streams of harness/codecs/derived-streams.json from their
+                 FATE sources, fetched by their pins, with the decode profile's ffmpeg, and
+                 check each against its correctness manifest pin
   manifest --out M.json LANE=DIR[,DIR...]...
                  hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
-        --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...]
-                 grade every vector by harness/codecs/numeric-rules.json; appends one row each
-  summarize RUN.jsonl OUT.json
-                 classify a grading run against the declared lane selection
+        --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...] [--lanes LANE,...]
+                 grade every vector, or those of the named lanes, by
+                 harness/codecs/numeric-rules.json; appends one row each
+  summarize RUN.jsonl OUT.json [--require-pass]
+                 classify a grading run against the declared lane selection; with
+                 --require-pass fail on any vector that fails and is not a listed open case
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
           [--seeks S.json] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
@@ -109,36 +116,79 @@ impl Gate<'_> {
     }
 }
 
+/// The list's `open_workloads` on `target`: workloads whose bounds fail there today,
+/// each with the measured `cause`. An entry with `targets` is open on those of the
+/// gate's targets only, and must hold elsewhere. Every id must be a workload of the
+/// list, listed once.
+pub fn open_workloads<'a>(list: &'a Value, target: &str) -> Result<Vec<&'a str>, String> {
+    let array = |value: &'a Value, key: &str| value.get(key).and_then(Value::as_array);
+    let ids: Vec<&str> = array(list, "workloads")
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|workload| workload.get("id").and_then(Value::as_str))
+        .collect();
+    let mut listed = Vec::new();
+    let mut open = Vec::new();
+    for entry in array(list, "open_workloads").unwrap_or_default() {
+        let text = |key| entry.get(key).and_then(Value::as_str);
+        let (Some(id), Some(cause)) = (text("id"), text("cause")) else {
+            return Err("an open workload needs an id and a cause".into());
+        };
+        if cause.trim().is_empty() {
+            return Err(format!("open workload {id}: its cause is empty"));
+        }
+        if !ids.contains(&id) {
+            return Err(format!("open workload {id}: not a workload of the list"));
+        }
+        if listed.contains(&id) {
+            return Err(format!("open workload {id}: listed twice"));
+        }
+        listed.push(id);
+        if let Some(scope) = entry.get("targets") {
+            let scope = scope.as_array().unwrap_or_default();
+            let known = |t: &Value| {
+                t.as_str()
+                    .is_some_and(|t| crate::gate::TARGETS.contains(&t))
+            };
+            if scope.is_empty() || !scope.iter().all(known) {
+                return Err(format!(
+                    "open workload {id}: its targets must be some of the gate's targets"
+                ));
+            }
+            if !scope.iter().any(|t| t.as_str() == Some(target)) {
+                continue;
+            }
+        }
+        open.push(id);
+    }
+    Ok(open)
+}
+
 /// The verdict of a codec collection's bounds, `results` each workload's id and whether
-/// its bound held. Where the gate applies (`gated`: native Linux AArch64, the gate
-/// build) a failed bound fails the collection, as a failed case fails a grade, and its
-/// lines tell failures that are only the list's `open_workloads` from others, as a
-/// grade's do; elsewhere the bounds are diagnostics and fail nothing. Returns the lines
-/// to print and whether the collection fails.
+/// its bound held. Where the gate applies (`gate`: the target measured on native Linux
+/// with glibc, AArch64 or 32-bit ARM, see [`memory::gate_platform`]) a failed bound
+/// fails the collection, as a failed case fails a grade, and its lines tell failures
+/// that are only the list's `open_workloads` on that target from others, as a grade's
+/// do; elsewhere the bounds are diagnostics and fail nothing. Returns the lines to
+/// print and whether the collection fails.
 pub fn bounds(
     list: &Value,
     name: &str,
     what: &str,
     results: &[(String, bool)],
-    gated: bool,
-) -> (Vec<String>, bool) {
+    gate: Option<&str>,
+) -> Result<(Vec<String>, bool), String> {
     let passed = results.iter().filter(|(_, held)| *held).count();
     let total = results.len();
-    if !gated {
-        return (
+    let Some(target) = gate else {
+        return Ok((
             vec![format!(
                 "{name} {what}: diagnostic on this target, not gated: {passed} of {total} within the bound"
             )],
             false,
-        );
-    }
-    let open: Vec<&str> = list
-        .get("open_workloads")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
+        ));
+    };
+    let open = open_workloads(list, target)?;
     let failed: Vec<&str> = results
         .iter()
         .filter(|(_, held)| !held)
@@ -156,7 +206,7 @@ pub fn bounds(
     if !other.is_empty() {
         lines.push(format!("{name} {what}: failing: {}", other.join(", ")));
     }
-    (lines, !failed.is_empty())
+    Ok((lines, !failed.is_empty()))
 }
 
 /// `--name value` and `--name=value` options and positional arguments, as
@@ -256,6 +306,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             let a = Args::parse(rest, &["out"], &[])?;
             aac_sources::run(root, &a.path("out")?)?;
         }
+        "derive" => {
+            let a = Args::parse(rest, &["ffmpeg"], &[])?;
+            derived::run(root, &a.path("ffmpeg")?)?;
+        }
         "manifest" => {
             let a = Args::parse(rest, &["out"], &[])?;
             if a.positional.is_empty() {
@@ -277,6 +331,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "out",
                     "scratch",
                     "only",
+                    "lanes",
                 ],
                 &[],
             )?;
@@ -291,6 +346,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 scratch: a.get("scratch").map(PathBuf::from),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                lanes: a
+                    .get("lanes")
+                    .map(|l| l.split(',').map(str::to_owned).collect()),
                 rules: correctness::Rules::load(root)?,
             };
             correctness::grade(&grade)?;
@@ -385,10 +443,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             };
             return gate.run(root, a.get("full").is_some(), || memory::run(&options));
         }
-        "summarize" => match rest {
-            [run, out] => summary::summarize(run, Path::new(out))?,
-            _ => return Err(USAGE.to_owned()),
-        },
+        "summarize" => {
+            let a = Args::parse(rest, &[], &["require-pass"])?;
+            match a.positional.as_slice() {
+                [run, out] => {
+                    summary::summarize(run, Path::new(out), a.get("require-pass").is_some())?;
+                }
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
         "time" => {
             let a = Args::parse(
                 rest,

@@ -1,0 +1,9 @@
+{
+ "name": "gate-run-aarch64-bbdefa70-20261116-025121-shard-1",
+ "path": "gate-run-aarch64-bbdefa70-20261116-025121-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at bbdefa70 on one c6g.4xlarge, Linux AArch64: the item codecs-audio, grading the aac, ac3, eac3 and dts correctness lanes against the decode profile's FFmpeg 9.0.2 (rows, summary, step records, logs, build identities); cited by docs/status.md",
+ "key": "evidence/gate-runs/bbdefa706033fb0e715b4ab5dd94b2cfdced4eeb-aarch64-20261116-025121/shard-1/046b27c09e4a14716eb4fbf2f421fed1092fe4691d91313880c5e1e259154573.tar.zst",
+ "sha256": "046b27c09e4a14716eb4fbf2f421fed1092fe4691d91313880c5e1e259154573",
+ "bytes": 1186359
+}

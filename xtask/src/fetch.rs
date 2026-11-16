@@ -556,6 +556,19 @@ fn fate_corpus_pins(root: &Path) -> Result<Vec<Pin>, String> {
     Ok(all)
 }
 
+/// The FATE sample at `relative` below `directory`: fetched by its pin when it is
+/// absent, verified when it is there.
+pub fn fate_sample(directory: &Path, relative: &str, sha256: &str) -> Result<(), String> {
+    fetch_vector(
+        directory,
+        relative,
+        sha256,
+        &Network,
+        download_cache().as_deref(),
+        VECTOR_LIMIT,
+    )
+}
+
 fn relative_path(path: &str) -> bool {
     !path.is_empty()
         && !path.contains('\\')

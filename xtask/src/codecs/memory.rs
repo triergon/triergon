@@ -68,13 +68,24 @@ fn work(worker: &Path, operation: &str, input: &Path) -> Result<Value, String> {
         .ok_or_else(|| format!("{}: no work line", worker.display()))
 }
 
-/// Whether the platform can produce a memory gate result.
+/// Whether the platform can produce a codec gate result: native Linux with glibc, on
+/// AArch64 or 32-bit ARM, the two gate targets' hosts.
 pub fn gate_platform() -> bool {
     cfg!(all(
         target_os = "linux",
-        target_arch = "aarch64",
+        any(target_arch = "aarch64", target_arch = "arm"),
         target_env = "gnu"
     ))
+}
+
+/// The gate target whose bounds a collection on this platform decides, where it
+/// decides any ([`gate_platform`]).
+pub fn gate_target() -> Result<Option<&'static str>, String> {
+    if gate_platform() {
+        gate_build::worker_target().map(Some)
+    } else {
+        Ok(None)
+    }
 }
 
 /// The memory verdict of one collection: both paired upper bounds below 1.0 on an
@@ -164,7 +175,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         println!("no gate result: {reason}");
     }
     if !gate_platform() {
-        println!("no gate result: memory gates are measured on native AArch64 Linux with glibc");
+        println!(
+            "no gate result: memory gates are measured on native Linux with glibc, AArch64 or 32-bit ARM"
+        );
     }
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
     let mut identity = Value::object([
@@ -338,7 +351,7 @@ pub fn run(options: &Options) -> Result<(), String> {
     }
     write(&options.out.join("summary.json"), &Value::Array(summary))?;
     let name = list_name(&options.workloads);
-    let (lines, failed) = super::bounds(&manifest, &name, "memory", &bounds, gate_platform());
+    let (lines, failed) = super::bounds(&manifest, &name, "memory", &bounds, gate_target()?)?;
     for line in &lines {
         println!("{line}");
     }
@@ -409,11 +422,18 @@ mod tests {
         let results = |held: &[(&str, bool)]| -> Vec<(String, bool)> {
             held.iter().map(|(id, h)| ((*id).to_owned(), *h)).collect()
         };
-        let list =
-            json::parse(r#"{"open_workloads": ["hevc-main10-2160p"], "workloads": []}"#).unwrap();
+        let list = json::parse(
+            r#"{"open_workloads": [{"id": "hevc-main10-2160p", "cause": "measured"}],
+                "workloads": [{"id": "aac-lc-stereo"}, {"id": "hevc-main10-2160p"}]}"#,
+        )
+        .unwrap();
+        let gate = Some("aarch64-unknown-linux-gnu");
+        let bounds = |what, results: &[(String, bool)], gate| {
+            super::super::bounds(&list, "workloads", what, results, gate).unwrap()
+        };
         let all = results(&[("aac-lc-stereo", true), ("hevc-main10-2160p", true)]);
         assert_eq!(
-            super::super::bounds(&list, "workloads", "timing", &all, true),
+            bounds("timing", &all, gate),
             (
                 vec!["workloads timing: 2 of 2 cases pass".to_owned()],
                 false
@@ -421,7 +441,7 @@ mod tests {
         );
         let open = results(&[("aac-lc-stereo", true), ("hevc-main10-2160p", false)]);
         assert_eq!(
-            super::super::bounds(&list, "workloads", "timing", &open, true),
+            bounds("timing", &open, gate),
             (
                 vec![
                     "workloads timing: 1 of 2 cases pass".to_owned(),
@@ -431,16 +451,83 @@ mod tests {
             )
         );
         let other = results(&[("aac-lc-stereo", false), ("hevc-main10-2160p", true)]);
-        let (lines, failed) = super::super::bounds(&list, "workloads", "memory", &other, true);
+        let (lines, failed) = bounds("memory", &other, gate);
         assert!(failed);
         assert_eq!(lines[1], "workloads memory: failing: aac-lc-stereo");
-        // A target the gate does not apply to reports its bounds and fails nothing.
-        let (lines, failed) = super::super::bounds(&list, "workloads", "memory", &other, false);
+        // A platform the gate does not apply to reports its bounds and fails nothing.
+        let (lines, failed) = bounds("memory", &other, None);
         assert!(!failed);
         assert_eq!(
             lines,
             vec!["workloads memory: diagnostic on this target, not gated: 1 of 2 within the bound"]
         );
+    }
+
+    #[test]
+    fn an_open_workload_with_targets_is_open_on_those_targets_alone() {
+        let list = |open: &str| {
+            json::parse(&format!(
+                r#"{{"open_workloads": [{open}],
+                    "workloads": [{{"id": "aac-he-stereo"}}, {{"id": "aac-lc-stereo"}}]}}"#
+            ))
+            .unwrap()
+        };
+        let armv7 = list(
+            r#"{"id": "aac-he-stereo", "cause": "SBR",
+                "targets": ["thumbv7neon-unknown-linux-gnueabihf"]}"#,
+        );
+        assert_eq!(
+            super::super::open_workloads(&armv7, "thumbv7neon-unknown-linux-gnueabihf"),
+            Ok(vec!["aac-he-stereo"])
+        );
+        assert_eq!(
+            super::super::open_workloads(&armv7, "aarch64-unknown-linux-gnu"),
+            Ok(vec![])
+        );
+        // On AArch64 a failure of a workload open only on ARMv7 fails as any other.
+        let failing = vec![("aac-he-stereo".to_owned(), false)];
+        let (lines, failed) = super::super::bounds(
+            &armv7,
+            "workloads",
+            "timing",
+            &failing,
+            Some("aarch64-unknown-linux-gnu"),
+        )
+        .unwrap();
+        assert!(failed);
+        assert_eq!(lines[1], "workloads timing: failing: aac-he-stereo");
+        for (open, error) in [
+            (
+                r#"{"id": "aac-he-stereo"}"#,
+                "an open workload needs an id and a cause",
+            ),
+            (
+                r#"{"id": "aac-he-stereo", "cause": " "}"#,
+                "open workload aac-he-stereo: its cause is empty",
+            ),
+            (
+                r#"{"id": "dts-core-es-6.1", "cause": "DTS"}"#,
+                "open workload dts-core-es-6.1: not a workload of the list",
+            ),
+            (
+                r#"{"id": "aac-he-stereo", "cause": "SBR"}, {"id": "aac-he-stereo", "cause": "SBR"}"#,
+                "open workload aac-he-stereo: listed twice",
+            ),
+            (
+                r#"{"id": "aac-he-stereo", "cause": "SBR", "targets": []}"#,
+                "open workload aac-he-stereo: its targets must be some of the gate's targets",
+            ),
+            (
+                r#"{"id": "aac-he-stereo", "cause": "SBR", "targets": ["x86_64-unknown-linux-gnu"]}"#,
+                "open workload aac-he-stereo: its targets must be some of the gate's targets",
+            ),
+        ] {
+            assert_eq!(
+                super::super::open_workloads(&list(open), "aarch64-unknown-linux-gnu"),
+                Err(error.to_owned()),
+                "{open}"
+            );
+        }
     }
 
     #[test]

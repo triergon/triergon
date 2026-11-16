@@ -496,6 +496,15 @@ large collections with one case's samples in memory at a time. Use a new `--outp
 directory for each invocation of `report`, `progressive` or `grade` so earlier
 measurements, traces and grades remain available.
 
+For ISO BMFF, collect `isobmff-bench --benchmark` and `isobmff-bench --memory`
+in separate output directories. Pass their `collection.json` files to `grade`
+with the registered open and index contract and corpus. Keep the `case-NNNN/`
+directories with both collections so the grader can verify the measurements.
+On AArch64, the sharded gate grades each ISO BMFF timing and memory pair on its
+measurement host with `grade --isobmff-part I/N`. The grader checks the full parity
+corpus and the exact partition of measurements, including matching aliases. The
+gate summary requires a passing grade for each planned part.
+
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.
 `--require-slice-acceptance` requires the feature gates; `--require-acceptance` also
@@ -705,17 +714,17 @@ may override that count for diagnostic comparisons.
 
 `cargo xtask gate` holds the full gate as one plan. Its items are the work for one
 measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
-measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the codecs'
-parity, a codec workload list's timing, a part of its memory (`codecs memory --part
+measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the video
+codecs' parity (`codecs`), the audio codecs' correctness lanes (`codecs-audio`: AAC,
+AC-3, E-AC-3 and DTS, failing on any vector that fails and is not a listed open case),
+a codec workload list's timing, a part of its memory (`codecs memory --part
 I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, then
 `--stage memory` from its records under the kernel bound), the checked or the release
 tests, and the font, shaping, rasterising and ASS comparisons. Every registered feature
 is either one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated
 (an on-demand or
-diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
-target leaves out an item that cannot measure there, with the reason `gate plan --target
-TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback worker runs
-its numeric modes only on native Linux AArch64. `cargo xtask gate plan --shards N`
+diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. Both
+targets run every item. `cargo xtask gate plan --shards N`
 splits the items into N shards of about equal planning weight, each for its own host;
 the weights are the minutes each item took on a c6g.4xlarge, the more of the two
 targets. `--items NAME,...`, given to every gate command of a run, narrows the plan to
@@ -749,11 +758,12 @@ they did not measure, after writing every record. `gate run` writes its verdict 
 step's `gate-result.json` (its `status`, with `"cases_checked": true`), so a step that
 [reuses](#reuse) the result takes the verdict; a reused result that no gate run checked
 fails the step, which `--full` measures again. Where the codec gates apply (native
-Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
-does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
-are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
-diagnostics, which they print as such and fail nothing. So no feature measures nothing in
-silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
+Linux with glibc on either gate target, the gate build) they also fail on a workload
+whose runtime or memory bound does not hold, and print a grade's verdict lines, so
+`gate summary` tells failures that are only a list's `open_workloads` on that target
+from others. Each open workload names its measured `cause`, and one with `targets` is
+open on those targets alone; elsewhere the codec bounds are diagnostics, which they
+print as such and fail nothing. So no feature measures nothing in silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
 run limit per target triple (30 s when absent), and every memory observation records how
 long its run took (`process_elapsed_ns`). Each list sets four times its slowest observed
 run on each target, rounded up, from a run at `8154812e`: `workloads.json` 221 s on Linux
@@ -778,7 +788,7 @@ On one host, a shard's run is:
    built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
    everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
    `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--isobmff-seek`, `--codecs` for each
-   workload list, `--external-vector`, `--capture` for the capture cases), with the
+   workload list, `--correctness` for the codec correctness lanes, `--external-vector`, `--capture` for the capture cases), with the
    [committed RSS module review](../harness/rss-bound/README.md#proof) of the tree's
    module source for the running kernel (`cargo xtask preflight` also takes
    `--reference NAME` for any other reference a run names by path, `--review FILE`
@@ -1090,9 +1100,11 @@ repository does not generate, with repository-relative paths: evidence set
 subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
 [file-workloads.json](../harness/codecs/file-workloads.json), and set
 `ogg-reader-inputs` the inputs of the Ogg reader comparison, set
-`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks, and set
+`codec-derived-streams` the 71 elementary streams of the audio correctness lanes that
+`cargo xtask codecs derive` makes from FATE samples
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/sets/)); a gate image is built with all four. The image
+[index](../harness/evidence/sets/)); a gate image is built with all five. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
