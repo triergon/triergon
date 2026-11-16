@@ -135,11 +135,24 @@ impl Mode {
 /// The four cases of the specification fold into two: with the angle's sign flipped
 /// for a negative magnitude, a positive angle gives `(m, m - a)` and any other
 /// `(m + a, m)` (`x + -y` and `x - y` round alike).
+///
+/// The comparisons test the bit patterns: `m >= 0.0` holds for `+0.0` up to `+inf` and
+/// for `-0.0`, and `a > 0.0` for the patterns after `+0.0` up to `+inf`; NaNs fail both,
+/// as they fail the float comparisons. On ARMv7 an integer comparison sets the flags
+/// the selects read directly, where a float comparison has to move them over from the
+/// VFP status register.
 pub(crate) fn decouple(magnitude: &mut [f32], angle: &mut [f32]) {
+    const INFINITY: u32 = 0x7f80_0000;
+    const NEGATIVE_ZERO: u32 = 0x8000_0000;
     for (m, a) in magnitude.iter_mut().zip(angle) {
         let (mv, av) = (*m, *a);
-        let signed = if mv >= 0.0 { av } else { -av };
-        (*m, *a) = if av > 0.0 {
+        let (mb, ab) = (mv.to_bits(), av.to_bits());
+        let signed = if mb <= INFINITY || mb == NEGATIVE_ZERO {
+            av
+        } else {
+            -av
+        };
+        (*m, *a) = if ab.wrapping_sub(1) < INFINITY {
             (mv, mv - signed)
         } else {
             (mv + signed, mv)
@@ -158,5 +171,38 @@ mod tests {
         decouple(&mut m, &mut a);
         assert_eq!(m, [2.0, 1.0, -2.0, -1.0, 0.0, -1.0]);
         assert_eq!(a, [1.0, 2.0, -1.0, -2.0, -1.0, 0.0]);
+    }
+
+    #[test]
+    fn bit_pattern_tests_match_the_float_comparisons() {
+        let values = [
+            0.0,
+            -0.0,
+            1.5,
+            -1.5,
+            f32::MIN_POSITIVE / 2.0,
+            -f32::MIN_POSITIVE / 2.0,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+            -f32::NAN,
+        ];
+        for &mv in &values {
+            for &av in &values {
+                let signed = if mv >= 0.0 { av } else { -av };
+                let want = if av > 0.0 {
+                    (mv, mv - signed)
+                } else {
+                    (mv + signed, mv)
+                };
+                let (mut m, mut a) = ([mv], [av]);
+                decouple(&mut m, &mut a);
+                assert_eq!(
+                    (m[0].to_bits(), a[0].to_bits()),
+                    (want.0.to_bits(), want.1.to_bits()),
+                    "{mv} {av}"
+                );
+            }
+        }
     }
 }
