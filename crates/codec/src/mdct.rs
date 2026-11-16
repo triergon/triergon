@@ -437,7 +437,8 @@ struct Dct4 {
     len: usize,
     fft: Fft,
     /// `e^{-iπ(j + 1/8) / K}` for `j < N / 4`, applied before the FFT, real and
-    /// imaginary parts.
+    /// imaginary parts, in the FFT's input order: slot `s` holds the twiddle of
+    /// `j = order[s]`.
     pre: (BudgetVec<f32>, BudgetVec<f32>),
     /// `scale` times the same, applied after it.
     post: (BudgetVec<f32>, BudgetVec<f32>),
@@ -466,21 +467,25 @@ impl Imdct {
         let q = n / 4;
         let k = n / 2;
         let fft = Fft::new(q, budget)?.ok_or(StorageError::Invalid("IMDCT length"))?;
-        let twiddles = |s: f64| -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
+        // The twiddles of each `j` that `index` yields, scaled by `s`.
+        let twiddles = |s: f64,
+                        index: &mut dyn Iterator<Item = usize>|
+         -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
             let angle = |j: usize| -PI * (j as f64 + 0.125) / k as f64;
             let mut re = BudgetVec::try_filled(budget, 0.0, q)?;
             let mut im = BudgetVec::try_filled(budget, 0.0, q)?;
-            for (j, (r, i)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
+            for ((r, i), j) in re.iter_mut().zip(im.iter_mut()).zip(index) {
                 (*r, *i) = ((s * angle(j).cos()) as f32, (s * angle(j).sin()) as f32);
             }
             Ok((re, im))
         };
+        let pre = twiddles(1.0, &mut fft.order().iter().map(|&j| j as usize))?;
         Ok(Imdct {
             dct4: Dct4 {
                 len: n,
                 fft,
-                pre: twiddles(1.0)?,
-                post: twiddles(scale)?,
+                pre,
+                post: twiddles(scale, &mut (0..q))?,
                 re: BudgetVec::try_filled(budget, 0.0, q)?,
                 im: BudgetVec::try_filled(budget, 0.0, q)?,
             },
@@ -539,39 +544,57 @@ impl Dct4 {
     /// If `x` or `w` is shorter than `K`.
     fn run(&mut self, x: &[f32], w: &mut [f32]) {
         let k = self.len / 2;
-        let (x, w) = (&x[..k], &mut w[..k]);
-        let (pre_re, pre_im) = (&self.pre.0, &self.pre.1);
-        let twiddled = |j: u32| {
-            let j = j as usize;
-            mul(x[2 * j], x[k - 1 - 2 * j], pre_re[j], pre_im[j])
+        // FFT input j is x[2j] + i x[K - 1 - 2j]: the first value of pair j and the
+        // second of pair K/2 - 1 - j.
+        let (pairs, _) = x[..k].as_chunks::<2>();
+        let half = pairs.len();
+        let input = |j: u32| {
+            // Every order entry is below K/2; the bound spares the index checks.
+            let j = (j as usize).min(half - 1);
+            (pairs[j][0], pairs[half - 1 - j][1])
         };
+        let (re, im) = (&mut self.re[..half], &mut self.im[..half]);
+        let (pre_re, pre_im) = (&self.pre.0[..half], &self.pre.1[..half]);
+        let order = &self.fft.order()[..half];
         // Pre-twiddle straight into the FFT's digit-reversed order, computing the
         // innermost radix-4 stage on each four points before they are stored.
-        let order = self.fft.order();
         if self.fft.leaf_is_radix4() {
-            let slots = self.re.chunks_exact_mut(4).zip(self.im.chunks_exact_mut(4));
-            for ((r, i), from) in slots.zip(order.chunks_exact(4)) {
-                let y = leaf4([from[0], from[1], from[2], from[3]].map(twiddled));
-                for (j, (yr, yi)) in y.into_iter().enumerate() {
-                    (r[j], i[j]) = (yr, yi);
+            let slots = re.as_chunks_mut::<4>().0.iter_mut();
+            let slots = slots.zip(im.as_chunks_mut::<4>().0.iter_mut());
+            let twiddles = pre_re.as_chunks::<4>().0.iter();
+            let twiddles = twiddles.zip(pre_im.as_chunks::<4>().0);
+            let from = order.as_chunks::<4>().0;
+            for (((r, i), from), (wr, wi)) in slots.zip(from).zip(twiddles) {
+                let point = |s: usize| {
+                    let (a, b) = input(from[s]);
+                    mul(a, b, wr[s], wi[s])
+                };
+                let y = leaf4([point(0), point(1), point(2), point(3)]);
+                for (s, (yr, yi)) in y.into_iter().enumerate() {
+                    (r[s], i[s]) = (yr, yi);
                 }
             }
         } else {
-            let slots = self.re.iter_mut().zip(self.im.iter_mut());
-            for ((re, im), &j) in slots.zip(order) {
-                (*re, *im) = twiddled(j);
+            let slots = re.iter_mut().zip(im.iter_mut()).zip(order);
+            for (((r, i), &j), (&wr, &wi)) in slots.zip(pre_re.iter().zip(pre_im)) {
+                let (a, b) = input(j);
+                (*r, *i) = mul(a, b, wr, wi);
             }
             // A one-point transform has no stage at all.
             if let Some(first) = self.fft.stages.first() {
-                run_stage(&mut self.re, &mut self.im, first);
+                run_stage(re, im, first);
             }
         }
-        self.fft.transform_after_first(&mut self.re, &mut self.im);
-        let (post_re, post_im) = (&self.post.0, &self.post.1);
-        for j in 0..k / 2 {
-            let (ur, ui) = mul(self.re[j], self.im[j], post_re[j], post_im[j]);
-            w[2 * j] = ur;
-            w[k - 1 - 2 * j] = -ui;
+        self.fft.transform_after_first(re, im);
+        // Output pair p is the real part of bin p and the negated imaginary part of bin
+        // K/2 - 1 - p, each post-twiddled.
+        let (post_re, post_im) = (&self.post.0[..half], &self.post.1[..half]);
+        let bins = || re.iter().zip(im.iter()).zip(post_re.iter().zip(post_im));
+        let real = bins().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).0);
+        let imag = bins().rev().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).1);
+        let (out, _) = w[..k].as_chunks_mut::<2>();
+        for ((o, ur), ui) in out.iter_mut().zip(real).zip(imag) {
+            *o = [ur, -ui];
         }
     }
 }
