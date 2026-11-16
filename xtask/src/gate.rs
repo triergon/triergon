@@ -1941,9 +1941,16 @@ const TEST_INPUTS: [&str; 3] = [
 /// for the same key: every tracked file as the working tree holds it, untracked
 /// files that are not ignored, the test inputs of [`TEST_INPUTS`], and what every
 /// gate key holds (the measuring code, toolchains, target and host class).
+///
+/// Release tests build in [`RELEASE_TESTS_TARGET_DIR`]: in the gate build's own
+/// directory, their feature set would rebuild its workers, and steps measured after
+/// them would time binaries the gate build did not make.
 fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i32> {
     let mut command = owned(&["test", "--workspace", "--locked", "--profile", profile]);
     command.extend(crate::harness::gate_build::target_args()?);
+    if profile == "release" {
+        command.extend(owned(&["--target-dir", RELEASE_TESTS_TARGET_DIR]));
+    }
     // The tests that read the evidence index, which the key leaves out, run apart
     // from the reused run and every time.
     let mut index = command.clone();
@@ -1977,6 +1984,9 @@ fn test(root: &Path, output: &Path, profile: &str, full: bool) -> R<i32> {
     let read = cargo(&index)?;
     Ok(if reused != 0 { reused } else { read })
 }
+
+/// The target directory of the release-profile tests, apart from the gate build's.
+const RELEASE_TESTS_TARGET_DIR: &str = "target/gate-tests";
 
 /// The tests that read the evidence index: the index changes when a result is
 /// promoted, so a test result's key leaves it out, and these run on every gate test
