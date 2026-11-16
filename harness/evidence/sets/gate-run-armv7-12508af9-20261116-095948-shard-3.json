@@ -1,0 +1,42 @@
+{
+ "name": "gate-run-armv7-12508af9-20261116-095948-shard-3",
+ "path": "gate-run-armv7-12508af9-20261116-095948-shard-3",
+ "retention": "retained",
+ "reason": "Capture comparison on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/12508af969651bc3ab733db0d30c0d8ca27b9c38-armv7-20261116-095948/shard-3/15ecd29debf07564098daba1954968b5c17f58c179fb86f3bbdec94569bfbef8.tar.zst",
+ "sha256": "15ecd29debf07564098daba1954968b5c17f58c179fb86f3bbdec94569bfbef8",
+ "bytes": 271450782,
+ "results": [
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "d52d9042773bd3c74df43f53f18183970fc60676c4f92b9bac79c468527daf1a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "efedfa80b6c98deb36746fc9bbb8b48171b20b06d29be7d31840a19031912e42",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "3c19621371ed31c99961174e6e80643cff5073060e4e14c266949348e0a08093",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "44fca91c12225b1c79e3c131689c43701ea44bc38e452eca770f3a2632acb5c2",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "12508af969651bc3ab733db0d30c0d8ca27b9c38"
+ ]
+}

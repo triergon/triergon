@@ -1,0 +1,63 @@
+{
+ "name": "gate-run-aarch64-863f42d8-20261116-073203-shard-5",
+ "path": "gate-run-aarch64-863f42d8-20261116-073203-shard-5",
+ "retention": "retained",
+ "reason": "Capture with the original forward transform. The AArch64 motion case exceeds the runtime ceiling.",
+ "key": "evidence/gate-runs/863f42d8839700c0dc91ff6849e30a6cffd881ce-aarch64-20261116-073203/shard-5/cec8e56be80587b44e895e433f67675dd4a164e362d7c648356c6ff58cb25221.tar.zst",
+ "sha256": "cec8e56be80587b44e895e433f67675dd4a164e362d7c648356c6ff58cb25221",
+ "bytes": 421379147,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "3330b8748cb448ad86446768c897be5c26ddb3a3d7889286337840e05e4ac0fd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "9c02960bc626db563e758e06af5d7692fe90364ca3c30386340ec039e5f4e8e1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "cf35c7012d076d569748cf34f743ccc4a7a1e113423c41a834f86abd46f0dc73",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "68f367b3954592296faeb68ecd3a71bf514c0c9bf81f3ddf4311753f6f65344f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6515505a90c3bee5bb6bc25bd145c58e15590c781852254caac86713d848e36b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "cdcbc5f63eb2dad1b2bb8e0b47db4dcd5c2a560eb1b3b2141c70b0a440950884",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2c3b6cc2e441874deaf8dca532480ea1df82d1e175dcbfc28ebdf8bfa67bdefa",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "863f42d8839700c0dc91ff6849e30a6cffd881ce"
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-863f42d8-20261116-073203-shard-1",
+ "path": "gate-run-armv7-863f42d8-20261116-073203-shard-1",
+ "retention": "retained",
+ "reason": "Capture timing and kernel-bound memory before the forward-transform change.",
+ "key": "evidence/gate-runs/863f42d8839700c0dc91ff6849e30a6cffd881ce-armv7-20261116-073203/shard-1/ab526845f765c6b2030b45474d2b72f61d32c945ec19c7b8c14f1c0689340b67.tar.zst",
+ "sha256": "ab526845f765c6b2030b45474d2b72f61d32c945ec19c7b8c14f1c0689340b67",
+ "bytes": 360809879,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "149bb51afe5284833746e9707220b41cd8a7fa1dc5cf6e3f7537da269bfcafa9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "446120b0512d204d94228dee4f8a3731e7b5976cb464b750117e4ce4f54ba16b",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "863f42d8839700c0dc91ff6849e30a6cffd881ce"
+ ]
+}

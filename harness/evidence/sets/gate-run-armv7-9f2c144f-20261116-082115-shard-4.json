@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-9f2c144f-20261116-082115-shard-4",
+ "path": "gate-run-armv7-9f2c144f-20261116-082115-shard-4",
+ "retention": "retained",
+ "reason": "Capture comparison on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/9f2c144f50c51e9df6c04b845b8a5afb225b9dcb-armv7-20261116-082115/shard-4/acae4cae8983bf6a487211469cfcdcdf536493a1ff8cc0b3124edb7cbdf30953.tar.zst",
+ "sha256": "acae4cae8983bf6a487211469cfcdcdf536493a1ff8cc0b3124edb7cbdf30953",
+ "bytes": 423450261,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e47c586d7c9e61c26b77b7f9058ab3129f5a27e12eec98106346d4f3f949af03",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b076e7f488d1cc6757df0027654684295f520e48b103913617398ea5d86be8ca",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "4fc1e815f3382040911666275b8b3b4ed3631050a97bbf40cbf0cf771f9dac49",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "63265a214adb52ad4d83d28f2d3c6f6050f47bbd823cd6ebc6e0b115429fbf1d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "36cc1b18a43e6571d86b85ee9d3eb671f453041a70ccc4fec30840a2cbacdef3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "e941a27ef56fb6a7cc7f1a7b4d563fff786ee6452a9cc255345bf2f84256ce40",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9f2c144f50c51e9df6c04b845b8a5afb225b9dcb"
+ ]
+}
