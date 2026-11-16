@@ -270,7 +270,7 @@ impl FrameDecoder {
 fn run_bank<const TAPS: usize, const LEN: usize>(
     qmf: &Qmf<TAPS>,
     st: &mut QmfState<LEN>,
-    tb: &mut [f32],
+    tb: &[f32],
     plane: &mut [f32],
     blocks: usize,
 ) {
@@ -278,7 +278,7 @@ fn run_bank<const TAPS: usize, const LEN: usize>(
     for t in 0..blocks {
         qmf.synth(
             st,
-            &mut tb[t * bands..t * bands + bands],
+            &tb[t * bands..t * bands + bands],
             &mut plane[t * bands..t * bands + bands],
         );
     }
