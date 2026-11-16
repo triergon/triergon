@@ -39,3 +39,19 @@ The memory gate requires native Linux on AArch64 or 32-bit ARMv7, at least 30
 pairs, and a calibrated observer that covers both workers. Each observation must reproduce the byte count
 and digest from its worker's correctness run. The report grades peak live heap and
 total resident peak RSS. It also reports resident growth as a diagnostic.
+
+## Short frames
+
+The conversion probe checks every luma and chroma sample at the seven even
+widths below 16, in both row orientations, at heights 2, 4 and 6. Each size and
+orientation uses a red impulse in each source row and 32 pseudo-random pictures.
+The AArch64 Linux probe also checks widths 18, 22, 34, 66, 258, 958 and 4094,
+where the converter uses the filtered fallback. The outputs must agree within
+one sample value. Build the capture reference for the target as above and give
+the test a fresh output directory.
+
+```sh
+CAPTURE_REFERENCE="$PWD/target/harness/ffmpeg-capture-worker" \
+CAPTURE_PROBE_DIR="$PWD/.research/short-capture" \
+CARGO_INCREMENTAL=0 cargo test --release -p capture-worker --test short_chroma -- --ignored
+```

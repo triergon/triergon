@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-9ce47662-20261116-033329-shard-1",
+ "path": "gate-run-armv7-9ce47662-20261116-033329-shard-1",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory in 32-bit ARMv7 Linux user space.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-armv7-20261116-033329/shard-1/b1361f7897e04cf360df70f7a4d1c6a492b576d095709abecf6ba5237fb777c7.tar.zst",
+ "sha256": "b1361f7897e04cf360df70f7a4d1c6a492b576d095709abecf6ba5237fb777c7",
+ "bytes": 360788986,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "db5825caf276979eef540ec212343110152a78fc010ed91077d91b18df28f03d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "64dedf9f6a94dcd868ef4283ff0783115b2723d5cdc1a42bb397da3af2a7e98c",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}

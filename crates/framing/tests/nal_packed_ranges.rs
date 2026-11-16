@@ -45,10 +45,10 @@ fn parsed(pool: &Budget, raw: Bytes, quantum: u64) -> HvcConfiguration {
 }
 
 #[test]
-fn packet_segment_keeps_two_full_offsets_and_two_wire_fields() {
+fn packet_segment_is_four_32_bit_fields() {
     assert_eq!(
         size_of::<NalPacketSegment>(),
-        2 * size_of::<usize>() + 2 * size_of::<u32>(),
+        4 * size_of::<u32>(),
         "source-range segment descriptor retains a redundant end offset"
     );
     assert!(!std::mem::needs_drop::<NalPacketSegment>());
