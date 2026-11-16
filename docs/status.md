@@ -57,7 +57,7 @@ worker's operations read only the raw-video and timed-text movies of its compari
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.8518 (35/35 pass) | heap ≤0.0877, total RSS ≤0.7956 (35/35 lower) | additional program and carriage profiles |
 | MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0435 (3/3 pass) | heap ≤0.0151, total RSS ≤0.6197 (3/3 lower) | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.8026 (71/71 pass) | heap ≤0.0207, total RSS ≤0.7318 (71/71 lower) | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.1873 (135/135 pass for AVC/HEVC) | heap ≤0.9367 (135/135 lower), total RSS fails at 1.0267 (134/135 lower; `avc-bad-update`) | AArch64 total RSS, ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.0962 (135/135 pass for AVC/HEVC) at `d915aa19` | heap ≤0.8367 (135/135 lower), total RSS fails at 1.0267 (134/135 lower; `avc-bad-update`) at `d915aa19` | AArch64 total RSS, ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 1.0271 (367/367 pass; worst `charset-windows-1251-text`) | heap ≤0.3360, total RSS ≤0.9311 (367/367 lower) | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.8098 (319/319 pass) at `99f1027b` | heap ≤0.9654, total RSS ≤0.9596 (319/319 lower) at `99f1027b` | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7248 (229/229 pass) | heap ≤0.5788, total RSS ≤0.7373 (229/229 lower) | — |
@@ -113,6 +113,15 @@ memory collected under the kernel RSS proof on CPUs 1–15, and graded with the 
 loaded; every step passes 319 of 319 cases. Sets
 `gate-run-aarch64-99f1027b-20261116-050209-shard-1` and
 `gate-run-armv7-99f1027b-20261116-050516-shard-1` hold each target's outputs, build
+identities, plan, step records and logs.
+
+The packet framing rows at `d915aa19` come from one partial gate run of the `framing` item
+per target, measured the same way; every step passes 135 of 135 cases, and only the total
+RSS bounds listed in the contract's `open_bounds` fail. No case's runtime bound is above
+1.10 on either target, against 28 on Linux AArch64 and 5 on ARMv7 at `a73350ca`; the
+median of the case medians is 0.9630 on Linux AArch64 (1.0411 at `a73350ca`) and 0.8100 on
+ARMv7 (0.8989). Sets `gate-run-aarch64-d915aa19-20261116-064738-shard-1` and
+`gate-run-armv7-d915aa19-20261116-064928-shard-1` hold each target's outputs, build
 identities, plan, step records and logs.
 
 The rows at `79e0ae13` come from one full sharded gate run per target
@@ -227,13 +236,12 @@ comparison on a c6g.2xlarge, with the codec workload timed twice by each runner:
 | `aac-lc-stereo` | 0.7350 (0.7357), 0.7339 (0.7361) | 0.7344 (0.7363), 0.7342 (0.7351) |
 | `c07-ui-static-480-bottomup` | 1.3026 (1.3047) | 1.2978 (1.3001) |
 
-The packet-framing rows compare all 135 cases with 30 timing and 30 kernel-bound
-memory pairs per case on c6g.4xlarge. The AArch64 worker at `be0eff89` uses the
-trained order recorded from its own training corpus. ARMv7 uses the toolchain link.
-The ARMv7 worker and reference rebuilt at `be0eff89` match both measured
-binaries at `f4f1c7ad`.
-The kept sets `packet-framing-be0eff89-aarch64` and `packet-framing-f4f1c7ad-armv7`
-contain the per-case results.
+At `be0eff89` the packet-framing rows compared all 135 cases with 30 timing and 30
+kernel-bound memory pairs per case on c6g.4xlarge, the AArch64 worker in the trained
+order recorded from its own training corpus and the ARMv7 worker in the toolchain link;
+the kept sets `packet-framing-be0eff89-aarch64` and `packet-framing-f4f1c7ad-armv7`
+contain those per-case results. At `d915aa19` the AArch64 worker links in its order
+retrained from the same training operations.
 
 On AArch64, `avc-bad-update` is the only total RSS miss. Its median
 resident pages are 443 at entry and 459 at peak in Triergon, and 450 at
@@ -645,6 +653,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Full gate run, ARMv7, shard 8 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`2154275af63ffe7e42974a6576f416a8e8bdbe130728b24ed3670ba4a001f49d`](../harness/evidence/sets/gate-run-armv7-a73350ca-20261116-022908-shard-8.json) |
 | AAC in MOV, ARMv7 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`ac664cca8d09697977201d5538a7542e925bdc4bd4ac75b106af4ee94872b698`](../harness/evidence/sets/aac-access-units-a73350ca-armv7.json) |
 | Per-case runtime ratios of the full gate runs and AAC in MOV, both targets | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`74bd0b90c8f4697c0e624136fcc511808a33d57158aaa27aa8a25e734ffcb3bb`](../harness/evidence/sets/closing-run-ratios-a73350ca.json) |
+| Packet framing, Linux AArch64 | `d915aa196a33328e07ecfb3ccc858a04585b2f31` | [`af871e6591be476a190154e041a4f54c72609797cb86fbd2fdc374fa2ad58d09`](../harness/evidence/sets/gate-run-aarch64-d915aa19-20261116-064738-shard-1.json) |
+| Packet framing, ARMv7 | `d915aa196a33328e07ecfb3ccc858a04585b2f31` | [`bd1f456614cf4e391f1235d571ea1d06ebdc3c50169653810ac546aff5d13b7b`](../harness/evidence/sets/gate-run-armv7-d915aa19-20261116-064928-shard-1.json) |
 | Subtitles, PGS, Linux AArch64 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1`](../harness/evidence/sets/gate-run-aarch64-99f1027b-20261116-050209-shard-1.json) |
 | Subtitles, PGS, ARMv7 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4c93b0902098f445ae645b18cc1df079177e3ae6bd45876e1f643f18b163b2de`](../harness/evidence/sets/gate-run-armv7-99f1027b-20261116-050516-shard-1.json) |
 | ISO BMFF open and index, AArch64 part 1 of 3 | `d315f73c3b7d944442d465bed89908f230be286f` | [`e580e786653f5f4647b325ab16f4295d526814103f34fbba8e4a31fade86afa7`](../harness/evidence/sets/gate-run-aarch64-d315f73c-20261116-010313-shard-1.json) |
@@ -981,7 +991,7 @@ measured cause in its list's `open_workloads`.
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals); the neutral reader's 648 comparison cases, as on AArch64 | 0.9747 (956/956 timed operations pass) | heap ≤0.2467, total RSS ≤0.8605 (956/956 lower) |
 | ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0222 (472/472 pass) | heap ≤0.8541, total RSS ≤0.8704 (472/472 lower) |
 | AAC in MOV | the configured decoder comparison: 34 clips, 3,544 access units | 1.1105 (34/34 pass) | heap ≤0.6772, total RSS ≤0.5415 (34/34 lower) |
-| Packet framing | 135/135 AVC/HEVC reference comparisons | 1.1841 (135/135 pass) | heap ≤0.7694 (135/135 lower), total RSS fails at 1.0948 (0/135 lower) |
+| Packet framing | 135/135 AVC/HEVC reference comparisons | 1.0431 (135/135 pass) at `d915aa19` | heap ≤0.7694 (135/135 lower), total RSS fails at 1.0866 (0/135 lower) at `d915aa19` |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness lanes as gate item `codecs-audio` at `bbdefa70`, as on AArch64: AAC 38/39 and one open case (`aac-sce-in-stereo`, FFmpeg's unwritten FR plane), AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 10/20 pass: the six video workloads 0.6113 to 1.1410, `aac-lc-5.1` 1.1622, `ac3-4.0` 1.1407, `aac-lc-stereo` 1.0065 and `eac3-5.1-1536` 0.9934; 10 open on this target (below), worst `dts-core-7.1-master` 1.9016 | heap ≤0.9566, total RSS ≤0.8419 (20/20 lower) |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | 7/10 pass, ≤1.1786; 3 open on this target (below): `mp2-256-48k` 1.8211, `mp3-vbr-v2` 1.7971 and `mp3-cbr-128-joint` 1.7627 | heap ≤0.8993, total RSS ≤0.7706 (10/10 lower) |
 | Capture | 15/15 at `576f088f`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.1865 at `576f088f` (15/15 pass; worst `c14-motion-960-rate255`) | heap ≤0.6086, total RSS ≤0.9765 (15/15 lower, kernel-bound) at `576f088f` |

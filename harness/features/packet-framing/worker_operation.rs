@@ -115,20 +115,25 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
 // Both live and retained packet observations use the same fold.
 fn packet_digest(hash: &mut Digest, kind: u64, input: i64, ordinal: u64, packet: &NalPacketOutput) {
     let fields = packet.source().fields;
-    hash.words(&[
-        kind,
-        input as u64,
-        ordinal,
-        fields.pts as u64,
-        fields.dts as u64,
-        fields.duration as u64,
-        fields.position as u64,
-        i64::from(fields.flags as i32) as u64,
-        i64::from(fields.stream_index) as u64,
-        1,
-        90000,
-    ]);
-    hash.blob(packet.bytes());
+    let bytes = packet.bytes();
+    // The metadata words, then the payload as a blob: its length word and bytes.
+    hash.fold(
+        &[
+            kind,
+            input as u64,
+            ordinal,
+            fields.pts as u64,
+            fields.dts as u64,
+            fields.duration as u64,
+            fields.position as u64,
+            i64::from(fields.flags as i32) as u64,
+            i64::from(fields.stream_index) as u64,
+            1,
+            90000,
+            bytes.len() as u64,
+        ],
+        bytes,
+    );
     let extra = packet
         .source()
         .new_extradata
