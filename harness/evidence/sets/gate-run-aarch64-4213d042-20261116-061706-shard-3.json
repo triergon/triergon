@@ -1,9 +1,9 @@
 {
  "name": "gate-run-aarch64-4213d042-20261116-061706-shard-3",
  "path": "gate-run-aarch64-4213d042-20261116-061706-shard-3",
- "retention": "90 days",
+ "retention": "retained",
  "reason": "Partial gate run at 4213d042 under static-toolchain-runtime-trained-order-v1, shard 3 of 3, items codec-file-workloads-2, codecs, tests-release, codec-workloads-2, isobmff-reader, on one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws, Linux AArch64: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grades, with the build identities, plan, step records and logs; for the docs/status.md AAC and codec rows after the AAC decoder's speed work",
- "key": "qualification/gate-runs/4213d0422df8d9caae433f9340287b8a342e2824-aarch64-20261116-061706/shard-3/bf8c813616d9e9e58351ebec251708b5f15828ecb7c64b1f1b2bbb0bb68fbe23.tar.zst",
+ "key": "evidence/gate-runs/4213d0422df8d9caae433f9340287b8a342e2824-aarch64-20261116-061706/shard-3/bf8c813616d9e9e58351ebec251708b5f15828ecb7c64b1f1b2bbb0bb68fbe23.tar.zst",
  "sha256": "bf8c813616d9e9e58351ebec251708b5f15828ecb7c64b1f1b2bbb0bb68fbe23",
  "bytes": 1723294,
  "results": [

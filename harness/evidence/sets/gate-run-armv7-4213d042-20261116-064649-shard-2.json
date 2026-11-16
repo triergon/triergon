@@ -1,9 +1,9 @@
 {
  "name": "gate-run-armv7-4213d042-20261116-064649-shard-2",
  "path": "gate-run-armv7-4213d042-20261116-064649-shard-2",
- "retention": "90 days",
+ "retention": "retained",
  "reason": "Partial gate run at 4213d042 under static-toolchain-runtime-trained-order-v1, shard 2 of 2, items codec-workloads, codec-workloads-4, codec-file-workloads, codecs-audio, ogg-readers, on one c6g.4xlarge host (Graviton2) from the gate image, with the derived audio streams of evidence set codec-derived-streams unpacked on the host, kernel 7.0.0-1014-aws, 32-bit ARMv7: timing on CPU 1, kernel-bound memory on CPUs 1-15 and the grades, with the build identities, plan, step records and logs; for the docs/status.md AAC and codec rows after the AAC decoder's speed work",
- "key": "qualification/gate-runs/4213d0422df8d9caae433f9340287b8a342e2824-armv7-20261116-064649/shard-2/4f3abc02cf65967b539edec53430981ff62c01bd19950843e3491dec234bd2ab.tar.zst",
+ "key": "evidence/gate-runs/4213d0422df8d9caae433f9340287b8a342e2824-armv7-20261116-064649/shard-2/4f3abc02cf65967b539edec53430981ff62c01bd19950843e3491dec234bd2ab.tar.zst",
  "sha256": "4f3abc02cf65967b539edec53430981ff62c01bd19950843e3491dec234bd2ab",
  "bytes": 1601849,
  "results": [
