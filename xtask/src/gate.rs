@@ -2766,8 +2766,21 @@ mod tests {
                 "font-shape-raster-ass".to_owned()
             ])
         );
-        assert!(names(&["progressive"]).is_err());
+        assert_eq!(
+            names(&["no-such-item"]),
+            Err("--items no-such-item: not an item of this target's plan".to_owned())
+        );
         assert_eq!(select(plan(), None).unwrap().len(), plan().len());
+        // Both targets plan every item, the progressive suite among them.
+        let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
+        for target in TARGETS {
+            let release = format!("target/{target}/release");
+            let selected = select(
+                items("/o", false, target, &release, &capture),
+                Some(&["progressive".to_owned()]),
+            );
+            assert_eq!(selected.map(|items| items.len()), Ok(1), "{target}");
+        }
     }
 
     #[test]
