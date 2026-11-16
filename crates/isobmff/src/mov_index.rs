@@ -657,8 +657,8 @@ impl<'a> SeekJob<'a> {
                         && (occurrence.source.fragment_flags.is_some()
                             || self.context.encoded_edits.is_some());
                     if self.scanned == 0 {
-                        // A fragment seek subtracts the media start from its
-                        // query. A leading empty edit delays index timestamps.
+                        // Convert the query to the packet index clock before
+                        // searching. Packet and presentation clocks can differ.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
                     }
                     if self.previous.is_some_and(|prior| timestamp <= prior)

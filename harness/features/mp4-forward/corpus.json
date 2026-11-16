@@ -691,6 +691,81 @@
         "bytes": 2716,
         "digest": 1403301861570612487
       }
+    },
+    {
+      "id": "progressive-leading-video-edit",
+      "profile": "progressive-leading-video-edit",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit.mp4",
+      "sha256": "d814d9726aa99e62dc1f83cb069162484defd8397ebbc3aa36972eb57df56b22",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 21,
+        "bytes": 4449,
+        "digest": 7900241654160636937
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-trimmed",
+      "profile": "progressive-leading-video-edit-trimmed",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-trimmed.mp4",
+      "sha256": "ef6fd674f8fe63a45ba122ea76bb9a119304b389026d744ee5d0b022a72c446b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 19,
+        "bytes": 2846,
+        "digest": 10881848924000310704
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-single-sync",
+      "profile": "progressive-leading-video-edit-single-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-single-sync.mp4",
+      "sha256": "4ff065b6eb9147d438adc3241a87b3108f5a90e3efc6fee2fdabf812327631a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 2827,
+        "digest": 5828933400729066579
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-rounded-end",
+      "profile": "progressive-leading-video-edit-rounded-end",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-rounded-end.mp4",
+      "sha256": "3f1811c7373788df7921f0e5210e678af0fbf30240479d7848ccffbc351f8d07",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 4430,
+        "digest": 381571246720305686
+      }
+    },
+    {
+      "id": "progressive-leading-video-edit-overlapping-sync",
+      "profile": "progressive-leading-video-edit-overlapping-sync",
+      "file": "crates/playback/tests/fixtures/mp4/forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "progressive-edited"
+      ],
+      "expected": {
+        "packets": 18,
+        "bytes": 2827,
+        "digest": 12073540634008711887
+      }
     }
   ]
 }

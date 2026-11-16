@@ -280,6 +280,118 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 }
 
 #[test]
+fn range_playback_keeps_the_leading_video_gap_and_uses_the_edited_seek_clock() {
+    let mut raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov").to_vec();
+    let baseline = Source::new(&raw, b"vide");
+    let baseline = rows(&baseline, range_plan(&baseline, *b"qt  ").unwrap());
+    // Add an empty rate-one row of 96 movie ticks to the first track.
+    // The movie clock is 1 kHz and the video clock is 12.8 kHz.
+    for (kind, old_size) in [
+        (b"moov", 859_u32),
+        (b"trak", 711),
+        (b"edts", 36),
+        (b"elst", 28),
+    ] {
+        let at = raw.windows(4).position(|bytes| bytes == kind).unwrap() - 4;
+        assert_eq!(raw[at..at + 4], old_size.to_be_bytes());
+        raw[at..at + 4].copy_from_slice(&(old_size + 12).to_be_bytes());
+    }
+    let elst = raw.windows(4).position(|kind| kind == b"elst").unwrap();
+    replace_atom_word(&mut raw, b"elst", 8, 1, 2);
+    raw.splice(
+        elst + 12..elst + 12,
+        [96, u32::MAX, 1 << 16].map(u32::to_be_bytes).concat(),
+    );
+
+    let source = Source::new(&raw, b"vide");
+    let mut input = source.input();
+    let config = range_config(
+        &source,
+        *b"qt  ",
+        &mut input,
+        ConfigurationLimits::default(),
+    )
+    .unwrap();
+    assert!(matches!(
+        source.job(&config, &input, 1_000_000),
+        Err(Error::Unsupported(_))
+    ));
+    let plan = range_plan(&source, *b"qt  ").unwrap();
+    let packets = rows(&source, plan.clone());
+    assert_eq!(packets.len(), baseline.len());
+    for ((packet, skip), (original, original_skip)) in packets.into_iter().zip(baseline) {
+        assert_eq!(packet.source.range, original.source.range);
+        assert_eq!(packet.source.ordinal, original.source.ordinal);
+        assert_eq!(packet.demux.pts, original.demux.pts.map(|pts| pts + 1229));
+        assert_eq!(packet.demux.dts, original.demux.dts.map(|dts| dts + 1229));
+        assert_eq!(packet.demux.duration, original.demux.duration);
+        assert_eq!(packet.demux.flags, original.demux.flags);
+        assert_eq!(skip, original_skip);
+    }
+
+    let tracks = [source.track()];
+    let plans = [Some(plan)];
+    let mut cursor = PacketCursor::new_encoded_regular(
+        &source.pool,
+        &tracks,
+        &source.media,
+        PacketLimits::default(),
+        &plans,
+        EncodedEditProfile,
+    )
+    .unwrap();
+    cursor.enable_range_seek_checkpoints();
+    let mut work = WorkBudget::new(4096);
+    let cancel = AtomicBool::new(false);
+    loop {
+        match cursor.poll(&mut work, &cancel).unwrap() {
+            CursorStatus::Ready => {
+                cursor.take_occurrence().unwrap();
+            }
+            CursorStatus::End => break,
+            CursorStatus::Yield => panic!("short AVC source has enough work"),
+        }
+    }
+    cursor.rewind_at_end().unwrap();
+    // The second sync frame decodes at 1741 and is displayed at 2765.
+    for (timestamp, ordinal) in [(2764, 1), (2765, 4)] {
+        let request = (tracks[0].track_id, timestamp);
+        let mut indexed = GlobalSeekJob::new_encoded_regular_rescaled(
+            &source.pool,
+            &tracks,
+            &source.media,
+            request,
+            SeekLimits::default(),
+            &plans,
+        )
+        .unwrap();
+        let mut checked = cursor
+            .prepare_checked_range_seek(request.0, request.1, SeekLimits::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            indexed.poll(&mut work, &cancel).unwrap(),
+            BuildStatus::Ready
+        );
+        assert_eq!(
+            checked.poll(&mut work, &cancel).unwrap(),
+            BuildStatus::Ready
+        );
+        let indexed = indexed.finish().unwrap();
+        let (_, checked) = checked.finish().unwrap();
+        assert_eq!(
+            indexed.landing().selected.occurrence.source.ordinal,
+            ordinal
+        );
+        assert_eq!(checked.selected.occurrence.source.ordinal, ordinal);
+        assert_eq!(
+            checked.selected.timestamp,
+            indexed.landing().selected.timestamp
+        );
+    }
+}
+
+#[test]
 fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
     let seed = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov");
     let mut raw = seed.to_vec();
