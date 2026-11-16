@@ -71,23 +71,12 @@ fn idct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
     ]
 }
 
-/// Forward DCT of an 8×8 block of samples or residuals (raster order). Both
-/// passes run down columns, so every column runs in its own vector lane: the
-/// row pass on the transposed block, which is then transposed back.
+/// Forward DCT of an 8×8 block of samples or residuals in raster order.
 pub(crate) fn fdct(block: &mut [i32; 64]) {
-    transpose(block);
-    columns_in_place(block, BITS - PASS, fdct_1d);
-    transpose(block);
-    columns_in_place(block, BITS + PASS, fdct_1d);
-}
-
-#[inline(always)]
-fn transpose(block: &mut [i32; 64]) {
-    for r in 0..8 {
-        for c in r + 1..8 {
-            block.swap(r * 8 + c, c * 8 + r);
-        }
+    for row in block.as_chunks_mut::<8>().0 {
+        *row = fdct_1d(*row, BITS - PASS);
     }
+    columns_in_place(block, BITS + PASS, fdct_1d);
 }
 
 /// Apply a 1-D transform down every column, in place. The loop body touches
