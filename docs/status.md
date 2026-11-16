@@ -767,8 +767,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Capture on 32-bit ARMv7, [set 5 of 5](../harness/evidence/sets/gate-run-armv7-9ce47662-20261116-033329-shard-5.json) | `9ce47662208072cf3ab14a69aef15fcc748cb81e` | `a777a5ff679b34c9a3038d00986fe4ac94920fb092de0daca8d7c02c030f7b1a` |
 | Wide short-frame conversion on AArch64 Linux | `cfcb1c97c65eb077063489b0191ff83f46049f37` | `700006d0c0f559aedcc7c6e56a4d7a36351047f63357658a4ae6e9204d9e383e` |
 | Capture on Linux AArch64 under the link policy: tests, parity with the conversion open, runtime and kernel-bound memory | `5aa554886320b59d220523032d9b81e998a60deb` | `c8a13c1a1388ffdcc928206334410d0d6d7556943d432f694fcbdbc881d47921` |
-| Short filtered capture conversion on Linux AArch64 | `a62c8eab90b2ce87b15d8319c695f40d6c66a7be` | `c4c70a345276dd534bdfc129201e9d25bae2a2d1fbc646d7087c7c2f4b578d58` |
-| Short filtered capture conversion on 32-bit ARMv7 | `a62c8eab90b2ce87b15d8319c695f40d6c66a7be` | `13899aab1f31f13df4d138fbbff8c826ec0b1cf6cdf85814112241b11478e7ca` |
+| [Short filtered capture conversion on Linux AArch64](../harness/evidence/sets/capture-short-narrow-aarch64.json) | `a62c8eab90b2ce87b15d8319c695f40d6c66a7be` | `fd51990053cd9355b0daf7eda09cf753c6ab9dadb47a24dda7d567de7ab0130a` |
+| [Short filtered capture conversion on 32-bit ARMv7](../harness/evidence/sets/capture-short-narrow-armv7.json) | `a62c8eab90b2ce87b15d8319c695f40d6c66a7be` | `f8ef3f3b0a5a3361079650e4bc3597f59caa9c2b08f2ba9bebcbfa2ccd0e4c94` |
 | Codec and capture timing, earlier and shared runner | `c21176e03328f26e0f49d6870dad0a55dd7c5e76` | `9a2cb6808d49462ff33e0666a44773692c44e85414f5aa9b2a21ea27a11a6bcf` |
 | Earlier: MP4 forward and range playback, AAC edits | `f5453ef9d88712777aa5b6383250875456e9f334` | `bb60ca1d1571ae40f6cc38e1d7f1315305eb2abd4daa371e1944f8b1c8273223` |
 | MP4 forward and range playback | `a41648dd4de2933d526415cce86a9ebbd1d4444b` | `32aa6f481afc5f6074dd14a683a110bc044b781b9c40b72c84876af9b812f977` |
