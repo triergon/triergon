@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-aarch64-9ce47662-20261116-033256-shard-4",
+ "path": "gate-run-aarch64-9ce47662-20261116-033256-shard-4",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory on AArch64 Linux.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-aarch64-20261116-033256/shard-4/cf1b760ac1049defdc0a510b0dc0218b2e7344f73eb403306880e1dec76b8a87.tar.zst",
+ "sha256": "cf1b760ac1049defdc0a510b0dc0218b2e7344f73eb403306880e1dec76b8a87",
+ "bytes": 421719491,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "a10572db5c9d43afb8edf4840f05f2b2a58703d9a3b82acfc951d8d3834e3584",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "3506f1401bd2f86befab0c9b4ace50a4b3198352b350963a68175ce7e9a842b1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "ba7abc9b706d4ada9dc4dbf6432d20aa2aa2ca163231349491455427dc5cce94",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "9367208cec0f357219ab3f9dce2e898f681c26e130e835a676a019c9dceaf417",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "0cf6d5c273c5735ae0f20aa1b907f8e176772411ee1bf64f8fa95438fc0d72b3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "ade98a682909f91356a813f4cf2afc16b1807a0dbe76a1b93d40601366906ef3",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}

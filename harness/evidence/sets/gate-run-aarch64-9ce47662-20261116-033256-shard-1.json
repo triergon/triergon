@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-9ce47662-20261116-033256-shard-1",
+ "path": "gate-run-aarch64-9ce47662-20261116-033256-shard-1",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory on AArch64 Linux.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-aarch64-20261116-033256/shard-1/bbaab5db72eb034862167a349603e66d122d17b213825adfc58f1058e541e2f5.tar.zst",
+ "sha256": "bbaab5db72eb034862167a349603e66d122d17b213825adfc58f1058e541e2f5",
+ "bytes": 359097060,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "08e295e91bd17b68ffaf04deffb44a8319487f36ea4f36f3fb5e0190fc20dd09",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c762803c66f52c8e209b512dda5279c9769de2c68b2d4fee5fc998beeaa0a8ce",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}
