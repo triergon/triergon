@@ -194,13 +194,19 @@ impl Synthesis {
             // reversed, with (-1)^(63 - j) = -(-1)^j
             self.b[k] = -sgn * x[63 - k].re;
         }
-        dct.run(&self.a, &mut self.c);
-        dct.run(&self.b, &mut self.d);
-        let v = &mut self.v[p..p + 128];
-        for m in 0..64 {
-            let s = if m & 1 == 0 { self.d[m] } else { -self.d[m] };
-            v[64 + m] = self.c[m] + s;
-            v[63 - m] = self.c[m] - s;
+        // C and S split as `Dct4::run_split` returns them: c[2k] = ce[k], c[63 - 2k] = co[k]
+        let (ce, co) = self.c.split_at_mut(32);
+        dct.run_split(&self.a, ce, co);
+        let (se, so) = self.d.split_at_mut(32);
+        dct.run_split(&self.b, se, so);
+        let v: &mut [f32; 128] = (&mut self.v[p..p + 128]).try_into().expect("128");
+        // v[64 + m] = C[m] + (-1)^m S[m] and v[63 - m] = C[m] - (-1)^m S[m], for the even
+        // m = 2k and the odd m = 63 - 2k
+        for (k, (((&ce, &co), &se), &so)) in ce.iter().zip(&*co).zip(&*se).zip(&*so).enumerate() {
+            v[64 + 2 * k] = ce + se;
+            v[63 - 2 * k] = ce - se;
+            v[127 - 2 * k] = co - so;
+            v[2 * k] = co + so;
         }
         let v = &self.v[p..p + 1280];
         let w = &self.t.synthesis_win;

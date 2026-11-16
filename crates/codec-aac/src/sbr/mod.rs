@@ -597,16 +597,17 @@ impl Sbr {
             let i_temp = (2 * ch.prev_t_env_last).saturating_sub(32).min(8);
             for i in 0..32 {
                 let row = &mut self.x[i];
-                *row = [Cpx::default(); 64];
                 let (kxi, mi) = if i < i_temp {
                     (ch.kx_prev, ch.m_prev)
                 } else {
                     (kx, m)
                 };
-                for (r, xl) in row.iter_mut().zip(&ch.xl[..kxi.min(32)]) {
+                let low = kxi.min(32);
+                for (r, xl) in row.iter_mut().zip(&ch.xl[..low]) {
                     *r = xl[i + T_HFADJ];
                 }
-                let hf = kxi..(kxi + mi).min(64);
+                let hf = kxi.min(64)..(kxi + mi).min(64);
+                row[low..hf.start].fill(Cpx::default());
                 // slots before i_temp take the previous frame's high band, whose last
                 // envelope ended after the frame border; a frame without its SBR element
                 // has no high band, that one included (observed behaviour, HE-AAC v1 and v2
@@ -614,8 +615,11 @@ impl Sbr {
                 // frames)
                 if ready {
                     let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
-                    row[hf.clone()].copy_from_slice(&high[hf]);
+                    row[hf.clone()].copy_from_slice(&high[hf.clone()]);
+                } else {
+                    row[hf.clone()].fill(Cpx::default());
                 }
+                row[hf.end..].fill(Cpx::default());
             }
             // keep state for the next frame
             for xl in ch.xl.iter_mut() {
@@ -674,26 +678,18 @@ impl Sbr {
                         self.x_r[i] = self.x[i];
                     }
                 }
-                for i in 0..32 {
-                    let x = self.x[i];
-                    self.ch[0]
-                        .synthesis
-                        .run(dct, &x, 1.0 / 32768.0, &mut l[i * 64..i * 64 + 64]);
+                for (x, out) in self.x[..32].iter().zip(l.chunks_exact_mut(64)) {
+                    self.ch[0].synthesis.run(dct, x, 1.0 / 32768.0, out);
                 }
-                for i in 0..32 {
-                    let x = self.x_r[i];
-                    self.ch[1]
-                        .synthesis
-                        .run(dct, &x, 1.0 / 32768.0, &mut r[i * 64..i * 64 + 64]);
+                for (x, out) in self.x_r[..32].iter().zip(r.chunks_exact_mut(64)) {
+                    self.ch[1].synthesis.run(dct, x, 1.0 / 32768.0, out);
                 }
                 continue;
             }
             let chn = &mut self.ch[c];
             let out: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
-            for i in 0..32 {
-                let x = self.x[i];
-                chn.synthesis
-                    .run(dct, &x, 1.0 / 32768.0, &mut out[i * 64..i * 64 + 64]);
+            for (x, out) in self.x[..32].iter().zip(out.chunks_exact_mut(64)) {
+                chn.synthesis.run(dct, x, 1.0 / 32768.0, out);
             }
         }
         if ready {
