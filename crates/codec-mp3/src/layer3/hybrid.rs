@@ -16,9 +16,8 @@ const ALIAS_C: [f64; 8] = [
 ];
 
 struct Tables {
-    /// Column `k` of the 18-point DCT-IV behind the 36-point IMDCT,
-    /// `cos(π/72 (2m + 1)(2k + 1))` for `m < 18`, padded with zeros to whole vectors.
-    dct18: [[f32; 20]; 18],
+    /// The 18-point DCT-IV behind the 36-point IMDCT.
+    dct18: Dct18,
     /// Column `k` of the 6-point DCT-IV behind the 12-point IMDCT,
     /// `cos(π/24 (2m + 1)(2k + 1))` for `m < 6`, padded likewise.
     dct6: [[f32; 8]; 6],
@@ -59,7 +58,7 @@ static TABLES: LazyLock<Tables> = LazyLock::new(|| {
         _ => sine(36, i),
     });
     Tables {
-        dct18: dct_iv_columns(18),
+        dct18: Dct18::new(),
         dct6: dct_iv_columns(6),
         normal,
         start,
@@ -196,7 +195,7 @@ fn long_imdct(
     overlap: &mut [f32; SUBBAND],
     out: &mut [f32; SUBBAND],
 ) {
-    let w = dct_iv(&tables.dct18, x);
+    let w = tables.dct18.transform(x);
     // y[n] = w[n + 9] for n < 9, -w[26 - n] for n < 27, -w[n - 27] after.
     for n in 0..9 {
         out[n] = overlap[n] + w[n + 9] * window[n];
@@ -239,12 +238,133 @@ fn short_imdct(
     }
 }
 
+/// A complex number, for the 18-point DCT-IV's inner DFT.
+#[derive(Clone, Copy, Debug)]
+struct Complex {
+    re: f32,
+    im: f32,
+}
+
+impl Complex {
+    fn unit(angle: f64) -> Complex {
+        Complex {
+            re: angle.cos() as f32,
+            im: angle.sin() as f32,
+        }
+    }
+}
+
+impl core::ops::Add for Complex {
+    type Output = Complex;
+    #[inline(always)]
+    fn add(self, other: Complex) -> Complex {
+        Complex {
+            re: self.re + other.re,
+            im: self.im + other.im,
+        }
+    }
+}
+
+impl core::ops::Sub for Complex {
+    type Output = Complex;
+    #[inline(always)]
+    fn sub(self, other: Complex) -> Complex {
+        Complex {
+            re: self.re - other.re,
+            im: self.im - other.im,
+        }
+    }
+}
+
+impl core::ops::Mul for Complex {
+    type Output = Complex;
+    #[inline(always)]
+    fn mul(self, other: Complex) -> Complex {
+        Complex {
+            re: self.re * other.re - self.im * other.im,
+            im: self.re * other.im + self.im * other.re,
+        }
+    }
+}
+
+/// The 18-point DCT-IV `w[m] = sum_k x[k] cos(π/72 (2m + 1)(2k + 1))` through a
+/// 9-point complex DFT (P. Duhamel, Y. Mahieux and J. P. Petit, "A fast algorithm
+/// for the implementation of filter banks based on 'time domain aliasing
+/// cancellation'", ICASSP 1991): the inputs fold into `z[n] = (x[2n] + i x[17 - 2n])
+/// e^(-iπ(4n + 1)/72)`, the DFT `Z` of `z` runs as three 3-point DFTs, twiddles and
+/// three more, and `Z[k] e^(-iπk/18)` gives `w[2k]` (real part) and `-w[17 - 2k]`
+/// (imaginary part).
+#[derive(Debug)]
+struct Dct18 {
+    /// `e^(-iπ(4n + 1)/72)`.
+    fold: [Complex; 9],
+    /// `e^(-2πi/9)`, `e^(-4πi/9)` and `e^(-8πi/9)`: the twiddles between the stages.
+    twiddles: [Complex; 3],
+    /// `e^(-iπk/18)`.
+    unfold: [Complex; 9],
+}
+
+impl Dct18 {
+    fn new() -> Dct18 {
+        use core::f64::consts::PI;
+        Dct18 {
+            fold: core::array::from_fn(|n| Complex::unit(-PI * (4 * n + 1) as f64 / 72.0)),
+            twiddles: [1.0, 2.0, 4.0].map(|k| Complex::unit(-2.0 * PI * k / 9.0)),
+            unfold: core::array::from_fn(|k| Complex::unit(-PI * k as f64 / 18.0)),
+        }
+    }
+
+    fn transform(&self, x: &[f32; 18]) -> [f32; 18] {
+        let z: [Complex; 9] = core::array::from_fn(|n| {
+            Complex {
+                re: x[2 * n],
+                im: x[17 - 2 * n],
+            } * self.fold[n]
+        });
+        // Z[k1 + 3 k2] = sum_n2 e^(-2πi n2 (k1 + 3 k2) / 9) sum_n1 z[3 n1 + n2] e^(-2πi n1 k1 / 3).
+        let [w1, w2, w4] = self.twiddles;
+        let [a0, a1, a2] = [0, 1, 2].map(|n2| dft3([z[n2], z[3 + n2], z[6 + n2]]));
+        let columns = [
+            [a0[0], a1[0], a2[0]],
+            [a0[1], a1[1] * w1, a2[1] * w2],
+            [a0[2], a1[2] * w2, a2[2] * w4],
+        ];
+        let mut w = [0.0; 18];
+        for (k1, column) in columns.into_iter().enumerate() {
+            for (k2, value) in dft3(column).into_iter().enumerate() {
+                let k = k1 + 3 * k2;
+                let u = value * self.unfold[k];
+                w[2 * k] = u.re;
+                w[17 - 2 * k] = -u.im;
+            }
+        }
+        w
+    }
+}
+
+/// The 3-point DFT `X[k] = sum_n x[n] e^(-2πi nk/3)`.
+#[inline(always)]
+fn dft3([a, b, c]: [Complex; 3]) -> [Complex; 3] {
+    const HALF_SQRT_3: f32 = 0.866_025_4;
+    let sum = b + c;
+    let difference = b - c;
+    let middle = Complex {
+        re: a.re - 0.5 * sum.re,
+        im: a.im - 0.5 * sum.im,
+    };
+    // -i (√3/2) (b - c)
+    let rotated = Complex {
+        re: HALF_SQRT_3 * difference.im,
+        im: -HALF_SQRT_3 * difference.re,
+    };
+    [a + sum, middle + rotated, middle - rotated]
+}
+
 /// `w[m] = sum_k x[k] columns[k][m]`, accumulated a column at a time so the sum over
 /// the `L` lanes (`m`, padded to whole vectors) vectorizes. Trailing zero coefficients
 /// are skipped: adding a zero product to a sum that starts at +0 never changes it.
-/// Kept out of line, so the use of its outputs does not reshape the vector loop. At 18
-/// and 6 points, and with the high lines mostly zero, this direct form is faster than
-/// the FFT-based [`triergon_codec::mdct::Imdct`].
+/// Kept out of line, so the use of its outputs does not reshape the vector loop. At 6
+/// points this direct form is the short blocks' transform.
 #[inline(never)]
 fn dct_iv<const N: usize, const L: usize>(columns: &[[f32; L]; N], x: &[f32; N]) -> [f32; L] {
     let used = x.iter().rposition(|&v| v != 0.0).map_or(0, |last| last + 1);

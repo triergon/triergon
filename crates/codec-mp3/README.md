@@ -38,8 +38,8 @@ output, without container trims. `--reset-at N` resets the decoder before access
   scalefactors with `scfsi` and the low-sampling-frequency scheme, every Huffman table
   with linbits and both count1 tables, requantization with pre-emphasis and subblock
   gain, short and mixed blocks, mid/side and intensity stereo (both schemes), alias
-  reduction, the 36- and 12-point IMDCT with the four window shapes, overlap and
-  frequency inversion.
+  reduction, the 36- and 12-point IMDCT with the four window shapes (the 36-point one
+  through a 9-point complex DFT), overlap and frequency inversion.
 - Layer II: the four MPEG-1 allocation tables, chosen by sample rate and bit rate per
   channel, and the table of the low sampling frequencies; scalefactor selection,
   grouped quantizers and the joint stereo bound.
