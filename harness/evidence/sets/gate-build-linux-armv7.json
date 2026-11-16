@@ -1,0 +1,10 @@
+{
+ "name": "gate-build-linux-armv7",
+ "path": "gate-build-linux-armv7",
+ "retention": "retained",
+ "reason": "32-bit ARMv7 status rows: the eight Matroska, startup and seek and HLS contracts, the external HDR vector, codec timing and capture qualification, with the CPU, kernel and user-space package list",
+ "key": "evidence/gate-build-linux-armv7/773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116.tar.gz",
+ "sha256": "773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116",
+ "bytes": 5869517627,
+ "source_revision": "78a873dd983c878c861a7b5549639a58d5a599c1"
+}

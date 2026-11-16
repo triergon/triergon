@@ -193,38 +193,6 @@ pub(super) fn measurement_parity(
     }))
 }
 
-fn command(program: &Path, args: &[&str]) -> Result<Value, String> {
-    let mut argv = vec![program.display().to_string()];
-    argv.extend(args.iter().map(|s| (*s).to_owned()));
-    let output = process::check_output(&argv)?;
-    json::parse(&output).map_err(|error| error.to_string())
-}
-
-fn audio_specific_config(dump: &str) -> Result<Vec<u8>, String> {
-    let mut config = Vec::new();
-    for line in dump.lines().filter(|line| !line.is_empty()) {
-        let (_, text) = line.split_once(':').ok_or("invalid configuration dump")?;
-        let (hex, _) = text
-            .trim_start()
-            .split_once("  ")
-            .ok_or("invalid configuration hex")?;
-        for word in hex.split_ascii_whitespace() {
-            if !word.len().is_multiple_of(2) || !word.is_ascii() {
-                return Err("invalid configuration hex word".into());
-            }
-            for at in (0..word.len()).step_by(2) {
-                config.push(
-                    u8::from_str_radix(&word[at..at + 2], 16).map_err(|error| error.to_string())?,
-                );
-            }
-        }
-    }
-    if !(2..=MAX_PACKET).contains(&config.len()) {
-        return Err("AAC configuration bounds".into());
-    }
-    Ok(config)
-}
-
 fn access_units(source: &[u8], probe: &Value) -> Result<(Vec<u8>, u32, u32, u32), String> {
     let Some([stream]) = probe.get("streams").and_then(Value::as_array) else {
         return Err("expected one AAC stream".into());
@@ -242,7 +210,10 @@ fn access_units(source: &[u8], probe: &Value) -> Result<(Vec<u8>, u32, u32, u32)
     if rate == 0 || !(1..=8).contains(&channels) || count == 0 {
         return Err("AAC stream shape".into());
     }
-    let config = audio_specific_config(string(stream, "extradata")?)?;
+    let config = crate::ffprobe::data_bytes(string(stream, "extradata")?)?;
+    if !(2..=MAX_PACKET).contains(&config.len()) {
+        return Err("AAC configuration bounds".into());
+    }
     let mut input = Vec::new();
     for field in [rate, channels, count, config.len() as u32] {
         input.extend_from_slice(&field.to_le_bytes());
@@ -387,7 +358,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
                 source_path.display()
             ));
         }
-        let probe = command(
+        let probe = process::check_json(
             &comparison.ffprobe,
             &[
                 "-v",
@@ -441,7 +412,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
 
         let raw = |worker: &Path, role: &str| -> Result<(Value, Vec<u8>), String> {
             let pcm = out.join(format!("{id}.{role}.pcm"));
-            let row = command(
+            let row = process::check_json(
                 worker,
                 &[
                     &format!("{operation}-raw"),

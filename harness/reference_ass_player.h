@@ -26,7 +26,7 @@
 #include "ass_render.h"
 
 /* The rasteriser's spline approximation error, in 1/64 pixel, that
- * ass_renderer_init gives it (ass_render.c:44). */
+ * the renderer gives it. */
 #define RASTERIZER_PRECISION 16
 
 #include "reference_ass_fixture.h"

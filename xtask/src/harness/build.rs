@@ -15,11 +15,13 @@ use crate::json::Value;
 
 type R<T> = Result<T, String>;
 
-const USAGE: &str = "usage: cargo xtask build-workers [--comparison-build] [--only WORKER]";
+const USAGE: &str =
+    "usage: cargo xtask build-workers [--comparison-build] [--only WORKER] [--all-references]";
 
-fn options(args: &[String]) -> R<(bool, Option<&str>)> {
+fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
     let mut comparison_build = false;
     let mut only = None;
+    let mut all_references = false;
     let mut args = args.iter();
     while let Some(flag) = args.next() {
         match flag.as_str() {
@@ -27,18 +29,16 @@ fn options(args: &[String]) -> R<(bool, Option<&str>)> {
             "--only" if only.is_none() => {
                 only = Some(args.next().ok_or(USAGE)?.as_str());
             }
+            "--all-references" if !all_references => all_references = true,
             _ => return Err(USAGE.into()),
         }
     }
-    Ok((comparison_build, only))
+    Ok((comparison_build, only, all_references))
 }
 
 pub fn main(root: &Path, args: &[String]) -> R<PathBuf> {
-    let (comparison_build, only) = options(args)?;
-    match only {
-        None => build(root, comparison_build),
-        Some(name) => build_selected(root, comparison_build, Some(name)),
-    }
+    let (comparison_build, only, all_references) = options(args)?;
+    build_selected(root, comparison_build, only, all_references)
 }
 
 fn sha(path: &Path) -> R<String> {
@@ -284,19 +284,37 @@ fn which(program: &str) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
-/// Measurement workers a contract may name as its candidate besides
-/// `media-worker`, with the command that builds each.
+/// A measurement worker and how `cargo` builds it: its name, package, example (none
+/// for a binary of the same name) and features.
 #[derive(Debug, PartialEq, Eq)]
-struct Candidate {
-    name: &'static str,
-    package: &'static str,
-    example: Option<&'static str>,
-    features: &'static [&'static str],
+pub struct Candidate {
+    pub name: &'static str,
+    pub package: &'static str,
+    pub example: Option<&'static str>,
+    pub features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 12] = [
+/// The worker every contract names unless it names another.
+const MEDIA_WORKER: Candidate = Candidate {
+    name: "media-worker",
+    package: "media-worker",
+    example: None,
+    features: &[],
+};
+
+/// Measurement workers a contract may name as its candidate besides
+/// `media-worker`.
+const ADDITIONAL_CANDIDATES: [Candidate; 13] = [
     Candidate {
         name: "playback-worker",
+        package: "playback-worker",
+        example: None,
+        features: &[],
+    },
+    // A second binary of the playback-worker package with the Matroska runners
+    // alone, the runner families its reference build can demux.
+    Candidate {
+        name: "playback-matroska-worker",
         package: "playback-worker",
         example: None,
         features: &[],
@@ -370,6 +388,40 @@ const ADDITIONAL_CANDIDATES: [Candidate; 12] = [
     },
 ];
 
+/// Every measurement worker, `media-worker` first.
+pub fn workers() -> impl Iterator<Item = &'static Candidate> {
+    std::iter::once(&MEDIA_WORKER).chain(ADDITIONAL_CANDIDATES.iter())
+}
+
+/// The `cargo rustc` command line that builds `spec` into `target_dir`, in the
+/// release profile for the worker target or the dev profile for this host, up to
+/// and including the `--` before the worker's own compiler arguments.
+pub fn cargo_rustc(spec: &Candidate, target_dir: &Path, release: bool) -> R<Vec<String>> {
+    let mut command: Vec<String> = ["cargo", "rustc", "-p", spec.package]
+        .map(String::from)
+        .to_vec();
+    if release {
+        command.push("--release".into());
+    }
+    command.extend([
+        "--locked".into(),
+        "--target-dir".into(),
+        target_dir.display().to_string(),
+    ]);
+    if release {
+        command.extend(gate_build::target_args()?);
+    }
+    match spec.example {
+        Some(example) => command.extend(["--example".into(), example.into()]),
+        None => command.extend(["--bin".into(), spec.name.into()]),
+    }
+    if !spec.features.is_empty() {
+        command.extend(["--features".into(), spec.features.join(",")]);
+    }
+    command.push("--".into());
+    Ok(command)
+}
+
 pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let spec = ADDITIONAL_CANDIDATES
         .iter()
@@ -384,6 +436,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let mut inputs = shared_inputs(root)?;
     if name == "isobmff-worker" {
         inputs.extend(crate::isobmff_bench::source_inputs(root)?);
+        inputs.extend(crate::isobmff_seek::source_inputs(root)?);
     }
     if name == "transport-worker" {
         inputs.extend(crate::transport_fixtures::entity_inputs(root)?);
@@ -398,6 +451,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             .map(str::to_owned),
         );
         for file in [
+            "avc-profile-extension-inputs.json",
             "contract.json",
             "corpus.json",
             "fixtures.rs",
@@ -451,59 +505,128 @@ fn selected_candidates(only: Option<&str>) -> R<Vec<&'static Candidate>> {
     }
 }
 
-fn additional_candidates(
+/// How a worker's trained order laid it out: the SHA-256 of the committed trained
+/// order, how many names it lists and how many of them the binary holds, and the
+/// SHA-256 of the ordering file the link used.
+pub struct LinkOrder {
+    trained_sha256: String,
+    trained: usize,
+    held: usize,
+    ordering_sha256: String,
+}
+
+impl LinkOrder {
+    fn record(order: Option<&Self>) -> Value {
+        order.map_or(Value::Null, |order| {
+            Value::object([
+                ("trained_sha256", Value::str(&order.trained_sha256)),
+                ("trained", Value::int(order.trained as i128)),
+                ("held", Value::int(order.held as i128)),
+                ("ordering_sha256", Value::str(&order.ordering_sha256)),
+            ])
+        })
+    }
+}
+
+/// Builds the worker `name` with `command`, a `cargo rustc` command line that ends
+/// with its link arguments. A worker the training manifest orders for the worker
+/// target ([`super::link_training::trained_order`]) is linked by the pinned
+/// toolchain's `lld`, then linked again with its functions in its trained order, the
+/// rest in module order; `command` then holds the second build. `binary` is where
+/// the build puts the worker. The ordering file is written to
+/// `target/harness/link-order/NAME-HASH.txt`, HASH the first 16 hex digits of its
+/// SHA-256, so the second build's link arguments change whenever the order does and
+/// cargo never reuses a link made with another order. The build fails when the
+/// binary holds fewer than [`super::link_order::MIN_HELD_PERCENT`] of the trained
+/// names, or when the second build's own ordering file differs. Returns how the
+/// order laid the worker out, none for a worker linked as its toolchain links it.
+fn build_in_link_order(
     root: &Path,
-    selected: &[&Candidate],
-) -> R<Vec<(&'static str, Vec<String>)>> {
-    let mut built = Vec::new();
-    for spec in selected {
-        let mut command: Vec<String> = [
-            "cargo",
-            "build",
-            "-p",
-            spec.package,
-            "--release",
-            "--locked",
-        ]
-        .map(String::from)
-        .to_vec();
-        command.extend([
-            "--target-dir".into(),
-            root.join("target").display().to_string(),
-        ]);
-        command.extend(gate_build::target_args()?);
-        if let Some(example) = spec.example {
-            command.extend(["--example".into(), example.into()]);
-        }
-        if !spec.features.is_empty() {
-            command.extend(["--features".into(), spec.features.join(",")]);
-        }
+    command: &mut Vec<String>,
+    binary: &Path,
+    name: &str,
+) -> R<Option<LinkOrder>> {
+    let cargo = |command: &[String]| -> R<()> {
         let status = Command::new("cargo")
             .args(&command[1..])
             .env("CARGO_INCREMENTAL", "0")
             .current_dir(root)
             .status()
             .map_err(|e| e.to_string())?;
-        if !status.success() {
-            return Err(format!("{} build failed: {status}", spec.name));
+        if status.success() {
+            Ok(())
+        } else {
+            Err(format!("{name} build failed: {status}"))
         }
-        if let Some(example) = spec.example {
-            fs::copy(
-                root.join(gate_build::release_dir()?)
-                    .join("examples")
-                    .join(example),
-                root.join(gate_build::release_dir()?).join(spec.name),
-            )
-            .map_err(|error| format!("{}: {error}", spec.name))?;
+    };
+    let linker = gate_build::ordered_link_arguments(root, None)?;
+    let trained = if linker.is_empty() {
+        None
+    } else {
+        super::link_training::trained_order(root, gate_build::worker_target()?, name)?
+    };
+    let Some(trained) = trained else {
+        cargo(command)?;
+        return Ok(None);
+    };
+    let first: Vec<String> = command.iter().cloned().chain(linker).collect();
+    cargo(&first)?;
+    let order = super::link_order::symbol_order(binary, &trained.names)?;
+    if !super::link_order::holds_enough(order.held, trained.names.len()) {
+        return Err(format!(
+            "{name} holds {} of the {} functions of its trained order; retrain it \
+             (cargo xtask link-order train)",
+            order.held,
+            trained.names.len()
+        ));
+    }
+    let hash = crate::sha256::hex(order.text.as_bytes());
+    let directory = root.join("target/harness/link-order");
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let path = directory.join(format!("{name}-{}.txt", &hash[..16]));
+    fs::write(&path, &order.text).map_err(|e| format!("{}: {e}", path.display()))?;
+    command.extend(gate_build::ordered_link_arguments(root, Some(&path))?);
+    cargo(command)?;
+    if super::link_order::symbol_order(binary, &trained.names)?.text != order.text {
+        return Err(format!(
+            "{name}: the ordered link holds other functions than the first link"
+        ));
+    }
+    Ok(Some(LinkOrder {
+        trained_sha256: trained.sha256,
+        trained: trained.names.len(),
+        held: order.held,
+        ordering_sha256: hash,
+    }))
+}
+
+/// A built worker: its name, the command that built it and how its trained order
+/// laid it out, none when it links as its toolchain does.
+type Built = (&'static str, Vec<String>, Option<LinkOrder>);
+
+fn additional_candidates(root: &Path, selected: &[&Candidate]) -> R<Vec<Built>> {
+    let mut built = Vec::new();
+    for spec in selected {
+        let mut command = cargo_rustc(spec, &root.join("target"), true)?;
+        command.extend(gate_build::worker_link_arguments()?);
+        let release = root.join(gate_build::release_dir()?);
+        let binary = match spec.example {
+            Some(example) => release.join("examples").join(example),
+            None => release.join(spec.name),
+        };
+        let order = build_in_link_order(root, &mut command, &binary, spec.name)?;
+        if spec.example.is_some() {
+            fs::copy(&binary, release.join(spec.name))
+                .map_err(|error| format!("{}: {error}", spec.name))?;
         }
-        built.push((spec.name, command));
+        built.push((spec.name, command, order));
     }
     Ok(built)
 }
 
-fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
+fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
     let mut candidates = Vec::new();
-    for (name, command) in built {
+    for (name, command, order) in built {
         let path = format!("{}/{name}", gate_build::release_dir()?);
         candidates.push((
             *name,
@@ -511,6 +634,7 @@ fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
                 ("path", Value::str(&path)),
                 ("sha256", Value::str(sha(&root.join(&path))?)),
                 ("command", strings(command)),
+                ("link_order", LinkOrder::record(order.as_ref())),
                 ("selected_graph", candidate_graph(root, name)?),
             ]),
         ));
@@ -825,38 +949,26 @@ pub fn measurement_reference_error(contract: &Value) -> Option<String> {
     }
 }
 
-pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
-    build_selected(root, comparison_build, None)
-}
-
-fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<PathBuf> {
+/// Builds the workers and references. A profile reference is built only when every
+/// profile it links is prepared, and `comparison_references` in `identity.json` lists
+/// those built; the others are printed, and with `all_references` fail the build.
+fn build_selected(
+    root: &Path,
+    comparison_build: bool,
+    only: Option<&str>,
+    all_references: bool,
+) -> R<PathBuf> {
     let selected = selected_candidates(only)?;
     gate_build::admit(root, comparison_build)?;
     let linux = cfg!(target_os = "linux");
-    let mut candidate_command: Vec<String> = [
-        "cargo",
-        "build",
-        "-p",
+    let mut candidate_command = cargo_rustc(&MEDIA_WORKER, &root.join("target"), true)?;
+    candidate_command.extend(gate_build::worker_link_arguments()?);
+    let candidate_order = build_in_link_order(
+        root,
+        &mut candidate_command,
+        &root.join(gate_build::release_dir()?).join("media-worker"),
         "media-worker",
-        "--release",
-        "--locked",
-    ]
-    .map(String::from)
-    .to_vec();
-    candidate_command.extend([
-        "--target-dir".into(),
-        root.join("target").display().to_string(),
-    ]);
-    candidate_command.extend(gate_build::target_args()?);
-    let status = Command::new("cargo")
-        .args(&candidate_command[1..])
-        .env("CARGO_INCREMENTAL", "0")
-        .current_dir(root)
-        .status()
-        .map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err(format!("candidate build failed: {status}"));
-    }
+    )?;
     let additional = additional_candidates(root, &selected)?;
     let out = root.join("target/harness");
     fs::create_dir_all(&out).map_err(|e| e.to_string())?;
@@ -893,7 +1005,7 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         "-Werror".into(),
         root.join("harness/reference.c").display().to_string(),
     ];
-    command.extend(shell_words(&flags)?);
+    command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
     command.extend(["-o".into(), worker.display().to_string()]);
     run(&command)?;
     let mut combined_command = vec![command[0].clone(), "-DTRIERGON_COMBINED_REFERENCE=1".into()];
@@ -904,13 +1016,23 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
     // source, made only when that profile exists, so the other references and
     // their identity records are unchanged.
     let mut profile_workers = Vec::new();
+    let mut skipped = Vec::new();
     for reference in PROFILE_REFERENCES {
         let path = out.join(reference.binary);
         let build = root.join(reference.profile).join("build.json");
         let profiles =
             || std::iter::once(reference.profile).chain(reference.linked.iter().copied());
-        if !profiles().all(|profile| root.join(profile).join("build.json").exists()) {
+        let missing: Vec<&str> = profiles()
+            .filter(|profile| !root.join(profile).join("build.json").exists())
+            .collect();
+        if !missing.is_empty() {
             let _ = fs::remove_file(&path);
+            println!(
+                "skipped {}: {} not prepared",
+                reference.binary,
+                missing.join(", ")
+            );
+            skipped.push(reference.binary);
             continue;
         }
         if let Some(prepared) = reference.prepared {
@@ -949,10 +1071,17 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
             command.push(generate(root)?.display().to_string());
         }
         command.push(root.join(reference.source).display().to_string());
-        command.extend(shell_words(&flags)?);
+        command.extend(gate_build::reference_link_flags(shell_words(&flags)?)?);
         command.extend(["-o".into(), path.display().to_string()]);
         run(&command)?;
         profile_workers.push((reference, path, build, command));
+    }
+    if all_references && !skipped.is_empty() {
+        return Err(format!(
+            "--all-references: {} reference(s) skipped: {}",
+            skipped.len(),
+            skipped.join(", ")
+        ));
     }
     let commands = instrumentation_commands(&compiler, root, &out, linux);
     for compile in &commands {
@@ -1209,6 +1338,10 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
             }),
         ),
         ("candidate_command", strings(&candidate_command)),
+        (
+            "candidate_link_order",
+            LinkOrder::record(candidate_order.as_ref()),
+        ),
         ("selected_graph", graph.clone()),
         ("additional_candidates", candidates),
         (
@@ -1413,24 +1546,33 @@ mod tests {
 
     #[test]
     fn worker_options_preserve_defaults_and_accept_either_flag_order() {
-        assert_eq!(options(&[]).unwrap(), (false, None));
+        assert_eq!(options(&[]).unwrap(), (false, None, false));
         assert_eq!(
             options(&args(&["--comparison-build"])).unwrap(),
-            (true, None)
+            (true, None, false)
         );
+        assert_eq!(
+            options(&args(&["--all-references"])).unwrap(),
+            (false, None, true)
+        );
+        assert!(options(&args(&["--all-references", "--all-references"])).is_err());
         for name in std::iter::once("media-worker")
             .chain(ADDITIONAL_CANDIDATES.iter().map(|spec| spec.name))
         {
             assert_eq!(
                 options(&args(&["--only", name])).unwrap(),
-                (false, Some(name))
+                (false, Some(name), false)
             );
             for arguments in [
                 args(&["--only", name, "--comparison-build"]),
                 args(&["--comparison-build", "--only", name]),
             ] {
-                assert_eq!(options(&arguments).unwrap(), (true, Some(name)));
+                assert_eq!(options(&arguments).unwrap(), (true, Some(name), false));
             }
+            assert_eq!(
+                options(&args(&["--all-references", "--only", name])).unwrap(),
+                (false, Some(name), true)
+            );
         }
     }
 

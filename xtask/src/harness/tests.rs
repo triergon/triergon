@@ -100,7 +100,14 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
             ])
         })
         .collect();
-    let memory = super::memory::evaluate(root(), &samples, 30, 0, &certificate, None);
+    let memory = super::memory::evaluate(
+        root(),
+        &samples,
+        crate::harness::timing::Pairs::fixed(30),
+        0,
+        &certificate,
+        None,
+    );
     let timing = Value::object([
         ("status", Value::str("measured")),
         ("worker_hashes", hashes.clone()),
@@ -130,12 +137,33 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
         ("rustc", Value::str(compiler)),
         ("build_environment", Value::Object(Vec::new())),
         ("cargo_configuration", Value::Array(Vec::new())),
+        ("link_policy", Value::str(gate_build::LINK_POLICY)),
+        ("candidate_link_order", link_order_record("media-worker")),
         (
             "instrumentation",
             v(r#"{"probe_sha256": "probe-hash", "observer_sha256": "observer-hash"}"#),
         ),
     ]);
     (contract, vec![row], identity)
+}
+
+/// The link-order record a gate build of `worker` gives on this host: its committed
+/// trained order, wholly held, where the policy orders the link and the training
+/// manifest trains the worker for this host's target; none elsewhere.
+fn link_order_record(worker: &str) -> Value {
+    let target = gate_build::worker_target().unwrap();
+    if !gate_build::orders_links(target) {
+        return Value::Null;
+    }
+    match super::link_training::trained_order(root(), target, worker).unwrap() {
+        Some(trained) => Value::object([
+            ("trained_sha256", Value::str(trained.sha256)),
+            ("trained", Value::int(trained.names.len() as i128)),
+            ("held", Value::int(trained.names.len() as i128)),
+            ("ordering_sha256", Value::str("0".repeat(64))),
+        ]),
+        None => Value::Null,
+    }
 }
 
 fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
@@ -152,6 +180,50 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
         result.get("accepted") == Some(&Value::Bool(true)),
         result.get("slice_accepted") == Some(&Value::Bool(true)),
     )
+}
+
+#[test]
+fn an_early_stopped_memory_collection_is_valid_only_under_its_rule() {
+    let (contract, rows, identity) = matched_gate_fixture();
+    let original = rows[0].get("memory").unwrap();
+    let certificate = original.get("certificate").unwrap();
+    let samples = original.get("samples").unwrap().as_array().unwrap()[..20].to_vec();
+    let gate = super::timing::Pairs::gate(30, super::memory::CEILING);
+    let memory = super::memory::evaluate(root(), &samples, gate, 0, certificate, None);
+    assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
+    assert_eq!(memory.get("pairs"), Some(&Value::int(20)));
+    let selected = identity.get("binaries").unwrap();
+    let valid = |memory: &Value| {
+        super::memory::evidence_valid(
+            root(),
+            &rows[0],
+            memory,
+            &contract,
+            &identity,
+            selected,
+            false,
+        )
+    };
+    assert!(valid(&memory));
+    // Another ceiling, fewer planned pairs than the contract's minimum, or a
+    // collection that ran on past its stop does not count.
+    let mut looser = memory.clone();
+    put(&mut looser, &["early_stop"], "ceiling", Value::float(1.5));
+    assert!(!valid(&looser));
+    let mut short = memory.clone();
+    put(&mut short, &["early_stop"], "planned_pairs", Value::int(20));
+    assert!(!valid(&short));
+    let all = original
+        .get("samples")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .to_vec();
+    let ran_on = super::memory::evaluate(root(), &all, gate, 0, certificate, None);
+    assert_eq!(
+        ran_on.get("status"),
+        Some(&Value::str("memory-pairs-off-rule"))
+    );
 }
 
 #[test]
@@ -173,7 +245,14 @@ fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
             Value::int(0),
         );
     }
-    let memory = super::memory::evaluate(root(), &samples, 30, 0, certificate, None);
+    let memory = super::memory::evaluate(
+        root(),
+        &samples,
+        crate::harness::timing::Pairs::fixed(30),
+        0,
+        certificate,
+        None,
+    );
     assert_eq!(memory.get("status"), Some(&Value::str("qualified")));
     assert_eq!(memory.get("heap_ratio_upper_95"), Some(&Value::float(0.0)));
     assert_eq!(
@@ -218,7 +297,14 @@ fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
             "heap_peak_bytes",
             Value::int(reference),
         );
-        let rejected = super::memory::evaluate(root(), &invalid, 30, 0, certificate, None);
+        let rejected = super::memory::evaluate(
+            root(),
+            &invalid,
+            crate::harness::timing::Pairs::fixed(30),
+            0,
+            certificate,
+            None,
+        );
         assert_eq!(
             rejected.get("status"),
             Some(&Value::str("invalid-memory-observation"))
@@ -279,7 +365,14 @@ fn zero_heap_is_valid_evidence_with_positive_reference_and_unchanged_rss() {
                 );
             }
         }
-        let bounded = super::memory::evaluate(root(), &rss, 30, 0, certificate, None);
+        let bounded = super::memory::evaluate(
+            root(),
+            &rss,
+            crate::harness::timing::Pairs::fixed(30),
+            0,
+            certificate,
+            None,
+        );
         assert_eq!(bounded.get("status"), Some(&Value::str("qualified")));
         assert!(super::memory::evidence_valid(
             root(),
@@ -716,7 +809,14 @@ fn per_worker_memory_outputs_reuse_the_same_observation_validation() {
             }
         }
     }
-    let measured = super::memory::evaluate(root(), &samples, 30, 0, certificate, Some(&expected));
+    let measured = super::memory::evaluate(
+        root(),
+        &samples,
+        crate::harness::timing::Pairs::fixed(30),
+        0,
+        certificate,
+        Some(&expected),
+    );
     let valid = |memory: &Value, outputs: &Value| {
         super::memory::evidence_valid_with_outputs(
             root(),
@@ -888,7 +988,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
         (
             "matroska-startup-seek",
             "playback-feed-fold-v1",
-            Some("playback-worker"),
+            Some("playback-matroska-worker"),
             Some("ffmpeg-video-native"),
         ),
         (
@@ -900,7 +1000,13 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
         (
             "matroska-audio-clocks",
             "playback-mkv-audio-fold-v1",
-            Some("playback-worker"),
+            Some("playback-matroska-worker"),
+            Some("ffmpeg-video-native"),
+        ),
+        (
+            "matroska-legacy-aac",
+            "playback-mkv-audio-fold-v1",
+            Some("playback-matroska-worker"),
             Some("ffmpeg-video-native"),
         ),
         (
@@ -999,7 +1105,7 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
             checked += 1;
         }
     }
-    assert_eq!(checked, 1044);
+    assert_eq!(checked, 1048);
     let mut contract = load("harness/features/matroska-zlib/contract.json");
     put(&mut contract, &[], "reference", Value::str("not-built"));
     assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());

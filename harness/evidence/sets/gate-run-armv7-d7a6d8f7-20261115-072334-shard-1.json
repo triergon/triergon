@@ -1,0 +1,76 @@
+{
+ "name": "gate-run-armv7-d7a6d8f7-20261115-072334-shard-1",
+ "path": "gate-run-armv7-d7a6d8f7-20261115-072334-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at d7a6d8f7 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image, items mp4-forward, mp4-range and isobmff-seek: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; every step passes; for the MP4 forward, MP4 range and ISO BMFF seek rows and the reuse of these results",
+ "key": "evidence/gate-runs/d7a6d8f78c7d9963455f3a0872ca935b79fa14b4-armv7-20261115-072334/shard-1/46d6e06cb79d76d0bc2eeb9cbfed97e045b66620645097a1c2921bdb19fbed09.tar.zst",
+ "sha256": "46d6e06cb79d76d0bc2eeb9cbfed97e045b66620645097a1c2921bdb19fbed09",
+ "bytes": 61111870,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "8685dc247d5c6111397494f1e665d754a2468194f708b951d64446fc4affe5c1",
+   "status": 0,
+   "report_sha256": "08d41e516185b4fe41fd58ad75e34e8f807efe17a7e17156681491a33a2fbfac",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --memory",
+   "key": "849255e43e493e074d74ba6f3c27f0f142c1f1b695abf388458fd290c0f87451",
+   "status": 0,
+   "report_sha256": "30595b5d345a49957843b0a30628a7b9db6d8f3ad47dd4f3abb4055853411236",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "cea22ebe2458274bda77a7cd11cf4da67af64b3e3de5dcf69a9b713f73145440",
+   "status": 0,
+   "report_sha256": "e5c93865c50b455701bb963d01e48200981eb7b7a7e606f00f5da09b2171f123",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0b8a0f8a6361ca426eeaa41883f6bc09e63e5e1256a883afb7295346f86d9ab5",
+   "status": 0,
+   "report_sha256": "c6e5a8fabfb78de96a5b1178bedcf5e96ad77884f6e97d29e653dcda85433f98",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --benchmark",
+   "key": "ac671898c7f04bb69e83529a1204adcd96a63364825f5b7778fcafe115fa52eb",
+   "status": 0,
+   "report_sha256": "5a0c68ed6bee6e54f037457929b191fb905c0047bbfb7d5e0c3b375db23d10f6",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b7b3632204a4af777a46bc3e8a6210d6a05ee9e6a2a025c0b9a4191b9514faef",
+   "status": 0,
+   "report_sha256": "95fb834b485beb331b9590bb484c4a07869e540a490f8472dcf9dc344276bbef",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "f41f3820ca48bdf8f03c74a6fb7b53d40685bf07787345f65a0b6e79df79941c",
+   "status": 0,
+   "report_sha256": "88f425879e13147c6e6dc238ff7df93c23f707de201139d1dfc261fefda3af5e"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "ce87aadb662d74c75b363eb2e52486ecea236dfaab634f0e984a7c2347e34235",
+   "status": 0,
+   "report_sha256": "640be9c175e8882eb2269d601b03170adc5d64616ed87ac1f28a4e2d4cbf1e49"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "d7a6d8f78c7d9963455f3a0872ca935b79fa14b4"
+ }
+}

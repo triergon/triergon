@@ -38,10 +38,10 @@
 //!   frame starts from the target stored at the index of the previous frame's last
 //!   envelope; the first PS frame starts from the zero matrix (t01..t03, t07, t09, t21,
 //!   t23).
-//! - IPD/OPD apply to 11 of 20 or 17 of 34 bands; above them the stored imaginary parts of
-//!   the matrices are kept. Values coded for 34 bands in a 20-band frame (IID last ran 34
-//!   bands) take the truncated means of the 34-band rows the start conversion averages
-//!   (m09, m21, m29, p07, p08, p12).
+//! - IPD/OPD apply to 11 of 20 or 17 of 34 bands; above them the real parts of the
+//!   matrices are not turned and the stored imaginary parts are kept. Values coded for 34
+//!   bands in a 20-band frame (IID last ran 34 bands) take the truncated means of the
+//!   34-band rows the start conversion averages (m09, m21, m29, p07, p08, p12, o21).
 //! - A frame without PS data repeats the last PS frame; a header-less frame uses the last
 //!   header; a header with IID or ICC disabled resets those values to index 0 (t04..t07,
 //!   t12, t17..t19).
@@ -49,8 +49,19 @@
 //!   its extension holds outputs the mono signal on both channels, keeps the signal state
 //!   and resets the values; PS stays off until the next header (t08, t09, t11, t20, t21).
 //! - A frame whose configuration differs from that of the frame read before it converts
-//!   its start matrices to the new layout and restarts the decorrelator (t13, t14,
-//!   t25..t27).
+//!   its start matrices to the new layout, restarts the decorrelator and resets the
+//!   IPD/OPD smoothing history; a frame without PS after it does so again (t13, t14,
+//!   t25..t27, o20, o21).
+//! - A frame that runs in another layout than the last frame that ran, the change having
+//!   been registered while the PS was off (by a header-less frame read after an error, or
+//!   by a frame that overran its extension), reads its start matrices and the IPD/OPD
+//!   history as stored and clears none of the decorrelator's state: each band takes the
+//!   state of the old layout's band on the same line (`synth.rs`; o01, o04, o05, o12, o13,
+//!   o21, o22).
+//! - In a frame without its SBR element the PS runs as in any frame without PS data, and
+//!   its output in the QMF bands from 32 up is zero in both channels, the decorrelated
+//!   signal of earlier frames included; the decorrelator's state advances on the zero input
+//!   there (o00, o31, o32; only kx = 32 is probed).
 
 mod synth;
 mod tables;
@@ -315,8 +326,8 @@ pub(crate) struct Ps {
     last_icc: [i8; MAX_PAR],
     last_ipd: [[u8; 17]; 2],
     /// IPD/OPD: enabled by the last extension; values per envelope index as coded, with
-    /// their band count (mapped onto the configuration each frame); smoothing history on the
-    /// configuration (two previous envelopes, newest first).
+    /// their band count (mapped onto the configuration each frame); smoothing history by
+    /// parameter band (two previous envelopes, newest first).
     phase_on: bool,
     phase: [[[u8; MAX_PAR]; 2]; MAX_ENV],
     phase_bands: [usize; MAX_ENV],
@@ -829,9 +840,11 @@ impl Ps {
             return;
         }
         // a frame whose configuration differs from that of the frame read before it (or a
-        // repeat of it) restarts the decorrelator and the ducking
+        // repeat of it) restarts the decorrelator and the ducking, and the IPD/OPD smoothing
+        // history starts again from index 0 (o20, o21)
         if self.changed() {
             self.synthesis().restart();
+            self.phase_history = [[[0; MAX_PAR]; 2]; 2];
         }
         self.matrices();
         let big = self.frame.big;
@@ -862,6 +875,10 @@ impl Ps {
         }
         self.start_re = re0;
         self.start_im = im0;
+        // phases reach the bands IPD/OPD can cover (11 of 20, 17 of 34); above them the real
+        // part is the unphased entry and the stored imaginary part is neither computed nor
+        // replaced (p12, o21)
+        let phased = ipd_bands(if f.big { 34 } else { 20 });
         let mut first = 0usize;
         for e in 0..f.envelopes {
             if e > 0 {
@@ -870,14 +887,12 @@ impl Ps {
             }
             let mut re1 = [[0f32; 4]; MAX_PAR];
             let mut im1 = [[0f32; 4]; MAX_PAR];
+            // unit phasors above the phased bands: the entries stay unturned
             let (pl, pr) = if has_phase {
-                self.smooth(e, pars, f.big)
+                self.smooth(e, phased, f.big)
             } else {
                 ([(1.0, 0.0); MAX_PAR], [(1.0, 0.0); MAX_PAR])
             };
-            // phases reach the bands IPD/OPD can cover (11 of 20, 17 of 34); above them the
-            // stored imaginary part is neither computed nor replaced
-            let phased = ipd_bands(if f.big { 34 } else { 20 });
             for b in 0..pars {
                 let h = table[usize::from(f.second)][usize::from(f.fine)]
                     [(i32::from(f.iid[e][b]) + 15) as usize][f.icc[e][b] as usize];
@@ -933,7 +948,8 @@ impl Ps {
             .expect("PS applies to single channel elements")
     }
 
-    /// Smoothed row phases (cos, sin) of envelope `e`; advances the smoothing history.
+    /// Smoothed row phases (cos, sin) of envelope `e` in the first `phased` parameter bands,
+    /// unit phasors above; advances the smoothing history of those bands.
     ///
     /// Observed behaviour, given by no available text: each IPD and OPD phase applied is
     /// arg(u0 + u1 / 2 + u2 / 4) of the unit phasors of the envelope's index and of the two
@@ -941,7 +957,13 @@ impl Ps {
     /// index 0 and does not advance in envelopes without IPD/OPD. Probes m07 (weights),
     /// m27, m28, m30 and m31 (history, on/off, storage); `signal/mix/recover_mix.py` in
     /// `harness/codecs/aac/ps` refits the weights (step C) and checks the model (step F).
-    fn smooth(&mut self, e: usize, pars: usize, big: bool) -> (Phases, Phases) {
+    /// The history is kept by parameter band: a registered 20 <-> 34 change resets it to
+    /// index 0 (`apply`), a layout change registered while the PS was off reads it as
+    /// stored, and only the IPD bands of the frame's layout advance it, so the rows above
+    /// keep their values for a later layout with more IPD bands. Probes o20, o21 and o22
+    /// (`signal/open` in `harness/codecs/aac/ps`); they reject the history converted or
+    /// kept at a registered change and zeroed or converted at a corner.
+    fn smooth(&mut self, e: usize, phased: usize, big: bool) -> (Phases, Phases) {
         let mut out = [[(1.0, 0.0); MAX_PAR]; 2];
         let mut unit = [[(1.0, 0.0); MAX_PAR]; 2];
         let mut cur = [[0u8; MAX_PAR]; 2];
@@ -949,7 +971,7 @@ impl Ps {
             to_config(coded, self.phase_bands[e], big, c);
         }
         for k in 0..2 {
-            for b in 0..pars {
+            for b in 0..phased {
                 let w = &t::PHASE_WEIGHTS;
                 let p = [
                     phasor(cur[k][b]),
@@ -962,12 +984,13 @@ impl Ps {
                 let n = re.hypot(im);
                 unit[k][b] = (re / n, im / n);
             }
-            self.phase_history[1][k] = self.phase_history[0][k];
-            self.phase_history[0][k] = cur[k];
+            let [newer, older] = &mut self.phase_history;
+            older[k][..phased].copy_from_slice(&newer[k][..phased]);
+            newer[k][..phased].copy_from_slice(&cur[k][..phased]);
         }
         // row 1 turns by the OPD, row 2 by OPD - IPD
         let (ipd, opd) = (unit[0], unit[1]);
-        for b in 0..pars {
+        for b in 0..phased {
             out[0][b] = opd[b];
             out[1][b] = (
                 opd[b].0 * ipd[b].0 + opd[b].1 * ipd[b].1,

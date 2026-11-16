@@ -305,14 +305,14 @@ impl<R: Read> BlockingReader<R> {
         loop {
             // Lent for this poll only; see EpochRestoreJob::try_owned_prefix.
             self.reader.owned_root = self.input.owned_source().cloned();
-            let step = self.poll_projected::<ScanProjection>(cancel);
+            let step = self.poll(cancel);
             self.reader.owned_root = None;
             match step? {
-                ParseStep::Event(ScanEvent::Seek(receipt)) => {
+                ParseStep::Event(Event::Seek(receipt)) => {
                     self.synchronize(cancel)?;
                     return Ok(receipt);
                 }
-                ParseStep::Event(ScanEvent::Packet(_)) => {
+                ParseStep::Event(Event::Packet(_)) => {
                     return Err(Error::Invalid("packet before seek receipt"));
                 }
                 ParseStep::Finished => {

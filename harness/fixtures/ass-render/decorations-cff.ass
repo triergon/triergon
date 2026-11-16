@@ -1,0 +1,30 @@
+;@attach NotoSans-Regular.otf
+;@attach NotoSans-BoldItalic.otf
+;@attach NotoSansJP-Regular.otf
+;@attach authored/authored-cff-features.otf
+;@default-family Noto Sans
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs in CFF faces (Noto Sans, regular and bold
+; italic, and an authored face) and a CID-keyed CFF face (Noto Sans JP),
+; including glyphs whose outlines run clockwise, against CFF's direction
+; (ˇ ˙ ◌ ☜ ♤ 〕 ］ ｝ in Noto Sans JP, A D E in the authored face).
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Noto Sans,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)}CFF underlined and struck
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,100)\b1\i1}CFF bold italic face
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,180)\fnNoto Sans JP}日本語の下線 CID
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,260)\fnNoto Sans JP\u0}日本語 {\u1}abc
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,340)\fnNoto Sans JP}ˇ˙◌☜♤〕］｝ x◌x
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,420)\fnAuthored CFF}ADE A D E

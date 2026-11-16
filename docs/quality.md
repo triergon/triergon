@@ -12,8 +12,8 @@ when it passes all three gates on every case in its corpus.
 | Gate | Requirement |
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
-| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
-| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
+| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval ([early stop](#early-stop)). The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
+| Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval ([early stop](#early-stop)). |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
 corpus manifest live in `harness/features/<feature>/`.
@@ -36,6 +36,23 @@ resource limit becomes an explicit, reviewed rule for that case.
   refused. With `TRIERGON_DOWNLOAD_CACHE` set, verified downloads are also kept in that
   directory under their hash and reused before any network access. CI keeps this
   cache between runs.
+- **Reference builds.** Each prepare command (`prepare-ffmpeg`, `fonts prepare`,
+  `shape prepare`, `raster prepare`, `ass prepare`) keys its build by the SHA-256 of
+  what the build depends on besides its own directory: the xtask code that defines it
+  (with its pinned source hashes, configure flags and link steps) and the worker link
+  policy's, its directory (the configure prefix), the keys of the builds it links, the
+  C and C++ compilers and their target, the installed package list (FFmpeg's default
+  configuration detects optional system libraries) and the compiler and `pkg-config`
+  environment variables. The key is recorded in `reference-key.json` beside
+  `build.json`. A prepare whose directory holds its key does nothing; one whose key is
+  packed in `.research/reference-cache/NAME/KEY.tar.zst` unpacks the pack, which
+  restores the directory as the packed build left it, so `build-workers` links the same
+  libraries and records the same identity; only a miss builds. `cargo xtask references
+  keys` lists each build's key and whether it is current, cached or missing, `pack`
+  packs current builds, and with `TRIERGON_EVIDENCE_ARCHIVE` set `fetch` and `upload`
+  move packs to and from `qualification/reference-builds/NAME/KEY.tar.zst`. A pack is
+  not evidence: it expires 90 days after its upload, and the next prepare that misses
+  it builds and uploads it again.
 - **FFmpeg pins.** `cargo xtask prepare-ffmpeg --profile P` builds FFmpeg from a pinned,
   hash-checked source with recorded configure flags, compiler and binary hashes, and
   `cargo xtask build-workers` builds the reference worker of every prepared profile
@@ -65,6 +82,17 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture output independently, and `capture` (gating) and `capture-small` for the
   capture comparison. The two capture profiles link FFmpeg's component libraries
   into the worker so the allocation observer can audit the code doing the work.
+- **Container scope.** A candidate worker carries only the runner families its
+  reference build can demux. `media-worker` reads Matroska for the `matroska` build's
+  container harness; `playback-matroska-worker` runs Matroska startup and seek (`feed-`)
+  and Matroska audio clocks (`mkv-audio-`) against `video`, whose only demuxer is
+  Matroska, and still links the playback engine's MP4 and TS backends, which `Engine`
+  holds beside Matroska; and
+  `playback-worker` carries every playback runner family for MP4 forward and range, TS
+  programs, raw Annex B and HLS segments against `formats` and its 12 demuxers (`ass`,
+  `h264`, `hevc`, `matroska`, `mov`, `mpegps`, `mpegts`, `mpegtsraw`, `srt`, `sup`,
+  `vobsub`, `webvtt`). Both playback binaries are built from the same runners
+  (`crates/playback-worker`); a contract's `candidate` names its binary.
 - **FreeType pin.** `cargo xtask fonts prepare` builds the FreeType 2.15.0 release
   tarball (hash-checked, tree verified before and after the build) as a static
   library without optional dependencies and records the configure flags, library
@@ -79,7 +107,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   default-load metrics and hinted outline there), which `cargo xtask check`
   requires, and `font-hinting-modes` (the nine other heights libass requests when
   hinting is on), run on demand and not gated yet. `cargo xtask fonts compare`
-  reports the required three, with `--all` all four.
+  reports the required three, with `--all` all four. Behaviour of TrueType
+  programs that no specification settles is established by probes:
+  `harness/fonts/probes/*.probe` describe small faces and their programs,
+  `cargo xtask fonts probe` assembles them and loads them through both font
+  workers, and each `.dump` beside a probe records the reference's default load
+  on 32-bit ARMv7 (`--record`).
 - **HarfBuzz and FriBidi pin.** `cargo xtask shape prepare` builds the FriBidi
   1.0.17 and HarfBuzz 14.6.0 release tarballs (hash-checked) as static libraries:
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
@@ -90,12 +123,13 @@ resource limit becomes an explicit, reviewed rule for that case.
   random strings as libass does, through FreeType-backed font functions at 256
   pixels (`shape-libass`) and through HarfBuzz's own at units per em
   (`shape-text`), resolve bidi paragraphs and lines (`shape-bidi`), run libass's
-  simple shaping level (`shape-simple`) and read every code point's properties
-  (`shape-unicode`), all required by `cargo xtask check`; `shape-text-all`, every
-  corpus face with every script at units per em, runs on demand. Acceptance of
-  the shaper rests on `shape-libass`, `shape-bidi`, `shape-simple` and
-  `shape-unicode`. `cargo xtask shape compare` reports the required five, with
-  `--all` all six.
+  simple shaping level (`shape-simple`), read every code point's properties
+  (`shape-unicode`) and every glyph's extents of the corpus's CFF, CFF2 and
+  collection faces at units per em (`shape-extents`), all required by `cargo
+  xtask check`; `shape-text-all`, every corpus face with every script at units
+  per em, runs on demand. Acceptance of the shaper rests on `shape-libass`,
+  `shape-bidi`, `shape-simple` and `shape-unicode`. `cargo xtask shape compare`
+  reports the required six, with `--all` all seven.
 - **libass pin.** `cargo xtask raster prepare` builds the libass 0.17.5 release
   tarball (hash-checked, tree verified after the build) as a static library
   without a system font provider (`--disable-fontconfig --disable-coretext
@@ -230,7 +264,12 @@ resource limit becomes an explicit, reviewed rule for that case.
   parity, timing and memory runs), `external-vector`, `trace-identities` and `fuzz
   --contract` (unless `--timeout-seconds` is given) honour it, and `cargo xtask
   check-design` fails on any other value. `raster-sweep` sets 120 for its heaviest
-  cases on 32-bit ARMv7.
+  cases on 32-bit ARMv7. `parity_timeout_seconds`, within the same bounds, limits the
+  worker runs of `report`'s parity comparison alone: a parity run is not timed and
+  both folds must still be equal, so a reference slow on one target can have more time
+  there while timing and memory keep `timeout_seconds`. The font, shaping and ASS
+  contracts set 120: on 32-bit ARMv7 FreeType folds the NotoSansCJK collection's
+  outlines at 16384 in up to 29.78 s, and 120 is four times that, rounded up.
   A contract with `"pinned_per_target": true` pins each case per target triple:
   `pins.json` maps each case to a fold for each of the contract's
   `required_targets`, except the targets `unpinned_targets` lists for a case
@@ -322,10 +361,14 @@ and rebuild workers before running the container and packet-framing commands.
 `cargo xtask isobmff-bench` compares all 1,020 open and index outcomes, including
 48 refusals. `--benchmark --memory` measures the 972 output labels, with 956
 physical operations and 16 explicit aliases. `--subset52` selects the separate
-52-operation measurement set while retaining the full correctness comparison.
-`cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.
-Their contracts and input manifests are in `harness/features/isobmff-open-index/`
-and `harness/features/packet-framing/`.
+52-operation measurement set while retaining the full correctness comparison, and
+`--part I/N` every Nth physical operation from the Ith with their aliases, so that N
+parts measure the set once between them.
+`cargo xtask isobmff-seek` compares all 476 seek and range-plan outcomes, including
+4 refusals, and `--benchmark --memory` measures the other 472.
+`cargo xtask framing --benchmark --memory` measures all 135 packet-framing scripts.
+Their contracts and input manifests are in `harness/features/isobmff-open-index/`,
+`harness/features/isobmff-seek/` and `harness/features/packet-framing/`.
 
 `report --memory-pairs N` selects a separate memory sample count, with
 `--pairs` applying to both measurements by default.
@@ -341,8 +384,8 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 `cargo xtask report` runs the correctness comparison of one feature contract
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
-`matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the six bitmap, caption and teletext `subtitle-*` features with
+`matroska-startup-seek` and `matroska-audio-clocks` do with `playback-matroska-worker`
+and the `video` reference and `hls-segments` with `playback-worker` and the `formats` reference, the six bitmap, caption and teletext `subtitle-*` features with
 `subtitle-worker` and the `subtitles` reference, `subtitle-text` with `subtitle-worker`
 and the `formats` reference, the three font features with `font-worker` and FreeType, the six
 shaping features with `shape-worker` and HarfBuzz and FriBidi, the five rasterising
@@ -386,13 +429,15 @@ selected corpus and keep their manifest spelling in recorded traces.
 `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
-oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
+oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`,
+or the Python `TRIERGON_PYTHON` names, as for the capture input generator),
 as do the numpy table-recovery chains under `harness/codecs/` and the capture input
 generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draws the
 cited capture inputs depend on. `cargo xtask codecs` grades, times, measures the memory
 of and records the identities of the codec crates against the pinned FFmpeg decoders,
-and compares the packets of the audio container readers with its `ffprobe`
-(`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
+and compares the packets of the audio container readers, and the Ogg reader's
+packets after seeks, with its `ffprobe` (`harness/codecs/STATUS.md`; the gate runs the
+Ogg lanes); `cargo xtask capture` does the same for the capture
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask codecs aac-access-units` prepares the [configured AAC
 workloads](../harness/features/aac-access-units/contract.json) from the pinned
@@ -437,10 +482,19 @@ complete standard-harness reports and recomputes runtime and memory bounds from
 their raw paired samples before applying the feature gates. Parity and FATE checks
 use the stored outcomes; grading does not rerun workers or oracles. Both collections
 must contain every case in the registered corpus, with identical parity, inputs,
-contract, workers, source graphs, compiler settings, instrumentation and allowed
-CPUs. CPU records are required in both reports. The memory build identity may add
-a kernel RSS proof pin; every other identity field must match. Both input reports
-and their raw samples are hash-linked from the graded report.
+contract, workers, source graphs, compiler settings and instrumentation. Each report
+records the CPUs it ran on, which may differ: timing runs alone on one CPU, memory on
+several. The memory build identity may add a kernel RSS proof pin; every other
+identity field must match. Both input reports and their raw samples are hash-linked
+from the graded report.
+
+`cargo xtask report` writes each case's raw measurements once and records their
+SHA-256 in `partial.json`. After validating the complete collection it publishes
+the compact `collection.json`, then streams the self-contained `report.json`.
+Pass `collection.json` and keep its `measurements/` directory alongside it to grade
+large collections with one case's samples in memory at a time. Use a new `--output`
+directory for each invocation of `report`, `progressive` or `grade` so earlier
+measurements, traces and grades remain available.
 
 Single external-vector reports can be graded as a pair too. Supply each required
 external grade with `--additional-report PATH` when grading its corpus.
@@ -471,12 +525,104 @@ may override that count for diagnostic comparisons.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
+- Workers and references follow one link policy, `static-toolchain-runtime-trained-order-v1`:
+  on GNU/Linux each side links its toolchain's runtime support libraries from their static
+  archives, libgcc's unwinder (`libgcc_eh`) for the Rust workers and libgcc, libstdc++
+  and libatomic for the C and C++ references. The C library, libc with libm, and
+  third-party libraries, such as zlib, stay shared on both sides. A C program already
+  links libgcc statically by default; the Rust standard library instead loads `libgcc_s`
+  and runs its initialisation in every program, one that never unwinds included, and
+  HarfBuzz and libass load `libstdc++`. Mapped shared, each costs its process resident
+  pages its own code does not use: on ARMv7, 18 for `libgcc_s` in the framing worker and
+  276 for `libstdc++` in the libass player reference. No worker or reference maps
+  libatomic today: the FFmpeg references name it, and the linker leaves it out. glibc's
+  static libm needs the static libc, so libm stays with libc. Elsewhere both sides link
+  as their toolchains do.
+- On GNU/Linux the policy also changes how a Rust worker with a trained order for the
+  target links: the pinned toolchain's own `lld` links it, in place of the toolchain's
+  default linker, with the functions its trained order lists first, in that order, and
+  every other function after them in module order. A worker without one, and every
+  reference, links as above. The code one operation runs is a fraction of a worker's,
+  and the kernel faults code in 64 KiB windows, so how much of a worker becomes
+  resident depends on how its functions lie among those windows. A result of an
+  ordered worker therefore reflects the linker, the module order and the trained order
+  together. Which workers take an order on which target is what
+  `harness/link-order/training.json` gives; [status](status.md) has their results.
+  - The trained order of a worker for a target, `harness/link-order/TARGET/WORKER.txt`,
+    lists by demangled name the functions a training corpus runs in the release
+    worker, in the order the operations first run them, and names in its header the
+    SHA-256 of the operations and training files it was recorded from. `cargo xtask
+    link-order train` records it on a prepared gate host of the target after
+    `build-workers`: it runs each training operation under QEMU's user-mode emulator
+    (`qemu-arm -cpu cortex-a15` for ARMv7 in the armhf user space, `qemu-aarch64 -cpu
+    neoverse-n1`; package `qemu-user`) with `-d page,in_asm`, which logs every block of
+    code when it first runs, and maps those addresses to the worker's functions. The
+    workers carry no instrumentation. A worker takes a trained order for a target when
+    the training manifest has operations for it that run on that target.
+  - The training corpus is its own. `harness/link-order/training.json` lists its files
+    by SHA-256 and the operations, each a worker's command line with `@NAME` for a
+    training file and optionally the targets it runs on; the files are kept as an
+    evidence set and unpacked at `.research/link-order-training`. `cargo xtask
+    link-order corpus OUT` makes them with the `ffmpeg` and `ffprobe` on `PATH`, from
+    FFmpeg's own video and audio generators encoded with libx264, libx265 and FFmpeg's
+    AAC, AC-3, E-AC-3 and Opus encoders, and makes the playback capsules and
+    packet-framing scripts from those files; another FFmpeg build may encode
+    differently, and the pins then refuse its output. `cargo xtask link-order separate`,
+    which `train` runs first, fails unless every training file has its pin and none has
+    the SHA-256 of a file any gate item reads on either target or of a committed file:
+    the corpus is apart from the gate by exact bytes. `cargo xtask link-order check`
+    compares the pins with every gate input known without a prepared host.
+  - `cargo xtask link-order BINARY [OUT] --trained FILE` writes a binary's symbol
+    ordering file: the functions the trained order lists, in its order, then every
+    other function in module order, sorted by the path of the item it belongs to (a
+    function by its own path, a method by its type's, a closure by its function's,
+    drop glue by the type it drops, generic arguments left out), then by name. A name
+    the binary does not hold is skipped.
+  - `build-workers` fails when the committed trained orders disagree with the training
+    manifest: an order of a worker or target the manifest does not train, a missing
+    one, or one recorded from other operations or files. It links each ordered worker
+    once, writes its ordering file to `target/harness/link-order/WORKER-HASH.txt`, HASH
+    the first 16 hex digits of its SHA-256 so that cargo links again whenever the order
+    changes, links it again with that file, and fails when the worker holds fewer than
+    95% of its trained order's names or the second link's ordering file differs.
+    `identity.json` records for each worker the SHA-256 of its trained order, how many
+    names it lists and how many the worker holds, and the SHA-256 of the ordering file,
+    or null for a worker linked without one. `cargo xtask check` runs `cargo xtask
+    link-order check`, which checks the committed orders against the manifest in the
+    same way and, on GNU/Linux, that the worker built for the checking host links in
+    each of its orders and holds 95% of the names of its order for that host's target.
+    Of an order for another target it holds fewer, as some functions exist on one
+    architecture only (64 of the 76 of the AArch64 framing worker's order on ARMv7), so
+    that share is printed and not checked; the gate build checks it on each target. The linker arguments, after the policy's
+    own, are
+
+    ```text
+    -C link-arg=-B$(rustc --print sysroot)/lib/rustlib/HOST/bin/gcc-ld
+    -C link-arg=-fuse-ld=lld
+    -C link-arg=-Wl,--symbol-ordering-file=ORDER
+    -C link-arg=-Wl,--no-warn-symbol-ordering
+    ```
+
+    where `HOST` is the host triple of `rustc -vV` and the first link leaves out the
+    last two; lld's warnings about ordered names it does not find are off because a
+    local name the binary holds more than once is listed once, and the held count
+    above takes their place. `build-workers` records the policy in `identity.json`, and
+    `report` and `grade` refuse a build that records another policy or none, or whose
+    workers' records disagree with the training manifest and the committed trained
+    orders of the checking host's target.
+- A gate run builds with `cargo xtask build-workers --all-references`, which fails when
+  any profile reference's FFmpeg, FreeType, HarfBuzz or libass profile is not prepared.
+  Without the flag, `build-workers` builds the references whose profiles are prepared
+  and prints each one it skipped; `comparison_references` in `identity.json` lists
+  exactly those it built.
 - Gate results assume the workspace release profile, `lto = "fat"` and
   `codegen-units = 1`, and a program that depends on these crates matches them only
-  with the same two settings in its own release profile. On ARMv7, building the
-  playback worker without fat LTO, Cargo's default, adds 12.6% user-mode instructions
-  on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times as long;
-  Cargo's default of 16 codegen units adds up to another 2.5%. `panic = "abort"` saves
+  with the same two settings in its own release profile and, on GNU/Linux, linked in
+  the playback worker's trained order as the workers are (the
+  [README](../README.md#getting-started) gives the commands). Cargo's default profile has
+  neither. On ARMv7, building the playback worker without fat LTO adds 12.6% user-mode
+  instructions on MP4 forward and 25.0% on TS program, and TS program takes 1.228 times
+  as long; 16 codegen units add up to another 2.5%. `panic = "abort"` saves
   a further 2 to 3% and is safe: no library code catches or relies on unwinding. A
   program that wraps calls into these crates in `catch_unwind` loses that protection
   under abort.
@@ -495,14 +641,15 @@ may override that count for diagnostic comparisons.
   one run of `--iterations` complete sessions, each opened afresh, and the run fails if
   any session's stream differs. Work counts are totals over the iterations.
 - `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
-  run may use and those online. Neither instance size nor pinning is required, but a
-  bound measured pinned to one CPU is not comparable with one measured unpinned.
+  run may use and those online. On Linux a timing session refuses to start unless the
+  process may use exactly one CPU (`taskset -c CPU`), or when it cannot read which CPUs
+  it may use, so every Linux bound is measured pinned and alone on its CPU.
 - Time optimised builds doing equivalent work. For demuxing, the timed operation is
   open, probe, the required reads and packet production for the same selection, with
   process startup and serialisation outside the timing.
 - Use 30 or more randomised A/B pairs per case after warm-up, keep every raw sample,
   and report p50, p95 and the confidence bound per case. An aggregate never hides a
-  failing case.
+  failing case. A gate session may end earlier, by the rule [below](#early-stop).
 - Measure on an isolated machine. Never time while compiling, fuzzing or running
   another benchmark; the runner watches the whole run and rejects it if a tracked
   process uses CPU or steal time grows.
@@ -515,7 +662,8 @@ may override that count for diagnostic comparisons.
 - Prepare both workers with the same sequential write and paths of equal length.
   Linker output and a sequentially written copy can occupy the page cache differently.
   Timing uses freshly written copies. Linux memory collection does the same for workers
-  selected by the report's build registration. It keeps both original paths for explicitly
+  selected by the report's build registration, one pair of copies per
+  [memory slot](#memory-in-parallel). It keeps both original paths for explicitly
   supplied workers and when the loader resolves libraries relative to an executable.
   Keep the measured executables with the raw memory samples. Grading Linux memory
   results rehashes the worker paths in the observer certificate, including any copies
@@ -543,6 +691,321 @@ may override that count for diagnostic comparisons.
   and instruction counts is placement. A screen never replaces a recorded result.
 - Qualification runs natively: on AArch64 Linux, and on 32-bit ARMv7 Linux in an armhf
   user space (below). Results on one platform do not establish another.
+- The gates qualify on one host class for both targets: the AWS c6g.4xlarge
+  (Graviton2, 16 vCPUs, 32 GiB), which runs 32-bit user spaces and has the memory
+  kernel-bound memory needs. Runtime from another class is not comparable, because
+  another core moves the candidate/reference ratio of the same instructions: on 13
+  Linux AArch64 rows measured first on c8g (Graviton4) and again on a c6g.4xlarge at
+  `79e0ae13`, each candidate's user-mode instruction count stayed within -0.4% to +0.3%
+  of the earlier build's (one row's code got 9% cheaper) while the runtime upper bounds
+  moved by -0.31 to +0.18 (`cargo xtask count`, below). Every row of
+  [status](status.md) names the class it was measured on.
+
+### Running the gates
+
+`cargo xtask gate` holds the full gate as one plan. Its items are the work for one
+measured thing: a feature's timing, memory and grade, a part of the ISO BMFF suite's
+measurements, the ISO BMFF seek, packet-framing and progressive TS suites, the codecs'
+parity, a codec workload list's timing, a part of its memory (`codecs memory --part
+I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, then
+`--stage memory` from its records under the kernel bound), the checked or the release
+tests, and the font, shaping, rasterising and ASS comparisons. Every registered feature
+is either one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated
+(an on-demand or
+diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. A
+target leaves out an item that cannot measure there, with the reason `gate plan --target
+TARGET` prints: 32-bit ARMv7 runs no progressive TS suite, whose playback worker runs
+its numeric modes only on native Linux AArch64. `cargo xtask gate plan --shards N`
+splits the items into N shards of about equal planning weight, each for its own host;
+the weights are the minutes each item took on a c6g.4xlarge, the more of the two
+targets. `--items NAME,...`, given to every gate command of a run, narrows the plan to
+those items, for a run of part of the gate; the shards record it, and `gate summary`
+checks them against the same narrowed plan, prints that the run is partial and writes
+`"partial": true` with the selection at the top of its result. A result cited as the
+full gate is a summary whose `partial` is false; a partial one is cited only for the
+items it ran.
+
+A change that reaches a few items gates them alone, one host per target, from a
+checkout at the change's head:
+
+```sh
+tools/gate-aws.sh run aarch64 1 HEAD .research/gate-aarch64 --items matroska-startup-seek,matroska-audio-clocks
+tools/gate-aws.sh run armv7 1 HEAD .research/gate-armv7 --items matroska-startup-seek,matroska-audio-clocks
+```
+
+`cargo xtask gate plan --target TARGET --items NAME,...` prints what the selection runs.
+A change reaches the items whose contract, corpus or inputs it changes, and those whose
+workers link a crate it changes (`cargo tree -i CRATE` lists the workers; a contract's
+`candidate` names its feature's worker). To let a later run take such a run's results,
+add each `OUT/shard-I/entry.json` to the index with its reason and promote it in the
+pull request that cites the run. A result is [reused](#reuse) only while its key
+holds: a change to `xtask/src`, to a worker the item runs or to any other input of the
+key measures it again.
+
+A measurement that exits 0 with a case it did not measure fails: `gate run` fails a
+timing step whose report holds a case not `measured`, or a memory step one not
+`qualified`, naming the cases, and `codecs time` and `codecs memory` fail on a workload
+they did not measure, after writing every record. `gate run` writes its verdict into the
+step's `gate-result.json` (its `status`, with `"cases_checked": true`), so a step that
+[reuses](#reuse) the result takes the verdict; a reused result that no gate run checked
+fails the step, which `--full` measures again. Where the codec gates apply (native
+Linux AArch64, the gate build) they also fail on a workload whose runtime or memory bound
+does not hold, and print a grade's verdict lines, so `gate summary` tells failures that
+are only a list's `open_workloads` from others; on 32-bit ARMv7 the codec bounds are
+diagnostics, which they print as such and fail nothing. So no feature measures nothing in
+silence. A workload list's `memory_timeout_seconds` gives `codecs memory` its observer
+run limit per target triple (30 s when absent), and every memory observation records how
+long its run took (`process_elapsed_ns`). Each list sets four times its slowest observed
+run on each target, rounded up, from a run at `8154812e`: `workloads.json` 221 s on Linux
+AArch64 and 208 s on 32-bit ARMv7 (`hevc-main10-2160p`, 55.16 s and 51.97 s), and
+`file-workloads.json` 170 s and 134 s (`flac-24-96k-5.1`, 42.44 s and 33.48 s).
+
+`cargo xtask gate check --shards N` runs on any machine in a second, before a host
+exists: it resolves the preflight of every shard as the shard resolves it, and fails,
+naming the item and the path, on any input a prepared host would not have. A host has
+the committed tree; the fixtures `fixtures` and `framing fixtures` generate from it,
+which the check generates under `target/gate-check`; the manifests the `fonts`,
+`shape`, `raster` and `ass` generators write; the vectors `fetch-vectors` fetches, by
+their pins; and the files of the kept evidence sets unpacked at the repository root
+(`"unpacked_at": "repository"` in the [index](../harness/evidence/sets/)), by
+the set's listing, without fetching any. Where preflight pins an input's hash, its
+source's must match. `tools/gate-aws.sh run` runs it before it launches anything.
+
+On one host, a shard's run is:
+
+1. `tools/gate-host.sh ready I/N`: the prepare commands, the workers with
+   `cargo xtask build-workers --all-references`, so that every profile reference is
+   built, and `cargo xtask gate preflight`, which runs `cargo xtask preflight` with
+   everything the shard measures (`--feature ID`, with `--corpus ID=DIR` and
+   `--manifest ID=FILE` as `report` takes them, `--isobmff`, `--isobmff-seek`, `--codecs` for each
+   workload list, `--external-vector`, `--capture` for the capture cases), with the
+   [committed RSS module review](../harness/rss-bound/README.md#proof) of the tree's
+   module source for the running kernel (`cargo xtask preflight` also takes
+   `--reference NAME` for any other reference a run names by path, `--review FILE`
+   for another review, and `--standard-memory` for a run without the kernel bound).
+   Preflight checks that the gate build's workers and references match the build
+   identity, that every case names a reference the identity holds and has each input it
+   reads with its pinned hash, that the references ISO BMFF, the codecs and capture
+   measure against were built, that the capture input generator's Python has numpy,
+   that the review covers this module source and kernel, and that the module is
+   unloaded. A feature without cases or a workload list without workloads
+   fails, and every failure is printed at once. Then `prove.sh` runs once into a
+   scratch directory and the module is unloaded again, so a module that will not
+   build, load or prove itself stops the run here.
+2. `tools/gate-host.sh run I/N OUT` times the shard alone on one CPU with the RSS
+   module unloaded (`taskset -c 1`, `cargo xtask gate run --stage timing`), after its
+   parity steps.
+3. It [proves](../harness/rss-bound/README.md) the kernel bound, rebuilds the workers
+   with the proof, checks them with `cargo xtask gate preflight --kernel`, and collects
+   memory on the remaining CPUs (`taskset -c 1-15` on a 16-CPU host, `cargo xtask gate
+   run --stage memory`).
+4. It grades with the module loaded. Grades measure nothing, so several run at once,
+   from a release build of xtask.
+
+Never time while memory, a build or anything else runs on the host. Each step's log,
+and a record of its command, status and time, go under OUT. `cargo xtask gate summary
+--output FILE DIR...` joins the shards' outputs into one result; it fails when a
+planned step did not run exactly once, a step failed, or the shards measured different
+source revisions or timing builds, and names the failed grades whose only failures are
+the contract's listed open cases.
+
+`cargo xtask build-workers --all-references` builds a worker for every reference profile
+and exits 1, writing no build identity, when a profile is not prepared, so that no gate
+run can measure without one of its references. Prepare them first, in this order (libass
+links the FreeType, FriBidi and HarfBuzz builds):
+
+```sh
+for profile in matroska formats video subtitles decode capture capture-small; do
+    cargo xtask prepare-ffmpeg --jobs 8 --profile "$profile"
+done
+cargo xtask fonts prepare --jobs 8
+cargo xtask shape prepare --jobs 8
+cargo xtask ass prepare --jobs 8      # the libass build, as raster prepare makes it
+cargo xtask build-workers --all-references
+```
+
+`cargo xtask preflight`, with or without `--kernel`, takes the committed review of the
+tree's module source for the running kernel unless `--review FILE` names another. `cargo
+xtask grade` joins one feature's timing and memory collections: it takes the paths of
+their `report.json` files and a new output directory, as a shard's grade step does:
+
+```sh
+cargo xtask grade OUT/benchmark/mp4-forward/report.json OUT/memory/mp4-forward/report.json \
+    --contract harness/features/mp4-forward/contract.json \
+    --manifest harness/features/mp4-forward/corpus.json \
+    --output OUT/graded/mp4-forward
+```
+
+#### Early stop
+
+Packet framing collects every timing and memory pair.
+
+A gate timing session (`report`, `isobmff-bench`, `isobmff-seek`, `external-vector`,
+`codecs time`, `capture qualify`) may end after 20 of its 30 pairs, taken as two blocks
+of ten: when
+every ratio `T_triergon / T_reference` of the second block and at least eight of the
+first lie strictly below the ceiling, and the lag-1 autocorrelation of the 20 ratios is
+at most 0.42. A gate memory collection stops only when its peak heap ratios and its
+total resident ratios each meet the same three conditions under 1. Otherwise either
+runs all 30 pairs and is graded by the paired bootstrap as before. A session that stops
+records the rule (`early_stop`) and, as its interval, the median of its 20 ratios
+bounded by their 3rd and 18th smallest. The validator and the memory evaluator replay
+the rule on the recorded pairs, so a session that stopped where the rule does not, or
+ran on where it stops, does not count; the record must name exactly the ceiling of
+[`harness/policy.json`](../harness/policy.json), and grading holds its planned pairs to
+the contract's minimum. A stopped session prints where it stopped, and its record
+labels its interval `order statistics of the look`. Comparisons with another build
+(`--baseline-worker`, quick checks) always run every pair, and `--no-early-stop` makes
+any gate command do the same.
+
+The bound is a sign test. When every ratio of the second block lies below the ceiling,
+so does the 18th smallest of all 20. For independent pairs whose true median ratio is
+at the ceiling, each ratio lies below it with probability at most ½, so the second block
+qualifies with probability at most 2⁻¹⁰, and with eight of the first block, at most
+2⁻¹⁰ · 56/2¹⁰ = 0.005%, whatever their distribution. Because the second block alone
+bounds it by 2⁻¹⁰ = 0.098%, a warm-up or drift confined to the first pairs cannot stop a
+case the second block would not. The autocorrelation limit, the 99th percentile of 20
+independent ratios, refuses sessions whose pairs are visibly not independent. This adds
+to the unchanged error of the 30-pair bound and keeps the one-sided 5% false-pass
+guarantee of a 95% bound.
+
+The guarantee assumes independent pairs. In the archived 30-pair sessions
+(`armv7-thumb2-3df7ae6d-linux-armv7` on ARMv7; `runners-gate-build-linux-arm64` and
+`mpegts-pes-gate-build-linux-arm64` on AArch64) the paired ratios behave as independent
+draws: against each session's own shuffled ratios, the share of sessions whose lag-1
+autocorrelation exceeds the shuffled 95th percentile is 4.5% to 5.3% of memory
+collections and 3.0% to 6.0% of timing sessions (5% for independent pairs), and the mean
+of pairs 1 to 10 against pairs 11 to 30 differs by −0.04 to +0.04 standard deviations on
+average, with 1.5% to 6.8% of sessions beyond either 5% tail of the shuffled shifts.
+Simulated with the true median exactly at the ceiling, the rule stops a session early
+with probability 0.007% for independent pairs, 0.025% at a lag-1 autocorrelation of 0.2,
+0.27% at 0.5, and 0.02% to 0.06% with the first ten pairs shifted favourably by 0.5 to 3
+standard deviations, where looks after 10 and 20 pairs would stop 2.7% to 99%.
+
+Replayed on those sessions and on `isobmff-armv7-runtime-regate-linux-arm64`, the rule
+stops 1,597 of 1,663 AArch64 and 2,980 of 3,037 ARMv7 timing sessions and 1,337 of 1,663
+AArch64 and 2,956 of 3,335 ARMv7 memory collections, and no session it stops failed at
+30 pairs (a collection refused as an invalid observation is refused either way).
+Drawing pairs from the ARMv7 timing sessions' own ratios rescaled to a median exactly at
+the ceiling, 0.006% of 128,000 simulated sessions stop early, and the share that passes,
+3.22%, is the 30-pair bound's; from the ARMv7 memory collections' total resident ratios
+at a median of 1, 0.003% of 60,000 stop early and 2.54% pass, as with 30 pairs. Against
+fresh 30-pair runs of `matroska-demux` and ISO BMFF on the same worker bytes, every
+session that stopped kept its verdict on both targets. Five ARMv7 `matroska-demux`
+memory cases, whose total resident bounds lie between 0.978 and 1.011, ran every pair on
+both sides and changed verdict between the two runs, as two 30-pair bounds that close to
+the ceiling can. ISO BMFF timing took 12.0 instead of 15.8 minutes on AArch64 and 14.8
+instead of 19.2 on ARMv7, and its memory 13.5 instead of 19.2 and 10.7 instead of 15.0.
+The replays, simulations and runs are evidence sets `gate-early-stop-two-blocks`,
+`gate-early-stop-runs-aarch64` and `gate-early-stop-runs-armv7`.
+
+#### Memory in parallel
+
+Memory collections run side by side, one slot per CPU the process may use (at most
+32, the sessions the kernel RSS bound admits), each slot's thread pinned to its CPU so
+the workers it starts run there alone. Each slot measures one case at a time from its
+own copies of the worker executables, and only those copies are evicted before every
+run, so one slot's eviction never touches an executable another slot runs. Inputs are
+not evicted: they stay in the page cache as in a serial run, and cases that read a
+common file (the input, an ordered entity or a companion) run in the same slot one
+after another. Workers measured from their own paths, as a comparison with another
+build is, are such a file, so their cases run one at a time; `codecs memory` and
+`capture qualify` measure copies whenever both workers are the gate build, as the other
+commands do unless they compare with another build. `capture qualify --stage timing`
+runs correctness and timing alone, on one CPU, and `--stage memory --timing DIR` then
+collects every case's memory in one collection from the records the timing run wrote,
+refusing them if the sources, workers, cases or host differ; without `--stage` one run
+does both, its memory after all its timing. Collecting side by side, it gives each
+case its own copy of its generated input, checked against the hash its timing recorded
+and removed when the run ends, so cases of one input no longer share a file; on one CPU
+they read the input itself. Pinned to one CPU, collection runs exactly as before. The
+reference's memory is measured afresh in every pair, not reused from earlier runs: on a
+second host of the same class it gives the same heaps and resident peaks within their
+spread (evidence set `gate-reference-memory-cross-host`), but caching it would save a
+few minutes and give up the interleaving of both workers within each pair.
+Collected serially and in parallel under the kernel bound with 30 pairs at `a92f2d0a`
+(evidence set `gate-parallel-memory-matroska`), `matroska-demux` gives every case the
+same peak heap sample for sample on Linux AArch64 and on the ARMv7 gate target, moves
+no case's median total RSS by more than one page on AArch64 or ten pages on ARMv7,
+both inside the serial collection's own spread, and grades every case the same. With
+each slot pinned to its CPU, at `8607afdd` on AArch64 and `247e8560` on ARMv7 (evidence
+set `gate-parallel-memory-matroska-head`), the same comparison gives the same result:
+heaps identical, medians within one page on AArch64 and twelve on ARMv7, verdicts
+unchanged.
+ISO BMFF, collected serially and in parallel at `a92f2d0a` (evidence sets
+`gate-parallel-memory-isobmff-aarch64` and `gate-parallel-memory-isobmff-armv7`), gives
+all 956 cases the same peak heap sample for sample, moves no case's median resident peak
+by more than two pages on AArch64 or nineteen on ARMv7, inside the serial spread, and
+passes every case either way; the collection took 82 instead of 252 minutes on AArch64
+and 96 instead of 296 on ARMv7.
+Capture, collected at `4b43bf74` from one timing run's records serially on five cases and
+in parallel on all fifteen (evidence sets `gate-parallel-memory-capture-codecs-aarch64`
+and `gate-parallel-memory-capture-codecs-armv7`), gives those five cases the same peak
+heap sample for sample on both targets, keeps every resident median inside the serial
+spread, and grades them the same; the fifteen took 10 minutes on AArch64 and 11 on ARMv7,
+where the five took 31 serially. The codec workloads, collected in parallel at the same
+revision, grade every workload as the serial collection of the same worker bytes at
+`8154812e` does, with the reference's heap identical sample for sample. The candidate's
+heap is identical in 21 of 30 workloads on AArch64 and 25 of 30 on ARMv7, and 8 or 16
+bytes apart in the others, in every sample: the codec worker keeps its own path, which a
+slot's copy lengthens. Collected serially, those workloads give the serial collection's
+heaps when measured from the workers' own paths and the parallel collection's when
+measured from a slot's copies.
+
+Each collection records the number of slots (`memory_slots`) and what the host's memory
+did over it (`host_memory`): `MemAvailable` at its start and end and the change of the
+reclaim and compaction counters of `/proc/vmstat`, which count the whole host. Run
+kernel-bound memory gates on a host of the class they are qualified on, a c6g.4xlarge
+with 32 GB, where no archived collection serial or parallel has had a pair voided by
+another task's update of a worker's resident counters; `preflight --kernel` refuses a
+host with less than 30 GiB of `MemTotal`. On smaller hosts such pairs occur, and a
+collection measures them again within the limit the [kernel
+bound](../harness/rss-bound/README.md#what-it-measures) sets; `host_memory` shows
+whether reclaim ran while they were measured.
+
+#### Reuse
+
+Every gate command (`report --benchmark`, `report --memory`, `grade`, `isobmff-bench`,
+`isobmff-seek`, `framing`, `progressive`, `external-vector`, `codecs time`, `codecs memory`, `capture
+qualify`) derives
+a key before it measures and writes it, with its exit status, to `gate-result.json` in
+its output directory. The key covers the command and its settings (pairs, seed,
+iterations, acceptance requirement, the kernel bound), the contract, manifest and other
+documents that define its cases, the bytes of every worker it runs and of every shared
+library their loader resolves, the allocation observer and probe, every shared input
+of the build identity (oracles, specification sources, reference headers, generator
+inputs), every file of `xtask/src` and `harness/*.py`, the reviewed input lists, the
+observers and the RSS module with `Cargo.lock`, `rust-toolchain.toml` and
+`harness/policy.json`, the Rust, C and Python versions with numpy's, the environment
+variables that change a build (`RUSTFLAGS`, `RUSTC_WRAPPER`, `CARGO_PROFILE_*`,
+`CARGO_BUILD_*`, `CARGO_TARGET_*`, `CC`, `CFLAGS` and the like), the gate target, and
+the host class (architecture and personality, kernel release, CPU model and
+features, machine type, page size, the CPUs online and, for a timed step, those the
+process may use). A
+probe that fails is an error. A `grade` key also binds the two collections it joins:
+each one's key and the SHA-256 of its report, so grading reports measured again with
+`--full` is never answered with an earlier grade. When an [evidence](#evidence) set
+that the index keeps lists a
+result with the same key, the command takes that result instead of measuring: it
+prints the set, writes a `gate-result.json` that names it as `reused` with the set's
+source revisions, and exits with the recorded status. `--full` measures (or, for
+`grade`, grades) anyway. Grading two reused collections takes the cited grade; a
+reused collection beside a measured one cannot be graded, so measure both with
+`--full`.
+
+`cargo xtask gate test --profile checked|release` runs the workspace tests for the gate
+target and is reused the same way. Its key holds the profile and adds every tracked
+file as the working tree holds it and the untracked files git does not ignore, but the
+evidence index (which a promotion changes) and `docs/`, and the test inputs the crate
+tests read when present (`.research/fate-samples`, `.research/flac-generated`,
+`.research/flac-test-files`). The few tests that read the evidence index skip the reused
+run and run on every `gate test`, so a failing index is never reused as a pass. The gate
+runs each profile once. The `checked` profile
+is the release optimisation with every overflow check and every `debug_assert!` and
+`#[cfg(debug_assertions)]` item of a debug build, so the same 4,429 tests run; it loses
+only the unoptimised build's larger stack frames, which bring stack depth problems out
+sooner, and on 32-bit ARMv7 it takes about 6.5 minutes against 29.7 for the debug
+profile. The release tests run the optimisation the workers are measured with.
 
 ### 32-bit ARMv7
 
@@ -588,6 +1051,9 @@ and user-space package list with the results. The `subtitles` reference builds l
 from its source archive, which needs `apt-get install autoconf automake libtool autopoint
 gettext` in the user space first.
 
+`tools/gate-host.sh setup armv7` does all of this on a gate host, and mounts the user
+space at every boot.
+
 The kernel RSS bound works for a 32-bit process through the module's 32-bit ioctl
 entry point. The module belongs to the host's kernel, so build and load it on the host,
 which needs the kernel's headers, and bind debugfs into the user space before entering
@@ -598,12 +1064,70 @@ size, inside it:
 ```sh
 sudo mount --bind /sys/kernel/debug /srv/armhf/sys/kernel/debug
 cd /srv/armhf/home/ubuntu/triergon
-harness/rss-bound/prove.sh .research/rss-bound/RSS-REVIEW.json .research/rss-bound /srv/armhf
+harness/rss-bound/prove.sh .research/rss-bound /srv/armhf
 ```
 
 Then build the workers with `TRIERGON_RSS_KERNEL_PROOF` and collect memory with
 `TRIERGON_RSS_KERNEL_BOUND=1` inside the user space, as the
 [kernel proof workflow](../harness/rss-bound/README.md) describes.
+
+### Gate hosts
+
+`tools/gate-aws.sh` runs gate hosts on AWS from a workstation with the `aws` CLI; the
+hosts hold no AWS credentials. `tools/gate-aws.sh image aarch64|armv7 REVISION
+INPUT...` builds a target's gate image on a Graviton2 c6g.4xlarge: Ubuntu 24.04 with
+the build packages, the kernel headers and Rust; the kernel the committed RSS module
+review of REVISION's module source covers, as GRUB's default, with every kernel package
+held and unattended and periodic apt runs masked and off, so the image never boots
+another (the image step launches a host from the new image and removes the image
+unless that host runs the reviewed kernel with the holds in place); for ARMv7 the
+armhf user space with its own Rust and the gate target; the repository at REVISION
+with every reference build (restored from the archive's packs where it holds their
+keys, the packs of the others uploaded), the generated fixtures, vectors, font corpus
+and manifests, and the workers; and each INPUT, an archive of media inputs the
+repository does not generate, with repository-relative paths: evidence set
+`gate-media-inputs` holds the FATE samples, the codec workload inputs and the
+subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
+[file-workloads.json](../harness/codecs/file-workloads.json), and set
+`ogg-reader-inputs` the inputs of the Ogg reader comparison, set
+`subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
+(`s3:evidence/SET/SHA.tar.gz`, their keys in the
+[index](../harness/evidence/sets/)); a gate image is built with all four. The image
+is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
+their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
+or to take a new base image.
+
+`tools/gate-aws.sh` needs bash 4 or later and refuses to start under an older one,
+such as macOS's `/bin/bash` 3.2, where a shard's exit handler never runs and its
+outputs would be lost; on macOS run it with Homebrew's bash first on `PATH`, or as
+`/opt/homebrew/bin/bash tools/gate-aws.sh`.
+
+`tools/gate-aws.sh run TARGET N REVISION OUT`, in a checkout at REVISION without
+changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
+start when it fails. Then it launches N hosts from the image,
+checks out REVISION on each, restores reference builds whose keys changed from the
+archive's packs (building and uploading the others), gets each host ready and runs
+shard I of N on host I. When a shard ends, finished or not, its host's outputs are
+archived under `qualification/gate-runs/RUN/shard-I/`, where they expire after 90 days
+unless promoted, and checked by downloading them back on the host;
+`OUT/shard-I/entry.json` holds the archive's index entry, which lists the [gate
+results](#reuse) it holds. Its logs and step records are copied to OUT, and the host is
+terminated. The last shard to end keeps its host
+for the summary when every shard finished, and a host whose outputs could not be
+archived stays until the command ends. OUT/hosts.txt records when each host was
+launched, ready, done and terminated. The command exits non-zero when a shard did not
+finish or the summary fails. Every host is a c6g.4xlarge, the class kernel-bound memory is qualified
+on, SSH is open to one address (`TRIERGON_SSH_CIDR`, a /32), and a timer on the host's
+disk powers it off, and so terminates it, 72 hours after it boots. Both
+commands refuse to launch anything unless `TRIERGON_SSH_CIDR` is the workstation's
+current public address as a /32, which they read from `https://checkip.amazonaws.com`
+and print beside it; they never widen it. When a poll fails because the workstation's
+public address is no longer the one the session's security group admits, the run says so
+and waits, polling on, instead of giving up on hosts that are still working: open the
+group to the new address (one /32) within 30 minutes and it carries on; after that the
+shard fails and the session's teardown removes its host. It never changes the group
+itself. A group it cannot read is reported as a credential failure, and counts as a
+failed poll.
 
 ## Robustness
 
@@ -621,8 +1145,8 @@ input hashes, platform and all per-case outcomes. Summaries and identities are k
 in the pull request that changes the result and in [status](status.md), whose
 [measured revisions](status.md#measured-revisions) table names the revision and
 raw-sample SHA-256 behind each cited result. Raw samples are archived by content hash,
-outside the repository. [harness/evidence/index.json](../harness/evidence/index.json)
-lists every archived set:
+outside the repository. The evidence index lists every archived set, one file per set,
+[harness/evidence/sets/SET.json](../harness/evidence/sets/):
 
 - its key and SHA-256;
 - whether it is kept (cited results) or expires after 90 days;
@@ -632,9 +1156,15 @@ Where a set lives decides how long it is kept: sets under `qualification/` expir
 days after upload, and sets under `evidence/` are kept. With `TRIERGON_EVIDENCE_ARCHIVE`
 set to the archive location:
 
-1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run.
+1. `cargo xtask evidence pack DIR OUT` writes the deterministic archive of a run. An
+   `OUT` ending in `.tar.gz` stores the tar uncompressed in gzip blocks; one ending in
+   `.tar.zst` compresses it with the system `zstd`, which suits large sets of reports.
 2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
-   prints its index entry. Every new set starts there.
+   prints its index entry, which lists the fresh [gate results](#reuse) the set holds;
+   with its reason filled in, it is the set's file `harness/evidence/sets/SET.json`.
+   Every new set starts there. `cargo xtask evidence entry SET OUT` prints the same
+   entry and uploads nothing, for a host without archive credentials whose upload
+   streams through another machine to the entry's key.
 3. `cargo xtask evidence promote SET` moves an indexed set under `evidence/` and
    records it as kept. Promote a set in the pull request that first cites it; an
    uncited upload simply expires.
@@ -643,7 +1173,9 @@ set to the archive location:
    system `zstd`. Packing and fetching stream, hashing and writing each file as it
    passes, so a set larger than memory unpacks on a 32-bit host.
 
-The index also records how identifiers were renamed.
+[harness/evidence/index.json](../harness/evidence/index.json) records where keys lie
+and how identifiers were renamed. A result key is listed by one kept set at most, so
+reuse finds one result for it.
 
 Every revision status cites stays reachable from `main`: `cargo xtask check-revisions`,
 part of `check`, fails when `HEAD` does not reach a cited commit. A pull request that

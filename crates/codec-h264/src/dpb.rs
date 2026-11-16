@@ -1,10 +1,72 @@
 //! Picture order count (8.2.1), picture numbers (8.2.4.1), reference list initialisation
-//! (8.2.4.2) and modification (8.2.4.3), and decoded reference picture marking (8.2.5).
+//! (8.2.4.2) and modification (8.2.4.3), and decoded reference picture marking (8.2.5) of
+//! the frame stores in the decoded picture buffer, which keeps their marking.
 
 use crate::DecodeError;
 use crate::picture::*;
 use crate::ps::Sps;
 use crate::slice::{SliceHeader, SliceType};
+use triergon_framing::picture_output::{Entry, Marking, Parity, View};
+
+/// The field of structure code `par` (1 top, 2 bottom).
+pub(crate) fn parity(par: u8) -> Parity {
+    if par == 2 {
+        Parity::Bottom
+    } else {
+        Parity::Top
+    }
+}
+
+/// A stored frame store and its marking, read for reference lists and marking.
+pub(crate) trait Stored {
+    fn store(&self) -> &FrameStore;
+    /// The marking of field `par` (1 top, 2 bottom).
+    fn mark(&self, par: u8) -> Marking;
+    fn is_ref(&self) -> bool {
+        self.mark(1) != Marking::Unused || self.mark(2) != Marking::Unused
+    }
+    /// Either field is marked `marking`.
+    fn has(&self, marking: Marking) -> bool {
+        self.mark(1) == marking || self.mark(2) == marking
+    }
+    fn is_short_frame(&self) -> bool {
+        self.mark(1) == Marking::ShortTerm && self.mark(2) == Marking::ShortTerm
+    }
+    fn is_long_frame(&self) -> bool {
+        self.mark(1) == Marking::LongTerm && self.mark(2) == Marking::LongTerm
+    }
+    /// Non-existing frames (frame_num gaps) are excluded from B-slice lists when POC is
+    /// unknown.
+    fn non_existing_bframe(&self, is_b: bool) -> bool {
+        is_b && self.store().non_existing
+    }
+}
+
+/// The stored frame stores `stored` in frame buffer number order: the order reference list
+/// initialisation and marking visit them in, which settles ties between pictures with equal
+/// picture numbers or order counts.
+pub(crate) fn by_number<T: Stored>(mut stored: Vec<T>) -> Vec<T> {
+    stored.sort_unstable_by_key(|s| s.store().number);
+    stored
+}
+
+impl Stored for View<'_, FrameStore> {
+    fn store(&self) -> &FrameStore {
+        self.picture()
+    }
+    fn mark(&self, par: u8) -> Marking {
+        self.marking(parity(par))
+    }
+}
+
+impl Stored for Entry<'_, FrameStore> {
+    fn store(&self) -> &FrameStore {
+        self.picture()
+    }
+    fn mark(&self, par: u8) -> Marking {
+        self.marking(parity(par))
+    }
+}
 
 /// POC decoding state carried between pictures.
 #[derive(Clone, Copy, Debug, Default)]
@@ -159,40 +221,38 @@ impl PicNums {
     }
 }
 
-fn field_ref(dpb: &[FrameStore], idx: usize, par: u8) -> RefPic {
-    let fs = &dpb[idx];
-    let p = (par - 1) as usize;
+fn field_ref(dpb: &[View<'_, FrameStore>], idx: usize, par: u8) -> RefPic {
+    let fs = dpb[idx].store();
     RefPic {
         idx,
         parity: par,
-        poc: fs.poc[p],
-        long: fs.mark[p] == RefMark::Long,
+        poc: fs.poc[(par - 1) as usize],
+        long: dpb[idx].mark(par) == Marking::LongTerm,
         id: ref_id(fs.uid, par),
     }
 }
 
-fn frame_ref(dpb: &[FrameStore], idx: usize) -> RefPic {
-    let fs = &dpb[idx];
+fn frame_ref(dpb: &[View<'_, FrameStore>], idx: usize) -> RefPic {
+    let fs = dpb[idx].store();
     RefPic {
         idx,
         parity: 0,
         poc: fs.frame_poc(),
-        long: fs.is_long_frame(),
+        long: dpb[idx].is_long_frame(),
         id: ref_id(fs.uid, 0),
     }
 }
 
 /// 8.2.4.2.5 alternating-parity field list from ordered frame entries.
 fn fields_from_frames(
-    dpb: &[FrameStore],
+    dpb: &[View<'_, FrameStore>],
     frames: &[usize],
     cur_par: u8,
-    kind: RefMark,
+    kind: Marking,
     out: &mut Vec<RefPic>,
 ) {
     let has = |i: usize, par: u8| -> bool {
-        let fs = &dpb[i];
-        fs.fields & par != 0 && fs.mark[(par - 1) as usize] == kind
+        dpb[i].store().fields & par != 0 && dpb[i].mark(par) == kind
     };
     let mut same: Vec<usize> = frames
         .iter()
@@ -232,11 +292,11 @@ fn fields_from_frames(
     }
 }
 
-/// Initial reference picture lists (8.2.4.2). `cur` is the DPB index of the current picture
-/// (its first field may be referenced when decoding the second field).
+/// Initial reference picture lists (8.2.4.2) from the stored pictures `dpb`, in storage
+/// order. The picture being decoded is not stored, but the first field of its frame is
+/// when it is a second field, and is then available to it.
 pub(crate) fn init_ref_lists(
-    dpb: &[FrameStore],
-    cur: usize,
+    dpb: &[View<'_, FrameStore>],
     nums: &PicNums,
     st: SliceType,
     cur_poc: i32,
@@ -245,36 +305,31 @@ pub(crate) fn init_ref_lists(
     let mut l1 = Vec::new();
     let is_b = st == SliceType::B;
     let field = nums.structure != 0;
-    let usable = |i: usize| -> bool {
-        let fs = &dpb[i];
-        fs.in_use && (i != cur || field)
-    };
     if !field {
         let short: Vec<usize> = (0..dpb.len())
-            .filter(|&i| usable(i) && dpb[i].is_short_frame() && !dpb[i].non_existing_bframe(is_b))
+            .filter(|&i| dpb[i].is_short_frame() && !dpb[i].non_existing_bframe(is_b))
             .collect();
-        let mut long: Vec<usize> = (0..dpb.len())
-            .filter(|&i| usable(i) && dpb[i].is_long_frame())
-            .collect();
-        long.sort_by_key(|&i| dpb[i].long_term_frame_idx);
+        let mut long: Vec<usize> = (0..dpb.len()).filter(|&i| dpb[i].is_long_frame()).collect();
+        long.sort_by_key(|&i| dpb[i].store().long_term_frame_idx);
         if !is_b {
             let mut s = short.clone();
-            s.sort_by_key(|&i| -nums.pic_num(&dpb[i], 0));
+            s.sort_by_key(|&i| -nums.pic_num(dpb[i].store(), 0));
             l0.extend(s.iter().map(|&i| frame_ref(dpb, i)));
             l0.extend(long.iter().map(|&i| frame_ref(dpb, i)));
         } else {
+            let frame_poc = |i: usize| dpb[i].store().frame_poc();
             let mut before: Vec<usize> = short
                 .iter()
                 .copied()
-                .filter(|&i| dpb[i].frame_poc() < cur_poc)
+                .filter(|&i| frame_poc(i) < cur_poc)
                 .collect();
             let mut after: Vec<usize> = short
                 .iter()
                 .copied()
-                .filter(|&i| dpb[i].frame_poc() > cur_poc)
+                .filter(|&i| frame_poc(i) > cur_poc)
                 .collect();
-            before.sort_by_key(|&i| -dpb[i].frame_poc());
-            after.sort_by_key(|&i| dpb[i].frame_poc());
+            before.sort_by_key(|&i| -frame_poc(i));
+            after.sort_by_key(|&i| frame_poc(i));
             l0.extend(
                 before
                     .iter()
@@ -292,38 +347,33 @@ pub(crate) fn init_ref_lists(
         }
     } else {
         let cur_par = nums.structure;
-        let short_any = |i: usize| -> bool {
-            let fs = &dpb[i];
-            (fs.mark[0] == RefMark::Short && fs.fields & 1 != 0)
-                || (fs.mark[1] == RefMark::Short && fs.fields & 2 != 0)
-        };
-        let long_any = |i: usize| -> bool {
-            let fs = &dpb[i];
-            (fs.mark[0] == RefMark::Long && fs.fields & 1 != 0)
-                || (fs.mark[1] == RefMark::Long && fs.fields & 2 != 0)
+        // Either decoded field is marked `kind`.
+        let any = |i: usize, kind: Marking| -> bool {
+            let d = &dpb[i];
+            (1..=2u8).any(|par| d.store().fields & par != 0 && d.mark(par) == kind)
         };
         let short: Vec<usize> = (0..dpb.len())
-            .filter(|&i| usable(i) && short_any(i) && !dpb[i].non_existing_bframe(is_b))
+            .filter(|&i| any(i, Marking::ShortTerm) && !dpb[i].non_existing_bframe(is_b))
             .collect();
         let mut long: Vec<usize> = (0..dpb.len())
-            .filter(|&i| usable(i) && long_any(i))
+            .filter(|&i| any(i, Marking::LongTerm))
             .collect();
-        long.sort_by_key(|&i| dpb[i].long_term_frame_idx);
+        long.sort_by_key(|&i| dpb[i].store().long_term_frame_idx);
         let entry_poc = |i: usize| -> i32 {
-            let fs = &dpb[i];
+            let d = &dpb[i];
             let mut v = i32::MAX;
-            for p in 0..2 {
-                if fs.fields & (1 << p) != 0 && fs.mark[p] == RefMark::Short {
-                    v = v.min(fs.poc[p]);
+            for par in 1..=2u8 {
+                if d.store().fields & par != 0 && d.mark(par) == Marking::ShortTerm {
+                    v = v.min(d.store().poc[(par - 1) as usize]);
                 }
             }
             v
         };
         if !is_b {
             let mut s = short.clone();
-            s.sort_by_key(|&i| -nums.frame_num_wrap(&dpb[i]));
-            fields_from_frames(dpb, &s, cur_par, RefMark::Short, &mut l0);
-            fields_from_frames(dpb, &long, cur_par, RefMark::Long, &mut l0);
+            s.sort_by_key(|&i| -nums.frame_num_wrap(dpb[i].store()));
+            fields_from_frames(dpb, &s, cur_par, Marking::ShortTerm, &mut l0);
+            fields_from_frames(dpb, &long, cur_par, Marking::LongTerm, &mut l0);
         } else {
             let mut before: Vec<usize> = short
                 .iter()
@@ -339,10 +389,10 @@ pub(crate) fn init_ref_lists(
             after.sort_by_key(|&i| entry_poc(i));
             let f0: Vec<usize> = before.iter().chain(after.iter()).copied().collect();
             let f1: Vec<usize> = after.iter().chain(before.iter()).copied().collect();
-            fields_from_frames(dpb, &f0, cur_par, RefMark::Short, &mut l0);
-            fields_from_frames(dpb, &long, cur_par, RefMark::Long, &mut l0);
-            fields_from_frames(dpb, &f1, cur_par, RefMark::Short, &mut l1);
-            fields_from_frames(dpb, &long, cur_par, RefMark::Long, &mut l1);
+            fields_from_frames(dpb, &f0, cur_par, Marking::ShortTerm, &mut l0);
+            fields_from_frames(dpb, &long, cur_par, Marking::LongTerm, &mut l0);
+            fields_from_frames(dpb, &f1, cur_par, Marking::ShortTerm, &mut l1);
+            fields_from_frames(dpb, &long, cur_par, Marking::LongTerm, &mut l1);
         }
     }
     if is_b && l1.len() > 1 && l0 == l1 {
@@ -351,63 +401,33 @@ pub(crate) fn init_ref_lists(
     [l0, l1]
 }
 
-impl FrameStore {
-    /// Non-existing frames (frame_num gaps) are excluded from B-slice lists when POC is unknown.
-    fn non_existing_bframe(&self, is_b: bool) -> bool {
-        is_b && self.non_existing
-    }
-}
-
 /// Apply ref_pic_list_modification (8.2.4.3) and truncate to num_ref_idx_active.
 pub(crate) fn modify_ref_list(
-    dpb: &[FrameStore],
-    cur: usize,
+    dpb: &[View<'_, FrameStore>],
     nums: &PicNums,
     list: &mut Vec<RefPic>,
     mods: &[(u32, u32)],
     num_active: usize,
 ) -> Result<(), DecodeError> {
     let field = nums.structure != 0;
-    // Find a picture by PicNum / LongTermPicNum among stored references.
-    let find_short = |pn: i32| -> Option<RefPic> {
-        for i in 0..dpb.len() {
-            let fs = &dpb[i];
-            if !fs.in_use || (i == cur && !field) {
-                continue;
+    // Find a picture by PicNum (`kind` short-term) or LongTermPicNum among stored references.
+    let find = |pn: i32, kind: Marking| -> Option<RefPic> {
+        let num = |fs: &FrameStore, par: u8| {
+            if kind == Marking::LongTerm {
+                nums.long_term_pic_num(fs, par)
+            } else {
+                nums.pic_num(fs, par)
             }
+        };
+        for (i, d) in dpb.iter().enumerate() {
+            let fs = d.store();
             if !field {
-                if fs.is_short_frame() && nums.pic_num(fs, 0) == pn {
+                if d.mark(1) == kind && d.mark(2) == kind && num(fs, 0) == pn {
                     return Some(frame_ref(dpb, i));
                 }
             } else {
                 for par in 1..=2u8 {
-                    if fs.fields & par != 0
-                        && fs.mark[(par - 1) as usize] == RefMark::Short
-                        && nums.pic_num(fs, par) == pn
-                    {
-                        return Some(field_ref(dpb, i, par));
-                    }
-                }
-            }
-        }
-        None
-    };
-    let find_long = |pn: i32| -> Option<RefPic> {
-        for i in 0..dpb.len() {
-            let fs = &dpb[i];
-            if !fs.in_use || (i == cur && !field) {
-                continue;
-            }
-            if !field {
-                if fs.is_long_frame() && nums.long_term_pic_num(fs, 0) == pn {
-                    return Some(frame_ref(dpb, i));
-                }
-            } else {
-                for par in 1..=2u8 {
-                    if fs.fields & par != 0
-                        && fs.mark[(par - 1) as usize] == RefMark::Long
-                        && nums.long_term_pic_num(fs, par) == pn
-                    {
+                    if fs.fields & par != 0 && d.mark(par) == kind && num(fs, par) == pn {
                         return Some(field_ref(dpb, i, par));
                     }
                 }
@@ -442,11 +462,11 @@ pub(crate) fn modify_ref_list(
                     } else {
                         no_wrap
                     };
-                    find_short(pn).ok_or(DecodeError::InvalidData(
+                    find(pn, Marking::ShortTerm).ok_or(DecodeError::InvalidData(
                         "ref_pic_list_modification: missing short-term picture",
                     ))?
                 }
-                _ => find_long(v as i32).ok_or(DecodeError::InvalidData(
+                _ => find(v as i32, Marking::LongTerm).ok_or(DecodeError::InvalidData(
                     "ref_pic_list_modification: missing long-term picture",
                 ))?,
             };
@@ -473,46 +493,104 @@ pub(crate) fn modify_ref_list(
     Ok(())
 }
 
-/// Sliding window marking (8.2.5.3).
-pub(crate) fn sliding_window(dpb: &mut [FrameStore], cur: usize, nums: &PicNums, max_refs: u32) {
-    let max = max_refs.max(1) as usize;
-    loop {
-        let refs: Vec<usize> = (0..dpb.len())
-            .filter(|&i| i != cur && dpb[i].in_use && dpb[i].is_ref())
-            .collect();
-        let n_short = refs
-            .iter()
-            .filter(|&&i| dpb[i].mark.contains(&RefMark::Short))
-            .count();
-        let n_long = refs
-            .iter()
-            .filter(|&&i| !dpb[i].mark.contains(&RefMark::Short))
-            .count();
-        if n_short + n_long < max || n_short == 0 {
-            break;
-        }
-        // Smallest FrameNumWrap among short-term.
-        let victim = refs
-            .iter()
-            .copied()
-            .filter(|&i| dpb[i].mark.contains(&RefMark::Short))
-            .min_by_key(|&i| nums.frame_num_wrap(&dpb[i]))
-            .unwrap();
-        for mk in dpb[victim]
-            .mark
-            .iter_mut()
-            .filter(|m| **m == RefMark::Short)
-        {
-            *mk = RefMark::None;
+/// Unmarks every field of `entry` marked `marking`.
+fn unmark(entry: &mut Entry<'_, FrameStore>, marking: Marking) {
+    for par in 1..=2u8 {
+        if entry.mark(par) == marking {
+            entry.set_marking(Some(parity(par)), Marking::Unused);
         }
     }
 }
 
-/// Adaptive memory control (8.2.5.4). Returns true when mmco 5 was executed.
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+/// Sliding window marking (8.2.5.3) of the stored pictures `dpb`. `first` is the position
+/// of the current frame's first field when the current picture is its second field.
+pub(crate) fn sliding_window(
+    dpb: &mut [Entry<'_, FrameStore>],
+    first: Option<usize>,
+    nums: &PicNums,
+    max_refs: u32,
+) {
+    let max = max_refs.max(1) as usize;
+    loop {
+        let refs: Vec<usize> = (0..dpb.len())
+            .filter(|&i| Some(i) != first && dpb[i].is_ref())
+            .collect();
+        let n_short = refs
+            .iter()
+            .filter(|&&i| dpb[i].has(Marking::ShortTerm))
+            .count();
+        let n_long = refs.len() - n_short;
+        if n_short + n_long < max || n_short == 0 {
+            break;
+        }
+        // Smallest FrameNumWrap among short-term.
+        let Some(victim) = refs
+            .iter()
+            .copied()
+            .filter(|&i| dpb[i].has(Marking::ShortTerm))
+            .min_by_key(|&i| nums.frame_num_wrap(dpb[i].store()))
+        else {
+            break;
+        };
+        unmark(&mut dpb[victim], Marking::ShortTerm);
+    }
+}
+
+/// The marking of the current picture that adaptive marking (8.2.5.4) decides when the
+/// picture is a frame or a first field, which is not stored yet.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct NewMarking {
+    /// The frame's, or the field's, marking.
+    pub marking: Marking,
+    /// LongTermFrameIdx, once one is assigned.
+    pub long_term_frame_idx: Option<u32>,
+}
+
+/// The current picture's place in marking: not stored yet, or the second field of the
+/// frame store at a position of the stored pictures, which holds its first field.
+#[derive(Debug)]
+pub(crate) enum Current<'a> {
+    New(&'a mut NewMarking),
+    Stored(usize),
+}
+
+impl Current<'_> {
+    fn is(&self, i: usize) -> bool {
+        matches!(*self, Current::Stored(at) if at == i)
+    }
+
+    /// Marks the current picture, of structure `structure` (0 frame, 1 top, 2 bottom), and
+    /// gives it `long_term_frame_idx` when that is some.
+    pub(crate) fn mark(
+        &mut self,
+        dpb: &mut [Entry<'_, FrameStore>],
+        structure: u8,
+        marking: Marking,
+        long_term_frame_idx: Option<u32>,
+    ) {
+        match self {
+            Current::New(new) => {
+                new.marking = marking;
+                if long_term_frame_idx.is_some() {
+                    new.long_term_frame_idx = long_term_frame_idx;
+                }
+            }
+            Current::Stored(at) => {
+                let d = &mut dpb[*at];
+                d.set_marking(Some(parity(structure)), marking);
+                if let Some(idx) = long_term_frame_idx {
+                    d.picture_mut().long_term_frame_idx = idx;
+                }
+            }
+        }
+    }
+}
+
+/// Adaptive memory control (8.2.5.4) of the stored pictures `dpb` and the current picture.
+/// Returns true when mmco 5 was executed.
 pub(crate) fn apply_mmcos(
-    dpb: &mut [FrameStore],
-    cur: usize,
+    dpb: &mut [Entry<'_, FrameStore>],
+    cur: &mut Current<'_>,
     nums: &PicNums,
     sh: &SliceHeader,
     max_lt_idx: &mut Option<u32>,
@@ -526,21 +604,18 @@ pub(crate) fn apply_mmcos(
                 let pn = curr - (m.diff_pic_nums_minus1 as i32 + 1);
                 // Locate the short-term picture/field with PicNum pn.
                 let mut found = None;
-                for i in 0..dpb.len() {
-                    let fs = &dpb[i];
-                    if !fs.in_use {
-                        continue;
-                    }
+                for (i, d) in dpb.iter().enumerate() {
+                    let fs = d.store();
                     if !field {
-                        if i != cur && fs.is_short_frame() && nums.pic_num(fs, 0) == pn {
+                        if !cur.is(i) && d.is_short_frame() && nums.pic_num(fs, 0) == pn {
                             found = Some((i, 0u8));
                         }
                     } else {
                         for par in 1..=2u8 {
                             if fs.fields & par != 0
-                                && fs.mark[(par - 1) as usize] == RefMark::Short
+                                && d.mark(par) == Marking::ShortTerm
                                 && nums.pic_num(fs, par) == pn
-                                && !(i == cur && par == nums.structure)
+                                && !(cur.is(i) && par == nums.structure)
                             {
                                 found = Some((i, par));
                             }
@@ -550,58 +625,61 @@ pub(crate) fn apply_mmcos(
                 let Some((i, par)) = found else { continue };
                 if m.op == 1 {
                     if par == 0 {
-                        dpb[i].mark = [RefMark::None; 2];
+                        dpb[i].set_marking(None, Marking::Unused);
                     } else {
-                        dpb[i].mark[(par - 1) as usize] = RefMark::None;
+                        dpb[i].set_marking(Some(parity(par)), Marking::Unused);
                     }
                 } else {
                     let idx = m.long_term_frame_idx;
                     // Free any other frame using this LongTermFrameIdx.
-                    for j in 0..dpb.len() {
+                    for (j, d) in dpb.iter_mut().enumerate() {
                         if j != i
-                            && dpb[j].in_use
-                            && dpb[j].mark.contains(&RefMark::Long)
-                            && dpb[j].long_term_frame_idx == idx
+                            && d.has(Marking::LongTerm)
+                            && d.store().long_term_frame_idx == idx
                         {
-                            for mk in dpb[j].mark.iter_mut().filter(|m| **m == RefMark::Long) {
-                                *mk = RefMark::None;
-                            }
+                            unmark(d, Marking::LongTerm);
                         }
+                    }
+                    if let Current::New(new) = cur
+                        && new.marking == Marking::LongTerm
+                        && new.long_term_frame_idx == Some(idx)
+                    {
+                        new.marking = Marking::Unused;
                     }
                     // A frame whose other field is long-term with a different index loses it.
+                    let d = &mut dpb[i];
                     if par != 0 {
-                        let other = (2 - par) as usize;
-                        if dpb[i].mark[other] == RefMark::Long && dpb[i].long_term_frame_idx != idx
+                        let other = 3 - par;
+                        if d.mark(other) == Marking::LongTerm
+                            && d.store().long_term_frame_idx != idx
                         {
-                            dpb[i].mark[other] = RefMark::None;
+                            d.set_marking(Some(parity(other)), Marking::Unused);
                         }
-                        dpb[i].mark[(par - 1) as usize] = RefMark::Long;
+                        d.set_marking(Some(parity(par)), Marking::LongTerm);
                     } else {
-                        dpb[i].mark = [RefMark::Long; 2];
+                        d.set_marking(None, Marking::LongTerm);
                     }
-                    dpb[i].long_term_frame_idx = idx;
+                    d.picture_mut().long_term_frame_idx = idx;
                 }
             }
             2 => {
                 let lpn = m.long_term_pic_num as i32;
-                for i in 0..dpb.len() {
-                    let fs = &dpb[i];
-                    if !fs.in_use {
-                        continue;
-                    }
+                for (i, d) in dpb.iter_mut().enumerate() {
                     if !field {
-                        if i != cur && fs.is_long_frame() && nums.long_term_pic_num(fs, 0) == lpn {
-                            dpb[i].mark = [RefMark::None; 2];
+                        if !cur.is(i)
+                            && d.is_long_frame()
+                            && nums.long_term_pic_num(d.store(), 0) == lpn
+                        {
+                            d.set_marking(None, Marking::Unused);
                         }
                     } else {
                         for par in 1..=2u8 {
-                            let fs = &dpb[i];
-                            if fs.fields & par != 0
-                                && fs.mark[(par - 1) as usize] == RefMark::Long
-                                && nums.long_term_pic_num(fs, par) == lpn
-                                && !(i == cur && par == nums.structure)
+                            if d.store().fields & par != 0
+                                && d.mark(par) == Marking::LongTerm
+                                && nums.long_term_pic_num(d.store(), par) == lpn
+                                && !(cur.is(i) && par == nums.structure)
                             {
-                                dpb[i].mark[(par - 1) as usize] = RefMark::None;
+                                d.set_marking(Some(parity(par)), Marking::Unused);
                             }
                         }
                     }
@@ -613,25 +691,23 @@ pub(crate) fn apply_mmcos(
                 } else {
                     Some(m.max_long_term_frame_idx_plus1 - 1)
                 };
-                for i in 0..dpb.len() {
-                    if i == cur || !dpb[i].in_use {
+                for (i, d) in dpb.iter_mut().enumerate() {
+                    if cur.is(i) {
                         continue;
                     }
                     let over = match *max_lt_idx {
                         None => true,
-                        Some(mx) => dpb[i].long_term_frame_idx > mx,
+                        Some(mx) => d.store().long_term_frame_idx > mx,
                     };
                     if over {
-                        for mk in dpb[i].mark.iter_mut().filter(|m| **m == RefMark::Long) {
-                            *mk = RefMark::None;
-                        }
+                        unmark(d, Marking::LongTerm);
                     }
                 }
             }
             5 => {
-                for i in 0..dpb.len() {
-                    if i != cur {
-                        dpb[i].mark = [RefMark::None; 2];
+                for (i, d) in dpb.iter_mut().enumerate() {
+                    if !cur.is(i) {
+                        d.set_marking(None, Marking::Unused);
                     }
                 }
                 *max_lt_idx = None;
@@ -639,28 +715,32 @@ pub(crate) fn apply_mmcos(
             }
             6 => {
                 let idx = m.long_term_frame_idx;
-                for j in 0..dpb.len() {
-                    if j != cur
-                        && dpb[j].in_use
-                        && dpb[j].mark.contains(&RefMark::Long)
-                        && dpb[j].long_term_frame_idx == idx
+                for (j, d) in dpb.iter_mut().enumerate() {
+                    if !cur.is(j)
+                        && d.has(Marking::LongTerm)
+                        && d.store().long_term_frame_idx == idx
                     {
-                        for mk in dpb[j].mark.iter_mut().filter(|m| **m == RefMark::Long) {
-                            *mk = RefMark::None;
+                        unmark(d, Marking::LongTerm);
+                    }
+                }
+                match cur {
+                    Current::New(new) => {
+                        new.marking = Marking::LongTerm;
+                        new.long_term_frame_idx = Some(idx);
+                    }
+                    Current::Stored(at) => {
+                        // The second field of a frame store whose first field is stored.
+                        let d = &mut dpb[*at];
+                        let other = 3 - nums.structure;
+                        if d.mark(other) == Marking::LongTerm
+                            && d.store().long_term_frame_idx != idx
+                        {
+                            d.set_marking(Some(parity(other)), Marking::Unused);
                         }
+                        d.set_marking(Some(parity(nums.structure)), Marking::LongTerm);
+                        d.picture_mut().long_term_frame_idx = idx;
                     }
                 }
-                let fs = &mut dpb[cur];
-                if field {
-                    let other = (2 - nums.structure) as usize;
-                    if fs.mark[other] == RefMark::Long && fs.long_term_frame_idx != idx {
-                        fs.mark[other] = RefMark::None;
-                    }
-                    fs.mark[(nums.structure - 1) as usize] = RefMark::Long;
-                } else {
-                    fs.mark = [RefMark::Long; 2];
-                }
-                fs.long_term_frame_idx = idx;
             }
             _ => {}
         }

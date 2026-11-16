@@ -545,13 +545,13 @@ fn an_active_sample_is_a_nonpass_after_calibration() {
         .and_then(|o| o.get("observer"))
         .cloned()
         .unwrap();
-    assert!(linux::sample_valid(
-        Some(&data),
+    assert!(linux::certificate_valid(
         Some(&certificate),
         &f.linked,
         Some(&f.observer),
         Some(&f.probe)
     ));
+    assert!(linux::guard_component_valid(&data));
     for key in [
         "guard_calls",
         "guard_window_calls",
@@ -559,13 +559,7 @@ fn an_active_sample_is_a_nonpass_after_calibration() {
     ] {
         set(&mut data, &[key], "6", Value::int(1));
     }
-    assert!(!linux::sample_valid(
-        Some(&data),
-        Some(&certificate),
-        &f.linked,
-        Some(&f.observer),
-        Some(&f.probe)
-    ));
+    assert!(!linux::guard_component_valid(&data));
 }
 
 #[test]
@@ -1071,7 +1065,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     let result = super::memory::evaluate(
         std::path::Path::new("."),
         &samples,
-        2,
+        crate::harness::timing::Pairs::fixed(2),
         0,
         &certificate,
         None,
@@ -1080,6 +1074,29 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         result.get("status").and_then(Value::as_str),
         Some("qualified")
     );
+    // The kernel certificate is the collection's and is verified once, but any
+    // sample that used the kernel bound, first or later, still needs it.
+    for index in [0, 1] {
+        let mut kernel = samples.clone();
+        set(
+            &mut kernel[index],
+            &["reference_rss", "observer"],
+            "kernel_rss_requested",
+            Value::int(1),
+        );
+        let refused = super::memory::evaluate(
+            std::path::Path::new("."),
+            &kernel,
+            crate::harness::timing::Pairs::fixed(2),
+            0,
+            &certificate,
+            None,
+        );
+        assert_eq!(
+            refused.get("status").and_then(Value::as_str),
+            Some("observer-unqualified")
+        );
+    }
     let outputs = v(
         r#"{"candidate":{"bytes":100,"fnv1a64":"1234"},"reference":{"bytes":120,"fnv1a64":"5678"}}"#,
     );
@@ -1099,7 +1116,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         super::memory::evaluate(
             std::path::Path::new("."),
             &[sample.clone(), sample.clone()],
-            2,
+            crate::harness::timing::Pairs::fixed(2),
             0,
             &certificate,
             outputs,
@@ -1152,7 +1169,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     let without_growth = super::memory::evaluate(
         std::path::Path::new("."),
         &samples,
-        2,
+        crate::harness::timing::Pairs::fixed(2),
         0,
         &certificate,
         None,
@@ -1597,4 +1614,112 @@ fn the_built_observer_counts_every_hook_and_operator_new_form() {
     let (_, data) = run("guard-file-writable");
     assert_eq!(data.get("status"), Some(&Value::str("invalid")));
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// A pair of valid observations, as `memory::measure` records it.
+fn observed_pair() -> Value {
+    let sample = |observer: Value| {
+        Value::object([
+            ("status", Value::str("measured")),
+            ("instrument_sha256", Value::str("observer-hash")),
+            ("observer", observer),
+        ])
+    };
+    Value::object([
+        ("candidate_heap", sample(receipt("heap"))),
+        ("candidate_rss", sample(kernel_receipt())),
+        ("reference_heap", sample(receipt("heap"))),
+        ("reference_rss", sample(kernel_receipt())),
+    ])
+}
+
+/// The observation the observer records when the module saw another task
+/// update the worker's resident counters.
+fn foreign_update(row: &mut Value, key: &str) {
+    for (field, value) in [
+        ("status", Value::str("invalid")),
+        ("error_bits", Value::int(512)),
+        ("kernel_rss_errors", Value::int(1)),
+    ] {
+        set(row, &[key, "observer"], field, value);
+    }
+}
+
+#[test]
+fn only_a_pair_the_kernel_bound_alone_voided_is_measured_again() {
+    let sha = Value::str("observer-hash");
+    let voided = |row: &Value| super::memory::voided_by_foreign_update(row, Some(&sha));
+    let clean = observed_pair();
+    assert!(linux::valid_receipt(&kernel_receipt(), "rss"));
+    assert!(!voided(&clean), "a valid pair is never discarded");
+    let mut row = clean.clone();
+    foreign_update(&mut row, "reference_rss");
+    assert!(voided(&row));
+    let mut both = row.clone();
+    foreign_update(&mut both, "candidate_rss");
+    assert!(voided(&both));
+    // Any other fault of the pair, or another module error, still fails it.
+    let observer = |key| [key, "observer"];
+    let refused = [
+        (
+            observer("reference_rss"),
+            "kernel_rss_errors",
+            Value::int(4),
+        ),
+        (
+            observer("reference_rss"),
+            "kernel_rss_missed",
+            Value::int(1),
+        ),
+        (
+            observer("reference_rss"),
+            "error_bits",
+            Value::int(512 | 128),
+        ),
+        (
+            observer("reference_rss"),
+            "kernel_rss_requested",
+            Value::int(0),
+        ),
+        (observer("candidate_heap"), "error_bits", Value::int(64)),
+    ];
+    for (path, field, value) in refused {
+        let mut changed = row.clone();
+        set(&mut changed, &path, field, value);
+        assert!(!voided(&changed), "{path:?} {field} was retried");
+    }
+    for (key, field, value) in [
+        ("reference_rss", "status", Value::str("observer-failed")),
+        ("candidate_rss", "instrument_sha256", Value::str("other")),
+    ] {
+        let mut changed = row.clone();
+        set(&mut changed, &[key], field, value);
+        assert!(!voided(&changed), "{key} {field} was retried");
+    }
+    let mut heap = row.clone();
+    foreign_update(&mut heap, "reference_heap");
+    assert!(!voided(&heap), "a heap run carries no kernel bound");
+}
+
+#[test]
+fn recorded_retries_must_be_voided_pairs_within_the_cap() {
+    let sha = Value::str("observer-hash");
+    let mut row = observed_pair();
+    foreign_update(&mut row, "reference_rss");
+    let retry = |pair: i128, sample: &Value| {
+        Value::object([("pair", Value::int(pair)), ("sample", sample.clone())])
+    };
+    let valid =
+        |list: Vec<Value>| super::memory::retries_valid(Some(&Value::Array(list)), 30, Some(&sha));
+    assert!(super::memory::retries_valid(None, 30, Some(&sha)));
+    assert!(valid(vec![retry(3, &row), retry(3, &row)]));
+    assert!(!valid(vec![retry(3, &row); super::memory::MAX_RETRIES + 1]));
+    assert!(
+        !valid(vec![retry(30, &row)]),
+        "a pair the collection never measured"
+    );
+    assert!(
+        !valid(vec![retry(3, &observed_pair())]),
+        "a valid pair was discarded"
+    );
 }

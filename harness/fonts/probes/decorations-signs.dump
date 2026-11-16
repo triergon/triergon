@@ -1,0 +1,15 @@
+height 16384 outlines
+face 0
+size 16384 256 256 1073742 1073742 13120 -3328 16384 9856 13107 3277 16384 16384 256 0 underline - strikeout -
+glyph 0 8192 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 9830 truetype 1 | 4 | 1638 0 1 1638 11469 1 8192 11469 1 8192 0 1
+bold 1 truetype 1 | 4 | 1638 0 1 1638 11725 1 8448 11725 1 8448 0 1
+oblique 1 truetype 1 | 4 | 1638 0 1 5536 11469 1 12090 11469 1 8192 0 1
+both 1 truetype 1 | 4 | 1587 0 1 5572 11725 1 12397 11725 1 8412 0 1
+glyph 2 4096 truetype 0 | |
+bold 2 truetype 0 | |
+oblique 2 truetype 0 | |
+both 2 truetype 0 | |

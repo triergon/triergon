@@ -1,0 +1,60 @@
+{
+ "name": "gate-run-armv7-6dc6440d-20261115-184229-shard-2",
+ "path": "gate-run-armv7-6dc6440d-20261115-184229-shard-2",
+ "retention": "retained",
+ "reason": "A partial gate run at 6dc6440d on 32-bit ARMv7 in the armhf user space, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items framing, matroska-startup-seek; for the Matroska startup and seek row on this target, whose worker the later trained-order revisions keep byte for byte; its framing worker took a trained order that the later revisions leave out on this target",
+ "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-armv7-20261115-184229/shard-2/13a05ccb7da42642a6f7a80d816b35505e8790aa8a73094b9cfb21520827baa0.tar.zst",
+ "sha256": "13a05ccb7da42642a6f7a80d816b35505e8790aa8a73094b9cfb21520827baa0",
+ "bytes": 20832711,
+ "results": [
+  {
+   "path": "memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "5418775ec8e30037edd51dcf5d688b19d733883023fdf07de4dc9e5aa9f7a485",
+   "status": 0,
+   "report_sha256": "014bf6bb57dda6787bfb8481d28ceaa3fbffa0176130748fc066463034994579",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "1a3277a536b9e8d0ce78ccb010f779d88396f445faa0a3acfc894fb2798cc876",
+   "status": 0,
+   "report_sha256": "d8cbcef1fc2b4d6712b7da02d2c0e13dc36846032ec78022471955326c2fe08d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f718defbbb4af2f3a036f91e3bb414b3bb7774ead8e68f325ee2760ff973425b",
+   "status": 0,
+   "report_sha256": "1b40eaefdf23859feae0c91faf887daadad1e487c1cb8a5cba261dbee4e0d66c",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "230e3753b87502496b591ce1dd3a06ed71b5414eb811381a7651767f8777fddb",
+   "status": 0,
+   "report_sha256": "a6e426cea039e6f0ee487e3a9640ba59a89632e91b53938bfde8b6874098bdee",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "148c40c35d91dd4386eda5985758ab41381a5d0aa78858b2a1927fd2a847498d",
+   "status": 0,
+   "report_sha256": "171b2e3d44ee4391b13040cbef4e36f51c9ef154136c0cf8b5b402869ea1059d"
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "ed0c13a460db88efc4c85b825af2669e0e441c964d8191f961917256b26be019",
+   "status": 0,
+   "report_sha256": "89adb6d44c96ed09982dbe7e8b2a2f56702e2348a771f80d1369661a00552f38"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+ }
+}

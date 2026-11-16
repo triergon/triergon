@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "matroska-legacy-aac",
   "operation": "matroska-audio-clock",
-  "candidate": "playback-worker",
+  "candidate": "playback-matroska-worker",
   "worker_operation": "mkv-audio-",
   "reference": "ffmpeg-video-native",
   "gate": "required",

@@ -28,6 +28,7 @@ dependencies = [
  "triergon-codec-aac",
  "triergon-codec-ac3",
  "triergon-harness-protocol",
+ "triergon-isobmff",
  "triergon-pixel",
  "triergon-session",
 ]

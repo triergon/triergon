@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use crate::harness::gate_build;
 use crate::harness::policy;
-use crate::harness::timing::{self, GATE_PAIRS, Operation, Work};
+use crate::harness::timing::{self, GATE_PAIRS, Operation, Pairs, Work};
 use crate::harness::worker::data;
 use crate::json::{self, Value};
 use crate::{python, sha256};
@@ -39,6 +39,8 @@ pub struct Options {
     pub out: PathBuf,
     pub label: String,
     pub only: Option<String>,
+    /// Let a gate session stop at an early look (`--no-early-stop` clears it).
+    pub early_stop: bool,
 }
 
 fn sha(path: &Path) -> Result<String, String> {
@@ -152,6 +154,8 @@ pub fn run(options: &Options) -> Result<(), String> {
         ("reference", Value::str(sha(&options.reference)?)),
     ]);
     let only: Option<Vec<&str>> = options.only.as_deref().map(|o| o.split(',').collect());
+    let mut unmeasured = Vec::new();
+    let mut bounds = Vec::new();
     for w in &workloads {
         let id = get_str(w, "id").ok_or("workload without id")?.to_owned();
         if only.as_ref().is_some_and(|o| !o.contains(&id.as_str())) {
@@ -200,7 +204,7 @@ pub fn run(options: &Options) -> Result<(), String> {
             &options.candidate,
             &options.reference,
             &path,
-            GATE_PAIRS,
+            Pairs::gate(GATE_PAIRS, gate.ceiling).early_stop(options.early_stop),
             iterations,
             SEED,
             &operation(name),
@@ -305,6 +309,11 @@ pub fn run(options: &Options) -> Result<(), String> {
         );
         set(&mut claims, &key, entry);
         write_claims(claims_path, &claims)?;
+        if state != "measured" {
+            unmeasured.push(id.clone());
+        } else {
+            bounds.push((id.clone(), delivery == Some(true)));
+        }
         println!(
             "CODECTIME {id} {state} {} {} {}",
             ratio
@@ -318,7 +327,22 @@ pub fn run(options: &Options) -> Result<(), String> {
             }
         );
     }
+    let name = super::memory::list_name(&options.workloads);
+    let (lines, failed) = super::bounds(
+        &manifest,
+        &name,
+        "timing",
+        &bounds,
+        super::memory::gate_platform(),
+    );
+    for line in &lines {
+        println!("{line}");
+    }
     println!("DONE");
+    super::memory::measured_all("timing", &unmeasured)?;
+    if failed {
+        return Err(format!("{name} timing: a gated bound failed"));
+    }
     Ok(())
 }
 

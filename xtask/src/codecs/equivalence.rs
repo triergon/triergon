@@ -89,14 +89,17 @@ fn decoder_entry(job: &Job) -> Value {
     ])
 }
 
-/// `cargo build --release --locked ARGS...` for the worker target in `root`; `quiet`
+/// `cargo rustc --release --locked ARGS...` for the worker target in `root`, linked
+/// under the gate build's link policy; ARGS select one binary or example; `quiet`
 /// captures its output.
 pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String> {
     let mut command = Command::new("cargo");
     command
-        .args(["build", "--release", "--locked"])
+        .args(["rustc", "--release", "--locked"])
         .args(crate::harness::gate_build::target_args()?)
         .args(args)
+        .arg("--")
+        .args(crate::harness::gate_build::worker_link_arguments()?)
         .env("CARGO_INCREMENTAL", "0")
         .current_dir(root);
     let status = if quiet {
@@ -108,7 +111,7 @@ pub fn cargo_build(root: &Path, args: &[&str], quiet: bool) -> Result<(), String
     if status.success() {
         Ok(())
     } else {
-        Err(format!("cargo build {}: {status}", args.join(" ")))
+        Err(format!("cargo rustc {}: {status}", args.join(" ")))
     }
 }
 

@@ -10,6 +10,7 @@ mod ts;
 use std::path::{Path, PathBuf};
 
 use crate::codecs::{Args, default_jobs};
+use crate::harness::reuse;
 
 pub const USAGE: &str = "usage: cargo xtask capture <command>
 
@@ -17,10 +18,15 @@ pub const USAGE: &str = "usage: cargo xtask capture <command>
                  conversion, mux, encoder and pipeline rules of one case; prints a summary line
   qualify --candidate W --reference W [--reference-small W] --oracle-bin DIR --observer SO
           --inputs DIR --out DIR [--cases F] [--only ID...] [--pairs N] [--iterations N]
-          [--memory-pairs N] [--seed N]
+          [--memory-pairs N] [--seed N] [--full] [--no-early-stop]
+          [--stage timing | --stage memory --timing DIR]
+                 --stage timing runs correctness and timing alone (on one CPU); --stage
+                 memory collects every case's memory in parallel from a timing run's
+                 records in DIR; without --stage one run does both
                  correctness, paired runtime, peak heap and total resident RSS per required case
                  (native Linux); inputs are generated with harness/capture/generate_inputs.py
-                 using $TRIERGON_PYTHON (default python3), which needs numpy
+                 using $TRIERGON_PYTHON (default python3), which needs numpy; a run a kept
+                 evidence set holds is reused unless --full
   summarize RUN  a qualify run's per-case results as a Markdown table
   equivalence --output F [--compare F] [--jobs N]
                  record every capture-worker output identity; --compare checks an earlier record";
@@ -85,32 +91,45 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "iterations",
                     "memory-pairs",
                     "seed",
+                    "stage",
+                    "timing",
                 ],
-                &[],
+                &["full", "no-early-stop"],
             )?;
-            qualify::run(
-                root,
-                &qualify::Options {
-                    candidate: a.required("candidate")?.to_owned(),
-                    reference: a.required("reference")?.to_owned(),
-                    reference_small: a
-                        .get("reference-small")
-                        .filter(|s| !s.is_empty())
-                        .map(str::to_owned),
-                    oracle_bin: a.required("oracle-bin")?.to_owned(),
-                    observer: a.required("observer")?.to_owned(),
-                    cases: a
-                        .get("cases")
-                        .map_or_else(|| root.join("harness/capture/cases.json"), PathBuf::from),
-                    only,
-                    inputs: a.path("inputs")?,
-                    out: a.path("out")?,
-                    pairs: a.number("pairs")?.unwrap_or(30),
-                    iterations: a.number("iterations")?.unwrap_or(3),
-                    memory_pairs: a.number("memory-pairs")?.unwrap_or(30),
-                    seed: a.number("seed")?.map_or(20_261_102, |s| s as u64),
+            let stage = match (a.get("stage"), a.get("timing")) {
+                (None, None) => qualify::Stage::Both,
+                (Some("timing"), None) => qualify::Stage::Timing,
+                (Some("memory"), Some(timing)) => qualify::Stage::Memory {
+                    timing: PathBuf::from(timing),
                 },
-            )?;
+                _ => return Err(USAGE.to_owned()),
+            };
+            let options = qualify::Options {
+                candidate: a.required("candidate")?.to_owned(),
+                reference: a.required("reference")?.to_owned(),
+                reference_small: a
+                    .get("reference-small")
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned),
+                oracle_bin: a.required("oracle-bin")?.to_owned(),
+                observer: a.required("observer")?.to_owned(),
+                cases: a
+                    .get("cases")
+                    .map_or_else(|| root.join("harness/capture/cases.json"), PathBuf::from),
+                only,
+                inputs: a.path("inputs")?,
+                out: a.path("out")?,
+                pairs: a.number("pairs")?.unwrap_or(30),
+                iterations: a.number("iterations")?.unwrap_or(3),
+                memory_pairs: a.number("memory-pairs")?.unwrap_or(30),
+                seed: a.number("seed")?.map_or(20_261_102, |s| s as u64),
+                early_stop: a.get("no-early-stop").is_none(),
+                stage,
+            };
+            let key = qualify::gate_key(root, &options)?;
+            return reuse::step(root, &options.out, &key, a.get("full").is_some(), || {
+                qualify::run(root, &options).map(|()| 0)
+            });
         }
         "summarize" => match rest {
             [run] => summary::run(Path::new(run))?,

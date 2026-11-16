@@ -1,0 +1,10 @@
+{
+ "name": "font-charmaps-vertical-801e0349",
+ "path": "font-charmaps-vertical-801e0349",
+ "retention": "retained",
+ "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's full charmap order and the @ font drawing, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' tests, clippy, shape ucd --check and fonts tables --check on AArch64. Measured at 801e0349, whose tree differs from b5bc0d90 only in docs/status.md and harness/evidence/index.json.",
+ "key": "evidence/font-charmaps-vertical-801e0349/8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37.tar.gz",
+ "sha256": "8a5799509af3fa883fa3686ea181d7b630dee90db6e71e60cb55023c65e8cd37",
+ "bytes": 98631031,
+ "source_revision": "b5bc0d90f1e2427849e43b4c00d2f0ef15ce2506"
+}

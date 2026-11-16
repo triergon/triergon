@@ -1,0 +1,273 @@
+{
+ "name": "progressive-rebased-gate-build",
+ "path": "progressive-rebased-gate-build",
+ "retention": "retained",
+ "reason": "Cited progressive transport measurements: all three parity and memory results pass; reordered-48000 exceeds the runtime ceiling. Includes the preceding compile failure.",
+ "key": "evidence/progressive-rebased-gate-build/0bb7c6833a18fd197b6b9f4c2704ee72530a320faab447b13e2ad4138851eb82.tar.gz",
+ "sha256": "0bb7c6833a18fd197b6b9f4c2704ee72530a320faab447b13e2ad4138851eb82",
+ "bytes": 50209037,
+ "source_revision": "58d9d0807a3dc1b75adcf0e3a9655175f9649996",
+ "collection_status": "failed-runtime",
+ "files": [
+  {
+   "path": "progressive-rebased-gate-build/SOURCE.bundle",
+   "sha256": "42aece356fbf3258c76cb542b191f37727043f469034dddb3cad7ad130b961f4"
+  },
+  {
+   "path": "progressive-rebased-gate-build/SUMMARY.json",
+   "sha256": "c210aa7598514d6cf506abaffc0453915229cd6854e881dc90efec3a4d0d5222"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/ARCHIVED-COMPARISON.json",
+   "sha256": "50c844c8ffc9a066ab571fe1df65c108834d70d9a6593b259e48152674dd4b06"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/ARCHIVED-DIGEST.json",
+   "sha256": "5ba8378dcdaba5a3462ddcb60f66a167d967ef9eeaf11a32eae3416811f5bcdd"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/ARCHIVED-PRIOR.json",
+   "sha256": "2bdc890544f6e2183242b27e1b3720396cf7f9f12003c8055319e4137bddacf9"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/GUEST-PREFLIGHT.log",
+   "sha256": "188ff7814ec7a387217e337676b816cb58a99d6f338cf3300cc90db4f2b09f3d"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/HOST.log",
+   "sha256": "4bb0d3ae64e2b1112a34ecaae756d2c00512eb13ba4da5cbd6a4b6ff9e438da1"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/LIBRARY-TEST-RESULTS.txt",
+   "sha256": "0c293825180fe284de2075c90297c70f576e0316e6959022e4a79776db008a67"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/NATIVE-EXIT.txt",
+   "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/NATIVE-MEMBERS.txt",
+   "sha256": "9283b3e09877da93010e7ccc8088dd8dfc90a44e3f1b66f48c045e262a328b32"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/NATIVE-RESULTS.sha256",
+   "sha256": "a8c0d2a02123198b9c126389cbf96abba446c07d8289616d7b33f720d6351924"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/NATIVE-RESULTS.tar.gz",
+   "sha256": "9fd3638afaf7555583a928d2594a757b035949558333c2136185e335a91285e0"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/NATIVE.log",
+   "sha256": "4c1cacb3bcefb3840968d3859c210b4ab92b329561258d57f6f2377690bfa4b2"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/QUALIFIED-SUMMARY.json",
+   "sha256": "ff620f0d9b10c68223cf4e2f3f6405d323fa93ff36816a2c317ff5640ab8fb72"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/REMOTE-GC.json",
+   "sha256": "dc09e657cf182e7e6037dfc6cb43ff30484ac4a476c04fd606507b4b07689d27"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/RSS-REVIEW.json",
+   "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/RUNNER-ADDRESS",
+   "sha256": "c2ac168a24d5095e36c8b1ffe42d517534f73a9c7299dfa4fc2ec99a04241326"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/SOURCE.bundle",
+   "sha256": "b62d50de18b7854873d473fc07ea7748efa8fd8c7933b0765b1254533ef453ef"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/SSH-WAIT.log",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/START-INSTANCE.json",
+   "sha256": "f72a9e3a724183d93017f1cbcea71f0d4b8321d9d534912be0741931e4f36660"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/STOP-INSTANCE.json",
+   "sha256": "323daa66c70209032719102e3db2718e12c1b6d653d1cf1ece33dd6e1690642e"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/build-logs/clippy.log",
+   "sha256": "5e32b9b3519ba673b6d80b7a460774c6c6d946f566af9585efd6c92fde49011d"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/build-logs/format.log",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/build-logs/library-tests.log",
+   "sha256": "b3cf6cea7d38dd8e691fdb8d12bdfbff9cd98984c2ff2695e479daaf70a9f85b"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/build-logs/proof-build.log",
+   "sha256": "3352cca9bfbc5ad7747cf54a9f5bb81670b3acce774768fbb3bd7a972a0aec2a"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/build-logs/workers.log",
+   "sha256": "0df2178c89bf7b25dcd695695565ad3e71dd36f428481d730bf949de0a21dd98"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/controls/memory.json",
+   "sha256": "485a3b05c00fe8f0c4db18f8cd6572fb14c35ebb7609116809a72d1c5d3f195f"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/controls/timing.json",
+   "sha256": "9fd888d329a0f7891ef1ee97dde1d3456167a3f36a6369753790ba21fe4eb7f2"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/guest.sh",
+   "sha256": "e1d3fcbb2cda5b2d5bae00acd9f868025e9259721ea98839deed3a38aa7c89ea"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/host.sh",
+   "sha256": "e189279b4127d0345d3dee0f56ff740956de389103a02656263eb67e9ed85a76"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/playback_control.rs",
+   "sha256": "8b4f3c3e2ba03a9380c9c9432411ac612b8e6cda7d9ad6686d1af7500cb7a3dd"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/boot.txt",
+   "sha256": "c3a55a1e702dd8d0836e4369e9e661e48f08775a8f98afbd443db4a965b7a343"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/gate-result.json",
+   "sha256": "a1b60dfea47046679dbdb4061e08a20f6af5ed0a7dc4173511204b1e12c725cb"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/memory-exit.txt",
+   "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/memory-identity.json",
+   "sha256": "4a40a729b94b04c8cb9934d7552e2cffcca617422462c93dee5c1559d8072252"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/platform.txt",
+   "sha256": "d59dd32d3c0f10fa871108539b327b52374fa45911988fd0efe09916a6434bb3"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/rustc.txt",
+   "sha256": "ba203e33fe4a5b8e05147bb6e57fb1ddace26d9f799f357420b666887dd7e2f1"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/source.txt",
+   "sha256": "9382574dbac20b668abc35a7e37bd07924dfca09417e8d86b4301e0384b8b850"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/timing-exit.txt",
+   "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+   "path": "progressive-rebased-gate-build/collection/source-context/timing-identity.json",
+   "sha256": "2e3ec62541e220e357ffad13221f9ed163dfb1d3ecf191a377188240755b71f6"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/ARCHIVED-COMPARISON.json",
+   "sha256": "50c844c8ffc9a066ab571fe1df65c108834d70d9a6593b259e48152674dd4b06"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/ARCHIVED-DIGEST.json",
+   "sha256": "5ba8378dcdaba5a3462ddcb60f66a167d967ef9eeaf11a32eae3416811f5bcdd"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/ARCHIVED-PRIOR.json",
+   "sha256": "2bdc890544f6e2183242b27e1b3720396cf7f9f12003c8055319e4137bddacf9"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/GUEST-PREFLIGHT.log",
+   "sha256": "192d4ce9fbfdd5be17f46ef9f01baa3c5e59b0c2b4e33d850dfe02422dc91a8a"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/HOST.log",
+   "sha256": "1fc7cd4b2dc09bf7f3dbde6a75fa47c9bcf2a72a3c40744d09c00d205bf55ed5"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/NATIVE-EXIT.txt",
+   "sha256": "39b8dc3fc8b44765c8e6f1adee04c5b465e555ab791cc42d0d9e810d5b64297c"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/NATIVE-MEMBERS.txt",
+   "sha256": "57bd7a9a56e75ffa9518212d0c60f92c2cee5bac0d75ca66b7b41282dde3446d"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/NATIVE-RESULTS.sha256",
+   "sha256": "3d9451e33f0aaf03c5e668530512c422e6087778adaf21809050a47cd6581281"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/NATIVE-RESULTS.tar.gz",
+   "sha256": "c9d99c67bcd83fab66fdc87b5269bba8c66e5d32d20744806aec1b0e3bcd4440"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/NATIVE.log",
+   "sha256": "46538851ac313a0c53863acf8bfd0a915f63b651a1e1737028c34ad52c9ddbb2"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/REMOTE-GC.json",
+   "sha256": "dc09e657cf182e7e6037dfc6cb43ff30484ac4a476c04fd606507b4b07689d27"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/RSS-REVIEW.json",
+   "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/RUNNER-ADDRESS",
+   "sha256": "08429acc5676dc99c27c12da62364f9edced8e746045e49d219e74513b5521ba"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/SOURCE.bundle",
+   "sha256": "e4f522398bd6be836e42dc63a9eff0522930a0e8221c035710c9cbe8226dfb19"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/SSH-WAIT.log",
+   "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/START-INSTANCE.json",
+   "sha256": "f72a9e3a724183d93017f1cbcea71f0d4b8321d9d534912be0741931e4f36660"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/STOP-INSTANCE.json",
+   "sha256": "323daa66c70209032719102e3db2718e12c1b6d653d1cf1ece33dd6e1690642e"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/build-logs/library-tests.log",
+   "sha256": "2a009b36153271306b60bb8152a88b7d47df2ca079f2acceba12df70023993fe"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/guest.sh",
+   "sha256": "e1d3fcbb2cda5b2d5bae00acd9f868025e9259721ea98839deed3a38aa7c89ea"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/host.sh",
+   "sha256": "e2cfa09b89c883495709915b5d4b4b757e4c1c8c9c787fedbd433e52a911161c"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/playback_control.rs",
+   "sha256": "8b4f3c3e2ba03a9380c9c9432411ac612b8e6cda7d9ad6686d1af7500cb7a3dd"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/source-context/rustc.txt",
+   "sha256": "ba203e33fe4a5b8e05147bb6e57fb1ddace26d9f799f357420b666887dd7e2f1"
+  },
+  {
+   "path": "progressive-rebased-gate-build/history/compile-failure/source-context/source.txt",
+   "sha256": "c22aca89d83b2e642b512d923e0462f31454fb54c19cb6262e9b907279e299a2"
+  }
+ ]
+}

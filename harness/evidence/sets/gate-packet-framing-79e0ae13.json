@@ -1,0 +1,56 @@
+{
+ "name": "gate-packet-framing-79e0ae13",
+ "path": "gate-packet-framing-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: packet framing's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-packet-framing-79e0ae13/5bfaaaf0dc18f27473bff810c9eb5d895bd787bda9a4df5942c27f2370844e76.tar.zst",
+ "sha256": "5bfaaaf0dc18f27473bff810c9eb5d895bd787bda9a4df5942c27f2370844e76",
+ "bytes": 5707345,
+ "results": [
+  {
+   "path": "gate-packet-framing-79e0ae13/aarch64/shard-6/benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "77e45bf417fc6e223f3a70c4258b46322ee866ffd35802943711a3a452dfcf4a",
+   "status": 0,
+   "report_sha256": "f5ed77608b25091255333b0918f8a07bafe8aac247c4eadbbf980dd7a1b850c0"
+  },
+  {
+   "path": "gate-packet-framing-79e0ae13/aarch64/shard-6/graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "8303d02da355562cc34776f70d1a91eb0af9b0387bb6aed4dfa9aaca4326b275",
+   "status": 0,
+   "report_sha256": "22c09ded58b2d37cbe59b01bdd91812484539e856c7597edc21e9455ba665041"
+  },
+  {
+   "path": "gate-packet-framing-79e0ae13/aarch64/shard-6/memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "a09a7a5a5150119cc4fd02beb802cf5f8d064ec40a30a27b6aa06e496a7cb10d",
+   "status": 0,
+   "report_sha256": "e54affbbbb7f6afa3cd8eaee93b36d409812ea5cdf8753ceb0a3da4b9dc10083"
+  },
+  {
+   "path": "gate-packet-framing-79e0ae13/armv7/shard-6/benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9b7053e5872db7ee3c011c268d2837edb5e79b96d67cd114dad1a72a845304ea",
+   "status": 0,
+   "report_sha256": "3e1057a9a19912a99175d9c45c36698fd05a0dcd9071c99c04f41c23ddd7975f"
+  },
+  {
+   "path": "gate-packet-framing-79e0ae13/armv7/shard-6/graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "9954412e90070028608d821f1b754873279c9da70277bc51e7886c0835fbf58c",
+   "status": 0,
+   "report_sha256": "30e925980e96e8a3423a7409ea2893277ed554a2e2985950df747a4d6ffc7a70"
+  },
+  {
+   "path": "gate-packet-framing-79e0ae13/armv7/shard-6/memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "3feef13545003665893c2b256ae40045281ce46b111c5bf8ae0868545e287e12",
+   "status": 0,
+   "report_sha256": "c8e24e1aeda15314c6029ad783db115c7283eec6056f2d33fe3a526a42f97f61"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

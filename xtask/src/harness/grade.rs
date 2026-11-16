@@ -4,12 +4,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
+use super::reuse;
 use super::timing::{self, GATE_PAIRS};
 use super::validation::{
     self, array, external_contract, field, hash, members, put, require_same, selected_operation,
@@ -21,7 +21,8 @@ use crate::sha256;
 
 pub const USAGE: &str =
     "usage: cargo xtask grade TIMING MEMORY --contract PATH --manifest PATH --output DIR
-    [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]";
+    [--additional-report EXTERNAL-GRADED-REPORT] [--require-slice-acceptance|--require-acceptance]
+    [--full]";
 
 type R<T> = Result<T, String>;
 
@@ -33,6 +34,8 @@ struct Options {
     output: PathBuf,
     additional: Vec<PathBuf>,
     requirement: Option<&'static str>,
+    /// Grade the reports even when a cited set holds this grade.
+    full: bool,
 }
 
 impl Options {
@@ -43,9 +46,11 @@ impl Options {
         let (mut contract, mut manifest, mut output) = (None, None, None);
         let mut additional = Vec::new();
         let mut requirement = None;
+        let mut full = false;
         let mut rest = rest.iter();
         while let Some(flag) = rest.next() {
             match flag.as_str() {
+                "--full" => full = true,
                 "--require-slice-acceptance" | "--require-acceptance" => {
                     let key = if flag == "--require-acceptance" {
                         "accepted"
@@ -86,6 +91,7 @@ impl Options {
             output: output.ok_or("--output is required")?,
             additional,
             requirement,
+            full,
         })
     }
 }
@@ -117,11 +123,35 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
     ))
 }
 
+/// The fields of a case row that its timing and memory collections must agree on:
+/// Compare parity outputs and status, plus the presence of a valid duration.
+/// Its numeric value may differ because each collection runs its own probe.
+fn joined_fields(row: &Value) -> R<Value> {
+    let mut fields = without(row, &["timing", "memory"])?;
+    if let Some(parity) = row.get("parity")
+        && let Some(run) = parity.get("reference_run")
+    {
+        let elapsed = run.get("elapsed_ns").ok_or("missing elapsed_ns")?;
+        let has_duration = *elapsed != Value::Null;
+        if has_duration {
+            u64::try_from(integer(run, "elapsed_ns")?)
+                .map_err(|_| "reference process duration must fit u64")?;
+        }
+        let mut parity = parity.clone();
+        let mut run = run.clone();
+        put(&mut run, "elapsed_ns", Value::Bool(has_duration))?;
+        put(&mut parity, "reference_run", run)?;
+        put(&mut fields, "parity", parity)?;
+    }
+    Ok(fields)
+}
+
 fn document(path: &Path) -> R<(Value, String)> {
     let bytes = fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
-    let value =
-        json::parse(std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+    let value = json::parse_observations(
+        std::str::from_utf8(&bytes).map_err(|e| format!("{}: {e}", path.display()))?,
+    )
+    .map_err(|e| format!("{}: {e}", path.display()))?;
     members(&value).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok((value, sha256::hex(&bytes)))
 }
@@ -311,15 +341,11 @@ impl Binding<'_> {
             "input_path",
             "origin",
             "redistribution_qualified",
-            "cpus",
         ] {
             same_field(timed, memory, key)?;
         }
-        same_field(
-            timed.get("environment").unwrap_or(&Value::Null),
-            memory.get("environment").unwrap_or(&Value::Null),
-            "cpus",
-        )?;
+        // Each report keeps its own CPU record: timing runs alone on one CPU,
+        // memory side by side on several, which changes no observation.
         identities(field(timed, "identity")?, field(memory, "identity")?)?;
         Ok(kind)
     }
@@ -500,7 +526,10 @@ fn samples(measurement: &Value, minimum: i128, failed_memory: bool) -> R<&[Value
     } else {
         integer(measurement, "pairs")?
     };
-    if pairs < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
+    // A collection that stopped early by rule set out to run its planned pairs;
+    // the evaluator replays the rule.
+    let planned = timing::planned_pairs(measurement).unwrap_or(pairs);
+    if planned < minimum.max(GATE_PAIRS as i128) || pairs != raw.len() as i128 {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
@@ -546,8 +575,8 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &joined_fields(timed)?,
+        &joined_fields(measured)?,
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
@@ -558,6 +587,8 @@ fn open_case(timed: &Value, measured: &Value) -> R<Value> {
     Ok(row)
 }
 
+/// `ceiling` is the policy's runtime ceiling, which a timing record that may
+/// stop early must name.
 fn join_case(
     timed: &Value,
     measured: &Value,
@@ -565,10 +596,11 @@ fn join_case(
     contract: &Value,
     identity: &Value,
     target: &str,
+    ceiling: f64,
 ) -> R<Value> {
     require_same(
-        &without(timed, &["timing", "memory"])?,
-        &without(measured, &["timing", "memory"])?,
+        &joined_fields(timed)?,
+        &joined_fields(measured)?,
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
@@ -627,6 +659,7 @@ fn join_case(
             },
             require_linux: linux,
             module_absence: true,
+            ceiling: Some(ceiling),
         },
     )
     .map_err(|error| format!("timing: {error}"))?;
@@ -731,6 +764,7 @@ fn validate_additional(
     binding: &Binding<'_>,
     identity: &Value,
     target: &str,
+    ceiling: f64,
 ) -> R<()> {
     let mut seen = BTreeSet::new();
     for row in rows {
@@ -741,7 +775,15 @@ fn validate_additional(
         let wrapper = Value::object([("case", row.clone())]);
         let expected = binding.expected(&wrapper, Shape::External)?;
         membership(&expected, std::slice::from_ref(row))?;
-        join_case(row, row, &expected[0], binding.contract, identity, target)?;
+        join_case(
+            row,
+            row,
+            &expected[0],
+            binding.contract,
+            identity,
+            target,
+            ceiling,
+        )?;
     }
     Ok(())
 }
@@ -769,6 +811,42 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         return Ok(0);
     }
     let options = Options::parse(root, args)?;
+    super::report::create_output(&options.output)?;
+    // A grade binds the gate results recorded beside the reports it joins.
+    let collections = [&options.timing, &options.memory]
+        .map(|report| report.parent().unwrap_or(Path::new(".")).to_path_buf());
+    let key = if collections.iter().all(|d| reuse::read(d).is_ok()) {
+        let reports = [options.timing.as_path(), options.memory.as_path()];
+        let mut files = vec![options.contract.as_path(), options.manifest.as_path()];
+        files.extend(options.additional.iter().map(PathBuf::as_path));
+        let settings = Value::object([(
+            "requirement",
+            options.requirement.map_or(Value::Null, Value::str),
+        )]);
+        Some(
+            reuse::Key::new(root, "grade", settings, &files, &[])?
+                .untimed()
+                .with_inputs(&reports)?,
+        )
+    } else {
+        None
+    };
+    let join = || {
+        if collections.iter().any(|d| reuse::was_reused(d)) {
+            return Err(
+                "a reused collection has no report to grade: measure both with --full".into(),
+            );
+        }
+        grade(root, &options)
+    };
+    match key {
+        Some(key) => reuse::step(root, &options.output, &key, options.full, join),
+        None => join(),
+    }
+}
+
+/// Join and grade the two reports.
+fn grade(root: &Path, options: &Options) -> R<i32> {
     let (timed, timing_sha) = document(&options.timing)?;
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
@@ -804,6 +882,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let memory_rows = membership(&expected, rows(&memory, kind)?)?;
     aliases(&expected, &timed_rows)?;
     aliases(&expected, &memory_rows)?;
+    let ceiling = super::policy::Runtime::load(root)?.ceiling;
     let combine = |spec: &Value| -> R<Value> {
         let id = text(spec, "id")?;
         let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
@@ -811,8 +890,10 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         if open.iter().any(|listed| listed == id) {
             return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}"));
         }
-        join_case(&clock, &measured, spec, &contract, identity, target)
-            .map_err(|e| format!("{id}: {e}"))
+        join_case(
+            &clock, &measured, spec, &contract, identity, target, ceiling,
+        )
+        .map_err(|e| format!("{id}: {e}"))
     };
     let mut additional = match memory.get("additional_cases") {
         Some(Value::Array(rows)) => rows.clone(),
@@ -831,7 +912,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     if kind == Shape::External && !additional.is_empty() {
         return Err("an external-vector grade cannot contain additional cases".into());
     }
-    validate_additional(&additional, &binding, identity, target)?;
+    validate_additional(&additional, &binding, identity, target, ceiling)?;
     let derived;
     let selected_contract = if kind == Shape::External {
         derived = external_contract(&contract, text(&expected[0], "id")?)?;
@@ -896,25 +977,16 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     ] {
         put(&mut report, key, value)?;
     }
-    // Refuse replacement so an earlier failed grade and its inputs stay intact.
-    fs::create_dir_all(&options.output)
-        .map_err(|e| format!("{}: {e}", options.output.display()))?;
     let destination = options.output.join("report.json");
     match kind {
-        Shape::Corpus => super::report::write_case_report(
+        Shape::Corpus => super::report::write_observed_case_report(
             &options.output,
             &report,
             expected.iter().map(combine),
         )?,
         Shape::External => {
             put(&mut report, "case", combine(&expected[0])?)?;
-            let mut file = fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&destination)
-                .map_err(|e| format!("{}: {e}", destination.display()))?;
-            file.write_all(json::to_python(&report, Some(2)).as_bytes())
-                .map_err(|e| format!("{}: {e}", destination.display()))?;
+            super::report::publish_json(&destination, &json::to_python(&report, Some(2)))?;
         }
     }
     let mut code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
@@ -935,6 +1007,51 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 mod tests {
     use super::*;
     use crate::harness::comparison::reference_record;
+
+    #[test]
+    fn an_early_stopped_collection_counts_its_planned_pairs() {
+        let record = |pairs: i64, planned: Option<i64>| {
+            let mut fields = vec![
+                ("pairs", Value::int(pairs)),
+                (
+                    "samples",
+                    Value::Array((0..pairs).map(|_| Value::Object(vec![])).collect()),
+                ),
+            ];
+            if let Some(planned) = planned {
+                fields.push((
+                    "early_stop",
+                    Value::object([
+                        ("rule", Value::str(timing::EARLY_STOP_RULE)),
+                        ("planned_pairs", Value::int(planned)),
+                    ]),
+                ));
+            }
+            Value::object(fields)
+        };
+        assert_eq!(samples(&record(20, Some(30)), 30, false).unwrap().len(), 20);
+        assert!(samples(&record(20, Some(20)), 30, false).is_err());
+        assert!(samples(&record(20, None), 30, false).is_err());
+        assert!(samples(&record(30, None), 30, false).is_ok());
+    }
+
+    #[test]
+    fn grading_cannot_reuse_a_collection_directory() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let args = [
+            "unused-timing.json",
+            "unused-memory.json",
+            "--contract",
+            "unused-contract.json",
+            "--manifest",
+            "unused-manifest.json",
+            "--output",
+            "harness/features/progressive-ts188",
+        ]
+        .map(str::to_owned);
+        let error = main(root, &args).unwrap_err();
+        assert!(error.contains("use a new output directory"));
+    }
 
     #[test]
     fn ordinary_contracts_do_not_require_functional_control_reports() {
@@ -1232,6 +1349,7 @@ mod tests {
                 &self.contract,
                 &self.identity,
                 "unqualified-test",
+                1.2,
             )
         }
 
@@ -1344,13 +1462,15 @@ mod tests {
             ("matroska-segment-metadata", 48),
             ("matroska-startup-seek", 44),
             ("hls-segments", 71),
-            ("packet-framing", 125),
+            ("packet-framing", 135),
             ("isobmff-open-index", 1020),
+            ("isobmff-seek", 476),
             ("font-outlines", 53),
             ("font-hinting-none", 159),
-            ("font-hinting-default", 53),
+            ("font-hinting-default", 159),
             ("font-hinting-modes", 954),
             ("matroska-audio-clocks", 10),
+            ("matroska-legacy-aac", 4),
             ("mp4-forward", 46),
             ("ts-program", 35),
             ("raw-annex-b", 7),
@@ -1359,7 +1479,7 @@ mod tests {
             ("subtitle-dvb", 241),
             ("subtitle-dvd", 228),
             ("subtitle-dvd-host", 5),
-            ("subtitle-cc", 205),
+            ("subtitle-cc", 461),
             ("subtitle-teletext", 72),
             ("subtitle-pgs-capsules", 229),
             ("subtitle-text", 367),
@@ -1429,7 +1549,10 @@ mod tests {
             };
             assert!(changed_binding.registered(root).is_err(), "{feature}");
             if feature.starts_with("matroska-")
-                && !matches!(feature, "matroska-startup-seek" | "matroska-audio-clocks")
+                && !matches!(
+                    feature,
+                    "matroska-startup-seek" | "matroska-audio-clocks" | "matroska-legacy-aac"
+                )
             {
                 matroska += count;
             }
@@ -1873,6 +1996,95 @@ mod tests {
     }
 
     #[test]
+    fn independent_framing_probes_may_take_different_time() {
+        let row = |status: &str, elapsed, digest| {
+            object(&[(
+                "parity",
+                object(&[
+                    ("reference", object(&[("digest", Value::int(digest))])),
+                    (
+                        "reference_run",
+                        object(&[("elapsed_ns", elapsed), ("status", Value::str(status))]),
+                    ),
+                ]),
+            )])
+        };
+        let timed = joined_fields(&row("ok", Value::int(100), 1)).unwrap();
+        let other = joined_fields(&row("ok", Value::int(200), 1)).unwrap();
+        assert!(require_same(&timed, &other, "case fields/parity").is_ok());
+        for different in [
+            row("timeout", Value::int(200), 1),
+            row("ok", Value::int(200), 2),
+            row("ok", Value::Null, 1),
+        ] {
+            let different = joined_fields(&different).unwrap();
+            assert!(require_same(&timed, &different, "case fields/parity").is_err());
+        }
+        assert!(joined_fields(&row("ok", Value::int(-1), 1)).is_err());
+    }
+
+    #[test]
+    fn collections_join_across_reference_run_times_but_no_other_parity_difference() {
+        let run = |status: &str, elapsed: i64| {
+            object(&[
+                ("status", Value::str(status)),
+                ("elapsed_ns", Value::int(elapsed)),
+            ])
+        };
+        let fixture = || {
+            let mut fixture = Fixture::new();
+            change(
+                &mut fixture.timed,
+                &["parity"],
+                "reference_run",
+                run("ok", 2_301_137),
+            );
+            change(
+                &mut fixture.measured,
+                &["parity"],
+                "reference_run",
+                run("ok", 2_332_973),
+            );
+            fixture
+        };
+        // Each collection's parity run records its own elapsed time.
+        fixture().join().unwrap();
+        let mut status = fixture();
+        change(
+            &mut status.measured,
+            &["parity"],
+            "reference_run",
+            run("timeout", 2_332_973),
+        );
+        let mut run_field = fixture();
+        change(
+            &mut run_field.measured,
+            &["parity", "reference_run"],
+            "signal",
+            Value::int(9),
+        );
+        let mut output = fixture();
+        change(
+            &mut output.measured,
+            &["parity"],
+            "reference",
+            object(&[("digest", Value::int(8))]),
+        );
+        let mut verdict = fixture();
+        change(
+            &mut verdict.measured,
+            &["parity"],
+            "status",
+            Value::str("fail"),
+        );
+        for differing in [status, run_field, output, verdict] {
+            assert!(differing.join().unwrap_err().contains("case fields/parity"));
+            let open = open_case(&differing.timed, &differing.measured);
+            assert!(open.unwrap_err().contains("case fields/parity"));
+        }
+    }
+
+    #[test]
     fn parity_operation_and_worker_selection_must_match_before_joining() {
         for (path, key, value) in [
             (vec!["operation"], "name", Value::str("other operation")),
@@ -2223,7 +2435,7 @@ mod tests {
         let result = super::super::memory::evaluate(
             root,
             array(&memory, "samples").unwrap(),
-            30,
+            timing::Pairs::fixed(30),
             280,
             field(&memory, "certificate").unwrap(),
             None,
@@ -2270,6 +2482,20 @@ mod tests {
             ("cases", Value::Array(vec![fixture.timed])),
         ]);
         assert!(binding.headers(&header, &header).is_ok());
+        let coverage = |observation| Value::Array(vec![object(&[("observation", observation)])]);
+        let mut timed = header.clone();
+        let mut memory = header.clone();
+        put(
+            &mut timed,
+            "fate_coverage",
+            coverage(json::parse_observations("1.0e-9223372036854775808").unwrap()),
+        )
+        .unwrap();
+        put(&mut memory, "fate_coverage", coverage(Value::float(1.0))).unwrap();
+        assert!(matches!(
+            binding.headers(&timed, &memory),
+            Err(error) if error == "fate_coverage mismatch"
+        ));
         for (key, value) in [
             ("collection_status", Value::str("partial")),
             ("contract_sha256", Value::str(digest('c'))),
@@ -2346,9 +2572,11 @@ mod tests {
                     Some(key) => put(&mut changed, key, record).unwrap(),
                     None => changed = record,
                 }
-                assert!(binding.headers(base, &changed).is_err());
                 if missing {
+                    assert!(binding.headers(base, &changed).is_err());
                     assert!(binding.headers(&changed, &changed).is_err());
+                } else {
+                    assert!(binding.headers(base, &changed).is_ok());
                 }
             }
         }

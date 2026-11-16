@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-dvb-79e0ae13",
+ "path": "gate-subtitle-dvb-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-dvb's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-subtitle-dvb-79e0ae13/31e96b79d2fece24e0c0c9c8d0c1237e972927393be9075a34896a086b7585c9.tar.zst",
+ "sha256": "31e96b79d2fece24e0c0c9c8d0c1237e972927393be9075a34896a086b7585c9",
+ "bytes": 9223595,
+ "results": [
+  {
+   "path": "gate-subtitle-dvb-79e0ae13/aarch64/shard-7/benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "3df35d66bb057d8d2ea978987a69b06d818637b8ba194df0c184dea1c290d7bb",
+   "status": 0,
+   "report_sha256": "1af80e93492545e0b172e4e8074b4d603e05562c20ce9159026b425740e79c33"
+  },
+  {
+   "path": "gate-subtitle-dvb-79e0ae13/aarch64/shard-7/graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "6eb1b78145e87a1eb905f9cd1c5cee50baf1db83ea13e35ec83d505ae110c153",
+   "status": 0,
+   "report_sha256": "d4080021baaca7be34a0ab417634eabdee5a47b9c10c26ef269df8790bafa66f"
+  },
+  {
+   "path": "gate-subtitle-dvb-79e0ae13/aarch64/shard-7/memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "c3908bb794cd3cfa0fbc7553f64087994225dfb7177bcee2e2c8c172b87d1b91",
+   "status": 0,
+   "report_sha256": "a5ba6cff55823b20a2239429c50d6effd7e720ed3f335b54966c05c773998e92"
+  },
+  {
+   "path": "gate-subtitle-dvb-79e0ae13/armv7/shard-7/benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "16cf95f33d85b8bcc6f4bc0dfcbbb3f8855ae238b187a252ec1c33448cf4d81c",
+   "status": 0,
+   "report_sha256": "f1401d3349f0848fa8622750d6e055b52445fd356c0e09f9a95a569460ad0a57"
+  },
+  {
+   "path": "gate-subtitle-dvb-79e0ae13/armv7/shard-7/graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "9fd166c73ff0568cbbdc7f42214a576b192b6ed796e3e03d9b843881e6162987",
+   "status": 0,
+   "report_sha256": "3082d807ecde9fb6f144864f561e1135e6599a08b05231675e5a2da75d8d02c4"
+  },
+  {
+   "path": "gate-subtitle-dvb-79e0ae13/armv7/shard-7/memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "7f27a01125fa665ad54ab6fd30299869d7cd95c415680cc586f762a3614800b2",
+   "status": 0,
+   "report_sha256": "4f6647c7a513ec18d77bb3aed237c100db5e3596052cdd129ce14b1155e0ae49"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-62e1ad85-armv7",
+ "retention": "retained",
+ "reason": "ARMv7 packet-framing parity, timing and kernel-bound memory on the matched adapters",
+ "key": "evidence/packet-framing-62e1ad85-armv7/b7d37c676319d2cd294639a8f2f51efb5dce9fde9dc948965850952c501bac3b.tar.zst",
+ "sha256": "b7d37c676319d2cd294639a8f2f51efb5dce9fde9dc948965850952c501bac3b",
+ "bytes": 15214033,
+ "source_revisions": {
+  "candidate": "62e1ad85011c85141ad58edfec275303a2d63b83"
+ }
+}

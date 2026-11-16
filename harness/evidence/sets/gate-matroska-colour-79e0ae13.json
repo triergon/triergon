@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-colour-79e0ae13",
+ "path": "gate-matroska-colour-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-colour's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-colour-79e0ae13/227c28e62aa64891b437cdd66997b79fe1c6a850960e36fedf3926b49e129742.tar.zst",
+ "sha256": "227c28e62aa64891b437cdd66997b79fe1c6a850960e36fedf3926b49e129742",
+ "bytes": 3211659,
+ "results": [
+  {
+   "path": "gate-matroska-colour-79e0ae13/aarch64/shard-1/benchmark/matroska-colour/gate-result.json",
+   "command": "report --benchmark",
+   "key": "105e679321aff555f41fb0024cd96401839e3102d5e76817d3d0ce9b65bfebca",
+   "status": 0,
+   "report_sha256": "6741a0f4d75faed5fac6f7a4b76e846997b2c0a8dca9f03e4b39389a8395bc74"
+  },
+  {
+   "path": "gate-matroska-colour-79e0ae13/aarch64/shard-1/graded/matroska-colour/gate-result.json",
+   "command": "grade",
+   "key": "ddff27f82bb45ef61942201114aee7df598034855069a196e804a3fdc5133170",
+   "status": 0,
+   "report_sha256": "7a49a51b85462c7cf8d65b84b1e9fd628cb95ca67f7a14289fa1cb04743485ee"
+  },
+  {
+   "path": "gate-matroska-colour-79e0ae13/aarch64/shard-1/memory/matroska-colour/gate-result.json",
+   "command": "report --memory",
+   "key": "5969451c8ca90d453260134b7ab2ce591d45594a01cee37ef7ed813d96c00326",
+   "status": 0,
+   "report_sha256": "d0e1f748d1bd0e2da140ddc2eb4db21e4a586da59e5451777755c5faf534f315"
+  },
+  {
+   "path": "gate-matroska-colour-79e0ae13/armv7/shard-1/benchmark/matroska-colour/gate-result.json",
+   "command": "report --benchmark",
+   "key": "82e6847feaa371b596edc8d62551afb106cdfbf0f395204d1068eff3a0b411c8",
+   "status": 0,
+   "report_sha256": "e52f282d4f8bce767d227e184ee2d827b42da4eb54518d01a3e27b5bb8ab43e2"
+  },
+  {
+   "path": "gate-matroska-colour-79e0ae13/armv7/shard-1/graded/matroska-colour/gate-result.json",
+   "command": "grade",
+   "key": "6dcba068c235917f433a7563742e2bc1a1b6f71f28ca1573b99eb7099c79d404",
+   "status": 0,
+   "report_sha256": "66bf49d26d286ff515b2737f6a7a5939ff8bfceddeebfdc883751f0c5ae27433"
+  },
+  {
+   "path": "gate-matroska-colour-79e0ae13/armv7/shard-1/memory/matroska-colour/gate-result.json",
+   "command": "report --memory",
+   "key": "0fab40718fa68ebf39cb068b0f0afe07fc30a2fcdd4f1d0f148feb8eddc5fff6",
+   "status": 0,
+   "report_sha256": "4cfada2c4b3890e306b16ebc99c752785a1accfb31967cd634e36593e4ca30b6"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

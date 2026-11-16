@@ -2,7 +2,9 @@
 //!
 //! Every label gets its own ordered trace comparison. Only successful operations
 //! are measured; explicit aliases share measurements after their traces match.
-//! The 52-operation selection changes measurement membership only.
+//! The 52-operation selection changes measurement membership only. The seek
+//! suite ([`crate::isobmff_seek`]) runs its cases through the same comparison and
+//! measurement.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
@@ -14,21 +16,27 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::checks::read_json;
 use crate::codecs::correctness::file_sha;
 use crate::harness::diff::equal;
+use crate::harness::policy::Runtime;
 use crate::harness::timing::{self, Operation};
 use crate::harness::worker::{self, Finished};
-use crate::harness::{acceptance, build, comparison, gate_build, memory, provenance, report};
+use crate::harness::{
+    acceptance, build, comparison, gate_build, memory, provenance, report, reuse,
+};
 use crate::json::{self, Value};
 use crate::sha256;
 
 type R<T> = Result<T, String>;
 
 pub const USAGE: &str = "usage: cargo xtask isobmff-bench [--benchmark] [--memory]
-    [--subset52] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
-    [--require-acceptance]
+    [--subset52] [--part I/N] [--output DIR] [--pairs N] [--memory-pairs N] [--seed N]
+    [--require-acceptance] [--full] [--no-early-stop]
 
 Always compare all 1020 traces: 972 output labels and 48 explicit refusals.
 The full measurement set has 956 physical operations and 16 explicit aliases.
 --subset52 measures the separate 52-operation manifest, retaining full parity.
+--part I/N measures every Nth physical operation of the set, from the Ith, with the
+aliases of those operations, retaining full parity; the N parts together measure
+the whole set once.
 Workers must belong to the current recorded gate build. Acceptance also requires
 the complete runtime and memory sets on native AArch64 Linux. For combined
 qualification, keep the RSS kernel module unloaded and
@@ -41,36 +49,37 @@ const FIXTURES: &str = "harness/fixtures/isobmff-open-index";
 const CONTRACT_SHA: &str = "0419a8ea026d84e1aa98d4896faa79ec2c3f2261bd356a6b04a65e22b8d9b760";
 const CORPUS_SHA: &str = "03761df0849a8d60a3cc2222e35dd8fe02308c0fe774b3e442b6850d99704e58";
 const SUBSET_SHA: &str = "d5efa68f708ffe403018a8c34aaeb10aa693cb4e5abcf9a0b571339c69d40b61";
-const WORK_CONTRACT: &str = "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
-const ITERATIONS: u32 = 50;
+pub(crate) const WORK_CONTRACT: &str =
+    "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a";
+pub(crate) const ITERATIONS: u32 = 50;
 const PARITY_CHECKS: usize = 1020;
 const TIMABLE_OUTPUTS: usize = 972;
 const PHYSICAL_OPERATIONS: usize = 956;
 const EXPLICIT_REFUSALS: usize = 48;
 const REFERENCE_REFUSAL: i128 = -1_094_995_529;
 
-fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
+pub(crate) fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
     value
         .get(key)
         .and_then(Value::as_str)
         .ok_or_else(|| format!("missing string {key}"))
 }
 
-fn integer(value: &Value) -> Option<i128> {
+pub(crate) fn integer(value: &Value) -> Option<i128> {
     match value {
         Value::Number(number) => number.as_i128(),
         _ => None,
     }
 }
 
-fn number(value: &Value, key: &str) -> R<i128> {
+pub(crate) fn number(value: &Value, key: &str) -> R<i128> {
     value
         .get(key)
         .and_then(integer)
         .ok_or_else(|| format!("missing integer {key}"))
 }
 
-fn strings(value: &Value, key: &str) -> R<Vec<String>> {
+pub(crate) fn strings(value: &Value, key: &str) -> R<Vec<String>> {
     value
         .get(key)
         .and_then(Value::as_array)
@@ -84,7 +93,7 @@ fn strings(value: &Value, key: &str) -> R<Vec<String>> {
         .collect()
 }
 
-fn field(value: &mut Value, key: &str, data: Value) {
+pub(crate) fn field(value: &mut Value, key: &str, data: Value) {
     if let Value::Object(fields) = value {
         if let Some((_, slot)) = fields.iter_mut().find(|(k, _)| k == key) {
             *slot = data;
@@ -121,20 +130,25 @@ fn document(root: &Path, name: &str, expected: &str) -> R<Value> {
 }
 
 #[derive(Clone)]
-struct Case {
-    index: usize,
-    label: String,
-    schedule: String,
-    mode: String,
-    input: String,
-    input_sha: String,
-    input_bytes: usize,
-    refusal: bool,
-    arguments: Vec<String>,
-    candidate_options: Vec<String>,
-    alias: Option<usize>,
-    time_outputs: Value,
-    memory_outputs: Value,
+pub(crate) struct Case {
+    pub(crate) index: usize,
+    pub(crate) label: String,
+    pub(crate) schedule: String,
+    pub(crate) mode: String,
+    /// The suite's operation name and comparison view, as its records give them.
+    pub(crate) operation_name: &'static str,
+    pub(crate) view: &'static str,
+    /// The input's directory, from the repository root, and its file name there.
+    pub(crate) directory: &'static str,
+    pub(crate) input: String,
+    pub(crate) input_sha: String,
+    pub(crate) input_bytes: usize,
+    pub(crate) refusal: bool,
+    pub(crate) arguments: Vec<String>,
+    pub(crate) candidate_options: Vec<String>,
+    pub(crate) alias: Option<usize>,
+    pub(crate) time_outputs: Value,
+    pub(crate) memory_outputs: Value,
 }
 
 fn compatibility_options(label: &str) -> Vec<String> {
@@ -180,6 +194,9 @@ impl Case {
             label: text(value, "case")?.into(),
             schedule: text(value, "schedule")?.into(),
             mode: text(value, "mode")?.into(),
+            operation_name: "isobmff-open-index",
+            view: "ordered-trace-and-packet-fold",
+            directory: FIXTURES,
             input: text(input, "path")?.into(),
             input_sha: text(input, "sha256")?.into(),
             input_bytes: usize::try_from(number(input, "bytes")?).map_err(|e| e.to_string())?,
@@ -277,19 +294,23 @@ impl Case {
             prefix: format!("{}-", self.mode),
             arguments: self.arguments.iter().map(OsString::from).collect(),
             candidate_options: self.candidate_options.iter().map(OsString::from).collect(),
-            work: timing::Work::default(),
+            // A range plan's roles each fold their own digest (harness/features/isobmff-seek).
+            work: timing::Work {
+                fields: Vec::new(),
+                own: comparison::own_fields(Some(&self.time_outputs), &[]),
+            },
             timeout: worker::DEFAULT_TIMEOUT,
         }
     }
 
-    fn id(&self) -> String {
+    pub(crate) fn id(&self) -> String {
         format!("{}-{}-{}", self.label, self.mode, self.schedule)
     }
 
-    fn operation_record(&self) -> Value {
+    pub(crate) fn operation_record(&self) -> Value {
         Value::object([
-            ("name", Value::str("isobmff-open-index")),
-            ("view", Value::str("ordered-trace-and-packet-fold")),
+            ("name", Value::str(self.operation_name)),
+            ("view", Value::str(self.view)),
             ("prefix", Value::str(format!("{}-", self.mode))),
             ("arguments", Value::strings(self.arguments.clone())),
             (
@@ -299,11 +320,11 @@ impl Case {
         ])
     }
 
-    fn path(&self, root: &Path) -> PathBuf {
-        root.join(FIXTURES).join(&self.input)
+    pub(crate) fn path(&self, root: &Path) -> PathBuf {
+        root.join(self.directory).join(&self.input)
     }
 
-    fn work(&self, candidate: bool, timed: bool) -> Value {
+    pub(crate) fn work(&self, candidate: bool, timed: bool) -> Value {
         let outputs = if timed {
             &self.time_outputs
         } else {
@@ -515,6 +536,22 @@ impl Suite {
                 .collect()
         }
     }
+
+    /// Part `index` of `count` of `selection`: every `count`th physical operation from
+    /// the `index`th, with the aliases that take its samples.
+    fn part(&self, selection: &[usize], (index, count): (usize, usize)) -> Vec<usize> {
+        let physical: Vec<usize> = selection
+            .iter()
+            .copied()
+            .filter(|&i| self.cases[i].alias.is_none())
+            .collect();
+        let kept: Vec<usize> = physical.into_iter().skip(index).step_by(count).collect();
+        selection
+            .iter()
+            .copied()
+            .filter(|&i| kept.contains(&self.cases[i].alias.unwrap_or(i)))
+            .collect()
+    }
 }
 
 /// ISO BMFF harness inputs to include in the shared build's source bindings.
@@ -545,7 +582,32 @@ pub fn source_inputs(root: &Path) -> R<Vec<String>> {
     Ok(files)
 }
 
-fn verify_input(root: &Path, case: &Case) -> R<()> {
+/// Every suite input matches its pin; for `cargo xtask preflight`.
+pub fn verify_inputs(root: &Path) -> R<String> {
+    let suite = Suite::load(root)?;
+    let mut inputs: Vec<&Case> = suite.cases.iter().collect();
+    inputs.dedup_by(|a, b| a.input == b.input);
+    for case in &inputs {
+        verify_input(root, case)?;
+    }
+    Ok(format!("{} cases", suite.cases.len()))
+}
+
+/// The suite's inputs as `verify_inputs` checks them: each path with its pinned
+/// SHA-256, once.
+pub fn inputs(root: &Path) -> R<Vec<(PathBuf, String)>> {
+    let suite = Suite::load(root)?;
+    let mut inputs: Vec<(PathBuf, String)> = suite
+        .cases
+        .iter()
+        .map(|case| (case.path(root), case.input_sha.clone()))
+        .collect();
+    inputs.sort();
+    inputs.dedup();
+    Ok(inputs)
+}
+
+pub(crate) fn verify_input(root: &Path, case: &Case) -> R<()> {
     let (_, actual) = provenance::file_identity(root, &case.path(root))?;
     let length = fs::metadata(case.path(root))
         .map_err(|e| e.to_string())?
@@ -566,7 +628,7 @@ fn write_new(path: &Path, bytes: &[u8]) -> R<()> {
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn write_json(path: &Path, value: &Value) -> R<String> {
+pub(crate) fn write_json(path: &Path, value: &Value) -> R<String> {
     let data = format!("{}\n", json::canonical(value));
     write_new(path, data.as_bytes())?;
     Ok(sha256::hex(data.as_bytes()))
@@ -590,7 +652,7 @@ fn refusal_matches(candidate: &Finished, reference: &Finished) -> bool {
         .any(|prefix| candidate.stderr.starts_with(prefix))
 }
 
-fn output_matches(case: &Case, candidate: &Finished, reference: &Finished) -> bool {
+pub(crate) fn output_matches(case: &Case, candidate: &Finished, reference: &Finished) -> bool {
     if candidate.code != 0
         || reference.code != 0
         || candidate.stdout.is_empty()
@@ -617,6 +679,19 @@ fn trace(
     reference: &Path,
     case: &Case,
     directory: &Path,
+) -> R<Value> {
+    trace_with(root, candidate, reference, case, directory, output_matches)
+}
+
+/// Runs both roles' traces of `case` and compares a successful pair with
+/// `matches`; a refusal pair must be the contract's matching refusal.
+pub(crate) fn trace_with(
+    root: &Path,
+    candidate: &Path,
+    reference: &Path,
+    case: &Case,
+    directory: &Path,
+    matches: fn(&Case, &Finished, &Finished) -> bool,
 ) -> R<Value> {
     let operation = case.operation();
     let input = case.path(root);
@@ -663,7 +738,7 @@ fn trace(
     }
     let matched = match (&results[0], &results[1]) {
         (Ok(Some(a)), Ok(Some(b))) if case.refusal => refusal_matches(a, b),
-        (Ok(Some(a)), Ok(Some(b))) => output_matches(case, a, b),
+        (Ok(Some(a)), Ok(Some(b))) => matches(case, a, b),
         _ => false,
     } && verify_input(root, case).is_ok();
     field(
@@ -693,7 +768,7 @@ fn trace(
     Ok(row)
 }
 
-fn native() -> bool {
+pub(crate) fn native() -> bool {
     cfg!(all(
         target_arch = "aarch64",
         target_os = "linux",
@@ -702,19 +777,23 @@ fn native() -> bool {
 }
 
 fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
-    number(raw, "pairs").ok() == Some(pairs as i128)
+    timing::planned_pairs(raw) == Some(pairs as i128)
         && number(raw, "seed").ok() == Some(i128::from(seed))
 }
 
-struct Options {
-    benchmark: bool,
-    memory: bool,
-    subset: bool,
-    require_acceptance: bool,
-    output: PathBuf,
-    pairs: usize,
-    memory_pairs: usize,
-    seed: u64,
+pub(crate) struct Options {
+    pub(crate) benchmark: bool,
+    pub(crate) memory: bool,
+    pub(crate) subset: bool,
+    pub(crate) require_acceptance: bool,
+    pub(crate) output: PathBuf,
+    pub(crate) pairs: usize,
+    pub(crate) memory_pairs: usize,
+    pub(crate) seed: u64,
+    pub(crate) full: bool,
+    /// Which part of the measured set to measure, counted from 0, of how many.
+    pub(crate) part: Option<(usize, usize)>,
+    pub(crate) early_stop: bool,
 }
 
 impl Options {
@@ -735,6 +814,9 @@ impl Options {
             pairs: timing::GATE_PAIRS,
             memory_pairs: timing::GATE_PAIRS,
             seed: 37,
+            full: false,
+            part: None,
+            early_stop: true,
         };
         let mut args = args.iter();
         while let Some(argument) = args.next() {
@@ -743,6 +825,12 @@ impl Options {
                 "--memory" => options.memory = true,
                 "--subset52" => options.subset = true,
                 "--require-acceptance" => options.require_acceptance = true,
+                "--full" => options.full = true,
+                "--part" => {
+                    let value = args.next().ok_or("--part needs I/N")?;
+                    options.part = Some(crate::gate::parse_part(value)?);
+                }
+                "--no-early-stop" => options.early_stop = false,
                 "--output" => {
                     options.output = root.join(args.next().ok_or("--output needs a directory")?);
                 }
@@ -776,23 +864,25 @@ impl Options {
         {
             return Err("need at least 30 pairs and a seed below the signed 64-bit limit".into());
         }
-        if options.require_acceptance && (options.subset || !options.benchmark || !options.memory) {
+        if options.require_acceptance
+            && (options.subset || options.part.is_some() || !options.benchmark || !options.memory)
+        {
             return Err("acceptance requires the full runtime and memory sets".into());
         }
         Ok(options)
     }
 }
 
-struct Build {
-    candidate: PathBuf,
-    reference: PathBuf,
-    workers: Value,
-    identity: Value,
-    graph: Value,
+pub(crate) struct Build {
+    pub(crate) candidate: PathBuf,
+    pub(crate) reference: PathBuf,
+    pub(crate) workers: Value,
+    pub(crate) identity: Value,
+    pub(crate) graph: Value,
 }
 
 impl Build {
-    fn load(root: &Path) -> R<Self> {
+    pub(crate) fn load(root: &Path) -> R<Self> {
         let identity = read_json(&root.join("target/harness/identity.json"))?;
         let candidate_record = identity
             .get("additional_candidates")
@@ -843,7 +933,7 @@ impl Build {
         })
     }
 
-    fn unchanged(&self, root: &Path) -> R<bool> {
+    pub(crate) fn unchanged(&self, root: &Path) -> R<bool> {
         Ok(Self::load(root).is_ok_and(|current| {
             current.workers == self.workers
                 && current.identity == self.identity
@@ -852,7 +942,7 @@ impl Build {
     }
 }
 
-fn case_directory(output: &Path, index: usize) -> PathBuf {
+pub(crate) fn case_directory(output: &Path, index: usize) -> PathBuf {
     output.join(format!("case-{index:04}"))
 }
 
@@ -863,25 +953,25 @@ fn measurement_error(error: String) -> Value {
     ])
 }
 
-fn measure(
+pub(crate) fn measure_time(
     root: &Path,
     build: &Build,
     case: &Case,
     options: &Options,
     contract: &Value,
     row: &Value,
-) -> R<(Value, Value)> {
+) -> R<Value> {
     let directory = case_directory(&options.output, case.index);
     let operation = case.operation();
     let input = case.path(root);
     let mut time = Value::Null;
-    let mut memory_result = Value::Null;
     if options.benchmark {
         let raw = timing::benchmark(
             &build.candidate,
             &build.reference,
             &input,
-            options.pairs,
+            timing::Pairs::gate(options.pairs, Runtime::load(root)?.ceiling)
+                .early_stop(options.early_stop),
             ITERATIONS,
             options.seed,
             &operation,
@@ -916,6 +1006,22 @@ fn measure(
             ("raw_sha256", Value::str(digest)),
         ]);
     }
+    Ok(time)
+}
+
+pub(crate) fn measure_memory(
+    slot: &memory::Slot,
+    root: &Path,
+    build: &Build,
+    case: &Case,
+    options: &Options,
+    contract: &Value,
+    row: &Value,
+) -> R<Value> {
+    let directory = case_directory(&options.output, case.index);
+    let operation = case.operation();
+    let input = case.path(root);
+    let mut memory_result = Value::Null;
     if options.memory {
         let arguments = |candidate| {
             operation
@@ -934,11 +1040,13 @@ fn measure(
             ("reference", case.work(false, false)),
         ]);
         let raw = memory::collect_commands(
+            slot,
             root,
             &build.candidate,
             &build.reference,
             &input,
-            options.memory_pairs,
+            timing::Pairs::gate(options.memory_pairs, memory::CEILING)
+                .early_stop(options.early_stop),
             options.seed,
             memory::Commands {
                 candidate: &candidate,
@@ -984,7 +1092,7 @@ fn measure(
             ("raw_sha256", Value::str(digest)),
         ]);
     }
-    Ok((time, memory_result))
+    Ok(memory_result)
 }
 
 fn alias_traces_match(output: &Path, case: usize, prior: usize) -> R<bool> {
@@ -999,7 +1107,7 @@ fn alias_traces_match(output: &Path, case: usize, prior: usize) -> R<bool> {
     Ok(true)
 }
 
-fn passed(value: &Value) -> bool {
+pub(crate) fn passed(value: &Value) -> bool {
     value.get("pass") == Some(&Value::Bool(true))
 }
 
@@ -1105,13 +1213,13 @@ fn checkpoint(
 }
 
 /// Expand only this case, including explicit aliases, from its checked raw files.
-fn report_case(output: &Path, row: &Value) -> R<Value> {
+pub(crate) fn report_case(output: &Path, row: &Value) -> R<Value> {
     crate::harness::validation::expand_measurements(output, row)
 }
 
 /// Write canonical report JSON with at most one case's raw observations in memory.
 /// Publish only a complete document and never replace an existing report.
-fn final_report(
+pub(crate) fn final_report(
     output: &Path,
     base: &Value,
     rows: &[Value],
@@ -1165,7 +1273,63 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             options.output.display()
         )
     })?;
-    let selection = suite.selection(options.subset);
+    if options.benchmark || options.memory {
+        let key = gate_key(&root, &options, &build)?;
+        reuse::step(&root, &options.output, &key, options.full, || {
+            compare(&root, &options, &suite, &build, policy)
+        })
+    } else {
+        compare(&root, &options, &suite, &build, policy)
+    }
+}
+
+/// A part as `I/N`, counted from 1, or null for the whole set.
+pub(crate) fn part_value(part: Option<(usize, usize)>) -> Value {
+    part.map_or(Value::Null, |(i, n)| Value::str(format!("{}/{n}", i + 1)))
+}
+
+/// The key of a measuring run: its settings, the suite's inputs and the workers.
+fn gate_key(root: &Path, options: &Options, build: &Build) -> R<reuse::Key> {
+    let command = match (options.benchmark, options.memory) {
+        (true, false) => "isobmff-bench --benchmark",
+        (false, true) => "isobmff-bench --memory",
+        _ => "isobmff-bench --benchmark --memory",
+    };
+    let settings = Value::object([
+        ("subset52", Value::Bool(options.subset)),
+        ("part", part_value(options.part)),
+        (
+            "require_acceptance",
+            Value::Bool(options.require_acceptance),
+        ),
+        ("pairs", Value::int(options.pairs as i128)),
+        ("memory_pairs", Value::int(options.memory_pairs as i128)),
+        ("seed", Value::int(options.seed)),
+        ("iterations", Value::int(ITERATIONS)),
+        ("early_stop", Value::Bool(options.early_stop)),
+        (
+            "kernel_bound",
+            std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+        ),
+    ]);
+    let inputs: Vec<PathBuf> = source_inputs(root)?
+        .iter()
+        .map(|file| root.join(file))
+        .collect();
+    let files: Vec<&Path> = inputs.iter().map(PathBuf::as_path).collect();
+    let workers = [
+        ("candidate", build.candidate.as_path()),
+        ("reference", build.reference.as_path()),
+    ];
+    reuse::Key::new(root, command, settings, &files, &workers)
+}
+
+/// Compare every case, then measure the selected set as requested.
+fn compare(root: &Path, options: &Options, suite: &Suite, build: &Build, policy: Value) -> R<i32> {
+    let selection = match options.part {
+        Some(part) => suite.part(&suite.selection(options.subset), part),
+        None => suite.selection(options.subset),
+    };
     let base = Value::object([
         ("schema", Value::int(1)),
         ("contract", Value::str("isobmff-open-index")),
@@ -1177,6 +1341,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         ("corpus_manifest_sha256", Value::str(CORPUS_SHA)),
         ("work_contract_sha256", Value::str(WORK_CONTRACT)),
         ("subset52_sha256", Value::str(SUBSET_SHA)),
+        ("part", part_value(options.part)),
         (
             "selection",
             Value::Array(selection.iter().map(|&i| Value::int(i as i128)).collect()),
@@ -1219,11 +1384,11 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             row
         })
         .collect();
-    checkpoint(&options.output, &base, &rows, &selection, &options, true)?;
+    checkpoint(&options.output, &base, &rows, &selection, options, true)?;
     for case in &suite.cases {
         let directory = case_directory(&options.output, case.index);
         fs::create_dir(&directory).map_err(|e| e.to_string())?;
-        let mut row = trace(&root, &build.candidate, &build.reference, case, &directory)?;
+        let mut row = trace(root, &build.candidate, &build.reference, case, &directory)?;
         field(
             &mut row,
             "reference",
@@ -1238,25 +1403,81 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let all_parity = rows
         .iter()
         .all(|r| r.get("match") == Some(&Value::Bool(true)));
-    let mut unchanged = build.unchanged(&root)?;
+    let mut unchanged = build.unchanged(root)?;
     checkpoint(
         &options.output,
         &base,
         &rows,
         &selection,
-        &options,
+        options,
         unchanged,
     )?;
     if all_parity && unchanged && (options.benchmark || options.memory) {
+        // Every operation is timed before any memory runs; memory then fills the
+        // CPUs, and aliases take the samples of the operation they repeat.
+        let mut measured = Vec::new();
         for &index in &selection {
             let case = &suite.cases[index];
-            let (time, memory) = if let Some(prior) = case.alias {
+            if let Some(prior) = case.alias {
                 if !selection.contains(&prior)
                     || !alias_traces_match(&options.output, index, prior)?
                 {
                     return Err(format!(
                         "alias {index} has no identical selected operation {prior}"
                     ));
+                }
+                continue;
+            }
+            if let Err(error) = verify_input(root, case) {
+                unchanged = false;
+                field(&mut rows[index], "measurement_error", Value::str(error));
+                checkpoint(&options.output, &base, &rows, &selection, options, false)?;
+                break;
+            }
+            let time = measure_time(root, build, case, options, &suite.contract, &rows[index])?;
+            if time != Value::Null {
+                field(&mut rows[index], "timing", time);
+                checkpoint(
+                    &options.output,
+                    &base,
+                    &rows,
+                    &selection,
+                    options,
+                    unchanged,
+                )?;
+            }
+            measured.push(index);
+        }
+        if options.memory && unchanged {
+            let workers = memory::WorkerPaths {
+                candidate: &build.candidate,
+                reference: &build.reference,
+                registered: true,
+            };
+            let jobs = measured
+                .iter()
+                .map(|&index| {
+                    let (case, row) = (&suite.cases[index], rows[index].clone());
+                    let (root, build, options) = (&root, &build, &options);
+                    let contract = &suite.contract;
+                    memory::Job::new(&workers, [case.path(root)], move |slot| {
+                        verify_input(root, case)?;
+                        measure_memory(slot, root, build, case, options, contract, &row)
+                    })
+                })
+                .collect();
+            for (&index, memory) in measured.iter().zip(memory::collect_all(jobs)?) {
+                let memory = memory?;
+                if memory != Value::Null {
+                    field(&mut rows[index], "memory", memory);
+                }
+            }
+        }
+        for &index in &selection {
+            let case = &suite.cases[index];
+            if let Some(prior) = case.alias {
+                if !unchanged {
+                    break;
                 }
                 field(&mut rows[index], "sampled_as", Value::int(prior as i128));
                 field(
@@ -1268,53 +1489,43 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                         .cloned()
                         .unwrap_or(Value::Null),
                 );
-                (
-                    rows[prior].get("timing").cloned().unwrap_or(Value::Null),
-                    rows[prior].get("memory").cloned().unwrap_or(Value::Null),
-                )
-            } else {
-                if let Err(error) = verify_input(&root, case) {
-                    unchanged = false;
-                    field(&mut rows[index], "measurement_error", Value::str(error));
-                    checkpoint(&options.output, &base, &rows, &selection, &options, false)?;
-                    break;
+                for key in ["timing", "memory"] {
+                    if let Some(sample) = rows[prior].get(key).filter(|v| **v != Value::Null) {
+                        let sample = sample.clone();
+                        field(&mut rows[index], key, sample);
+                    }
                 }
-                measure(&root, &build, case, &options, &suite.contract, &rows[index])?
-            };
-            if time != Value::Null {
-                field(&mut rows[index], "timing", time);
-            }
-            if memory != Value::Null {
-                field(&mut rows[index], "memory", memory);
+            } else if !measured.contains(&index) {
+                continue;
             }
             write_json(
                 &case_directory(&options.output, index).join("result.json"),
                 &rows[index],
             )?;
-            checkpoint(
-                &options.output,
-                &base,
-                &rows,
-                &selection,
-                &options,
-                unchanged,
-            )?;
             println!("{}: {} {} {}", index, case.label, case.mode, case.schedule);
         }
+        checkpoint(
+            &options.output,
+            &base,
+            &rows,
+            &selection,
+            options,
+            unchanged,
+        )?;
     }
-    unchanged &= build.unchanged(&root)?;
+    unchanged &= build.unchanged(root)?;
     let mut summary = checkpoint(
         &options.output,
         &base,
         &rows,
         &selection,
-        &options,
+        options,
         unchanged,
     )?;
     let observations = rows.iter().map(|row| report_case(&options.output, row));
     let errors = (!unchanged).then(|| Err("source or worker changed during collection".to_owned()));
     let verdict = acceptance::acceptance_iter(
-        &root,
+        root,
         &suite.contract,
         observations.chain(errors),
         &build.identity,
@@ -1404,6 +1615,23 @@ mod tests {
         for i in expected {
             assert!(!suite.cases[i].refusal);
             assert!(suite.cases[i].alias.is_none());
+        }
+    }
+
+    #[test]
+    fn parts_measure_every_operation_once_with_its_aliases() {
+        let suite = Suite::load(&root()).unwrap();
+        let all = suite.selection(false);
+        let mut joined: Vec<usize> = (0..3).flat_map(|i| suite.part(&all, (i, 3))).collect();
+        joined.sort_unstable();
+        assert_eq!(joined, all);
+        for i in 0..3 {
+            let part = suite.part(&all, (i, 3));
+            for &index in &part {
+                if let Some(prior) = suite.cases[index].alias {
+                    assert!(part.contains(&prior));
+                }
+            }
         }
     }
 

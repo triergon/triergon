@@ -1656,33 +1656,22 @@ pub fn conditional_coverage(parsed: &Value, owner: &Value, admission: Option<&Ad
     Value::Object(fields)
 }
 
-pub fn sample_valid(
-    data: Option<&Value>,
-    certificate: Option<&Value>,
-    linked: &Value,
-    observer_sha: Option<&str>,
-    probe_sha: Option<&str>,
-) -> bool {
-    certificate_valid(certificate, linked, observer_sha, probe_sha)
-        && data.is_some_and(|d| zero_active(d).is_ok())
-}
-
 // ---------------------------------------------------------------------------
 // Optional kernel resident-set bound.
 
-fn u16le(b: &[u8], at: usize) -> R<u16> {
+pub(super) fn u16le(b: &[u8], at: usize) -> R<u16> {
     b.get(at..at + 2)
         .map(|x| u16::from_le_bytes([x[0], x[1]]))
         .ok_or_else(|| "truncated ELF".into())
 }
 
-fn u32le(b: &[u8], at: usize) -> R<u32> {
+pub(super) fn u32le(b: &[u8], at: usize) -> R<u32> {
     b.get(at..at + 4)
         .map(|x| u32::from_le_bytes([x[0], x[1], x[2], x[3]]))
         .ok_or_else(|| "truncated ELF".into())
 }
 
-fn u64le(b: &[u8], at: usize) -> R<u64> {
+pub(super) fn u64le(b: &[u8], at: usize) -> R<u64> {
     b.get(at..at + 8)
         .map(|x| u64::from_le_bytes(x.try_into().unwrap()))
         .ok_or_else(|| "truncated ELF".into())

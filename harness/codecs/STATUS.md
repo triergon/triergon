@@ -13,8 +13,8 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 | Path | Content |
 |---|---|
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: lossy audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; FLAC bit-exact; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB; and the reviewed rules for the Layer I and II float decoders and the integer stereo mix of 16-bit FLAC |
-| `correctness-manifest.json` | The 775 correctness vectors: 454 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
-| `reader-manifest.json`, `reader-rules.json`, `reader-differences.json` | The 305 reader comparison inputs; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
+| `correctness-manifest.json` | The 778 correctness vectors: 457 of the video and elementary-stream lanes and 321 of the file-format lanes (FLAC 187, MP3 39, MP2 20, MP1 5, Vorbis 21, Opus 49) |
+| `reader-manifest.json`, `reader-seeks.json`, `reader-rules.json`, `reader-differences.json` | The 316 reader comparison inputs and the 26 Ogg seek cases; the views and fields compared per format, the reviewed comparison rules and the scoped dispositions of FFmpeg behaviours `cargo xtask codecs readers` applies; and every reviewed difference with its disposition |
 | `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 20 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
@@ -23,7 +23,7 @@ driven by `cargo xtask codecs` (`manifest`, `grade`, `summarize`, `readers`, `ti
 | `codec-comparison` evidence set | Correctness rows and summaries, timing and memory records, identity hashes; `cargo xtask evidence fetch codec-comparison` unpacks it into `.research/evidence/codec-comparison/` |
 | `audio-review-linux-arm64`, `audio-quick-check-linux-arm64` evidence sets | The file-format lanes' correctness rows, instruction counts, paired timing and paired memory the status rows cite; the reader lane with both Ogg views, the generated Ogg inputs it compares (`inputs/ogg-generated`), and the quick check of the head against main |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
-| `flac/`, `mp3/`, `ogg/` | Generators of the FLAC, MPEG audio and Ogg vectors |
+| `flac/`, `mp3/`, `ogg/` | Generators of the FLAC, MPEG audio, Ogg and Speex vectors |
 | `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker the cited results were measured with, and the proof that `prepare-ffmpeg --profile decode` rebuilds it: byte-identical output on every vector and workload, identical classifications |
 
 ## Running the comparison
@@ -38,6 +38,7 @@ cargo xtask codecs grade --manifest harness/codecs/correctness-manifest.json --r
   --reference target/harness/ffmpeg-decode-worker --out run.jsonl
 cargo xtask codecs summarize run.jsonl summary.json
 cargo xtask codecs readers --manifest harness/codecs/reader-manifest.json --root . \
+  --seeks harness/codecs/reader-seeks.json \
   --ffprobe $FF/ffprobe --codec-worker target/release/codec-worker --out readers.jsonl
 ```
 
@@ -68,7 +69,9 @@ The vectors are the FATE suite's `aac`, `ac3`, `eac3`, `dts`, `h264-conformance`
 derived from them with the decode profile's `ffmpeg` (manifest paths under `target/`):
 ADTS from the MP4 and 3GP vectors (`-map 0:a:0 -c:a copy -f adts`), DTS cores
 (`-map 0:a:0 -c:a copy -bsf:a dca_core -f dts`) and AC-3 streams copied out of their
-containers (`-map 0:a:N -c:a copy -f ac3`). The file-format lanes add FATE's `vorbis`,
+containers (`-map 0:a:N -c:a copy -f ac3`). The aac lane adds three crafted HE-AAC v2
+streams of Parametric Stereo paths no FATE vector takes, in `aac/ps/vectors`
+([aac/ps/README.md](aac/ps/README.md)). The file-format lanes add FATE's `vorbis`,
 `opus` and `mp3-conformance` directories, the IETF CELLAR FLAC test files (`subset`,
 `uncommon`; CC0), the FLAC streams `harness/codecs/flac/flac_vectors.py FFMPEG FLAC
 .research/flac-generated` encodes, the MPEG audio streams
@@ -79,7 +82,7 @@ in `.research/opus-generated`. `cargo xtask codecs manifest` rehashes them:
 ```sh
 cargo xtask codecs manifest --out harness/codecs/correctness-manifest.json \
   h264=.research/fate-samples/h264-conformance hevc=.research/fate-samples/hevc-conformance \
-  ac3=target/agent-ac3/es eac3=target/agent-ac3/es aac=target/agent-aac/vec \
+  ac3=target/agent-ac3/es eac3=target/agent-ac3/es aac=target/agent-aac/vec,harness/codecs/aac/ps/vectors \
   dts=target/agent-dca/vec \
   flac=.research/flac-test-files/subset,.research/flac-test-files/uncommon,.research/flac-generated \
   mp3=.research/fate-samples/mp3-conformance,.research/mp3/vectors mp2=.research/mp3/vectors \
@@ -107,15 +110,31 @@ mix, which `codec-worker` reproduces (`flac-integer-device-mix`).
 
 `cargo xtask codecs readers` compares the packets the container readers emit with the
 decode profile's `ffprobe -show_packets`, the demuxer forced on both sides. Its inputs
-are FATE's `vorbis` and `mp3-conformance` directories, the Ogg files
-`harness/codecs/ogg/make_vectors.sh` generated (archived in `audio-quick-check-linux-arm64`
-under `inputs/ogg-generated`; copy them to `.research/ogg-generated`), the FLAC test
-files and generated FLAC streams, and the streams in `.research/elementary` (encoded by
-FFmpeg, and crafted damaged ones in `crafted/`). `codec-worker packets FORMAT FILE`
-prints every packet `triergon_ogg::BlockingReader` or the `triergon_elementary` reader
-emits: track, pts, dts, duration, size, position and trims as the reader reports them,
-for Ogg also its FFmpeg-compatible view (`triergon_ogg::compat::clock::packet_timing`)
-and the reader's resync and lost-page events.
+are FATE's `vorbis` and `mp3-conformance` directories, FATE's Theora samples
+(`ogg/bear.ogv`, `ogg/empty_theora_packets.ogv`, `vp3/offset_test.ogv`) and chained
+`ogg-flac`, `ogg-opus` and `ogg-vorbis/chained-meta.ogg`, the Ogg files
+`harness/codecs/ogg/make_vectors.sh` generated (`.research/ogg-generated`) and the
+Speex files `harness/codecs/ogg/make_speex_vectors.sh` generated with speexenc 1.2.1
+(`.research/speex-generated`), the FLAC test files and generated FLAC streams, and the
+streams in `.research/elementary` (encoded by FFmpeg, and crafted damaged ones in
+`crafted/`). `codecs manifest` lists the Ogg lane's first two directories; its other
+rows are kept in the manifest as they are, the chained samples named with their
+directory. Evidence set `ogg-reader-inputs` holds every input of the Ogg lane at its
+repository path. `codec-worker packets FORMAT FILE` prints every packet
+`triergon_ogg::BlockingReader` or the `triergon_elementary` reader emits: track, pts,
+dts, duration, size, position and trims as the reader reports them, for Ogg also its
+FFmpeg-compatible view (`triergon_ogg::compat::clock::packet_timing`), the granule
+position of a packet that ends its page, and the reader's resync and lost-page events.
+Ogg compares FFmpeg's audio and video streams; a reader track that is a stream of
+another type in FFmpeg (Ogg Skeleton) is counted, not compared.
+
+Each case of `reader-seeks.json` (lane `reader-ogg-seek`) runs `codec-worker seek ogg
+FILE TRACK SECONDS exact|preroll`, which seeks the reader and prints its receipt and
+every packet after it, against `ffprobe -read_intervals SECONDS%` with the target less
+the reader's preroll. FFmpeg's packets before the reader's landing are counted, not
+compared; the rest are aligned by position and size and compared like a whole file,
+and their differences are reviewed per case by name. The gate runs both Ogg lanes
+(item `ogg-readers`); the command fails when a case fails.
 
 `reader-rules.json` projects the reader's times into FFmpeg's stream time base, aligns
 packets per stream (by position for elementary streams, by size for Ogg, where the
@@ -131,9 +150,23 @@ relation) of exactly one disposition the case lists. Each view of each input is 
 unexplained differences, attributed where a scope matches, to `OUT.differences.json`
 for review.
 
+`cargo xtask codecs isobmff-reader` applies the same alignment and the same reviewed,
+frozen difference lists to the neutral ISO BMFF reader, against the formats profile's
+`ffprobe` with the MOV demuxer, and is a gate item (`isobmff-reader`). Its contract,
+corpus of 648 read and seek cases, rules and differences are in
+[harness/features/isobmff-reader](../features/isobmff-reader); it fails when a case
+fails:
+
+```sh
+cargo xtask codecs isobmff-reader --ffprobe .research/reference-formats/install/bin/ffprobe \
+  --codec-worker target/release/codec-worker --out isobmff-reader.jsonl
+```
+
 ## Timing and memory
 
-`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282).
+`cargo xtask codecs time` pairs the workers on the workloads (30 pairs, seed 280, retried on 281 and 282;
+a workload settled below the ceiling stops at 20, see
+[early stop](../../docs/quality.md#early-stop)).
 `cargo xtask codecs memory --candidate target/release/codec-worker --reference
 target/harness/ffmpeg-decode-worker --workloads harness/codecs/file-workloads.json
 --root . --out DIR` measures both workers' `OP-memory` runs under the shared observer
@@ -153,7 +186,9 @@ observation per workload and `summary.json`.
   `CORRECTNESS-MANIFEST-AC3-NODITHER.json` is the dither-stripped comparison set.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).
-- `ps-open-*.adts` ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open
-  Parametric Stereo cases, the manifest's `open_cases`: crafted streams of paths the
-  probes did not recover, which `summarize` requires to keep failing; their
-  numbers are in the known differences of [crates/codec-aac](../../crates/codec-aac/README.md).
+- `ps-open-noext-after-error.adts`, `ps-open-dt-envelope-reference.adts`,
+  `ps-open-sbr-after-missing.adts` and `ps-open-sbr-truncated.adts`
+  ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open Parametric Stereo and
+  SBR cases, the manifest's `open_cases`: crafted streams of paths the probes did not
+  recover, which `summarize` requires to keep failing; their numbers are in the known
+  differences of [crates/codec-aac](../../crates/codec-aac/README.md).

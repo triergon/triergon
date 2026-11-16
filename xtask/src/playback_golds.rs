@@ -147,14 +147,7 @@ struct Case {
 }
 
 fn generate(root: &Path, dir: &Path) -> R<(String, String)> {
-    let index = crate::checks::read_json(&root.join(crate::evidence::INDEX))?;
-    let set = index
-        .get("sets")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .find(|set| set.get("name").and_then(Value::as_str) == Some(SET))
-        .ok_or_else(|| format!("{SET} is not in {}", crate::evidence::INDEX))?;
+    let set = crate::evidence::set(root, SET)?;
     let base = top_level(dir)?;
     let mut cases: Vec<Case> = Vec::new();
     let mut captures = Vec::new();

@@ -1,0 +1,38 @@
+{
+ "name": "hls-clock-projection-comparison",
+ "path": "hls-clock-projection-comparison",
+ "retention": "90 days",
+ "reason": "HLS clock projection measurements",
+ "key": "qualification/repository/hls-clock-projection-comparison/474667621e4ca0f6c093d4b0c799309cc45b07663d48734edb1ba469be076c3b.tar.gz",
+ "sha256": "474667621e4ca0f6c093d4b0c799309cc45b07663d48734edb1ba469be076c3b",
+ "files": [
+  {
+   "path": "hls-clock-projection-comparison/FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "hls-clock-projection-comparison/GUEST-PREFLIGHT.log",
+   "sha256": "0e5c00adaeb34dd56d73ed53ce4fd5ce46e25d1fedf50de085363aa0990d8ebc"
+  },
+  {
+   "path": "hls-clock-projection-comparison/NATIVE-EXIT.txt",
+   "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+   "path": "hls-clock-projection-comparison/NATIVE-RESULTS.sha256",
+   "sha256": "24c19ee916ca93eeaed8ce994427f8a18570ae970256b0f2892b5135ef1b544b"
+  },
+  {
+   "path": "hls-clock-projection-comparison/NATIVE-RESULTS.tar.gz",
+   "sha256": "393bd06f3327bcee2537c8b16d8fd4d477b5c8fc84c981b9cefecadc7c6066da"
+  },
+  {
+   "path": "hls-clock-projection-comparison/NATIVE.log",
+   "sha256": "f7d4cd71713321256515d9458d17a88ec860396e53fe8774ff165f4f3cf34d13"
+  },
+  {
+   "path": "hls-clock-projection-comparison/SOURCE.bundle",
+   "sha256": "f6a824a6c3f0d0b21557e7b6f3d84029cc72263bf62a41cdecfd4aab26261428"
+  }
+ ]
+}

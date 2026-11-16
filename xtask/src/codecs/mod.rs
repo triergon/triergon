@@ -8,12 +8,15 @@ mod aac_sources;
 pub mod correctness;
 pub mod equivalence;
 pub mod fuzz;
+pub mod isobmff_reader;
 pub mod memory;
 pub mod readers;
 pub mod summary;
 pub mod timing;
 
 use std::path::{Path, PathBuf};
+
+use crate::json::Value;
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
@@ -34,23 +37,127 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
   summarize RUN.jsonl OUT.json
                  classify a grading run against the declared lane selection
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
-          [--only SUBSTR,...]
+          [--seeks S.json] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
                  with ffprobe by harness/codecs/reader-rules.json and the reviewed
-                 difference lists of reader-differences.json; appends one row per input
-                 and view, and writes the observed lists to OUT.differences.json
+                 difference lists of reader-differences.json, and the packets after
+                 each seek case of S.json (lane reader-ogg-seek); appends one row per
+                 case, writes the observed lists to OUT.differences.json, and fails
+                 when a case fails
+  isobmff-reader --ffprobe FP --codec-worker W --out OUT.jsonl [--only SUBSTR,...]
+                 compare every packet the neutral ISO BMFF reader emits, read through and
+                 after a seek, with ffprobe by harness/features/isobmff-reader/rules.json and
+                 the reviewed difference lists of its differences.json; appends one row per
+                 case, writes the observed lists to OUT.differences.json and fails on a
+                 failing case
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
-       [--only ID,...]
-                 paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282)
+       [--only ID,...] [--full] [--no-early-stop]
+                 paired timing of the decoder workloads (30 pairs, seed 280, retried on 281 and 282,
+                 ending early once settled below the ceiling)
   memory --candidate W --reference W --workloads F --root R --out DIR
-         [--pairs N] [--seed S] [--only ID,...]
+         [--pairs N] [--seed S] [--only ID,...] [--part I/N] [--full] [--no-early-stop]
                  paired peak heap and total resident peak RSS of the decoder workloads
-                 under the shared observer (30 pairs, seed 283)
+                 under the shared observer (30 pairs, seed 283); --part I/N takes
+                 every Nth workload from the Ith
+                 a result a kept evidence set holds is reused unless --full
   equivalence --output F [--compare F] [--jobs N]
                  record every decoder output identity; --compare checks an earlier record
   fuzz --lane LANE --output DIR [--rounds N] [--seed N] [--timeout-seconds S] [--only SUBSTR,...]
                  cargo xtask fuzz campaign over the lane's vectors: release and checked
                  codec-worker builds decode each mutation whole (4 rounds, seed 280, 30 s)";
+
+/// A measuring codec command as a gate step ([`crate::harness::reuse`]): its key
+/// binds the workload list and every input it names, and both workers.
+struct Gate<'a> {
+    command: &'static str,
+    settings: Value,
+    workloads: &'a Path,
+    root: &'a Path,
+    workers: [&'a Path; 2],
+    out: &'a Path,
+}
+
+impl Gate<'_> {
+    /// Reuse the cited result unless `full`, else run and record the step.
+    fn run(
+        self,
+        repository: &Path,
+        full: bool,
+        run: impl FnOnce() -> Result<(), String>,
+    ) -> Result<i32, String> {
+        let list = crate::checks::read_json(self.workloads)?;
+        let mut inputs = vec![self.workloads.to_path_buf()];
+        for workload in list
+            .get("workloads")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            if let Some(path) = workload.get("path").and_then(Value::as_str) {
+                inputs.push(self.root.join(path));
+            }
+        }
+        let files: Vec<&Path> = inputs.iter().map(PathBuf::as_path).collect();
+        let [candidate, reference] = self.workers;
+        let key = crate::harness::reuse::Key::new(
+            repository,
+            self.command,
+            self.settings,
+            &files,
+            &[("candidate", candidate), ("reference", reference)],
+        )?;
+        crate::harness::reuse::step(repository, self.out, &key, full, || run().map(|()| 0))
+    }
+}
+
+/// The verdict of a codec collection's bounds, `results` each workload's id and whether
+/// its bound held. Where the gate applies (`gated`: native Linux AArch64, the gate
+/// build) a failed bound fails the collection, as a failed case fails a grade, and its
+/// lines tell failures that are only the list's `open_workloads` from others, as a
+/// grade's do; elsewhere the bounds are diagnostics and fail nothing. Returns the lines
+/// to print and whether the collection fails.
+pub fn bounds(
+    list: &Value,
+    name: &str,
+    what: &str,
+    results: &[(String, bool)],
+    gated: bool,
+) -> (Vec<String>, bool) {
+    let passed = results.iter().filter(|(_, held)| *held).count();
+    let total = results.len();
+    if !gated {
+        return (
+            vec![format!(
+                "{name} {what}: diagnostic on this target, not gated: {passed} of {total} within the bound"
+            )],
+            false,
+        );
+    }
+    let open: Vec<&str> = list
+        .get("open_workloads")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let failed: Vec<&str> = results
+        .iter()
+        .filter(|(_, held)| !held)
+        .map(|(id, _)| id.as_str())
+        .collect();
+    let (listed, other): (Vec<&str>, Vec<&str>) = failed.iter().partition(|id| open.contains(id));
+    let mut lines = vec![format!("{name} {what}: {passed} of {total} cases pass")];
+    if !listed.is_empty() {
+        lines.push(format!(
+            "{name} {what}: {} open failures, as listed: {}",
+            listed.len(),
+            listed.join(", ")
+        ));
+    }
+    if !other.is_empty() {
+        lines.push(format!("{name} {what}: failing: {}", other.join(", ")));
+    }
+    (lines, !failed.is_empty())
+}
 
 /// `--name value` and `--name=value` options and positional arguments, as
 /// `argparse` accepts them; `switches` take no value.
@@ -191,7 +298,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         "readers" => {
             let a = Args::parse(
                 rest,
-                &["manifest", "root", "ffprobe", "codec-worker", "out", "only"],
+                &[
+                    "manifest",
+                    "root",
+                    "ffprobe",
+                    "codec-worker",
+                    "out",
+                    "only",
+                    "seeks",
+                ],
                 &[],
             )?;
             readers::run(&readers::Options {
@@ -202,7 +317,21 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
                 rules: readers::Rules::load(root)?,
+                seeks: match a.get("seeks") {
+                    Some(seeks) => readers::SeekCase::load(Path::new(seeks))?,
+                    None => Vec::new(),
+                },
             })?;
+        }
+        "isobmff-reader" => {
+            let a = Args::parse(rest, &["ffprobe", "codec-worker", "out", "only"], &[])?;
+            return isobmff_reader::run(&isobmff_reader::Options {
+                root: root.to_path_buf(),
+                ffprobe: a.required("ffprobe")?.to_owned(),
+                codec_worker: a.path("codec-worker")?,
+                out: a.path("out")?,
+                only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+            });
         }
         "memory" => {
             let a = Args::parse(
@@ -216,10 +345,11 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "pairs",
                     "seed",
                     "only",
+                    "part",
                 ],
-                &[],
+                &["full", "no-early-stop"],
             )?;
-            memory::run(&memory::Options {
+            let options = memory::Options {
                 repository: root.to_path_buf(),
                 candidate: a.path("candidate")?,
                 reference: a.path("reference")?,
@@ -229,7 +359,31 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 pairs: a.number("pairs")?.unwrap_or(memory::PAIRS),
                 seed: a.number("seed")?.map_or(memory::SEED, |s| s as u64),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
-            })?;
+                part: a.get("part").map(crate::gate::parse_part).transpose()?,
+                early_stop: a.get("no-early-stop").is_none(),
+            };
+            let settings = Value::object([
+                ("pairs", Value::int(options.pairs as i64)),
+                ("part", a.get("part").map_or(Value::Null, Value::str)),
+                ("seed", Value::int(options.seed)),
+                (
+                    "only",
+                    options.only.as_deref().map_or(Value::Null, Value::str),
+                ),
+                (
+                    "kernel_bound",
+                    std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+                ),
+            ]);
+            let gate = Gate {
+                command: "codecs memory",
+                settings,
+                workloads: &options.workloads,
+                root: &options.root,
+                workers: [&options.candidate, &options.reference],
+                out: &options.out,
+            };
+            return gate.run(root, a.get("full").is_some(), || memory::run(&options));
         }
         "summarize" => match rest {
             [run, out] => summary::summarize(run, Path::new(out))?,
@@ -248,9 +402,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "label",
                     "only",
                 ],
-                &[],
+                &["full", "no-early-stop"],
             )?;
-            timing::run(&timing::Options {
+            let options = timing::Options {
                 repository: root.to_path_buf(),
                 candidate: a.path("candidate")?,
                 reference: a.path("reference")?,
@@ -260,7 +414,24 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 label: a.required("label")?.to_owned(),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
-            })?;
+                early_stop: a.get("no-early-stop").is_none(),
+            };
+            let settings = Value::object([
+                ("label", Value::str(&options.label)),
+                (
+                    "only",
+                    options.only.as_deref().map_or(Value::Null, Value::str),
+                ),
+            ]);
+            let gate = Gate {
+                command: "codecs time",
+                settings,
+                workloads: &options.workloads,
+                root: &options.root,
+                workers: [&options.candidate, &options.reference],
+                out: &options.out,
+            };
+            return gate.run(root, a.get("full").is_some(), || timing::run(&options));
         }
         "equivalence" => {
             let a = Args::parse(rest, &["output", "compare", "jobs"], &[])?;

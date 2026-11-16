@@ -20,22 +20,35 @@ pub const MAXIMUM_TIMEOUT_SECONDS: u64 = 3600;
 /// a whole number of seconds from 1 to [`MAXIMUM_TIMEOUT_SECONDS`], or
 /// [`DEFAULT_TIMEOUT`] when it declares none.
 pub fn contract_timeout(contract: &Value) -> Result<Duration, String> {
-    let Some(declared) = contract.get("timeout_seconds") else {
-        return Ok(DEFAULT_TIMEOUT);
-    };
-    match declared {
-        Value::Number(number) => number
-            .as_i128()
-            .and_then(|seconds| u64::try_from(seconds).ok())
-            .filter(|seconds| (1..=MAXIMUM_TIMEOUT_SECONDS).contains(seconds))
-            .map(Duration::from_secs),
-        _ => None,
-    }
-    .ok_or_else(|| {
-        format!(
-            "timeout_seconds must be a whole number of seconds from 1 to {MAXIMUM_TIMEOUT_SECONDS}"
-        )
-    })
+    declared_timeout(contract, "timeout_seconds").unwrap_or(Ok(DEFAULT_TIMEOUT))
+}
+
+/// How long one worker run of a parity comparison of `contract`'s cases may take:
+/// its `parity_timeout_seconds`, else [`contract_timeout`]. A parity run is not
+/// timed, and both workers' folds must still be equal, so a reference slow on a
+/// target can have a longer limit there than the timing and memory runs.
+pub fn contract_parity_timeout(contract: &Value) -> Result<Duration, String> {
+    declared_timeout(contract, "parity_timeout_seconds")
+        .unwrap_or_else(|| contract_timeout(contract))
+}
+
+/// The limit `key` declares: a whole number of seconds from 1 to
+/// [`MAXIMUM_TIMEOUT_SECONDS`]; none when it is absent.
+fn declared_timeout(contract: &Value, key: &str) -> Option<Result<Duration, String>> {
+    let declared = contract.get(key)?;
+    Some(
+        match declared {
+            Value::Number(number) => number
+                .as_i128()
+                .and_then(|seconds| u64::try_from(seconds).ok())
+                .filter(|seconds| (1..=MAXIMUM_TIMEOUT_SECONDS).contains(seconds))
+                .map(Duration::from_secs),
+            _ => None,
+        }
+        .ok_or_else(|| {
+            format!("{key} must be a whole number of seconds from 1 to {MAXIMUM_TIMEOUT_SECONDS}")
+        }),
+    )
 }
 
 /// One argument of a worker command line.
@@ -57,9 +70,9 @@ impl WorkerImage {
         Ok(Self { bytes, permissions })
     }
 
-    fn write(&self, slot: &Path) -> Result<PathBuf, String> {
+    fn write(&self, target: &Path) -> Result<(), String> {
+        let slot = target.parent().ok_or("worker path has no parent")?;
         fs::create_dir_all(slot).map_err(|e| format!("{}: {e}", slot.display()))?;
-        let target = slot.join("worker");
         let pending = slot.join(format!(".worker-{}", std::process::id()));
         let mut file =
             fs::File::create_new(&pending).map_err(|e| format!("{}: {e}", pending.display()))?;
@@ -67,11 +80,11 @@ impl WorkerImage {
             .write_all(&self.bytes)
             .and_then(|()| file.set_permissions(self.permissions.clone()));
         drop(file);
-        if let Err(error) = written.and_then(|()| fs::rename(&pending, &target)) {
+        if let Err(error) = written.and_then(|()| fs::rename(&pending, target)) {
             let _ = fs::remove_file(&pending);
             return Err(format!("{}: {error}", target.display()));
         }
-        Ok(target)
+        Ok(())
     }
 }
 
@@ -95,10 +108,14 @@ impl WorkerPair {
 
     /// Give both workers fresh files with the same write pattern and path length.
     pub fn write(&self, directory: &Path) -> Result<[PathBuf; 2], String> {
-        Ok([
-            self.0.write(&directory.join("a"))?,
-            self.1.write(&directory.join("b"))?,
-        ])
+        let paths = Self::paths(directory);
+        self.0.write(&paths[0])?;
+        self.1.write(&paths[1])?;
+        Ok(paths)
+    }
+
+    pub fn paths(directory: &Path) -> [PathBuf; 2] {
+        [directory.join("a/worker"), directory.join("b/worker")]
     }
 }
 
@@ -317,7 +334,7 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
     }
     let data = std::str::from_utf8(&finished.stdout)
         .ok()
-        .and_then(|text| json::parse(text).ok());
+        .and_then(|text| json::parse_observations(text).ok());
     match data {
         Some(data @ Value::Object(_)) => Value::object([
             ("status", Value::str("ok")),
@@ -327,7 +344,13 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
                 Value::int(started.elapsed().as_nanos() as i64),
             ),
         ]),
-        _ => Value::object([("status", Value::str("invalid-worker-output"))]),
+        _ => Value::object([
+            ("status", Value::str("invalid-worker-output")),
+            (
+                "stdout",
+                Value::str(String::from_utf8_lossy(&finished.stdout)),
+            ),
+        ]),
     }
 }
 
@@ -393,6 +416,47 @@ mod timeout_tests {
             assert!(contract_timeout(&declaring(invalid)).is_err(), "{invalid}");
         }
     }
+
+    #[test]
+    fn a_parity_limit_is_its_own_and_otherwise_the_run_limit() {
+        let both =
+            json::parse(r#"{"id": "f", "timeout_seconds": 30, "parity_timeout_seconds": 120}"#)
+                .unwrap();
+        assert_eq!(contract_timeout(&both), Ok(Duration::from_secs(30)));
+        assert_eq!(contract_parity_timeout(&both), Ok(Duration::from_secs(120)));
+        assert_eq!(
+            contract_parity_timeout(&declaring("45")),
+            Ok(Duration::from_secs(45))
+        );
+        let none = json::parse(r#"{"id": "f"}"#).unwrap();
+        assert_eq!(contract_parity_timeout(&none), Ok(DEFAULT_TIMEOUT));
+        let invalid = json::parse(r#"{"id": "f", "parity_timeout_seconds": 0}"#).unwrap();
+        assert!(
+            contract_parity_timeout(&invalid)
+                .unwrap_err()
+                .starts_with("parity_timeout_seconds")
+        );
+    }
+
+    #[test]
+    fn the_font_shape_and_ass_contracts_allow_their_references_slow_parity_runs() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        for contract in crate::harness::features::discover(root).unwrap() {
+            let candidate = contract.document.get("candidate").and_then(Value::as_str);
+            if matches!(
+                candidate,
+                Some("font-worker" | "shape-worker" | "ass-worker")
+            ) {
+                assert_eq!(
+                    contract_parity_timeout(&contract.document),
+                    Ok(Duration::from_secs(120)),
+                    "{}",
+                    contract.id
+                );
+                assert_eq!(contract_timeout(&contract.document), Ok(DEFAULT_TIMEOUT));
+            }
+        }
+    }
 }
 
 #[cfg(all(test, unix))]
@@ -407,7 +471,9 @@ mod tests {
     fn classifies_outcomes() {
         let ok = execute(&sh("echo '{\"a\": 1.50}'"), DEFAULT_TIMEOUT);
         assert_eq!(status(&ok), "ok");
-        assert_eq!(data(&ok).get("a"), Some(&Value::float(1.5)));
+        let value = data(&ok).get("a").unwrap();
+        assert_eq!(value.as_f64(), Some(1.5));
+        assert_eq!(json::observations(value), "1.50");
         let failed = execute(&sh("echo bad >&2; exit 3"), DEFAULT_TIMEOUT);
         assert_eq!(failed.get("exit_code"), Some(&Value::int(3)));
         assert_eq!(failed.get("stderr").and_then(Value::as_str), Some("bad\n"));
@@ -424,6 +490,23 @@ mod tests {
         assert_eq!(
             slow.get("argv").and_then(Value::as_array).map(<[_]>::len),
             Some(3)
+        );
+    }
+
+    #[test]
+    fn duplicate_worker_fields_are_retained_as_failed_stdout() {
+        let output = execute(
+            &sh("echo '{\"elapsed_ns\": 1, \"elapsed_ns\": NaN}'"),
+            DEFAULT_TIMEOUT,
+        );
+        assert_eq!(status(&output), "invalid-worker-output");
+        assert_eq!(
+            output.get("stdout").and_then(Value::as_str),
+            Some("{\"elapsed_ns\": 1, \"elapsed_ns\": NaN}\n")
+        );
+        assert_eq!(
+            json::parse_observations(&json::observations(&output)),
+            Ok(output)
         );
     }
 }

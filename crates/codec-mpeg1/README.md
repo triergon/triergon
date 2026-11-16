@@ -45,7 +45,7 @@ charges a caller's `Budget`.
 | Sequence header | Before every I picture. Size from the `Geometry`, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units, vbv_buffer_size from `vbv_bits` in 16 kbit units (1–1023), default intra and non-intra matrices, constrained_parameters_flag 0 |
 | GOP | GOP header before every I picture; time code from the picture index at 30 Hz. An I picture every `gop` pictures; a P picture whose prediction is worse than intra coding across the picture becomes an I picture and restarts the GOP (scene change). Without B pictures every GOP decodes independently; `closed_gop` is set on the first GOP only, as FFmpeg does |
 | Slices | One slice per picture; DC and vector predictors run across row ends, and per-row quantiser changes travel in macroblock_quant fields |
-| Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper |
+| Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search |
 | Quantiser | quantizer_scale 2–31 |
 | Rate control | GOP bit allocation by the MPEG-2 Test Model 5 complexity rule (I/P only); one quantiser per picture from a per-type `bits ≈ α · activity / q` model, rows deviating by a bounded amount; VBV modelled as the variable-rate case of Annex C; vbv_delay 0xFFFF |
 
@@ -58,8 +58,8 @@ charges a caller's `Budget`.
 - `encode` refuses a picture whose geometry differs from the configuration
   (`Error::PictureGeometry`) before changing any state. `out` is cleared first.
 - Storage sized from the configuration is charged to the encoder's budget before it
-  is allocated: the reference and reconstructed pictures, the previous source luma,
-  the macroblock and motion arrays and the coarse planes, the bit writer and the
+  is allocated: the reference and reconstructed pictures, the previous source
+  picture, the macroblock and motion arrays and the coarse planes, the bit writer and the
   caller's `out` at the bound of one picture (the VBV buffer plus one full and
   16 bytes per further macroblock; the bit writer never grows), and the first I
   picture's trial pass (one row). The default `Limits::live_storage_bytes` is
@@ -69,8 +69,11 @@ charges a caller's `Budget`.
 - The input must have its coded padding filled (`Picture::pad_edges`; the pixel
   `Converter` does this).
 - Every call encodes and advances the picture index, also for an unchanged source
-  picture (a keepalive). The first I picture of an encoder runs a trial pass to seed
-  the intra rate model.
+  picture (a keepalive). When the whole picture repeats, a macroblock the previous
+  picture skipped after its residual quantised to zero is skipped again without
+  computing the residual, as long as its quantiser is no finer: its residual is the
+  same, and the output is what computing it would give. The first I picture of an
+  encoder runs a trial pass to seed the intra rate model.
 - The picture rate is fixed at 30 Hz. Timestamps belong to the caller or muxer.
 - A nonzero `vbv_underflow_bits` means some picture exceeded the modelled buffer
   occupancy.
@@ -93,6 +96,7 @@ case the harness requires:
 
 Unit tests cover the VLC tables (prefix-free and complete), DC differentials, escape
 levels, reconstruction oddification and saturation, half-sample rounding, motion
-search and bounds, and the zero-residual shortcut against the complete transform;
+search and bounds, the zero-residual shortcut against the complete transform, and
+skips reused for a repeated picture against the computed path;
 `tests/encoder.rs` covers configuration and geometry refusal. Gates:
 [docs/quality.md](../../docs/quality.md).

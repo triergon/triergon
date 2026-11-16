@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "shape-extents",
+  "operation": "shape-extents",
+  "candidate": "shape-worker",
+  "worker_operation": "extents-",
+  "reference": "harfbuzz-native",
+  "gate": "required",
+  "compare_order": 6,
+  "contract": [
+    "one font file read from memory; every face of a collection, each with HarfBuzz's OpenType font functions at its default scale (units per em) and in triergon-shape with OtMetrics at units per em",
+    "per glyph of every face, in order: whether hb_font_get_glyph_extents gives extents, and its x bearing, y bearing, width and height (zero when it gives none); packets count glyphs",
+    "a face the candidate cannot open and a glyph whose extents it cannot read within the face's limits are recorded as such, so the case fails; the file is read before each timed and memory operation"
+  ],
+  "required_profiles": [
+    "cff",
+    "cff-cid",
+    "cff2",
+    "collection"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [],
+  "open_cases": [],
+  "parity_timeout_seconds": 120
+}

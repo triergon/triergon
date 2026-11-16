@@ -2,17 +2,20 @@
 //! Original Samples and clock/config/edit provenance travel with every entry.
 //! Compact streaming metadata passes; no per-sample array or payload cache.
 //! Regression guards were observed failing before implementation activation.
-use crate::mov_cursor::TrackProjection;
+use crate::mov_cursor::{PlainPrepare, PlainStart, TrackProjection, TrackResume};
 use crate::{
     BuildStatus, ClockOrigin, CursorStatus, DemuxProfile, DemuxTrack, MediaClock,
     OpusRecoveryLanding, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
     opus_seek::OpusRecoverySeek,
 };
+use plain_scan::{PlainChoice, PlainScan, PlainStep, PlainTrack};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
+
+mod plain_scan;
 
 #[derive(Clone, Copy, Debug)]
 pub struct IndexLimits {
@@ -101,6 +104,19 @@ impl RunCarry {
         }
     }
 }
+/// The fields of a ready [`IndexEntry`] other than its occurrence, which stays in
+/// the packet cursor until the entry is taken.
+#[derive(Clone, Copy, Debug)]
+struct EntryFields {
+    ordinal: u64,
+    position: i64,
+    timestamp: i64,
+    flags: i32,
+    raw_flag_bits: u8,
+    size: u32,
+    min_distance: i32,
+}
+
 /// One demux table stream, keeping a single ready projection. A complete
 /// source is mandatory for the existing explicit absent-tfdt demux origin.
 #[derive(Debug)]
@@ -111,7 +127,7 @@ pub struct IndexCursor<'a> {
     distance: u64,
     run: Option<(usize, usize)>,
     carry: Option<RunCarry>,
-    ready: Option<IndexEntry>,
+    ready: Option<EntryFields>,
     failed: Option<Error>,
     allow_initial_nonkey: bool,
     dependency_table: bool,
@@ -232,7 +248,10 @@ impl<'a> IndexCursor<'a> {
                 let next = self.next.checked_add(1).ok_or(Error::Overflow)?;
                 bound(next, self.max_entries)?;
                 let source_run = self.cursor.ready_source_run()?;
-                let occurrence = self.cursor.take_occurrence()?;
+                let occurrence = self
+                    .cursor
+                    .occurrence()
+                    .ok_or(Error::Invalid("no ready native packet"))?;
                 // Public AVIndexEntry has key/discard bits, independently of
                 // AVPacket's disposable hint. Preserve that hint on the retained
                 // occurrence, while the separately typed index keeps its own ABI.
@@ -291,7 +310,7 @@ impl<'a> IndexCursor<'a> {
                             && (previous.flags ^ flags) & !0x800 == 0
                             && flags & 0x400 != 0
                             && occurrence.demux.flags & 4 == 0
-                            && previous.clocks_continue(&occurrence)
+                            && previous.clocks_continue(occurrence)
                     }
                     _ => false,
                 };
@@ -342,9 +361,8 @@ impl<'a> IndexCursor<'a> {
                     demux_dts: occurrence.demux.dts,
                     demux_exact_dts: occurrence.demux.dts_field.exact_ticks,
                 });
-                let entry = IndexEntry {
+                let entry = EntryFields {
                     ordinal: self.next,
-                    track_id: occurrence.track_id,
                     position: i64::try_from(occurrence.source.range.start)
                         .map_err(|_| Error::Unsupported("native index signed position"))?,
                     timestamp: occurrence.demux.dts_field.signed_ticks(),
@@ -353,7 +371,6 @@ impl<'a> IndexCursor<'a> {
                     size: u32::try_from(size).map_err(|_| Error::Overflow)?,
                     min_distance: i32::try_from(distance)
                         .map_err(|_| Error::Unsupported("native index signed distance"))?,
-                    occurrence,
                 };
                 self.next = next;
                 self.distance = distance;
@@ -368,9 +385,81 @@ impl<'a> IndexCursor<'a> {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        self.ready
+        let fields = self
+            .ready
             .take()
-            .ok_or(Error::Invalid("no ready native index entry"))
+            .ok_or(Error::Invalid("no ready native index entry"))?;
+        let occurrence = self.cursor.take_occurrence()?;
+        Ok(IndexEntry {
+            ordinal: fields.ordinal,
+            track_id: occurrence.track_id,
+            position: fields.position,
+            timestamp: fields.timestamp,
+            flags: fields.flags,
+            raw_flag_bits: fields.raw_flag_bits,
+            size: fields.size,
+            min_distance: fields.min_distance,
+            occurrence,
+        })
+    }
+
+    /// The ready entry, before it is taken or skipped.
+    fn ready_entry(&self) -> Result<(EntryFields, &PacketOccurrence)> {
+        let fields = self
+            .ready
+            .ok_or(Error::Invalid("no ready native index entry"))?;
+        let occurrence = self
+            .cursor
+            .occurrence()
+            .ok_or(Error::Invalid("no ready native packet"))?;
+        Ok((fields, occurrence))
+    }
+
+    /// Drop the ready entry without moving its occurrence.
+    fn skip_entry(&mut self) {
+        self.ready = None;
+        self.cursor.discard_occurrence();
+    }
+
+    /// Prepares the index and, before its first entry, finds whether a seek to
+    /// `query` can read its entries from the track's tables: still `Untried`
+    /// when the work is spent.
+    fn prepare_plain(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        query: i128,
+        allow_initial_prefix: bool,
+    ) -> Result<Plain<'a>> {
+        if self.next != 0 || self.ready.is_some() || self.dependency_table {
+            return Ok(Plain::Off);
+        }
+        let PlainPrepare::Ready(source) = self.cursor.prepare_plain(work, cancel)? else {
+            return Ok(Plain::Untried);
+        };
+        Ok(source.map_or(Plain::Off, |source| {
+            Plain::Scanning(PlainScan::new(PlainTrack {
+                source,
+                allow_initial_nonkey: self.allow_initial_nonkey,
+                allow_initial_prefix,
+                max_entries: self.max_entries,
+                // As the first entry does, take a fragment edit's media start
+                // from the query.
+                target: query - i128::from(self.cursor.index_edit_offset()),
+            }))
+        }))
+    }
+
+    /// Continue a prepared plain index from `start`, whose sample is entry
+    /// `ordinal`. `false` when the work is spent.
+    fn start_plain_at(
+        &mut self,
+        start: PlainStart<'a>,
+        ordinal: u64,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        self.next = ordinal;
+        self.cursor.start_plain_at(start, work)
     }
 }
 
@@ -416,6 +505,12 @@ pub struct SeekJob<'a> {
     index_timestamp: i128,
     first: Option<IndexEntry>,
     best: Option<IndexEntry>,
+    /// The track's packet state at `first` and `best`, kept when a global seek
+    /// starts its packets there.
+    first_resume: Option<TrackResume<'a>>,
+    best_resume: Option<TrackResume<'a>>,
+    keep_resume: bool,
+    plain: Plain<'a>,
     previous: Option<i64>,
     unordered_minimum: Option<i64>,
     scanned: u64,
@@ -423,10 +518,26 @@ pub struct SeekJob<'a> {
     ready: bool,
     failed: Option<Error>,
 }
+/// Where a seek stands with reading a track's entries from its tables.
+// One per seek job.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum Plain<'a> {
+    /// The index has not been prepared yet.
+    Untried,
+    Scanning(PlainScan<'a>),
+    /// The scan chose this entry; the index moves to it.
+    Starting(PlainChoice<'a>),
+    /// The index produces the chosen entry next.
+    Selecting(PlainChoice<'a>),
+    /// The seek reads every entry.
+    Off,
+}
 #[derive(Debug)]
 pub struct SeekPlan<'a> {
     context: Context<'a>,
     landing: SeekLanding,
+    resume: Option<TrackResume<'a>>,
 }
 /// Resumes the real demux occurrence state by a bounded metadata replay from
 /// original tables. Skipped metadata causes no payload reads or caller output.
@@ -492,6 +603,10 @@ impl<'a> SeekJob<'a> {
             index_timestamp: i128::from(timestamp),
             first: None,
             best: None,
+            first_resume: None,
+            best_resume: None,
+            keep_resume: false,
+            plain: Plain::Untried,
             previous: None,
             unordered_minimum: None,
             scanned: 0,
@@ -518,46 +633,71 @@ impl<'a> SeekJob<'a> {
             if self.ready {
                 return Ok(BuildStatus::Ready);
             }
+            if !matches!(self.plain, Plain::Off) && self.poll_plain(work, cancel)? {
+                return Ok(BuildStatus::Yield);
+            }
+            if self.ready {
+                return Ok(BuildStatus::Ready);
+            }
             match self.index.poll(work, cancel)? {
                 CursorStatus::Yield => return Ok(BuildStatus::Yield),
                 CursorStatus::Ready => {
                     if !work.try_charge(1) {
                         return Ok(BuildStatus::Yield);
                     }
-                    let entry = self.index.take_entry()?;
-                    if entry.timestamp == i64::MIN {
+                    let (fields, occurrence) = self.index.ready_entry()?;
+                    let (timestamp, key) = (fields.timestamp, fields.flags & 1 != 0);
+                    if timestamp == i64::MIN {
                         return Err(Error::Unsupported("native seek null index clock"));
                     }
+                    // A secondary track can replay its non-sync prefix. The
+                    // primary needs a preceding key.
+                    let nonkey_first = self.scanned == 0
+                        && !key
+                        && (occurrence.source.fragment_flags.is_some()
+                            || self.context.encoded_edits.is_some());
                     if self.scanned == 0 {
                         // A fragment seek subtracts the media start from its
                         // query. A leading empty edit delays index timestamps.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
-                        // A secondary track can replay its non-sync prefix.
-                        // The primary needs a preceding key.
-                        if entry.flags & 1 == 0
-                            && (entry.occurrence.source.fragment_flags.is_some()
-                                || self.context.encoded_edits.is_some())
-                        {
-                            self.first = Some(entry.clone());
-                        }
                     }
-                    if self.previous.is_some_and(|prior| entry.timestamp <= prior)
+                    if self.previous.is_some_and(|prior| timestamp <= prior)
                         || self.unordered_minimum.is_some()
                     {
                         self.unordered_minimum = Some(
                             self.unordered_minimum
-                                .map_or(entry.timestamp, |v| v.min(entry.timestamp)),
+                                .map_or(timestamp, |v| v.min(timestamp)),
                         );
                     }
-                    self.previous = Some(entry.timestamp);
+                    self.previous = Some(timestamp);
                     self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
-                    if entry.flags & 1 != 0 {
-                        if self.first.is_none() {
-                            self.first = Some(entry.clone());
+                    let first = nonkey_first || (key && self.first.is_none());
+                    let best = key && i128::from(timestamp) <= self.index_timestamp;
+                    if !first && !best {
+                        // Only selectable entries leave the index cursor.
+                        self.index.skip_entry();
+                        continue;
+                    }
+                    if self.keep_resume {
+                        let cursor = &self.index.cursor;
+                        if first {
+                            self.first_resume =
+                                Some(cursor.ready_track_resume(fields.ordinal, None)?);
                         }
-                        if i128::from(entry.timestamp) <= self.index_timestamp {
+                        if best {
+                            let previous = self.best_resume.take();
+                            self.best_resume =
+                                Some(cursor.ready_track_resume(fields.ordinal, previous)?);
+                        }
+                    }
+                    let entry = self.index.take_entry()?;
+                    match (first, best) {
+                        (true, true) => {
+                            self.first = Some(entry.clone());
                             self.best = Some(entry);
                         }
+                        (true, false) => self.first = Some(entry),
+                        _ => self.best = Some(entry),
                     }
                 }
                 CursorStatus::End => {
@@ -589,6 +729,74 @@ impl<'a> SeekJob<'a> {
             }
         }
     }
+    /// Seeks a plain regular track from its table where it can. `true` when the
+    /// work is spent; otherwise the seek is ready or reads every entry.
+    fn poll_plain(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        loop {
+            match &mut self.plain {
+                Plain::Off => return Ok(false),
+                Plain::Untried => {
+                    let next = self.index.prepare_plain(
+                        work,
+                        cancel,
+                        self.index_timestamp,
+                        self.allow_initial_prefix,
+                    )?;
+                    if matches!(next, Plain::Untried) {
+                        return Ok(true);
+                    }
+                    self.plain = next;
+                }
+                Plain::Scanning(scan) => match scan.poll(work) {
+                    PlainStep::Yield => return Ok(true),
+                    PlainStep::GiveUp => self.plain = Plain::Off,
+                    PlainStep::Done(choice) => self.plain = Plain::Starting(choice),
+                },
+                Plain::Starting(choice) => {
+                    let choice = *choice;
+                    if !self
+                        .index
+                        .start_plain_at(choice.start, choice.ordinal, work)?
+                    {
+                        return Ok(true);
+                    }
+                    self.plain = Plain::Selecting(choice);
+                }
+                Plain::Selecting(choice) => {
+                    let choice = *choice;
+                    match self.index.poll(work, cancel)? {
+                        CursorStatus::Yield => return Ok(true),
+                        CursorStatus::End => {
+                            return Err(Error::Invalid("plain seek selection vanished"));
+                        }
+                        CursorStatus::Ready => {}
+                    }
+                    let resume = if self.keep_resume {
+                        Some(self.index.cursor.ready_track_resume(choice.ordinal, None)?)
+                    } else {
+                        None
+                    };
+                    let entry = self.index.take_entry()?;
+                    if entry.ordinal != choice.ordinal
+                        || (entry.flags & 1 == 0 && !choice.first_fallback)
+                    {
+                        return Err(Error::Invalid("plain seek selection disagreement"));
+                    }
+                    if choice.first_fallback {
+                        self.first = Some(entry);
+                        self.first_resume = resume;
+                    } else {
+                        self.best = Some(entry);
+                        self.best_resume = resume;
+                    }
+                    self.scanned = choice.scanned;
+                    self.plain = Plain::Off;
+                    self.ready = true;
+                    return Ok(false);
+                }
+            }
+        }
+    }
     pub fn finish(mut self) -> Result<SeekPlan<'a>> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -602,8 +810,14 @@ impl<'a> SeekJob<'a> {
             .take()
             .or_else(|| self.first.take())
             .ok_or(Error::Invalid("missing native seek selection"))?;
+        let resume = if used_first_fallback {
+            self.first_resume
+        } else {
+            self.best_resume
+        };
         Ok(SeekPlan {
             context: self.context,
+            resume,
             landing: SeekLanding {
                 requested_timestamp: self.timestamp,
                 selected,
@@ -744,6 +958,8 @@ pub struct GlobalSeekJob<'a> {
     reference_base: TimeBase,
     reference: Option<SeekLanding>,
     anchors: BudgetVec<ResumePoint>,
+    /// Each track's packet state at its anchor, when its seek kept one.
+    resumes: BudgetVec<Option<TrackResume<'a>>>,
     child: Option<SeekJob<'a>>,
     opus_track: Option<usize>,
     opus_recovery: Option<Box<OpusRecoverySeek<'a>>>,
@@ -763,6 +979,8 @@ pub struct GlobalSeekPlan<'a> {
     projection: TrackProjection,
     reference: SeekLanding,
     anchors: BudgetVec<ResumePoint>,
+    /// Every track's packet state at its anchor, when all were kept.
+    resumes: Option<BudgetVec<TrackResume<'a>>>,
 }
 enum GlobalSeekMode<'a> {
     SameBase,
@@ -896,6 +1114,8 @@ impl<'a> GlobalSeekJob<'a> {
         owned.try_reserve_exact(tracks.len())?;
         let mut anchors = BudgetVec::new(pool);
         anchors.try_reserve_exact(tracks.len())?;
+        let mut resumes = BudgetVec::new(pool);
+        resumes.try_reserve_exact(tracks.len())?;
         for (i, track) in tracks.iter().enumerate() {
             if tracks[..i].iter().any(|t| t.track_id == track.track_id) {
                 return Err(Error::Invalid("duplicate native seek track"));
@@ -915,6 +1135,7 @@ impl<'a> GlobalSeekJob<'a> {
                     occurrence: 0,
                 })
                 .map_err(|e| e.error)?;
+            resumes.try_push(None).map_err(|e| e.error)?;
         }
         let mut job = Self {
             pool: pool.clone(),
@@ -928,6 +1149,7 @@ impl<'a> GlobalSeekJob<'a> {
             reference_base: base,
             reference: None,
             anchors,
+            resumes,
             child: None,
             opus_track: None,
             opus_recovery: None,
@@ -936,10 +1158,9 @@ impl<'a> GlobalSeekJob<'a> {
             ready: false,
             failed: None,
         };
-        job.child = Some(SeekJob::build(
-            job.track_context(reference_index),
-            timestamp,
-        )?);
+        let mut child = SeekJob::build(job.track_context(reference_index), timestamp)?;
+        child.keep_resume = job.projection.is_all();
+        job.child = Some(child);
         Ok(job)
     }
     fn track_context(&self, at: usize) -> Context<'a> {
@@ -1017,12 +1238,13 @@ impl<'a> GlobalSeekJob<'a> {
                 if !work.try_charge(1) {
                     return Ok(BuildStatus::Yield);
                 }
-                let plan = self
+                let SeekPlan {
+                    landing, resume, ..
+                } = self
                     .child
                     .take()
                     .ok_or(Error::Invalid("native seek child absent"))?
                     .finish()?;
-                let landing = plan.landing().clone();
                 self.scanned = self
                     .scanned
                     .checked_add(landing.scanned_entries)
@@ -1047,6 +1269,7 @@ impl<'a> GlobalSeekJob<'a> {
                     )?);
                 } else {
                     self.anchors.as_mut_slice()[at].occurrence = landing.selected.ordinal;
+                    self.resumes.as_mut_slice()[at] = resume;
                     if self.reference.is_none() {
                         self.reference = Some(landing);
                     } else {
@@ -1095,6 +1318,7 @@ impl<'a> GlobalSeekJob<'a> {
             // its verified non-sync prefix from the beginning.
             let mut child = SeekJob::build(self.track_context(self.at), timestamp)?;
             child.allow_initial_prefix = true;
+            child.keep_resume = self.projection.is_all() && !recovering_opus;
             self.child = Some(child);
         }
     }
@@ -1106,7 +1330,19 @@ impl<'a> GlobalSeekJob<'a> {
             return Err(Error::Invalid("native global seek plan not ready"));
         }
         self.projection.retain(&mut self.anchors);
+        let resumes = if self.resumes.as_slice().iter().all(Option::is_some) {
+            let mut kept = BudgetVec::new(&self.pool);
+            kept.try_reserve_exact(self.resumes.len())?;
+            for resume in self.resumes.as_mut_slice() {
+                kept.try_push(resume.take().ok_or(Error::Invalid("native seek resume"))?)
+                    .map_err(|e| e.error)?;
+            }
+            Some(kept)
+        } else {
+            None
+        };
         Ok(GlobalSeekPlan {
+            resumes,
             pool: self.pool,
             tracks: self.tracks,
             media: self.media,
@@ -1129,6 +1365,16 @@ impl<'a> GlobalSeekPlan<'a> {
         self.anchors.as_slice()
     }
     pub fn cursor(&self) -> Result<PacketCursor<'a>> {
+        // Start where each track's seek left its packet state, as a replay from
+        // the beginning would reach it.
+        if let Some(resumes) = &self.resumes {
+            return PacketCursor::from_track_resumes(
+                &self.pool,
+                resumes.as_slice(),
+                self.media,
+                self.limits.index.packets,
+            );
+        }
         let cursor = if !self.projection.is_all() {
             PacketCursor::new_projected(
                 &self.pool,

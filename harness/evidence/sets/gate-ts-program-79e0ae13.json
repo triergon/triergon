@@ -1,0 +1,56 @@
+{
+ "name": "gate-ts-program-79e0ae13",
+ "path": "gate-ts-program-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: ts-program's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-ts-program-79e0ae13/85136ebd8227a2295ea4d04a5ae380a3aa88aa9602c00b74a4599da36e741f95.tar.zst",
+ "sha256": "85136ebd8227a2295ea4d04a5ae380a3aa88aa9602c00b74a4599da36e741f95",
+ "bytes": 3254742,
+ "results": [
+  {
+   "path": "gate-ts-program-79e0ae13/aarch64/shard-9/benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "dc4a4cb3eec6c47c57aff7073454b2c25acea0a1519c0efa1684adb094a61e8d",
+   "status": 0,
+   "report_sha256": "3cadaf6a3a2135cf8f19eb6298887c141d947080675190f8a5615c09863885fe"
+  },
+  {
+   "path": "gate-ts-program-79e0ae13/aarch64/shard-9/graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "7dbe5fb4bb28255cb44fbb4d90105bf3d6f49831fa09f6891e1cab8e197e1a6f",
+   "status": 0,
+   "report_sha256": "aadb30de95b37d4e0b27d399c46502fff3f6a9991c7759c1f9fe0f0b8cc00218"
+  },
+  {
+   "path": "gate-ts-program-79e0ae13/aarch64/shard-9/memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "49105867f163e436dafa105a3239f9967a798122dd8fa24c62b5a7042e3edfa3",
+   "status": 0,
+   "report_sha256": "8a0a80adbde92b6268eec103c2994a4fba251a0a0ad652cd3ddcd1a248c9015a"
+  },
+  {
+   "path": "gate-ts-program-79e0ae13/armv7/shard-9/benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "02d0838a114475a5223839049a81258c18f0f075ef8671284d8321eebeaf8c79",
+   "status": 0,
+   "report_sha256": "f536fce7711bff3145aecae22f56c29ae4538abeb05b9241c969031cba45f7af"
+  },
+  {
+   "path": "gate-ts-program-79e0ae13/armv7/shard-9/graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "d07917629089707c1af6e1f285a751fc3bc8535e9734c49e549aaa2b1e5d269e",
+   "status": 0,
+   "report_sha256": "8ab6826dbb8e3f77b4f87277b48d33f092f5ace79356bc673fa3bde5bc93c20e"
+  },
+  {
+   "path": "gate-ts-program-79e0ae13/armv7/shard-9/memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "258ba4133a5c6b45bee4c97c82db7b101d8426432f41771ffd4ae76aef8baf88",
+   "status": 0,
+   "report_sha256": "fdd42ce80e73804c441749a99e394e07380780d47e622c6afa054231ffa0c328"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

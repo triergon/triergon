@@ -1,0 +1,27 @@
+# Where a CFF2 charstring goes on after a subroutine that ends inside a
+# number or after an escape byte, and after endchar, which CFF2 does not
+# define. Local 0 draws `10 20 rlineto` and ends in a 16.16 number cut after
+# its third byte; local 1 draws the same and ends in an escape byte. Each
+# glyph moves to (100, 100) first; a line of 3000 right drawn after the call
+# or after endchar shows whether the glyph's charstring went on.
+format cff2
+local
+  10 20 rlineto byte:255 byte:0 byte:1
+end
+local
+  10 20 rlineto byte:12
+end
+glyph
+end
+glyph # 1: local 0, then a line
+  100 100 rmoveto -107 callsubr 3000 0 rlineto
+end
+glyph # 2: local 1, then a line
+  100 100 rmoveto -106 callsubr 3000 0 rlineto
+end
+glyph # 3: a line, endchar, then a line
+  100 100 rmoveto 10 20 rlineto endchar 3000 0 rlineto
+end
+glyph # 4: local 0 alone
+  100 100 rmoveto -107 callsubr
+end

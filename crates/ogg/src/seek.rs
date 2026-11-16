@@ -4,28 +4,38 @@
 //! A seek to `target` on a track lands on the packet whose output is needed first:
 //!
 //! - with [`SeekPolicy::PreviousRandomAccess`], the packet containing the target, or for
-//!   Vorbis the packet before it, whose block the target packet overlaps;
+//!   Vorbis the packet before it, whose block the target packet overlaps, or for Theora
+//!   the keyframe the target frame is decoded from;
 //! - with [`SeekPolicy::PlaybackPreroll`], the same for `target` less the mapping's
 //!   preroll (Opus 80 ms, RFC 7845 section 4.6), with output discarded up to the target.
 //!
-//! On a random-access source of known length the reader bisects the track's link for
-//! the last page of the track whose granule position is early enough, probing a bounded
-//! number of bytes at each step, and reads forward from it. Otherwise it reads the
-//! source again from its start.
+//! The target is on the physical stream's timeline. In a chained source the seek lands
+//! in the link that holds it, on the track at the requested track's position among its
+//! link's tracks: a known link that starts at or before the target, or, past the last
+//! known link, the links that follow it as reading reaches them.
+//!
+//! On a random-access source of known length the reader bisects the link for the last
+//! page of the track whose granule position is early enough, probing a bounded number
+//! of bytes at each step, and reads forward from it; a Theora target that is not a
+//! keyframe bisects again for the keyframe its page's granule positions name (Theora I
+//! appendix A.2.3). Otherwise it reads the source again from its start.
+use crate::mapping::Timeline;
 use crate::page::{MAX_PAGE, Page};
 use crate::queue::Queue;
-use crate::track::Packet;
-use triergon_core::container::{Event, SeekMethod, SeekPolicy, SeekReceipt};
-use triergon_core::{Result, Time, TimeBase};
+use crate::track::{Packet, Track};
+use triergon_core::container::{Event, RandomAccess, SeekMethod, SeekPolicy, SeekReceipt};
+use triergon_core::{Result, Rounding, Time, TimeBase};
 
 /// Search spans at most this long are read forward instead of probed.
 const LINEAR: u64 = MAX_PAGE as u64;
 
-/// A bisection over one link's pages for the last page of a serial at or before a
-/// granule position.
+/// A bisection over one link's pages for the last page of a serial whose packets end
+/// at or before a tick.
 #[derive(Debug)]
 pub(crate) struct Bisection {
     serial: u32,
+    timeline: Timeline,
+    /// In link-local ticks of the track time base.
     goal: i64,
     /// Pages before this offset hold headers.
     data: u64,
@@ -52,6 +62,7 @@ pub(crate) enum Probe {
 impl Bisection {
     pub(crate) fn new(
         serial: u32,
+        timeline: Timeline,
         goal: i64,
         start: u64,
         data: u64,
@@ -60,6 +71,7 @@ impl Bisection {
     ) -> Bisection {
         Bisection {
             serial,
+            timeline,
             goal,
             data,
             lo: start,
@@ -108,7 +120,7 @@ impl Bisection {
             && page.offset >= self.data
             && let Some(granule) = header.granule_position()
         {
-            if granule <= self.goal {
+            if self.timeline.ticks(granule) <= self.goal {
                 self.lo = page.offset;
             } else {
                 self.hi = start;
@@ -142,7 +154,15 @@ pub(crate) struct Landing {
     pub policy: SeekPolicy,
     /// Packets ending at or before this tick are not needed.
     pub threshold: i64,
-    pub primes: bool,
+    primes: bool,
+    /// The track's timeline and link offset, for the keyframes its granule positions
+    /// name.
+    timeline: Timeline,
+    offset: i64,
+    /// Where the last keyframe of the track seen starts, for mappings with keyframes.
+    keyframe: Option<i64>,
+    /// The threshold was moved back to the keyframe the target needs.
+    rewound: bool,
     pub method: SeekMethod,
     pub scanned: u64,
     pub replays_from_start: bool,
@@ -151,44 +171,111 @@ pub(crate) struct Landing {
     last_end: Option<i64>,
 }
 
+/// What offering a packet did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Offer {
+    /// The packet is not needed.
+    Skipped,
+    /// The seek has landed: the receipt and the packets from the landing are queued.
+    Landed,
+    /// The target is not a keyframe: delivery must restart before the keyframe it
+    /// needs, which the threshold now names.
+    Rewind,
+}
+
 impl Landing {
+    /// A landing on track `index` for `requested`.
     pub(crate) fn new(
-        track: usize,
+        index: usize,
+        track: &Track,
         requested: Time,
         policy: SeekPolicy,
-        threshold: i64,
-        primes: bool,
         method: SeekMethod,
-        time_base: TimeBase,
-    ) -> Landing {
-        Landing {
-            track,
+    ) -> Result<Landing> {
+        let mut landing = Landing {
+            track: index,
             requested,
             policy,
-            threshold,
-            primes,
+            threshold: 0,
+            primes: false,
+            timeline: *track.timeline(),
+            offset: 0,
+            keyframe: None,
+            rewound: false,
             method,
             scanned: 0,
             replays_from_start: method == SeekMethod::Restart,
-            time_base,
+            time_base: track.time_base,
             held: None,
             last_end: None,
-        }
+        };
+        landing.retarget(index, track)?;
+        Ok(landing)
     }
 
-    /// Offer a packet; `true` when the seek has landed and `out` holds the receipt and
-    /// the packets that follow.
-    pub(crate) fn offer(&mut self, packet: Packet, out: &mut Queue<Output>) -> Result<bool> {
+    /// Land on another track instead: the one at the same position of the next chain
+    /// link, when the seek did not land in the previous one.
+    pub(crate) fn retarget(&mut self, index: usize, track: &Track) -> Result<()> {
+        let timeline = *track.timeline();
+        let preroll = match self.policy {
+            SeekPolicy::PlaybackPreroll => timeline.preroll(),
+            SeekPolicy::PreviousRandomAccess => 0,
+        };
+        let target = self
+            .requested
+            .to_i64_ticks(track.time_base, Rounding::Floor)?;
+        self.track = index;
+        self.threshold = target.saturating_sub(preroll);
+        self.primes = timeline.primes();
+        self.timeline = timeline;
+        self.offset = track.offset;
+        self.keyframe = None;
+        self.rewound = false;
+        self.time_base = track.time_base;
+        self.held = None;
+        self.last_end = None;
+        Ok(())
+    }
+
+    /// Offer a packet of any track.
+    pub(crate) fn offer(&mut self, packet: Packet, out: &mut Queue<Output>) -> Result<Offer> {
         if packet.index != self.track {
-            return Ok(false);
+            return Ok(Offer::Skipped);
         }
         let end = packet.end();
+        // The keyframe this packet is decoded from: the last keyframe packet, or the
+        // one its page's granule position names when it ends the page.
+        let keyframes = self.timeline.keyframes();
+        if keyframes {
+            if packet.random_access == RandomAccess::Sync {
+                self.keyframe = packet.pts;
+            }
+            // A keyframe tick out of range names none.
+            if let Some(named) = packet
+                .granule
+                .and_then(|g| self.timeline.keyframe(g))
+                .and_then(|tick| tick.checked_add(self.offset))
+            {
+                self.keyframe = Some(named);
+            }
+        }
         if end.is_none_or(|end| end <= self.threshold) {
             self.last_end = end.or(self.last_end);
             if self.primes {
                 self.held = Some(packet);
             }
-            return Ok(false);
+            return Ok(Offer::Skipped);
+        }
+        if keyframes
+            && !self.rewound
+            && packet.random_access != RandomAccess::Sync
+            && let Some(keyframe) = self.keyframe
+        {
+            // Packets ending at or before the keyframe's start are not needed.
+            self.rewound = true;
+            self.threshold = keyframe;
+            self.last_end = None;
+            return Ok(Offer::Rewind);
         }
         let first = self.held.take();
         self.announce(first.as_ref().unwrap_or(&packet), out)?;
@@ -196,7 +283,7 @@ impl Landing {
             out.push(Event::Packet(first))?;
         }
         out.push(Event::Packet(packet))?;
-        Ok(true)
+        Ok(Offer::Landed)
     }
 
     /// The input ended before the landing: land on the last packet seen, or where the

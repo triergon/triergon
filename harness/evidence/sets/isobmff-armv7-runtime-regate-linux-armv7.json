@@ -1,0 +1,10 @@
+{
+ "name": "isobmff-armv7-runtime-regate-linux-armv7",
+ "path": "isobmff-armv7-runtime-regate-linux-armv7",
+ "retention": "retained",
+ "reason": "ISO BMFF open and index, 32-bit ARMv7: the 30-pair timing and memory collection on the gate build, instruction counts against the earlier revision, the playback worker's same-code comparison, observed resident peaks recomputed for this and the two earlier runs, with the CPU, kernel and user-space package list",
+ "key": "evidence/isobmff-armv7-runtime-regate-linux-armv7/bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1.tar.gz",
+ "sha256": "bb7a7df1df72022fd2cdb617e6f0876327405c2833a0e056d319ff97d5fcbfe1",
+ "bytes": 2590598677,
+ "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+}

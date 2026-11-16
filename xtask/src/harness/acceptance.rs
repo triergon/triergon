@@ -227,15 +227,19 @@ pub(crate) fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
 
 /// Check a timing row against its contract: the declared iteration count, any
 /// pinned outputs, and the record itself as [`super::timing::validate`] grades it.
-pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
+pub fn timing_valid(
+    row: &Value,
+    contract: &Value,
+    selected: &Value,
+    require_linux: bool,
+    ceiling: Option<f64>,
+) -> bool {
     let timing = row.get("timing").unwrap_or(&Value::Null);
     let Ok(fields) = super::comparison::work_fields(contract) else {
         return false;
     };
-    let work = super::comparison::Work {
-        fields,
-        own: vec![],
-    };
+    let own = super::comparison::own_fields(row.get("expected_time_outputs"), &fields);
+    let work = super::comparison::Work { fields, own };
     timing
         .get("iterations")
         .is_some_and(|count| super::validation::iterations_valid(contract, count))
@@ -253,6 +257,7 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
                 work: &work,
                 require_linux,
                 module_absence: contract.get("case_operations") == Some(&Value::Bool(true)),
+                ceiling,
             },
         )
         .is_ok()
@@ -370,7 +375,13 @@ fn grade_case_with_runtime(
     let upper = float(timing.get("ratio").and_then(|r| r.get("upper_95"))).unwrap_or(f64::INFINITY);
     let prerequisites_pass = reasons.is_empty();
     let timing_ok = s(timing, "status") == Some("measured")
-        && timing_valid(row, contract, &selected, require_linux)
+        && timing_valid(
+            row,
+            contract,
+            &selected,
+            require_linux,
+            runtime.map(|gate| gate.ceiling),
+        )
         && !timing.get("contaminants").is_some_and(Value::truthy)
         && upper.is_finite()
         && upper > 0.0
@@ -410,7 +421,7 @@ fn grade_case_with_runtime(
     }
 }
 
-pub(super) fn parity_passes(row: &Value) -> bool {
+pub(crate) fn parity_passes(row: &Value) -> bool {
     row.get("parity").is_some_and(|proof| {
         s(proof, "status") == Some("pass") && s(proof, "source_timing_status") == Some("pass")
     })
@@ -670,7 +681,7 @@ pub(crate) fn acceptance_iter(
     }
     match gate_build::pinned_release(root) {
         Ok(pinned) => reasons.extend(
-            gate_build::refusals(identity, &pinned)
+            gate_build::identity_refusals(root, identity, &pinned)
                 .into_iter()
                 .map(|reason| format!("not the gate build: {reason}")),
         ),

@@ -1,9 +1,10 @@
 # triergon-codec-h264
 
 H.264/AVC decoder for Annex B byte streams, written from Rec. ITU-T H.264 (08/2024). It
-is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md) and
-[triergon-codec](../codec/README.md)
-(it implements `VideoDecoder`) and builds on stable Rust. It
+is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md),
+[triergon-codec](../codec/README.md) (it implements `VideoDecoder`) and
+[triergon-framing](../framing/README.md) (Annex B units and the decoded picture buffer),
+and builds on stable Rust. It
 decodes 8-bit 4:2:0 (and 4:0:0) Constrained Baseline, Main and High streams to cropped
 pictures in output order. It does not scale, convert colour or conceal damaged slices.
 
@@ -44,7 +45,7 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 | Prediction | Intra 4x4/8x8/16x16, constrained intra; spatial and temporal direct; default, explicit and implicit weighted prediction |
 | Transform | 4x4 and 8x8, scaling matrices (SPS and PPS, fall-back rules A/B) |
 | References | POC types 0/1/2, list modification, sliding window, all MMCO operations, long-term references, frame_num gaps |
-| Output | DPB bumping (level limits, `max_dec_frame_buffering`, `max_num_reorder_frames`), cropping, VUI SAR and colour description |
+| Output | The decoded picture buffer of `triergon-framing`'s `picture_output`: removal (C.4.4) and bumping (C.4.5.3) while more frames are stored than the DPB size (level limit or `max_dec_frame_buffering`) or more than `max_num_reorder_frames` wait; cropping, VUI SAR and colour description |
 
 ## Behaviour and limits
 
@@ -62,9 +63,19 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   base view decodes. Redundant slices are dropped.
 - Limits: at most 1024 macroblocks per side; DPB size from the level or
   `max_dec_frame_buffering`.
+- Output order: after a picture is decoded and marked, an IDR picture or
+  `memory_management_control_operation` 5 outputs every prior picture (or discards them
+  with `no_output_of_prior_pics_flag`), the picture is stored, and the picture waiting
+  with the lowest order count is output while the condition above holds. A first field
+  is not output before its second field joins it, or before the next picture shows that
+  none comes; pictures with equal order counts leave in decode order. A frame store is
+  free once its picture is output and unused for reference; at most three more stores
+  than the DPB size are made, and when every one holds a picture, pictures are output
+  until one is free (a buffer of reference pictures none of which waits is
+  `ResourceLimit`).
 - Storage: frame buffers (also while output pictures share them), motion and macroblock
-  arrays, deblocking state, RBSP and slice lists are charged to a `Budget` before they are
-  allocated. `Decoder::with_limits(Limits { live_storage_bytes })` gives the decoder its
+  arrays, the decoded picture buffer, deblocking state, RBSP and slice lists are charged
+  to a `Budget` before they are allocated. `Decoder::with_limits(Limits { live_storage_bytes })` gives the decoder its
   own pool (320 MiB by default) and `Decoder::new_in(&budget)` charges a caller's pool. A
   refused charge is `DecodeError::Budget`; that picture is not decoded and the decoder
   stays usable. The default covers a level 5.2 DPB (184320 macroblocks) and five more

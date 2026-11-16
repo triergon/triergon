@@ -12,6 +12,17 @@
 //! the scope of exactly one disposition the case lists; otherwise the view fails.
 //! Every case is a row, and the run writes its unexplained differences, attributed
 //! where a scope matches, to `OUT.differences.json` for review.
+//!
+//! A seek case (`--seeks`, `harness/codecs/reader-seeks.json`) compares the packets
+//! after a seek the same way: `codec-worker seek ogg FILE TRACK SECONDS POLICY` against
+//! `ffprobe -read_intervals SECONDS%` of the same file, from the reader's landing to the
+//! end. FFmpeg lands on a page start: the packets it delivers before the reader's
+//! landing are counted and not compared (see `before_landing`), and the rest are aligned
+//! by position and size, packets that differ in both never pairing, so that packets of
+//! different chain links do not pair. The reader's own landing is checked as well: a
+//! case fails where the receipt lands after the requested time or the sought stream's
+//! first packet starts after it (`landing_check`); in a chained file that is the track
+//! at the case track's position in the link the reader sought.
 
 use std::fs;
 use std::io::Write;
@@ -42,9 +53,12 @@ const FIELDS: [&str; 7] = [
 const OTHER: [&str; 4] = ["unmatched", "packets", "streams", "end"];
 const RULES: &str = "harness/codecs/reader-rules.json";
 const DIFFERENCES: &str = "harness/codecs/reader-differences.json";
+pub const SEEKS_SCHEMA: &str = "triergon.codecs.reader-seeks.v1";
+/// The lane of seek case rows.
+const SEEK_LANE: &str = "reader-ogg-seek";
 pub const DIFFERENCES_SCHEMA: &str = "triergon.codecs.reader-differences.v1";
 /// The columns of one recorded difference.
-const COLUMNS: [&str; 7] = [
+pub(super) const COLUMNS: [&str; 7] = [
     "stream",
     "candidate_packet",
     "reference_packet",
@@ -70,7 +84,7 @@ pub fn format(lane: &str) -> Option<&'static str> {
 /// File name suffixes a reader lane's manifest takes.
 pub fn suffixes(lane: &str) -> Option<&'static [&'static str]> {
     Some(match lane {
-        "reader-ogg" => &[".ogg", ".oga", ".opus"],
+        "reader-ogg" => &[".ogg", ".oga", ".opus", ".ogv", ".spx"],
         "reader-flac" => &[".flac"],
         "reader-mp3" => &[".mp1", ".mp2", ".mp3", ".bit"],
         "reader-aac" => &[".aac", ".adts"],
@@ -127,8 +141,12 @@ struct ViewRules {
 #[derive(Clone, Debug, PartialEq)]
 struct FormatRules {
     streams: Streams,
+    /// The FFmpeg stream types compared (`codec_type`); others are counted.
+    media: Vec<String>,
     /// The packet field both sides' packets are aligned by.
     align_by: usize,
+    /// Packets that differ in both the aligned field and the size never pair.
+    apart: bool,
     native: ViewRules,
     compat: Option<ViewRules>,
 }
@@ -162,6 +180,10 @@ enum Packets {
     Resplit,
     /// A paired packet right after an unpaired one.
     AfterUnmatched,
+    /// A reader packet of a chain link after the first.
+    LaterLink,
+    /// A reader packet that ends a page stating granule position 0.
+    ZeroGranulePage,
 }
 
 impl Packets {
@@ -179,6 +201,8 @@ impl Packets {
             "unmatched-candidate" => Packets::UnmatchedCandidate,
             "resplit" => Packets::Resplit,
             "after-unmatched" => Packets::AfterUnmatched,
+            "later-link" => Packets::LaterLink,
+            "zero-granule-page" => Packets::ZeroGranulePage,
             _ => return None,
         })
     }
@@ -223,6 +247,7 @@ struct Disposition {
 #[derive(Clone, Debug, PartialEq)]
 struct Reviewed {
     sha256: String,
+    name: String,
     view: View,
     dispositions: Vec<String>,
     difference_sha256: String,
@@ -314,7 +339,7 @@ fn scope(value: &Value, id: &str) -> Result<Scope, String> {
 }
 
 /// The canonical text a difference list is hashed by: its rows without dispositions.
-fn list_sha256(rows: &[Value]) -> String {
+pub(super) fn list_sha256(rows: &[Value]) -> String {
     sha256::hex(json::canonical(&Value::Array(rows.to_vec())).as_bytes())
 }
 
@@ -359,11 +384,19 @@ impl Rules {
                     .get("compat")
                     .map(|v| view_rules(v, &format!("formats.{name}.views.compat")))
                     .transpose()?;
+                let media = match rules.get("media") {
+                    None => vec!["audio".to_owned()],
+                    Some(value) => text_list(Some(value))
+                        .filter(|m| !m.is_empty())
+                        .ok_or_else(|| format!("formats.{name}.media"))?,
+                };
                 Ok((
                     name.clone(),
                     FormatRules {
                         streams,
+                        media,
                         align_by,
+                        apart: false,
                         native,
                         compat,
                     },
@@ -446,6 +479,7 @@ impl Rules {
             }
             reviewed.push(Reviewed {
                 sha256: sha,
+                name,
                 view,
                 dispositions: listed,
                 difference_sha256,
@@ -477,6 +511,91 @@ pub struct Options {
     pub out: PathBuf,
     pub only: Option<String>,
     pub rules: Rules,
+    /// The seek cases, from `--seeks`.
+    pub seeks: Vec<SeekCase>,
+}
+
+/// One seek case of `harness/codecs/reader-seeks.json`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SeekCase {
+    name: String,
+    /// The manifest vector it reads.
+    input: String,
+    track: usize,
+    seconds: String,
+    /// `exact` or `preroll`.
+    policy: String,
+    /// Where FFmpeg is asked to seek: `seconds` less the preroll the reader applies.
+    reference_seconds: String,
+}
+
+/// A decimal number of seconds as `codec-worker seek` and `ffprobe` take it.
+fn decimal(text: &str) -> bool {
+    let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+    !whole.is_empty()
+        && whole.bytes().all(|b| b.is_ascii_digit())
+        && fraction.bytes().all(|b| b.is_ascii_digit())
+}
+
+impl SeekCase {
+    /// The cases of a seek manifest.
+    pub fn load(path: &Path) -> Result<Vec<SeekCase>, String> {
+        SeekCase::parse(&crate::checks::read_json(path)?)
+            .map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    fn parse(document: &Value) -> Result<Vec<SeekCase>, String> {
+        if document.get("schema").and_then(Value::as_str) != Some(SEEKS_SCHEMA) {
+            return Err(format!("schema is not {SEEKS_SCHEMA}"));
+        }
+        if document
+            .get("contract")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err("no contract".into());
+        }
+        let mut cases: Vec<SeekCase> = Vec::new();
+        for case in document
+            .get("cases")
+            .and_then(Value::as_array)
+            .ok_or("no cases")?
+        {
+            let text = |key: &str| {
+                case.get(key)
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("a case without {key}"))
+            };
+            let case = SeekCase {
+                name: text("name")?,
+                input: text("input")?,
+                track: int(case.get("track"))
+                    .and_then(|t| usize::try_from(t).ok())
+                    .ok_or("a case without track")?,
+                seconds: text("seconds")?,
+                policy: text("policy")?,
+                reference_seconds: text("reference_seconds")?,
+            };
+            if !decimal(&case.seconds) || !decimal(&case.reference_seconds) {
+                return Err(format!("{}: seconds are not decimal", case.name));
+            }
+            if !["exact", "preroll"].contains(&case.policy.as_str()) {
+                return Err(format!("{}: unknown policy {}", case.name, case.policy));
+            }
+            if case.policy == "exact" && case.reference_seconds != case.seconds {
+                return Err(format!(
+                    "{}: an exact seek asks FFmpeg for its own target",
+                    case.name
+                ));
+            }
+            if cases.iter().any(|c| c.name == case.name) {
+                return Err(format!("{}: listed twice", case.name));
+            }
+            cases.push(case);
+        }
+        Ok(cases)
+    }
 }
 
 /// One packet's compared fields, `None` where absent.
@@ -503,6 +622,7 @@ struct Emitted {
     later_link: bool,
     after_lost: bool,
     after_resync: bool,
+    zero_granule: bool,
 }
 
 /// The reader's reading: the FFmpeg streams its tracks are, packets per stream, and
@@ -510,8 +630,12 @@ struct Emitted {
 #[derive(Debug, Default)]
 struct Candidate {
     tracks: Vec<i128>,
+    /// The FFmpeg stream of each reader track, by track index.
+    stream_of_track: Vec<(i128, i128)>,
     streams: Vec<(i128, Vec<Emitted>)>,
     error: Option<String>,
+    /// The seek receipt line, for a seek case.
+    receipt: Option<Value>,
 }
 
 /// The pinned `ffprobe` reading.
@@ -522,6 +646,8 @@ struct Reference {
     time_bases: Vec<(i128, Ratio)>,
     error: Option<String>,
     other_packets: i128,
+    /// Streams of types not compared.
+    ignored: Vec<i128>,
     code: i64,
     stderr: String,
 }
@@ -552,21 +678,30 @@ fn ratio(text: &str) -> Option<Ratio> {
     Some((n.parse().ok()?, d.parse().ok()?)).filter(|&(n, d)| n > 0 && d > 0)
 }
 
-fn reference(ffprobe: &str, format: &str, path: &str) -> Result<Reference, Stop> {
-    let argv: Vec<String> = [
-        ffprobe,
-        "-v",
-        "error",
-        "-f",
-        format,
-        "-show_entries",
-        "stream=index,codec_type,time_base:packet=stream_index,pts,dts,duration,size,pos:packet_side_data=skip_samples,discard_padding",
-        "-of",
-        "json",
-        path,
-    ]
-    .map(String::from)
-    .to_vec();
+/// FFmpeg's packets of the `media` stream types, from `seek` seconds when given.
+fn reference(
+    ffprobe: &str,
+    format: &str,
+    path: &str,
+    media: &[String],
+    seek: Option<&str>,
+) -> Result<Reference, Stop> {
+    let mut argv: Vec<String> = [ffprobe, "-v", "error", "-f", format]
+        .map(String::from)
+        .to_vec();
+    if let Some(seconds) = seek {
+        argv.extend(["-read_intervals".to_owned(), format!("{seconds}%")]);
+    }
+    argv.extend(
+        [
+            "-show_entries",
+            "stream=index,codec_type,time_base:packet=stream_index,pts,dts,duration,size,pos:packet_side_data=skip_samples,discard_padding",
+            "-of",
+            "json",
+            path,
+        ]
+        .map(String::from),
+    );
     let done = run_text(&argv, RUN_TIMEOUT)?;
     let document = python::loads(&done.stdout).unwrap_or(Value::Null);
     let mut reference = Reference {
@@ -589,8 +724,14 @@ fn reference(ffprobe: &str, format: &str, path: &str) -> Result<Reference, Stop>
         {
             reference.time_bases.push((index, base));
         }
-        if stream.get("codec_type").and_then(Value::as_str) == Some("audio") {
+        if stream
+            .get("codec_type")
+            .and_then(Value::as_str)
+            .is_some_and(|kind| media.iter().any(|m| m == kind))
+        {
             reference.tracks.push(index);
+        } else {
+            reference.ignored.push(index);
         }
     }
     for packet in document
@@ -628,15 +769,23 @@ fn candidate(
     worker: &Path,
     format: &str,
     path: &str,
+    seek: Option<&SeekCase>,
     streams: Streams,
     audio: &[i128],
 ) -> Result<Result<Candidate, String>, Stop> {
-    let argv = vec![
+    let mut argv = vec![
         python::path(worker),
-        "packets".to_owned(),
+        if seek.is_some() { "seek" } else { "packets" }.to_owned(),
         format.to_owned(),
         path.to_owned(),
     ];
+    if let Some(seek) = seek {
+        argv.extend([
+            seek.track.to_string(),
+            seek.seconds.clone(),
+            seek.policy.clone(),
+        ]);
+    }
     let done = run_text(&argv, RUN_TIMEOUT)?;
     if done.code != 0 {
         return Ok(Err(format!(
@@ -684,8 +833,16 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
         .collect();
     mapped.sort_unstable();
     mapped.dedup();
+    let stream_of_track = tracks
+        .iter()
+        .filter_map(|t| {
+            let index = int(t.get("index"))?;
+            Some((index, stream_of(index)?))
+        })
+        .collect();
     let mut reading = Candidate {
         tracks: mapped,
+        stream_of_track,
         error: match end.get("end").and_then(Value::as_str) {
             Some("eof") => None,
             _ => Some(python::str(end.get("error").unwrap_or(&Value::Null))),
@@ -704,6 +861,10 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
             }
             Some("resync") => {
                 resync = true;
+                continue;
+            }
+            Some("seek") => {
+                reading.receipt = Some(packet);
                 continue;
             }
             Some(other) => return Err(format!("codec-worker: unknown event {other}")),
@@ -736,6 +897,7 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
             later_link: link(track).is_some_and(|l| l > 0),
             after_lost: lost.contains(&track),
             after_resync: std::mem::take(&mut resync),
+            zero_granule: int(packet.get("granule")) == Some(0),
         };
         seen.push(track);
         lost.retain(|&t| t != track);
@@ -783,14 +945,15 @@ fn project(packets: &mut [Fields], from: Ratio, to: Ratio) {
 }
 
 /// Packets as the alignment sees them: the aligned field and the size.
-type Key = [Option<i128>; 2];
+pub(super) type Key = [Option<i128>; 2];
 /// One alignment step: a reader packet, a reference packet, or both paired.
-type Pair = (Option<usize>, Option<usize>);
+pub(super) type Pair = (Option<usize>, Option<usize>);
 
 /// The in-order alignment of two packet sequences at the least cost: a pair costs the
 /// number of its keys that differ, an unpaired packet 1, and of equal costs a pair is
-/// preferred, then an unpaired reader packet.
-fn align(a: &[Key], b: &[Key]) -> Vec<Pair> {
+/// preferred, then an unpaired reader packet. With `apart`, packets that differ in every
+/// key never pair.
+pub(super) fn align(a: &[Key], b: &[Key], apart: bool) -> Vec<Pair> {
     let (n, m) = (a.len(), b.len());
     if n == m && a == b || (n + 1) * (m + 1) > ALIGN_CELLS {
         let mut pairs: Vec<_> = (0..n.min(m)).map(|i| (Some(i), Some(i))).collect();
@@ -809,8 +972,10 @@ fn align(a: &[Key], b: &[Key]) -> Vec<Pair> {
             let mut best = (u32::MAX, 0u8);
             if i < n && j < m {
                 let unequal = a[i].iter().zip(&b[j]).filter(|(x, y)| x != y).count();
-                let pair = cost[(i + 1) * width + j + 1] + unequal as u32;
-                best = (pair, 0);
+                if !apart || unequal < a[i].len() {
+                    let pair = cost[(i + 1) * width + j + 1] + unequal as u32;
+                    best = (pair, 0);
+                }
             }
             if i < n && cost[(i + 1) * width + j] + 1 < best.0 {
                 best = (cost[(i + 1) * width + j] + 1, 1);
@@ -925,7 +1090,7 @@ impl<'a> Comparison<'a> {
                         .map(|p| [p[rules.align_by], p[SIZE]])
                         .collect()
                 };
-                let alignment = align(&keys(&native), &keys(theirs));
+                let alignment = align(&keys(&native), &keys(theirs), rules.apart);
                 Aligned {
                     stream,
                     alignment,
@@ -1171,6 +1336,8 @@ impl<'a> Comparison<'a> {
             Packets::Resplit => self
                 .placed(stream, d)
                 .is_some_and(|(alignment, at)| self.resplit(stream, alignment, at)),
+            Packets::LaterLink => flag(|p| p.later_link),
+            Packets::ZeroGranulePage => flag(|p| p.zero_granule),
             Packets::AfterUnmatched => self.placed(stream, d).is_some_and(|(alignment, at)| {
                 d.candidate.is_some()
                     && d.reference.is_some()
@@ -1251,6 +1418,7 @@ fn grade_view(
     found: &[Difference],
     reproduced: usize,
     case: (&str, &str),
+    seek: bool,
 ) -> Graded {
     let (name, sha) = case;
     let rows: Vec<Value> = found.iter().map(Difference::row).collect();
@@ -1291,10 +1459,11 @@ fn grade_view(
             proposal: None,
         };
     }
+    // A file's seek cases share its hash: they are reviewed by name too.
     let reviewed = rules
         .reviewed
         .iter()
-        .find(|r| r.sha256 == sha && r.view == view);
+        .find(|r| r.sha256 == sha && r.view == view && (!seek || r.name == name));
     // The proposal attributes among the reviewed case's dispositions, or among all of
     // them for differences not reviewed yet (where scopes may overlap: unattributed).
     let considered: Vec<&Disposition> = rules
@@ -1407,9 +1576,16 @@ fn grade_case(
     format: &str,
     path: &str,
     case: (&str, &str),
+    seek: Option<&SeekCase>,
 ) -> Result<CaseGrade, Stop> {
     let rules = options.rules.format(format)?;
-    let theirs = reference(&options.ffprobe, format, path)?;
+    let mut theirs = reference(
+        &options.ffprobe,
+        format,
+        path,
+        &rules.media,
+        seek.map(|s| s.reference_seconds.as_str()),
+    )?;
     let mut fields = vec![
         ("ffprobe_rc".to_owned(), Value::int(theirs.code)),
         (
@@ -1421,10 +1597,11 @@ fn grade_case(
             Value::int(theirs.other_packets),
         ),
     ];
-    let ours = match candidate(
+    let mut ours = match candidate(
         &options.codec_worker,
         format,
         path,
+        seek,
         rules.streams,
         &theirs.tracks,
     )? {
@@ -1438,6 +1615,21 @@ fn grade_case(
             });
         }
     };
+    // The reader's tracks that are FFmpeg streams of types not compared.
+    let ignored: usize = ours
+        .streams
+        .iter()
+        .filter(|(s, _)| theirs.ignored.contains(s))
+        .map(|(_, p)| p.len())
+        .sum();
+    ours.streams.retain(|(s, _)| !theirs.ignored.contains(s));
+    ours.tracks.retain(|s| !theirs.ignored.contains(s));
+    if ignored > 0 {
+        fields.push((
+            "candidate_other_packets".into(),
+            Value::int(ignored as i128),
+        ));
+    }
     let count = |streams: Vec<(i128, usize)>| {
         Value::Array(
             streams
@@ -1458,6 +1650,29 @@ fn grade_case(
         "candidate_end".into(),
         ours.error.clone().map_or(Value::str("eof"), Value::str),
     ));
+    if seek.is_some() {
+        fields.push((
+            "receipt".into(),
+            ours.receipt.clone().unwrap_or(Value::Null),
+        ));
+        fields.push((
+            "reference_before_landing".into(),
+            count(before_landing(&ours, &mut theirs)),
+        ));
+    }
+    // After a seek the two sides may deliver different links of the same sizes, so
+    // packets are aligned by where they are as well as by size.
+    let by_position;
+    let rules = if seek.is_some() {
+        by_position = FormatRules {
+            align_by: POSITION,
+            apart: true,
+            ..rules.clone()
+        };
+        &by_position
+    } else {
+        rules
+    };
     let comparison = Comparison::new(&ours, &theirs, rules);
     let native = comparison.differences(View::Native, &rules.native);
     let compat = rules
@@ -1471,6 +1686,7 @@ fn grade_case(
             .partition(|d| compat.iter().any(|c| c.key() == d.key())),
         None => (native, Vec::new()),
     };
+    let seeking = seek.is_some();
     let mut views = vec![(
         View::Native,
         grade_view(
@@ -1480,12 +1696,21 @@ fn grade_case(
             &unexplained,
             reproduced.len(),
             case,
+            seeking,
         ),
     )];
     if let Some(compat) = &compat {
         views.push((
             View::Compat,
-            grade_view(&options.rules, &comparison, View::Compat, compat, 0, case),
+            grade_view(
+                &options.rules,
+                &comparison,
+                View::Compat,
+                compat,
+                0,
+                case,
+                seeking,
+            ),
         ));
     }
     let rank = |status: &str| match status {
@@ -1494,12 +1719,18 @@ fn grade_case(
         "reproduced-by-compat" => 1,
         _ => 0,
     };
-    let status = views
+    let mut status = views
         .iter()
         .map(|(_, g)| g.status)
         .max_by_key(|s| rank(s))
         .unwrap_or("fail")
         .to_owned();
+    if let Some(seek) = seek
+        && let Err(error) = landing_check(&ours, seek)
+    {
+        fields.push(("landing_error".into(), Value::str(error)));
+        status = "fail".into();
+    }
     let proposals = views
         .iter()
         .filter_map(|(_, g)| g.proposal.clone())
@@ -1518,6 +1749,107 @@ fn grade_case(
         status,
         proposals,
     })
+}
+
+/// A seek's landing as the reader reports and delivers it: its receipt lands at or
+/// before the requested time, and the sought stream's first packet after the seek
+/// starts at or before the requested time too, so a seek that lands past its target
+/// fails although the comparison drops FFmpeg's packets before the reader's landing.
+/// The sought stream is the FFmpeg stream of the case's track: in a chained file the
+/// reader seeks the track at the same position in the link that holds the target, a
+/// track of the same stream, and its times count from the start of the file.
+fn landing_check(ours: &Candidate, seek: &SeekCase) -> Result<(), String> {
+    let seconds = |key: &str| -> Result<Ratio, String> {
+        let time = ours
+            .receipt
+            .as_ref()
+            .and_then(|r| r.get(key))
+            .and_then(Value::as_array)
+            .and_then(|t| Some((int(t.first())?, int(t.get(1))?)))
+            .filter(|&(_, denominator)| denominator > 0);
+        time.ok_or(format!("the seek receipt has no {key} time"))
+    };
+    let requested = seconds("requested")?;
+    let landed = seconds("landing")?;
+    // a <= b for a = a.0 / a.1 and b = b.0 / b.1, both denominators positive.
+    let at_or_before = |a: Ratio, b: Ratio| a.0 * b.1 <= b.0 * a.1;
+    if !at_or_before(landed, requested) {
+        return Err(format!(
+            "lands at {}/{} s, after the requested {}/{} s",
+            landed.0, landed.1, requested.0, requested.1
+        ));
+    }
+    let track = i128::try_from(seek.track).map_err(|e| e.to_string())?;
+    let stream = ours
+        .stream_of_track
+        .iter()
+        .find(|(index, _)| *index == track)
+        .map(|(_, stream)| *stream)
+        .ok_or("the sought track is no FFmpeg stream")?;
+    let first = packets_of(&ours.streams, stream)
+        .first()
+        .ok_or("the sought stream delivers no packet")?;
+    let pts = first.native[PTS].ok_or("the sought stream's first packet has no time")?;
+    let (numerator, denominator) = first.time_base;
+    if denominator <= 0 || !at_or_before((pts * numerator, denominator), requested) {
+        return Err(format!(
+            "the sought stream's first packet starts at {pts} x {numerator}/{denominator} s, after the requested {}/{} s",
+            requested.0, requested.1
+        ));
+    }
+    Ok(())
+}
+
+/// Drop from each reference stream the packets FFmpeg delivers before the reader's
+/// landing, and return the count dropped per stream. Where the reader has packets of a
+/// stream, its first is FFmpeg's packet of the same size, starting at or before it, from
+/// which the longest run of equal sizes follows (of equal runs, the most equal
+/// positions, then the one leaving as many packets as the reader's); FFmpeg's packets
+/// before it are dropped. Where it has none, FFmpeg's packets starting before the
+/// reader's landing packet are.
+fn before_landing(ours: &Candidate, theirs: &mut Reference) -> Vec<(i128, usize)> {
+    let landing = ours
+        .streams
+        .iter()
+        .filter_map(|(_, packets)| packets.first().and_then(|p| p.native[POSITION]))
+        .min();
+    let mut dropped = Vec::new();
+    for (stream, packets) in &mut theirs.streams {
+        let mine = packets_of(&ours.streams, *stream);
+        let start = match mine.first().and_then(|p| p.native[POSITION]) {
+            Some(first) => {
+                let score = |j: usize| {
+                    let pairs = mine.iter().zip(&packets[j..]);
+                    let run = pairs
+                        .clone()
+                        .take_while(|(a, b)| a.native[SIZE] == b[SIZE])
+                        .count();
+                    let placed = pairs
+                        .take(run)
+                        .filter(|(a, b)| a.native[POSITION] == b[POSITION])
+                        .count();
+                    (run, placed, packets.len() - j == mine.len())
+                };
+                (0..packets.len())
+                    .take_while(|&j| packets[j][POSITION].is_some_and(|p| p <= first))
+                    .map(|j| (score(j), j))
+                    .filter(|((run, _, _), _)| *run > 0)
+                    .max_by_key(|(score, j)| (*score, usize::MAX - j))
+                    .map_or(0, |(_, j)| j)
+            }
+            None => landing.map_or(0, |landing| {
+                packets
+                    .iter()
+                    .take_while(|p| p[POSITION].is_some_and(|p| p < landing))
+                    .count()
+            }),
+        };
+        if start > 0 {
+            packets.drain(..start);
+            dropped.push((*stream, start));
+        }
+    }
+    dropped
 }
 
 fn view_status(row: &Value, view: &str) -> Option<String> {
@@ -1545,18 +1877,35 @@ pub fn run(options: &Options) -> Result<(), String> {
         .map_err(|e| format!("{}: {e}", options.out.display()))?;
     let mut counts: Vec<(String, usize)> = Vec::new();
     let mut proposals = Vec::new();
-    for v in vectors {
-        let text = |key: &str| -> Result<String, String> {
-            v.get(key)
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .ok_or_else(|| format!("vector without {key}"))
-        };
-        let lane = text("lane")?;
+    let mut failed = 0;
+    let text = |v: &Value, key: &str| -> Result<String, String> {
+        v.get(key)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| format!("vector without {key}"))
+    };
+    // Every vector once, then every seek case on its vector.
+    let mut jobs: Vec<(&Value, Option<&SeekCase>)> = vectors.iter().map(|v| (v, None)).collect();
+    for seek in &options.seeks {
+        let vector = vectors
+            .iter()
+            .find(|v| v.get("name").and_then(Value::as_str) == Some(seek.input.as_str()))
+            .ok_or_else(|| format!("seek {}: no vector {}", seek.name, seek.input))?;
+        jobs.push((vector, Some(seek)));
+    }
+    for (v, seek) in jobs {
+        let mut lane = text(v, "lane")?;
         let Some(format) = format(&lane) else {
             continue;
         };
-        let (name, relative, sha) = (text("name")?, text("path")?, text("sha256")?);
+        let (mut name, relative, sha) = (text(v, "name")?, text(v, "path")?, text(v, "sha256")?);
+        if let Some(seek) = seek {
+            if lane != "reader-ogg" {
+                return Err(format!("seek {}: {lane} has no seeking reader", seek.name));
+            }
+            SEEK_LANE.clone_into(&mut lane);
+            name.clone_from(&seek.name);
+        }
         if let Some(only) = &only
             && !only.iter().any(|o| name.contains(o) || *o == lane)
         {
@@ -1574,7 +1923,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         } else if file_sha(Path::new(&path))? != sha {
             "input-hash-mismatch".to_owned()
         } else {
-            match grade_case(options, format, &path, (&name, &sha)) {
+            match grade_case(options, format, &path, (&name, &sha), seek) {
                 Ok(graded) => {
                     row.extend(graded.fields);
                     proposals.extend(graded.proposals);
@@ -1587,6 +1936,16 @@ pub fn run(options: &Options) -> Result<(), String> {
                 Err(Stop::Fatal(message)) => return Err(message),
             }
         };
+        if ![
+            "pass",
+            "reproduced-by-compat",
+            "disposition",
+            "refused-by-both",
+        ]
+        .contains(&status.as_str())
+        {
+            failed += 1;
+        }
         row.push(("status".into(), Value::str(status.as_str())));
         let row = Value::Object(row);
         writeln!(out, "{}", json::to_python(&row, None))
@@ -1636,6 +1995,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         println!("COUNT {key} {n}");
     }
     println!("DONE");
+    if failed > 0 {
+        return Err(format!("{failed} reader cases failed"));
+    }
     Ok(())
 }
 
@@ -1719,17 +2081,17 @@ mod tests {
         let k = |v: &[i128]| v.iter().map(|&x| [Some(x), Some(1)]).collect::<Vec<_>>();
         // A leading reference packet, then equal positions.
         assert_eq!(
-            align(&k(&[46, 880]), &k(&[0, 46, 880])),
+            align(&k(&[46, 880]), &k(&[0, 46, 880]), false),
             [(None, Some(0)), (Some(0), Some(1)), (Some(1), Some(2))]
         );
         // Shifted positions pair in order.
         assert_eq!(
-            align(&k(&[10, 20]), &k(&[5, 15])),
+            align(&k(&[10, 20]), &k(&[5, 15]), false),
             [(Some(0), Some(0)), (Some(1), Some(1))]
         );
         // Four reader packets one reference packet holds.
         assert_eq!(
-            align(&k(&[0, 9, 10, 11, 12, 20]), &k(&[0, 9, 20])),
+            align(&k(&[0, 9, 10, 11, 12, 20]), &k(&[0, 9, 20]), false),
             [
                 (Some(0), Some(0)),
                 (Some(1), Some(1)),
@@ -1755,8 +2117,10 @@ mod tests {
             .collect();
         Candidate {
             tracks: vec![0],
+            stream_of_track: vec![(0, 0)],
             streams: vec![(0, packets)],
             error: None,
+            receipt: None,
         }
     }
 
@@ -1773,7 +2137,9 @@ mod tests {
         let all = vec![SIZE, PTS, DTS, DURATION, TRIM_START, TRIM_END];
         FormatRules {
             streams: Streams::PositionInLink,
+            media: vec!["audio".to_owned()],
             align_by: SIZE,
+            apart: false,
             native: ViewRules {
                 compare: all.clone(),
                 duration_excludes_padding: true,
@@ -1992,6 +2358,149 @@ mod tests {
             rules.format(format(lane).unwrap()).unwrap();
             assert!(suffixes(lane).is_some());
         }
-        assert!(rules.format("ogg").unwrap().compat.is_some());
+        let ogg = rules.format("ogg").unwrap();
+        assert!(ogg.compat.is_some());
+        assert_eq!(ogg.media, ["audio", "video"]);
+        assert_eq!(rules.format("flac").unwrap().media, ["audio"]);
+        let seeks = SeekCase::load(&root.join(SEEKS)).unwrap();
+        assert_eq!(seeks.len(), SEEK_CASES);
+        let manifest = crate::checks::read_json(&root.join(MANIFEST)).unwrap();
+        let vectors = manifest.get("vectors").and_then(Value::as_array).unwrap();
+        let ogg_vectors = vectors
+            .iter()
+            .filter(|v| v.get("lane").and_then(Value::as_str) == Some("reader-ogg"))
+            .count();
+        assert_eq!(ogg_vectors, OGG_CASES);
+        assert_eq!(vectors.len(), READER_CASES);
+        for seek in &seeks {
+            assert!(
+                vectors.iter().any(|v| {
+                    v.get("name").and_then(Value::as_str) == Some(seek.input.as_str())
+                        && v.get("lane").and_then(Value::as_str) == Some("reader-ogg")
+                }),
+                "{}",
+                seek.name
+            );
+        }
+    }
+
+    /// The committed manifests' case counts, raised with every case added.
+    const READER_CASES: usize = 316;
+    const OGG_CASES: usize = 45;
+    const SEEK_CASES: usize = 26;
+    const MANIFEST: &str = "harness/codecs/reader-manifest.json";
+    const SEEKS: &str = "harness/codecs/reader-seeks.json";
+
+    #[test]
+    fn seek_cases_name_decimal_targets_and_their_reference_target() {
+        let case = |policy: &str, seconds: &str, reference: &str| {
+            json::parse(&format!(
+                r#"{{"schema": "{SEEKS_SCHEMA}", "contract": "c", "cases": [{{"name": "n",
+                "input": "a.opus", "track": 0, "seconds": "{seconds}", "policy": "{policy}",
+                "reference_seconds": "{reference}"}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert!(SeekCase::parse(&case("exact", "1.5", "1.5")).is_ok());
+        assert!(SeekCase::parse(&case("preroll", "1.5", "1.42")).is_ok());
+        assert!(SeekCase::parse(&case("exact", "1.5", "1.42")).is_err());
+        assert!(SeekCase::parse(&case("exact", "-1", "-1")).is_err());
+        assert!(SeekCase::parse(&case("nearest", "1", "1")).is_err());
+    }
+
+    #[test]
+    fn a_seek_must_land_at_or_before_its_target() {
+        let seek = SeekCase {
+            name: "n".into(),
+            input: "a.opus".into(),
+            track: 0,
+            seconds: "1.5".into(),
+            policy: "exact".into(),
+            reference_seconds: "1.5".into(),
+        };
+        // Packets of 48 kHz ticks; the receipt in seconds.
+        let landed = |landing: &str, first: i128| {
+            let mut ours = reading(
+                vec![[Some(9), Some(0), Some(first), None, None, None, None]],
+                None,
+            );
+            ours.receipt = Some(
+                json::parse(&format!(
+                    r#"{{"event":"seek","requested":[3,2],"landing":{landing}}}"#
+                ))
+                .unwrap(),
+            );
+            landing_check(&ours, &seek)
+        };
+        assert!(landed("[1,1]", 48_000).is_ok());
+        assert!(landed("[3,2]", 72_000).is_ok());
+        // The receipt or the first packet past the target.
+        assert!(landed("[2,1]", 48_000).is_err());
+        assert!(landed("[1,1]", 72_001).is_err());
+        assert!(landed("[1,0]", 48_000).is_err());
+        // A chain: the seek to track 0 delivers track 1, the same stream in the second
+        // link, timed from the start of the file.
+        let chained = |first: i128| {
+            let mut ours = reading(
+                vec![[Some(9), Some(0), Some(first), None, None, None, None]],
+                None,
+            );
+            ours.stream_of_track = vec![(0, 0), (1, 0)];
+            ours.receipt = Some(json::parse(r#"{"requested":[3,2],"landing":[1,1]}"#).unwrap());
+            ours
+        };
+        assert!(landing_check(&chained(48_000), &seek).is_ok());
+        assert!(landing_check(&chained(72_001), &seek).is_err());
+        // A track of no compared stream, and a stream that delivers nothing.
+        let mut unmapped = chained(48_000);
+        unmapped.stream_of_track = vec![(1, 0)];
+        assert!(landing_check(&unmapped, &seek).is_err());
+        let mut silent = chained(48_000);
+        silent.streams.clear();
+        assert!(landing_check(&silent, &seek).is_err());
+    }
+
+    #[test]
+    fn ffmpeg_packets_before_the_reader_landing_are_counted_not_compared() {
+        let packet = |position: i128, size: i128| {
+            [
+                Some(size),
+                Some(position),
+                Some(0),
+                Some(0),
+                Some(960),
+                None,
+                None,
+            ]
+        };
+        let ours = reading(vec![packet(300, 7), packet(300, 8)], None);
+        let mut theirs = reference_of(vec![
+            packet(100, 5),
+            packet(300, 6),
+            packet(300, 7),
+            packet(300, 8),
+        ]);
+        assert_eq!(before_landing(&ours, &mut theirs), [(0, 2)]);
+        assert_eq!(theirs.streams[0].1.len(), 2);
+        // FFmpeg landing later leaves the reader's extra packets to compare.
+        let mut later = reference_of(vec![packet(300, 8)]);
+        assert!(before_landing(&ours, &mut later).is_empty());
+        // Packets starting after the reader's landing are not FFmpeg's earlier landing.
+        let mut after = reference_of(vec![packet(400, 7), packet(400, 8)]);
+        assert!(before_landing(&ours, &mut after).is_empty());
+        // Packets apart in every key never pair.
+        let k = |v: &[i128]| v.iter().map(|&x| [Some(x), Some(x)]).collect::<Vec<Key>>();
+        assert_eq!(
+            align(&k(&[1]), &k(&[2]), true),
+            [(Some(0), None), (None, Some(0))]
+        );
+        assert_eq!(align(&k(&[1]), &k(&[2]), false), [(Some(0), Some(0))]);
+        // Of equal sizes, the run that keeps as many packets as the reader's.
+        let same = reading(vec![packet(300, 7), packet(300, 7)], None);
+        let mut runs = reference_of(vec![packet(300, 7), packet(300, 7), packet(300, 7)]);
+        assert_eq!(before_landing(&same, &mut runs), [(0, 1)]);
+        // FFmpeg stopping early still lands on the reader's first packet.
+        let mut short = reference_of(vec![packet(100, 5), packet(300, 7)]);
+        assert_eq!(before_landing(&ours, &mut short), [(0, 1)]);
     }
 }

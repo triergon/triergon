@@ -647,13 +647,6 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<Event>> {
-        self.step_seeking_projected::<TypedProjection>(work, cancel)
-    }
-    pub(super) fn step_seeking_projected<D: PacketProjection>(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<ParseStep<D::Event>> {
         loop {
             check(cancel)?;
             match self.seek_mode {
@@ -769,7 +762,7 @@ impl Reader {
                 },
                 SeekMode::Scan => {
                     let mut scan = self.scan.take().required("missing seek scan")?;
-                    let result = self.advance_scan::<D>(&mut scan, work, cancel);
+                    let result = self.advance_scan(&mut scan, work, cancel);
                     if matches!(self.seek_mode, SeekMode::Scan) && self.scan.is_none() {
                         self.scan = Some(scan);
                     }
@@ -799,7 +792,7 @@ impl Reader {
                             self.cluster_time = epoch.cluster_time;
                             self.state = State::Envelope;
                             self.seek_mode = SeekMode::Receipt;
-                            return Ok(ParseStep::Event(D::configuration(configuration)?));
+                            return Ok(ParseStep::Event(Event::Configuration(configuration)));
                         }
                         other => return crate::matroska::typed::pending(other),
                     }
@@ -814,7 +807,7 @@ impl Reader {
                         .clone()
                         .required("missing initial replay configuration")?;
                     self.seek_mode = SeekMode::Receipt;
-                    return Ok(ParseStep::Event(D::configuration(configuration)?));
+                    return Ok(ParseStep::Event(Event::Configuration(configuration)));
                 }
                 SeekMode::Receipt => {
                     self.envelope.healthy_for_job(work, cancel)?;
@@ -825,7 +818,7 @@ impl Reader {
                     self.pending_seek = None;
                     self.seek_mode = SeekMode::None;
                     self.seek_plan = None;
-                    return Ok(ParseStep::Event(D::seek(receipt)?));
+                    return Ok(ParseStep::Event(Event::Seek(receipt)));
                 }
             }
         }
@@ -841,12 +834,12 @@ impl Reader {
         };
         job.step(&mut self.envelope, work, cancel)
     }
-    fn advance_scan<D: PacketProjection>(
+    fn advance_scan(
         &mut self,
         scan: &mut ScanState,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> Result<ParseStep<Event>> {
         loop {
             check(cancel)?;
             if !scan.begun {
@@ -923,11 +916,11 @@ impl Reader {
                 if self.scan.is_some() {
                     return Ok(ParseStep::Yield);
                 }
-                return self.step_seeking_projected::<D>(work, cancel);
+                return self.step_seeking(work, cancel);
             }
             // The public step already checked the cursor. This loop
             // retains exclusive access and propagates any new read failure.
-            let progress = self.step_demux_after_health_check::<ScanProjection>(
+            let progress = self.step_demux_after_health_check::<TypedProjection>(
                 work,
                 cancel,
                 scan.policy.stop,
@@ -947,23 +940,26 @@ impl Reader {
                 continue;
             }
             match progress {
-                ParseStep::Event(ScanEvent::Packet(packet)) => {
+                ParseStep::Event(Event::Packet(packet)) => {
                     let location = self
                         .last_location
                         .as_ref()
                         .required("missing scanned block location")?;
-                    let result = self.consider_scan_packet(
-                        scan,
-                        location.block_offset(),
-                        packet.fields,
-                        || Ok(location.clone()),
-                    );
+                    let fields = ScanPacketFields {
+                        track: packet.packet.track,
+                        pts_ns: packet.packet.pts_ns,
+                        keyframe: packet.packet.keyframe,
+                    };
+                    let result =
+                        self.consider_scan_packet(scan, location.block_offset(), fields, || {
+                            Ok(location.clone())
+                        });
                     // Keep payload/configuration/group owners through every
                     // fallible consideration, then drop at the old arm boundary.
                     drop(packet);
                     result?;
                 }
-                ParseStep::Event(ScanEvent::Envelope(ElementEvent::Start(header)))
+                ParseStep::Event(Event::Envelope(ElementEvent::Start(header)))
                     if header.id == CLUSTER =>
                 {
                     scan.cluster_configuration = if scan.prefix_from_initial {
@@ -978,9 +974,11 @@ impl Reader {
                     } else {
                         None
                     };
-                    return Ok(ParseStep::Event(D::envelope(ElementEvent::Start(header))?));
+                    return Ok(ParseStep::Event(Event::Envelope(ElementEvent::Start(
+                        header,
+                    ))));
                 }
-                ParseStep::Event(ScanEvent::Configuration(configuration)) => drop(configuration),
+                ParseStep::Event(Event::Configuration(configuration)) => drop(configuration),
                 ParseStep::Finished => {
                     if scan.best.is_none() {
                         if scan.policy.allow_first_after_negative_preroll && !scan.retried {
@@ -1000,14 +998,14 @@ impl Reader {
                     }
                     scan.finishing = true;
                 }
-                ParseStep::Event(ScanEvent::Envelope(event)) => {
-                    return Ok(ParseStep::Event(D::envelope(event)?));
+                ParseStep::Event(Event::Envelope(event)) => {
+                    return Ok(ParseStep::Event(Event::Envelope(event)));
                 }
-                ParseStep::Event(ScanEvent::Document(document)) => {
-                    return Ok(ParseStep::Event(D::document(document)?));
+                ParseStep::Event(Event::Document(document)) => {
+                    return Ok(ParseStep::Event(Event::Document(document)));
                 }
-                ParseStep::Event(ScanEvent::Seek(receipt)) => {
-                    return Ok(ParseStep::Event(D::seek(receipt)?));
+                ParseStep::Event(Event::Seek(receipt)) => {
+                    return Ok(ParseStep::Event(Event::Seek(receipt)));
                 }
                 other => return crate::matroska::typed::pending(other),
             }

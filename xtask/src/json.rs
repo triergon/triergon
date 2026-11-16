@@ -132,12 +132,12 @@ impl Value {
 
 /// A finite JSON number as (negative, significant digits, exponent), normalised
 /// so equal values compare equal; `None` for `NaN` and infinities.
-fn decimal(text: &str) -> Option<(bool, String, i64)> {
+fn decimal(text: &str) -> Option<(bool, String, i128)> {
     let (negative, body) = text
         .strip_prefix('-')
         .map_or((false, text), |rest| (true, rest));
     let (mantissa, exponent) = match body.find(['e', 'E']) {
-        Some(at) => (&body[..at], body[at + 1..].parse::<i64>().ok()?),
+        Some(at) => (&body[..at], i128::from(body[at + 1..].parse::<i64>().ok()?)),
         None => (body, 0),
     };
     let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
@@ -150,13 +150,12 @@ fn decimal(text: &str) -> Option<(bool, String, i64)> {
         return None;
     }
     let digits = format!("{whole}{fraction}");
-    let mut exponent = exponent - fraction.len() as i64;
     let digits = digits.trim_start_matches('0');
     let trimmed = digits.trim_end_matches('0');
-    exponent += (digits.len() - trimmed.len()) as i64;
     if trimmed.is_empty() {
         return Some((false, String::new(), 0));
     }
+    let exponent = exponent - fraction.len() as i128 + (digits.len() - trimmed.len()) as i128;
     Some((negative, trimmed.to_owned(), exponent))
 }
 
@@ -166,7 +165,12 @@ pub fn decimal_text(text: &str) -> String {
         .strip_prefix('-')
         .map_or((false, text), |rest| (true, rest));
     let (mantissa, exponent) = match body.find(['e', 'E']) {
-        Some(at) => (&body[..at], body[at + 1..].parse::<i64>().unwrap_or(0)),
+        Some(at) => {
+            let Ok(exponent) = body[at + 1..].parse::<i64>() else {
+                return text.to_owned();
+            };
+            (&body[..at], i128::from(exponent))
+        }
         None => (body, 0),
     };
     let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
@@ -177,14 +181,14 @@ pub fn decimal_text(text: &str) -> String {
     } else {
         coefficient
     };
-    let exponent = exponent - fraction.len() as i64;
-    let adjusted = exponent + coefficient.len() as i64 - 1;
+    let exponent = exponent - fraction.len() as i128;
+    let adjusted = exponent + coefficient.len() as i128 - 1;
     let sign = if negative { "-" } else { "" };
     let text = if exponent <= 0 && adjusted >= -6 {
         if exponent == 0 {
             coefficient.to_owned()
         } else {
-            let point = coefficient.len() as i64 + exponent;
+            let point = coefficient.len() as i128 + exponent;
             if point > 0 {
                 format!(
                     "{}.{}",
@@ -281,11 +285,18 @@ pub fn to_python(value: &Value, indent: Option<usize>) -> String {
 /// form whose SHA-256 identifies a document.
 pub fn canonical(value: &Value) -> String {
     let mut out = String::new();
-    write_canonical(&mut out, value);
+    write_compact(&mut out, value, true);
     out
 }
 
-fn write_canonical(out: &mut String, value: &Value) {
+/// Compact JSON with object members in their recorded order.
+pub fn observations(value: &Value) -> String {
+    let mut out = String::new();
+    write_compact(&mut out, value, false);
+    out
+}
+
+fn write_compact(out: &mut String, value: &Value, sort: bool) {
     match value {
         Value::Array(items) => {
             out.push('[');
@@ -293,22 +304,31 @@ fn write_canonical(out: &mut String, value: &Value) {
                 if i > 0 {
                     out.push(',');
                 }
-                write_canonical(out, item);
+                write_compact(out, item, sort);
             }
             out.push(']');
         }
         Value::Object(members) => {
-            let mut keys: Vec<&str> = members.iter().map(|(k, _)| k.as_str()).collect();
-            keys.sort_unstable();
-            keys.dedup();
             out.push('{');
-            for (i, key) in keys.iter().enumerate() {
-                if i > 0 {
+            let mut write = |index: usize, key: &str, member: &Value| {
+                if index > 0 {
                     out.push(',');
                 }
                 write_string(out, key);
                 out.push(':');
-                write_canonical(out, value.get(key).expect("key"));
+                write_compact(out, member, sort);
+            };
+            if sort {
+                let mut keys: Vec<&str> = members.iter().map(|(key, _)| key.as_str()).collect();
+                keys.sort_unstable();
+                keys.dedup();
+                for (index, key) in keys.into_iter().enumerate() {
+                    write(index, key, value.get(key).expect("key"));
+                }
+            } else {
+                for (index, (key, member)) in members.iter().enumerate() {
+                    write(index, key, member);
+                }
             }
             out.push('}');
         }
@@ -415,21 +435,33 @@ impl fmt::Display for Error {
 
 /// Parse one JSON document; surrounding whitespace is allowed, trailing data is not.
 pub fn parse(text: &str) -> Result<Value, Error> {
-    parse_with(text, false)
+    parse_with(text, ParseMode::Python)
 }
 
 /// Strict protocol parsing: duplicate keys, `NaN` and `Infinity` and floats
 /// beyond binary64 are errors, and floats keep their exact decimal text.
 pub fn parse_strict(text: &str) -> Result<Value, Error> {
-    parse_with(text, true)
+    parse_with(text, ParseMode::Strict)
 }
 
-fn parse_with(text: &str, strict: bool) -> Result<Value, Error> {
+/// Read stored observations, preserving number spellings and invalid clock values.
+pub fn parse_observations(text: &str) -> Result<Value, Error> {
+    parse_with(text, ParseMode::Observations)
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum ParseMode {
+    Python,
+    Strict,
+    Observations,
+}
+
+fn parse_with(text: &str, mode: ParseMode) -> Result<Value, Error> {
     let mut parser = Parser {
         text: text.as_bytes(),
         pos: 0,
         depth: 0,
-        strict,
+        mode,
     };
     parser.whitespace();
     let value = parser.value()?;
@@ -446,7 +478,7 @@ struct Parser<'a> {
     text: &'a [u8],
     pos: usize,
     depth: usize,
-    strict: bool,
+    mode: ParseMode,
 }
 
 impl Parser<'_> {
@@ -530,7 +562,7 @@ impl Parser<'_> {
             }
             self.pos += 1;
             self.whitespace();
-            if self.strict && members.iter().any(|(k, _)| *k == key) {
+            if self.mode != ParseMode::Python && members.iter().any(|(k, _)| *k == key) {
                 return Err(Error {
                     message: format!("duplicate JSON field: {key}"),
                     line: 0,
@@ -578,7 +610,7 @@ impl Parser<'_> {
         let start = self.pos;
         for word in ["NaN", "Infinity", "-Infinity"] {
             if self.literal(word) {
-                if self.strict {
+                if self.mode == ParseMode::Strict {
                     return Err(Error {
                         message: format!("non-finite JSON constant: {word}"),
                         line: 0,
@@ -618,19 +650,21 @@ impl Parser<'_> {
             }
         }
         let raw = std::str::from_utf8(&self.text[start..self.pos]).expect("ASCII number");
-        if self.strict {
-            let float = raw.contains(['.', 'e', 'E']);
-            if float && !raw.parse::<f64>().is_ok_and(f64::is_finite) {
-                return Err(Error {
-                    message: "JSON number exceeds the finite binary64 protocol range".into(),
-                    line: 0,
-                    column: 0,
-                    offset: usize::MAX,
-                });
-            }
-            return Ok(Value::Number(Number(raw.to_owned())));
+        let float = raw.contains(['.', 'e', 'E']);
+        if self.mode == ParseMode::Strict && float && !raw.parse::<f64>().is_ok_and(f64::is_finite)
+        {
+            return Err(Error {
+                message: "JSON number exceeds the finite binary64 protocol range".into(),
+                line: 0,
+                column: 0,
+                offset: usize::MAX,
+            });
         }
-        Ok(Value::Number(Number(canonical_number(raw))))
+        Ok(Value::Number(Number(if self.mode == ParseMode::Python {
+            canonical_number(raw)
+        } else {
+            raw.to_owned()
+        })))
     }
 
     fn digits(&mut self) {
@@ -804,6 +838,25 @@ mod tests {
         assert_eq!(
             parse_strict("[1.50]").unwrap(),
             Value::Array(vec![Value::Number(Number("1.50".into()))])
+        );
+    }
+
+    #[test]
+    fn observation_exponents_remain_exact_at_the_integer_limits() {
+        let number = |text| match parse_observations(text).unwrap() {
+            Value::Number(number) => number,
+            _ => unreachable!(),
+        };
+        let tiny = "1.0e-9223372036854775808";
+        assert!(!number(tiny).equals(&number("1.0")));
+        assert!(!number(tiny).equals(&number("0.0")));
+        assert!(number(tiny).equals(&number("1e-9223372036854775808")));
+        assert!(number("100e9223372036854775806").equals(&number("10e9223372036854775807")));
+        assert_eq!(observations(&parse_observations(tiny).unwrap()), tiny);
+        assert_eq!(decimal_text(tiny), "1.0E-9223372036854775808");
+        assert_eq!(
+            decimal_text("10e9223372036854775807"),
+            "1.0E+9223372036854775808"
         );
     }
 

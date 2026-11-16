@@ -1,0 +1,24 @@
+;@attach NotoSansJP-VF.otf
+;@default-family Noto Sans JP
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 500
+; Underlines and strike-outs in a CFF2 variable face at its default instance,
+; from tags and from the style, with synthetic bold and italic, including
+; glyphs whose outlines run clockwise, against CFF's direction (☀ ◌ ♤ ｝).
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Noto Sans JP,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,-1,-1,100,100,0,0,1,0,0,7,20,20,20,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,20)}CFF2 日本語の下線
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,100)\u0}no underline {\s0}neither {\u1}under
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,180)\b1}bold 太字 {\i1}italic 斜体
+Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,{\pos(20,260)}☀◌♤｝ x☀x

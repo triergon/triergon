@@ -10,12 +10,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use super::acceptance::acceptance;
+use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
+use super::policy::Runtime;
 use super::provenance::source_identity_error;
-use super::timing::{Operation, Work, benchmark};
+use super::reuse;
+use super::timing::{Operation, Pairs, Work, benchmark};
 use super::validation::{self, selected_operation};
 use super::worker;
 use crate::checks::read_json;
@@ -43,6 +45,10 @@ pub struct Options {
     /// Time and measure the candidate against this worker of another build instead
     /// of the reference. Correctness is still compared with the reference.
     pub baseline_worker: Option<PathBuf>,
+    /// Measure even when a cited evidence set holds this collection's result.
+    pub full: bool,
+    /// Let a gate session stop at an early look; `--no-early-stop` runs every pair.
+    pub early_stop: bool,
 }
 
 impl Options {
@@ -63,7 +69,21 @@ impl Options {
             memory_pairs: None,
             iterations: None,
             seed: 280,
+            full: false,
+            early_stop: true,
         }
+    }
+
+    /// Timed iterations per pair member: the override, else the contract's.
+    fn iterations(&self, contract: &Value) -> u32 {
+        self.iterations
+            .or_else(|| {
+                contract
+                    .get("iterations")
+                    .and_then(Value::as_f64)
+                    .map(|n| n as u32)
+            })
+            .unwrap_or(200)
     }
 }
 
@@ -603,7 +623,7 @@ impl PrefixFeature {
         Ok((candidate, self.reference_worker(root, &identity)?))
     }
 
-    pub(super) fn reference_worker(
+    pub(crate) fn reference_worker(
         &self,
         root: &Path,
         identity: &Value,
@@ -645,30 +665,97 @@ impl PrefixFeature {
     }
 }
 
-fn save_json(path: &Path, value: &Value) -> Result<(), String> {
+/// A checkpoint of the rows collected so far; never an acceptance.
+fn partial(base: &[(&str, Value)], rows: &[Value]) -> Value {
+    let mut partial = base.to_vec();
+    partial.extend([
+        ("collection_status", Value::str("partial")),
+        ("cases", Value::Array(rows.to_vec())),
+        (
+            "acceptance",
+            Value::object([
+                ("accepted", Value::Bool(false)),
+                ("slice_accepted", Value::Bool(false)),
+                ("slice_reasons", Value::strings(["collection incomplete"])),
+                ("reasons", Value::strings(["collection incomplete"])),
+            ]),
+        ),
+    ]);
+    object(partial)
+}
+
+/// Why a measured case's inputs no longer match their pins, if they do not.
+fn input_failure(
+    corpus: &Path,
+    case: &Value,
+    input: &Path,
+    sha: &str,
+    prefix: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    if digest(input)? != sha {
+        return Ok(Some("input-hash-mismatch"));
+    }
+    let failure = additional_input_failure(corpus, case, prefix)?;
+    if failure.is_none() && prefix.is_some() {
+        resolved_case_arguments(corpus, case, case_arguments(case))?;
+    }
+    Ok(failure)
+}
+
+/// Why a case cannot be measured from `corpus`, before anything runs: a missing
+/// or changed input, ordered entity or companion.
+pub(super) fn input_problem(
+    corpus: &Path,
+    case: &Value,
+    prefix: Option<&str>,
+) -> Result<Option<&'static str>, String> {
+    let file = s(case, "file").ok_or("case without input path")?;
+    if Path::new(file)
+        .components()
+        .any(|c| !matches!(c, std::path::Component::Normal(_)))
+    {
+        return Err("input escapes corpus".into());
+    }
+    let path = corpus.join(file);
+    if !path.is_file() {
+        return Ok(Some("missing-sample"));
+    }
+    input_failure(
+        corpus,
+        case,
+        &path,
+        s(case, "sha256").unwrap_or_default(),
+        prefix,
+    )
+}
+
+/// Every corpus file a case reads: its input, ordered entities and companions.
+pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, String> {
+    let mut files = vec![corpus.join(s(case, "file").ok_or("case without input path")?)];
+    for key in ["entities", "companions"] {
+        for input in case.get(key).and_then(Value::as_array).unwrap_or_default() {
+            files.push(corpus.join(s(input, "file").ok_or("input without a path")?));
+        }
+    }
+    Ok(files)
+}
+
+fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Stream canonical report JSON, retaining at most one case from the iterator.
-/// Publish a complete report without replacing an existing destination.
-pub(crate) fn write_case_report(
-    output: &Path,
-    header: &Value,
-    rows: impl Iterator<Item = Result<Value, String>>,
+/// Publish a complete JSON document without replacing another result.
+pub(crate) fn publish_json(path: &Path, text: &str) -> Result<(), String> {
+    publish(path, |writer| writer.write_all(text.as_bytes()))
+}
+
+fn publish(
+    destination: &Path,
+    write: impl FnOnce(&mut BufWriter<fs::File>) -> std::io::Result<()>,
 ) -> Result<(), String> {
-    let Value::Object(fields) = header else {
-        return Err("report header must be an object".into());
-    };
-    let mut fields: BTreeMap<_, _> = fields
-        .iter()
-        .map(|(key, value)| (key.as_str(), value))
-        .collect();
-    let placeholder = Value::Null;
-    fields.insert("cases", &placeholder);
-    let temporary = output.join("report.json.tmp");
-    let destination = output.join("report.json");
+    let temporary = destination.with_extension("json.tmp");
     let file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -676,39 +763,251 @@ pub(crate) fn write_case_report(
         .map_err(|error| format!("{}: {error}", temporary.display()))?;
     let result = (|| -> std::io::Result<()> {
         let mut writer = BufWriter::new(file);
+        write(&mut writer)?;
+        writer.flush()?;
+        drop(writer);
+        fs::hard_link(&temporary, destination)
+    })();
+    let _ = fs::remove_file(&temporary);
+    result.map_err(|error| format!("{}: {error}", destination.display()))
+}
+
+fn store_measurement(
+    output: &Path,
+    case: usize,
+    kind: &str,
+    measurement: &Value,
+) -> Result<Value, String> {
+    let name = format!("measurements/{case:04}-{kind}.json");
+    let path = output.join(&name);
+    let data = json::observations(measurement) + "\n";
+    OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .and_then(|mut file| file.write_all(data.as_bytes()))
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Value::object([
+        ("raw", Value::str(name)),
+        ("raw_sha256", Value::str(sha256::hex(data.as_bytes()))),
+    ]))
+}
+
+/// Stream canonical report JSON for callers with a canonical output format.
+pub(crate) fn write_case_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+) -> Result<(), String> {
+    stream_report(output, header, rows, true)
+}
+
+/// Stream the cases in their recorded order, including each observer's run order.
+pub(crate) fn write_observed_case_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+) -> Result<(), String> {
+    stream_report(output, header, rows, false)
+}
+
+/// Retain at most one case and publish without replacing an existing report.
+fn stream_report(
+    output: &Path,
+    header: &Value,
+    rows: impl Iterator<Item = Result<Value, String>>,
+    canonical: bool,
+) -> Result<(), String> {
+    let Value::Object(fields) = header else {
+        return Err("report header must be an object".into());
+    };
+    let mut fields: Vec<_> = fields
+        .iter()
+        .filter(|(key, _)| key != "cases")
+        .map(|(key, value)| (key.as_str(), value))
+        .collect();
+    fields.push(("cases", &Value::Null));
+    let serialize = if canonical {
+        json::canonical
+    } else {
+        json::observations
+    };
+    if canonical {
+        fields.sort_unstable_by_key(|(key, _)| *key);
+    }
+    publish(&output.join("report.json"), |writer| {
         let mut rows = rows;
         write!(writer, "{{")?;
-        for (index, (key, value)) in fields.iter().enumerate() {
+        for (index, (key, value)) in fields.into_iter().enumerate() {
             let separator = if index == 0 { "" } else { "," };
-            write!(writer, "{separator}{}:", json::canonical(&Value::str(*key)))?;
-            if *key == "cases" {
+            write!(writer, "{separator}{}:", json::canonical(&Value::str(key)))?;
+            if key == "cases" {
                 write!(writer, "[")?;
                 for (index, row) in rows.by_ref().enumerate() {
                     let row = row.map_err(std::io::Error::other)?;
                     let separator = if index == 0 { "" } else { "," };
-                    write!(writer, "{separator}{}", json::canonical(&row))?;
+                    write!(writer, "{separator}{}", serialize(&row))?;
                 }
                 write!(writer, "]")?;
             } else {
-                write!(writer, "{}", json::canonical(value))?;
+                write!(writer, "{}", serialize(value))?;
             }
         }
-        writeln!(writer, "}}")?;
-        writer.flush()?;
-        drop(writer);
-        fs::hard_link(&temporary, &destination)
-    })();
-    let _ = fs::remove_file(&temporary);
-    result.map_err(|error| format!("{}: {error}", destination.display()))
+        writeln!(writer, "}}")
+    })
 }
 
 fn object(pairs: Vec<(&str, Value)>) -> Value {
     Value::Object(pairs.into_iter().map(|(k, v)| (k.to_owned(), v)).collect())
 }
 
-/// Run the report; returns the process exit code (0 all cases pass, 1 a case
-/// failed, 2 a required acceptance was not reached).
+fn reject_controls(proof: &mut Value, error: &str) -> Result<(), String> {
+    validation::put(proof, "passed", Value::Bool(false))?;
+    validation::put(proof, "error", Value::str(error))
+}
+
+/// Reserve a new directory before emitting any report, traces or observations.
+pub(crate) fn create_output(path: &Path) -> Result<(), String> {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
+    }
+    fs::create_dir(path)
+        .map_err(|error| format!("{}: {error}; use a new output directory", path.display()))
+}
+
+fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
+    let mut directories = Vec::with_capacity(cases.len());
+    for case in cases {
+        let id = s(case, "id").unwrap_or_default();
+        let relative = Path::new(id);
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err(format!(
+                "case id {id:?} does not name a relative output directory"
+            ));
+        }
+        directories.push(relative);
+    }
+    // A case may name another case's parent directory. Reserve the parent
+    // first without changing the order of the report rows.
+    directories.sort_unstable_by_key(|&path| (path.components().count(), path));
+    for relative in directories {
+        create_output(&output.join(relative))?;
+    }
+    Ok(())
+}
+
+/// Run the report; returns 0 for matching parity, 1 for a failed case and 2
+/// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
+    create_output(&options.output)?;
+    match gate_key(root, options, &[])? {
+        Some(key) => reuse::step(root, &options.output, &key, options.full, || {
+            collect(root, options, None)
+        }),
+        None => collect(root, options, None),
+    }
+}
+
+/// The key of a gate collection: timing or memory against the reference, not a
+/// comparison with another build. It binds every worker the run uses, and any
+/// `documents` beyond the contract and manifest that define its cases.
+pub(crate) fn gate_key(
+    root: &Path,
+    options: &Options,
+    documents: &[PathBuf],
+) -> Result<Option<reuse::Key>, String> {
+    let mode = match (options.benchmark, options.memory) {
+        _ if options.baseline_worker.is_some() => return Ok(None),
+        (false, false) => return Ok(None),
+        (true, false) => "report --benchmark",
+        (false, true) => "report --memory",
+        (true, true) => "report --benchmark --memory",
+    };
+    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let contract = read_json(&options.contract)?;
+    let (manifest, _) = super::manifest::read(root, &options.manifest)?;
+    let (media, native) = validation::current_workers(root, &identity)?;
+    let candidate = match s(&contract, "candidate").unwrap_or("media-worker") {
+        "media-worker" => media.clone(),
+        name => validation::candidate_worker(root, &identity, name)?,
+    };
+    let mut workers = vec![
+        ("candidate".to_owned(), candidate),
+        ("media-worker".to_owned(), media),
+        ("ffmpeg-worker".to_owned(), native),
+    ];
+    for case in manifest
+        .get("cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let selected = selected_operation(case, &contract, &identity)?;
+        for record in [&selected.reference, &selected.measured] {
+            let path = root.join(s(record, "path").unwrap_or_default());
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if !workers.iter().any(|(known, _)| *known == name) {
+                workers.push((name, path));
+            }
+        }
+    }
+    let settings = Value::object([
+        ("pairs", Value::int(options.pairs as i64)),
+        (
+            "memory_pairs",
+            Value::int(options.memory_pairs.unwrap_or(options.pairs) as i64),
+        ),
+        ("iterations", Value::int(options.iterations(&contract))),
+        ("seed", Value::int(options.seed)),
+        (
+            "require_acceptance",
+            Value::Bool(options.require_acceptance),
+        ),
+        (
+            "require_slice_acceptance",
+            Value::Bool(options.require_slice_acceptance),
+        ),
+        ("fate_cache", Value::Bool(options.fate_cache.is_some())),
+        ("early_stop", Value::Bool(options.early_stop)),
+        (
+            "kernel_bound",
+            std::env::var("TRIERGON_RSS_KERNEL_BOUND").map_or(Value::Null, Value::str),
+        ),
+    ]);
+    let shared = [
+        "harness/fate/index.json",
+        "harness/fate/map.json",
+        "harness/module-gates.json",
+        "harness/comparison-rules.json",
+    ]
+    .map(|path| root.join(path));
+    let files: Vec<&Path> = [options.contract.as_path(), options.manifest.as_path()]
+        .into_iter()
+        .chain(shared.iter().chain(documents).map(PathBuf::as_path))
+        .chain(options.additional_reports.iter().map(PathBuf::as_path))
+        .collect();
+    let workers: Vec<(&str, &Path)> = workers
+        .iter()
+        .map(|(name, path)| (name.as_str(), path.as_path()))
+        .collect();
+    reuse::Key::new(root, mode, settings, &files, &workers).map(Some)
+}
+
+/// Collect inside the directory reserved by the report command.
+pub(crate) fn collect(
+    root: &Path,
+    options: &Options,
+    controls: Option<&Value>,
+) -> Result<i32, String> {
     if options.baseline_worker.is_some()
         && (options.require_acceptance || options.require_slice_acceptance)
     {
@@ -717,7 +1016,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(&identity, &pinned));
-    let refusals = gate_build::refusals(&identity, &pinned);
+    let refusals = gate_build::identity_refusals(root, &identity, &pinned);
     if !refusals.is_empty() && (options.require_acceptance || options.require_slice_acceptance) {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
@@ -725,6 +1024,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let contract = read_json(&options.contract)?;
     let work_fields = super::comparison::work_fields(&contract)?;
     let timeout = worker::contract_timeout(&contract)?;
+    let parity_timeout = worker::contract_parity_timeout(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
@@ -736,15 +1036,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.
     let worker_operation = s(&contract, "worker_operation").map(str::to_owned);
-    let iterations = options
-        .iterations
-        .or_else(|| {
-            contract
-                .get("iterations")
-                .and_then(Value::as_f64)
-                .map(|n| n as u32)
-        })
-        .unwrap_or(200);
+    let iterations = options.iterations(&contract);
     if (options.require_acceptance || options.require_slice_acceptance)
         && !validation::iterations_valid(&contract, &Value::int(iterations))
     {
@@ -766,7 +1058,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         }
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
-    fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
+    let measures = options.benchmark || options.memory;
+    if measures {
+        let samples = options.output.join("measurements");
+        fs::create_dir(&samples).map_err(|e| format!("{}: {e}", samples.display()))?;
+    }
     let target = gate_target()?;
     let coverage = fate_coverage(
         root,
@@ -774,7 +1070,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         &read_json(&root.join("harness/fate/map.json"))?,
         options.fate_cache.as_deref(),
     )?;
-    let base = vec![
+    let mut base = vec![
         ("schema", Value::int(1)),
         ("target", Value::str(&target)),
         ("identity", identity.clone()),
@@ -795,17 +1091,52 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         ("fate_coverage", Value::Array(coverage.clone())),
         ("additional_cases", Value::Array(additional.clone())),
     ];
+    if measures {
+        base.push(("case_storage", Value::str("sha256-files")));
+    }
+    if let Some(proof) = controls {
+        base.push(("functional_controls", proof.clone()));
+    }
+    let validate_controls = |header: &Value| {
+        if contract.get("functional_controls").is_some() {
+            crate::progressive_bench::validate_report_controls(
+                root,
+                &options.output.join("report.json"),
+                header,
+                &contract,
+                &manifest,
+            )
+        } else {
+            Ok(())
+        }
+    };
+    let header = object(base.clone());
+    if measures || controls.is_some() {
+        validate_controls(&header)?;
+    }
     let corpus = options
         .corpus
         .canonicalize()
         .map_err(|e| format!("{}: {e}", options.corpus.display()))?;
     let reviewed = reviewed_inputs(root)?;
-    let mut rows: Vec<Value> = Vec::new();
-    for case in manifest
+    let cases = manifest
         .get("cases")
         .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
+        .unwrap_or_default();
+    reserve_case_outputs(&options.output, cases)?;
+    let mut rows: Vec<Value> = Vec::new();
+    let mut memory_jobs = Vec::new();
+    // A gate comparison stops early once its bound is settled below the ceiling;
+    // a comparison with another build runs every pair.
+    let planned_memory = options.memory_pairs.unwrap_or(options.pairs);
+    let (timing_pairs, memory_pairs) = match options.baseline_worker {
+        None => (
+            Pairs::gate(options.pairs, Runtime::load(root)?.ceiling).early_stop(options.early_stop),
+            Pairs::gate(planned_memory, super::memory::CEILING).early_stop(options.early_stop),
+        ),
+        Some(_) => (Pairs::fixed(options.pairs), Pairs::fixed(planned_memory)),
+    };
+    for case in cases {
         let id = s(case, "id").unwrap_or_default().to_owned();
         let mut timed: Option<(PathBuf, PathBuf, Operation)> = None;
         let mut row = vec![
@@ -866,7 +1197,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
-                timeout,
+                timeout: parity_timeout,
             };
             timed = Some((
                 measured.clone(),
@@ -912,7 +1243,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
-                timeout,
+                timeout: parity_timeout,
             };
             let comparison = rule.map(|rule| Comparison {
                 rule,
@@ -969,78 +1300,118 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         row.push(("parity", parity));
         if let (true, Some((measured, input, operation))) = (passed, timed) {
             let reference = options.baseline_worker.clone().unwrap_or(measured);
-            let check_inputs = || {
-                if digest(&input)? != sha {
-                    return Ok(Some("input-hash-mismatch"));
-                }
-                let failure = additional_input_failure(&corpus, case, worker_operation.as_deref())?;
-                if failure.is_none() && worker_operation.is_some() {
-                    resolved_case_arguments(&corpus, case, case_arguments(case))?;
-                }
-                Ok(failure)
-            };
+            let prefix = worker_operation.as_deref();
             if options.benchmark {
-                let timing = measure_pinned(check_inputs, || {
-                    benchmark(
-                        &candidate,
-                        &reference,
-                        &input,
-                        options.pairs,
-                        iterations,
-                        options.seed,
-                        &operation,
-                    )
-                })?;
-                row.push(("timing", timing));
+                let timing = measure_pinned(
+                    || input_failure(&corpus, case, &input, sha, prefix),
+                    || {
+                        benchmark(
+                            &candidate,
+                            &reference,
+                            &input,
+                            timing_pairs,
+                            iterations,
+                            options.seed,
+                            &operation,
+                        )
+                    },
+                )?;
+                row.push((
+                    "timing",
+                    store_measurement(&options.output, rows.len(), "timing", &timing)?,
+                ));
             }
             if options.memory {
-                let memory = measure_pinned(check_inputs, || {
-                    super::memory::collect(
-                        root,
-                        super::memory::WorkerPaths {
-                            candidate: &candidate,
-                            reference: &reference,
-                            registered: options.baseline_worker.is_none(),
+                let index = rows.len();
+                let registered = options.baseline_worker.is_none();
+                let workers = super::memory::WorkerPaths {
+                    candidate: &candidate,
+                    reference: &reference,
+                    registered,
+                };
+                let files = case_files(&corpus, case)?;
+                let (corpus, candidate, reference) =
+                    (corpus.clone(), candidate.clone(), reference.clone());
+                let job = super::memory::Job::new(&workers, files, move |slot| {
+                    let memory = measure_pinned(
+                        || input_failure(&corpus, case, &input, sha, prefix),
+                        || {
+                            super::memory::collect(
+                                slot,
+                                root,
+                                super::memory::WorkerPaths {
+                                    candidate: &candidate,
+                                    reference: &reference,
+                                    registered,
+                                },
+                                &input,
+                                memory_pairs,
+                                options.seed,
+                                &operation,
+                            )
                         },
-                        &input,
-                        options.memory_pairs.unwrap_or(options.pairs),
-                        options.seed,
-                        &operation,
-                    )
-                })?;
-                row.push(("memory", memory));
+                    )?;
+                    store_measurement(&options.output, index, "memory", &memory)
+                });
+                memory_jobs.push((index, job));
             }
         }
         rows.push(object(row));
-        let mut partial = base.clone();
-        partial.extend([
-            ("collection_status", Value::str("partial")),
-            ("cases", Value::Array(rows.clone())),
-            (
-                "acceptance",
-                Value::object([
-                    ("accepted", Value::Bool(false)),
-                    ("slice_accepted", Value::Bool(false)),
-                    ("slice_reasons", Value::strings(["collection incomplete"])),
-                    ("reasons", Value::strings(["collection incomplete"])),
-                ]),
-            ),
-        ]);
-        save_json(&options.output.join("partial.json"), &object(partial))?;
+        save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
     }
-    let mut verdict = acceptance(
+    // Every case is timed before any memory runs; memory then fills the CPUs.
+    let (indices, jobs): (Vec<usize>, Vec<_>) = memory_jobs.into_iter().unzip();
+    for (index, memory) in indices.into_iter().zip(super::memory::collect_all(jobs)?) {
+        validation::put(&mut rows[index], "memory", memory?)?;
+    }
+    if options.memory {
+        save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
+    }
+    let mut unavailable = None;
+    let load_case = |row: &Value| {
+        if measures {
+            validation::expand_measurements(&options.output, row)
+        } else {
+            Ok(row.clone())
+        }
+    };
+    let mut verdict = acceptance_iter(
         root,
         &contract,
-        &rows,
+        rows.iter()
+            .map(|row| load_case(row).inspect_err(|error| unavailable = Some(error.clone()))),
         &identity,
         &target,
         &coverage,
         &additional,
     );
-    if let Some(error) = source_identity_error(root, &identity)
-        && let Value::Object(fields) = &mut verdict
+    if let Some(error) = unavailable {
+        return Err(error);
+    }
+    let control_error = validate_controls(&header).err();
+    let controls_valid = controls.is_none() || control_error.is_none();
+    if let Some(error) = &control_error
+        && let Some((_, proof)) = base
+            .iter_mut()
+            .find(|(key, _)| *key == "functional_controls")
     {
-        for (key, value) in fields.iter_mut() {
+        reject_controls(proof, error)?;
+    }
+    let identity_error = source_identity_error(root, &identity)
+        .or_else(|| validation::current_workers(root, &identity).err())
+        .or_else(|| {
+            if candidate_name == "media-worker" {
+                None
+            } else {
+                validation::candidate_worker(root, &identity, &candidate_name).err()
+            }
+        });
+    let identity_valid = identity_error.is_none();
+    for error in [identity_error, control_error].into_iter().flatten() {
+        let Value::Object(fields) = &mut verdict else {
+            return Err("acceptance verdict must be an object".into());
+        };
+        for (key, value) in fields {
             match (key.as_str(), value) {
                 ("accepted" | "slice_accepted", v) => *v = Value::Bool(false),
                 ("reasons" | "slice_reasons", Value::Array(list)) => list.push(Value::str(&error)),
@@ -1051,10 +1422,24 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let mut report = base;
     report.extend([
         ("collection_status", Value::str("complete")),
-        ("cases", Value::Array(rows.clone())),
+        (
+            "summary",
+            Value::object([(
+                "source_and_workers_unchanged",
+                Value::Bool(identity_valid && controls_valid),
+            )]),
+        ),
         ("acceptance", verdict.clone()),
     ]);
-    save_json(&options.output.join("report.json"), &object(report))?;
+    if measures {
+        publish_measurements(&options.output, object(report), &rows, load_case)?;
+    } else {
+        report.push(("cases", Value::Array(rows.clone())));
+        publish_json(
+            &options.output.join("report.json"),
+            &(json::to_python(&object(report), Some(2)) + "\n"),
+        )?;
+    }
     let reasons = |key: &str| {
         verdict
             .get(key)
@@ -1087,7 +1472,26 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    Ok(i32::from(!ratchet(&label, &rows, &open)))
+    let parity_matches = ratchet(&label, &rows, &open);
+    Ok(i32::from(
+        !parity_matches || !controls_valid || !identity_valid,
+    ))
+}
+
+fn publish_measurements(
+    output: &Path,
+    mut header: Value,
+    rows: &[Value],
+    load_case: impl FnMut(&Value) -> Result<Value, String>,
+) -> Result<(), String> {
+    validation::put(&mut header, "case_storage", Value::str("sha256-files"))?;
+    validation::put(&mut header, "cases", Value::Array(rows.to_vec()))?;
+    publish_json(
+        &output.join("collection.json"),
+        &(json::to_python(&header, Some(2)) + "\n"),
+    )?;
+    validation::put(&mut header, "case_storage", Value::str("inline"))?;
+    write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
 
 /// A contract's `open_cases` on `target`: case ids that fail today, each tied to
@@ -1353,34 +1757,44 @@ mod prefix_tests {
     #[test]
     fn registered_prefix_features_use_supplied_corpus_directories() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let mut corpora = BTreeMap::from([
-            ("hls-segments".to_owned(), root.join("harness/fixtures/hls")),
+        for (candidate, corpora) in [
             (
-                "matroska-startup-seek".to_owned(),
-                root.join(".research/startup-seek-fixtures"),
+                "playback-worker",
+                vec![
+                    ("hls-segments", root.join("harness/fixtures/hls")),
+                    ("mp4-range", root.join(".research/mp4-range-fixtures")),
+                    (
+                        "progressive-ts188",
+                        root.join("harness/features/progressive-ts188/inputs"),
+                    ),
+                ],
             ),
             (
-                "mp4-range".to_owned(),
-                root.join(".research/mp4-range-fixtures"),
+                "playback-matroska-worker",
+                vec![(
+                    "matroska-startup-seek",
+                    root.join(".research/startup-seek-fixtures"),
+                )],
             ),
-            (
-                "progressive-ts188".to_owned(),
-                root.join("harness/features/progressive-ts188/inputs"),
-            ),
-        ]);
-        let features = PrefixFeature::registered(root, "playback-worker", &corpora).unwrap();
-        for (id, directory) in &corpora {
-            let feature = features.iter().find(|feature| feature.id == *id).unwrap();
-            assert_eq!(&feature.corpus, directory);
-            assert!(!feature.cases.is_empty());
+        ] {
+            let mut corpora: BTreeMap<String, std::path::PathBuf> = corpora
+                .into_iter()
+                .map(|(id, directory)| (id.to_owned(), directory))
+                .collect();
+            let features = PrefixFeature::registered(root, candidate, &corpora).unwrap();
+            for (id, directory) in &corpora {
+                let feature = features.iter().find(|feature| feature.id == *id).unwrap();
+                assert_eq!(&feature.corpus, directory);
+                assert!(!feature.cases.is_empty());
+            }
+            corpora.insert("unused".to_owned(), root.to_path_buf());
+            assert!(
+                PrefixFeature::registered(root, candidate, &corpora)
+                    .err()
+                    .unwrap()
+                    .contains("no registered prefix feature unused")
+            );
         }
-        corpora.insert("unused".to_owned(), root.to_path_buf());
-        assert!(
-            PrefixFeature::registered(root, "playback-worker", &corpora)
-                .err()
-                .unwrap()
-                .contains("no registered prefix feature unused")
-        );
     }
 
     #[test]
@@ -1429,7 +1843,7 @@ mod prefix_tests {
         assert_eq!(
             found,
             [
-                ("font-hinting-default", "font-sized-", 53),
+                ("font-hinting-default", "font-sized-", 159),
                 ("font-hinting-modes", "font-sized-", 954),
                 ("font-hinting-none", "font-sized-", 159),
                 ("font-outlines", "font-", 53),
@@ -1568,6 +1982,69 @@ mod tests {
     }
 
     #[test]
+    fn measured_checkpoint_keeps_samples_separate_and_checks_their_digest() {
+        let output = Output::new();
+        fs::create_dir(output.0.join("measurements")).unwrap();
+        let timing = json::parse_strict(
+            r#"{"ratio":{"upper_95":1.01234567890123456789},"samples":[18446744073709551615]}"#,
+        )
+        .unwrap();
+        let memory = json::parse_observations(
+            r#"{"status":"invalid-memory-work","samples":[{"reference_rss":9007199254740993,"candidate_heap":NaN}]}"#,
+        )
+        .unwrap();
+        let row = Value::object([
+            ("id", Value::str("sample")),
+            (
+                "timing",
+                store_measurement(&output.0, 0, "timing", &timing).unwrap(),
+            ),
+            (
+                "memory",
+                store_measurement(&output.0, 0, "memory", &memory).unwrap(),
+            ),
+        ]);
+        let checkpoint = Value::object([
+            ("collection_status", Value::str("partial")),
+            ("case_storage", Value::str("sha256-files")),
+            ("cases", Value::Array(vec![row.clone()])),
+        ]);
+        let path = output.0.join("partial.json");
+        save_checkpoint(&path, &checkpoint).unwrap();
+        let text = fs::read_to_string(path).unwrap();
+        assert!(!text.contains("samples"));
+        assert!(!output.0.join("report.json").exists());
+        let expanded = validation::expand_measurements(&output.0, &row).unwrap();
+        assert_eq!(
+            json::canonical(expanded.get("timing").unwrap()),
+            json::canonical(&timing)
+        );
+        let memory = json::observations(&memory);
+        assert_eq!(json::observations(expanded.get("memory").unwrap()), memory);
+        let inline = output.0.join("inline");
+        create_output(&inline).unwrap();
+        stream_report(
+            &inline,
+            &Value::Object(Vec::new()),
+            [Ok(expanded)].into_iter(),
+            false,
+        )
+        .unwrap();
+        assert!(
+            fs::read_to_string(inline.join("report.json"))
+                .unwrap()
+                .contains(&memory)
+        );
+        assert!(store_measurement(&output.0, 0, "memory", &timing).is_err());
+        fs::write(output.0.join("measurements/0000-memory.json"), b"{}\n").unwrap();
+        assert!(
+            validation::expand_measurements(&output.0, &row)
+                .unwrap_err()
+                .contains("raw measurement changed")
+        );
+    }
+
+    #[test]
     fn case_report_preserves_raw_rows_and_number_precision() {
         let output = Output::new();
         let header = Value::object([
@@ -1591,6 +2068,7 @@ mod tests {
         .unwrap();
         let expected = Value::object([
             ("z", header.get("z").unwrap().clone()),
+            ("a", Value::str("complete")),
             (
                 "cases",
                 Value::Array(
@@ -1599,7 +2077,6 @@ mod tests {
                         .collect(),
                 ),
             ),
-            ("a", Value::str("complete")),
         ]);
         let text = fs::read_to_string(output.0.join("report.json")).unwrap();
         assert_eq!(text, format!("{}\n", json::canonical(&expected)));
@@ -1629,6 +2106,25 @@ mod tests {
     }
 
     #[test]
+    fn parity_only_cannot_overwrite_a_measured_report() {
+        let parent = Output::new();
+        let output = parent.0.join("run");
+        create_output(&output).unwrap();
+        let path = output.join("partial.json");
+        fs::write(&path, "measurement checkpoint").unwrap();
+        let options = Options {
+            output,
+            ..Options::defaults(&parent.0)
+        };
+        assert!(
+            run(&parent.0, &options)
+                .unwrap_err()
+                .contains("use a new output directory")
+        );
+        assert_eq!(fs::read_to_string(path).unwrap(), "measurement checkpoint");
+    }
+
+    #[test]
     fn case_report_keeps_existing_destination() {
         let output = Output::new();
         let destination = output.0.join("report.json");
@@ -1646,6 +2142,42 @@ mod tests {
     }
 
     #[test]
+    fn complete_json_keeps_existing_destination() {
+        let output = Output::new();
+        let destination = output.0.join("report.json");
+        fs::write(&destination, b"existing grade\n").unwrap();
+        assert!(publish_json(&destination, "{}\n").is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"existing grade\n");
+        assert!(!output.0.join("report.json.tmp").exists());
+    }
+
+    #[test]
+    fn case_output_keeps_existing_nested_traces() {
+        let output = Output::new();
+        let nested = output.0.join("nested/case");
+        create_output(&nested).unwrap();
+        let trace = nested.join("progressive-fold.json");
+        fs::write(&trace, b"existing trace\n").unwrap();
+        for id in ["nested/case", "../outside"] {
+            let case = Value::object([("id", Value::str(id))]);
+            assert!(reserve_case_outputs(&output.0, &[case]).is_err());
+        }
+        assert_eq!(fs::read(&trace).unwrap(), b"existing trace\n");
+    }
+
+    #[test]
+    fn case_outputs_reserve_nested_cases_in_either_order() {
+        for child in ["nested/child", "Nested/child"] {
+            for ids in [[child, "nested"], ["nested", child]] {
+                let output = Output::new();
+                let cases = ids.map(|id| Value::object([("id", Value::str(id))]));
+                reserve_case_outputs(&output.0, &cases).unwrap();
+                assert!(output.0.join(child).is_dir());
+            }
+        }
+    }
+
+    #[test]
     fn case_report_keeps_existing_temporary_file() {
         let output = Output::new();
         let temporary = output.0.join("report.json.tmp");
@@ -1660,5 +2192,38 @@ mod tests {
         );
         assert_eq!(fs::read(&temporary).unwrap(), b"in progress\n");
         assert!(!output.0.join("report.json").exists());
+    }
+
+    #[test]
+    fn final_validation_failures_are_written_in_both_report_forms() {
+        let output = Output::new();
+        let mut proof = Value::object([
+            ("passed", Value::Bool(true)),
+            ("path", Value::str("controls/report.json")),
+        ]);
+        reject_controls(&mut proof, "functional control proof hash mismatch").unwrap();
+        let header = Value::object([
+            ("functional_controls", proof),
+            (
+                "summary",
+                Value::object([("source_and_workers_unchanged", Value::Bool(false))]),
+            ),
+        ]);
+        publish_measurements(&output.0, header, &[Value::int(1)], |case| Ok(case.clone())).unwrap();
+        for name in ["collection.json", "report.json"] {
+            let report = read_json(&output.0.join(name)).unwrap();
+            assert_eq!(
+                report
+                    .get("summary")
+                    .and_then(|summary| summary.get("source_and_workers_unchanged")),
+                Some(&Value::Bool(false))
+            );
+            let proof = report.get("functional_controls").unwrap();
+            assert_eq!(proof.get("passed"), Some(&Value::Bool(false)));
+            assert_eq!(
+                s(proof, "error"),
+                Some("functional control proof hash mismatch")
+            );
+        }
     }
 }
