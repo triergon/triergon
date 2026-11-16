@@ -34,55 +34,6 @@
     "thumbv7neon-unknown-linux-gnueabihf"
    ],
    "cause": "Runtime: on aac-he-stereo the HE-AAC decoder runs 1.51 times the reference's user-mode instructions (4.24 G against 2.81 G) and 1.30 times its cycles (1.60 G against 1.23 G). The reference's ARMv7 build runs SBR's QMF windowing, its subband shuffles, the HF generation, gain filtering and noise and the s16 conversion as NEON code, 19.6% of its cycles; LLVM emits no NEON float instructions for this target, explicit four-lane blocks and algebraic float operations included, so the decoder runs that work scalar, and the QMF synthesis alone takes 21.7% of its cycles. Measured at bbe30b3b on a c6g.4xlarge, evidence set aac-thumb2-speed-armv7."
-  },
-  {
-   "id": "dts-core-es-6.1",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the DTS core decoder runs 1.97 times the reference's user-mode instructions on dts-core-es-6.1 (10.82 G against 5.50 G); FrameDecoder::decode_normalized takes 55.0% of cycles and the library integer division __aeabi_uidiv 7.6%. Built as A32 with NEON the workloads are still above the ceiling (dts-core-es-6.1 1.6030, dts-core-7.1-master 1.6343). Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
-  },
-  {
-   "id": "dts-core-7.1-master",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the DTS core decoder runs 1.97 times the reference's user-mode instructions on dts-core-es-6.1 (10.82 G against 5.50 G); FrameDecoder::decode_normalized takes 55.0% of cycles and the library integer division __aeabi_uidiv 7.6%. Built as A32 with NEON the workloads are still above the ceiling (dts-core-es-6.1 1.6030, dts-core-7.1-master 1.6343). Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
-  },
-  {
-   "id": "ac3-5.1-448",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the AC-3 decoder runs 1.59 times the reference's user-mode instructions on ac3-2.0-192 (5.44 G against 3.43 G), with the library floor taking 12.2% of cycles. The Thumb-2 encoding adds part: built as A32 with NEON the workloads measure ac3-5.1-448 1.2190 and ac3-2.0-192 1.2657, still above the ceiling. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
-  },
-  {
-   "id": "ac3-2.0-192",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the AC-3 decoder runs 1.59 times the reference's user-mode instructions on ac3-2.0-192 (5.44 G against 3.43 G), with the library floor taking 12.2% of cycles. The Thumb-2 encoding adds part: built as A32 with NEON the workloads measure ac3-5.1-448 1.2190 and ac3-2.0-192 1.2657, still above the ceiling. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
-  },
-  {
-   "id": "eac3-7.1",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the Thumb-2 encoding. Built as A32 with NEON against the same reference the workloads are within the ceiling (eac3-7.1 1.1589, eac3-5.1-spx 1.1231, eac3-stereo-spx 1.1821), with the same instruction count (6.75 G against 6.73 G on eac3-stereo-spx) and 1.7 times fewer branch misses; no Rust target compiles A32 with NEON under default flags. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
-  },
-  {
-   "id": "eac3-5.1-spx",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the Thumb-2 encoding. Built as A32 with NEON against the same reference the workloads are within the ceiling (eac3-7.1 1.1589, eac3-5.1-spx 1.1231, eac3-stereo-spx 1.1821), with the same instruction count (6.75 G against 6.73 G on eac3-stereo-spx) and 1.7 times fewer branch misses; no Rust target compiles A32 with NEON under default flags. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
-  },
-  {
-   "id": "eac3-stereo-spx",
-   "targets": [
-    "thumbv7neon-unknown-linux-gnueabihf"
-   ],
-   "cause": "Runtime: the Thumb-2 encoding. Built as A32 with NEON against the same reference the workloads are within the ceiling (eac3-7.1 1.1589, eac3-5.1-spx 1.1231, eac3-stereo-spx 1.1821), with the same instruction count (6.75 G against 6.73 G on eac3-stereo-spx) and 1.7 times fewer branch misses; no Rust target compiles A32 with NEON under default flags. Measured at 4cbd1e86 on a c6g.4xlarge, evidence set codec-armv7-causes."
   }
  ],
  "workloads": [

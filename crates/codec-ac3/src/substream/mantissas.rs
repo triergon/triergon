@@ -13,25 +13,27 @@ use crate::tables::{
 };
 use triergon_bitstream::BitReader;
 
-/// Per-block mantissa group state (7.3.5): groups are shared across exponent sets.
+/// Per-block mantissa group state (7.3.5): groups are shared across exponent sets. Each
+/// grouped quantizer keeps its current group and how many of its values were used.
+#[derive(Clone, Copy)]
 struct Groups {
     g1: [i32; 3],
-    n1: usize,
+    used1: usize,
     g2: [i32; 3],
-    n2: usize,
+    used2: usize,
     g4: [i32; 2],
-    n4: usize,
+    used4: usize,
 }
 
 impl Groups {
     fn new() -> Self {
         Groups {
             g1: [0; 3],
-            n1: 0,
+            used1: 3,
             g2: [0; 3],
-            n2: 0,
+            used2: 3,
             g4: [0; 2],
-            n4: 0,
+            used4: 2,
         }
     }
 }
@@ -45,7 +47,6 @@ impl Substream {
         noise: NoiseMode,
         groups: &GroupTables,
     ) -> Result<(), E> {
-        self.coef_clear();
         let mut g = Groups::new();
         let mut got_cpl = false;
         for ch in 0..self.nfchans {
@@ -62,15 +63,13 @@ impl Substream {
                 );
                 read_mantissas(
                     br,
-                    &self.bap[ch],
-                    &self.exps[ch],
-                    0,
-                    end,
+                    &self.bap[ch][..end],
+                    &self.exps[ch][..end],
                     dith,
                     rng,
                     groups,
                     &mut g,
-                    &mut self.icoef[ch],
+                    &mut self.icoef[ch][..end],
                 );
             }
             if self.cplinu && self.chincpl[ch] && !got_cpl {
@@ -87,15 +86,13 @@ impl Substream {
                     // suppresses the resulting noise during decoupling.
                     read_mantissas(
                         br,
-                        &self.bap[CPL],
-                        &self.exps[CPL],
-                        s,
-                        e,
+                        &self.bap[CPL][s..e],
+                        &self.exps[CPL][s..e],
                         rng.compatible(),
                         rng,
                         groups,
                         &mut g,
-                        &mut self.icoef[CPL],
+                        &mut self.icoef[CPL][s..e],
                     );
                 }
             }
@@ -110,32 +107,17 @@ impl Substream {
             } else {
                 read_mantissas(
                     br,
-                    &self.bap[LFE],
-                    &self.exps[LFE],
-                    0,
-                    7,
+                    &self.bap[LFE][..7],
+                    &self.exps[LFE][..7],
                     false,
                     rng,
                     groups,
                     &mut g,
-                    &mut self.icoef[LFE],
+                    &mut self.icoef[LFE][..7],
                 );
             }
         }
         Ok(())
-    }
-
-    fn coef_clear(&mut self) {
-        let n = self.nfchans;
-        for c in &mut self.icoef[..n] {
-            c.fill(0);
-        }
-        if self.cplinu {
-            self.icoef[CPL].fill(0);
-        }
-        if self.lfeon {
-            self.icoef[LFE].fill(0);
-        }
     }
 
     fn read_aht_channel(
@@ -245,31 +227,43 @@ impl Substream {
         let (start, end) = (self.strtmant[ch], self.endmant[ch]);
         let src = &self.aht_coef[ch][blk];
         for bin in start..end {
-            self.icoef[ch][bin] = (src[bin].round() as i32) >> self.exps[ch][bin];
+            self.icoef[ch][bin] = round_to_i32(src[bin]) >> self.exps[ch][bin];
         }
     }
+}
+
+/// `x.round() as i32`: nearest, halves away from zero, saturating, NaN to zero. ARMv7
+/// has no rounding instruction, so `f32::round` is a library call there; the conversion
+/// toward zero is one instruction. `x - t` is exact: for |x| < 2^23 both are multiples of
+/// the ulp of `x` and differ by less than 1, and above that `x` is an integer.
+#[inline]
+fn round_to_i32(x: f32) -> i32 {
+    let t = x as i32;
+    let f = x - t as f32;
+    t.saturating_add(i32::from(f >= 0.5) - i32::from(f <= -0.5))
 }
 
 static AHT_IDCT: std::sync::LazyLock<[[f32; 6]; 6]> =
     std::sync::LazyLock::new(crate::quant::aht_idct_matrix);
 
-/// Unpack mantissas for bins start..end (7.3) as Q23 integers shifted by the exponent.
+/// Unpack the mantissas of a run of bins (7.3) as Q23 integers shifted by the exponent.
+/// The reader and the group state are worked on as local copies so that they stay in
+/// registers through the loop.
 #[allow(clippy::too_many_arguments)]
 #[inline]
 fn read_mantissas(
     br: &mut BitReader<'_>,
-    bap: &[u8; 256],
-    exps: &[u8; 256],
-    start: usize,
-    end: usize,
+    bap: &[u8],
+    exps: &[u8],
     dither: bool,
     rng: &mut Rng,
     t: &GroupTables,
-    g: &mut Groups,
-    out: &mut [i32; 256],
+    groups: &mut Groups,
+    out: &mut [i32],
 ) {
-    for bin in start..end {
-        let b = bap[bin];
+    let mut r = *br;
+    let mut g = *groups;
+    for ((&b, &e), out) in bap.iter().zip(exps).zip(out) {
         let m = match b {
             0 => {
                 if dither {
@@ -279,38 +273,43 @@ fn read_mantissas(
                 }
             }
             1 => {
-                if g.n1 == 0 {
-                    g.g1 = t.g1[br.read(5) as usize];
-                    g.n1 = 3;
+                if g.used1 >= 3 {
+                    g.g1 = t.g1[r.read(5) as usize];
+                    g.used1 = 0;
                 }
-                g.n1 -= 1;
-                g.g1[2 - g.n1]
+                g.used1 += 1;
+                g.g1[g.used1 - 1]
             }
             2 => {
-                if g.n2 == 0 {
-                    g.g2 = t.g2[br.read(7) as usize];
-                    g.n2 = 3;
+                if g.used2 >= 3 {
+                    g.g2 = t.g2[r.read(7) as usize];
+                    g.used2 = 0;
                 }
-                g.n2 -= 1;
-                g.g2[2 - g.n2]
+                g.used2 += 1;
+                g.g2[g.used2 - 1]
             }
-            3 => t.b3[br.read(3) as usize],
+            3 => t.b3[r.read(3) as usize],
             4 => {
-                if g.n4 == 0 {
-                    g.g4 = t.g4[br.read(7) as usize];
-                    g.n4 = 2;
+                if g.used4 >= 2 {
+                    g.g4 = t.g4[r.read(7) as usize];
+                    g.used4 = 0;
                 }
-                g.n4 -= 1;
-                g.g4[1 - g.n4]
+                g.used4 += 1;
+                g.g4[g.used4 - 1]
             }
-            5 => t.b5[br.read(4) as usize],
+            5 => t.b5[r.read(4) as usize],
             _ => {
-                let bits = BAP_BITS[b as usize] as u32;
-                br.read_signed(bits) << (24 - bits)
+                // At most 16 bits: the top 32 of the window hold them.
+                let bits = u32::from(BAP_BITS[usize::from(b & 15)]);
+                let v = (r.peek32() as i32) >> (32 - bits);
+                r.skip(bits as usize);
+                v << (24 - bits)
             }
         };
-        out[bin] = m >> exps[bin];
+        *out = m >> e;
     }
+    *br = r;
+    *groups = g;
 }
 
 /// One gain-adaptive-quantized AHT mantissa (Annex E 3.4.4.2, Tables E3.5/E3.6).
@@ -353,6 +352,48 @@ fn gaq_mantissa(br: &mut BitReader<'_>, hebap: usize, m: u32, gain_log: u8) -> f
             } else {
                 s as f32 * EXP_SCALE[(sb - 1) as usize] * 0.25
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::round_to_i32;
+
+    #[test]
+    fn rounding_matches_the_library_round() {
+        let edges = [
+            0.0,
+            -0.0,
+            0.5,
+            -0.5,
+            1.5,
+            -1.5,
+            2.5,
+            0.499_999_97,
+            -0.499_999_97,
+            8_388_607.5,
+            -8_388_607.5,
+            8_388_608.0,
+            2_147_483_520.0,
+            2_147_483_648.0,
+            -2_147_483_648.0,
+            -2_147_483_904.0,
+            1e20,
+            -1e20,
+            f32::INFINITY,
+            f32::NEG_INFINITY,
+            f32::NAN,
+        ];
+        let mut bits = 0x1234_5678u32;
+        let random = (0..1 << 20).map(|_| {
+            bits ^= bits << 13;
+            bits ^= bits >> 17;
+            bits ^= bits << 5;
+            f32::from_bits(bits)
+        });
+        for x in edges.into_iter().chain(random) {
+            assert_eq!(round_to_i32(x), x.round() as i32, "{x:e}");
         }
     }
 }

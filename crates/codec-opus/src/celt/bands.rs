@@ -5,10 +5,12 @@
 use super::alloc::{
     Allocation, BITRES, bits_to_pulses, pulse_count, pulses_to_bits, split_threshold,
 };
+use super::block_len;
 use super::pvq::{self, MAX_BAND, Spread};
 use super::tables::{BANDS, EBANDS, LOG_N};
 use crate::range::{RangeDecoder, ilog};
 use core::ops::Range;
+use triergon_codec::divide;
 
 /// Normalised folding source of both channels: bins up to the last band's start.
 pub(super) const NORM_LEN: usize = 8 * 100;
@@ -47,8 +49,8 @@ fn bitexact_log2tan(sin: i32, cos: i32) -> i32 {
 
 /// One level of the Haar transform over `stride` interleaved signals.
 fn haar(x: &mut [f32], n0: usize, stride: usize) {
-    for pair in x[..n0 * stride].chunks_exact_mut(2 * stride) {
-        let (a, b) = pair.split_at_mut(stride);
+    for p in 0..n0 / 2 {
+        let (a, b) = x[2 * p * stride..][..2 * stride].split_at_mut(stride);
         for (a, b) in a.iter_mut().zip(b) {
             let (t1, t2) = (FRAC_SQRT_2 * *a, FRAC_SQRT_2 * *b);
             *a = t1 + t2;
@@ -71,8 +73,14 @@ fn ordery(stride: usize) -> &'static [usize] {
 }
 
 /// Gather `stride` interleaved blocks of `n0` bins into consecutive blocks.
-fn deinterleave(x: &mut [f32], n0: usize, stride: usize, hadamard: bool) {
-    let mut tmp = [0f32; MAX_BAND];
+/// `tmp` is scratch.
+fn deinterleave(
+    x: &mut [f32],
+    n0: usize,
+    stride: usize,
+    hadamard: bool,
+    tmp: &mut [f32; MAX_BAND],
+) {
     let n = n0 * stride;
     for i in 0..stride {
         let to = if hadamard { ordery(stride)[i] } else { i } * n0;
@@ -84,8 +92,7 @@ fn deinterleave(x: &mut [f32], n0: usize, stride: usize, hadamard: bool) {
 }
 
 /// The inverse of [`deinterleave`].
-fn interleave(x: &mut [f32], n0: usize, stride: usize, hadamard: bool) {
-    let mut tmp = [0f32; MAX_BAND];
+fn interleave(x: &mut [f32], n0: usize, stride: usize, hadamard: bool, tmp: &mut [f32; MAX_BAND]) {
     let n = n0 * stride;
     for i in 0..stride {
         let from = if hadamard { ordery(stride)[i] } else { i } * n0;
@@ -139,6 +146,10 @@ struct Bands<'a, 'r> {
     tf_change: i32,
     remaining_bits: i32,
     seed: u32,
+    /// Scratch of the codeword decoder and of the block reordering, kept across bands
+    /// so that neither is cleared per band.
+    pulses: [i32; MAX_BAND],
+    reorder: [f32; MAX_BAND],
 }
 
 /// Decode the normalised shapes of all bands into `x` (and `y` for a stereo frame), with
@@ -174,6 +185,8 @@ pub(super) fn decode(
         tf_change: 0,
         remaining_bits: 0,
         seed: *seed,
+        pulses: [0; MAX_BAND],
+        reorder: [0.0; MAX_BAND],
     };
     let stereo = y.is_some();
     let mut dual_stereo = allocation.dual_stereo;
@@ -191,7 +204,7 @@ pub(super) fn decode(
         state.remaining_bits = total_bits - tell - 1;
         state.band = i;
         let b = if i < allocation.coded_bands {
-            let share = balance / (allocation.coded_bands - i).min(3) as i32;
+            let share = divide(balance, (allocation.coded_bands - i).min(3) as i32);
             (state.remaining_bits + 1)
                 .min(allocation.pulses[i] + share)
                 .clamp(0, 16383)
@@ -377,7 +390,7 @@ impl Bands<'_, '_> {
             } else {
                 self.triangular_angle(qn)
             } as i32;
-            itheta = itheta * 16384 / qn as i32;
+            itheta = divide(itheta * 16384, qn as i32);
         } else if stereo {
             invert = b > 2 << BITRES && self.remaining_bits > 2 << BITRES && self.rc.bit_logp(2);
         }
@@ -470,7 +483,7 @@ impl Bands<'_, '_> {
         let mut tf_change = self.tf_change;
         let recombine = tf_change.max(0) as usize;
         let mut b_count = blocks;
-        let mut n_b = n0 / blocks;
+        let mut n_b = block_len(n0, blocks);
 
         // Recombine blocks to increase frequency resolution.
         for k in 0..recombine {
@@ -498,14 +511,16 @@ impl Bands<'_, '_> {
         let n_b0 = n_b;
         // Order the bins by time instead of frequency.
         if let Some(lowband) = lowband.as_deref_mut().filter(|_| blocks0 > 1) {
-            deinterleave(lowband, n_b >> recombine, blocks0 << recombine, long_blocks);
+            let (n0, stride) = (n_b >> recombine, blocks0 << recombine);
+            deinterleave(lowband, n0, stride, long_blocks, &mut self.reorder);
         }
 
         let mut cm = self.partition(x, b, blocks0, lowband.as_deref(), lm, gain, fill);
 
         // Undo the reordering and the time-frequency changes.
         if blocks0 > 1 {
-            interleave(x, n_b >> recombine, blocks0 << recombine, long_blocks);
+            let (n0, stride) = (n_b >> recombine, blocks0 << recombine);
+            interleave(x, n0, stride, long_blocks, &mut self.reorder);
         }
         n_b = n_b0;
         b_count = blocks0;
@@ -641,7 +656,15 @@ impl Bands<'_, '_> {
             self.remaining_bits -= cost;
         }
         if q != 0 {
-            return pvq::decode_band(self.rc, x, pulse_count(q), self.spread, blocks, gain);
+            return pvq::decode_band(
+                self.rc,
+                &mut self.pulses,
+                x,
+                pulse_count(q),
+                self.spread,
+                blocks,
+                gain,
+            );
         }
 
         // No pulses: fold the source, or fill with noise.
@@ -780,7 +803,7 @@ fn quantisation_steps(n: usize, b: i32, offset: i32, pulse_cap: i32, stereo: boo
     }
     // Leave enough bits to code one pulse in the side of a fully sided split.
     let qb = (b - pulse_cap - (4 << BITRES))
-        .min((b + n2 * offset) / n2)
+        .min(divide(b + n2 * offset, n2))
         .min(8 << BITRES);
     if qb < (1 << BITRES >> 1) {
         1
@@ -838,7 +861,7 @@ pub(super) fn anti_collapse(p: &AntiCollapse<'_>, x: &mut [f32], frame: usize, m
             let n0 = EBANDS[i + 1] - EBANDS[i];
             let n = n0 << p.lm;
             // Depth in 1/8 bits per bin.
-            let depth = (1 + p.pulses[i]) / n as i32;
+            let depth = divide(1 + p.pulses[i], n as i32);
             let thresh = 0.5 * super::energy::exp2(-0.125 * depth as f32);
             let (mut prev1, mut prev2) = (p.prev1[c][i], p.prev2[c][i]);
             if p.channels == 1 {
@@ -889,12 +912,13 @@ mod tests {
 
     #[test]
     fn hadamard_interleaving_round_trips() {
+        let mut tmp = [0.0; MAX_BAND];
         let original: Vec<f32> = (0..32).map(|v| v as f32).collect();
         for (n0, stride) in [(16, 2), (8, 4), (4, 8), (2, 16)] {
             for hadamard in [false, true] {
                 let mut x = original.clone();
-                deinterleave(&mut x, n0, stride, hadamard);
-                interleave(&mut x, n0, stride, hadamard);
+                deinterleave(&mut x, n0, stride, hadamard, &mut tmp);
+                interleave(&mut x, n0, stride, hadamard, &mut tmp);
                 assert_eq!(x, original);
             }
         }

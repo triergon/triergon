@@ -122,14 +122,14 @@ pub struct Decoder {
 }
 
 /// 32-band synthesis history of one slot.
-type History32 = QmfState<1024>;
+type History32 = QmfState<512>;
 
 /// The X96 64-band filter bank, created when a stream first carries X96.
 #[derive(Debug)]
 struct X96Bank {
     qmf: Qmf<1024>,
     /// One history per coded slot.
-    state: BudgetVec<QmfState<2048>>,
+    state: BudgetVec<QmfState<1024>>,
 }
 
 /// Decoder state of the frame stages, apart from the normalization buffer.

@@ -1,0 +1,39 @@
+{
+ "name": "gate-run-armv7-c68c9667-20261116-082759-shard-2",
+ "path": "gate-run-armv7-c68c9667-20261116-082759-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at c68c9667 on three c6g.4xlarge hosts, 32-bit ARMv7, shard 2 of the codec items (codecs, codecs-audio, ogg-readers, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release, isobmff-reader) with the codec-derived streams input: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md",
+ "key": "evidence/gate-runs/c68c9667b9ae49601190c3d710fb53e0c69fd97a-armv7-20261116-082759/shard-2/0498bb42d62a0feba2ce6c80eed17794a76e651699bbb6e815d78da44aaa0f48.tar.zst",
+ "sha256": "0498bb42d62a0feba2ce6c80eed17794a76e651699bbb6e815d78da44aaa0f48",
+ "bytes": 1306740,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "9c51811215a8083b54e9bb3a0daacb7e01cc451ce07142a10a54232dd39b81e0",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "d03cc0212d23ce0d1418c9245e227793579e2768c551da66e19ff570963c9abc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "6776226069b504eca198a1f3cbd0912c35873917d394f2fed410ae823391abf8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "a456e4221c199f6ed678cfac0f93d3fa681962342f985b0d3453cfd4a28a62e6",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

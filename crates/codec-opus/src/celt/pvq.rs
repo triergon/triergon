@@ -1,6 +1,7 @@
 //! Pyramid vector quantisation (RFC 6716 section 4.3.4): codeword indexing, the spreading
 //! rotation and normalisation.
 
+use super::block_len;
 use crate::range::RangeDecoder;
 
 /// Widest band: 22 bins of the last band times eight short blocks.
@@ -156,7 +157,9 @@ fn unspread(x: &mut [f32], blocks: usize, k: usize, spread: Spread) {
             stride2 += 1;
         }
     }
-    for block in x.chunks_exact_mut(len / blocks) {
+    let size = block_len(len, blocks);
+    for b in 0..blocks {
+        let block = &mut x[b * size..][..size];
         if stride2 > 0 {
             rotate_pairs(block, stride2, s, c);
         }
@@ -169,24 +172,24 @@ fn collapse_mask(y: &[i32], blocks: usize) -> u32 {
     if blocks <= 1 {
         return 1;
     }
-    y.chunks_exact(y.len() / blocks)
-        .enumerate()
-        .fold(0, |mask, (i, block)| {
-            mask | (u32::from(block.iter().any(|&v| v != 0)) << i)
-        })
+    let size = block_len(y.len(), blocks);
+    (0..blocks).fold(0, |mask, b| {
+        let block = &y[b * size..][..size];
+        mask | (u32::from(block.iter().any(|&v| v != 0)) << b)
+    })
 }
 
 /// Decode a band's pulses into the unit-norm vector `x` scaled by `gain` (`alg_unquant`)
-/// and return its collapse mask.
+/// and return its collapse mask. `pulses` is scratch.
 pub(super) fn decode_band(
     rc: &mut RangeDecoder<'_>,
+    pulses: &mut [i32; MAX_BAND],
     x: &mut [f32],
     k: usize,
     spread: Spread,
     blocks: usize,
     gain: f32,
 ) -> u32 {
-    let mut pulses = [0i32; MAX_BAND];
     let y = &mut pulses[..x.len()];
     decode_pulses(rc, y, k);
     // Exact in integers: at most 128 pulses.

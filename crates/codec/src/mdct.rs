@@ -31,6 +31,8 @@ fn mul(a: f32, b: f32, c: f32, d: f32) -> (f32, f32) {
 struct Stage {
     radix: usize,
     span: usize,
+    /// Blocks of `radix * span` points in the transform.
+    blocks: usize,
     re: BudgetVec<f32>,
     im: BudgetVec<f32>,
 }
@@ -116,6 +118,7 @@ impl Fft {
             let stage = Stage {
                 radix,
                 span,
+                blocks: stride,
                 re,
                 im,
             };
@@ -187,8 +190,11 @@ fn leaf4(x: [(f32, f32); 4]) -> [(f32, f32); 4] {
 /// One stage over every block of the planes.
 fn run_stage(re: &mut [f32], im: &mut [f32], stage: &Stage) {
     let block = stage.radix * stage.span;
-    let blocks = re.chunks_exact_mut(block).zip(im.chunks_exact_mut(block));
-    for (r, i) in blocks {
+    // Blocks by their count rather than `chunks_exact`, whose remainder is a library
+    // division on ARMv7.
+    for b in 0..stage.blocks {
+        let points = b * block..(b + 1) * block;
+        let (r, i) = (&mut re[points.clone()], &mut im[points]);
         match stage.radix {
             2 => butterfly2(r, i, stage),
             3 => butterfly3(r, i, stage),
@@ -437,7 +443,8 @@ struct Dct4 {
     len: usize,
     fft: Fft,
     /// `e^{-iπ(j + 1/8) / K}` for `j < N / 4`, applied before the FFT, real and
-    /// imaginary parts.
+    /// imaginary parts, in the FFT's input order: slot `s` holds the twiddle of
+    /// `j = order[s]`.
     pre: (BudgetVec<f32>, BudgetVec<f32>),
     /// `scale` times the same, applied after it.
     post: (BudgetVec<f32>, BudgetVec<f32>),
@@ -466,21 +473,25 @@ impl Imdct {
         let q = n / 4;
         let k = n / 2;
         let fft = Fft::new(q, budget)?.ok_or(StorageError::Invalid("IMDCT length"))?;
-        let twiddles = |s: f64| -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
+        // The twiddles of each `j` that `index` yields, scaled by `s`.
+        let twiddles = |s: f64,
+                        index: &mut dyn Iterator<Item = usize>|
+         -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
             let angle = |j: usize| -PI * (j as f64 + 0.125) / k as f64;
             let mut re = BudgetVec::try_filled(budget, 0.0, q)?;
             let mut im = BudgetVec::try_filled(budget, 0.0, q)?;
-            for (j, (r, i)) in re.iter_mut().zip(im.iter_mut()).enumerate() {
+            for ((r, i), j) in re.iter_mut().zip(im.iter_mut()).zip(index) {
                 (*r, *i) = ((s * angle(j).cos()) as f32, (s * angle(j).sin()) as f32);
             }
             Ok((re, im))
         };
+        let pre = twiddles(1.0, &mut fft.order().iter().map(|&j| j as usize))?;
         Ok(Imdct {
             dct4: Dct4 {
                 len: n,
                 fft,
-                pre: twiddles(1.0)?,
-                post: twiddles(scale)?,
+                pre,
+                post: twiddles(scale, &mut (0..q))?,
                 re: BudgetVec::try_filled(budget, 0.0, q)?,
                 im: BudgetVec::try_filled(budget, 0.0, q)?,
             },
@@ -539,40 +550,98 @@ impl Dct4 {
     /// If `x` or `w` is shorter than `K`.
     fn run(&mut self, x: &[f32], w: &mut [f32]) {
         let k = self.len / 2;
-        let (x, w) = (&x[..k], &mut w[..k]);
-        let (pre_re, pre_im) = (&self.pre.0, &self.pre.1);
-        let twiddled = |j: u32| {
-            let j = j as usize;
-            mul(x[2 * j], x[k - 1 - 2 * j], pre_re[j], pre_im[j])
+        // FFT input j is x[2j] + i x[K - 1 - 2j]: the first value of pair j and the
+        // second of pair K/2 - 1 - j.
+        let (pairs, _) = x[..k].as_chunks::<2>();
+        let half = pairs.len();
+        // K >= 2, so there is a last pair.
+        let Some(last) = half.checked_sub(1) else {
+            return;
         };
+        let input = |j: u32| {
+            // Every order entry is at most `last`; the bound spares the index checks.
+            let j = (j as usize).min(last);
+            (pairs[j][0], pairs[last - j][1])
+        };
+        let (re, im) = (&mut self.re[..half], &mut self.im[..half]);
+        let (pre_re, pre_im) = (&self.pre.0[..half], &self.pre.1[..half]);
+        let order = &self.fft.order()[..half];
         // Pre-twiddle straight into the FFT's digit-reversed order, computing the
         // innermost radix-4 stage on each four points before they are stored.
-        let order = self.fft.order();
         if self.fft.leaf_is_radix4() {
-            let slots = self.re.chunks_exact_mut(4).zip(self.im.chunks_exact_mut(4));
-            for ((r, i), from) in slots.zip(order.chunks_exact(4)) {
-                let y = leaf4([from[0], from[1], from[2], from[3]].map(twiddled));
-                for (j, (yr, yi)) in y.into_iter().enumerate() {
-                    (r[j], i[j]) = (yr, yi);
+            let slots = re.as_chunks_mut::<4>().0.iter_mut();
+            let slots = slots.zip(im.as_chunks_mut::<4>().0.iter_mut());
+            let twiddles = pre_re.as_chunks::<4>().0.iter();
+            let twiddles = twiddles.zip(pre_im.as_chunks::<4>().0);
+            let from = order.as_chunks::<4>().0;
+            for (((r, i), from), (wr, wi)) in slots.zip(from).zip(twiddles) {
+                let point = |s: usize| {
+                    let (a, b) = input(from[s]);
+                    mul(a, b, wr[s], wi[s])
+                };
+                let y = leaf4([point(0), point(1), point(2), point(3)]);
+                for (s, (yr, yi)) in y.into_iter().enumerate() {
+                    (r[s], i[s]) = (yr, yi);
                 }
             }
         } else {
-            let slots = self.re.iter_mut().zip(self.im.iter_mut());
-            for ((re, im), &j) in slots.zip(order) {
-                (*re, *im) = twiddled(j);
+            let slots = re.iter_mut().zip(im.iter_mut()).zip(order);
+            for (((r, i), &j), (&wr, &wi)) in slots.zip(pre_re.iter().zip(pre_im)) {
+                let (a, b) = input(j);
+                (*r, *i) = mul(a, b, wr, wi);
             }
             // A one-point transform has no stage at all.
             if let Some(first) = self.fft.stages.first() {
-                run_stage(&mut self.re, &mut self.im, first);
+                run_stage(re, im, first);
             }
         }
-        self.fft.transform_after_first(&mut self.re, &mut self.im);
-        let (post_re, post_im) = (&self.post.0, &self.post.1);
-        for j in 0..k / 2 {
-            let (ur, ui) = mul(self.re[j], self.im[j], post_re[j], post_im[j]);
-            w[2 * j] = ur;
-            w[k - 1 - 2 * j] = -ui;
-        }
+        self.fft.transform_after_first(re, im);
+        let post = (&self.post.0[..half], &self.post.1[..half]);
+        post_twiddle((re, im), post, w[..k].as_chunks_mut::<2>().0);
+    }
+}
+
+/// The DCT-IV output from the FFT bins `(re, im)`: pair p is the real part of bin p and
+/// the negated imaginary part of bin q = K/2 - 1 - p, each post-twiddled by `post`.
+///
+/// AArch64 vectorises a forward stream of real parts against a reversed stream of
+/// imaginary parts. ARMv7 runs the loop scalar, where loading every bin twice costs as
+/// much as an FFT stage, so there pairs p and q are written together from bins p and q,
+/// inwards from both ends. Both compute every value alike.
+#[cfg(not(target_arch = "arm"))]
+fn post_twiddle((re, im): (&[f32], &[f32]), post: (&[f32], &[f32]), out: &mut [[f32; 2]]) {
+    let bins = || re.iter().zip(im).zip(post.0.iter().zip(post.1));
+    let real = bins().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).0);
+    let imag = bins().rev().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).1);
+    for ((o, ur), ui) in out.iter_mut().zip(real).zip(imag) {
+        *o = [ur, -ui];
+    }
+}
+
+/// See the other target's [`post_twiddle`].
+#[cfg(target_arch = "arm")]
+fn post_twiddle((re, im): (&[f32], &[f32]), post: (&[f32], &[f32]), out: &mut [[f32; 2]]) {
+    let half = out.len();
+    let bins = |from: usize, to: usize| {
+        let (re, im) = (&re[from..to], &im[from..to]);
+        let post = post.0[from..to].iter().zip(&post.1[from..to]);
+        re.iter()
+            .zip(im)
+            .zip(post)
+            .map(|((&a, &b), (&c, &d))| mul(a, b, c, d))
+    };
+    let outer = half / 2;
+    let (front, rest) = out.split_at_mut(outer);
+    let (middle, back) = rest.split_at_mut(half - 2 * outer);
+    let ends = front.iter_mut().zip(back.iter_mut().rev());
+    let values = bins(0, outer).zip(bins(half - outer, half).rev());
+    for ((o_p, o_q), ((ur_p, ui_p), (ur_q, ui_q))) in ends.zip(values) {
+        *o_p = [ur_p, -ui_q];
+        *o_q = [ur_q, -ui_p];
+    }
+    // The middle pair of an odd count is its own mirror.
+    for (o, (ur, ui)) in middle.iter_mut().zip(bins(outer, half - outer)) {
+        *o = [ur, -ui];
     }
 }
 

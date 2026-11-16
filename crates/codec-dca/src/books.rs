@@ -66,16 +66,80 @@ pub(crate) fn huffman_sel_count(abits: u32) -> u32 {
     }
 }
 
-/// Block code (Table D.6): (levels, code bits) for ABITS 1..=7.
+/// Block code (Table D.6) of one ABITS: four base-`levels` quantizer indices packed into
+/// a `bits`-bit code, least significant digit first.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BlockCode {
+    levels: u32,
+    pub bits: u32,
+    /// `ceil(2^32 / levels)`, so that the digit split divides by multiplication.
+    recip: u32,
+}
+
+impl BlockCode {
+    const fn new(levels: u32, bits: u32) -> Self {
+        Self {
+            levels,
+            bits,
+            recip: (1u64 << 32).div_ceil(levels as u64) as u32,
+        }
+    }
+
+    /// The four signed quantizer indices of `code`, or `None` when `code` is not below
+    /// `levels^4`.
+    ///
+    /// Each digit takes `floor(code / levels)` as the high half of `code * recip`. With
+    /// `recip = (2^32 + e) / levels` and `0 <= e < levels`, that equals the quotient
+    /// whenever `code * e < 2^32` (T. Granlund and P. L. Montgomery, "Division by
+    /// invariant integers using multiplication", 1994); codes have at most 19 bits and
+    /// `levels` is at most 25.
+    #[inline]
+    pub(crate) fn split(self, mut code: u32) -> Option<[i32; 4]> {
+        let off = (self.levels - 1) / 2;
+        let mut q = [0i32; 4];
+        for v in &mut q {
+            let next = ((u64::from(code) * u64::from(self.recip)) >> 32) as u32;
+            *v = (code - next * self.levels) as i32 - off as i32;
+            code = next;
+        }
+        (code == 0).then_some(q)
+    }
+}
+
+const BLOCK_CODES: [BlockCode; 7] = [
+    BlockCode::new(3, 7),
+    BlockCode::new(5, 10),
+    BlockCode::new(7, 12),
+    BlockCode::new(9, 13),
+    BlockCode::new(13, 15),
+    BlockCode::new(17, 17),
+    BlockCode::new(25, 19),
+];
+
+/// Block code for ABITS 1..=7.
 #[inline]
-pub(crate) fn block_code(abits: u32) -> (i32, u32) {
-    match abits {
-        1 => (3, 7),
-        2 => (5, 10),
-        3 => (7, 12),
-        4 => (9, 13),
-        5 => (13, 15),
-        6 => (17, 17),
-        _ => (25, 19),
+pub(crate) fn block_code(abits: u32) -> BlockCode {
+    BLOCK_CODES[(abits as usize).clamp(1, 7) - 1]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::BLOCK_CODES;
+
+    #[test]
+    fn block_code_split_matches_division() {
+        for bc in BLOCK_CODES {
+            let levels = bc.levels as i32;
+            let off = (levels - 1) / 2;
+            for code in 0..1u32 << bc.bits {
+                let mut c = code as i32;
+                let mut want = [0i32; 4];
+                for v in &mut want {
+                    *v = c % levels - off;
+                    c /= levels;
+                }
+                assert_eq!(bc.split(code), (c == 0).then_some(want), "{levels} {code}");
+            }
+        }
     }
 }
