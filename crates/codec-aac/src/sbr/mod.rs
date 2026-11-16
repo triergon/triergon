@@ -6,10 +6,10 @@ pub(crate) mod ps;
 mod qmf;
 pub(crate) mod tables;
 
-pub(crate) use qmf::synthesis_dct;
+pub(crate) use qmf::Modulation;
 
 use crate::error::{DecodeError, Result};
-use crate::fft::{Cpx, Dct4};
+use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
 use freq::FreqTables;
 use tables::NOISE;
@@ -554,7 +554,7 @@ impl Sbr {
         nch: usize,
         ps: bool,
         _cpe: bool,
-        dct: &mut Dct4,
+        qmf: &mut Modulation,
     ) {
         let ready = self.have_header && self.data_ok;
         let reset = self.reset && ready;
@@ -567,11 +567,8 @@ impl Sbr {
             let buf: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
             let ch = &mut self.ch[c];
             // QMF analysis of the core output (float scale -> 16-bit domain)
-            for t in 0..32 {
-                let mut tmp = [Cpx::default(); 32];
-                ch.analysis
-                    .run(&buf[t * 32..t * 32 + 32], 32768.0, &mut tmp);
-                ch.xa[t] = tmp;
+            for (input, xa) in buf[..1024].chunks_exact(32).zip(ch.xa.iter_mut()) {
+                ch.analysis.run(qmf, input, 32768.0, xa);
             }
             let (kx, m) = if ready {
                 (self.ft.kx, self.ft.m)
@@ -679,17 +676,17 @@ impl Sbr {
                     }
                 }
                 for (x, out) in self.x[..32].iter().zip(l.chunks_exact_mut(64)) {
-                    self.ch[0].synthesis.run(dct, x, 1.0 / 32768.0, out);
+                    self.ch[0].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
                 for (x, out) in self.x_r[..32].iter().zip(r.chunks_exact_mut(64)) {
-                    self.ch[1].synthesis.run(dct, x, 1.0 / 32768.0, out);
+                    self.ch[1].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
                 continue;
             }
             let chn = &mut self.ch[c];
             let out: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
             for (x, out) in self.x[..32].iter().zip(out.chunks_exact_mut(64)) {
-                chn.synthesis.run(dct, x, 1.0 / 32768.0, out);
+                chn.synthesis.run(qmf, x, 1.0 / 32768.0, out);
             }
         }
         if ready {

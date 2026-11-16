@@ -35,7 +35,6 @@ struct Stage {
 /// inner loop contiguous so that it vectorises.
 #[derive(Debug)]
 pub(crate) struct Fft {
-    n: usize,
     bitrev: Vec<u16>,
     stages: Vec<Stage>,
     /// final radix-2 stage twiddles W_n^k, k < n/2 (odd log2(n) only)
@@ -73,7 +72,6 @@ impl Fft {
             [c, s]
         });
         Fft {
-            n,
             bitrev,
             stages,
             last,
@@ -99,8 +97,9 @@ impl Fft {
     }
 
     /// FFT of data already stored in bit-reversed order (`d[perm(i)] = x[i]`).
-    pub(crate) fn run_permuted(&self, re: &mut [f32], im: &mut [f32]) {
-        let n = self.n;
+    #[cfg(test)]
+    fn run_permuted(&self, re: &mut [f32], im: &mut [f32]) {
+        let n = self.bitrev.len();
         let (re, im) = (&mut re[..n], &mut im[..n]);
         for (r, i) in re.chunks_exact_mut(4).zip(im.chunks_exact_mut(4)) {
             let (or, oi) = bfly4([r[0], r[1], r[2], r[3]], [i[0], i[1], i[2], i[3]]);
