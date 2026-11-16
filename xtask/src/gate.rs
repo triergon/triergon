@@ -288,6 +288,8 @@ const FORMATS_FFPROBE: &str = ".research/reference-formats/install/bin/ffprobe";
 const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
 const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
 const OGG_READER_LANES: &str = "reader-ogg,reader-ogg-seek";
+/// The correctness lanes of the audio decoders the `codecs-audio` item grades.
+const AUDIO_LANES: &str = "aac,ac3,eac3,dts";
 
 fn xtask(args: &[&str]) -> Vec<String> {
     std::iter::once("xtask")
@@ -666,6 +668,73 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         weight: 23,
         steps: codecs,
         preflight: owned(&["--codecs", "harness/codecs/workloads.json"]),
+    });
+    // The AAC, AC-3, E-AC-3 and DTS decoders against FFmpeg's on every vector of their
+    // correctness lanes, the derived streams among them included; the summary fails on
+    // any vector that fails and is not a listed open case.
+    let audio_bin = format!("{out}/codec-audio-bin");
+    let mut build_audio = owned(&["sh", "-c"]);
+    build_audio.push(format!(
+        "mkdir -p {audio_bin} && \
+         cargo build --release --locked {cargo_target} -p triergon-codec-aac --example decode_aac && \
+         cargo build --release --locked {cargo_target} -p triergon-codec-ac3 --example decode_ac3 && \
+         cargo build --release --locked {cargo_target} -p triergon-codec-dca --example decode_dts && \
+         cp {release}/examples/decode_aac {audio_bin}/codec-aac-decode && \
+         cp {release}/examples/decode_ac3 {audio_bin}/codec-ac3-decode && \
+         cp {release}/examples/decode_dts {audio_bin}/codec-dca-decode"
+    ));
+    let audio_run = format!("{out}/codecs-audio-grade.jsonl");
+    items.push(Item {
+        name: "codecs-audio".into(),
+        weight: 5,
+        steps: vec![
+            step(
+                "codec-audio-bin",
+                Stage::Timing,
+                Placement::Free,
+                build_audio,
+            ),
+            step(
+                "codecs-audio-grade",
+                Stage::Timing,
+                Placement::Free,
+                xtask(&[
+                    "codecs",
+                    "grade",
+                    "--manifest",
+                    crate::codecs::derived::MANIFEST,
+                    "--lanes",
+                    AUDIO_LANES,
+                    "--root",
+                    ".",
+                    "--bin",
+                    &audio_bin,
+                    "--ffmpeg",
+                    &format!("{FFMPEG_BIN}/ffmpeg"),
+                    "--ffprobe",
+                    &format!("{FFMPEG_BIN}/ffprobe"),
+                    "--codec-worker",
+                    &codec_worker,
+                    "--reference",
+                    "target/harness/ffmpeg-decode-worker",
+                    "--out",
+                    &audio_run,
+                ]),
+            ),
+            step(
+                "codecs-audio-summary",
+                Stage::Timing,
+                Placement::Free,
+                xtask(&[
+                    "codecs",
+                    "summarize",
+                    &audio_run,
+                    &format!("{out}/codecs-audio-summary.json"),
+                    "--require-pass",
+                ]),
+            ),
+        ],
+        preflight: owned(&["--correctness", AUDIO_LANES]),
     });
     // The Ogg reader's packets and seeks against ffprobe, in both views; the step fails
     // on a case that neither passes nor differs only by its reviewed differences.

@@ -195,8 +195,9 @@ fn class_of(row: &Value, lane: &str) -> Result<String, String> {
 
 /// `summarize RUN.jsonl OUT.json`: classify every row, write the summary and
 /// print the per-lane counts and each failure. Fails when a listed open case
-/// does not fail or has no disposition.
-pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
+/// does not fail or has no disposition, and with `require_pass` when any other
+/// vector fails, after writing the summary.
+pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String> {
     let source = fs::read_to_string(run).map_err(|e| format!("{run}: {e}"))?;
     let mut rows = Vec::new();
     for line in python::splitlines(&source) {
@@ -345,6 +346,18 @@ pub fn summarize(run: &str, out: &Path) -> Result<(), String> {
             closed.join(", ")
         ));
     }
+    let failed: Vec<String> = failures
+        .iter()
+        .filter(|f| !get(f, "open_case").is_some_and(Value::truthy))
+        .map(|f| python::str(get(f, "name").unwrap_or(&Value::Null)))
+        .collect();
+    if require_pass && !failed.is_empty() {
+        return Err(format!(
+            "{} vectors fail and are not listed open cases: {}",
+            failed.len(),
+            failed.join(", ")
+        ));
+    }
     Ok(())
 }
 
@@ -426,10 +439,30 @@ mod tests {
             )
         };
         fs::write(&run, line("fail") + "\n").unwrap();
-        summarize(run.to_str().unwrap(), &out).unwrap();
+        summarize(run.to_str().unwrap(), &out, true).unwrap();
         fs::write(&run, line("pass") + "\n").unwrap();
-        let error = summarize(run.to_str().unwrap(), &out).unwrap_err();
+        let error = summarize(run.to_str().unwrap(), &out, false).unwrap_err();
         assert!(error.contains("no longer fail"), "{error}");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn require_pass_fails_on_an_unlisted_failure() {
+        let dir = std::env::temp_dir().join(format!("summary-require-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let run = dir.join("run.jsonl");
+        let out = dir.join("summary.json");
+        let line = |status: &str| {
+            format!(
+                r#"{{"lane": "dts", "name": "dts.core.dts", "decoder": {{"status": "{status}"}}, "output": {{"status": "pass"}}}}"#
+            )
+        };
+        fs::write(&run, line("fail") + "\n").unwrap();
+        summarize(run.to_str().unwrap(), &out, false).unwrap();
+        let error = summarize(run.to_str().unwrap(), &out, true).unwrap_err();
+        assert!(error.contains("dts.core.dts"), "{error}");
+        fs::write(&run, line("pass") + "\n").unwrap();
+        summarize(run.to_str().unwrap(), &out, true).unwrap();
         fs::remove_dir_all(&dir).unwrap();
     }
 }

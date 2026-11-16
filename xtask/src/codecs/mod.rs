@@ -6,6 +6,7 @@ mod aac_access_units;
 mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
+pub mod derived;
 pub mod equivalence;
 pub mod fuzz;
 pub mod isobmff_reader;
@@ -27,15 +28,21 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  decoder and write, or with --check compare, the generated PS tables
   aac-sources --out DIR
                  author the fixed-layout and indexed-rate AAC-LC sources
+  derive --ffmpeg FF
+                 make the derived streams of harness/codecs/derived-streams.json from their
+                 FATE sources, fetched by their pins, with the decode profile's ffmpeg, and
+                 check each against its correctness manifest pin
   manifest --out M.json LANE=DIR[,DIR...]...
                  hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
-        --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...]
-                 grade every vector by harness/codecs/numeric-rules.json; appends one row each
-  summarize RUN.jsonl OUT.json
-                 classify a grading run against the declared lane selection
+        --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...] [--lanes LANE,...]
+                 grade every vector, or those of the named lanes, by
+                 harness/codecs/numeric-rules.json; appends one row each
+  summarize RUN.jsonl OUT.json [--require-pass]
+                 classify a grading run against the declared lane selection; with
+                 --require-pass fail on any vector that fails and is not a listed open case
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
           [--seeks S.json] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
@@ -299,6 +306,10 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             let a = Args::parse(rest, &["out"], &[])?;
             aac_sources::run(root, &a.path("out")?)?;
         }
+        "derive" => {
+            let a = Args::parse(rest, &["ffmpeg"], &[])?;
+            derived::run(root, &a.path("ffmpeg")?)?;
+        }
         "manifest" => {
             let a = Args::parse(rest, &["out"], &[])?;
             if a.positional.is_empty() {
@@ -320,6 +331,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "out",
                     "scratch",
                     "only",
+                    "lanes",
                 ],
                 &[],
             )?;
@@ -334,6 +346,9 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 out: a.path("out")?,
                 scratch: a.get("scratch").map(PathBuf::from),
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                lanes: a
+                    .get("lanes")
+                    .map(|l| l.split(',').map(str::to_owned).collect()),
                 rules: correctness::Rules::load(root)?,
             };
             correctness::grade(&grade)?;
@@ -428,10 +443,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             };
             return gate.run(root, a.get("full").is_some(), || memory::run(&options));
         }
-        "summarize" => match rest {
-            [run, out] => summary::summarize(run, Path::new(out))?,
-            _ => return Err(USAGE.to_owned()),
-        },
+        "summarize" => {
+            let a = Args::parse(rest, &[], &["require-pass"])?;
+            match a.positional.as_slice() {
+                [run, out] => {
+                    summary::summarize(run, Path::new(out), a.get("require-pass").is_some())?;
+                }
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
         "time" => {
             let a = Args::parse(
                 rest,

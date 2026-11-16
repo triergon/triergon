@@ -2685,336 +2685,336 @@
   {
    "lane": "ac3",
    "name": "diatonis.ac3",
-   "path": "target/agent-ac3/es/diatonis.ac3",
+   "path": ".research/codec-derived/ac3/diatonis.ac3",
    "bytes": 117012,
    "sha256": "d4b9294410dbf587aeda7ee8f469d8e383ba9027ec5297eaaeed85f9bbac2b7c"
   },
   {
    "lane": "ac3",
    "name": "millers_crossing_4.0.ac3",
-   "path": "target/agent-ac3/es/millers_crossing_4.0.ac3",
+   "path": ".research/codec-derived/ac3/millers_crossing_4.0.ac3",
    "bytes": 95232,
    "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802"
   },
   {
    "lane": "ac3",
    "name": "monsters_inc_2.0_192_small.ac3",
-   "path": "target/agent-ac3/es/monsters_inc_2.0_192_small.ac3",
+   "path": ".research/codec-derived/ac3/monsters_inc_2.0_192_small.ac3",
    "bytes": 100000,
    "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae"
   },
   {
    "lane": "ac3",
    "name": "monsters_inc_5.1_448_small.ac3",
-   "path": "target/agent-ac3/es/monsters_inc_5.1_448_small.ac3",
+   "path": ".research/codec-derived/ac3/monsters_inc_5.1_448_small.ac3",
    "bytes": 100000,
    "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db"
   },
   {
    "lane": "ac3",
    "name": "mp3ac325_a0.ac3",
-   "path": "target/agent-ac3/es/mp3ac325_a0.ac3",
+   "path": ".research/codec-derived/ac3/mp3ac325_a0.ac3",
    "bytes": 7050,
    "sha256": "890487cadca665da46e2822b006116eaec29233d6ccc447ea77def38e47586d3"
   },
   {
    "lane": "ac3",
    "name": "mp3ac325_a1.ac3",
-   "path": "target/agent-ac3/es/mp3ac325_a1.ac3",
+   "path": ".research/codec-derived/ac3/mp3ac325_a1.ac3",
    "bytes": 3426,
    "sha256": "d22b569a39c4dfe4461cb4a56496f43c473e588193524398d4ba0bb1e0cbf310"
   },
   {
    "lane": "eac3",
    "name": "csi_miami_5.1_256_spx_small.eac3",
-   "path": "target/agent-ac3/es/csi_miami_5.1_256_spx_small.eac3",
+   "path": ".research/codec-derived/ac3/csi_miami_5.1_256_spx_small.eac3",
    "bytes": 48128,
    "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3"
   },
   {
    "lane": "eac3",
    "name": "csi_miami_stereo_128_spx.eac3",
-   "path": "target/agent-ac3/es/csi_miami_stereo_128_spx.eac3",
+   "path": ".research/codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
    "bytes": 333664,
    "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb"
   },
   {
    "lane": "eac3",
    "name": "csi_miami_stereo_128_spx_small.eac3",
-   "path": "target/agent-ac3/es/csi_miami_stereo_128_spx_small.eac3",
+   "path": ".research/codec-derived/ac3/csi_miami_stereo_128_spx_small.eac3",
    "bytes": 249856,
    "sha256": "adc397f12472353237f7dc8139c2223937abc23eff9cd80ac2e3471814a04c3a"
   },
   {
    "lane": "eac3",
    "name": "matrix2_commentary1_stereo_192_small.eac3",
-   "path": "target/agent-ac3/es/matrix2_commentary1_stereo_192_small.eac3",
+   "path": ".research/codec-derived/ac3/matrix2_commentary1_stereo_192_small.eac3",
    "bytes": 99840,
    "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c"
   },
   {
    "lane": "eac3",
    "name": "serenity_english_5.1_1536_small.eac3",
-   "path": "target/agent-ac3/es/serenity_english_5.1_1536_small.eac3",
+   "path": ".research/codec-derived/ac3/serenity_english_5.1_1536_small.eac3",
    "bytes": 99328,
    "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a"
   },
   {
    "lane": "eac3",
    "name": "the_great_wall_7.1.eac3",
-   "path": "target/agent-ac3/es/the_great_wall_7.1.eac3",
+   "path": ".research/codec-derived/ac3/the_great_wall_7.1.eac3",
    "bytes": 723456,
    "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50"
   },
   {
    "lane": "aac",
    "name": "aac-sce-in-stereo.adts",
-   "path": "target/agent-aac/vec/aac-sce-in-stereo.adts",
+   "path": ".research/codec-derived/aac/aac-sce-in-stereo.adts",
    "bytes": 42006,
    "sha256": "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796"
   },
   {
    "lane": "aac",
    "name": "al04_44.adts",
-   "path": "target/agent-aac/vec/al04_44.adts",
+   "path": ".research/codec-derived/aac/al04_44.adts",
    "bytes": 68371,
    "sha256": "ce01790c62e932cc33eb3a1092cece90df608e9f8b6b88baaa57b623488c8f1e"
   },
   {
    "lane": "aac",
    "name": "al05_44.adts",
-   "path": "target/agent-aac/vec/al05_44.adts",
+   "path": ".research/codec-derived/aac/al05_44.adts",
    "bytes": 121062,
    "sha256": "7b11acefbea0c1180b370405d4933ef06a80e3abbb558e1400bc264384146903"
   },
   {
    "lane": "aac",
    "name": "al06_44.adts",
-   "path": "target/agent-aac/vec/al06_44.adts",
+   "path": ".research/codec-derived/aac/al06_44.adts",
    "bytes": 200256,
    "sha256": "a28702cffbea3ade83390c2b8e83833261ca87468c139df3490ea9ef1dda399f"
   },
   {
    "lane": "aac",
    "name": "al07_96.adts",
-   "path": "target/agent-aac/vec/al07_96.adts",
+   "path": ".research/codec-derived/aac/al07_96.adts",
    "bytes": 404789,
    "sha256": "77b8c71a77c98816f95a49b209264af383d4a515a5fd24486e9806bdfda2961a"
   },
   {
    "lane": "aac",
    "name": "al15_44.adts",
-   "path": "target/agent-aac/vec/al15_44.adts",
+   "path": ".research/codec-derived/aac/al15_44.adts",
    "bytes": 145819,
    "sha256": "b6646ef38d56f50824a0ad3108bff9d560d3cb75833fbe2bcd69daa4bb1072d0"
   },
   {
    "lane": "aac",
    "name": "al17_44.adts",
-   "path": "target/agent-aac/vec/al17_44.adts",
+   "path": ".research/codec-derived/aac/al17_44.adts",
    "bytes": 121910,
    "sha256": "15ce1b21c69691275140c4c0a474b660331716ba2b177f0c9abbbc8b8763be42"
   },
   {
    "lane": "aac",
    "name": "al18_44.adts",
-   "path": "target/agent-aac/vec/al18_44.adts",
+   "path": ".research/codec-derived/aac/al18_44.adts",
    "bytes": 542116,
    "sha256": "17e6246f5e46613e903000b4387672586252b12128b3af882d8fa9b98ce127ba"
   },
   {
    "lane": "aac",
    "name": "al22_chCfg0PCE_44.adts",
-   "path": "target/agent-aac/vec/al22_chCfg0PCE_44.adts",
+   "path": ".research/codec-derived/aac/al22_chCfg0PCE_44.adts",
    "bytes": 69547,
    "sha256": "bcc3a68808c793f9865d87b1ec3d895c5010b5f6a6bd206cb1426d4151f9bad6"
   },
   {
    "lane": "aac",
    "name": "al_sbr_cm_48_2.adts",
-   "path": "target/agent-aac/vec/al_sbr_cm_48_2.adts",
+   "path": ".research/codec-derived/aac/al_sbr_cm_48_2.adts",
    "bytes": 198304,
    "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8"
   },
   {
    "lane": "aac",
    "name": "al_sbr_cm_48_5.1.adts",
-   "path": "target/agent-aac/vec/al_sbr_cm_48_5.1.adts",
+   "path": ".research/codec-derived/aac/al_sbr_cm_48_5.1.adts",
    "bytes": 520018,
    "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8"
   },
   {
    "lane": "aac",
    "name": "al_sbr_ps_04_new.adts",
-   "path": "target/agent-aac/vec/al_sbr_ps_04_new.adts",
+   "path": ".research/codec-derived/aac/al_sbr_ps_04_new.adts",
    "bytes": 27887,
    "sha256": "f95a16be6678ced08108ed788a3c4619501cea3936eabd831ad450b76b91f43f"
   },
   {
    "lane": "aac",
    "name": "al_sbr_ps_06_new.adts",
-   "path": "target/agent-aac/vec/al_sbr_ps_06_new.adts",
+   "path": ".research/codec-derived/aac/al_sbr_ps_06_new.adts",
    "bytes": 55767,
    "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87"
   },
   {
    "lane": "aac",
    "name": "al_sbr_sr_48_2_fsaac48.adts",
-   "path": "target/agent-aac/vec/al_sbr_sr_48_2_fsaac48.adts",
+   "path": ".research/codec-derived/aac/al_sbr_sr_48_2_fsaac48.adts",
    "bytes": 161104,
    "sha256": "10f2d0f66455a3b9dea8138a1f21d9c39cd9633fde3f31750b8e61e16a59fb75"
   },
   {
    "lane": "aac",
    "name": "am00_88.adts",
-   "path": "target/agent-aac/vec/am00_88.adts",
+   "path": ".research/codec-derived/aac/am00_88.adts",
    "bytes": 563793,
    "sha256": "1ff00000c44317a3eb32c7b6b67b1e2269e16e941cc3ff7990d473584c00688f"
   },
   {
    "lane": "aac",
    "name": "am05_44.adts",
-   "path": "target/agent-aac/vec/am05_44.adts",
+   "path": ".research/codec-derived/aac/am05_44.adts",
    "bytes": 145822,
    "sha256": "090ecd1da2493bd920536964870423719bf6061202b8a27d8033507d08a122c1"
   },
   {
    "lane": "aac",
    "name": "ap05_48.adts",
-   "path": "target/agent-aac/vec/ap05_48.adts",
+   "path": ".research/codec-derived/aac/ap05_48.adts",
    "bytes": 310736,
    "sha256": "ec4aa0192a7672510eeca67d733868ada88600124f8ca81777fba75e98952005"
   },
   {
    "lane": "aac",
    "name": "ct_File1_fixed_raw.adts",
-   "path": "target/agent-aac/vec/ct_File1_fixed_raw.adts",
+   "path": ".research/codec-derived/aac/ct_File1_fixed_raw.adts",
    "bytes": 32690,
    "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
   },
   {
    "lane": "aac",
    "name": "ct_File1_raw.adts",
-   "path": "target/agent-aac/vec/ct_File1_raw.adts",
+   "path": ".research/codec-derived/aac/ct_File1_raw.adts",
    "bytes": 31507,
    "sha256": "2b7312468bef3ba96a41b51e6e43b54a3edb1f6638d4c6cb96331efb757818b4"
   },
   {
    "lane": "aac",
    "name": "ct_File2.adts",
-   "path": "target/agent-aac/vec/ct_File2.adts",
+   "path": ".research/codec-derived/aac/ct_File2.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_File3.adts",
-   "path": "target/agent-aac/vec/ct_File3.adts",
+   "path": ".research/codec-derived/aac/ct_File3.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_File4.adts",
-   "path": "target/agent-aac/vec/ct_File4.adts",
+   "path": ".research/codec-derived/aac/ct_File4.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_File5.adts",
-   "path": "target/agent-aac/vec/ct_File5.adts",
+   "path": ".research/codec-derived/aac/ct_File5.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_File6.adts",
-   "path": "target/agent-aac/vec/ct_File6.adts",
+   "path": ".research/codec-derived/aac/ct_File6.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_File7.adts",
-   "path": "target/agent-aac/vec/ct_File7.adts",
+   "path": ".research/codec-derived/aac/ct_File7.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_faac-adts.adts",
-   "path": "target/agent-aac/vec/ct_faac-adts.adts",
+   "path": ".research/codec-derived/aac/ct_faac-adts.adts",
    "bytes": 299647,
    "sha256": "052f9c7c5359d642fbba887d57fc72fe5745fc75b34cddc7a7adc0a912f9cf9c"
   },
   {
    "lane": "aac",
    "name": "ct_sbr_bc-ps_bc.adts",
-   "path": "target/agent-aac/vec/ct_sbr_bc-ps_bc.adts",
+   "path": ".research/codec-derived/aac/ct_sbr_bc-ps_bc.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_sbr_bc-ps_i.adts",
-   "path": "target/agent-aac/vec/ct_sbr_bc-ps_i.adts",
+   "path": ".research/codec-derived/aac/ct_sbr_bc-ps_i.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_sbr_bic-ps_i.adts",
-   "path": "target/agent-aac/vec/ct_sbr_bic-ps_i.adts",
+   "path": ".research/codec-derived/aac/ct_sbr_bic-ps_i.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_sbr_i-ps_bic.adts",
-   "path": "target/agent-aac/vec/ct_sbr_i-ps_bic.adts",
+   "path": ".research/codec-derived/aac/ct_sbr_i-ps_bic.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_sbr_i-ps_i.adts",
-   "path": "target/agent-aac/vec/ct_sbr_i-ps_i.adts",
+   "path": ".research/codec-derived/aac/ct_sbr_i-ps_i.adts",
    "bytes": 32577,
    "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
   },
   {
    "lane": "aac",
    "name": "ct_sbr_i-ps_i_raw.adts",
-   "path": "target/agent-aac/vec/ct_sbr_i-ps_i_raw.adts",
+   "path": ".research/codec-derived/aac/ct_sbr_i-ps_i_raw.adts",
    "bytes": 32690,
    "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
   },
   {
    "lane": "aac",
    "name": "foo.adts",
-   "path": "target/agent-aac/vec/foo.adts",
+   "path": ".research/codec-derived/aac/foo.adts",
    "bytes": 32768,
    "sha256": "4439c5a704ed599e45d3b88fe135f994d32d2b65f5d0c0f6a8eb329ea69c45ec"
   },
   {
    "lane": "aac",
    "name": "id3v1.adts",
-   "path": "target/agent-aac/vec/id3v1.adts",
+   "path": ".research/codec-derived/aac/id3v1.adts",
    "bytes": 2816,
    "sha256": "2a0fc1de29e543806699655fa35d0f30ae5796b125e371fa59fa2848a04d0bdd"
   },
   {
    "lane": "aac",
    "name": "id3v2.adts",
-   "path": "target/agent-aac/vec/id3v2.adts",
+   "path": ".research/codec-derived/aac/id3v2.adts",
    "bytes": 30099,
    "sha256": "a671b99d08c1b7c78a77685fceb1824587fa7139cb42fe839c4b0bed113acd64"
   },
   {
    "lane": "aac",
    "name": "id3v2_two_tags.adts",
-   "path": "target/agent-aac/vec/id3v2_two_tags.adts",
+   "path": ".research/codec-derived/aac/id3v2_two_tags.adts",
    "bytes": 60240,
    "sha256": "ccaab043f75b6949dce4569da9a8d311d992e0c3da0d0989cc993100291eb281"
   },
@@ -3042,161 +3042,161 @@
   {
    "lane": "dts",
    "name": "core_51_24_48_768_0.core.dts",
-   "path": "target/agent-dca/vec/core_51_24_48_768_0.core.dts",
+   "path": ".research/codec-derived/dts/core_51_24_48_768_0.core.dts",
    "bytes": 6144,
    "sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143"
   },
   {
    "lane": "dts",
    "name": "core_51_24_48_768_1.core.dts",
-   "path": "target/agent-dca/vec/core_51_24_48_768_1.core.dts",
+   "path": ".research/codec-derived/dts/core_51_24_48_768_1.core.dts",
    "bytes": 6144,
    "sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00"
   },
   {
    "lane": "dts",
    "name": "dts.core.dts",
-   "path": "target/agent-dca/vec/dts.core.dts",
+   "path": ".research/codec-derived/dts/dts.core.dts",
    "bytes": 254518,
    "sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612"
   },
   {
    "lane": "dts",
    "name": "dts_es.core.dts",
-   "path": "target/agent-dca/vec/dts_es.core.dts",
+   "path": ".research/codec-derived/dts/dts_es.core.dts",
    "bytes": 503000,
    "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638"
   },
   {
    "lane": "dts",
    "name": "dtsx_7.1.4_24bit.core.dts",
-   "path": "target/agent-dca/vec/dtsx_7.1.4_24bit.core.dts",
+   "path": ".research/codec-derived/dts/dtsx_7.1.4_24bit.core.dts",
    "bytes": 4024,
    "sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2"
   },
   {
    "lane": "dts",
    "name": "master_audio_7.1_24bit.core.dts",
-   "path": "target/agent-dca/vec/master_audio_7.1_24bit.core.dts",
+   "path": ".research/codec-derived/dts/master_audio_7.1_24bit.core.dts",
    "bytes": 2358064,
    "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f"
   },
   {
    "lane": "dts",
    "name": "x96_51_24_96_1509.core.dts",
-   "path": "target/agent-dca/vec/x96_51_24_96_1509.core.dts",
+   "path": ".research/codec-derived/dts/x96_51_24_96_1509.core.dts",
    "bytes": 12072,
    "sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93"
   },
   {
    "lane": "dts",
    "name": "x96_xch_61_24_96_3840.core.dts",
-   "path": "target/agent-dca/vec/x96_xch_61_24_96_3840.core.dts",
+   "path": ".research/codec-derived/dts/x96_xch_61_24_96_3840.core.dts",
    "bytes": 12072,
    "sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c"
   },
   {
    "lane": "dts",
    "name": "x96_xxch_71_24_96_3840.core.dts",
-   "path": "target/agent-dca/vec/x96_xxch_71_24_96_3840.core.dts",
+   "path": ".research/codec-derived/dts/x96_xxch_71_24_96_3840.core.dts",
    "bytes": 12072,
    "sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897"
   },
   {
    "lane": "dts",
    "name": "xbr_51_24_48_3840.core.dts",
-   "path": "target/agent-dca/vec/xbr_51_24_48_3840.core.dts",
+   "path": ".research/codec-derived/dts/xbr_51_24_48_3840.core.dts",
    "bytes": 12072,
    "sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40"
   },
   {
    "lane": "dts",
    "name": "xbr_xch_61_24_48_3840.core.dts",
-   "path": "target/agent-dca/vec/xbr_xch_61_24_48_3840.core.dts",
+   "path": ".research/codec-derived/dts/xbr_xch_61_24_48_3840.core.dts",
    "bytes": 12072,
    "sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac"
   },
   {
    "lane": "dts",
    "name": "xbr_xxch_71_24_48_3840.core.dts",
-   "path": "target/agent-dca/vec/xbr_xxch_71_24_48_3840.core.dts",
+   "path": ".research/codec-derived/dts/xbr_xxch_71_24_48_3840.core.dts",
    "bytes": 12072,
    "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4"
   },
   {
    "lane": "dts",
    "name": "xch_61_24_48_768.core.dts",
-   "path": "target/agent-dca/vec/xch_61_24_48_768.core.dts",
+   "path": ".research/codec-derived/dts/xch_61_24_48_768.core.dts",
    "bytes": 6144,
    "sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba"
   },
   {
    "lane": "dts",
    "name": "xll_51_16_192_768_0.core.dts",
-   "path": "target/agent-dca/vec/xll_51_16_192_768_0.core.dts",
+   "path": ".research/codec-derived/dts/xll_51_16_192_768_0.core.dts",
    "bytes": 6144,
    "sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681"
   },
   {
    "lane": "dts",
    "name": "xll_51_16_192_768_1.core.dts",
-   "path": "target/agent-dca/vec/xll_51_16_192_768_1.core.dts",
+   "path": ".research/codec-derived/dts/xll_51_16_192_768_1.core.dts",
    "bytes": 6144,
    "sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319"
   },
   {
    "lane": "dts",
    "name": "xll_51_24_48_768.core.dts",
-   "path": "target/agent-dca/vec/xll_51_24_48_768.core.dts",
+   "path": ".research/codec-derived/dts/xll_51_24_48_768.core.dts",
    "bytes": 6144,
    "sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3"
   },
   {
    "lane": "dts",
    "name": "xll_51_24_48_none.core.dts",
-   "path": "target/agent-dca/vec/xll_51_24_48_none.core.dts",
+   "path": ".research/codec-derived/dts/xll_51_24_48_none.core.dts",
    "bytes": 34164,
    "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6"
   },
   {
    "lane": "dts",
    "name": "xll_71_24_48_768_0.core.dts",
-   "path": "target/agent-dca/vec/xll_71_24_48_768_0.core.dts",
+   "path": ".research/codec-derived/dts/xll_71_24_48_768_0.core.dts",
    "bytes": 6144,
    "sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0"
   },
   {
    "lane": "dts",
    "name": "xll_71_24_48_768_1.core.dts",
-   "path": "target/agent-dca/vec/xll_71_24_48_768_1.core.dts",
+   "path": ".research/codec-derived/dts/xll_71_24_48_768_1.core.dts",
    "bytes": 6144,
    "sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968"
   },
   {
    "lane": "dts",
    "name": "xll_71_24_96_768.core.dts",
-   "path": "target/agent-dca/vec/xll_71_24_96_768.core.dts",
+   "path": ".research/codec-derived/dts/xll_71_24_96_768.core.dts",
    "bytes": 6144,
    "sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a"
   },
   {
    "lane": "dts",
    "name": "xll_x96_51_24_96_1509.core.dts",
-   "path": "target/agent-dca/vec/xll_x96_51_24_96_1509.core.dts",
+   "path": ".research/codec-derived/dts/xll_x96_51_24_96_1509.core.dts",
    "bytes": 12072,
    "sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956"
   },
   {
    "lane": "dts",
    "name": "xll_xch_61_24_48_768.core.dts",
-   "path": "target/agent-dca/vec/xll_xch_61_24_48_768.core.dts",
+   "path": ".research/codec-derived/dts/xll_xch_61_24_48_768.core.dts",
    "bytes": 6144,
    "sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9"
   },
   {
    "lane": "dts",
    "name": "xxch_71_24_48_2046.core.dts",
-   "path": "target/agent-dca/vec/xxch_71_24_48_2046.core.dts",
+   "path": ".research/codec-derived/dts/xxch_71_24_48_2046.core.dts",
    "bytes": 12072,
    "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4"
   },

@@ -23,7 +23,7 @@ use crate::sha256;
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
        [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--isobmff-reader]
        [--codecs WORKLOADS]...
-       [--readers LANE,...]
+       [--readers LANE,...] [--correctness LANE,...]
        [--external-vector] [--capture CASES] [--reference NAME]...
        [--review FILE | --standard-memory] [--kernel]
 
@@ -36,11 +36,12 @@ contract's corpus.json); with --isobmff the ISO BMFF suite's inputs, with
 comparison's, with --codecs each workload list's inputs,
 with --readers the reader comparison's inputs of those lanes
 (harness/codecs/reader-manifest.json; reader-ogg-seek is reader-ogg's seek cases,
-harness/codecs/reader-seeks.json), with --external-vector the mandatory external
-vector and with --capture the capture cases, their input generator and its numpy
-Python; that each named reference was built and is current: those --isobmff,
---isobmff-seek, --codecs, --readers and --capture measure against, and any
---reference; that the RSS module review covers
+harness/codecs/reader-seeks.json), with --correctness the correctness manifest's
+vectors of those lanes (harness/codecs/correctness-manifest.json), with
+--external-vector the mandatory external vector and with --capture the capture
+cases, their input generator and its numpy Python; that each named reference was built and is current: those --isobmff,
+--isobmff-seek, --codecs, --readers, --correctness and --capture measure against,
+and any --reference; that the RSS module review covers
 this module source and kernel (the committed review,
 harness/rss-bound/reviews/SOURCE-RELEASE.json, or --review FILE), unless the run's
 memory uses the standard bounds (--standard-memory); and that the RSS module is
@@ -62,6 +63,8 @@ struct Options {
     codecs: Vec<PathBuf>,
     /// Reader comparison lanes.
     readers: Vec<String>,
+    /// Correctness lanes.
+    correctness: Vec<String>,
     external_vector: bool,
     capture: Option<PathBuf>,
     references: Vec<String>,
@@ -100,6 +103,9 @@ impl Options {
                 "--codecs" => options.codecs.push(root.join(value()?)),
                 "--readers" => options
                     .readers
+                    .extend(value()?.split(',').map(str::to_owned)),
+                "--correctness" => options
+                    .correctness
                     .extend(value()?.split(',').map(str::to_owned)),
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
@@ -198,7 +204,13 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     if !options.readers.is_empty() {
         checks.check(
             format!("reader inputs {}", options.readers.join(",")),
-            reader_inputs(root, &options.readers),
+            reader_files(root, &options.readers).and_then(|files| pinned_inputs(&files)),
+        );
+    }
+    if !options.correctness.is_empty() {
+        checks.check(
+            format!("correctness inputs {}", options.correctness.join(",")),
+            correctness_files(root, &options.correctness).and_then(|files| pinned_inputs(&files)),
         );
     }
     if options.external_vector {
@@ -289,7 +301,7 @@ impl Options {
         if self.isobmff || self.isobmff_seek {
             names.push(crate::isobmff_bench::REFERENCE.to_owned());
         }
-        if !self.codecs.is_empty() || !self.readers.is_empty() {
+        if !self.codecs.is_empty() || !self.readers.is_empty() || !self.correctness.is_empty() {
             names.push("ffmpeg-decode-native".to_owned());
         }
         if self.capture.is_some() {
@@ -432,40 +444,63 @@ const SEEK_LANE: &str = "reader-ogg-seek";
 /// The reader comparison's vectors of `lanes`, as paths with their pins, after the
 /// manifests that list them.
 fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
-    let mut files = vec![(root.join(READER_MANIFEST), None)];
-    let mut wanted: Vec<&str> = lanes.iter().map(String::as_str).collect();
-    if wanted.contains(&SEEK_LANE) {
-        files.push((root.join(READER_SEEKS), None));
-        wanted.push("reader-ogg");
+    let mut wanted: Vec<&str> = lanes
+        .iter()
+        .map(String::as_str)
+        .filter(|lane| *lane != SEEK_LANE)
+        .collect();
+    let mut seeks = Vec::new();
+    if lanes.iter().any(|lane| lane == SEEK_LANE) {
+        seeks.push((root.join(READER_SEEKS), None));
+        if !wanted.contains(&"reader-ogg") {
+            wanted.push("reader-ogg");
+        }
     }
-    let manifest = read_json(&root.join(READER_MANIFEST))?;
-    let mut vectors = 0;
-    for vector in manifest
+    let mut files = lane_files(root, READER_MANIFEST, &wanted)?;
+    files.splice(1..1, seeks);
+    Ok(files)
+}
+
+/// The correctness manifest's vectors of `lanes`, after the manifest.
+fn correctness_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
+    let wanted: Vec<&str> = lanes.iter().map(String::as_str).collect();
+    lane_files(root, crate::codecs::derived::MANIFEST, &wanted)
+}
+
+/// `manifest` and every vector of `lanes` it lists, with its pin. A lane without
+/// vectors fails.
+fn lane_files(root: &Path, manifest: &str, lanes: &[&str]) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = vec![(root.join(manifest), None)];
+    let listed = read_json(&root.join(manifest))?;
+    let vectors = listed
         .get("vectors")
         .and_then(Value::as_array)
-        .unwrap_or_default()
-    {
-        let text = |key| vector.get(key).and_then(Value::as_str);
-        if !text("lane").is_some_and(|lane| wanted.contains(&lane)) {
-            continue;
+        .unwrap_or_default();
+    for lane in lanes {
+        let before = files.len();
+        for vector in vectors {
+            let text = |key| vector.get(key).and_then(Value::as_str);
+            if text("lane") != Some(*lane) {
+                continue;
+            }
+            let path =
+                text("path").ok_or_else(|| format!("{manifest}: a vector without a path"))?;
+            let pin =
+                text("sha256").ok_or_else(|| format!("{manifest}: a vector without a hash"))?;
+            files.push((root.join(path), Some(pin.to_owned())));
         }
-        let path = text("path").ok_or("a reader vector without a path")?;
-        let pin = text("sha256").ok_or("a reader vector without a hash")?;
-        files.push((root.join(path), Some(pin.to_owned())));
-        vectors += 1;
-    }
-    if vectors == 0 {
-        return Err(format!("no reader vectors of {}", lanes.join(",")));
+        if files.len() == before {
+            return Err(format!("{manifest}: no vectors of {lane}"));
+        }
     }
     Ok(files)
 }
 
-/// Every reader vector of `lanes` exists with its pinned hash.
-fn reader_inputs(root: &Path, lanes: &[String]) -> R<String> {
-    let files = reader_files(root, lanes)?;
+/// Every pinned file exists with its pin.
+fn pinned_inputs(files: &[(PathBuf, Option<String>)]) -> R<String> {
     let mut problems = Vec::new();
     let mut vectors = 0;
-    for (path, pin) in &files {
+    for (path, pin) in files {
         let Some(pin) = pin else { continue };
         vectors += 1;
         match sha256::file_hex(path) {
@@ -592,6 +627,11 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     if !options.readers.is_empty() {
         for (path, pin) in reader_files(root, &options.readers)? {
+            add(path, pin.as_deref());
+        }
+    }
+    if !options.correctness.is_empty() {
+        for (path, pin) in correctness_files(root, &options.correctness)? {
             add(path, pin.as_deref());
         }
     }
