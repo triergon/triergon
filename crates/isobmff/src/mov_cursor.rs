@@ -238,8 +238,12 @@ impl<'a> Slot<'a> {
         self.fragment_edit.map_or(0, |edit| edit.packet_offset)
     }
 
-    fn fragment_seek_offset(&self) -> i64 {
-        self.fragment_edit.map_or(0, |edit| edit.media_start)
+    fn seek_offset(&self) -> i64 {
+        if let Some(edit) = self.encoded_edit {
+            edit.seek_offset()
+        } else {
+            self.fragment_edit.map_or(0, |edit| edit.media_start)
+        }
     }
 
     fn source(&self) -> Result<SourceTrack<'a>> {
@@ -692,10 +696,7 @@ fn count(value: u64, maximum: u64) -> Result<()> {
 }
 impl<'a> PacketCursor<'a> {
     pub(crate) fn index_edit_offset(&self) -> i64 {
-        self.slots
-            .as_slice()
-            .first()
-            .map_or(0, Slot::fragment_seek_offset)
+        self.slots.as_slice().first().map_or(0, Slot::seek_offset)
     }
 
     pub fn new(

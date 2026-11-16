@@ -566,6 +566,132 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
             ));
         }
     }
+    let leading_video_file = "avc-leading-edit.mp4";
+    let leading_video = leading_video_edit_fixture(&control);
+    write(&output.join(leading_video_file), &leading_video)?;
+    cases.extend([
+        mp4_range_case(
+            "leading-video-edit-open",
+            leading_video_file,
+            &leading_video,
+            [],
+            (237, 81_478, 9_596_315_584_292_083_372),
+        ),
+        mp4_range_case(
+            "leading-video-edit-seek",
+            leading_video_file,
+            &leading_video,
+            ["28000"],
+            (181, 62_042, 5_378_275_097_212_072_522),
+        ),
+        mp4_range_case(
+            "leading-video-edit-seek-before-sync",
+            leading_video_file,
+            &leading_video,
+            ["17535"],
+            (237, 81_478, 9_596_315_584_292_083_372),
+        ),
+        mp4_range_case(
+            "leading-video-edit-seek-at-sync",
+            leading_video_file,
+            &leading_video,
+            ["17536"],
+            (181, 62_042, 5_378_275_097_212_072_522),
+        ),
+    ]);
+    let trimmed_file = "avc-leading-edit-trimmed.mp4";
+    let mut trimmed = leading_video.clone();
+    // Start the media edit exactly on the second sync sample's source CTS.
+    trimmed[81_782..81_786].copy_from_slice(&18_672_u32.to_be_bytes());
+    write(&output.join(trimmed_file), &trimmed)?;
+    cases.extend([
+        mp4_range_case(
+            "leading-video-edit-trimmed-open",
+            trimmed_file,
+            &trimmed,
+            [],
+            (225, 69_726, 580_711_317_104_354_027),
+        ),
+        mp4_range_case(
+            "leading-video-edit-trimmed-seek",
+            trimmed_file,
+            &trimmed,
+            ["17536"],
+            (169, 50_686, 5_242_818_698_675_809_095),
+        ),
+    ]);
+    let unrepresentable_file = "avc-unrepresentable-edit.mp4";
+    let unrepresentable = wide_video_edit_fixture(&leading_video, (1_u64 << 59) - 64, 4_000);
+    write(&output.join(unrepresentable_file), &unrepresentable)?;
+    cases.push(mp4_range_case(
+        "unrepresentable-video-edit-audio-only",
+        unrepresentable_file,
+        &unrepresentable,
+        [],
+        (189, 32_517, 3_117_005_324_307_362_295),
+    ));
+    let signed_endpoint_file = "avc-signed-endpoint-edit.mp4";
+    let mut exact_clock = leading_video.clone();
+    // Use the video time base as the movie time base. Scale the audio
+    // edit to preserve its duration while putting the video end at i64::MAX.
+    exact_clock[81_554..81_558].copy_from_slice(&16_000_u32.to_be_bytes());
+    exact_clock[81_558..81_562].copy_from_slice(&(4_096_u32 * 16).to_be_bytes());
+    let audio_edit = exact_clock[81_790..]
+        .windows(4)
+        .position(|kind| kind == b"elst")
+        .expect("audio edit list")
+        + 81_790;
+    let span = audio_edit + 12..audio_edit + 16;
+    let duration = u32::from_be_bytes(exact_clock[span.clone()].try_into().expect("edit duration"));
+    exact_clock[span].copy_from_slice(&(duration * 16).to_be_bytes());
+    let signed_endpoint = wide_video_edit_fixture(&exact_clock, i64::MAX as u64 - 64_000, 64_000);
+    write(&output.join(signed_endpoint_file), &signed_endpoint)?;
+    cases.push(mp4_range_case(
+        "signed-video-edit-endpoint-audio-only",
+        signed_endpoint_file,
+        &signed_endpoint,
+        [],
+        (189, 32_517, 3_117_005_324_307_362_295),
+    ));
+    let short_file = "avc-leading-edit-short-reordered.mp4";
+    let mut short = leading_video.clone();
+    // Cut between presentation ticks 1328 and 1344 relative to the
+    // second sync sample, leaving a reordered decode tail.
+    short[81_778..81_782].copy_from_slice(&84_u32.to_be_bytes());
+    short[81_782..81_786].copy_from_slice(&18_672_u32.to_be_bytes());
+    write(&output.join(short_file), &short)?;
+    cases.push(mp4_range_case(
+        "leading-video-edit-short-reordered",
+        short_file,
+        &short,
+        [],
+        (202, 47_093, 7_610_120_524_339_765_167),
+    ));
+    let overlapping_file = "forward-avc-empty-edit-overlapping-sync.mp4";
+    let overlapping = fs::read(
+        paths
+            .root
+            .join("crates/playback/tests/fixtures/mp4")
+            .join(overlapping_file),
+    )
+    .map_err(|error| format!("{overlapping_file}: {error}"))?;
+    write(&output.join(overlapping_file), &overlapping)?;
+    cases.extend([
+        mp4_range_case(
+            "leading-video-edit-overlapping-sync-open",
+            overlapping_file,
+            &overlapping,
+            [],
+            (18, 2_827, 2_951_212_463_114_411_726),
+        ),
+        mp4_range_case(
+            "leading-video-edit-overlapping-sync-seek",
+            overlapping_file,
+            &overlapping,
+            ["27"],
+            (17, 2_651, 7_260_646_860_981_280_469),
+        ),
+    ]);
     cases.extend(mp4_range_fate_cases(&paths.root)?);
     let count = cases.len();
     paths.manifest(
@@ -577,6 +703,40 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
         ]),
     )?;
     Ok(format!("MP4 range corpus: {count} playback comparisons"))
+}
+
+// The pinned seed's media precedes the movie box, so chunk offsets stay put.
+fn leading_video_edit_fixture(seed: &[u8]) -> Vec<u8> {
+    let leading = [96, u32::MAX, 1 << 16].map(u32::to_be_bytes).concat();
+    let mut data = seed.to_vec();
+    for at in [81_526, 81_642, 81_742, 81_750] {
+        let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
+        data[at..at + 4].copy_from_slice(&(size + leading.len() as u32).to_be_bytes());
+    }
+    // Extend the movie and video track durations to include the delay.
+    for at in [81_558, 81_678] {
+        data[at..at + 4].copy_from_slice(&4096_u32.to_be_bytes());
+    }
+    data[81_762..81_766].copy_from_slice(&2_u32.to_be_bytes());
+    data.splice(81_766..81_766, leading);
+    data
+}
+
+fn wide_video_edit_fixture(seed: &[u8], gap: u64, duration: u64) -> Vec<u8> {
+    let mut data = seed.to_vec();
+    for at in [81_526, 81_642, 81_742, 81_750] {
+        let size = u32::from_be_bytes(seed[at..at + 4].try_into().expect("box size"));
+        data[at..at + 4].copy_from_slice(&(size + 16).to_be_bytes());
+    }
+    data[81_758] = 1;
+    let mut edits = Vec::new();
+    for (duration, media_start) in [(gap, -1_i64), (duration, 2_672)] {
+        edits.extend(duration.to_be_bytes());
+        edits.extend(media_start.to_be_bytes());
+        edits.extend((1_u32 << 16).to_be_bytes());
+    }
+    data.splice(81_766..81_790, edits);
+    data
 }
 
 fn mp4_opus_composition_fixture(seed: &[u8]) -> Vec<u8> {

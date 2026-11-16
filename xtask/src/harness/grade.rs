@@ -1728,7 +1728,7 @@ mod tests {
             ("font-hinting-default", 159),
             ("font-hinting-modes", 954),
             ("matroska-audio-clocks", 10),
-            ("mp4-forward", 46),
+            ("mp4-forward", 51),
             ("ts-program", 35),
             ("raw-annex-b", 7),
             ("mpegts-pes", 97),

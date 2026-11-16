@@ -703,6 +703,159 @@
       }
     },
     {
+      "id": "leading-video-edit-open",
+      "profile": "leading-video-edit-open",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 237,
+        "bytes": 81478,
+        "digest": 9596315584292083372
+      }
+    },
+    {
+      "id": "leading-video-edit-seek",
+      "profile": "leading-video-edit-seek",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "28000"
+      ],
+      "expected": {
+        "packets": 181,
+        "bytes": 62042,
+        "digest": 5378275097212072522
+      }
+    },
+    {
+      "id": "leading-video-edit-seek-before-sync",
+      "profile": "leading-video-edit-seek-before-sync",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "17535"
+      ],
+      "expected": {
+        "packets": 237,
+        "bytes": 81478,
+        "digest": 9596315584292083372
+      }
+    },
+    {
+      "id": "leading-video-edit-seek-at-sync",
+      "profile": "leading-video-edit-seek-at-sync",
+      "file": "avc-leading-edit.mp4",
+      "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "17536"
+      ],
+      "expected": {
+        "packets": 181,
+        "bytes": 62042,
+        "digest": 5378275097212072522
+      }
+    },
+    {
+      "id": "leading-video-edit-trimmed-open",
+      "profile": "leading-video-edit-trimmed-open",
+      "file": "avc-leading-edit-trimmed.mp4",
+      "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 225,
+        "bytes": 69726,
+        "digest": 580711317104354027
+      }
+    },
+    {
+      "id": "leading-video-edit-trimmed-seek",
+      "profile": "leading-video-edit-trimmed-seek",
+      "file": "avc-leading-edit-trimmed.mp4",
+      "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "17536"
+      ],
+      "expected": {
+        "packets": 169,
+        "bytes": 50686,
+        "digest": 5242818698675809095
+      }
+    },
+    {
+      "id": "unrepresentable-video-edit-audio-only",
+      "profile": "unrepresentable-video-edit-audio-only",
+      "file": "avc-unrepresentable-edit.mp4",
+      "sha256": "36116695ac130b276e7f44bc0f49c58f6c38713c582075add21f1b35ae481d3f",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 189,
+        "bytes": 32517,
+        "digest": 3117005324307362295
+      }
+    },
+    {
+      "id": "signed-video-edit-endpoint-audio-only",
+      "profile": "signed-video-edit-endpoint-audio-only",
+      "file": "avc-signed-endpoint-edit.mp4",
+      "sha256": "57e65c61776b77c498a203a3e38e64f90ad93e461e77fa7192f34fc839acb9f9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 189,
+        "bytes": 32517,
+        "digest": 3117005324307362295
+      }
+    },
+    {
+      "id": "leading-video-edit-short-reordered",
+      "profile": "leading-video-edit-short-reordered",
+      "file": "avc-leading-edit-short-reordered.mp4",
+      "sha256": "86dbc2353fc13606e6f4b598e7f42a38e4ac87074a374adddee6202f4af8c8bc",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 202,
+        "bytes": 47093,
+        "digest": 7610120524339765167
+      }
+    },
+    {
+      "id": "leading-video-edit-overlapping-sync-open",
+      "profile": "leading-video-edit-overlapping-sync-open",
+      "file": "forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 18,
+        "bytes": 2827,
+        "digest": 2951212463114411726
+      }
+    },
+    {
+      "id": "leading-video-edit-overlapping-sync-seek",
+      "profile": "leading-video-edit-overlapping-sync-seek",
+      "file": "forward-avc-empty-edit-overlapping-sync.mp4",
+      "sha256": "086cfd2e1663444586c4126a66a18ba5ac1ee3dd80f78656a353d9b594892972",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "27"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 2651,
+        "digest": 7260646860981280469
+      }
+    },
+    {
       "id": "fate-non-sync-prefix-open",
       "profile": "fate-non-sync-prefix-open",
       "file": "mov/mp4-init-nonkeyframe.mp4",
