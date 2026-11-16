@@ -88,10 +88,10 @@ on the width:
   to zero so neutral grey maps to exactly 128, and chroma is the mean of each
   horizontal pixel pair, decimated vertically with centre-sited taps 1/8, 3/8, 3/8,
   1/8 over rows 2k−1 … 2k+2 with the edge rows replicated, rounded once. Below a
-  width of 16 this agrees within 1 with FFmpeg's ARMv7 build. At widths of 2
-  modulo 4 from 18 up, FFmpeg's ARMv7 build faults
-  instead of converting, and this path decimates chroma as FFmpeg's AArch64 build
-  does, within 1 of that build's output.
+  width of 16 the reference is FFmpeg's ARMv7 build. At widths of 2 modulo 4
+  from 18 up, FFmpeg's ARMv7 build faults, and the reference is its AArch64 build.
+  The [conversion probe](../../harness/capture/README.md#short-frames) compares
+  the short-frame rules at the widths each reference produces.
 
 On the filtered path, a 2-row picture takes chroma from the lower row. A 4-row
 picture averages each pair of rows. In a 6-row picture, the top chroma row

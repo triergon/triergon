@@ -3,6 +3,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+// The ARMv7 reference faults on these widths. Check the filtered fallback
+// against the AArch64 Linux reference, which produces an output.
+#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+const FALLBACK_WIDTHS: &[usize] = &[18, 22, 34, 66, 258, 958, 4094];
+#[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+const FALLBACK_WIDTHS: &[usize] = &[];
+
 #[test]
 #[ignore = "requires the pinned capture reference worker"]
 fn short_filtered_frames_against_reference() {
@@ -11,7 +18,7 @@ fn short_filtered_frames_against_reference() {
     fs::create_dir(&root).unwrap();
     let candidate = Path::new(env!("CARGO_BIN_EXE_capture-worker"));
     let mut random = 0x1fb7_1cdf_u32;
-    for width in (2..16).step_by(2) {
+    for width in (2..16).step_by(2).chain(FALLBACK_WIDTHS.iter().copied()) {
         for height in [2, 4, 6] {
             for flip in [0, 1] {
                 let geometry = format!("{width}x{height}-flip{flip}");
