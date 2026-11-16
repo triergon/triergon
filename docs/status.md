@@ -321,8 +321,8 @@ ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 The ISO BMFF row used the gate build at `f99d893196908d562c897bccb20c6a972cd25d11`
 on a c8g.large pinned to CPU 1, 30 pairs. Runtime comes from the timing collection and
 memory from a separate collection under the kernel RSS bound; both are in the raw
-samples. `cargo xtask grade` cannot join them, because FFmpeg's log lines carry heap
-addresses that differ between runs.
+samples. This earlier run kept separate verdicts because its grader compared the
+process addresses in the reference diagnostics.
 
 The MP4 forward and range results used the gate build at
 `f5453ef9d88712777aa5b6383250875456e9f334` on a c8g.large pinned to CPU 1, with
