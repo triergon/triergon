@@ -9,11 +9,36 @@ permissions:
   contents: read
 
 jobs:
+  # What the change needs: `docs` for a pull request that changes only files the
+  # documentation checks read (tools/ci-scope.py, against the merge base), `full`
+  # for any other pull request and for every push. A change to the classifier is
+  # itself `full`, so the lint part runs its tests (tools/test-ci-scope.py).
+  scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+      - name: Classify the change
+        id: scope
+        run: |
+          scope=full
+          # A pull request is checked as its merge commit: HEAD^2 is its head.
+          if [ "${{ github.event_name }}" = pull_request ] && git rev-parse -q --verify HEAD^2 > /dev/null; then
+            base=$(git merge-base HEAD^1 HEAD^2) && scope=$(python3 tools/ci-scope.py "$base" HEAD^2) || scope=full
+          fi
+          echo "scope=$scope" | tee -a "$GITHUB_OUTPUT"
+
   # `cargo xtask check` in its four parts, side by side. Each part prepares what it
   # reads (`cargo xtask prepare-check PART`) and runs its steps of the full check
   # (`cargo xtask check PART`); together they run every step.
   part:
     name: ${{ matrix.part }}
+    needs: scope
+    if: needs.scope.outputs.scope == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
@@ -42,8 +67,11 @@ jobs:
             pinned-downloads-
       - name: Install check dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync zstd
+          # The image's package lists usually still serve these; refresh them only
+          # when they do not.
+          packages='build-essential pkg-config zlib1g-dev nasm rsync zstd'
+          sudo apt-get install -y $packages ||
+            { sudo apt-get update && sudo apt-get install -y $packages; }
           rustup show active-toolchain || rustup toolchain install
           rustc -vV
           mkdir -p "$TRIERGON_DOWNLOAD_CACHE"
@@ -170,18 +198,71 @@ jobs:
           fi
           key=$(ls "$TRIERGON_DOWNLOAD_CACHE" | sort | sha256sum | cut -c1-16)
           echo "key=pinned-downloads-${{ matrix.part }}-$key" >> "$GITHUB_OUTPUT"
+      # Saved from main only, which every pull request restores; the key names the
+      # pinned SHA-256 of every entry, so a pull request that changes no pin finds
+      # its downloads there.
       - name: Save pinned downloads
-        if: always() && steps.downloads.outputs.key != ''
+        if: always() && github.event_name == 'push' && steps.downloads.outputs.key != ''
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: /home/runner/.cache/triergon-downloads
           key: ${{ steps.downloads.outputs.key }}
 
-  # The one required check: it passes only when every part passed.
+  # The steps that read the documents and evidence sets, for a pull request that
+  # changes nothing else (`cargo xtask check docs`), on the test part's target
+  # directory from main.
+  docs:
+    needs: scope
+    if: needs.scope.outputs.scope == 'docs'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          # `cargo xtask check-revisions` needs every commit HEAD reaches.
+          fetch-depth: 0
+      - name: Install the toolchain
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc -vV
+      - name: Target cache key
+        id: target-key
+        run: |
+          {
+            rustc -vV
+            cc --version
+            ld --version
+            dpkg-query -W 'libc6*' 'libgcc*' 'gcc*' 'binutils*' || true
+          } > "$RUNNER_TEMP/toolchain"
+          toolchain=$(sha256sum < "$RUNNER_TEMP/toolchain" | cut -c1-32)
+          echo "prefix=target-test-$ImageOS-$toolchain-" >> "$GITHUB_OUTPUT"
+      - name: Restore target directory
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            target
+            !target/harness
+            !target/tmp
+          key: ${{ steps.target-key.outputs.prefix }}${{ github.sha }}
+          restore-keys: ${{ steps.target-key.outputs.prefix }}
+      - name: Date sources by their content
+        run: python3 tools/target-cache.py apply target
+      - name: Verify documents and evidence sets
+        run: cargo xtask check docs
+
+  # The one required check: it passes when every part passed, or for a pull request
+  # that changes only documents and evidence sets, when `docs` passed.
   check:
     if: always()
-    needs: part
+    needs: [scope, part, docs]
     runs-on: ubuntu-24.04
     steps:
-      - name: Every part passed
-        run: test "${{ needs.part.result }}" = success
+      - name: Every required job passed
+        run: |
+          case "${{ needs.scope.outputs.scope }}" in
+            full) test "${{ needs.part.result }}" = success ;;
+            docs) test "${{ needs.docs.result }}" = success ;;
+            *) exit 1 ;;
+          esac

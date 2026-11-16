@@ -24,6 +24,12 @@ restore the packed reference builds (`cargo xtask references`) and the target
 directory of an earlier run; `tools/target-cache.py` marks every tracked file whose
 content differs from that run's as new, so cargo rebuilds whatever reads it.
 
+A pull request that changes only `docs/`, `harness/evidence/sets/` or Markdown files
+no code reads runs `cargo xtask check docs` instead: formatting, check-design,
+check-links, check-revisions and the evidence index tests. `tools/ci-scope.py` decides
+this against the merge base; any other change, and every push to main, runs all four
+parts.
+
 Set `CARGO_INCREMENTAL=0` for direct cargo commands; the reference builds and
 benchmarks assume it.
 
