@@ -1118,8 +1118,11 @@ outputs would be lost; on macOS run it with Homebrew's bash first on `PATH`, or 
 changes to tracked files, runs `cargo xtask gate check --shards N` and refuses to
 start when it fails. Then it launches N hosts from the image,
 checks out REVISION on each, restores reference builds whose keys changed from the
-archive's packs (building and uploading the others), gets each host ready and runs
-shard I of N on host I. When a shard ends, finished or not, its host's outputs are
+archive's packs (building and uploading the others), unpacks each `--input s3:KEY` (a
+media inputs archive in the evidence archive, for a kept input set the image lacks) at
+the repository root, gets each host ready and runs shard I of N on host I. `gate check`
+counts the files of a kept set unpacked at the repository root as present whether or
+not the image holds them. When a shard ends, finished or not, its host's outputs are
 archived under `qualification/gate-runs/RUN/shard-I/`, where they expire after 90 days
 unless promoted, and checked by downloading them back on the host;
 `OUT/shard-I/entry.json` holds the archive's index entry, which lists the [gate

@@ -12,6 +12,7 @@
 #       archive (.tar.gz, repository-relative paths): a local file or s3:KEY in
 #       the evidence archive
 #   tools/gate-aws.sh run aarch64|armv7 SHARDS REVISION OUT [--full] [--items NAME,...]
+#       [--input s3:KEY]...
 #       the full gate of REVISION on SHARDS hosts from the target's image, in
 #       parallel: each takes the references of REVISION from its image or the
 #       archive, gets ready, and runs its shard (tools/gate-host.sh); the
@@ -23,7 +24,9 @@
 #       checkout is REVISION, unchanged, and `cargo xtask gate check` passes in it
 #       for SHARDS shards of the target. The RSS module review is the one REVISION commits
 #       for its module source and the image's kernel. --items runs those items of
-#       the plan alone
+#       the plan alone; each --input, a media inputs archive in the evidence
+#       archive (.tar.gz, repository-relative paths), is unpacked at each host's
+#       repository root before it gets ready, for inputs the image lacks
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
 # start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to, which must be
@@ -44,6 +47,7 @@ if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
     exit 2
 fi
 set -euo pipefail
+RUN_INPUTS=()
 
 : "${AWS_PROFILE:?}" "${AWS_REGION:?}" "${TRIERGON_SUBNET:?}" "${TRIERGON_SSH_CIDR:?}"
 : "${TRIERGON_EVIDENCE_ARCHIVE:?}"
@@ -371,6 +375,12 @@ shard() {
     copy "$i" "$HERE/gate-host.sh" gate-host.sh
     on "$i" "bash ~/gate-host.sh checkout $revision" | tail -n +2 |
         fetch_packs "$i" "$(repository_path "$target")"
+    local input
+    for input in "${RUN_INPUTS[@]}"; do
+        on "$i" "curl -fsS --retry 3 '$(presign "$input")' | tar -xzf - -C $(repository_path "$target")" ||
+            { say "host $i: could not unpack $input"; return 1; }
+        say "host $i: unpacked $input"
+    done
     detached "$i" "READY" ready "$i/$count"
     detached "$i" "DONE" run "$i/$count" ".research/gate/$revision" "$full"
     touch "$out/shard-$i/finished"
@@ -466,6 +476,13 @@ run() {
         case $1 in
         --full) full=--full ;;
         --items) items=$2; shift ;;
+        --input)
+            case $2 in
+            s3:*) RUN_INPUTS+=("${2#s3:}") ;;
+            *) echo "--input takes s3:KEY, an archive in the evidence archive: $2" >&2; return 2 ;;
+            esac
+            shift
+            ;;
         *) echo "unknown option $1" >&2; return 2 ;;
         esac
         shift
