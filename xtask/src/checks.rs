@@ -144,9 +144,28 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     }
 }
 
+/// Why a contract's `open_bounds` are not valid against its feature's committed
+/// `corpus.json`, on any gate target; nothing for a contract that lists none.
+fn open_bounds_error(contract_path: &Path, contract: &Value) -> Option<String> {
+    contract.get("open_bounds")?;
+    let corpus = contract_path.with_file_name("corpus.json");
+    let manifest = match read_json(&corpus) {
+        Ok(manifest) => manifest,
+        Err(error) => {
+            return Some(format!(
+                "open_bounds needs the committed corpus.json: {error}"
+            ));
+        }
+    };
+    crate::gate::TARGETS
+        .iter()
+        .find_map(|target| crate::harness::bounds::open_bounds(contract, &manifest, target).err())
+}
+
 /// The fields every feature contract (`harness/features/<id>/contract.json`) may
-/// declare that the harness reads the same way for all of them: `timeout_seconds`
-/// and `measurement_reference`.
+/// declare that the harness reads the same way for all of them: `timeout_seconds`,
+/// `measurement_reference` and, against the feature's committed `corpus.json`,
+/// `open_bounds`.
 fn contract_fields(root: &Path) -> Vec<String> {
     let features = root.join("harness/features");
     walk::files(&features, &|rel| rel.ends_with("contract.json"))
@@ -163,6 +182,7 @@ fn contract_fields(root: &Path) -> Vec<String> {
                         .and(crate::harness::worker::contract_parity_timeout(&contract))
                         .err(),
                     crate::harness::build::measurement_reference_error(&contract),
+                    open_bounds_error(&path, &contract),
                 ]
                 .into_iter()
                 .flatten()

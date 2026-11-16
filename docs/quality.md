@@ -311,6 +311,19 @@ resource limit becomes an explicit, reviewed rule for that case.
   listed. Features that a module's documentation names as additional coverage, such
   as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
   without blocking it.
+- **Bounds.** `cargo xtask grade` fails on a case whose runtime bound is above the
+  ceiling, or whose heap or total RSS bound is not below 1, or whose measurement of
+  either is not valid, and prints one line per failing bound and case, as the codec
+  bounds do. A contract may list `open_bounds`: each entry a `bound` (`runtime`,
+  `heap` or `total_rss`), the `cases` it fails for today, its measured `cause` and
+  optionally the gate `targets` it is open on. Such a bound fails as `open as listed`
+  and does not fail the step; the case's other bounds are graded as any case's, and a
+  listed bound that holds is printed for removal from the list. `cargo xtask check`
+  validates every contract's `open_bounds` against its corpus. Suites that have no
+  grade apply the same verdict to their own collections: the progressive TS suite's
+  timing and memory collections, and `capture qualify --stage memory` for each case
+  not open on the target; the ISO BMFF suites and the codec workload lists already
+  fail on a failing bound.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash, or

@@ -1,0 +1,9 @@
+{
+ "name": "closing-run-ratios-a73350ca",
+ "path": "closing-run-ratios-a73350ca",
+ "retention": "retained",
+ "reason": "Per-case runtime ratios of the full gate runs at a73350ca and of AAC in MOV, both targets, computed on a host from the shard archives (fetched and verified there): every timed case's paired median and 95% bounds (ratios-TARGET.jsonl), per feature the cases with median and with bound above 1.0 and with bound above 1.20, 1.10 and 1.05 and the median of case medians (ratios-TARGET.md), the worst bounds per feature, the archives read and the scripts; for docs/status.md",
+ "key": "evidence/closing-run-ratios/a73350ca/74bd0b90c8f4697c0e624136fcc511808a33d57158aaa27aa8a25e734ffcb3bb.tar.zst",
+ "sha256": "74bd0b90c8f4697c0e624136fcc511808a33d57158aaa27aa8a25e734ffcb3bb",
+ "bytes": 271093
+}
