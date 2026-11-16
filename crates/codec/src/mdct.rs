@@ -554,10 +554,14 @@ impl Dct4 {
         // second of pair K/2 - 1 - j.
         let (pairs, _) = x[..k].as_chunks::<2>();
         let half = pairs.len();
+        // K >= 2, so there is a last pair.
+        let Some(last) = half.checked_sub(1) else {
+            return;
+        };
         let input = |j: u32| {
-            // Every order entry is below K/2; the bound spares the index checks.
-            let j = (j as usize).min(half - 1);
-            (pairs[j][0], pairs[half - 1 - j][1])
+            // Every order entry is at most `last`; the bound spares the index checks.
+            let j = (j as usize).min(last);
+            (pairs[j][0], pairs[last - j][1])
         };
         let (re, im) = (&mut self.re[..half], &mut self.im[..half]);
         let (pre_re, pre_im) = (&self.pre.0[..half], &self.pre.1[..half]);
@@ -592,16 +596,52 @@ impl Dct4 {
             }
         }
         self.fft.transform_after_first(re, im);
-        // Output pair p is the real part of bin p and the negated imaginary part of bin
-        // K/2 - 1 - p, each post-twiddled.
-        let (post_re, post_im) = (&self.post.0[..half], &self.post.1[..half]);
-        let bins = || re.iter().zip(im.iter()).zip(post_re.iter().zip(post_im));
-        let real = bins().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).0);
-        let imag = bins().rev().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).1);
-        let (out, _) = w[..k].as_chunks_mut::<2>();
-        for ((o, ur), ui) in out.iter_mut().zip(real).zip(imag) {
-            *o = [ur, -ui];
-        }
+        let post = (&self.post.0[..half], &self.post.1[..half]);
+        post_twiddle((re, im), post, w[..k].as_chunks_mut::<2>().0);
+    }
+}
+
+/// The DCT-IV output from the FFT bins `(re, im)`: pair p is the real part of bin p and
+/// the negated imaginary part of bin q = K/2 - 1 - p, each post-twiddled by `post`.
+///
+/// AArch64 vectorises a forward stream of real parts against a reversed stream of
+/// imaginary parts. ARMv7 runs the loop scalar, where loading every bin twice costs as
+/// much as an FFT stage, so there pairs p and q are written together from bins p and q,
+/// inwards from both ends. Both compute every value alike.
+#[cfg(not(target_arch = "arm"))]
+fn post_twiddle((re, im): (&[f32], &[f32]), post: (&[f32], &[f32]), out: &mut [[f32; 2]]) {
+    let bins = || re.iter().zip(im).zip(post.0.iter().zip(post.1));
+    let real = bins().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).0);
+    let imag = bins().rev().map(|((&a, &b), (&c, &d))| mul(a, b, c, d).1);
+    for ((o, ur), ui) in out.iter_mut().zip(real).zip(imag) {
+        *o = [ur, -ui];
+    }
+}
+
+/// See the other target's [`post_twiddle`].
+#[cfg(target_arch = "arm")]
+fn post_twiddle((re, im): (&[f32], &[f32]), post: (&[f32], &[f32]), out: &mut [[f32; 2]]) {
+    let half = out.len();
+    let bins = |from: usize, to: usize| {
+        let (re, im) = (&re[from..to], &im[from..to]);
+        let post = post.0[from..to].iter().zip(&post.1[from..to]);
+        re.iter()
+            .zip(im)
+            .zip(post)
+            .map(|((&a, &b), (&c, &d))| mul(a, b, c, d))
+    };
+    let outer = half / 2;
+    let (front, rest) = out.split_at_mut(outer);
+    let (middle, back) = rest.split_at_mut(half - 2 * outer);
+    let ends = front.iter_mut().zip(back.iter_mut().rev());
+    let values = bins(0, outer).zip(bins(half - outer, half).rev());
+    for ((o_p, o_q), ((ur_p, ui_p), (ur_q, ui_q))) in ends.zip(values) {
+        *o_p = [ur_p, -ui_q];
+        *o_q = [ur_q, -ui_p];
+    }
+    // The middle pair of an odd count is its own mirror.
+    for (o, (ur, ui)) in middle.iter_mut().zip(bins(outer, half - outer)) {
+        *o = [ur, -ui];
     }
 }
 
