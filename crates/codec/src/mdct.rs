@@ -31,6 +31,8 @@ fn mul(a: f32, b: f32, c: f32, d: f32) -> (f32, f32) {
 struct Stage {
     radix: usize,
     span: usize,
+    /// Blocks of `radix * span` points in the transform.
+    blocks: usize,
     re: BudgetVec<f32>,
     im: BudgetVec<f32>,
 }
@@ -116,6 +118,7 @@ impl Fft {
             let stage = Stage {
                 radix,
                 span,
+                blocks: stride,
                 re,
                 im,
             };
@@ -187,8 +190,11 @@ fn leaf4(x: [(f32, f32); 4]) -> [(f32, f32); 4] {
 /// One stage over every block of the planes.
 fn run_stage(re: &mut [f32], im: &mut [f32], stage: &Stage) {
     let block = stage.radix * stage.span;
-    let blocks = re.chunks_exact_mut(block).zip(im.chunks_exact_mut(block));
-    for (r, i) in blocks {
+    // Blocks by their count rather than `chunks_exact`, whose remainder is a library
+    // division on ARMv7.
+    for b in 0..stage.blocks {
+        let points = b * block..(b + 1) * block;
+        let (r, i) = (&mut re[points.clone()], &mut im[points]);
         match stage.radix {
             2 => butterfly2(r, i, stage),
             3 => butterfly3(r, i, stage),
