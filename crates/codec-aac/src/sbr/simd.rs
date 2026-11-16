@@ -23,13 +23,6 @@ fn ld2(x: &[Cpx], i: usize) -> V {
 }
 
 #[inline(always)]
-fn st2(x: &mut [Cpx], i: usize, v: V) {
-    let [a, b, c, d] = v.to_array();
-    x[i] = Cpx::new(a, b);
-    x[i + 1] = Cpx::new(c, d);
-}
-
-#[inline(always)]
 fn rev(v: V) -> V {
     simd_swizzle!(v, [3, 2, 1, 0])
 }
@@ -126,51 +119,4 @@ pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut 
         }
         (acc * V::splat(scale)).copy_to_slice(&mut out[n..n + 4]);
     }
-}
-
-/// HF generation of one subband: xh\[s\] = xl\[s\] + a0 xl\[s - 1\] + a1 xl\[s - 2\],
-/// s0 <= s < s1, two time slots a step.
-pub(super) fn hf_gen(xl: &[Cpx], xh: &mut [Cpx], a0: Cpx, a1: Cpx, s0: usize, s1: usize) {
-    // [-im, re] of both values: the products with the imaginary coefficient parts
-    let turn = |v: V| {
-        let n = -v;
-        simd_swizzle!(v, n, [5, 0, 7, 2])
-    };
-    let (a0r, a0i, a1r, a1i) = (
-        V::splat(a0.re),
-        V::splat(a0.im),
-        V::splat(a1.re),
-        V::splat(a1.im),
-    );
-    let mut s = s0;
-    while s + 2 <= s1 {
-        let x1 = ld2(xl, s - 1);
-        let x2 = ld2(xl, s - 2);
-        // re: x0 + a0r x1r - a0i x1i + a1r x2r - a1i x2i; im: x0 + a0r x1i + a0i x1r + ...
-        let y = ld2(xl, s) + a0r * x1 + a0i * turn(x1) + a1r * x2 + a1i * turn(x2);
-        st2(xh, s, y);
-        s += 2;
-    }
-    if s < s1 {
-        let (x0, x1, x2) = (xl[s], xl[s - 1], xl[s - 2]);
-        xh[s] = Cpx::new(
-            x0.re + a0.re * x1.re - a0.im * x1.im + a1.re * x2.re - a1.im * x2.im,
-            x0.im + a0.re * x1.im + a0.im * x1.re + a1.re * x2.im + a1.im * x2.re,
-        );
-    }
-}
-
-/// The covariance sums of `lpc`, two vectors of four accumulators:
-/// \[phi01.re, phi01.im, phi02.re, phi02.im\] and \[phi11, phi12.re, phi12.im, phi22\].
-pub(super) fn covariance(x: &[Cpx], len: usize) -> ([f32; 4], [f32; 4]) {
-    let mut p = V::splat(0.0);
-    let mut q = V::splat(0.0);
-    for n in 0..len {
-        let (a, b, c) = (x[n + 2], x[n + 1], x[n]);
-        p += V::from_array([a.re, a.im, a.re, a.im]) * V::from_array([b.re, b.re, c.re, c.re])
-            + V::from_array([a.im, -a.re, a.im, -a.re]) * V::from_array([b.im, b.im, c.im, c.im]);
-        q += V::from_array([b.re, b.re, b.im, c.re]) * V::from_array([b.re, c.re, c.re, c.re])
-            + V::from_array([b.im, b.im, -b.re, c.im]) * V::from_array([b.im, c.im, c.im, c.im]);
-    }
-    (p.to_array(), q.to_array())
 }

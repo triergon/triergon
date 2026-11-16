@@ -1088,9 +1088,6 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
             };
             let xl = &c.xl[src];
             let xh = &mut c.xh[k];
-            #[cfg(feature = "simd")]
-            simd::hf_gen(xl, xh, a0, a1, s0, s1);
-            #[cfg(not(feature = "simd"))]
             for s in s0..s1 {
                 let x0 = xl[s];
                 let x1 = xl[s - 1];
@@ -1108,41 +1105,25 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
 /// Covariance-method second order prediction coefficients (4.6.18.6.2).
 fn lpc(x: &[Cpx; XL_LEN]) -> (Cpx, Cpx) {
     // phi(i, j) = sum_{n=0}^{37} x[n + 2 - i] conj(x[n + 2 - j])
-    #[cfg(feature = "simd")]
-    let (r01, r02, r11, r12, r22) = {
-        let ([p01r, p01i, p02r, p02i], [p11, p12r, p12i, p22]) =
-            simd::covariance(x, 2 * NUM_TIME_SLOTS + 6);
-        (
-            Cpx::new(p01r, p01i),
-            Cpx::new(p02r, p02i),
-            p11,
-            Cpx::new(p12r, p12i),
-            p22,
-        )
-    };
-    #[cfg(not(feature = "simd"))]
-    let (r01, r02, r11, r12, r22) = {
-        let mut r01 = Cpx::default();
-        let mut r02 = Cpx::default();
-        let mut r11 = 0f32;
-        let mut r12 = Cpx::default();
-        let mut r22 = 0f32;
-        for n in 0..(2 * NUM_TIME_SLOTS + 6) {
-            let a = x[n + 2];
-            let b = x[n + 1];
-            let cc = x[n];
-            // phi(0,1) = sum a conj(b)
-            r01.re += a.re * b.re + a.im * b.im;
-            r01.im += a.im * b.re - a.re * b.im;
-            r02.re += a.re * cc.re + a.im * cc.im;
-            r02.im += a.im * cc.re - a.re * cc.im;
-            r11 += b.re * b.re + b.im * b.im;
-            r12.re += b.re * cc.re + b.im * cc.im;
-            r12.im += b.im * cc.re - b.re * cc.im;
-            r22 += cc.re * cc.re + cc.im * cc.im;
-        }
-        (r01, r02, r11, r12, r22)
-    };
+    let mut r01 = Cpx::default();
+    let mut r02 = Cpx::default();
+    let mut r11 = 0f32;
+    let mut r12 = Cpx::default();
+    let mut r22 = 0f32;
+    for n in 0..(2 * NUM_TIME_SLOTS + 6) {
+        let a = x[n + 2];
+        let b = x[n + 1];
+        let cc = x[n];
+        // phi(0,1) = sum a conj(b)
+        r01.re += a.re * b.re + a.im * b.im;
+        r01.im += a.im * b.re - a.re * b.im;
+        r02.re += a.re * cc.re + a.im * cc.im;
+        r02.im += a.im * cc.re - a.re * cc.im;
+        r11 += b.re * b.re + b.im * b.im;
+        r12.re += b.re * cc.re + b.im * cc.im;
+        r12.im += b.im * cc.re - b.re * cc.im;
+        r22 += cc.re * cc.re + cc.im * cc.im;
+    }
     let det = r22 * r11 - (r12.re * r12.re + r12.im * r12.im) / (1.0 + 1e-6);
     let mut a1 = Cpx::default();
     if det != 0.0 {
