@@ -179,11 +179,16 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         report::create_output(&options.output.join("parity"))?;
     }
     let documents = ["controls.json", "provenance.json"].map(|name| root.join(FEATURE).join(name));
+    // The suite has no grade: each measuring collection grades its own bounds.
+    let measure = || {
+        let code = collect(root, &options, report::collect, check_controls)?;
+        let measured = (options.benchmark || options.memory) && code == 0;
+        let failed = measured && crate::harness::bounds::collection_verdict(root, &options)?;
+        Ok(code.max(i32::from(failed)))
+    };
     match report::gate_key(root, &options, &documents)? {
-        Some(key) => reuse::step(root, &options.output, &key, options.full, || {
-            collect(root, &options, report::collect, check_controls)
-        }),
-        None => collect(root, &options, report::collect, check_controls),
+        Some(key) => reuse::step(root, &options.output, &key, options.full, measure),
+        None => measure(),
     }
 }
 

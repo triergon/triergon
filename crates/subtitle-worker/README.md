@@ -55,7 +55,9 @@ memory modes also print `input_digest`, worked out outside the operation from th
 prepared packets as the reference works it out: their count, then per packet whether it has a PTS,
 the PTS and the duration, in order, folded word by word (d = 31d + w, wrapping); the
 `subtitle-cc` contract compares it, so the prepared packets' order and times must
-match the reference's exactly. The bench mode adds the
+match the reference's exactly. PGS works it out from its prepared packets' clocks
+without the input mode's view, which copies every payload, so a timed or measured
+run holds its input once. The bench mode adds the
 elapsed time of the timed loop and the memory mode brackets one operation with the
 allocation-window markers. The
 trace mode prints the same values as lines, identical to the reference's trace, so a
