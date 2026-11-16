@@ -1,0 +1,10 @@
+{
+ "name": "hevc-eos-open-5380ca22-linux-arm64",
+ "path": "hevc-eos-open-5380ca22-linux-arm64",
+ "retention": "90 days",
+ "reason": "The subtitle-cc open case hevc-eos-ts in its four variants, on a c8g.2xlarge (Linux AArch64): folds of the pinned FFmpeg subtitles reference worker and of subtitle-worker, which differ in every variant because the caption extractor has no model of the decoder's picture output at a new sequence. A zstd-compressed tar of the deterministic pack.",
+ "key": "qualification/hevc-eos-open-5380ca22-linux-arm64/e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550.tar.zst",
+ "sha256": "e002f09354010e50a0f5d43fdd084bcc9f9306350f662c57f041462e9e8e8550",
+ "bytes": 788,
+ "source_revision": "5380ca22cd06eb1b9e12eaab126c7b762f04b8c1"
+}

@@ -1,0 +1,6 @@
+{
+ "name": "progressive-word-scan-counts",
+ "retention": "90 days",
+ "key": "qualification/repository/progressive-word-scan-counts/e3d3b5e8d3272536da2ee1d9ef67c6d13d6dbc0cfa1dafa2ccc6e46c7d00dd90.tar.gz",
+ "sha256": "e3d3b5e8d3272536da2ee1d9ef67c6d13d6dbc0cfa1dafa2ccc6e46c7d00dd90"
+}

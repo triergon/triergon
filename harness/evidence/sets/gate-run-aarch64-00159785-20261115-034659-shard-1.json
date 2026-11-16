@@ -1,0 +1,30 @@
+{
+ "name": "gate-run-aarch64-00159785-20261115-034659-shard-1",
+ "path": "gate-run-aarch64-00159785-20261115-034659-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at 00159785 on Linux AArch64, one c6g.4xlarge from the gate image, item isobmff-seek: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; 476/476 parity, the authored movies fail runtime and fragmented-1200 fails heap; for the ISO BMFF seek and range plan row and the reuse of its results",
+ "key": "evidence/gate-runs/001597859a0faf2508d29773627116ee33689cda-aarch64-20261115-034659/shard-1/f4bbd658d24164f76bee744ed119f7ff8fda400f04da071e3667d8f24a05dc0e.tar.zst",
+ "sha256": "f4bbd658d24164f76bee744ed119f7ff8fda400f04da071e3667d8f24a05dc0e",
+ "bytes": 40955782,
+ "results": [
+  {
+   "path": "memory/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --memory",
+   "key": "f02d466974bc7ce91fcddefbeed2d4df586aef5313efbc1561258487ffb1c8d7",
+   "status": 1,
+   "report_sha256": "e4751ef63ffbf9452d1c141edec39503a6c084f991253eced76a13d83c4b29da",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --benchmark",
+   "key": "5d8370cb3db8d7fff42a98c9b9e94203eae4d356b4a19ab78e33b00e4fde0d9f",
+   "status": 1,
+   "report_sha256": "13b8320cc5ef11465ad419969e7aae8de03e56d803100876706aa31a1a130682",
+   "cases_checked": true
+  }
+ ],
+ "source_revisions": {
+  "candidate": "001597859a0faf2508d29773627116ee33689cda"
+ }
+}

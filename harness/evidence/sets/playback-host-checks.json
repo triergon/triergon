@@ -1,0 +1,46 @@
+{
+ "name": "playback-host-checks",
+ "path": "playback-host-checks",
+ "retention": "90 days",
+ "reason": "Playback and clock host checks",
+ "key": "qualification/repository/playback-host-checks/e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8.tar.gz",
+ "sha256": "e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8",
+ "files": [
+  {
+   "path": "playback-host-checks/COMPAT-REFERENCE-TEST.log",
+   "sha256": "f8a878d24c16d69a23ae19627c5a7ce2921e5290a6e93534bf651f389f30b758"
+  },
+  {
+   "path": "playback-host-checks/COMPAT-TIME-ORACLE.log",
+   "sha256": "aabc6aa3ed3dbeb988c771a1c615cc17ddbd784326d9220d8b8215befd8b3ca7"
+  },
+  {
+   "path": "playback-host-checks/COMPAT-WORKSPACE-CHECK.log",
+   "sha256": "f804c1e069614ecd56fbccf52c91d36fb0b9aa6f8e4875ce595278f6ccb325db"
+  },
+  {
+   "path": "playback-host-checks/COMPAT-WORKSPACE-CLIPPY.log",
+   "sha256": "f5fa357d8f51e0c25786f8cab2c675c70c11382f318fed905446910a0d5bf121"
+  },
+  {
+   "path": "playback-host-checks/COMPAT-WORKSPACE-DOC.log",
+   "sha256": "dd949629615b74fd7fbeeef6f4085f97b7d264049c2ebd6b8ede4c0d7eaa64d2"
+  },
+  {
+   "path": "playback-host-checks/COMPAT-WORKSPACE-TEST.log",
+   "sha256": "fadae6686f7f0eeb028252b5282adba853ac6f3ce500259e9169c55fd4b4b4e6"
+  },
+  {
+   "path": "playback-host-checks/ORACLE.tar.gz",
+   "sha256": "862d9f40947b7525cec99bfea5b32a12fc5ff645ce5d71a4fffab83e520c22d3"
+  },
+  {
+   "path": "playback-host-checks/REVIEW.json",
+   "sha256": "78cb9a3e8b54ad92cb1e52634fba8e4f18b6bec75e611afe792c09b872c16a56"
+  },
+  {
+   "path": "playback-host-checks/SOURCE.bundle",
+   "sha256": "ea064f0510957eac949d91b14646c4f2d2413fe2dec550403e5123b54245dd35"
+  }
+ ]
+}

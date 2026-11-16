@@ -1,0 +1,30 @@
+{
+ "name": "gate-run-armv7-00159785-20261115-034714-shard-1",
+ "path": "gate-run-armv7-00159785-20261115-034714-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at 00159785 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image, item isobmff-seek: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; 476/476 parity, the authored movies fail runtime and fragmented-1200 fails heap; for the ISO BMFF seek and range plan row and the reuse of its results",
+ "key": "evidence/gate-runs/001597859a0faf2508d29773627116ee33689cda-armv7-20261115-034714/shard-1/fcf9a2a4dffb550368cae52927cde3b08fd8693e48639a53c2498f120f21f339.tar.zst",
+ "sha256": "fcf9a2a4dffb550368cae52927cde3b08fd8693e48639a53c2498f120f21f339",
+ "bytes": 46016747,
+ "results": [
+  {
+   "path": "memory/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --memory",
+   "key": "e71dd0b29bf4ed7f50eeb5888a94fed44df6446415bf9133db0da0b26ca1dc4d",
+   "status": 1,
+   "report_sha256": "113318bf27d0cb5134313390593c121abe28363cc62db67fdadb29ce4c43ed06",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --benchmark",
+   "key": "9b092d3da797968d591d521256d8b376e4766486d9d45dafb4f1023a2a572d03",
+   "status": 1,
+   "report_sha256": "76cca2fbb4759b56c6d22786ddd84a67ed3642ef7b79ed23e020545f6c34cb41",
+   "cases_checked": true
+  }
+ ],
+ "source_revisions": {
+  "candidate": "001597859a0faf2508d29773627116ee33689cda"
+ }
+}

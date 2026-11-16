@@ -1,0 +1,126 @@
+{
+ "name": "gate-codecs-memory-8154812e",
+ "path": "gate-codecs-memory-8154812e",
+ "retention": "retained",
+ "reason": "Partial sharded gate run at 8154812e under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), kernel 7.0.0-1014-aws: the memory of both codec workload lists, in parts, on Linux AArch64 and 32-bit ARMv7, every observer run's elapsed time recorded, with each shard's build identities, plan, step records and step logs; for the docs/status.md codec rows' memory",
+ "key": "evidence/gate-codecs-memory-8154812e/6ad80f90b4784bea932beae4bab944354a42d34dec581faa97d3b74e5cd2e56f.tar.zst",
+ "sha256": "6ad80f90b4784bea932beae4bab944354a42d34dec581faa97d3b74e5cd2e56f",
+ "bytes": 1746263,
+ "results": [
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-1/memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "693542ed7f095254d8d2c0e0500094a2c7315205c34bf3b2a121c897ccbecd55",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-1/memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "b1b51919b62676afe1f3d9ceca26fe23434a817b9abfe7db065ded531c753b1e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-2/memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "a27c385d9bdd7b470175b385d9db67cba280edb94edafeb8b078703cb34ffc8d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-2/memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "5162ca31ec35ce9c19ac6de6704b27c2d83ac40e996e0d4feec683f8870b63b6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-3/memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "b21038d209cc8a51bc72fc915960be2ba8755035baddd63b103234b3d7933748",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-3/memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "431231837b7320317cf95b4c83c594965f4c3369b8d227bc9221ac991f6c52e3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-4/memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "5e4e5bcfd26fe82ad63bf47ce90890f73af23dbc259fba431a8a538e7c30ce77",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/aarch64/shard-4/memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "a0b87c88a880cf239e898d4ac80054577a5dd3d1825e3b5e8254e38de8ab9845",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-1/memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "448e1c8dfb1d846e22b96f64bfc9d943601f1b171ff00fed86f693ea14e2e643",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-1/memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "1450579d9643b01f794f3bbe0819655eea997d34dcbf559607dda9c1c06d34df",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-2/memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "4942618bf80d4a64c2f51596a177dca77f3cf87ebd6ac3affcbbc959446035a8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-2/memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "37cfbf65b3001927571bea0394f12ef48b3a75b2b64494f906d9e60e4e7b83e9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-3/memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "c1d1ed5cacabaedd68c84b47939c7321d990156cf2f3172face8a956edf0841c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-3/memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "9a9cfda4b4bf837d722609936764f65bd52562672ff14480bd958c9887ad2758",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-4/memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "8859087e631d0f2e998a257ede7de2fdec946e92b95204d2203a74860203eaee",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-codecs-memory-8154812e/armv7/shard-4/memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "eef15ccefa224259d56520b87f35f0d08200734d9b66049b54245f133506ef37",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "8154812e05da374a0f7c173bfd01770d5bd0ca85"
+ }
+}

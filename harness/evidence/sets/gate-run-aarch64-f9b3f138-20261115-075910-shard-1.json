@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-f9b3f138-20261115-075910-shard-1",
+ "path": "gate-run-aarch64-f9b3f138-20261115-075910-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at f9b3f138 on Linux AArch64, c6g.4xlarge, items tests and tests-release on one host from the gate image: the workspace tests, checked and release, pass; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the tests of the closed caption change",
+ "key": "evidence/gate-runs/f9b3f13839e31b8a1c97cb299902e9748acaf9ec-aarch64-20261115-075910/shard-1/07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479.tar.zst",
+ "sha256": "07715774a1e6e3d70b81912dc6498fc8d460285699a999b8351bab2d04da8479",
+ "bytes": 6182289,
+ "results": [
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "43faca389064aa1acddd0e175700ea36b816fbc9e8d880adf9bd9aec2908b352",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "f483b8780feaad991472ba4f31507ca60df981631035259f8855ae102b1904cd",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+ }
+}

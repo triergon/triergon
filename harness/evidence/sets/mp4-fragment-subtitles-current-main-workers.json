@@ -1,0 +1,9 @@
+{
+ "name": "mp4-fragment-subtitles-current-main-workers",
+ "path": "mp4-fragment-subtitles-current-main-workers",
+ "retention": "retained",
+ "reason": "Compare MP4 range workers after the caption changes",
+ "key": "evidence/mp4-fragment-subtitles-current-main-workers/5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875.tar.gz",
+ "sha256": "5baf97ff731c7af0956f82da9a3085acc2dccb81fb19bd65e40f929cdc5e5875",
+ "bytes": 25576885
+}

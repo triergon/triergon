@@ -1,0 +1,140 @@
+{
+ "name": "gate-run-armv7-4d31df88",
+ "path": "gate-run-armv7-4d31df88",
+ "retention": "retained",
+ "reason": "A partial gate run at 4d31df88 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image with the ogg-reader-inputs set unpacked at the repository root, items codecs, codec-workloads and its five memory parts, codec-file-workloads and its three memory parts, isobmff-1, isobmff-2, isobmff-3, isobmff-reader, isobmff-seek and ogg-readers: the shard's outputs as tools/gate-host.sh writes them, with its summary and host log; every step passes but isobmff-seek (measured again at 00159785), and the codec timing and memory are diagnostics on this target; for the ARMv7 codec, ISO BMFF, ISO BMFF reader and Ogg reader rows and the reuse of their results",
+ "key": "evidence/gate-run-armv7-4d31df88/840ad51a537eb0b05aea13fa2597836c4b1e5301f6eb01e884399f6003b128cb.tar.zst",
+ "sha256": "840ad51a537eb0b05aea13fa2597836c4b1e5301f6eb01e884399f6003b128cb",
+ "bytes": 22625326,
+ "results": [
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "a08d322db130759cf8d1b93d33d2c100ba0362d8d86289b181e19186f0ac0c1c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "ba2c7c78ad7b6bdc13aee4894fa6dc6a64c36b86790a565cd12c2c92610335b4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "3f055247e6e246fe7ae68339a08a9fe749c7440a2e2e7df3c02f066d8634a3d3",
+   "status": 0,
+   "report_sha256": "f7c224bbe21f221dbc1e9d9a2ef6b094e1e651d1f1ec2043e32f79d5859c41dc"
+  },
+  {
+   "path": "benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "9b62a99a67181bbacdcf0b85682efa452ab61dcedfa7825f54f62325560a2796",
+   "status": 0,
+   "report_sha256": "eaffa9974cec70e7145a4044e383dd059e27be6ece2573db5ae57233e502c5dc"
+  },
+  {
+   "path": "benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "940ba20b294eb1b6ebe5b575001e6066cff5e9947fd998c29b3e99be2b3fc44d",
+   "status": 0,
+   "report_sha256": "4fbeb834153cecb0d7dec7f964ecb29ad700824ff472810c541a4354f92092f3"
+  },
+  {
+   "path": "benchmark/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --benchmark",
+   "key": "1c1baa16d3d4dffd3616adb531ca958df5366cf3176ca3f744467b527f074a2a",
+   "status": 1,
+   "report_sha256": "e1b3037d01eb4aba3a8939aa30baf210d8bcfdb7d4b953cfd19f44c4af0c703c"
+  },
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "9a8785fc5788bf7a18e0c6238f87be5f13e3974baf5ff5500d122f87ab4a5229",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "4d596d4e2de85d5f0c782c32aae725cbfe6683e0de5232992a2e8a7367989387",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "f3a8e3346e24429c8049ca6fa07bbd7be3f40bf46bedcc7782368307f4c955c9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "574f144386205796de3fdacf0e4c3d59fd2d574614d14fa8bc1e4341b30ba49e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "b2bcc5c729afc5127149b80ac7d15e102872b180b85df72fd6305fe68d18d1b6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "ad9bebf243da812277297893e15523c221aa4b3d0d208e656c1f9f5c39ac91ec",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "fff3a3e99b26f09361874fafda1a3674db6780f29fe519cd7353fd56a635c7d5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "397a5a2a79768eb905a0025f36e2b439ff2a878cc4bf94244b39137e6501ccb3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "6bfd25d5802025baf680ff365d01b3abf3ddadd70fe732eef2cf75f0c734a445",
+   "status": 0,
+   "report_sha256": "4d0efe11296a6111ffc49da394c479ba275ca5a724f7dcc283716ed45ed7bf4f"
+  },
+  {
+   "path": "memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "203a78f279eb36b66479170fa7a8a08d9ef5f84b7581e8a04311e308c9a571ff",
+   "status": 0,
+   "report_sha256": "5370897fe144197fabf2d718d2f3a9acb78f5e32e00f1439199dc52a5a1c0840"
+  },
+  {
+   "path": "memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "d28642041d6c5535a530f089c6e40f03d4d7dfb6f705c3dda7870433fe52dbc9",
+   "status": 0,
+   "report_sha256": "9f36bf0d09ae50d2ea41cb161f9a685b25edef6eaadbcd149953ddcb028d58b1"
+  },
+  {
+   "path": "memory/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --memory",
+   "key": "14fa17be66eeb5e41c74e2d702f41ced438c973c4077a049c2a0b2198f952cb3",
+   "status": 1,
+   "report_sha256": "7102c6a435f26eb72fe88a8d5558eb8b1797542bdcb9ab9a2ab972e2f8c50782"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "4d31df88e5805ec85b2d858f12b9ac7a0ae11a5c"
+ }
+}

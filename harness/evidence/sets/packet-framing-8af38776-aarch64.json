@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-8af38776-aarch64",
+ "retention": "retained",
+ "reason": "AArch64 packet-framing comparison with shared Annex B copying",
+ "key": "evidence/packet-framing-8af38776-aarch64/cec526c3298fa4b55f865d432145d0d496ad45290fc97f4aa5642660bb529540.tar.zst",
+ "sha256": "cec526c3298fa4b55f865d432145d0d496ad45290fc97f4aa5642660bb529540",
+ "bytes": 26806037,
+ "source_revisions": {
+  "candidate": "8af387768d9af93a1e2f6d81a6d4141e7e8db1cd"
+ }
+}

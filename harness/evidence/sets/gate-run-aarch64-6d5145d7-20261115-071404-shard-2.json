@@ -1,0 +1,44 @@
+{
+ "name": "gate-run-aarch64-6d5145d7-20261115-071404-shard-2",
+ "path": "gate-run-aarch64-6d5145d7-20261115-071404-shard-2",
+ "retention": "retained",
+ "reason": "A partial gate run at 6d5145d7 on Linux AArch64, c6g.4xlarge, items subtitle-cc, tests and tests-release on two hosts, of which this shard ran subtitle-cc (with the worker tests and the core time test) from the gate image with evidence set subtitle-cc-inputs unpacked at the repository root before the host got ready: 461/461 caption cases pass timing, memory and the grade; its checked tests failed only on the manifest membership test's count of 449 caption cases, corrected in f9b3f138; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the closed caption row",
+ "key": "evidence/gate-runs/6d5145d7f31b002c72f9815130b522964d2abb64-aarch64-20261115-071404/shard-2/7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497.tar.zst",
+ "sha256": "7c9c1afadc396331987d6bee144a7e4bb28a46c36b41d012d5cde95880100497",
+ "bytes": 59347851,
+ "results": [
+  {
+   "path": "memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "cbccdf6d3ff2a9b2d7899cc85f2ac97384aadffad5d76d56105a84c81dd2f944",
+   "status": 0,
+   "report_sha256": "a9ab6b73961ab8656a18a0b2bb2474dfdc014d9c32fe4f4321f9dfc6eb9d564c",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "69a44be35ea8831b6e7fd5254b9477b258dff204d5e62d82fe64f7201242c514",
+   "status": 0,
+   "report_sha256": "a79186ef33b834257e4f1506d31233c6dc91dab6aa5784f70068c6ebe4fedf17",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "77cc6b387507201c794014abdb4d321834c2464920b1830d3ffd3fd901e9c3f4",
+   "status": 0,
+   "report_sha256": "8adb189196e38ca7889603f2982c748109f9c483e3a768440e3d4b0a7216573c"
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "ec64228d264919f4f588d567235178acae5a2139265a5c8abb280ceb8cfa4b3a",
+   "status": 101,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6d5145d7f31b002c72f9815130b522964d2abb64"
+ }
+}

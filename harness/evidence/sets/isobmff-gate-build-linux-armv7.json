@@ -1,0 +1,10 @@
+{
+ "name": "isobmff-gate-build-linux-armv7",
+ "path": "isobmff-gate-build-linux-armv7",
+ "retention": "retained",
+ "reason": "32-bit ARMv7 ISO BMFF status row: all 1,020 open and index comparisons with timing and memory for the 972 output labels, with the CPU, kernel and user-space package list",
+ "key": "evidence/isobmff-gate-build-linux-armv7/ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691.tar.gz",
+ "sha256": "ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691",
+ "bytes": 2605870759,
+ "source_revision": "9621f6063a2e517fecc1c28757e6bed50b5228a8"
+}

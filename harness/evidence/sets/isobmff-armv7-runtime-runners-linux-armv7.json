@@ -1,0 +1,10 @@
+{
+ "name": "isobmff-armv7-runtime-runners-linux-armv7",
+ "path": "isobmff-armv7-runtime-runners-linux-armv7",
+ "retention": "retained",
+ "reason": "ISO BMFF ARMv7 runtime change, 32-bit ARMv7: 30-pair screens of every contract the core change reaches against the base worker on the gate build, the MP4 forward and TS program gates with their profiles, with the CPU, kernel and user-space package list",
+ "key": "evidence/isobmff-armv7-runtime-runners-linux-armv7/fe4098d3c3812710cc17b7b78155f2ee87eba366ce3bbe3d9de9569631bd7106.tar.gz",
+ "sha256": "fe4098d3c3812710cc17b7b78155f2ee87eba366ce3bbe3d9de9569631bd7106",
+ "bytes": 531449971,
+ "source_revision": "4c823f7f74419cbfb9c8220a72b4684931c621f9"
+}
