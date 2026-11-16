@@ -700,6 +700,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | HLS segments, earlier comparison | `5ec7c1f8a7816b1427631f22a8ca77ba74abeeee` | `fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d` |
 | Earlier: packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
 | MP4 forward and range playback with a leading empty AVC edit | `f16392a95cd03c7ef2b90445baa994e637ca3ead` | `f62922f9609fda3ae29dd1d3053a9e2917e5d5a94333a4caa3e0db29c993365c` |
+| MP4 range playback with a track shorter than the movie | `df8e76b816e05904db6b3c57615ef8f235dd50b3` | `c931c162d04fdbde96b7a9cc2272fb0b22134aadbf44d749c684aedd952944db` |
 | MP4 range playback with an initial non-sync prefix | `e35e3584f748a9dd6a4bc41e8de826b682c688e0` | `35b353d845a9a414bad2fcd862a5e22e23000c2d98711aee2cb8bfe9febc3063` |
 | MP4 range playback with fragmented subtitles | `766961a481106e878705bcb43a438c24725869e0` | `7b6e9c9b7f078554882d60869a07068fcec65ce1e4271f69db3f15e9de147bcf` |
 | MP4 range playback earlier fragmented subtitle comparison | `b42e33df742854373b2aba84decd086481aa8af6` | `5093aa38db9a01fb644488dafb2924b602d855825e16ff9052568f5e13abc1d5` |
