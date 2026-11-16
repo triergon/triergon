@@ -1,0 +1,154 @@
+{
+ "name": "gate-run-armv7-f8e1c4d9-20261116-084029-shard-3",
+ "path": "gate-run-armv7-f8e1c4d9-20261116-084029-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run at f8e1c4d9 under static-toolchain-runtime-trained-order-v1 of the 33 capture, Matroska, subtitle, test and external-vector items, shard 3 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, 32-bit ARMv7: the shard's items (subtitle-pgs, capture-c04-motion-960, capture-c03-ui-transition-960, subtitle-pgs-capsules, subtitle-teletext, matroska-cues-preroll, matroska-header-removal), timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md capture, Matroska and subtitle rows on 32-bit ARMv7",
+ "key": "evidence/gate-runs/f8e1c4d9136d5a43661d8f069ca0908e07cb2acc-armv7-20261116-084029/shard-3/93267497404a699167cff41b70f85f6726cd9067f6e8820c6f29f3f616b5ed05.tar.zst",
+ "sha256": "93267497404a699167cff41b70f85f6726cd9067f6e8820c6f29f3f616b5ed05",
+ "bytes": 366822055,
+ "results": [
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "60e4f93f2acaf7d477c306b3f4b7901741556f7bd85a6c00712e7dd305f89c7b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "8f3cd5ff3c94d00d2c8066264b955019522345e34d2f7d0034763a339b07095f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --memory",
+   "key": "bfb7eac81ef7273aaf98a7215d2d36fee740b15f1d21582d18d6a9a8b3be5d0e",
+   "status": 0,
+   "report_sha256": "a3b329599c105449d408f56137578d979535e7bb1c31e949eb484d2f4f6b4a04",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "30be1cd38e9110df5086767d4e845f3da9140a10ce665e2c46c3ac444a6f96ac",
+   "status": 0,
+   "report_sha256": "f4463f1d6f5ba24c1db31d61951051d15d47e123dc1acacc95f2499cdcc8f9e5",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "078d7150c04f95da7290bfad69ba09896759b5069c805a58763fe39874c6c364",
+   "status": 0,
+   "report_sha256": "9205b0f59f876ab8629188f6a64d38fdccdacb8222ccfcf0c4c0d70477d90f9d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-header-removal/gate-result.json",
+   "command": "report --memory",
+   "key": "4f677450921aa5c44dc5d470e1b19c3da5ac6ebd07f38d1102a9540d1af9f1d4",
+   "status": 0,
+   "report_sha256": "01968a0168c7e03f620b1f2c4ffa8f1ea682058a1e3b4f9411a5298aef14031c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "fd7234d4c064549257c73a5f836cdab6774e6606cc5469beaa2fa7c956ec8c2a",
+   "status": 0,
+   "report_sha256": "eefaa9c534064ea20721533de35ed86b8f45318494c9a76187d84f559a6feb94",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "98abee651fab9b0057559d609bd0ae5b16d93dcfe480edf6fb771a55728d4e1a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2f800a976c24e46a521efc8cdf4e1c4ed4132e1fadb876549d1a33b4317e76a0",
+   "status": 0,
+   "report_sha256": "51645487bd18abbb0617653222e336d2e060444eb3c740cca259220c974adb64",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "503668b16695ed964c0e335bbd88784d6e935b3f6ea1ff8b9d0ffe0cf9914e8d",
+   "status": 0,
+   "report_sha256": "e3dde8dacf8e02843ce7ab0b3f68caaf7f5678357195ee8c8c3da4ea8cd1c0b9",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0c3a52673fd84d572ba5fb350f3ff744eb713023ea39ad715699f08a4a7c452f",
+   "status": 0,
+   "report_sha256": "87ae276ea231f3cf8219b42daf9c2dbb8d32bcf7fb951f5698fcb30d3cb9fb1d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-header-removal/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9ac523d6c6d28c9436f2b421e3f5f8486bf8e35bbc4087fc35f6f2dcb2b67a67",
+   "status": 0,
+   "report_sha256": "a3d2b8702e3184e0629e48574e5156308bd88880eb7abcf36feea1adf7717192",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e793e93deadf949475752e5f39c009769cd3caf91b66a9112ac86cce4ecf15ee",
+   "status": 0,
+   "report_sha256": "83d0f800b2643256cf89f224d13fa097754748d3cfaf50bdd51c50eb7581f064",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-pgs-capsules/gate-result.json",
+   "command": "grade",
+   "key": "4ec67706e8a069f621d3d2b1c83e5d0174cf2d5982c3b968437dd6025cf6a39d",
+   "status": 0,
+   "report_sha256": "1af4e598615e24ebd717eb61619eb249c816c38f49e1ebb8535191227eeeac64"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "9cded36a95c258099af128886b200cfc962f4c17531c2f67acf12535488da71a",
+   "status": 0,
+   "report_sha256": "8a000e7536def0a4f83420e73d6ab0125267e11a07fa26299a4f6d5f7c40ae00"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "f8f6a6cb8a486189c79452bbcf8c59495634259ed0222584fdea0eebbfedf607",
+   "status": 0,
+   "report_sha256": "4e40fe83ade3cb2f7588ab7025a68b3811b2864fda31799fb201354f8cb80bef"
+  },
+  {
+   "path": "graded/matroska-header-removal/gate-result.json",
+   "command": "grade",
+   "key": "2a85d83da75f005b79009caa62cee123aa784dd591b0c874595e6450e68bf20e",
+   "status": 0,
+   "report_sha256": "ae6c5c21be2f26ee79b0b7563c6649351e7710f013a4e77d5d70d0065e6531f0"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "0c46fef79b8b0f83a5ec21160416730451a01130a5b8d55ca5282e7abca0b6e9",
+   "status": 0,
+   "report_sha256": "efed62d2200938506d571962eec35f4414fa3cbbed3d899249fba94d6cd6f219"
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "433189d8c3787531ae05d9f23a9f7a56242c708eb2b714e1231a62e45890d648",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-aarch64-f8e1c4d9-20261116-095854-shard-2",
+ "path": "gate-run-aarch64-f8e1c4d9-20261116-095854-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at f8e1c4d9 under static-toolchain-runtime-trained-order-v1 of capture-c06, c08 and c11, shard 2 of 3, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, Linux AArch64: the shard's items (capture-c06-ui-scroll-960-bottomup), timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md capture, Matroska and subtitle rows on Linux AArch64; it measures the three capture cases whose timing in the run of all 33 items followed the release tests' rebuild of the capture worker",
+ "key": "evidence/gate-runs/f8e1c4d9136d5a43661d8f069ca0908e07cb2acc-aarch64-20261116-095854/shard-2/3f6038c74e3357cc0730af234a1714b767b56d03bff426b64b5cee65cc4315a6.tar.zst",
+ "sha256": "3f6038c74e3357cc0730af234a1714b767b56d03bff426b64b5cee65cc4315a6",
+ "bytes": 8638189,
+ "results": [
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "6094ab87ca0d89b79fed06479ff3e75f42f8b967ff6639c455a5a31c885f402d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c26264ced205bdf4c5157089bf74ec0489cf77fbf015519a0dd1f68b9539f4d5",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

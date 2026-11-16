@@ -85,29 +85,44 @@ fn bounded_rational(value: f64) -> Result<[i64; 2]> {
         )
     };
     let original = (n, d);
-    let (mut p0, mut q0, mut p1, mut q1) = (0_u128, 1_u128, 1_u128, 0_u128);
+    // Convergents above MAX end the expansion, so they are kept in saturating
+    // 64-bit arithmetic: saturation only lowers values already above MAX.
+    const LIMIT: u64 = MAX as u64;
+    let (mut p0, mut q0, mut p1, mut q1) = (0_u64, 1_u64, 1_u64, 0_u64);
     loop {
-        let a = n / d;
-        let p2 = p0 + a * p1;
-        let q2 = q0 + a * q1;
-        if p2 > MAX || q2 > MAX {
-            let pn = (MAX - p0).checked_div(p1).unwrap_or(MAX);
-            let qn = (MAX - q0).checked_div(q1).unwrap_or(MAX);
+        let (a, remainder) = div_rem(n, d);
+        let a = u64::try_from(a).unwrap_or(u64::MAX);
+        let p2 = a.saturating_mul(p1).saturating_add(p0);
+        let q2 = a.saturating_mul(q1).saturating_add(q0);
+        if p2 > LIMIT || q2 > LIMIT {
+            let pn = (LIMIT - p0).checked_div(p1).unwrap_or(LIMIT);
+            let qn = (LIMIT - q0).checked_div(q1).unwrap_or(LIMIT);
             let k = pn.min(qn);
             let (p, q) = (p0 + k * p1, q0 + k * q1);
-            let error = |p: u128, q: u128| (original.0 * q).abs_diff(original.1 * p);
-            return if q1 != 0 && error(p1, q1) * q <= error(p, q) * q1 {
+            let error =
+                |p: u64, q: u64| (original.0 * u128::from(q)).abs_diff(original.1 * u128::from(p));
+            return if q1 != 0 && error(p1, q1) * u128::from(q) <= error(p, q) * u128::from(q1) {
                 Ok([p1 as i64, q1 as i64])
             } else {
                 Ok([p as i64, q as i64])
             };
         }
-        let remainder = n % d;
         if remainder == 0 {
             return Ok([p2 as i64, q2 as i64]);
         }
         (p0, q0, p1, q1) = (p1, q1, p2, q2);
         (n, d) = (d, remainder);
+    }
+}
+
+/// `n / d` and `n % d`, in 64-bit arithmetic once both fit. Only a value below
+/// 2⁻¹¹ has a denominator wider than 64 bits, and after its first two terms every
+/// remainder is below its 53-bit significand.
+#[cfg(feature = "reference-trace")]
+fn div_rem(n: u128, d: u128) -> (u128, u128) {
+    match (u64::try_from(n), u64::try_from(d)) {
+        (Ok(n), Ok(d)) => (u128::from(n / d), u128::from(n % d)),
+        _ => (n / d, n % d),
     }
 }
 
@@ -202,6 +217,59 @@ mod tests {
         );
         for x in [f64::NAN, f64::INFINITY, -1., f64::MAX] {
             assert!(bounded_rational(x).is_err());
+        }
+    }
+
+    /// The same bounded continued fraction of a positive normal value, in 128-bit
+    /// arithmetic throughout.
+    fn wide_bounded_rational(value: f64) -> [i64; 2] {
+        const MAX: u128 = i32::MAX as u128;
+        let bits = value.to_bits();
+        let significand = u128::from((bits & ((1_u64 << 52) - 1)) | (1_u64 << 52));
+        let shift = 1023 + 52 - ((bits >> 52) & 0x7ff) as u32;
+        let (mut n, mut d) = (significand, 1_u128 << shift);
+        let original = (n, d);
+        let (mut p0, mut q0, mut p1, mut q1) = (0_u128, 1_u128, 1_u128, 0_u128);
+        loop {
+            let a = n / d;
+            let (p2, q2) = (p0 + a * p1, q0 + a * q1);
+            if p2 > MAX || q2 > MAX {
+                let k = ((MAX - p0).checked_div(p1).unwrap_or(MAX))
+                    .min((MAX - q0).checked_div(q1).unwrap_or(MAX));
+                let (p, q) = (p0 + k * p1, q0 + k * q1);
+                let error = |p: u128, q: u128| (original.0 * q).abs_diff(original.1 * p);
+                let first = q1 != 0 && error(p1, q1) * q <= error(p, q) * q1;
+                return if first { [p1, q1] } else { [p, q] }.map(|v| v as i64);
+            }
+            if n % d == 0 {
+                return [p2 as i64, q2 as i64];
+            }
+            (p0, q0, p1, q1) = (p1, q1, p2, q2);
+            (n, d) = (d, n % d);
+        }
+    }
+
+    #[test]
+    fn narrow_arithmetic_matches_the_wide_expansion() {
+        let low = (0.5 / i32::MAX as f64).to_bits() + 1;
+        let high = (i32::MAX as f64).to_bits();
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut values: Vec<f64> = (0..200_000)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                f64::from_bits(low + state % (high - low))
+            })
+            .collect();
+        values.extend((1..=2000).map(|k| f64::from(k) / 2000.));
+        values.extend((1..=1000).map(|k| f64::from(k as f32 / 1000.)));
+        for x in values {
+            assert_eq!(
+                bounded_rational(x).unwrap(),
+                wide_bounded_rational(x),
+                "{x:e}"
+            );
         }
     }
 }

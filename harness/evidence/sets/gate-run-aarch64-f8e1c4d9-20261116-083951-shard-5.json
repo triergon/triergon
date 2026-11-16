@@ -1,0 +1,127 @@
+{
+ "name": "gate-run-aarch64-f8e1c4d9-20261116-083951-shard-5",
+ "path": "gate-run-aarch64-f8e1c4d9-20261116-083951-shard-5",
+ "retention": "retained",
+ "reason": "Partial gate run at f8e1c4d9 under static-toolchain-runtime-trained-order-v1 of the 33 capture, Matroska, subtitle, test and external-vector items, shard 5 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, Linux AArch64: the shard's items (capture-c14-motion-960-rate255, capture-c12-motion-960-1m, subtitle-dvb, capture-c15-noise-480-bottomup, capture-c07-ui-static-480-bottomup, capture-c10-ui-transition-480-topdown, subtitle-dvd-host), timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md capture, Matroska and subtitle rows on Linux AArch64",
+ "key": "evidence/gate-runs/f8e1c4d9136d5a43661d8f069ca0908e07cb2acc-aarch64-20261116-083951/shard-5/2b596cc87144af2d43994fd15fb87fefc63eff4062b5e0227e4032807f999212.tar.zst",
+ "sha256": "2b596cc87144af2d43994fd15fb87fefc63eff4062b5e0227e4032807f999212",
+ "bytes": 600368277,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "a9abbde6ebce5bf34dabdda86ef0bf78bc6764f241055ff188e1c0f9c971b719",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "58f9f58ace686765de0a917d54c0d6c49921e7e5e56772974e1751a52785e727",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5b649515d3afef0764be74a7185ac11755f19302d92587977ff6310e1b9cd9ed",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "bcacc8f15de9269ed3540b60e0df8676411fb9109b085a4bac7be36b601b91dd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "df8162399f5ae9680785bd2b7b16d1056bb4dc8353b70dbaa80145c4185f4bcf",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "4018e706595e8ebb210c1c0236bb39e5e60c897da4bc495c746dd71e7f6260e6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "26c6724934ba20e9f7079c6f8e86d2f54d8abd17dcf1f4036c3673101d735fda",
+   "status": 0,
+   "report_sha256": "4a5f25045ee33e9d32b755cbdac2d32a7e30593e4fb89642f33505d23499b755",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "0ec87b53956b20c113377cb1f35665cbf2b3d196665fc2bdca588fc5d0486ca4",
+   "status": 0,
+   "report_sha256": "9b24c1b5e0cc10b0fab5ab17c485b90b44f0558bed679cb0de3beaf546b3e9e4",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "213176a4d67cc1d3aeebbb52ff94a14168b36d50a17b16f0ff59bc9f321c58be",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "be3dda82d7cae2602f3e36d83a7599f1a871a1f3f6bc21973b2987cc2953f441",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "43a8fcf6b9c735026b2c50a525432c5da37997dd6bbdde8659bfceca38e0edfc",
+   "status": 0,
+   "report_sha256": "20790681f9aafd14ad4b5eb60f212871e0820a215531416de58c25434e189937",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9290ce58d719bd3e3bb997a1013e67281f9bbbd16ba91722d573c0b1aa2d0584",
+   "status": 0,
+   "report_sha256": "f76d254f0960b70b55b0633334691a089d5fc323b9b2b62801974ece83b25562",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "578473d9122280d73054e65ce2582479276737efa22691af62e5458258571d0b",
+   "status": 1,
+   "report_sha256": "e8398acd29b585542a0749bad5d718eb1172e10f6e0288407580854243313006"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "4b2720de21d36dc78a0ca22f7b4e2370fe46c46b58038b5cbfeaed13482da852",
+   "status": 0,
+   "report_sha256": "0d6cea93f75fbea1af2ffce1be07ddba981af0e8e171a701ccd02fdd7ef3082d"
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "8dd1ca41c7d1ca5c39ff04ab1c28d659be864dd083db40c8a008369160b5cd86",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b64098cacdf682f59827b47ac01be7b9b0722027df6ad574c8f94a2384bb29be",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

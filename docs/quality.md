@@ -1023,7 +1023,8 @@ evidence index (which a promotion changes) and `docs/`, and the test inputs the 
 tests read when present (`.research/fate-samples`, `.research/flac-generated`,
 `.research/flac-test-files`). The few tests that read the evidence index skip the reused
 run and run on every `gate test`, so a failing index is never reused as a pass. The gate
-runs each profile once. The `checked` profile
+runs each profile once. The release tests build in `target/gate-tests`, so they never
+rebuild the gate build's workers that later steps on the same host time. The `checked` profile
 is the release optimisation with every overflow check and every `debug_assert!` and
 `#[cfg(debug_assertions)]` item of a debug build, so the same 4,429 tests run; it loses
 only the unoptimised build's larger stack frames, which bring stack depth problems out

@@ -154,7 +154,7 @@ fn nonzero(levels: &[i32; 64]) -> u64 {
 
 /// Iterate the set bits of `mask`, lowest first.
 #[inline]
-fn bits(mut mask: u64) -> impl Iterator<Item = usize> {
+pub(crate) fn bits(mut mask: u64) -> impl Iterator<Item = usize> {
     std::iter::from_fn(move || {
         (mask != 0).then(|| {
             let i = mask.trailing_zeros() as usize;
@@ -175,7 +175,9 @@ fn oddify_saturate(v: i32) -> i32 {
 }
 
 /// Reconstruct intra coefficients: DC from its 8-bit quantised value, AC by
-/// (2·QF·q·W)/16 truncated toward zero, oddified and saturated.
+/// (2·QF·q·W)/16 truncated toward zero, oddified and saturated. Only the DC
+/// and the positions in `mask` are written; [`idct`](crate::dct::idct) reads no
+/// others.
 #[inline]
 pub(crate) fn dequant_intra(
     levels: &[i32; 64],
@@ -184,7 +186,6 @@ pub(crate) fn dequant_intra(
     scale: u32,
     out: &mut [i32; 64],
 ) {
-    out.fill(0);
     out[0] = dc * 8;
     for i in bits(mask) {
         out[i] = oddify_saturate((2 * levels[i] * scale as i32 * INTRA_MATRIX[i] as i32) / 16);
@@ -192,10 +193,9 @@ pub(crate) fn dequant_intra(
 }
 
 /// Reconstruct non-intra coefficients: ((2·QF + sign)·q·16)/16, oddified and
-/// saturated.
+/// saturated. Only the positions in `mask` are written.
 #[inline]
 pub(crate) fn dequant_inter(levels: &[i32; 64], mask: u64, scale: u32, out: &mut [i32; 64]) {
-    out.fill(0);
     for i in bits(mask) {
         let l = levels[i];
         out[i] = oddify_saturate((2 * l + l.signum()) * scale as i32);
