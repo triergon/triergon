@@ -5,85 +5,195 @@
 use crate::tables::kbd_window;
 use core::f64::consts::PI;
 
-/// In-place complex inverse FFT (z[n] = sum Z[k] e^{+j 2 pi k n / N}) for a fixed size.
+/// 1/sqrt(2), the real and imaginary part of the eighth root of unity.
+const H: f32 = core::f32::consts::FRAC_1_SQRT_2;
+
+/// Complex inverse FFT (Z(n) = sum z(k) e^{+j 2 pi k n / N}) of N = 16 B points, B = 8 for
+/// N = 128 and B = 4 for N = 64: B-point DFTs of the inputs in digit-reversed order, then
+/// two radix-4 decimation-in-time passes (J. W. Cooley and J. W. Tukey, "An algorithm for
+/// the machine calculation of complex Fourier series", 1965; the eight-point kernel as in
+/// G. D. Bergland, "A fast Fourier transform algorithm using base 8 iterations", 1968).
+/// Every pass reads and writes each point once, so the transform makes three passes over
+/// memory instead of a radix-2 transform's six, and the pre- and post-twiddles ride along
+/// with the first and the last pass.
 #[derive(Debug)]
 struct Fft<const N: usize> {
-    bitrev: [u8; N],
-    /// Twiddles for every stage, stage with half-size h at [h..2h].
-    tw_re: [f32; N],
-    tw_im: [f32; N],
+    /// cos and sin of 2 pi q k / L for q = 1..3, for the pass of length L at [L/4 + k].
+    cos: [[f32; N]; 3],
+    sin: [[f32; N]; 3],
 }
 
 impl<const N: usize> Fft<N> {
     fn new() -> Self {
-        let bits = N.trailing_zeros();
-        let mut bitrev = [0u8; N];
-        for (i, b) in bitrev.iter_mut().enumerate() {
-            *b = ((i as u32).reverse_bits() >> (32 - bits)) as u8;
-        }
-        let mut tw_re = [0f32; N];
-        let mut tw_im = [0f32; N];
-        let mut h = 1;
-        while h < N {
-            for k in 0..h {
-                let a = PI * k as f64 / h as f64;
-                tw_re[h + k] = a.cos() as f32;
-                tw_im[h + k] = a.sin() as f32;
+        let mut cos = [[0f32; N]; 3];
+        let mut sin = [[0f32; N]; 3];
+        for l in [N / 4, N] {
+            for k in 0..l / 4 {
+                for q in 0..3 {
+                    let a = 2.0 * PI * ((q + 1) * k) as f64 / l as f64;
+                    cos[q][l / 4 + k] = a.cos() as f32;
+                    sin[q][l / 4 + k] = a.sin() as f32;
+                }
             }
-            h *= 2;
         }
-        Fft {
-            bitrev,
-            tw_re,
-            tw_im,
+        Fft { cos, sin }
+    }
+
+    /// Transforms the points `z(k)`, k = 0..N, and passes output n multiplied by `post`
+    /// (cos, sin) at n to `emit`. `re` and `im` are the work space.
+    #[inline(always)]
+    fn run(
+        &self,
+        z: impl Fn(usize) -> Complex,
+        post: (&[f32; N], &[f32; N]),
+        emit: impl FnMut(usize, Complex),
+        re: &mut [f32; N],
+        im: &mut [f32; N],
+    ) {
+        if N == 128 {
+            dft8_pass(z, re, im);
+        } else {
+            dft4_pass(z, re, im);
+        }
+        self.radix4_pass(N / 4, re, im);
+        self.last_pass(post, emit, re, im);
+    }
+
+    /// Combines four DFTs of length L/4 at each multiple of L into one of length L.
+    #[inline(always)]
+    fn radix4_pass(&self, l: usize, re: &mut [f32; N], im: &mut [f32; N]) {
+        let q = l / 4;
+        let (c, s) = (&self.cos, &self.sin);
+        for (re, im) in re.chunks_exact_mut(l).zip(im.chunks_exact_mut(l)) {
+            let [r0, r1, r2, r3] = quarters(re, q);
+            let [i0, i1, i2, i3] = quarters(im, q);
+            for k in 0..q {
+                let a1 = cmul((r1[k], i1[k]), (c[0][q + k], s[0][q + k]));
+                let a2 = cmul((r2[k], i2[k]), (c[1][q + k], s[1][q + k]));
+                let a3 = cmul((r3[k], i3[k]), (c[2][q + k], s[2][q + k]));
+                let x = dft4((r0[k], i0[k]), a1, a2, a3);
+                (r0[k], i0[k]) = x[0];
+                (r1[k], i1[k]) = x[1];
+                (r2[k], i2[k]) = x[2];
+                (r3[k], i3[k]) = x[3];
+            }
         }
     }
 
-    /// Input must already be in bit-reversed order.
-    #[inline]
-    fn run(&self, re: &mut [f32; N], im: &mut [f32; N]) {
-        // Stage h = 1 and h = 2 as one radix-4 pass (no multiplications).
-        let mut s = 0;
-        while s < N {
-            let (a0r, a0i) = (re[s], im[s]);
-            let (a1r, a1i) = (re[s + 1], im[s + 1]);
-            let (a2r, a2i) = (re[s + 2], im[s + 2]);
-            let (a3r, a3i) = (re[s + 3], im[s + 3]);
-            let (b0r, b0i) = (a0r + a1r, a0i + a1i);
-            let (b1r, b1i) = (a0r - a1r, a0i - a1i);
-            let (b2r, b2i) = (a2r + a3r, a2i + a3i);
-            let (b3r, b3i) = (a2r - a3r, a2i - a3i);
-            // multiply b3 by +j (inverse transform)
-            let (c3r, c3i) = (-b3i, b3r);
-            re[s] = b0r + b2r;
-            im[s] = b0i + b2i;
-            re[s + 2] = b0r - b2r;
-            im[s + 2] = b0i - b2i;
-            re[s + 1] = b1r + c3r;
-            im[s + 1] = b1i + c3i;
-            re[s + 3] = b1r - c3r;
-            im[s + 3] = b1i - c3i;
-            s += 4;
+    /// The final radix-4 pass (length N) with the post-twiddle of every output.
+    #[inline(always)]
+    fn last_pass(
+        &self,
+        (pc, ps): (&[f32; N], &[f32; N]),
+        mut emit: impl FnMut(usize, Complex),
+        re: &mut [f32; N],
+        im: &mut [f32; N],
+    ) {
+        let q = N / 4;
+        let (c, s) = (&self.cos, &self.sin);
+        let [r0, r1, r2, r3] = quarters(re, q);
+        let [i0, i1, i2, i3] = quarters(im, q);
+        let [pc0, pc1, pc2, pc3] = quarters_of(pc, q);
+        let [ps0, ps1, ps2, ps3] = quarters_of(ps, q);
+        for k in 0..q {
+            let a1 = cmul((r1[k], i1[k]), (c[0][q + k], s[0][q + k]));
+            let a2 = cmul((r2[k], i2[k]), (c[1][q + k], s[1][q + k]));
+            let a3 = cmul((r3[k], i3[k]), (c[2][q + k], s[2][q + k]));
+            let x = dft4((r0[k], i0[k]), a1, a2, a3);
+            emit(k, cmul(x[0], (pc0[k], ps0[k])));
+            emit(q + k, cmul(x[1], (pc1[k], ps1[k])));
+            emit(2 * q + k, cmul(x[2], (pc2[k], ps2[k])));
+            emit(3 * q + k, cmul(x[3], (pc3[k], ps3[k])));
         }
-        let mut h = 4;
-        while h < N {
-            let twr = &self.tw_re[h..2 * h];
-            let twi = &self.tw_im[h..2 * h];
-            let mut g = 0;
-            while g < N {
-                let (lo_r, hi_r) = re[g..g + 2 * h].split_at_mut(h);
-                let (lo_i, hi_i) = im[g..g + 2 * h].split_at_mut(h);
-                for k in 0..h {
-                    let tr = hi_r[k] * twr[k] - hi_i[k] * twi[k];
-                    let ti = hi_r[k] * twi[k] + hi_i[k] * twr[k];
-                    hi_r[k] = lo_r[k] - tr;
-                    hi_i[k] = lo_i[k] - ti;
-                    lo_r[k] += tr;
-                    lo_i[k] += ti;
-                }
-                g += 2 * h;
-            }
-            h *= 2;
+    }
+}
+
+/// The four consecutive quarters of length `q` of `v`.
+#[inline(always)]
+fn quarters(v: &mut [f32], q: usize) -> [&mut [f32]; 4] {
+    let (a, v) = v.split_at_mut(q);
+    let (b, v) = v.split_at_mut(q);
+    let (c, d) = v.split_at_mut(q);
+    [a, b, c, &mut d[..q]]
+}
+
+#[inline(always)]
+fn quarters_of(v: &[f32], q: usize) -> [&[f32]; 4] {
+    let (a, v) = v.split_at(q);
+    let (b, v) = v.split_at(q);
+    let (c, d) = v.split_at(q);
+    [a, b, c, &d[..q]]
+}
+
+type Complex = (f32, f32);
+
+#[inline(always)]
+fn cmul(a: Complex, w: Complex) -> Complex {
+    (a.0 * w.0 - a.1 * w.1, a.1 * w.0 + a.0 * w.1)
+}
+
+/// Inverse 4-point DFT.
+#[inline(always)]
+fn dft4(a0: Complex, a1: Complex, a2: Complex, a3: Complex) -> [Complex; 4] {
+    let t0 = (a0.0 + a2.0, a0.1 + a2.1);
+    let t1 = (a0.0 - a2.0, a0.1 - a2.1);
+    let t2 = (a1.0 + a3.0, a1.1 + a3.1);
+    let t3 = (a1.0 - a3.0, a1.1 - a3.1);
+    [
+        (t0.0 + t2.0, t0.1 + t2.1),
+        (t1.0 - t3.1, t1.1 + t3.0),
+        (t0.0 - t2.0, t0.1 - t2.1),
+        (t1.0 + t3.1, t1.1 - t3.0),
+    ]
+}
+
+/// First input of the bottom DFT that lands at block `g` of 16: the two base-4 digits of
+/// `g` swapped.
+#[inline(always)]
+fn digit_reversed(g: usize) -> usize {
+    (g >> 2) | ((g & 3) << 2)
+}
+
+/// 16 inverse 4-point DFTs of the inputs k = b + 16 m, block g at 4g.
+#[inline(always)]
+fn dft4_pass<const N: usize>(
+    z: impl Fn(usize) -> (f32, f32),
+    re: &mut [f32; N],
+    im: &mut [f32; N],
+) {
+    for g in 0..16 {
+        let b = digit_reversed(g);
+        let x = dft4(z(b), z(b + 16), z(b + 32), z(b + 48));
+        for (m, x) in x.iter().enumerate() {
+            re[4 * g + m] = x.0;
+            im[4 * g + m] = x.1;
+        }
+    }
+}
+
+/// 16 inverse 8-point DFTs of the inputs k = b + 16 m, block g at 8g.
+#[inline(always)]
+fn dft8_pass<const N: usize>(
+    z: impl Fn(usize) -> (f32, f32),
+    re: &mut [f32; N],
+    im: &mut [f32; N],
+) {
+    for g in 0..16 {
+        let b = digit_reversed(g);
+        let e = dft4(z(b), z(b + 32), z(b + 64), z(b + 96));
+        let o = dft4(z(b + 16), z(b + 48), z(b + 80), z(b + 112));
+        // o[m] times e^{j pi m / 4}.
+        let o = [
+            o[0],
+            ((o[1].0 - o[1].1) * H, (o[1].0 + o[1].1) * H),
+            (-o[2].1, o[2].0),
+            ((-o[3].0 - o[3].1) * H, (o[3].0 - o[3].1) * H),
+        ];
+        for m in 0..4 {
+            re[8 * g + m] = e[m].0 + o[m].0;
+            im[8 * g + m] = e[m].1 + o[m].1;
+            re[8 * g + m + 4] = e[m].0 - o[m].0;
+            im[8 * g + m + 4] = e[m].1 - o[m].1;
         }
     }
 }
@@ -100,10 +210,10 @@ pub(crate) struct Imdct {
     s2: [f32; 64],
     /// 2 * w[n], n = 0..256 (first half of the symmetric 512-point window).
     w: [f32; 256],
+    /// Work space of the IFFT.
     re: [f32; 128],
     im: [f32; 128],
-    re2: [f32; 64],
-    im2: [f32; 64],
+    /// Post-twiddled IFFT output y[n] (y1 and y2 for the short transforms).
     yr: [f32; 128],
     yi: [f32; 128],
 }
@@ -139,8 +249,6 @@ impl Imdct {
             w,
             re: [0.0; 128],
             im: [0.0; 128],
-            re2: [0.0; 64],
-            im2: [0.0; 64],
             yr: [0.0; 128],
             yi: [0.0; 128],
         })
@@ -149,47 +257,60 @@ impl Imdct {
     /// 512-sample transform (blksw = 0). Writes 256 output samples and updates `delay`.
     pub(crate) fn long(&mut self, x: &[f32; 256], delay: &mut [f32; 256], out: &mut [f32]) {
         let out: &mut [f32; 256] = (&mut out[..256]).try_into().expect("256 samples");
-        // Pre-twiddle (contiguous, vectorisable), then bit-reversal permutation.
-        let (zr, zi) = (&mut self.yr, &mut self.yi);
-        for k in 0..128 {
-            let xr = x[255 - 2 * k];
-            let xi = x[2 * k];
-            zr[k] = xr * self.c1[k] - xi * self.s1[k];
-            zi[k] = xi * self.c1[k] + xr * self.s1[k];
+        let (c1, s1) = (&self.c1, &self.s1);
+        // Pre-twiddle (step 2) as the transform reads its input.
+        let z = |k: usize| {
+            let (xr, xi) = (x[255 - 2 * k], x[2 * k]);
+            (xr * c1[k] - xi * s1[k], xi * c1[k] + xr * s1[k])
+        };
+        let w = &self.w;
+        if cfg!(target_arch = "arm") {
+            // Without f32 vectors (ARMv7), windowing, de-interleaving and overlap-add
+            // (steps 5 and 6) of each output as the transform produces it save a pass over
+            // memory: y[m] lands at samples 127 - 2m and 128 + 2m of both halves, y[64 + m]
+            // at 2m and 255 - 2m. Each delay sample is read before it is replaced.
+            let emit = |n: usize, (yr, yi): Complex| {
+                if n < 64 {
+                    let (a, b) = (127 - 2 * n, 128 + 2 * n);
+                    out[a] = yr * w[a] + delay[a];
+                    out[b] = -yr * w[b] + delay[b];
+                    delay[a] = yi * w[b];
+                    delay[b] = yi * w[a];
+                } else {
+                    let (a, b) = (2 * (n - 64), 255 - 2 * (n - 64));
+                    out[a] = -yi * w[a] + delay[a];
+                    out[b] = yi * w[b] + delay[b];
+                    delay[a] = -yr * w[b];
+                    delay[b] = -yr * w[a];
+                }
+            };
+            self.fft128
+                .run(z, (c1, s1), emit, &mut self.re, &mut self.im);
+        } else {
+            // Elsewhere the separate loops vectorise.
+            let (yr, yi) = (&mut self.yr, &mut self.yi);
+            let emit = |n: usize, y: Complex| (yr[n], yi[n]) = y;
+            self.fft128
+                .run(z, (c1, s1), emit, &mut self.re, &mut self.im);
+            window_overlap(&self.yr, &self.yi, w, delay, out);
         }
-        for k in 0..128 {
-            let p = self.fft128.bitrev[k] as usize;
-            self.re[p] = zr[k];
-            self.im[p] = zi[k];
-        }
-        self.fft128.run(&mut self.re, &mut self.im);
-        let (yr, yi) = (&mut self.yr, &mut self.yi);
-        for n in 0..128 {
-            let (zr, zi) = (self.re[n], self.im[n]);
-            yr[n] = zr * self.c1[n] - zi * self.s1[n];
-            yi[n] = zi * self.c1[n] + zr * self.s1[n];
-        }
-        window_overlap(yr, yi, &self.w, delay, out);
     }
 
     /// Two interleaved 256-sample transforms (blksw = 1).
     pub(crate) fn short(&mut self, x: &[f32; 256], delay: &mut [f32; 256], out: &mut [f32]) {
         let out = &mut out[..256];
-        // First half-block (even coefficients) -> y1 stored in yr/yi[0..64].
+        let (c2, s2) = (&self.c2, &self.s2);
+        // The even coefficients give y1 in yr/yi[0..64], the odd ones y2 in [64..128].
+        let re: &mut [f32; 64] = (&mut self.re[..64]).try_into().expect("64 points");
+        let im: &mut [f32; 64] = (&mut self.im[..64]).try_into().expect("64 points");
         for half in 0..2 {
-            for k in 0..64 {
-                let xr = x[2 * (127 - 2 * k) + half];
-                let xi = x[2 * (2 * k) + half];
-                let p = self.fft64.bitrev[k] as usize;
-                self.re2[p] = xr * self.c2[k] - xi * self.s2[k];
-                self.im2[p] = xi * self.c2[k] + xr * self.s2[k];
-            }
-            self.fft64.run(&mut self.re2, &mut self.im2);
-            for n in 0..64 {
-                let (zr, zi) = (self.re2[n], self.im2[n]);
-                self.yr[half * 64 + n] = zr * self.c2[n] - zi * self.s2[n];
-                self.yi[half * 64 + n] = zi * self.c2[n] + zr * self.s2[n];
-            }
+            let z = |k: usize| {
+                let (xr, xi) = (x[2 * (127 - 2 * k) + half], x[4 * k + half]);
+                (xr * c2[k] - xi * s2[k], xi * c2[k] + xr * s2[k])
+            };
+            let (yr, yi) = (&mut self.yr, &mut self.yi);
+            let emit = |n: usize, y: Complex| (yr[64 * half + n], yi[64 * half + n]) = y;
+            self.fft64.run(z, (c2, s2), emit, re, im);
         }
         let (y1r, y2r) = self.yr.split_at(64);
         let (y1i, y2i) = self.yi.split_at(64);
@@ -428,25 +549,25 @@ mod perf {
         let mut d = [0f32; 256];
         let mut o = [0f32; 256];
         let n = 500_000;
-        let (mut el, mut el2) = (f64::MAX, f64::MAX);
+        let (mut long, mut short) = (f64::MAX, f64::MAX);
         for _ in 0..7 {
             let st = std::time::Instant::now();
             for _ in 0..n {
                 t.long(&x, &mut d, &mut o);
                 x[3] += o[5] * 1e-9;
             }
-            el = el.min(st.elapsed().as_secs_f64());
-            let st2 = std::time::Instant::now();
+            long = long.min(st.elapsed().as_secs_f64());
+            let st = std::time::Instant::now();
             for _ in 0..n {
-                t.fft128.run(&mut t.re, &mut t.im);
-                t.re[1] += 1e-9;
+                t.short(&x, &mut d, &mut o);
+                x[3] += o[5] * 1e-9;
             }
-            el2 = el2.min(st2.elapsed().as_secs_f64());
+            short = short.min(st.elapsed().as_secs_f64());
         }
         eprintln!(
-            "long: {:.1} ns/call, fft128: {:.1} ns/call",
-            el / n as f64 * 1e9,
-            el2 / n as f64 * 1e9
+            "long: {:.1} ns/call, short: {:.1} ns/call",
+            long / n as f64 * 1e9,
+            short / n as f64 * 1e9
         );
     }
 }

@@ -1,0 +1,9 @@
+{
+ "name": "audio-speed-0ac17828-armv7",
+ "path": "audio-speed-0ac17828-armv7",
+ "retention": "retained",
+ "reason": "Audio decoder speed work on 32-bit ARMv7 (thumbv7neon in the gate image's armhf root), c6g.4xlarge: user-space instruction, cycle and branch-miss counts with output digests of main and of the codec sources at 0ac17828 for the AC-3, E-AC-3, DTS, MPEG audio, FLAC, Vorbis and Opus timing workloads; per-vector RMS and maximum error against FFmpeg of main and of 0ac17828 on the pinned vectors and on regenerated MPEG audio vectors, with their comparison; per-function profiles and lane notes; cited by docs/status.md",
+ "key": "evidence/audio-speed-0ac17828-armv7/2988054fd06b3213f14908b5105a956764404e2fdd399c16f38f7b36b70217b3.tar.zst",
+ "sha256": "2988054fd06b3213f14908b5105a956764404e2fdd399c16f38f7b36b70217b3",
+ "bytes": 105767
+}

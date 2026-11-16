@@ -1,4 +1,4 @@
-//! DCT-IV: `y[k] = sum_n x[n] cos(pi/N (n + 1/2)(k + 1/2))`, in place, for N = 32 or 64.
+//! DCT-IV: `y[k] = sum_n x[n] cos(pi/N (n + 1/2)(k + 1/2))` for N = 32 or 64.
 //!
 //! Computed through an N/2-point complex FFT: `z[m] = (x[2m] + i x[N-1-2m]) e^{-i pi (m + 1/4)/N}`,
 //! `Z = FFT(z)`, `Z'[m] = Z[m] e^{-i pi m / N}`, `y[2m] = Re Z'[m]`, `y[N-1-2m] = -Im Z'[m]`.
@@ -45,18 +45,24 @@ impl Dct4 {
         }
     }
 
+    /// Transform `x`, handing each output pair `(k, y[k], y[N-1-k])` for even `k` to
+    /// `emit`.
     #[inline]
-    pub(crate) fn transform(&self, x: &mut [f32]) {
+    pub(crate) fn transform_pairs(&self, x: &[f32], emit: impl FnMut(usize, f32, f32)) {
         match self.n {
-            32 => self.transform_n::<32, 16>(x),
-            64 => self.transform_n::<64, 32>(x),
+            32 => self.transform_n::<32, 16>(x, emit),
+            64 => self.transform_n::<64, 32>(x, emit),
             _ => unreachable!("DCT-IV size"),
         }
     }
 
     #[inline]
-    fn transform_n<const N: usize, const M: usize>(&self, x: &mut [f32]) {
-        let x: &mut [f32; N] = (&mut x[..N]).try_into().expect("DCT length");
+    fn transform_n<const N: usize, const M: usize>(
+        &self,
+        x: &[f32],
+        mut emit: impl FnMut(usize, f32, f32),
+    ) {
+        let x: &[f32; N] = x[..N].try_into().expect("DCT length");
         let pre: &[(f32, f32); M] = self.pre[..M].try_into().expect("twiddles");
         let post: &[(f32, f32); M] = self.post[..M].try_into().expect("twiddles");
         let rev: &[u8; M] = self.rev[..M].try_into().expect("bit reversal");
@@ -93,8 +99,7 @@ impl Dct4 {
         }
         for k in 0..M {
             let (c, s) = post[k];
-            x[2 * k] = re[k] * c - im[k] * s;
-            x[N - 1 - 2 * k] = -(re[k] * s + im[k] * c);
+            emit(2 * k, re[k] * c - im[k] * s, -(re[k] * s + im[k] * c));
         }
     }
 }
@@ -111,7 +116,10 @@ mod tests {
                 .map(|i| ((i * 7919 % 97) as f32 - 48.0) / 17.0)
                 .collect();
             let src = x.clone();
-            d.transform(&mut x);
+            d.transform_pairs(&src, |k, a, b| {
+                x[k] = a;
+                x[n - 1 - k] = b;
+            });
             for k in 0..n {
                 let mut acc = 0f64;
                 for (i, &v) in src.iter().enumerate() {

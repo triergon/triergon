@@ -1,0 +1,46 @@
+{
+ "name": "gate-run-aarch64-0ac17828-20261116-062732-shard-1",
+ "path": "gate-run-aarch64-0ac17828-20261116-062732-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 0ac17828 on three c6g.4xlarge hosts, Linux AArch64, shard 1 of the codec items (codecs, codecs-audio, ogg-readers, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release, isobmff-reader) with the codec-derived streams input: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md",
+ "key": "evidence/gate-runs/0ac17828e7e7839c6779fcded191102aad09fd0b-aarch64-20261116-062732/shard-1/6e44268a1550ad8e66ebbe636a2fb678a8024c7315e4955f7ffdae819c3db344.tar.zst",
+ "sha256": "6e44268a1550ad8e66ebbe636a2fb678a8024c7315e4955f7ffdae819c3db344",
+ "bytes": 7631764,
+ "results": [
+  {
+   "path": "memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "35e4cccef4d1a16882478794c9f0f624791a786ad53df109fd8b94037ca287ee",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "538ad7f84f04dd6a72921ae216834574917e91587cbc7309f993bd5280ba188c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "0c272365db351a0c4137d573d27ffda9cd075987832bd48c03f835f6991c3baa",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "e1c219e6232d18b04f1a7014583cd491d3905002cae20db95dc361f4afbba5d9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "0029c97174bdc2895c640ab5558b09e381daa7be4cbefdf4bb80056a72dfab6d",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -12,16 +12,22 @@
 
 use crate::dct::Dct4;
 
+/// Output pairs `(i, N-1-i)` computed together by the polyphase window.
+const GROUP: usize = 8;
+
 /// Synthesis bank of `TAPS / 16` bands.
 #[derive(Debug)]
 pub(crate) struct Qmf<const TAPS: usize> {
-    /// Sign-modified prototype regrouped as 16 taps x n, gain folded in.
+    /// Sign-modified prototype, gain folded in, in the order the window reads it: for
+    /// each group of `GROUP` outputs `i` below `n / 2` and each tap `m`, the coefficients
+    /// `h[n m + i]`, then `h[n m + n - 1 - i]` of the mirrored outputs.
     coef: [f32; TAPS],
     dct: Dct4,
 }
 
-/// Per-channel synthesis history: 16 slots of `[U | W]` vectors (2 n floats each,
-/// `LEN = 32 n`).
+/// Per-channel synthesis history: 16 slots of `[U | W]` half vectors (`n` floats each,
+/// `LEN = 16 n`). `U` is antisymmetric and `W` symmetric about the middle, so their lower
+/// halves determine them.
 #[derive(Clone, Debug)]
 pub(crate) struct QmfState<const LEN: usize> {
     ring: [f32; LEN],
@@ -44,63 +50,98 @@ impl<const LEN: usize> QmfState<LEN> {
 
 impl<const TAPS: usize> Qmf<TAPS> {
     pub(crate) fn new(proto: &[f64; TAPS], scale: f64) -> Self {
+        let n = TAPS / 16;
+        let mut coef = [0.0; TAPS];
+        let mut k = 0;
+        for i0 in (0..n / 2).step_by(GROUP) {
+            for m in 0..16 {
+                for i in i0..i0 + GROUP {
+                    coef[k] = (proto[n * m + i] * scale) as f32;
+                    coef[k + GROUP] = (proto[n * m + n - 1 - i] * scale) as f32;
+                    k += 1;
+                }
+                k += GROUP;
+            }
+        }
         Self {
-            coef: std::array::from_fn(|i| (proto[i] * scale) as f32),
-            dct: Dct4::new(TAPS / 16),
+            coef,
+            dct: Dct4::new(n),
         }
     }
 
-    /// Synthesize one block: `input` holds `n` subband samples (clobbered), `out`
-    /// receives `n` PCM samples.
+    /// Synthesize one block: `input` holds `n` subband samples, `out` receives `n` PCM
+    /// samples.
     #[inline]
     pub(crate) fn synth<const LEN: usize>(
         &self,
         st: &mut QmfState<LEN>,
-        input: &mut [f32],
+        input: &[f32],
         out: &mut [f32],
     ) {
         match TAPS / 16 {
-            32 => self.synth_n::<32, LEN>(st, input, out),
-            _ => self.synth_n::<64, LEN>(st, input, out),
+            32 => self.synth_n::<32, 16, LEN>(st, input, out),
+            _ => self.synth_n::<64, 32, LEN>(st, input, out),
         }
     }
 
     #[inline]
-    fn synth_n<const N: usize, const LEN: usize>(
+    fn synth_n<const N: usize, const HALF: usize, const LEN: usize>(
         &self,
         st: &mut QmfState<LEN>,
-        input: &mut [f32],
+        input: &[f32],
         out: &mut [f32],
     ) {
-        debug_assert_eq!(LEN, 32 * N);
-        let x: &mut [f32; N] = (&mut input[..N]).try_into().expect("block length");
-        // V = DCT-IV(X); the 0.25 factor of C.3.6 is folded into the prototype.
-        self.dct.transform(x);
+        debug_assert_eq!(LEN, 16 * N);
         // The new slot (time s) replaces the oldest one; slot (pos + m) & 15 holds s - m.
         st.pos = (st.pos + 15) & 15;
-        let base = st.pos * 2 * N;
-        let (u, w) = st.ring[base..base + 2 * N].split_at_mut(N);
-        let u: &mut [f32; N] = u.try_into().expect("slot");
-        let w: &mut [f32; N] = w.try_into().expect("slot");
-        for i in 0..N {
-            let a = x[i];
-            let b = x[N - 1 - i];
-            u[i] = a - b;
-            w[i] = -(a + b);
-        }
+        let base = st.pos * N;
+        let (u, w) = st.ring[base..base + N].split_at_mut(HALF);
+        let u: &mut [f32; HALF] = u.try_into().expect("slot");
+        let w: &mut [f32; HALF] = w.try_into().expect("slot");
+        // V = DCT-IV(X), the 0.25 factor of C.3.6 folded into the prototype;
+        // U[i] = V[i] - V[N-1-i] and W[i] = -(V[i] + V[N-1-i]) for i < N/2.
+        self.dct.transform_pairs(input, |k, a, b| {
+            if k < HALF {
+                u[k] = a - b;
+                w[k] = -(a + b);
+            } else {
+                u[N - 1 - k] = b - a;
+                w[N - 1 - k] = -(b + a);
+            }
+        });
+        // Slot m (time s - m) contributes U for even m and W for odd m. With
+        // U[N-1-i] = -U[i] and W[N-1-i] = W[i], each loaded value serves output i and
+        // its mirror N-1-i.
+        let taps: [&[f32; HALF]; 16] = std::array::from_fn(|m| {
+            let off = ((st.pos + m) & 15) * N + (m & 1) * HALF;
+            st.ring[off..off + HALF].try_into().expect("slot")
+        });
         let out: &mut [f32; N] = (&mut out[..N]).try_into().expect("block length");
-        let mut acc = [0f32; N];
         let coef = &self.coef[..16 * N];
-        for m in 0..16 {
-            let idx = (st.pos + m) & 15;
-            let off = idx * 2 * N + if m & 1 == 0 { 0 } else { N };
-            let g: &[f32; N] = st.ring[off..off + N].try_into().expect("slot");
-            let h: &[f32; N] = coef[m * N..m * N + N].try_into().expect("taps");
-            for i in 0..N {
-                acc[i] += h[i] * g[i];
+        // Each group's accumulators are held over all 16 taps: on targets where f32
+        // arithmetic stays scalar, they then live in registers.
+        for (j, c) in coef.chunks_exact(32 * GROUP).enumerate() {
+            let i0 = j * GROUP;
+            let mut lo = [0f32; GROUP];
+            let mut hi = [0f32; GROUP];
+            for (c, g) in c.chunks_exact(4 * GROUP).zip(taps.chunks_exact(2)) {
+                let (ce, co) = c.split_at(2 * GROUP);
+                let ge = &g[0][i0..i0 + GROUP];
+                let go = &g[1][i0..i0 + GROUP];
+                for i in 0..GROUP {
+                    lo[i] += ce[i] * ge[i];
+                    hi[i] -= ce[GROUP + i] * ge[i];
+                }
+                for i in 0..GROUP {
+                    lo[i] += co[i] * go[i];
+                    hi[i] += co[GROUP + i] * go[i];
+                }
+            }
+            for i in 0..GROUP {
+                out[i0 + i] = lo[i];
+                out[N - 1 - i0 - i] = hi[i];
             }
         }
-        *out = acc;
     }
 }
 
@@ -125,7 +166,7 @@ mod tests {
                 x.iter_mut()
                     .enumerate()
                     .for_each(|(k, v)| *v = ((i + k) % 7) as f32 - 3.0);
-                q.synth(&mut st, &mut x, &mut out);
+                q.synth(&mut st, &x, &mut out);
                 acc += out[3];
             }
             let ns = t.elapsed().as_nanos() as f64 / iters as f64;
@@ -134,7 +175,7 @@ mod tests {
                 ns / n as f64
             );
         }
-        probe::<512, 1024>(&crate::tables::QMF_NONPERFECT);
-        probe::<1024, 2048>(&crate::tables::X96_FIR);
+        probe::<512, 512>(&crate::tables::QMF_NONPERFECT);
+        probe::<1024, 1024>(&crate::tables::X96_FIR);
     }
 }

@@ -303,17 +303,12 @@ pub(crate) fn decode_subframe(
                         *v = br.huff(book);
                     }
                 } else if a <= 7 {
-                    let (levels, bits) = books::block_code(a);
-                    let off = (levels - 1) / 2;
+                    let bc = books::block_code(a);
                     for blk in 0..2 {
-                        let mut code = br.read(bits) as i32;
-                        for j in 0..4 {
-                            q[blk * 4 + j] = code % levels - off;
-                            code /= levels;
-                        }
-                        if code != 0 {
-                            return Err(DecodeError::InvalidData("X96 block code"));
-                        }
+                        let digits = bc
+                            .split(br.read(bc.bits))
+                            .ok_or(DecodeError::InvalidData("X96 block code"))?;
+                        q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
                     }
                 } else {
                     let bits = a - 3;

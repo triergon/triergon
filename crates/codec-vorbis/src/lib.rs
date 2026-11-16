@@ -383,9 +383,6 @@ fn decode_residues(
             coded[a] = true;
         }
     }
-    for channel in spectra.channels_mut() {
-        channel[..half].fill(0.0);
-    }
     let mut coded_lines = 0;
     for (number, submap) in mapping.submaps.iter().enumerate() {
         let mut members = [Member::default(); 256];
