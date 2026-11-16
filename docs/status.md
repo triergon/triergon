@@ -526,7 +526,7 @@ the highest upper bound 1.0658) and 0.790 on ARMv7 (the highest upper bound 0.94
 `ass-render-host` on ARMv7 had a worst upper bound of 0.8688, peak heap 0.614 and total RSS
 0.866.
 
-The shaping cases that need the interpreter (Bitstream Vera 1.10 in the corpus, DejaVu Sans
+The shaping cases that need the interpreter (the corpus's Bitstream Vera, DejaVu Sans
 and Vera Latin, and the samples `c` with U+0308 and `x` with U+0301) were compared at
 `dc792ea4b25af0e64db6b73b47ce66dc89b6e045` against main at `51977abacdfe2e8086c124e37c0ad303168423f3` on the same host class and targets: `shape-libass` 209/209,
 `shape-text` 208/209 and `shape-text-all` 1,789/1,790 with every other feature as on main, and
