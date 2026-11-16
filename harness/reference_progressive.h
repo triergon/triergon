@@ -428,12 +428,6 @@ static int progressive_main(int argc, char **argv) {
               stderr);
         return 2;
     }
-#if !defined(__linux__) || !defined(__aarch64__)
-    if (mem || bench) {
-        fputs("numeric modes require native Linux AArch64\n", stderr);
-        return 2;
-    }
-#endif
     av_log_set_level(AV_LOG_ERROR);
     const int has_dts = !strcmp(argv[argc - 2], "pts-dts");
     const unsigned iterations = bench ? 50 : 1;
