@@ -1,0 +1,25 @@
+{
+ "name": "aac-access-units-a73350ca-armv7",
+ "path": "aac-access-units-a73350ca-armv7",
+ "retention": "retained",
+ "reason": "AAC in MOV (aac-access-units, on demand) at a73350ca, one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws, 32-bit ARMv7: parity with codecs aac-access-units, then the 34 workloads timed on CPU 1 with codecs time and their memory under the kernel bound on CPUs 1-15 with codecs memory, as the gate measures a codec workload list; the outputs, ledgers, logs and the workers' SHA-256; for the docs/status.md AAC in MOV rows",
+ "key": "evidence/aac-access-units/a73350ca-armv7/ac664cca8d09697977201d5538a7542e925bdc4bd4ac75b106af4ee94872b698.tar.zst",
+ "sha256": "ac664cca8d09697977201d5538a7542e925bdc4bd4ac75b106af4ee94872b698",
+ "bytes": 69196662,
+ "results": [
+  {
+   "path": "benchmark/gate-result.json",
+   "command": "codecs time",
+   "key": "54bdee29054568a8aa7803e20f5e6a315b3370278fcf68b75d954e2e70df6fc7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "c487422964d66f71dd49119573e934182292469076f02434ffda3a255160bc93",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
