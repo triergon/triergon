@@ -20,11 +20,10 @@ cargo xtask capture summarize DIR
 
 The comparison runs on native Linux AArch64 and in the 32-bit ARMv7 user space
 ([quality](../../docs/quality.md#32-bit-armv7)), each with its own reference build.
-The reference's conversion follows its target, and the converter follows the ARMv7
-build: the contract's `open_cases` list the AArch64 build's conversion of all 15
-cases. `qualify` still compares and reports them as failing and marks them
-`open_on_target`. It refuses a listed id that is not in the cases file, and fails
-once every case is measured if a listed case passes.
+For Linux AArch64 the capture worker opens the session with
+`Session::open_filtered`, which uses the centre-sited filter at every width.
+For ARMv7 it uses `Session::open`, whose policy depends on the width.
+Conversion, encoding and muxing are compared on all 15 cases on both targets.
 
 The gate times and measures memory in separate runs: the same command with
 `--stage timing --out TIMING` under `taskset -c 1`, then with `--stage memory --timing
