@@ -103,7 +103,7 @@ c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 plans, step records and logs, `aac-access-units-a73350ca-TARGET` the AAC in MOV
 measurements, and `closing-run-ratios-a73350ca` every timed case's paired median and 95%
 bounds with, per feature and target, the cases whose median or bound is above 1.0 and whose
-bound is above the [ceiling](quality.md#gates), 1.10 and 1.05, and the median of the case
+bound is above 1.20, the [ceiling](quality.md#gates) and 1.05, and the median of the case
 medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
 
 The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
@@ -188,7 +188,7 @@ The packet framing rows come from one partial gate run of the `framing` item per
 measured the same way, at `d79071d4` on Linux AArch64 and at `9870b694` on ARMv7, whose
 framing worker is byte for byte the one `d79071d4` builds (that commit changes only the
 AArch64 link order). Every step passes 135 of 135 cases, and only the total RSS bounds
-listed in the contract's `open_bounds` fail. No case's runtime bound is above 1.10 on
+listed in the contract's `open_bounds` fail. No case's runtime bound is above the [ceiling](quality.md#gates) on
 either target; the median of the case medians is 0.9477 on Linux AArch64 (0.9630 at
 `d915aa19`) and 0.7924 on ARMv7 (0.8100). On ARMv7, `hevc-irap_repeat` has a median of
 0.9928 and a bound of 1.0263, against 1.0381 and 1.0431 at `d915aa19`.
