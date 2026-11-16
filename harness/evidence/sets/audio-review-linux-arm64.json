@@ -1,0 +1,156 @@
+{
+ "name": "audio-review-linux-arm64",
+ "path": "audio-review-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited FLAC, MPEG audio, Vorbis and Opus correctness rows, the reader lane, instruction counts against the previous revision, paired timing and paired memory of the ten file-format workloads, and the worker identity",
+ "key": "evidence/audio-review-linux-arm64/0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53.tar.gz",
+ "sha256": "0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53",
+ "bytes": 16341236,
+ "source_revision": "ccff5b5734c113c1d88160b84825157508c701c0",
+ "files": [
+  {
+   "path": "audio-review-linux-arm64/SOURCE.json",
+   "sha256": "11cc5ce5d55b662d21a5b86ace61a80479afcc46fd00f40c930001ebb101f62e"
+  },
+  {
+   "path": "audio-review-linux-arm64/correctness/manifest.json",
+   "sha256": "e7514d7a2d9e428ef0934c4ff8dec1da473cab62d61a3d69a9cab68b2c64a8d7"
+  },
+  {
+   "path": "audio-review-linux-arm64/correctness/run.jsonl",
+   "sha256": "a1828c7c8c3f49ce7de06382c6ecef4625f8b363549945df4b3eae69e0de5980"
+  },
+  {
+   "path": "audio-review-linux-arm64/correctness/summary.json",
+   "sha256": "8c01da5d97517bb6d9710ccf9d01c829836cbe990ea6a0f333ca3f44626be9ff"
+  },
+  {
+   "path": "audio-review-linux-arm64/correctness/summary.txt",
+   "sha256": "539a2c63431fdc5639d9c06a671e09b9617a7317636998dff68a5722b8d3b46e"
+  },
+  {
+   "path": "audio-review-linux-arm64/identity.json",
+   "sha256": "a0991a8bb4392b19c5604a7790f755474cc6f2bc31e09173226127dbaf2e7d57"
+  },
+  {
+   "path": "audio-review-linux-arm64/instruction-counts.txt",
+   "sha256": "31b2a06a99732c1c6d0f952014d178a632e0e36180e0f08609f96b603c101618"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/flac-16-44k-stereo.json",
+   "sha256": "547dde3e665a1902b06e64565d0f74f63095eacd3c04cfc275bb427ce0b6788e"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/flac-24-96k-5.1.json",
+   "sha256": "016282e54afdf7a7fa225de912716fa4c49dfeff5646c226d6721d89da232dd6"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/identity.json",
+   "sha256": "c0b24a542d9852e0f0e10a19cb9773f89ad48cf036058d37b61dc9b700a76173"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/mem.log",
+   "sha256": "419c9af16de8f951f821ab9c30ba7ea1cd1e749fc658f7b6376b57ff06ead72b"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/mp2-256-48k.json",
+   "sha256": "4e95a0ff310b043ea533bc7c5c5abcdb0233a425f19ee0e8c645708abdc3f02a"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/mp3-cbr-128-joint.json",
+   "sha256": "6443ea4bb648380be6c052831b7eb5d58b4852f1cbd97698b0f2d4c92348ff16"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/mp3-vbr-v2.json",
+   "sha256": "123e6ea0a0655411fbd9a6bb97965e896c5157b5c2306b7dbc8845223da0a087"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/opus-5.1-256.json",
+   "sha256": "f1ab4c3deb7f55cea91f2b078bc3336004fdebfb2a354cbb9f5380840d6a406e"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/opus-music-128-stereo.json",
+   "sha256": "83c2171f95da3318786b197f14953849fc2862344d52d9f71174184bf034de29"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/opus-speech-24-mono.json",
+   "sha256": "491a380a6ea6976c44d2b1192813095dbe216e2def9b6a833d7f03885a51a13e"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/summary.json",
+   "sha256": "a3e8f8c0b1c27066202c0b79d0098eecc3590a347538c6fba36e7dbbefe424dc"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/vorbis-q3-5.1.json",
+   "sha256": "9631a587cd3e770ace4418fde7ac4472b82179f9a935f6e6718cbbbd387b60aa"
+  },
+  {
+   "path": "audio-review-linux-arm64/memory/vorbis-q5-stereo.json",
+   "sha256": "fbec2f66bc486bb93f5f65fde8e94779d191f08c7cbf5244eb2e92f6cf82caf0"
+  },
+  {
+   "path": "audio-review-linux-arm64/readers/reader-manifest.json",
+   "sha256": "09861b1d0fa7dc8e03aea4c3d3af718f32b578c6995a1b6828bd95dd9010d060"
+  },
+  {
+   "path": "audio-review-linux-arm64/readers/reader-rules.json",
+   "sha256": "a5531a7fb0cf17a02276b0441c7031aa70b68c06d2004261f95c1a0526a88582"
+  },
+  {
+   "path": "audio-review-linux-arm64/readers/run.jsonl",
+   "sha256": "ee5371c6d1bca95fd3b9fed88a6162762d7acfa570539288f3120c2af4181659"
+  },
+  {
+   "path": "audio-review-linux-arm64/readers/run.log",
+   "sha256": "7246d970a8d79bdcf0d2bfbcc3f99a1d28408e5207a86052722fce3aa2dbffc9"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/flac-16-44k-stereo.json",
+   "sha256": "856ceb3d2ce301bbec546eac743cb1bd9525dbd268eb3817ed1dcbbd2cd7b2c9"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/flac-24-96k-5.1.json",
+   "sha256": "1b320563641cc3310e4a69c82ee15b438c69824be7eb449ed97f6285a3d2e1f4"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/ledger.json",
+   "sha256": "c40addd161bd84db1a121bd0766229c734a3383e51a1d8a59a8d4966279faf53"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/mp2-256-48k.json",
+   "sha256": "3c6f6b7454fdab935bdc71a6a739285bce41cfd2581ec4a7e6ebfa9b68453f39"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/mp3-cbr-128-joint.json",
+   "sha256": "35abd6cfd476e1316f03e9f2028da8c13881d3d027b8ff5a9a07ee982d6df806"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/mp3-vbr-v2.json",
+   "sha256": "9931f8da3072a73f6242e4fd267a3d63f4b5cb00e0fae25062246ceae10c1d58"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/opus-5.1-256.json",
+   "sha256": "553600f15919d4a42077be5c4563b526f41f53e45546eda4dd0fca0c48fa6dfc"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/opus-music-128-stereo.json",
+   "sha256": "4a5550d83f2bdf29bb563a073f056905449af2cc860f75a60dde3e37f07ff72e"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/opus-speech-24-mono.json",
+   "sha256": "c5e0bba1f253c3c04d101d551797a77598de99305d9120744169c16fe5738883"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/time.log",
+   "sha256": "3c995184437fdc1e6b06a069bead13b7aa7c9c2ae9432577c7966d80b1856507"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/vorbis-q3-5.1.json",
+   "sha256": "f99c2bacbf38e6868e3b0c7b53d08b1eacdbd0d0906f11cbe14ad09fec58cfb8"
+  },
+  {
+   "path": "audio-review-linux-arm64/timing/vorbis-q5-stereo.json",
+   "sha256": "ecd1198875d3392228f4ebc9e4ddcfccf1048cc6cfb58f9813b469ff7097d48f"
+  }
+ ]
+}

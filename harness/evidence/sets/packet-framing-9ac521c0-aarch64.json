@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-9ac521c0-aarch64",
+ "retention": "retained",
+ "reason": "AArch64 packet-framing comparison with batched metadata and shared input",
+ "key": "evidence/packet-framing-9ac521c0-aarch64/a2e15d0086ac9dfd35b24d800951471a381665906a2bd5334eaa2b25a27995e3.tar.zst",
+ "sha256": "a2e15d0086ac9dfd35b24d800951471a381665906a2bd5334eaa2b25a27995e3",
+ "bytes": 28356284,
+ "source_revisions": {
+  "candidate": "9ac521c0a9c7b884044aee5baf7a928bcd144383"
+ }
+}

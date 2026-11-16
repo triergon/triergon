@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-978d24ec-aarch64",
+ "retention": "retained",
+ "reason": "AArch64 packet-framing comparison with shared output reservation",
+ "key": "evidence/packet-framing-978d24ec-aarch64/7d1bbe11302c70567e039e77977048827bebe32efe457c788758a5d12cd8efbc.tar.zst",
+ "sha256": "7d1bbe11302c70567e039e77977048827bebe32efe457c788758a5d12cd8efbc",
+ "bytes": 27154488,
+ "source_revisions": {
+  "candidate": "978d24eca5305e4c9b8f4e1265e720b23bddcd86"
+ }
+}

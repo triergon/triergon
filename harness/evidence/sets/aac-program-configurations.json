@@ -1,0 +1,10 @@
+{
+ "name": "aac-program-configurations",
+ "path": "aac-program-configurations",
+ "retention": "retained",
+ "reason": "Configured raw AAC-LC speaker and PCM parity, paired runtime, peak heap and total resident peak",
+ "key": "evidence/aac-program-configurations/86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf.tar.gz",
+ "sha256": "86fc2ed8f95b4c4584f8ceb1ce90350c699db984d77de998bbb74bee415c49cf",
+ "bytes": 163382979,
+ "source_revision": "0a51b7c3746c882b3ca5127ad047162130c01ea6"
+}

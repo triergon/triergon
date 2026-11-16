@@ -1,0 +1,12 @@
+{
+ "name": "mp4-seek-commands-quick-check-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited same-code listings, instruction counts and the paired hls-segments and matroska-startup-seek timing screen of the single MP4 seek path, measured as merged against its parent",
+ "key": "evidence/mp4-seek-commands-quick-check-linux-arm64/4524a1e620ecae5f3ce32a2225e90074438c53dee422a093e65c0c8892a1e355.tar.gz",
+ "sha256": "4524a1e620ecae5f3ce32a2225e90074438c53dee422a093e65c0c8892a1e355",
+ "bytes": 165372254,
+ "source_revisions": {
+  "candidate": "1c5c4b87e6a10495b1c603718b14b6cf3a905a83",
+  "baseline": "912628d9726be2fbed8f0718b11f5ff4d150102a"
+ }
+}

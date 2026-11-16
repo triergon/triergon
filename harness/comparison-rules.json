@@ -3,7 +3,7 @@
   "approval": {
     "status": "approved",
     "date": "2026-10-31",
-    "scope": "The two-case proposal in the zlib-reference-comparison evidence set (harness/evidence/index.json); numerical gates and required cases unchanged"
+    "scope": "The two-case proposal in the zlib-reference-comparison evidence set (harness/evidence/sets/); numerical gates and required cases unchanged"
   },
   "reference_source_revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
   "rules": [

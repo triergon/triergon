@@ -1,0 +1,79 @@
+{
+ "name": "playback-gate-build-kernel-rss",
+ "path": "playback-gate-build-kernel-rss",
+ "retention": "retained",
+ "reason": "Rust 1.99.1 default-flag playback qualification with separate timing and kernel-backed resident-peak bounds",
+ "key": "evidence/playback-gate-build-kernel-rss/a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f.tar.gz",
+ "sha256": "a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f",
+ "bytes": 125975457,
+ "files": [
+  {
+   "path": "playback-gate-build-kernel-rss/FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/HOST.log",
+   "sha256": "4c176165334d2922f11754ed500dba33a58be31532aacfdd0736b57b046c8d24"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/NATIVE-EXIT.txt",
+   "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/NATIVE-RESULTS.sha256",
+   "sha256": "cbc241196c7baf6500f6ec6a272f4e6cee6cc69538bbc00e8f69ad5523f08d6a"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/NATIVE-RESULTS.tar.gz",
+   "sha256": "ddc44849b379e6addd1b80b991fc492fa708835adc36d113f0bea988e4cf4924"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/PAIRED-SCREEN.log",
+   "sha256": "d8091522e75043cd1ff238dd1646a8923516cee0d1c534bde31d3d3deaa9abe6"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/QUALIFIED-SUMMARY.json",
+   "sha256": "a37bd3f17068dcea4da24daf52c3c41dc8f82a1e8f88d80c04a662f6afad5f3e"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/REPLAY-FINAL-STATE.txt",
+   "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/REPLAY-INPUTS.sha256",
+   "sha256": "2a12b87b8d8e2fd89b81eddb97524c9d9a45b1381677ea9a1d5a4273c2f9525b"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/REPLAY-INPUTS.tar.gz",
+   "sha256": "e6db05e33a3ed068fb71e9db639d7a2d569feb01f2d06dc9d143627e54871dbf"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/REPLAY-MODULE.sha256",
+   "sha256": "09996712d3b3f6dcc22701c49ac3457214b763f07318dc1da28f2fbbce703a15"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/RSS-REVIEW.json",
+   "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/SAME-CODE.log",
+   "sha256": "8c5d6910c2e684e13abbd11d9721ab48388aa281eae6a3ffde25cf3e55612dd6"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/SOURCE.bundle",
+   "sha256": "6c03278a7ab304c6325dcd60e63f1c3b451b72dfc5447548da21acc421cb7baf"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/export-replay.sh",
+   "sha256": "5383b481f71cc35dea40a945ec9555b88bb32465a8eb81b50a5f5e6502609c55"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/guest.sh",
+   "sha256": "032f64a7898be8ee74dfdd7b54121d3072086d433c93ce3b513545e13288e34a"
+  },
+  {
+   "path": "playback-gate-build-kernel-rss/host.sh",
+   "sha256": "abf5ec1f5289845e8ee04c210f9d40ee1c8a3f66b01f95549c25b6307f02d492"
+  }
+ ]
+}

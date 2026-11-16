@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-f9b3f138-20261115-075939-shard-1",
+ "path": "gate-run-armv7-f9b3f138-20261115-075939-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at f9b3f138 on 32-bit ARMv7, c6g.4xlarge, items tests and tests-release on one host from the gate image: the workspace tests, checked and release, pass; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the tests of the closed caption change",
+ "key": "evidence/gate-runs/f9b3f13839e31b8a1c97cb299902e9748acaf9ec-armv7-20261115-075939/shard-1/78d171085e6d6e671d46fcd595877ffd7417ebedcb28f9b5f54d67eed52242d8.tar.zst",
+ "sha256": "78d171085e6d6e671d46fcd595877ffd7417ebedcb28f9b5f54d67eed52242d8",
+ "bytes": 6468673,
+ "results": [
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "4c081eb9de88fbf57de39aac77735756f18277dae83386392f7a716502ed6562",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "7b1831d7c54e58d766dfd784842d374ff33cce4b7ec84e21bb3582234a26f1a5",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "f9b3f13839e31b8a1c97cb299902e9748acaf9ec"
+ }
+}

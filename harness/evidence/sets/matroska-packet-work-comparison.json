@@ -1,0 +1,19 @@
+{
+ "name": "matroska-packet-work-comparison",
+ "retention": "90 days",
+ "reason": "HLS segment results",
+ "key": "qualification/repository/matroska-packet-work-comparison/17616435eb698188cc65dc9aa8974b20bcdc550fbb7a97605e550f95ae9c25c0.tar.gz",
+ "sha256": "17616435eb698188cc65dc9aa8974b20bcdc550fbb7a97605e550f95ae9c25c0",
+ "path": "matroska-packet-work-comparison",
+ "files": [
+  {
+   "path": "matroska-packet-work-comparison/comparison.tar.gz",
+   "sha256": "93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe"
+  },
+  {
+   "path": "matroska-packet-work-comparison/contents.json",
+   "sha256": "9b400af3ad0ec5f191d1f51d81504b699cd9df3ba61811ae9433593919cf8a17"
+  }
+ ],
+ "bytes": 22108332
+}

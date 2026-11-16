@@ -1,0 +1,12 @@
+{
+ "name": "one-nal-form-quick-check-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited same-code listings, instruction counts and the paired hls-segments, matroska-startup-seek and packet-framing timing screen of the single NAL configuration and packet form, measured as merged against its parent",
+ "key": "evidence/one-nal-form-quick-check-linux-arm64/da6a1d8f751d64e6a670e9fb8f7ec0d3a700f00cf21a8ffb7ed653e41c288478.tar.gz",
+ "sha256": "da6a1d8f751d64e6a670e9fb8f7ec0d3a700f00cf21a8ffb7ed653e41c288478",
+ "bytes": 339139877,
+ "source_revisions": {
+  "candidate": "cf9ad665bfc96dd64a843828d4f57a2e1a73eed8",
+  "baseline": "1c5c4b87e6a10495b1c603718b14b6cf3a905a83"
+ }
+}

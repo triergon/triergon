@@ -1,0 +1,56 @@
+{
+ "name": "gate-matroska-startup-seek-79e0ae13",
+ "path": "gate-matroska-startup-seek-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: matroska-startup-seek's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-matroska-startup-seek-79e0ae13/cd00f33a0e070c68f46bd887725e7924fe80ebd46ad714779045eb3eb1f0a460.tar.zst",
+ "sha256": "cd00f33a0e070c68f46bd887725e7924fe80ebd46ad714779045eb3eb1f0a460",
+ "bytes": 3572390,
+ "results": [
+  {
+   "path": "gate-matroska-startup-seek-79e0ae13/aarch64/shard-4/benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f4f443acdea4fb1a8a21e0ba2bc3a923cf7ab847ca14434c07ce602570f3e244",
+   "status": 0,
+   "report_sha256": "a2f2393b9f0e932f6ca166246c24c905a0481900d2b15e68dd9aa0ec5c3f0ac2"
+  },
+  {
+   "path": "gate-matroska-startup-seek-79e0ae13/aarch64/shard-4/graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "a7df747c6c241c4d76db73c06cd0f06f0ec6021ba0fd319ed35b23a845e549bf",
+   "status": 0,
+   "report_sha256": "420575a508e8b113113bd0207ec4e4570b6f14c8326d3e9be0d91f5dc0cad0fa"
+  },
+  {
+   "path": "gate-matroska-startup-seek-79e0ae13/aarch64/shard-4/memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "bf2972560568abe5ab5943b5474aa7dd6df623f6ded5bd5ce1ede441ecf17d8c",
+   "status": 0,
+   "report_sha256": "42f1e6e0a86bff9daa8f180ada129955ea885521315435aa828e116fd2f8b8ee"
+  },
+  {
+   "path": "gate-matroska-startup-seek-79e0ae13/armv7/shard-4/benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e6eeb52769acdf73a0929c645a7560e484beb0c81d3469d405dca20fbe1545d6",
+   "status": 0,
+   "report_sha256": "4a2e748655278985d33ea28c04b93e94862a7cff47b7d97f55d621e147ddef68"
+  },
+  {
+   "path": "gate-matroska-startup-seek-79e0ae13/armv7/shard-4/graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "244cb6d4a00eaba281c168d617816c1dd661b791c1e21121a32e141eeeaf3e2a",
+   "status": 0,
+   "report_sha256": "a2692fa7e71790e46686d530bdb1e4ac5ac25bc65d75040a13117fb287f4ec66"
+  },
+  {
+   "path": "gate-matroska-startup-seek-79e0ae13/armv7/shard-4/memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "431dd26733d8d4b4a1ac0816d6ce04b5e1aeab879d564d30c40d19979847a6f4",
+   "status": 0,
+   "report_sha256": "2af4f450897c7e40ac8b166f2ec2099a086e2106c06b6d8033a223d06f0e0316"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

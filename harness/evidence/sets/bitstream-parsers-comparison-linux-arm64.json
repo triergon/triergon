@@ -1,0 +1,10 @@
+{
+ "name": "bitstream-parsers-comparison-linux-arm64",
+ "path": "bitstream-parsers-comparison-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited paired timing, trace identities and corrupted-input comparison of the HLS AVC and raw HEVC parsers on the shared RBSP reader",
+ "key": "evidence/bitstream-parsers-comparison-linux-arm64/03819b5fb765876520d644dabb0acf86f2ab482e2801912f75ca450a11871af7.tar.gz",
+ "sha256": "03819b5fb765876520d644dabb0acf86f2ab482e2801912f75ca450a11871af7",
+ "bytes": 347179404,
+ "source_revision": "6ea304754e31df0d11fb3e4b1b3cba4cfabb5aca"
+}
