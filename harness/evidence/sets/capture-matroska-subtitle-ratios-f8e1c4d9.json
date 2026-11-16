@@ -1,0 +1,9 @@
+{
+ "name": "capture-matroska-subtitle-ratios-f8e1c4d9",
+ "path": "capture-matroska-subtitle-ratios-f8e1c4d9",
+ "retention": "retained",
+ "reason": "Per-case runtime and memory bounds of the partial gate runs at f8e1c4d9 of the capture, Matroska, subtitle, test and external-vector items, both targets, with capture c06, c08 and c11 from the run of those three items, computed on a host from the shard archives (fetched and verified there): every case's paired median and 95% bounds with its heap and total RSS bounds (ratios-TARGET.jsonl), per feature the worst bounds, the median of the case medians and the cases above 1.05 (rows-TARGET.txt), the archives read and the script; for docs/status.md",
+ "key": "evidence/capture-matroska-subtitle-ratios/f8e1c4d9/85c8cb5d20eb157dd4b619d7d7b9e072ca70352d9cf5ca0b257cd7948de094e5.tar.zst",
+ "sha256": "85c8cb5d20eb157dd4b619d7d7b9e072ca70352d9cf5ca0b257cd7948de094e5",
+ "bytes": 164115
+}

@@ -1,6 +1,11 @@
 //! Separable 8×8 DCT-II / DCT-III in 32-bit fixed point with the MPEG
 //! normalisation F(u,v) = ¼·C(u)·C(v)·ΣΣ f(x,y)·cos((2x+1)uπ/16)·cos((2y+1)vπ/16).
-//! Each 1-D pass splits into the even (4-point) and odd (4×4 rotation) halves.
+//! Each 1-D transform splits into the even (4-point) and odd (4×4 rotation)
+//! halves. Its outputs are exact integer sums of the inputs times basis
+//! weights, which lets the inverse run as sums of the basis rows of the
+//! coefficients a block has.
+
+use crate::block::bits;
 
 /// cos(kπ/16)·2^13 / 2 (the ½ of the 1-D normalisation folded in), and the
 /// DC/X4 factor ½·cos(π/4).
@@ -26,9 +31,10 @@ pub(super) fn magnitude_bound(sum_abs: u32) -> u32 {
     sum_abs.div_ceil(4)
 }
 
-#[inline(always)]
-fn fdct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
-    let round = 1 << (shift - 1);
+/// The 1-D forward transform before rounding: sums and differences of mirrored
+/// inputs, the even outputs from the sums and the odd ones from the differences.
+/// Every output is the sum of the inputs times ±C1..C7.
+const fn fdct_terms(x: [i32; 8]) -> [i32; 8] {
     let (s07, d07) = (x[0] + x[7], x[0] - x[7]);
     let (s16, d16) = (x[1] + x[6], x[1] - x[6]);
     let (s25, d25) = (x[2] + x[5], x[2] - x[5]);
@@ -36,20 +42,27 @@ fn fdct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
     let (t0, t3) = (s07 + s34, s07 - s34);
     let (t1, t2) = (s16 + s25, s16 - s25);
     [
-        ((t0 + t1) * C4 + round) >> shift,
-        (d07 * C1 + d16 * C3 + d25 * C5 + d34 * C7 + round) >> shift,
-        (t3 * C2 + t2 * C6 + round) >> shift,
-        (d07 * C3 - d16 * C7 - d25 * C1 - d34 * C5 + round) >> shift,
-        ((t0 - t1) * C4 + round) >> shift,
-        (d07 * C5 - d16 * C1 + d25 * C7 + d34 * C3 + round) >> shift,
-        (t3 * C6 - t2 * C2 + round) >> shift,
-        (d07 * C7 - d16 * C5 + d25 * C3 - d34 * C1 + round) >> shift,
+        (t0 + t1) * C4,
+        d07 * C1 + d16 * C3 + d25 * C5 + d34 * C7,
+        t3 * C2 + t2 * C6,
+        d07 * C3 - d16 * C7 - d25 * C1 - d34 * C5,
+        (t0 - t1) * C4,
+        d07 * C5 - d16 * C1 + d25 * C7 + d34 * C3,
+        t3 * C6 - t2 * C2,
+        d07 * C7 - d16 * C5 + d25 * C3 - d34 * C1,
     ]
 }
 
+/// One rounded pass of the forward transform.
 #[inline(always)]
-fn idct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
-    let round = 1 << (shift - 1);
+fn fdct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
+    fdct_terms(x).map(|v| (v + (1 << (shift - 1))) >> shift)
+}
+
+/// The 1-D inverse transform before rounding: the even half from the 4-point
+/// transform of the even inputs, the odd half from the 4×4 rotation of the odd
+/// ones. Every output is the sum of the inputs times ±C1..C7.
+const fn idct_terms(x: [i32; 8]) -> [i32; 8] {
     let p = (x[0] + x[4]) * C4;
     let q = (x[0] - x[4]) * C4;
     let r = x[2] * C2 + x[6] * C6;
@@ -60,34 +73,40 @@ fn idct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
     let o2 = x[1] * C5 - x[3] * C1 + x[5] * C7 + x[7] * C3;
     let o3 = x[1] * C7 - x[3] * C5 + x[5] * C3 - x[7] * C1;
     [
-        (e0 + o0 + round) >> shift,
-        (e1 + o1 + round) >> shift,
-        (e2 + o2 + round) >> shift,
-        (e3 + o3 + round) >> shift,
-        (e3 - o3 + round) >> shift,
-        (e2 - o2 + round) >> shift,
-        (e1 - o1 + round) >> shift,
-        (e0 - o0 + round) >> shift,
+        e0 + o0,
+        e1 + o1,
+        e2 + o2,
+        e3 + o3,
+        e3 - o3,
+        e2 - o2,
+        e1 - o1,
+        e0 - o0,
     ]
 }
 
-/// Forward DCT of an 8×8 block of samples or residuals in raster order.
+/// `INVERSE[j][k]`: the weight of input `j` in output `k` of [`idct_terms`].
+const INVERSE: [[i32; 8]; 8] = {
+    let mut basis = [[0; 8]; 8];
+    let mut j = 0;
+    while j < 8 {
+        let mut unit = [0; 8];
+        unit[j] = 1;
+        basis[j] = idct_terms(unit);
+        j += 1;
+    }
+    basis
+};
+
+/// Forward DCT of an 8×8 block of samples or residuals (raster order). Both
+/// passes run down columns, so every column runs in its own vector lane: the
+/// row pass on the transposed block, which is then transposed back.
 pub(crate) fn fdct(block: &mut [i32; 64]) {
-    // The transposed row pass vectorises more effectively on 32-bit ARM.
-    #[cfg(target_arch = "arm")]
-    {
-        transpose(block);
-        columns_in_place(block, BITS - PASS, fdct_1d);
-        transpose(block);
-    }
-    #[cfg(not(target_arch = "arm"))]
-    for row in block.as_chunks_mut::<8>().0 {
-        *row = fdct_1d(*row, BITS - PASS);
-    }
+    transpose(block);
+    columns_in_place(block, BITS - PASS, fdct_1d);
+    transpose(block);
     columns_in_place(block, BITS + PASS, fdct_1d);
 }
 
-#[cfg(target_arch = "arm")]
 #[inline(always)]
 fn transpose(block: &mut [i32; 64]) {
     for r in 0..8 {
@@ -121,18 +140,41 @@ fn columns_in_place(block: &mut [i32; 64], shift: u32, f: impl Fn([i32; 8], u32)
 }
 
 /// Inverse DCT of dequantised coefficients (raster order), producing samples
-/// or residuals before clamping.
-pub(crate) fn idct(block: &mut [i32; 64]) {
-    for row in block.chunks_exact_mut(8) {
-        if row[1..].iter().all(|&v| v == 0) {
-            let dc = (row[0] * C4 + (1 << (BITS - PASS - 1))) >> (BITS - PASS);
-            row.fill(dc);
-            continue;
+/// or residuals before clamping. `support` is a raster bit mask holding every
+/// non-zero coefficient; the entries outside it are not read.
+///
+/// Each pass sums the basis rows of its non-zero inputs, rounding between the
+/// passes as the separable transform does, so its work follows the coefficients
+/// a block has: most coded blocks have a handful, in one or two rows.
+pub(crate) fn idct(block: &mut [i32; 64], support: u64) {
+    let mut rows = [[0i32; 8]; 8];
+    for at in bits(support) {
+        let (row, x) = (&mut rows[at / 8], block[at]);
+        for (sum, &weight) in row.iter_mut().zip(&INVERSE[at % 8]) {
+            *sum += x * weight;
         }
-        let out = idct_1d(row.try_into().unwrap(), BITS - PASS);
-        row.copy_from_slice(&out);
     }
-    columns_in_place(block, BITS + PASS, idct_1d);
+    let mut occupied = [0; 8];
+    let mut count = 0;
+    for (r, row) in rows.iter_mut().enumerate() {
+        if support >> (8 * r) & 0xff != 0 {
+            *row = row.map(|v| (v + (1 << (BITS - PASS - 1))) >> (BITS - PASS));
+            occupied[count] = r;
+            count += 1;
+        }
+    }
+    for (i, out) in block.chunks_exact_mut(8).enumerate() {
+        let mut sums = [1 << (BITS + PASS - 1); 8];
+        for &r in &occupied[..count] {
+            let weight = INVERSE[r][i];
+            for (sum, &v) in sums.iter_mut().zip(&rows[r]) {
+                *sum += v * weight;
+            }
+        }
+        for (o, sum) in out.iter_mut().zip(sums) {
+            *o = sum >> (BITS + PASS);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -221,7 +263,7 @@ mod tests {
                 std::array::from_fn(|i| (forward[i].round() as i32).clamp(-2048, 2047));
             let wanted = reference_idct(&coeffs);
             let mut got = coeffs;
-            idct(&mut got);
+            idct(&mut got, u64::MAX);
             for i in 0..64 {
                 let w = wanted[i].round().clamp(-256.0, 255.0);
                 let e = got[i].clamp(-256, 255) as f64 - w;
@@ -234,6 +276,72 @@ mod tests {
         }
     }
 
+    /// The separable butterfly the basis sums reproduce: each row through the
+    /// 1-D transform, rounded, then each column.
+    fn butterfly_idct(block: &[i32; 64]) -> [i32; 64] {
+        let pass =
+            |x: [i32; 8], shift: u32| idct_terms(x).map(|v| (v + (1 << (shift - 1))) >> shift);
+        let mut rows = [0; 64];
+        for (out, row) in rows.chunks_exact_mut(8).zip(block.chunks_exact(8)) {
+            out.copy_from_slice(&pass(row.try_into().unwrap(), BITS - PASS));
+        }
+        let mut out = [0; 64];
+        for c in 0..8 {
+            let column = pass(std::array::from_fn(|r| rows[r * 8 + c]), BITS + PASS);
+            for r in 0..8 {
+                out[r * 8 + c] = column[r];
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn forward_rows_equal_the_butterfly() {
+        let mut rng = Lcg(5);
+        for _ in 0..20_000 {
+            let input: [i32; 64] = std::array::from_fn(|_| rng.next(-255, 255));
+            let mut rows = [0; 64];
+            for (out, row) in rows.chunks_exact_mut(8).zip(input.chunks_exact(8)) {
+                out.copy_from_slice(&fdct_1d(row.try_into().unwrap(), BITS - PASS));
+            }
+            let mut wanted = [0; 64];
+            for c in 0..8 {
+                let column = fdct_1d(std::array::from_fn(|r| rows[r * 8 + c]), BITS + PASS);
+                for r in 0..8 {
+                    wanted[r * 8 + c] = column[r];
+                }
+            }
+            let mut got = input;
+            fdct(&mut got);
+            assert_eq!(got, wanted, "{input:?}");
+        }
+    }
+
+    #[test]
+    fn sparse_inverse_equals_the_butterfly() {
+        let mut rng = Lcg(11);
+        for n in 0..60_000 {
+            let count = [1, 2, 3, 5, 9, 20, 64][n % 7];
+            let mut coeffs = [0; 64];
+            let mut support = 0u64;
+            for _ in 0..count {
+                let at = rng.next(0, 63) as usize;
+                coeffs[at] = rng.next(-2048, 2047);
+                support |= 1 << at;
+            }
+            let wanted = butterfly_idct(&coeffs);
+            // Entries outside the support are not read.
+            let mut got = coeffs.map(|v| if v == 0 { 0x5a5a } else { v });
+            for at in 0..64 {
+                if support >> at & 1 != 0 {
+                    got[at] = coeffs[at];
+                }
+            }
+            idct(&mut got, support);
+            assert_eq!(got, wanted, "{coeffs:?}");
+        }
+    }
+
     #[test]
     fn constant_block_dc() {
         let mut b = [128; 64];
@@ -242,7 +350,7 @@ mod tests {
         assert!(b[1..].iter().all(|&v| v == 0));
         let mut r = [0; 64];
         r[0] = 1024;
-        idct(&mut r);
+        idct(&mut r, 1);
         assert!(r.iter().all(|&v| v == 128));
     }
 }

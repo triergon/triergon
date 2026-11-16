@@ -99,27 +99,53 @@ fn lane_sum(acc: &[u16; 16]) -> u32 {
     u32::from(acc.iter().sum::<u16>())
 }
 
-/// SAD of two 16×16 blocks; per-lane accumulation keeps it vectorisable.
-#[inline(never)]
-pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
+/// Adds the absolute differences of one 16-sample row to the per-lane sums.
+#[inline(always)]
+fn accumulate(acc: &mut [u16; 16], a: &[u8; 16], b: &[u8; 16]) {
+    for i in 0..16 {
+        acc[i] += u16::from(a[i].abs_diff(b[i]));
+    }
+}
+
+/// The 16 samples of `plane` at `at`.
+#[inline(always)]
+fn row16(plane: &[u8], at: usize) -> &[u8; 16] {
+    plane[at..][..16].try_into().expect("16 samples")
+}
+
+/// SAD of `ROWS` rows of 16 samples.
+#[inline(always)]
+fn sad_rows<const ROWS: usize>(
+    cur: &[u8],
+    cur_stride: usize,
+    reference: &[u8],
+    ref_stride: usize,
+) -> u32 {
     let mut acc = [0u16; 16];
-    for row in 0..16 {
-        let a: &[u8; 16] = cur[row * cur_stride..row * cur_stride + 16]
-            .try_into()
-            .unwrap();
-        let b: &[u8; 16] = reference[row * ref_stride..row * ref_stride + 16]
-            .try_into()
-            .unwrap();
-        for i in 0..16 {
-            acc[i] += a[i].abs_diff(b[i]) as u16;
-        }
+    for row in 0..ROWS {
+        accumulate(
+            &mut acc,
+            row16(cur, row * cur_stride),
+            row16(reference, row * ref_stride),
+        );
     }
     lane_sum(&acc)
 }
 
+/// SAD of two 16×16 blocks.
+///
+/// The SADs are kept out of line: inlined into the search, the sums of their
+/// lanes compile on 32-bit Arm to a lane move per lane and spills, and as
+/// functions of their own to vector additions.
+#[inline(never)]
+pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
+    sad_rows::<16>(cur, cur_stride, reference, ref_stride)
+}
+
 /// SAD of two 16×16 blocks, abandoned once it reaches `limit`: the result is
-/// exact when below `limit` and otherwise only guaranteed to be >= `limit`.
-#[inline]
+/// exact when below `limit` and otherwise the sum of the rows up to the first
+/// group of four at which it reached `limit`.
+#[inline(never)]
 pub(crate) fn sad16_within(
     cur: &[u8],
     cur_stride: usize,
@@ -128,20 +154,13 @@ pub(crate) fn sad16_within(
     limit: u32,
 ) -> u32 {
     let mut total = 0u32;
-    for quarter in 0..4 {
-        let mut acc = [0u16; 16];
-        for row in quarter * 4..quarter * 4 + 4 {
-            let a: &[u8; 16] = cur[row * cur_stride..row * cur_stride + 16]
-                .try_into()
-                .unwrap();
-            let b: &[u8; 16] = reference[row * ref_stride..row * ref_stride + 16]
-                .try_into()
-                .unwrap();
-            for i in 0..16 {
-                acc[i] += a[i].abs_diff(b[i]) as u16;
-            }
-        }
-        total += lane_sum(&acc);
+    for rows in [0, 4, 8, 12] {
+        total += sad_rows::<4>(
+            &cur[rows * cur_stride..],
+            cur_stride,
+            &reference[rows * ref_stride..],
+            ref_stride,
+        );
         if total >= limit {
             return total;
         }
@@ -150,9 +169,7 @@ pub(crate) fn sad16_within(
 }
 
 /// SAD of a 16×16 block against the half-sample interpolation of
-/// `reference` (top-left full sample given) without materialising it. The
-/// sample-to-the-right rows are separate overlapping 16-byte loads, which keeps
-/// every operand a plain vector.
+/// `reference` (top-left full sample given) without materialising it.
 #[inline]
 pub(crate) fn sad16_half(
     cur: &[u8],
@@ -161,54 +178,49 @@ pub(crate) fn sad16_half(
     half_x: bool,
     half_y: bool,
 ) -> u32 {
-    let cur = &cur[..15 * stride + 16];
-    let reference = &reference[..15 * stride + 16 + half_y as usize * stride + half_x as usize];
-    let mut acc = [0u16; 16];
-    for k in 0..16 {
-        let a: &[u8; 16] = cur[k * stride..][..16].try_into().unwrap();
-        let mut pred = [0u8; 16];
-        half_row(reference, k * stride, stride, half_x, half_y, &mut pred);
-        for i in 0..16 {
-            acc[i] += a[i].abs_diff(pred[i]) as u16;
+    /// One interpolation, decided once for the whole block.
+    #[inline(never)]
+    fn sad<const HX: bool, const HY: bool>(cur: &[u8], reference: &[u8], stride: usize) -> u32 {
+        let mut acc = [0u16; 16];
+        for k in 0..16 {
+            let prediction = half_row::<HX, HY>(reference, k * stride, stride);
+            accumulate(&mut acc, row16(cur, k * stride), &prediction);
         }
+        lane_sum(&acc)
     }
-    lane_sum(&acc)
+    match (half_x, half_y) {
+        (false, false) => sad16(cur, stride, reference, stride),
+        (true, false) => sad::<true, false>(cur, reference, stride),
+        (false, true) => sad::<false, true>(cur, reference, stride),
+        (true, true) => sad::<true, true>(cur, reference, stride),
+    }
 }
 
-/// One 16-sample row of the half-sample prediction starting at `at`.
-/// Averages round half up (MPEG-1).
+/// One 16-sample row of the half-sample prediction starting at `at`, with a
+/// half-sample offset to the right (`HX`) and down (`HY`). The samples to the
+/// right and below are separate overlapping 16-byte loads, which keeps every
+/// operand a plain vector. Averages round half up (MPEG-1).
 #[inline(always)]
-fn half_row(
-    plane: &[u8],
-    at: usize,
-    stride: usize,
-    half_x: bool,
-    half_y: bool,
-    out: &mut [u8; 16],
-) {
-    let p0: &[u8; 16] = plane[at..][..16].try_into().unwrap();
-    match (half_x, half_y) {
-        (false, false) => *out = *p0,
+fn half_row<const HX: bool, const HY: bool>(plane: &[u8], at: usize, stride: usize) -> [u8; 16] {
+    let p0 = row16(plane, at);
+    match (HX, HY) {
+        (false, false) => *p0,
         (true, false) => {
-            let p1: &[u8; 16] = plane[at + 1..][..16].try_into().unwrap();
-            for i in 0..16 {
-                out[i] = ((p0[i] as u16 + p1[i] as u16 + 1) >> 1) as u8;
-            }
+            let p1 = row16(plane, at + 1);
+            std::array::from_fn(|i| ((u16::from(p0[i]) + u16::from(p1[i]) + 1) >> 1) as u8)
         }
         (false, true) => {
-            let q0: &[u8; 16] = plane[at + stride..][..16].try_into().unwrap();
-            for i in 0..16 {
-                out[i] = ((p0[i] as u16 + q0[i] as u16 + 1) >> 1) as u8;
-            }
+            let q0 = row16(plane, at + stride);
+            std::array::from_fn(|i| ((u16::from(p0[i]) + u16::from(q0[i]) + 1) >> 1) as u8)
         }
         (true, true) => {
-            let p1: &[u8; 16] = plane[at + 1..][..16].try_into().unwrap();
-            let q0: &[u8; 16] = plane[at + stride..][..16].try_into().unwrap();
-            let q1: &[u8; 16] = plane[at + stride + 1..][..16].try_into().unwrap();
-            for i in 0..16 {
-                let s = p0[i] as u16 + p1[i] as u16 + q0[i] as u16 + q1[i] as u16;
-                out[i] = ((s + 2) >> 2) as u8;
-            }
+            let p1 = row16(plane, at + 1);
+            let q0 = row16(plane, at + stride);
+            let q1 = row16(plane, at + stride + 1);
+            std::array::from_fn(|i| {
+                let s = u16::from(p0[i]) + u16::from(p1[i]) + u16::from(q0[i]) + u16::from(q1[i]);
+                ((s + 2) >> 2) as u8
+            })
         }
     }
 }
@@ -301,40 +313,28 @@ pub(crate) fn predict_luma_blocks(
     vy: i32,
     blocks: &mut [[u8; 64]; 6],
 ) {
+    #[inline(always)]
+    fn rows<const HX: bool, const HY: bool>(
+        plane: &[u8],
+        base: usize,
+        stride: usize,
+        blocks: &mut [[u8; 64]; 6],
+    ) {
+        for r in 0..16 {
+            let row = half_row::<HX, HY>(plane, base + r * stride, stride);
+            let (top, at) = ((r >> 3) * 2, (r & 7) * 8);
+            blocks[top][at..at + 8].copy_from_slice(&row[..8]);
+            blocks[top + 1][at..at + 8].copy_from_slice(&row[8..]);
+        }
+    }
     let sx = (x as i32 + (vx >> 1)) as usize;
     let sy = (y as i32 + (vy >> 1)) as usize;
     let base = sy * stride + sx;
-    let (hx, hy) = (vx & 1 != 0, vy & 1 != 0);
-    for r in 0..16 {
-        let at = base + r * stride;
-        let mut row = [0u8; 16];
-        match (hx, hy) {
-            (false, false) => row.copy_from_slice(&plane[at..at + 16]),
-            (true, false) => {
-                let a: &[u8; 17] = plane[at..at + 17].try_into().unwrap();
-                for c in 0..16 {
-                    row[c] = ((a[c] as u16 + a[c + 1] as u16 + 1) >> 1) as u8;
-                }
-            }
-            (false, true) => {
-                let a: &[u8; 16] = plane[at..at + 16].try_into().unwrap();
-                let b: &[u8; 16] = plane[at + stride..at + stride + 16].try_into().unwrap();
-                for c in 0..16 {
-                    row[c] = ((a[c] as u16 + b[c] as u16 + 1) >> 1) as u8;
-                }
-            }
-            (true, true) => {
-                let a: &[u8; 17] = plane[at..at + 17].try_into().unwrap();
-                let b: &[u8; 17] = plane[at + stride..at + stride + 17].try_into().unwrap();
-                for c in 0..16 {
-                    let s = a[c] as u16 + a[c + 1] as u16 + b[c] as u16 + b[c + 1] as u16;
-                    row[c] = ((s + 2) >> 2) as u8;
-                }
-            }
-        }
-        let (top, rr) = ((r >> 3) * 2, (r & 7) * 8);
-        blocks[top][rr..rr + 8].copy_from_slice(&row[..8]);
-        blocks[top + 1][rr..rr + 8].copy_from_slice(&row[8..]);
+    match (vx & 1 != 0, vy & 1 != 0) {
+        (false, false) => rows::<false, false>(plane, base, stride, blocks),
+        (true, false) => rows::<true, false>(plane, base, stride, blocks),
+        (false, true) => rows::<false, true>(plane, base, stride, blocks),
+        (true, true) => rows::<true, true>(plane, base, stride, blocks),
     }
 }
 
@@ -609,13 +609,14 @@ impl Search<'_> {
         let hi_y = b.hi_y.div_euclid(8).min(COARSE_RADIUS);
         let mut best = [(u32::MAX, 0i32, 0i32); COARSE_KEEP];
         let span = (hi_x - lo_x + 1).max(0) as usize;
-        let mut sads = [0u16; 2 * COARSE_RADIUS as usize + 1];
         for dy in lo_y..=hi_y {
             let ry = (y0 as i32 + dy) as usize;
             // Sliding correlation: for every block sample, one contiguous pass
             // over all horizontal displacements of this row (vectorises over dx).
+            // Clearing the whole array, of a size known when compiling, takes a
+            // few vector stores rather than a call.
+            let mut sads = [0u16; 2 * COARSE_RADIUS as usize + 1];
             let sads = &mut sads[..span];
-            sads.fill(0);
             for r in 0..4 {
                 let start = (ry + r) * width + (x0 as i32 + lo_x) as usize;
                 let line = &coarse.reference[start..start + span + 3];

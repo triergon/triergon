@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-armv7-f8e1c4d9-20261116-095918-shard-3",
+ "path": "gate-run-armv7-f8e1c4d9-20261116-095918-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run at f8e1c4d9 under static-toolchain-runtime-trained-order-v1 of capture-c06, c08 and c11, shard 3 of 3, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, 32-bit ARMv7: the shard's items (capture-c08-ui-scroll-480-bottomup), timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md capture, Matroska and subtitle rows on 32-bit ARMv7; it measures the three capture cases whose timing in the run of all 33 items followed the release tests' rebuild of the capture worker",
+ "key": "evidence/gate-runs/f8e1c4d9136d5a43661d8f069ca0908e07cb2acc-armv7-20261116-095918/shard-3/1664812cb40a330c02ac61963ab76d2bbb9f88f0bcbf7de4e74941af606c2085.tar.zst",
+ "sha256": "1664812cb40a330c02ac61963ab76d2bbb9f88f0bcbf7de4e74941af606c2085",
+ "bytes": 4226676,
+ "results": [
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "3ed4c901e8e8e1d9a8f076b73d786f527eb196ea02af914b60f13f8a7847df50",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "cda9e68f3190fc0dce921817d621848fda68f438c89af7947f3b0e0f61240a72",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

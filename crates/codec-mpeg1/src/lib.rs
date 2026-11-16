@@ -732,7 +732,7 @@ impl Encoder {
             };
             block::write_coefficients(&mut self.writer, &levels, mask, true);
             block::dequant_intra(&levels, mask, dc, s.q, &mut coeffs);
-            dct::idct(&mut coeffs);
+            dct::idct(&mut coeffs, mask | 1);
             let dst = match plane {
                 0 => self.recon.y_mut(),
                 1 => self.recon.cb_mut(),
@@ -905,7 +905,7 @@ impl Encoder {
             }
             block::write_coefficients(&mut self.writer, &self.levels[b], masks[b], false);
             block::dequant_inter(&self.levels[b], masks[b], s.q, &mut coeffs);
-            dct::idct(&mut coeffs);
+            dct::idct(&mut coeffs, masks[b]);
             for (p, &c) in pred[b].iter_mut().zip(&coeffs) {
                 *p = (*p as i32 + c).clamp(0, 255) as u8;
             }

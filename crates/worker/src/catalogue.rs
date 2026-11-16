@@ -210,54 +210,43 @@ pub struct CatalogueView<'a> {
     chapters: Vec<ChapterView<'a>>,
     attachments: Vec<AttachmentView<'a>>,
 }
+/// The `creation_time` text of a Segment's DateUTC: the signed nanoseconds since
+/// 2001-01-01T00:00:00Z, truncated toward zero to microseconds.
 fn utc_date(ns: i64) -> String {
-    let micros = i128::from(ns / 1000) + 978_307_200_000_000_i128;
+    /// Seconds from the Unix epoch to the Matroska epoch.
+    const MATROSKA_EPOCH: i64 = 978_307_200;
+    // Every i64 of nanoseconds lies within 1708 to 2293, so no step overflows.
+    let micros = ns / 1000 + MATROSKA_EPOCH * 1_000_000;
     let seconds = micros.div_euclid(1_000_000);
     let sub = micros.rem_euclid(1_000_000);
-    let mut days = seconds.div_euclid(86_400);
     let time = seconds.rem_euclid(86_400);
-    let leap = |y: i128| y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
-    let mut year = 1970;
-    while days < 0 {
-        year -= 1;
-        days += if leap(year) { 366 } else { 365 };
-    }
-    loop {
-        let n = if leap(year) { 366 } else { 365 };
-        if days < n {
-            break;
-        }
-        days -= n;
-        year += 1;
-    }
-    let mut month = 1;
-    for n in [
-        31,
-        if leap(year) { 29 } else { 28 },
-        31,
-        30,
-        31,
-        30,
-        31,
-        31,
-        30,
-        31,
-        30,
-        31,
-    ] {
-        if days < n {
-            break;
-        }
-        days -= n;
-        month += 1;
-    }
+    let days = i32::try_from(seconds.div_euclid(86_400)).expect("days of an i64 DateUTC");
+    let (year, month, day) = civil_from_days(days);
     format!(
-        "{year:04}-{month:02}-{:02}T{:02}:{:02}:{:02}.{sub:06}Z",
-        days + 1,
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{sub:06}Z",
         time / 3600,
         time / 60 % 60,
         time % 60
     )
+}
+
+/// The proleptic Gregorian year, month and day of a day count from 1970-01-01, by
+/// whole 400-year eras of 146,097 days, each counted from a March 1st.
+fn civil_from_days(days: i32) -> (i32, i32, i32) {
+    let shifted = days + 719_468;
+    let era = shifted.div_euclid(146_097);
+    let day_of_era = shifted.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_from_march = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_from_march + 2) / 5 + 1;
+    let month = if month_from_march < 10 {
+        month_from_march + 3
+    } else {
+        month_from_march - 9
+    };
+    (era * 400 + year_of_era + i32::from(month <= 2), month, day)
 }
 fn flatten_tag<'a>(
     tag: SimpleTag<'a>,
@@ -601,5 +590,43 @@ mod tests {
             None,
             r#"[["language","und"],["title","Language probe"]]"#,
         );
+    }
+
+    #[test]
+    fn creation_time_covers_every_date_utc() {
+        for (ns, text) in [
+            (0, "2001-01-01T00:00:00.000000Z"),
+            (-1, "2001-01-01T00:00:00.000000Z"),
+            (1000, "2001-01-01T00:00:00.000001Z"),
+            (-1001, "2000-12-31T23:59:59.999999Z"),
+            (-86_400_000_000_001, "2000-12-31T00:00:00.000000Z"),
+            (36_720_000_000_000_000, "2002-03-02T00:00:00.000000Z"),
+            (i64::MIN, "1708-09-22T00:12:43.145225Z"),
+            (i64::MAX, "2293-04-11T23:47:16.854775Z"),
+        ] {
+            assert_eq!(utc_date(ns), text, "{ns}");
+        }
+    }
+
+    #[test]
+    fn civil_days_follow_the_gregorian_calendar() {
+        let leap = |y: i32| y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+        let (mut year, mut month, mut day) = (1600, 1, 1);
+        for days in -135_140..120_000 {
+            assert_eq!(civil_from_days(days), (year, month, day), "{days}");
+            let length = match month {
+                2 if leap(year) => 29,
+                2 => 28,
+                4 | 6 | 9 | 11 => 30,
+                _ => 31,
+            };
+            day += 1;
+            if day > length {
+                (month, day) = (month + 1, 1);
+                if month > 12 {
+                    (year, month) = (year + 1, 1);
+                }
+            }
+        }
     }
 }
