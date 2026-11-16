@@ -8,7 +8,7 @@ use super::energy::MAX_FINE_BITS;
 use super::tables::{
     ALLOC_VECTORS, BANDS, CACHE_BITS, CACHE_CAPS, CACHE_INDEX, EBANDS, LOG_N, LOG2_FRAC,
 };
-use crate::range::RangeDecoder;
+use crate::range::{RangeDecoder, divide};
 use core::ops::Range;
 
 /// Fractional bits per bit.
@@ -324,7 +324,7 @@ fn interpolate(
         }
         // The left-over bits this band would get, including those of skipped bands.
         let mut left = total - psum;
-        let per_coeff = left / width_from_start(coded);
+        let per_coeff = divide(left, width_from_start(coded));
         left -= width_from_start(coded) * per_coeff;
         let rem = (left - width_from_start(j)).max(0);
         let width = (EBANDS[coded] - EBANDS[j]) as i32;
@@ -366,7 +366,7 @@ fn interpolate(
 
     // Spread the remaining bits evenly, then the remainder from the bottom.
     let mut left = total - psum;
-    let per_coeff = left / width_from_start(coded);
+    let per_coeff = divide(left, width_from_start(coded));
     left -= width_from_start(coded) * per_coeff;
     for j in start..coded {
         let width = (EBANDS[j + 1] - EBANDS[j]) as i32;
@@ -400,7 +400,7 @@ fn interpolate(
             } else if bits[j] + offset < (den * 3) << BITRES {
                 offset += nc_log_n >> 3;
             }
-            let mut fine = ((bits[j] + offset + (den << (BITRES - 1))) / (den << BITRES)).max(0);
+            let mut fine = divide(bits[j] + offset + (den << (BITRES - 1)), den << BITRES).max(0);
             if c * fine > bits[j] >> BITRES {
                 fine = bits[j] >> stereo >> BITRES;
             }

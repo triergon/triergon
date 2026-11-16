@@ -5,9 +5,10 @@
 use super::alloc::{
     Allocation, BITRES, bits_to_pulses, pulse_count, pulses_to_bits, split_threshold,
 };
+use super::block_len;
 use super::pvq::{self, MAX_BAND, Spread};
 use super::tables::{BANDS, EBANDS, LOG_N};
-use crate::range::{RangeDecoder, ilog};
+use crate::range::{RangeDecoder, divide, ilog};
 use core::ops::Range;
 
 /// Normalised folding source of both channels: bins up to the last band's start.
@@ -47,8 +48,8 @@ fn bitexact_log2tan(sin: i32, cos: i32) -> i32 {
 
 /// One level of the Haar transform over `stride` interleaved signals.
 fn haar(x: &mut [f32], n0: usize, stride: usize) {
-    for pair in x[..n0 * stride].chunks_exact_mut(2 * stride) {
-        let (a, b) = pair.split_at_mut(stride);
+    for p in 0..n0 / 2 {
+        let (a, b) = x[2 * p * stride..][..2 * stride].split_at_mut(stride);
         for (a, b) in a.iter_mut().zip(b) {
             let (t1, t2) = (FRAC_SQRT_2 * *a, FRAC_SQRT_2 * *b);
             *a = t1 + t2;
@@ -191,7 +192,7 @@ pub(super) fn decode(
         state.remaining_bits = total_bits - tell - 1;
         state.band = i;
         let b = if i < allocation.coded_bands {
-            let share = balance / (allocation.coded_bands - i).min(3) as i32;
+            let share = divide(balance, (allocation.coded_bands - i).min(3) as i32);
             (state.remaining_bits + 1)
                 .min(allocation.pulses[i] + share)
                 .clamp(0, 16383)
@@ -377,7 +378,7 @@ impl Bands<'_, '_> {
             } else {
                 self.triangular_angle(qn)
             } as i32;
-            itheta = itheta * 16384 / qn as i32;
+            itheta = divide(itheta * 16384, qn as i32);
         } else if stereo {
             invert = b > 2 << BITRES && self.remaining_bits > 2 << BITRES && self.rc.bit_logp(2);
         }
@@ -470,7 +471,7 @@ impl Bands<'_, '_> {
         let mut tf_change = self.tf_change;
         let recombine = tf_change.max(0) as usize;
         let mut b_count = blocks;
-        let mut n_b = n0 / blocks;
+        let mut n_b = block_len(n0, blocks);
 
         // Recombine blocks to increase frequency resolution.
         for k in 0..recombine {
@@ -780,7 +781,7 @@ fn quantisation_steps(n: usize, b: i32, offset: i32, pulse_cap: i32, stereo: boo
     }
     // Leave enough bits to code one pulse in the side of a fully sided split.
     let qb = (b - pulse_cap - (4 << BITRES))
-        .min((b + n2 * offset) / n2)
+        .min(divide(b + n2 * offset, n2))
         .min(8 << BITRES);
     if qb < (1 << BITRES >> 1) {
         1
@@ -838,7 +839,7 @@ pub(super) fn anti_collapse(p: &AntiCollapse<'_>, x: &mut [f32], frame: usize, m
             let n0 = EBANDS[i + 1] - EBANDS[i];
             let n = n0 << p.lm;
             // Depth in 1/8 bits per bin.
-            let depth = (1 + p.pulses[i]) / n as i32;
+            let depth = divide(1 + p.pulses[i], n as i32);
             let thresh = 0.5 * super::energy::exp2(-0.125 * depth as f32);
             let (mut prev1, mut prev2) = (p.prev1[c][i], p.prev2[c][i]);
             if p.channels == 1 {

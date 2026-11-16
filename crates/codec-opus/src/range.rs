@@ -47,6 +47,39 @@ pub(crate) fn ilog(x: u32) -> u32 {
     32 - x.leading_zeros()
 }
 
+/// `a / b` rounded towards zero, `b > 0`.
+///
+/// The 32-bit ARM targets have no integer divide instruction in their baseline, and the
+/// library routine costs several times a VFP double division there. A double holds both
+/// operands exactly and the rounded quotient never reaches the next integer (that would
+/// take `|a| >= 2^53`), so the truncated double quotient is the integer one.
+#[inline(always)]
+pub(crate) fn divide(a: i32, b: i32) -> i32 {
+    debug_assert!(b > 0);
+    #[cfg(all(target_arch = "arm", target_abi = "eabihf"))]
+    {
+        (f64::from(a) / f64::from(b)) as i32
+    }
+    #[cfg(not(all(target_arch = "arm", target_abi = "eabihf")))]
+    {
+        a / b
+    }
+}
+
+/// [`divide`] for unsigned operands.
+#[inline(always)]
+pub(crate) fn divide_u32(a: u32, b: u32) -> u32 {
+    debug_assert!(b > 0);
+    #[cfg(all(target_arch = "arm", target_abi = "eabihf"))]
+    {
+        (f64::from(a) / f64::from(b)) as u32
+    }
+    #[cfg(not(all(target_arch = "arm", target_abi = "eabihf")))]
+    {
+        a / b
+    }
+}
+
 impl<'a> RangeDecoder<'a> {
     /// Start decoding `data` (RFC 6716 section 4.1.1).
     pub(crate) fn new(data: &'a [u8]) -> Self {
@@ -136,8 +169,17 @@ impl<'a> RangeDecoder<'a> {
     /// (RFC 6716 section 4.1.2). Must be followed by [`Self::update`].
     #[inline(always)]
     pub(crate) fn decode(&mut self, ft: u32) -> (u32, u32) {
-        let ext = self.rng / ft;
-        let fs = self.val / ext + 1;
+        let ext = divide_u32(self.rng, ft);
+        let fs = divide_u32(self.val, ext) + 1;
+        (ft - fs.min(ft), ext)
+    }
+
+    /// `ec_decode_bin`: [`Self::decode`] with a total of `1 << bits`.
+    #[inline(always)]
+    pub(crate) fn decode_bin(&mut self, bits: u32) -> (u32, u32) {
+        let ft = 1 << bits;
+        let ext = self.rng >> bits;
+        let fs = divide_u32(self.val, ext) + 1;
         (ft - fs.min(ft), ext)
     }
 

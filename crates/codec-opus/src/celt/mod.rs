@@ -44,6 +44,14 @@ pub(crate) fn fade(i: usize, outgoing: f32, incoming: f32) -> f32 {
     w * incoming + (1.0 - w) * outgoing
 }
 
+/// The length of each of `blocks` (a power of two) blocks of `len` bins, by a shift: a
+/// run-time division is a library call on ARMv7.
+#[inline(always)]
+fn block_len(len: usize, blocks: usize) -> usize {
+    debug_assert!(blocks.is_power_of_two());
+    len >> blocks.trailing_zeros()
+}
+
 /// Buffers and transforms of one CELT frame, shared by all streams of a decoder.
 #[derive(Debug)]
 pub(crate) struct Workspace {
