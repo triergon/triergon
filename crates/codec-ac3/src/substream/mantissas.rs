@@ -47,7 +47,6 @@ impl Substream {
         noise: NoiseMode,
         groups: &GroupTables,
     ) -> Result<(), E> {
-        self.coef_clear();
         let mut g = Groups::new();
         let mut got_cpl = false;
         for ch in 0..self.nfchans {
@@ -119,19 +118,6 @@ impl Substream {
             }
         }
         Ok(())
-    }
-
-    fn coef_clear(&mut self) {
-        let n = self.nfchans;
-        for c in &mut self.icoef[..n] {
-            c.fill(0);
-        }
-        if self.cplinu {
-            self.icoef[CPL].fill(0);
-        }
-        if self.lfeon {
-            self.icoef[LFE].fill(0);
-        }
     }
 
     fn read_aht_channel(

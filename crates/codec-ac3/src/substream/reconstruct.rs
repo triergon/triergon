@@ -1,7 +1,7 @@
 //! Coefficient reconstruction (decoupling, rematrixing, spectral extension, dynamic
 //! range) and the inverse transform with overlap-add (7.4-7.9).
 
-use super::{BlockSink, CPL, LFE, NoiseMode, Substream};
+use super::{BlockSink, CPL, LFE, NCH, NoiseMode, Substream};
 use crate::imdct::Imdct;
 use crate::noise::Rng;
 use crate::tables::{REMAT_BANDS, spx_atten, spx_band_start};
@@ -9,6 +9,22 @@ use crate::tables::{REMAT_BANDS, spx_atten, spx_band_start};
 impl Substream {
     pub(super) fn reconstruct(&mut self, rng: &mut Rng, noise: NoiseMode) {
         let nfch = self.nfchans;
+        // The mantissas of this block fill bins 0..endmant, decoupling fills the coupling
+        // range; only the bins below the higher of the two are converted.
+        let mut top = [0; NCH];
+        for ch in 0..nfch {
+            let end = self.endmant[ch];
+            top[ch] = if self.cplinu && self.chincpl[ch] {
+                let (lo, hi) = (self.cplstrtmant, self.cplendmant);
+                if end < lo {
+                    self.icoef[ch][end..lo].fill(0);
+                }
+                end.max(hi)
+            } else {
+                end
+            };
+        }
+        top[LFE] = 7;
         // Decoupling (7.4.3).
         if self.cplinu {
             let begf = self.cplbegf as usize;
@@ -73,28 +89,30 @@ impl Substream {
         } else {
             g0
         };
-        for ch in 0..nfch {
+        for ch in (0..nfch).chain(self.lfeon.then_some(LFE)) {
             let g = if ch == 1 { g1 } else { g0 };
-            for (d, &s) in self.coef[ch].iter_mut().zip(self.icoef[ch].iter()) {
+            let n = top[ch];
+            for (d, &s) in self.coef[ch][..n].iter_mut().zip(&self.icoef[ch][..n]) {
                 *d = s as f32 * g;
             }
-        }
-        if self.lfeon {
-            for (d, &s) in self.coef[LFE].iter_mut().zip(self.icoef[LFE].iter()) {
-                *d = s as f32 * g0;
+            if self.coef_end[ch] > n {
+                self.coef[ch][n..self.coef_end[ch]].fill(0.0);
             }
+            self.coef_end[ch] = n;
         }
         // Spectral extension (Annex E 3.6).
         if self.eac3 && self.spxinu {
             for ch in 0..nfch {
                 if self.chinspx[ch] {
-                    self.apply_spx(ch, rng, noise);
+                    let end = self.apply_spx(ch, rng, noise);
+                    self.coef_end[ch] = self.coef_end[ch].max(end);
                 }
             }
         }
     }
 
-    fn apply_spx(&mut self, ch: usize, rng: &mut Rng, noise: NoiseMode) {
+    /// Returns the end of the extended bins.
+    fn apply_spx(&mut self, ch: usize, rng: &mut Rng, noise: NoiseMode) -> usize {
         let tc = &mut self.coef[ch];
         let copystart = spx_band_start(self.spxstrtf);
         let copyend = spx_band_start(self.spx_begin);
@@ -172,6 +190,7 @@ impl Substream {
             }
             m += bs;
         }
+        m
     }
 
     /// FFmpeg 9.0.2 compatibility (observed black-box): the first audio
