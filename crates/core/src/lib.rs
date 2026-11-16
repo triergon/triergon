@@ -31,5 +31,5 @@ pub use input::{
     SourceFailure, SourceId, SourceLocation, Step,
 };
 pub use round::round_ties_even_i32;
-pub use time::{Rounding, Time, TimeBase};
+pub use time::{Rounding, TickScale, Time, TimeBase};
 pub use work::WorkBudget;

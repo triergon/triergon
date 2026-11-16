@@ -1,0 +1,93 @@
+# endchar with every operand count, and its four-operand accented form (adx
+# ady bchar achar, Type 1's seac): the base and accent are the glyphs the
+# charset names with the standard encoding's strings for bchar and achar.
+# Glyph 1 is `A` (SID 34, standard code 65): x 100..500, y 0..600; glyph 2 is
+# `acute` (SID 125, code 194): x 200..350, y 650..750; glyph 3 is `B` (SID 35,
+# code 66), drawn by an accented endchar itself.
+glyph
+  endchar
+end
+glyph sid 34 # 1: A
+  100 0 rmoveto 200 600 200 -600 rlineto endchar
+end
+glyph sid 125 # 2: acute
+  250 650 rmoveto 100 100 -150 0 rlineto endchar
+end
+glyph sid 35 # 3: B as A with an acute moved by (0, 10)
+  0 10 65 194 endchar
+end
+glyph # 4: A with an acute moved by (50, 20)
+  50 20 65 194 endchar
+end
+glyph # 5: a width, then the accented form
+  300 50 20 65 194 endchar
+end
+glyph # 6: endchar with a width only, after a line
+  100 100 rmoveto 10 10 rlineto endchar
+end
+glyph # 7: endchar with one operand, a width, and nothing drawn
+  300 endchar
+end
+glyph # 8: endchar with two operands after a line
+  100 100 rmoveto 10 10 rlineto 1 2 endchar
+end
+glyph # 9: endchar with three operands after a line
+  100 100 rmoveto 10 10 rlineto 1 2 3 endchar
+end
+glyph # 10: endchar with four operands after a line: the accented form, with the line
+  100 100 rmoveto 10 10 rlineto 50 20 65 194 endchar
+end
+glyph # 11: endchar with six operands after a line
+  100 100 rmoveto 10 10 rlineto 1 50 20 65 194 1 endchar
+end
+glyph # 12: an accent code the charset does not hold (197 is macron)
+  50 20 65 197 endchar
+end
+glyph # 13: a base code the charset does not hold (67 is C)
+  50 20 67 194 endchar
+end
+glyph # 14: a base that is itself accented (B)
+  50 20 66 194 endchar
+end
+glyph # 15: a code outside the standard encoding's 256
+  50 20 65 300 endchar
+end
+glyph # 16: fractional offsets
+  fixed:0.5 fixed:-0.5 65 194 endchar
+end
+glyph # 17: the accented form inside a local subroutine
+  -107 callsubr
+end
+glyph # 18: endchar inside a subroutine after a line
+  100 100 rmoveto -106 callsubr 500 500 rlineto endchar
+end
+glyph # 19: a line after endchar
+  100 100 rmoveto 10 10 rlineto endchar 500 500 rlineto endchar
+end
+glyph # 20: codes as fractions (65.5, 194.5)
+  50 20 fixed:65.5 fixed:194.5 endchar
+end
+glyph # 21: a code of 0 (notdef in the standard encoding) for the accent
+  50 20 65 0 endchar
+end
+glyph # 22: the accented form after a line outside both glyphs
+  600 900 rmoveto 10 10 rlineto 50 20 65 194 endchar
+end
+glyph # 23: the accented form after stems and a hint mask
+  0 1 2 1 hstemhm hintmask byte:0x15 50 20 65 194 endchar
+end
+glyph # 24: a base that is glyph 0 (code 32, space, is not in the charset either)
+  50 20 32 194 endchar
+end
+glyph # 25: endchar with five operands after a line (the width already read)
+  100 100 rmoveto 10 10 rlineto 1 50 20 65 194 endchar
+end
+glyph # 26: endchar with four operands, the accent offset by (-50, -650), after a moveto
+  100 100 rmoveto -50 -650 65 194 endchar
+end
+local
+  50 20 65 194 endchar
+end
+local
+  10 10 rlineto endchar
+end

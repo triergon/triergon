@@ -1,14 +1,15 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
 
+use crate::cff;
 use crate::cmap::{Cmap, Subtable};
 use crate::rotations::{Decide, FaceRotations};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, Platform,
-    SizedFont, TextLookup, Variant, VariationSequences,
+    CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, OutlineFormat,
+    Platform, SizedFont, TextLookup, Variant, VariationSequences,
 };
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
@@ -126,8 +127,8 @@ fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
 /// The font functions HarfBuzz builds in (`hb-ot`), at a [`Scale`]: the `cmap`
 /// subtable HarfBuzz prefers among the table's raw encoding records, read as
 /// HarfBuzz reads it, its variation sequences, `hmtx`
-/// advances, and extents from the `glyf` header box or the charstring's
-/// control box.
+/// advances, and extents from the `glyf` header box or, for CFF and CFF2, as
+/// HarfBuzz's own charstring reading gives them.
 #[derive(Debug)]
 pub struct OtMetrics<'a> {
     font: &'a Font,
@@ -139,6 +140,8 @@ pub struct OtMetrics<'a> {
     x_mult: i64,
     x_multf: f32,
     y_multf: f32,
+    /// A CFF or CFF2 face's charstring tables, read once.
+    cff: Option<cff::Face<'a>>,
 }
 
 impl<'a> OtMetrics<'a> {
@@ -157,22 +160,28 @@ impl<'a> OtMetrics<'a> {
             x_mult: i64::from(scale.x) * 0x10000 / upem,
             x_multf: scale.x as f32 / f32::from(font.units_per_em()),
             y_multf: scale.y as f32 / f32::from(font.units_per_em()),
+            cff: cff::Face::new(font),
         }
     }
 
     /// The unscaled ink box (x min, y max, width, height ≤ 0) as hb-ot reads it:
     /// for TrueType the `glyf` header box moved to the `hmtx` side bearing, for
-    /// CFF the charstring's control box, each side rounded as `roundf` rounds it
-    /// after HarfBuzz narrows its double to a float.
+    /// CFF and CFF2 the box HarfBuzz's own charstring reading gives
+    /// ([`cff::Face::extents`]).
     fn unscaled_extents(&self, glyph: GlyphId) -> Result<Option<[i32; 4]>> {
         // HarfBuzz's own functions have no budget beyond the face's limits.
         let mut work = WorkBudget::new(self.font.limits().work);
+        if self.font.outline_format() != OutlineFormat::TrueType {
+            return self
+                .cff
+                .as_ref()
+                .map_or(Ok(None), |face| face.extents(glyph, &mut work));
+        }
         let control = self.font.control_box(glyph, &mut work).map(Some);
         let Some(control) = unless_unloadable(control, None)? else {
             return Ok(None);
         };
         Ok(Some(match control {
-            ControlBox::Empty => [0; 4],
             ControlBox::Glyf(b) => {
                 let [x_min, y_min, x_max, y_max] =
                     [b.x_min, b.y_min, b.x_max, b.y_max].map(i32::from);
@@ -183,19 +192,8 @@ impl<'a> OtMetrics<'a> {
                     -(y_max - y_min).abs(),
                 ]
             }
-            ControlBox::Charstring(b) => {
-                let round = |v: i32| ((f64::from(v) / 65536.0) as f32).round() as i32;
-                let [mut x, mut y, mut w, mut h] = [0; 4];
-                if b.x_min < b.x_max {
-                    x = round(b.x_min);
-                    w = round(b.x_max) - x;
-                }
-                if b.y_min < b.y_max {
-                    y = round(b.y_max);
-                    h = round(b.y_min) - y;
-                }
-                [x, y, w, h]
-            }
+            // A TrueType face has no charstrings.
+            ControlBox::Empty | ControlBox::Charstring(_) => [0; 4],
         }))
     }
 }
@@ -229,17 +227,29 @@ impl Metrics for OtMetrics<'_> {
         let Some([x, y, w, h]) = self.unscaled_extents(glyph)? else {
             return Ok(None);
         };
+        // At units per em the extents are the unscaled box, beyond 2^24 and
+        // at the ends of the 32-bit range too (probe `cff-huge`).
+        let upem = i32::from(self.font.units_per_em());
+        if (self.scale.x, self.scale.y) == (upem, upem) {
+            return Ok(Some(Extents {
+                x_bearing: x,
+                y_bearing: y,
+                width: w,
+                height: h,
+            }));
+        }
         // Scaled as HarfBuzz scales extents: outwards to whole units.
         let x1 = x as f32 * self.x_multf;
         let y1 = y as f32 * self.y_multf;
         let x2 = x1 + w as f32 * self.x_multf;
         let y2 = y1 + h as f32 * self.y_multf;
         let (x_bearing, y_bearing) = (x1.floor() as i32, y1.floor() as i32);
+        let size = |end: f32, start: i32| (end.ceil() as i32).saturating_sub(start);
         Ok(Some(Extents {
             x_bearing,
             y_bearing,
-            width: x2.ceil() as i32 - x_bearing,
-            height: y2.ceil() as i32 - y_bearing,
+            width: size(x2, x_bearing),
+            height: size(y2, y_bearing),
         }))
     }
 }

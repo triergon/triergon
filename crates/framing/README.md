@@ -14,6 +14,11 @@ is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
 Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
 and are fed with `provide` and closed with `finish` or `fail`.
 
+AVC and HEVC record parsers, including their compatibility wrappers, also offer
+`step_into` with an empty output slot and `ConfigProgress`. This publishes the
+configuration directly into caller storage. Occupied slots are rejected without
+advancing the parser; `step` retains the same progress and error behaviour.
+
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
@@ -76,6 +81,8 @@ assert_eq!(decoder_input, [
 | NAL streams | `NalReader`, `Framing::{AnnexB, LengthPrefixed}`, `LengthSize` | Incremental AVC/HEVC NAL extraction from any chunking; 1–4 byte big-endian lengths or Annex-B start codes; fixed NAL header facts |
 | NAL units in memory | `AnnexBUnits`, `start_code`, `split_length_prefixed`; `NalHeader::parse`; `avc`, `hevc` | An access unit's or stream's NAL units without their start codes or length prefixes; validated fixed headers; H.264 and H.265 type values and the HEVC type classes (slice, access-unit start, IRAP, IDR, BLA, RASL, RADL) |
 | Parameter-set walks | `skip_avc_scaling_matrix`, `skip_vui_to_timing`, `skip_hevc_profile_tier_level` | Pass over an SPS's H.264 scaling matrix, VUI fields before the timing, or H.265 profile-tier-level, over any `BitSource`, so each caller keeps its own emulation-prevention strictness and errors |
+| H.264 headers | `read_avc_sps`, `read_avc_pps`, `read_avc_slice_header`, `avc_slice_pps_id`; `AvcSps`, `AvcVui`, `AvcPocSyntax`, `AvcPps`, `AvcSliceHeader`, `AvcSliceDepth`, `AvcReading` | The SPS, PPS and slice header fields that picture order and output need (order count syntax, `frame_num` and `gaps_in_frame_num_value_allowed_flag`, fields, VUI timing and bitstream restriction, `no_output_of_prior_pics_flag`, `memory_management_control_operation` 5); `00 00 00` to `00 00 02` inside an RBSP refused or read as data |
+| Picture output | `picture_output::{DecodedPictures, Entry, View, NewPicture, Leave, Marking, Parity, PictureId, HevcLimits, HevcPicture, AvcPicture, StoreError, Refused, LateOutput}`, `picture_output::order::{AvcOrder, HevcOrder, AfterMmco5, AfterGap}`, `picture_output::levels::{max_dpb_mbs, max_dpb_frames}` | The decoded picture buffer of H.264 Annex C.4 (gap frames C.4.2, C.4.4, C.4.5, field pairs, bumping C.4.5.3) and H.265 Annex C.5.2 (C.5.2.2–C.5.2.4), generic over the stored picture, driven by marking, removal, storage and flush events, each stored picture readable by position and markable by field, and plain storage and bumping for a caller with its own output conditions; the output of the H.264 and HEVC decoders and of caption extraction; picture order counts of H.264 8.2.1 (types 0, 1, 2, `memory_management_control_operation` 5, `frame_num` gaps) and H.265 8.3.1; MaxDpbMbs and MaxDpbFrames of Table A-1; FFmpeg's observed departures as separate steps and options |
 | Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4; an HEVC end of sequence or bitstream starts the next one, as in FFmpeg's parser); reports IDR/IRAP; keeps original start codes and padding |
 | avcC | `AvcConfigParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
 | hvcC | `HvcConfigParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
@@ -117,18 +124,17 @@ size/type header); sample jobs take one complete container sample.
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
 generation. Raw and reserved fields stay readable; local violations are reported
 through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
-fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
-retained view keeps the whole backing allocation charged. Small AVC records can
-reuse the checked offsets from the validation pass when the remaining work
-budget covers publishing the descriptors.
+fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input. A
+retained view keeps the whole backing allocation charged. The configuration
+writers use the validated parameter-set ranges from these records.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
-Stateful packet jobs allocate segment storage as needed and share the original
-payload for passthrough packets.
+Stateful packet jobs charge heap segment storage to the caller's pool and
+share the original payload for passthrough packets.
 
 **Codec-specific limits.**
 
@@ -138,6 +144,16 @@ payload for passthrough packets.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
   unknown versions. The `compat::nal` receiver parsers accept them for the packet
   session only.
+- The AVC packet receiver can emit parameter sets before a buffering-period SEI
+  (H.264 Annex D). It uses in-band sets found before the following slice, then
+  falls back to the active configuration for missing sets. It preserves the
+  original packet NALs and does not parse the SEI payload.
+- The AVC High-profile comparisons frame samples from complete sequence and
+  picture parameter-set arrays with zero to three extension header bytes.
+  The receiver preserves those bytes as a trailing suffix and reports
+  `Truncated` as the strict source refusal. When a complete extension header
+  declares entries and the record ends at the header, the receiver frames
+  the base parameter sets and preserves the header and the strict refusal.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps. `append_payload` can consume an interior NAL
   slice while the reader is waiting for input.
@@ -169,6 +185,7 @@ Implemented from these specifications:
 |---|---|
 | H.264 NAL / Annex B / AU | ITU-T H.264 (08/2024) §7.3.1, §7.4.1 Table 7-1, §§7.3.2.1.1, 7.3.2.2, 7.3.3, 7.4.1.2.3–4, Annex B |
 | HEVC NAL / Annex B / AU | ITU-T H.265 (07/2024) §7.3.1.2, §7.4.2 Table 7-1, §7.4.2.4.4, Annex B |
+| Picture output | ITU-T H.264 (08/2024) §8.2.1, §8.2.5.3–4, §A.3.1 Table A-1, Annex C.4.4–C.4.5; ITU-T H.265 (07/2024) §8.1.3, §8.3.1–8.3.2, Annex C.5.2 |
 | avcC | ISO/IEC 14496-15:2010 with the 2006 FRExt amendment |
 | hvcC, AAC ASC/ADTS | ISO/IEC 14496-15 and 14496-3 record layouts, from licensed interoperability references |
 | AV1 | AV1 Bitstream v1.0.0 Errata 1 §§4.10.5, 5.2–5.3, 6.2; AV1-ISOBMFF v1.3.0 §§2.3.3–2.4 |
@@ -189,13 +206,17 @@ Verification:
   `hevc-aud0.hevc` with an end of sequence before its second VPS and an end of
   bitstream at the end.
 
-From the repository root, `cargo xtask framing` compares all 125 AVC/HEVC
+From the repository root, `cargo xtask framing` compares all 135 AVC/HEVC
 packet-framing scripts with the pinned FFmpeg bitstream-filter API. The
 [contract](../../harness/features/packet-framing/contract.json) covers configuration,
 complete packet fields and side data, malformed input, flush and drain actions,
 and retained packet access after close. Add `--benchmark --memory` to collect
 paired runtime and memory measurements through the shared harness; qualification
 requires the pinned gate build on native AArch64 Linux.
+
+Set `TRIERGON_PACKET_EVENTS` to a private output directory when running
+`cargo test -p triergon-framing --features reference-trace --test packet_view`
+to export every complete event trace and digest with all digest assertions active.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in

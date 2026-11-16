@@ -11,6 +11,7 @@
 pub mod compat;
 #[cfg(feature = "reference-trace")]
 mod dts_operation;
+pub mod picture_output;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
 
@@ -29,6 +30,10 @@ mod av1;
 mod av1_config;
 mod av1_temporal_unit;
 mod avc_picture;
+pub use avc_picture::{
+    AvcPocSyntax, AvcPps, AvcReading, AvcSliceDepth, AvcSliceHeader, AvcSps, AvcVui,
+    avc_slice_pps_id, read_avc_pps, read_avc_slice_header, read_avc_sps,
+};
 mod config;
 mod declared_config;
 mod dts_core;
@@ -38,6 +43,7 @@ mod dts_source;
 mod eac3_bsi;
 mod flac_config;
 mod header;
+mod inline_storage;
 mod mpeg_audio;
 mod nal_syntax;
 mod nal_units;
@@ -60,6 +66,18 @@ pub use annexb::{AnnexBOutput, AnnexBWriter, BuildStep};
 pub use audio_config::{
     canonical_flac_configuration, canonical_opus_configuration, canonical_vorbis_configuration,
 };
+
+/// Progress of a configuration parser publishing into a caller-provided slot.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfigProgress {
+    /// A complete configuration was placed in the previously empty slot.
+    Ready,
+    /// More work is needed; the slot remains empty.
+    Yield,
+    /// The configuration was already published; the slot remains empty.
+    Complete,
+}
+
 pub use av1::{
     Av1Leb128, Av1Obu, Av1ObuExtension, Av1ObuFacts, Av1ObuFraming, Av1ObuHeader,
     Av1ObuHeaderIssues, Av1ObuLimits, Av1ObuReader,

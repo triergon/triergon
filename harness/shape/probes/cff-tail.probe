@@ -1,0 +1,18 @@
+# How a CFF charstring may end: after an escape byte or inside a number
+# before endchar's byte, or with operands left by endchar. Each draws
+# `100 100 rmoveto 10 20 rlineto` first.
+glyph
+  endchar
+end
+glyph # 1: endchar, then an escape byte
+  100 100 rmoveto 10 20 rlineto endchar byte:12
+end
+glyph # 2: a three-byte number cut short at the end
+  100 100 rmoveto 10 20 rlineto byte:28 byte:1
+end
+glyph # 3: an escape byte at the end
+  100 100 rmoveto 10 20 rlineto byte:12
+end
+glyph # 4: an escape that reads endchar's byte as its second
+  100 100 rmoveto 10 20 rlineto byte:12 endchar
+end

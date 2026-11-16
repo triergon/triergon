@@ -1,0 +1,18 @@
+# The subroutine bias for 33900 local subroutines: 32768. Local 0 draws a
+# line. Glyph 1 calls index -32768; glyph 2 -1131; glyph 3 -107.
+local
+  66 0 rlineto return
+end
+pad-local 33899
+glyph
+  endchar
+end
+glyph
+  100 100 rmoveto -32768 callsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -1131 callsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -107 callsubr 5 5 rlineto endchar
+end

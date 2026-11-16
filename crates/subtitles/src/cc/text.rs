@@ -13,12 +13,20 @@ impl Text {
     }
 
     pub(crate) fn put(&mut self, bytes: &[u8]) -> Result<()> {
-        let needed = self.0.len() + bytes.len();
+        self.reserve(bytes.len())?;
+        self.0.try_extend_from_slice(bytes)
+    }
+
+    /// Makes room for `additional` more bytes: putting them then neither
+    /// allocates nor fails.
+    #[inline]
+    pub(crate) fn reserve(&mut self, additional: usize) -> Result<()> {
+        let needed = self.0.len() + additional;
         if needed > self.0.capacity() {
             let target = needed.max(self.0.capacity() * 2).max(64);
             self.0.try_reserve_exact(target - self.0.len())?;
         }
-        self.0.try_extend_from_slice(bytes)
+        Ok(())
     }
 
     pub(crate) fn clear(&mut self) {

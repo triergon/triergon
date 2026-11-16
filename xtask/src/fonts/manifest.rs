@@ -36,9 +36,14 @@ const MODES: &[&str] = &["outlines", "advances"];
 /// `@` font, unhinted and of the default load.
 const DEFAULT_MODES: &[&str] = &["outlines", "advances", "vertical"];
 
-/// What libass's shaper reads from the default load at its default size: every
-/// glyph's metrics and hinted outline.
+/// What libass's shaper reads from the default load: every glyph's metrics and
+/// hinted outline.
 const DEFAULT_LOAD: &[&str] = &["default"];
+
+/// The 26.6 heights the default load is compared at: libass's default size of
+/// 256 pixels, and 15.625 and 10 pixels, small sizes where a face's programs
+/// take other paths.
+const DEFAULT_LOAD_HEIGHTS: [i32; 3] = [UNHINTED_HEIGHT, 1000, 640];
 
 /// The cases `cargo xtask check` mutates: one file of each outline format but the
 /// collection, small enough for the dev build within the per-input timeout (the
@@ -86,7 +91,7 @@ fn load(id: &str) -> R<Load> {
     match id {
         "font-outlines" => Ok(Load::Faces),
         "font-hinting-none" => Ok(Load::Sized(DEFAULT_MODES, &[UNHINTED_HEIGHT])),
-        "font-hinting-default" => Ok(Load::Sized(DEFAULT_LOAD, &[UNHINTED_HEIGHT])),
+        "font-hinting-default" => Ok(Load::Sized(DEFAULT_LOAD, &DEFAULT_LOAD_HEIGHTS)),
         "font-hinting-modes" => Ok(Load::Sized(MODES, &HINTING_HEIGHTS)),
         _ => Err(format!("{id}: not a font feature")),
     }
@@ -152,7 +157,7 @@ fn note(id: &str) -> &'static str {
             "Every file of the font corpus as libass 0.17.5 loads it by default (ASS_HINTING_NONE): unhinted outlines at 256 pixels (16384 in 26.6), the FT_LOAD_DEFAULT advances there, and the vertical advances of both loads."
         }
         "font-hinting-default" => {
-            "Every file of the font corpus at libass 0.17.5's default size of 256 pixels (16384 in 26.6): every glyph's FT_LOAD_DEFAULT metrics and hinted outline, which libass's HarfBuzz callbacks read for advances, extents and contour points."
+            "Every file of the font corpus at libass 0.17.5's default size of 256 pixels (16384 in 26.6), and at 15.625 and 10 pixels (1000 and 640): every glyph's FT_LOAD_DEFAULT metrics and hinted outline, which libass's HarfBuzz callbacks read for advances, extents and contour points."
         }
         _ => {
             "Every file of the font corpus at the nine other 26.6 heights libass requests when hinting is on: unhinted outlines and FT_LOAD_DEFAULT advances."
@@ -192,7 +197,7 @@ mod tests {
             [
                 ("font-outlines", 53),
                 ("font-hinting-none", 159),
-                ("font-hinting-default", 53),
+                ("font-hinting-default", 159),
                 ("font-hinting-modes", 954)
             ]
         );

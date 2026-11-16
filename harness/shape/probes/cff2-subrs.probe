@@ -1,0 +1,151 @@
+# Subroutines in CFF2, which has no return: a subroutine ends at its end.
+# Local 0 draws `0 10 rlineto`; local 1 calls local 0 and draws `10 0
+# rlineto`; global 0 draws `-20 0 rlineto`. Local 2 nests the chain of
+# cff-subr-depth through locals 3 to 23 (glyph 3 + d - 1 nests d deep).
+format cff2
+global
+  -20 0 rlineto
+end
+local
+  0 10 rlineto
+end
+local
+  -107 callsubr 10 0 rlineto
+end
+local
+  return
+end
+local
+  -103 callsubr 0 10 rlineto
+end
+local
+  -102 callsubr 0 10 rlineto
+end
+local
+  -101 callsubr 0 10 rlineto
+end
+local
+  -100 callsubr 0 10 rlineto
+end
+local
+  -99 callsubr 0 10 rlineto
+end
+local
+  -98 callsubr 0 10 rlineto
+end
+local
+  -97 callsubr 0 10 rlineto
+end
+local
+  -96 callsubr 0 10 rlineto
+end
+local
+  -95 callsubr 0 10 rlineto
+end
+local
+  -94 callsubr 0 10 rlineto
+end
+local
+  -93 callsubr 0 10 rlineto
+end
+local
+  -92 callsubr 0 10 rlineto
+end
+local
+  -91 callsubr 0 10 rlineto
+end
+local
+  -90 callsubr 0 10 rlineto
+end
+local
+  -89 callsubr 0 10 rlineto
+end
+local
+  -88 callsubr 0 10 rlineto
+end
+local
+  -87 callsubr 0 10 rlineto
+end
+local
+  -86 callsubr 0 10 rlineto
+end
+local
+  -85 callsubr 0 10 rlineto
+end
+local
+  -84 callsubr 0 10 rlineto
+end
+local
+  50 0 rlineto
+end
+glyph
+end
+glyph # 1: local 1, which calls local 0
+  100 100 rmoveto -106 callsubr 5 5 rlineto
+end
+glyph # 2: global 0, then return in local 2
+  100 100 rmoveto -107 callgsubr -105 callsubr 5 5 rlineto
+end
+glyph # 1 deep
+  100 100 rmoveto -84 callsubr
+end
+glyph # 2 deep
+  100 100 rmoveto -85 callsubr
+end
+glyph # 3 deep
+  100 100 rmoveto -86 callsubr
+end
+glyph # 4 deep
+  100 100 rmoveto -87 callsubr
+end
+glyph # 5 deep
+  100 100 rmoveto -88 callsubr
+end
+glyph # 6 deep
+  100 100 rmoveto -89 callsubr
+end
+glyph # 7 deep
+  100 100 rmoveto -90 callsubr
+end
+glyph # 8 deep
+  100 100 rmoveto -91 callsubr
+end
+glyph # 9 deep
+  100 100 rmoveto -92 callsubr
+end
+glyph # 10 deep
+  100 100 rmoveto -93 callsubr
+end
+glyph # 11 deep
+  100 100 rmoveto -94 callsubr
+end
+glyph # 12 deep
+  100 100 rmoveto -95 callsubr
+end
+glyph # 13 deep
+  100 100 rmoveto -96 callsubr
+end
+glyph # 14 deep
+  100 100 rmoveto -97 callsubr
+end
+glyph # 15 deep
+  100 100 rmoveto -98 callsubr
+end
+glyph # 16 deep
+  100 100 rmoveto -99 callsubr
+end
+glyph # 17 deep
+  100 100 rmoveto -100 callsubr
+end
+glyph # 18 deep
+  100 100 rmoveto -101 callsubr
+end
+glyph # 19 deep
+  100 100 rmoveto -102 callsubr
+end
+glyph # 20 deep
+  100 100 rmoveto -103 callsubr
+end
+glyph # 21 deep
+  100 100 rmoveto -104 callsubr
+end

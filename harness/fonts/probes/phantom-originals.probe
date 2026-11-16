@@ -1,0 +1,60 @@
+# The phantom points' original positions, as GC[1] reads them in x and y and
+# MD[1] measures them from a glyph point in y, written into points' y, in a
+# simple glyph and a composite; then SHC from a phantom point, which moves a
+# contour by how far the phantom point's current position is from its
+# original one. Observed: they start scaled, the vertical ones at half the
+# advance; the horizontal ones' x and the vertical ones' y then move to the
+# pixel grid, and MD[1] in a composite measures from the scaled positions.
+heights 16384 1000 700 640
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+glyph advance 611 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off, 120 0, 140 0, 160 0, 180 0, 200 0, 220 0
+  program
+    SVTCA[1]; PUSH 0 12; GC[1]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 1 13; GC[1]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 2 14; GC[1]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 3 15; GC[1]; SVTCA[0]; SCFS
+    SVTCA[0]; PUSH 4 12; GC[1]; SCFS
+    SVTCA[0]; PUSH 5 13; GC[1]; SCFS
+    SVTCA[0]; PUSH 6 14; GC[1]; SCFS
+    SVTCA[0]; PUSH 7 15; GC[1]; SCFS
+    SVTCA[0]; PUSH 8 11 12; MD[1]; SCFS
+    SVTCA[0]; PUSH 9 11 13; MD[1]; SCFS
+    SVTCA[0]; PUSH 10 11 14; MD[1]; SCFS
+    SVTCA[0]; PUSH 11 11 15; MD[1]; SCFS
+  end
+end
+glyph advance 600
+  component 3 offset 0 13
+  program
+    SVTCA[1]; PUSH 0 12; GC[1]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 1 13; GC[1]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 2 14; GC[1]; SVTCA[0]; SCFS
+    SVTCA[1]; PUSH 3 15; GC[1]; SVTCA[0]; SCFS
+    SVTCA[0]; PUSH 4 12; GC[1]; SCFS
+    SVTCA[0]; PUSH 5 13; GC[1]; SCFS
+    SVTCA[0]; PUSH 6 14; GC[1]; SCFS
+    SVTCA[0]; PUSH 7 15; GC[1]; SCFS
+    SVTCA[0]; PUSH 8 11 12; MD[1]; SCFS
+    SVTCA[0]; PUSH 9 11 13; MD[1]; SCFS
+    SVTCA[0]; PUSH 10 11 14; MD[1]; SCFS
+    SVTCA[0]; PUSH 11 11 15; MD[1]; SCFS
+  end
+end
+glyph advance 611 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off, 120 0, 140 0, 160 0, 180 0, 200 0, 220 0
+  program
+    SVTCA[0]; PUSH 14; SRP2; PUSH 0; SHC[0]; SVTCA[1]; PUSH 13; SRP2; PUSH 1; SHC[0]
+  end
+end
+glyph advance 611 lsb 37
+  contour 100 -12, 100 703, 300 716 off, 497 703, 497 -12, 300 -25 off, 120 0, 140 0, 160 0, 180 0, 200 0, 220 0
+end
+glyph advance 600
+  component 3 offset 0 13
+  program
+    SVTCA[0]; PUSH 15; SRP2; PUSH 0; SHC[0]
+  end
+end

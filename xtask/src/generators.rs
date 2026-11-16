@@ -827,7 +827,8 @@ mod tests {
                 "shape-libass",
                 "shape-bidi",
                 "shape-simple",
-                "shape-unicode"
+                "shape-unicode",
+                "shape-extents"
             ]
         );
         assert_eq!(compared(shape, &["--all"]), shape.features(root).unwrap());
