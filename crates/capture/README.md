@@ -70,9 +70,10 @@ Multiplex differences (PMT stream type, SDT provider) are listed under
 
 The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an
 I/P GOP of 30, `mpegts`) driven by the capture build of `harness/reference.c`. Its
-conversion follows the target it is built for; the converter follows FFmpeg built for
-32-bit ARMv7 on every target, so the AArch64 build's conversion of the required cases
-is an open case on `aarch64-unknown-linux-gnu`, compared and reported as failing. The
+conversion follows the target it is built for. `Session::open` uses the
+width-dependent conversion and `Session::open_filtered` uses the centre-sited
+chroma filter at every width. The capture worker uses the filtered conversion on
+AArch64 Linux. The
 contract and required cases live in `harness/capture/contract.json` and
 `harness/capture/cases.json`; `harness/capture/` runs both pipelines and applies
 the per-stage rules documented in [triergon-pixel](../pixel/README.md#conformance)

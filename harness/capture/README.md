@@ -46,9 +46,12 @@ The conversion probe checks every luma and chroma sample at the seven even
 widths below 16, in both row orientations, at heights 2, 4 and 6. Each size and
 orientation uses a red impulse in each source row and 32 pseudo-random pictures.
 The AArch64 Linux probe also checks widths 18, 22, 34, 66, 258, 958 and 4094,
-where the converter uses the filtered fallback. The outputs must agree within
-one sample value. Build the capture reference for the target as above and give
-the test a fresh output directory.
+where the converter uses the filtered fallback. Both probes require exact
+sample equality. The AArch64 resolution probe also checks one 480×270 and one
+960×540 picture in both row orientations. Its parameter recovery test uses
+two-row frames to recover the chroma coefficients and six-row frames to
+recover the first vertical filter row. Build the capture reference for the
+target as above and give the tests a fresh output directory.
 
 ```sh
 CAPTURE_REFERENCE="$PWD/target/harness/ffmpeg-capture-worker" \
