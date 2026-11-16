@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-9ce47662-20261116-033329-shard-4",
+ "path": "gate-run-armv7-9ce47662-20261116-033329-shard-4",
+ "retention": "retained",
+ "reason": "Capture parity, timing and kernel-bound peak memory in 32-bit ARMv7 Linux user space.",
+ "key": "evidence/gate-runs/9ce47662208072cf3ab14a69aef15fcc748cb81e-armv7-20261116-033329/shard-4/7b5a95d7d996ae5c6b0ad39a4a70f4859d113401d9c950396fffae4548959462.tar.zst",
+ "sha256": "7b5a95d7d996ae5c6b0ad39a4a70f4859d113401d9c950396fffae4548959462",
+ "bytes": 423475283,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "ee80caeb440ec81045fdf3a4fe574917735c1a7d0a3a5d14779b0be002bde693",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "72b10d00c66755bdc0a73b2ba99d38169c7c3a9d100cab979bbfde47b8bb9a0f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "5dcee622d97c74a6ea4601cddbe1813b5c7e0959a23dacd467c5937eb0918c97",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "2d1669ffcc02375917d80e1fb617ec5c619584f81fd77e64d92e12f3ad957cf4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "0412a6fcd616008e205f3027ffa58b3373840baddb769323a8c784236202d598",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "d0aa6996c7be102b3ac64c0412c90741a2591c2c4c27c9b99e93e5eae64bd259",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "9ce47662208072cf3ab14a69aef15fcc748cb81e"
+ ]
+}

@@ -37,8 +37,8 @@ use crate::json::{self, Value};
 use crate::process::exit_code;
 use crate::{python, sha256};
 
-/// How long one capture session may take in a timed run, on the slowest
-/// target.
+/// Time limit for a capture session on the slowest target, including
+/// sessions under the memory observer.
 const SESSION_TIMEOUT: Duration = Duration::from_secs(60);
 /// Offsets from `--seed`: the timing session and its two retries, then the
 /// `--enable-small` comparison and its retries, then memory.
@@ -677,7 +677,7 @@ fn memory_stage(
                 a.seed + MEMORY_SEED,
                 args,
                 outputs,
-                crate::harness::worker::DEFAULT_TIMEOUT,
+                SESSION_TIMEOUT,
             )
         }));
         collected.push(index);

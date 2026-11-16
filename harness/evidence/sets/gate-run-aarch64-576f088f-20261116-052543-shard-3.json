@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-aarch64-576f088f-20261116-052543-shard-3",
+ "path": "gate-run-aarch64-576f088f-20261116-052543-shard-3",
+ "retention": "retained",
+ "reason": "Capture on aarch64 with the pinned reference and kernel-bound resident memory.",
+ "key": "evidence/gate-runs/576f088fa2d463585adf87d471ba2ccc22c72c67-aarch64-20261116-052543/shard-3/4092c01e475c86ca437bb29c14a1d307bacb8dbdc077c5e4fa56f2461d6e5a35.tar.zst",
+ "sha256": "4092c01e475c86ca437bb29c14a1d307bacb8dbdc077c5e4fa56f2461d6e5a35",
+ "bytes": 317359094,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e00b5f87932bf1b251f5fa71d3628c0d93804f022cb21945c77b7644cecd5f62",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "2f2aeaa1c341cfcb3c3317e02af9fa9b89b8799205d7f9027a585efda5db7844",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5dc3e5c337da2468b734190cbc22b55d97f2cc887fce4a43d8ae1f0afacb63d0",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "ebcd6ce252937596b01889d2f4ea8447905e8a2738517a384b14fcce0bd54ff2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "e352544558f452bd9a2c10f0024123be4f44b8c780dac1a6fc4f7fc8fa7ade6d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "0ade16df61f8dbabc14c7853a6abd57c2bada6852e68923acefa5e6b003eb544",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "576f088fa2d463585adf87d471ba2ccc22c72c67"
+ ]
+}

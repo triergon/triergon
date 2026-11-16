@@ -16,6 +16,8 @@
 //!   gives no result (it faults), and this path decimates chroma as FFmpeg's
 //!   AArch64 build does, within 1 of that build's output.
 //!
+//! At heights of 2, 4 and 6 the filtered path uses the boundary rules checked
+//! by the capture worker's `short_filtered_frames_against_reference` test.
 //! FFmpeg built for AArch64 takes the filtered path at every width.
 
 use crate::{Error, Geometry, Picture, Result};
@@ -260,8 +262,14 @@ mod filtered {
             }
             let rows = [(2 * k).saturating_sub(1), 2 * k, 2 * k + 1, last];
             let start = k * chroma_stride;
-            decimate(cb_rows, rows, &mut out.cb[start..start + half]);
-            decimate(cr_rows, rows, &mut out.cr[start..start + half]);
+            let decimate_plane = |ring: &[Vec<i32>; 4], plane: &mut [u8]| match (g.height, k) {
+                (2, _) => decimate_short::<1, 0, 0>(ring, 1, plane),
+                (4, _) => decimate_short::<1, 1, 0>(ring, 2 * k, plane),
+                (6, 0) => decimate_short::<3, 3, 1>(ring, 0, plane),
+                _ => decimate(ring, rows, plane),
+            };
+            decimate_plane(cb_rows, &mut out.cb[start..start + half]);
+            decimate_plane(cr_rows, &mut out.cr[start..start + half]);
         }
     }
 
@@ -300,6 +308,21 @@ mod filtered {
         for ((((out, &a), &b), &c), &d) in out.iter_mut().zip(a).zip(b).zip(c).zip(d) {
             let sum = a + 3 * (b + c) + d;
             *out = ((sum + C_OFFSET) >> C_SHIFT).clamp(0, 255) as u8;
+        }
+    }
+
+    fn decimate_short<const A: i32, const B: i32, const C: i32>(
+        ring: &[Vec<i32>; 4],
+        first: usize,
+        out: &mut [u8],
+    ) {
+        let [a, b, c] = std::array::from_fn(|i| &ring[(first + i) & 3]);
+        // Each row represents the sum of two pixels in 16-bit fixed point.
+        let scale = (A + B + C) << 17;
+        let offset = 128 * scale + scale / 2;
+        for (((out, &a), &b), &c) in out.iter_mut().zip(a).zip(b).zip(c) {
+            let sum = A * a + B * b + C * c;
+            *out = ((sum + offset) / scale).clamp(0, 255) as u8;
         }
     }
 }
@@ -424,10 +447,10 @@ mod tests {
         }
     }
 
-    fn red_row_on_grey(width: u32, row: usize, orientation: Orientation) -> Picture {
-        let geometry = Geometry::new(width, 8).unwrap();
+    fn red_row_on_grey(width: u32, height: u32, row: usize, orientation: Orientation) -> Picture {
+        let geometry = Geometry::new(width, height).unwrap();
         let mut rgba = Vec::new();
-        for y in 0..8 {
+        for y in 0..height as usize {
             let pixel = if y == row {
                 [255, 0, 0, 255]
             } else {
@@ -443,7 +466,7 @@ mod tests {
     #[test]
     fn filtered_vertical_taps_are_center_sited() {
         let column = |p: &Picture| (0..4).map(|k| p.cr[k * 8]).collect::<Vec<_>>();
-        let red = |row, orientation| red_row_on_grey(14, row, orientation);
+        let red = |row, orientation| red_row_on_grey(14, 8, row, orientation);
         assert_eq!(column(&red(0, Orientation::TopDown)), [184, 128, 128, 128]);
         assert_eq!(column(&red(1, Orientation::TopDown)), [170, 142, 128, 128]);
         assert_eq!(column(&red(2, Orientation::TopDown)), [142, 170, 128, 128]);
@@ -456,9 +479,47 @@ mod tests {
     }
 
     #[test]
+    fn short_filtered_frames_use_the_observed_chroma_taps() {
+        let observed: [&[&[u8]]; 3] = [
+            &[&[128], &[240]],
+            &[&[184, 128], &[184, 128], &[128, 184], &[128, 184]],
+            &[
+                &[176, 128, 128],
+                &[176, 142, 128],
+                &[144, 170, 128],
+                &[128, 170, 142],
+                &[128, 142, 170],
+                &[128, 128, 184],
+            ],
+        ];
+        for (height, impulses) in (2..=6).step_by(2).zip(observed) {
+            for (row, expected) in impulses.iter().enumerate() {
+                for orientation in [Orientation::TopDown, Orientation::BottomUp] {
+                    let source_row = match orientation {
+                        Orientation::TopDown => row,
+                        Orientation::BottomUp => height as usize - 1 - row,
+                    };
+                    let picture = red_row_on_grey(14, height, source_row, orientation);
+                    let stride = picture.geometry.chroma_stride();
+                    let actual: Vec<_> = picture
+                        .cr
+                        .chunks_exact(stride)
+                        .take(height as usize / 2)
+                        .map(|chroma_row| chroma_row[0])
+                        .collect();
+                    assert_eq!(
+                        actual, *expected,
+                        "height {height}, row {row}, {orientation:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn block_chroma_covers_its_row_pair() {
         let column = |p: &Picture| (0..4).map(|k| p.cr[k * 8]).collect::<Vec<_>>();
-        let red = |row, orientation| red_row_on_grey(16, row, orientation);
+        let red = |row, orientation| red_row_on_grey(16, 8, row, orientation);
         assert_eq!(column(&red(0, Orientation::TopDown)), [184, 128, 128, 128]);
         assert_eq!(column(&red(1, Orientation::TopDown)), [184, 128, 128, 128]);
         assert_eq!(column(&red(2, Orientation::TopDown)), [128, 184, 128, 128]);
