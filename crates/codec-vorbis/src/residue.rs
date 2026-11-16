@@ -193,8 +193,9 @@ impl Residue {
     }
 
     /// Decodes the residue vectors of the `members` of a submap into the first `half`
-    /// values of their `spectra` (section 8.6.2), which must be zero on entry. Returns
-    /// how many leading values of each vector decode may have set; the rest stay zero.
+    /// values of their `spectra` (section 8.6.2), clearing what decode does not set.
+    /// Returns how many leading values of each vector decode may have set; the rest are
+    /// zero.
     pub(crate) fn decode(
         &self,
         r: &mut LsbReader<'_>,
@@ -204,18 +205,27 @@ impl Residue {
         spectra: &mut Spectra,
         scratch: &mut Scratch,
     ) -> usize {
+        let mut clear = |from: usize| {
+            for member in members {
+                spectra.channel_mut(usize::from(member.channel))[from..half].fill(0.0);
+            }
+        };
         if !members.iter().any(|member| member.coded) {
+            clear(0);
             return 0;
         }
         let count = members.len();
         if self.format == Format::Interleaved {
+            // The spread of the interleaved vector sets the first `extent` values.
             let extent = self.reach(count * half).div_ceil(count).min(half);
+            clear(extent);
             let vector = &mut scratch.interleaved[..count * half];
             vector[..extent * count].fill(0.0);
             self.decode_bundle(r, codebooks, &mut Single(vector), &mut scratch.classes);
             deinterleave(&vector[..extent * count], members, half, spectra);
             extent
         } else {
+            clear(0);
             let mut bundle = Members {
                 spectra,
                 members,
