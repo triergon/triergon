@@ -180,16 +180,16 @@ fn collapse_mask(y: &[i32], blocks: usize) -> u32 {
 }
 
 /// Decode a band's pulses into the unit-norm vector `x` scaled by `gain` (`alg_unquant`)
-/// and return its collapse mask.
+/// and return its collapse mask. `pulses` is scratch.
 pub(super) fn decode_band(
     rc: &mut RangeDecoder<'_>,
+    pulses: &mut [i32; MAX_BAND],
     x: &mut [f32],
     k: usize,
     spread: Spread,
     blocks: usize,
     gain: f32,
 ) -> u32 {
-    let mut pulses = [0i32; MAX_BAND];
     let y = &mut pulses[..x.len()];
     decode_pulses(rc, y, k);
     // Exact in integers: at most 128 pulses.

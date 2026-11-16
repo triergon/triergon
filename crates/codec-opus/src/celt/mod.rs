@@ -285,7 +285,9 @@ impl CeltDecoder {
             }
             let shape = &work.shapes[ch * MAX_FRAME..ch * MAX_FRAME + n];
             let spectrum = &mut work.spectrum[ch * MAX_FRAME..ch * MAX_FRAME + n];
-            spectrum.fill(0.0);
+            // The coded bands are written below; only the bins outside them are cleared.
+            spectrum[..EBANDS[start] << lm].fill(0.0);
+            spectrum[EBANDS[end] << lm..].fill(0.0);
             for band in start..end {
                 let range = EBANDS[band] << lm..EBANDS[band + 1] << lm;
                 let gain = amplitude[band] * SIGNAL_SCALE;
