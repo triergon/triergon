@@ -671,15 +671,20 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     });
     // The AAC, AC-3, E-AC-3 and DTS decoders against FFmpeg's on every vector of their
     // correctness lanes, the derived streams among them included; the summary fails on
-    // any vector that fails and is not a listed open case.
+    // any vector that fails and is not a listed open case. The AAC decoder is built as
+    // the codec worker builds it: by the pinned nightly with its `simd` feature, in the
+    // nightly workers' target directory.
     let audio_bin = format!("{out}/codec-audio-bin");
+    let nightly_release = release.replacen("target/", "target/nightly/", 1);
+    let nightly = crate::NIGHTLY;
     let mut build_audio = owned(&["sh", "-c"]);
     build_audio.push(format!(
         "mkdir -p {audio_bin} && \
-         cargo build --release --locked {cargo_target} -p triergon-codec-aac --example decode_aac && \
+         cargo +{nightly} build --release --locked {cargo_target} --target-dir target/nightly \
+           -p triergon-codec-aac --features simd --example decode_aac && \
          cargo build --release --locked {cargo_target} -p triergon-codec-ac3 --example decode_ac3 && \
          cargo build --release --locked {cargo_target} -p triergon-codec-dca --example decode_dts && \
-         cp {release}/examples/decode_aac {audio_bin}/codec-aac-decode && \
+         cp {nightly_release}/examples/decode_aac {audio_bin}/codec-aac-decode && \
          cp {release}/examples/decode_ac3 {audio_bin}/codec-ac3-decode && \
          cp {release}/examples/decode_dts {audio_bin}/codec-dca-decode"
     ));

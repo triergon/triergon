@@ -1,4 +1,5 @@
-//! `std::simd` forms of the SBR hot loops, used with the opt-in `simd` feature (nightly).
+//! `std::simd` forms of the SBR QMF banks' windowing and shuffles, used with the `simd`
+//! feature (nightly).
 //!
 //! Every lane performs the scalar code's operations in the scalar code's order, so the
 //! results equal the scalar code's wherever the vector unit follows IEEE 754 (AArch64).
@@ -118,5 +119,91 @@ pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut 
                 + ld(v, 256 * i + 192 + n) * ld(w, 128 * i + 64 + n);
         }
         (acc * V::splat(scale)).copy_to_slice(&mut out[n..n + 4]);
+    }
+}
+
+#[cfg(test)]
+// the scalar forms are written index-style, as the default code's loops are
+#[allow(clippy::needless_range_loop)]
+mod tests {
+    use super::*;
+
+    /// Values well inside the normal range, so that no product or sum is subnormal and
+    /// the kernels must equal the scalar arithmetic bit for bit on every target.
+    fn values(seed: u32, n: usize) -> Vec<f32> {
+        let mut s = seed;
+        (0..n)
+            .map(|_| {
+                s = s.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                (s as i32) as f32 / 2_147_483_648.0 * 1000.0
+            })
+            .collect()
+    }
+
+    fn bits(v: &[f32]) -> Vec<u32> {
+        v.iter().map(|x| x.to_bits()).collect()
+    }
+
+    #[test]
+    fn analysis_kernels_equal_the_scalar_arithmetic() {
+        let w: [f32; 320] = values(1, 320).try_into().unwrap();
+        let input = values(2, 32);
+        let mut x = values(3, 320);
+        let mut expected = x.clone();
+        for n in 0..32 {
+            expected[31 - n] = input[n] * 0.5;
+        }
+        let u = analysis_window(&mut x, &input, 0.5, &w);
+        assert_eq!(bits(&x), bits(&expected));
+        let scalar_u: Vec<f32> = (0..64)
+            .map(|n| (0..5).fold(0.0, |u, j| u + expected[64 * j + n] * w[64 * j + n]))
+            .collect();
+        assert_eq!(bits(&u), bits(&scalar_u));
+        let (d, r) = analysis_fold(&u);
+        let scalar_d: Vec<f32> = (0..32).map(|n| u[n] - u[63 - n]).collect();
+        let scalar_r: Vec<f32> = (0..32).map(|n| u[31 - n] + u[32 + n]).collect();
+        assert_eq!(bits(&d), bits(&scalar_d));
+        assert_eq!(bits(&r), bits(&scalar_r));
+    }
+
+    #[test]
+    fn synthesis_kernels_equal_the_scalar_arithmetic() {
+        let re = values(4, 64);
+        let im = values(5, 64);
+        let x: Vec<Cpx> = (0..64).map(|k| Cpx::new(re[k], im[k])).collect();
+        let (mut a, mut b) = ([0f32; 64], [0f32; 64]);
+        synthesis_inputs(&x, &mut a, &mut b);
+        for k in 0..64 {
+            let sgn = if k & 1 == 0 { 1.0 } else { -1.0 };
+            assert_eq!(a[k].to_bits(), (sgn * x[k].im).to_bits(), "a[{k}]");
+            assert_eq!(b[k].to_bits(), (-sgn * x[63 - k].re).to_bits(), "b[{k}]");
+        }
+
+        let [ce, co, se, so] = [6, 7, 8, 9].map(|seed| values(seed, 32));
+        let mut v = [0f32; 128];
+        synthesis_butterflies(&ce, &co, &se, &so, &mut v);
+        let mut expected = [0f32; 128];
+        for k in 0..32 {
+            expected[64 + 2 * k] = ce[k] + se[k];
+            expected[63 - 2 * k] = ce[k] - se[k];
+            expected[127 - 2 * k] = co[k] - so[k];
+            expected[2 * k] = co[k] + so[k];
+        }
+        assert_eq!(bits(&v), bits(&expected));
+
+        let history = values(10, 1280);
+        let w: [f32; 640] = values(11, 640).try_into().unwrap();
+        let mut out = [0f32; 64];
+        synthesis_window(&history, &w, 0.25, &mut out);
+        let scalar: Vec<f32> = (0..64)
+            .map(|n| {
+                let acc = (0..5).fold(0.0, |acc, i| {
+                    acc + (history[256 * i + n] * w[128 * i + n]
+                        + history[256 * i + 192 + n] * w[128 * i + 64 + n])
+                });
+                acc * 0.25
+            })
+            .collect();
+        assert_eq!(bits(&out), bits(&scalar));
     }
 }

@@ -31,8 +31,8 @@ triergon = { path = "../triergon", features = ["matroska", "isobmff", "ogg", "el
 codecs = ["dep:triergon-codec-ac3", "dep:triergon-codec-aac", "dep:triergon-codec-dca", "dep:triergon-codec-h264", "dep:triergon-codec-hevc", "dep:triergon-codec-flac", "dep:triergon-codec-mp3", "dep:triergon-codec-opus", "dep:triergon-codec-vorbis"]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
 simd = ["triergon-codec-hevc?/simd"]
-# Nightly-only explicit SIMD forms of the AAC decoder's SBR loops; ARMv7 output can differ
-# in subnormal values.
+# Nightly-only explicit SIMD forms of the AAC decoder's SBR QMF banks; ARMv7 output can
+# differ in subnormal values.
 aac-simd = ["triergon-codec-aac?/simd"]
 
 [lints]
