@@ -1,0 +1,19 @@
+# A font program that fails from 12 ppem on and runs below, when one face is
+# requested at several sizes in turn.
+sequence 640 1000 640
+sequence 1000 640 1000
+heights 1000 640
+fpgm
+  PUSH 0; FDEF; ENDF
+  MPPEM; PUSH 12; LT
+  IF
+  ELSE
+    BYTES 0x28
+  EIF
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]; PUSH 0; MPPEM; SCFS
+  end
+end

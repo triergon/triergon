@@ -1,0 +1,37 @@
+# How odd operand counts of stem operators count toward the hint mask's
+# length. Mask bytes are 0x15 (an rmoveto without operands), so a byte read
+# as an operator fails the glyph, and a byte too many swallows the first
+# byte of the `100 100 rmoveto` after it.
+glyph
+  endchar
+end
+glyph # 1: 8 hstems, then vstemhm with 1 operand, one mask byte
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 5 vstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 2: 8 hstems, then vstemhm with 1 operand, two mask bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 5 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 3: 8 hstems, then vstemhm with 3 operands, two mask bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 5 6 7 vstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 4: a width and 8 hstems (17 operands), one mask byte
+  9 0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 5: 8 hstems, then 1 operand before hintmask, one mask byte
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 5 hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 6: 8 hstems, then 1 operand before hintmask, two mask bytes
+  0 1 2 1 4 1 6 1 8 1 10 1 12 1 14 1 hstemhm 5 hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 7: 7 hstems in a 15-operand first hstemhm (a width), then 1 vstem, one mask byte
+  9 0 1 2 1 4 1 6 1 8 1 10 1 12 1 hstemhm 0 1 vstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 8: 15 operands in a later hstemhm: 7 or 8 stems with 1 earlier, one mask byte
+  0 1 hstemhm 9 0 1 2 1 4 1 6 1 8 1 10 1 12 1 hstemhm hintmask byte:0x15 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 9: as 8, two mask bytes
+  0 1 hstemhm 9 0 1 2 1 4 1 6 1 8 1 10 1 12 1 hstemhm hintmask bytes:1515 100 100 rmoveto 10 20 rlineto endchar
+end
+glyph # 10: a second hintmask, operands before it not counted again: 8 stems, then `1 2 hintmask`
+  0 1 2 1 4 1 6 1 hstemhm 0 1 2 1 4 1 6 1 vstemhm hintmask byte:0x15 100 100 rmoveto 0 1 hintmask byte:0x15 10 20 rlineto endchar
+end

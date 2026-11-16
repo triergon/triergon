@@ -99,10 +99,17 @@ fn operation(
     let mut stats = Stats::default();
     stats.start(o.retain, o.window)?;
     let mut driver = Driver::new(input, length, o.window, o.quantum)?;
+    driver.shared_payloads = o.retain == 0;
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
     if policy.regular_recovery {
         driver.recovered_regular_operation(op, &mut stats, &mut retained, trace.as_deref_mut())?;
+    } else if let DemuxOperation::RangePlan(request) = op {
+        if o.retain != 0 {
+            return Err(Error::Unsupported("range plan packet retention").into());
+        }
+        let model = driver.open_with_policy(policy)?;
+        driver.range_plan(&model, request, &mut stats, trace.as_deref_mut())?;
     } else {
         let model = driver.open_with_policy(policy)?;
         if matches!(op, DemuxOperation::Open) {
@@ -135,8 +142,10 @@ fn output_stats(stats: &Stats, iterations: u64, elapsed: u128) -> Result<()> {
 }
 fn main_result(mut args: Vec<String>) -> Result<()> {
     let mut policy = OpenPolicy::default();
+    let mut range_plan = false;
     loop {
         match args.get(1).map(String::as_str) {
+            Some("--range-plan") => range_plan = true,
             Some("--bounded-timing") => policy.tables.timing_runs = TimingRunPolicy::BoundedPrefix,
             Some("--bounded-sync") => {
                 policy.tables.sync_samples = SyncSamplePolicy::BoundedPrefix;
@@ -181,6 +190,16 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
     let path = args.get(2).ok_or(Error::Invalid("missing input path"))?;
     let bench = matches!(mode, "open-bench" | "native-index-bench" | "seek-bench");
     let seek = matches!(mode, "seek-trace" | "seek-bench" | "seek-memory");
+    if range_plan
+        && (!seek
+            || policy.regular_recovery
+            || policy.tables != SampleTablePolicy::default()
+            || policy.media_data != MediaDataPolicy::Strict)
+    {
+        return Err(
+            Error::Invalid("a range plan is a seek mode with strict tables and media").into(),
+        );
+    }
     let option_offset = if seek {
         if bench { 8 } else { 7 }
     } else if bench {
@@ -198,12 +217,17 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
             1 => true,
             _ => return Err(Error::Invalid("native afterEOF boolean").into()),
         };
-        DemuxOperation::Seek(DemuxSeekRequest {
+        let request = DemuxSeekRequest {
             track: argument(&args, at, 0i32)?,
             ticks: argument(&args, at + 1, 0i64)?,
             count,
             after_eof,
-        })
+        };
+        if range_plan {
+            DemuxOperation::RangePlan(request)
+        } else {
+            DemuxOperation::Seek(request)
+        }
     } else if matches!(
         mode,
         "native-index-trace" | "native-index-bench" | "native-index-memory"

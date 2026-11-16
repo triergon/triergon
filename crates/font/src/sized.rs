@@ -3,7 +3,7 @@
 //! hinted advances HarfBuzz receives, vertical advances, kerning and decoration
 //! lines.
 
-use crate::bytecode::{GlyphPoints, Hinter, Programs, Tables};
+use crate::bytecode::{GlyphPoints, Hinter, Phantoms, Programs, Tables};
 use crate::fixed::Scale;
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Glyf};
@@ -136,7 +136,23 @@ impl Font {
     ///
     /// A size of zero pixels per em, such as height 0, keeps its scales and
     /// metrics, but FreeType then loads glyphs unscaled, in font units, and
-    /// unhinted (`FT_Load_Glyph`: "undefined scale means no scale").
+    /// unhinted (`FT_Load_Glyph`: "undefined scale means no scale"), by the
+    /// default load as by the unhinted one, with the linear vertical advance
+    /// scaled by the size's scale. Observed: FreeType's request of such a size
+    /// fails for a TrueType face and succeeds for a CFF one, and glyphs load
+    /// so either way (probes `zero-ppem`, `zero-ppem-control-program`,
+    /// `zero-ppem-uninstructed`).
+    ///
+    /// Each call is a request of the size, as each of libass's is: the face's
+    /// next hinted load runs its TrueType control value program again from
+    /// freshly scaled control values, cleared storage and a fresh twilight
+    /// zone, at the size the face is already at too (probe
+    /// `sizes-same-size-request`). That load so does the work of scaling the
+    /// `cvt ` table, clearing `maxp`'s storage area and twilight points and
+    /// running the control value program, in the storage the face kept from
+    /// its previous size, and pays for it from its own `WorkBudget`; a call
+    /// itself does no work, so request a size once for the glyphs loaded at
+    /// it.
     ///
     /// # Errors
     ///
@@ -169,6 +185,9 @@ impl Font {
                 scale,
             )),
         };
+        if let Some(bytecode) = &self.bytecode {
+            bytecode.request();
+        }
         if ppem == 0 {
             return Ok(SizedFont {
                 font: self,
@@ -476,8 +495,9 @@ impl<'f> SizedFont<'f> {
             control: bytes(font.tables.prep),
         };
         let (ppem, scale) = (self.metrics.y_ppem, self.hinted_scale);
-        // The interpreter runs the font and control value programs once per
-        // size, and keeps the state they leave for the size's glyphs.
+        // The interpreter runs the font program once for the face and the
+        // control value program once per size, and keeps the state they
+        // leave for the size's glyphs.
         let tables = || {
             let table = |tag| font.table(tag).unwrap_or_default();
             Tables {
@@ -487,25 +507,32 @@ impl<'f> SizedFont<'f> {
                 gasp: table(*b"gasp"),
             }
         };
-        let m = bytecode.with_size(tables, ppem, scale.y, font.limits.work, |state| {
-            state.units.clear();
-            let mut hinting = GlyfHinting {
-                font,
-                hinter: &mut state.hinter,
-                programs,
-                units: &mut state.units,
-                ends: &mut state.ends,
-            };
-            outline.begin(font.limits.points);
-            table.outline(
-                &font.glyf_context(),
-                glyph,
-                scale,
-                outline,
-                work,
-                &mut hinting,
-            )
-        })?;
+        let m = bytecode.with_size(
+            tables,
+            (ppem, scale.y),
+            font.limits.work,
+            work,
+            |state, work| {
+                state.hinter.usable()?;
+                state.units.clear();
+                let mut hinting = GlyfHinting {
+                    font,
+                    hinter: &mut state.hinter,
+                    programs,
+                    units: &mut state.units,
+                    ends: &mut state.ends,
+                };
+                outline.begin(font.limits.points);
+                table.outline(
+                    &font.glyf_context(),
+                    glyph,
+                    scale,
+                    outline,
+                    work,
+                    &mut hinting,
+                )
+            },
+        )?;
         let (origin, advances) = font.glyf_advances(m, scale);
         if origin != 0 {
             glyf::translate(outline.points_mut(), (-origin, 0))?;
@@ -535,19 +562,21 @@ impl<'f> SizedFont<'f> {
 
     /// Applies libass's synthetic styles to an outline loaded by
     /// [`Self::outline_into`]: the [`Synthesis::shear`] first, then emboldening
-    /// by [`Self::embolden_strength`]. Metrics are unchanged.
+    /// by [`Self::embolden_strength`]. Metrics are unchanged. Returns `false`
+    /// when emboldening was asked for and refused, as FreeType refuses it: the
+    /// outline then keeps the shear alone (see [`Outline::embolden`]).
     ///
     /// # Errors
     ///
     /// `Overflow` for coordinates beyond `i32`.
-    pub fn synthesize(&self, outline: &mut Outline, synthesis: Synthesis) -> Result<()> {
+    pub fn synthesize(&self, outline: &mut Outline, synthesis: Synthesis) -> Result<bool> {
         if synthesis.oblique {
             outline.transform([0x1_0000, Synthesis::shear(self.font), 0, 0x1_0000])?;
         }
         if synthesis.embolden {
-            outline.embolden(self.embolden_strength())?;
+            return outline.embolden(self.embolden_strength());
         }
-        Ok(())
+        Ok(true)
     }
 
     /// The advance FreeType's default loading reports (`FT_LOAD_DEFAULT`, the
@@ -686,10 +715,11 @@ impl<'f> SizedFont<'f> {
 }
 
 /// The phantom points `units` (font units) as the programs see them at the
-/// 16.16 `scale`. Observed: the horizontal ones' x and the vertical ones' y
-/// on the pixel grid, the vertical ones at half the advance
-/// (`phantom-points`). `Overflow` for a point outside 32 bits.
-fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<[Point; 4]> {
+/// 16.16 `scale`. Observed: scaled, the vertical ones at half the advance,
+/// they start there, and the horizontal ones' x and the vertical ones' y
+/// are then moved to the pixel grid (`phantom-points`, `phantom-originals`).
+/// `Overflow` for a point outside 32 bits.
+fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<Phantoms> {
     let scaled = |u: i32| i32::try_from(mul_fix(i64::from(u), scale)).map_err(|_| Error::Overflow);
     let fitted = |u: i32| {
         scaled(u)?
@@ -699,12 +729,21 @@ fn scaled_phantom_points(units: [Point; 4], scale: i64) -> Result<[Point; 4]> {
     };
     let [pp1, pp2, pp3, pp4] = units;
     let middle = scaled(((i64::from(pp2.x) - i64::from(pp1.x)) / 2) as i32)?;
-    Ok([
-        Point::new(fitted(pp1.x)?, 0),
-        Point::new(fitted(pp2.x)?, 0),
-        Point::new(middle, fitted(pp3.y)?),
-        Point::new(middle, fitted(pp4.y)?),
-    ])
+    Ok(Phantoms {
+        current: [
+            Point::new(fitted(pp1.x)?, 0),
+            Point::new(fitted(pp2.x)?, 0),
+            Point::new(middle, fitted(pp3.y)?),
+            Point::new(middle, fitted(pp4.y)?),
+        ],
+        original: [
+            Point::new(scaled(pp1.x)?, 0),
+            Point::new(scaled(pp2.x)?, 0),
+            Point::new(middle, scaled(pp3.y)?),
+            Point::new(middle, scaled(pp4.y)?),
+        ],
+        units,
+    })
 }
 
 /// Runs each glyph's program as a hinted TrueType load builds its outline.
@@ -749,13 +788,12 @@ impl glyf::Hint for GlyfHinting<'_> {
             self.ends.try_push(end).map_err(|e| e.error)?;
         }
         let units = self.font.phantom_points(metrics);
-        let scaled = scaled_phantom_points(units, self.hinter.scale())?;
         let points = GlyphPoints {
             outline,
             base,
             ends: self.ends.as_slice(),
             units: (!composite).then(|| &self.units.as_slice()[base..]),
-            phantoms: (scaled, units),
+            phantoms: scaled_phantom_points(units, self.hinter.scale())?,
         };
         self.hinter.hint(self.programs, instructions, points, work)
     }
@@ -771,9 +809,13 @@ mod tests {
     fn phantom_points_outside_32_bits_are_an_overflow() {
         let units = [(0, 0), (1000, 0), (0, 800), (0, -200)].map(|(x, y)| Point::new(x, y));
         // Height 1000 at 2048 units per em.
+        let points = |p: [(i32, i32); 4]| p.map(|(x, y)| Point::new(x, y));
         assert_eq!(
-            scaled_phantom_points(units, 32000),
-            Ok([(0, 0), (512, 0), (244, 384), (244, -128)].map(|(x, y)| Point::new(x, y)))
+            scaled_phantom_points(units, 32000).map(|p| (p.current, p.original)),
+            Ok((
+                points([(0, 0), (512, 0), (244, 384), (244, -128)]),
+                points([(0, 0), (488, 0), (244, 391), (244, -98)])
+            ))
         );
         let wide = [(0, 0), (32767, 0), (0, 0), (0, 0)].map(|(x, y)| Point::new(x, y));
         assert_eq!(scaled_phantom_points(wide, 1 << 33), Err(Error::Overflow));

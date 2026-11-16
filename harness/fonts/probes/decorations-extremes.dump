@@ -1,0 +1,45 @@
+height 16384 outlines
+face 0
+size 16384 256 256 67108864 67108864 13312 -3072 16384 10240 13312 3072 16384 16384 256 0 underline -50331136 -16777728 strikeout 16776704 50330112
+glyph 0 8192 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 10240 truetype 1 | 4 | 1024 0 1 1024 11264 1 8192 11264 1 8192 0 1
+bold 1 truetype 1 | 4 | 1024 0 1 1024 11520 1 8448 11520 1 8448 0 1
+oblique 1 truetype 1 | 4 | 1024 0 1 4852 11264 1 12020 11264 1 8192 0 1
+both 1 truetype 1 | 4 | 973 0 1 4888 11520 1 12327 11520 1 8412 0 1
+glyph 2 4096 truetype 0 | |
+bold 2 truetype 0 | |
+oblique 2 truetype 0 | |
+both 2 truetype 0 | |
+height 131072 outlines
+face 0
+size 131072 2048 2048 536870912 536870912 106496 -24576 131072 81920 106496 24576 131072 131072 2048 0 underline - strikeout -
+glyph 0 65536 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 81920 truetype 1 | 4 | 8192 0 1 8192 90112 1 65536 90112 1 65536 0 1
+bold 1 truetype 1 | 4 | 8192 0 1 8192 92160 1 67584 92160 1 67584 0 1
+oblique 1 truetype 1 | 4 | 8192 0 1 38816 90112 1 96160 90112 1 65536 0 1
+both 1 truetype 1 | 4 | 7786 0 1 39106 92160 1 98614 92160 1 67294 0 1
+glyph 2 32768 truetype 0 | |
+bold 2 truetype 0 | |
+oblique 2 truetype 0 | |
+both 2 truetype 0 | |
+height 262144 outlines
+face 0
+size 262144 4096 4096 1073741824 1073741824 212992 -49152 262144 163840 212992 49152 262144 262144 4096 0 underline - strikeout -
+glyph 0 131072 truetype 0 | |
+bold 0 truetype 0 | |
+oblique 0 truetype 0 | |
+both 0 truetype 0 | |
+glyph 1 163840 truetype 1 | 4 | 16384 0 1 16384 180224 1 131072 180224 1 131072 0 1
+bold 1 truetype 1 | 4 | 16384 0 1 16384 184320 1 135168 184320 1 135168 0 1
+oblique 1 truetype 1 | 4 | 16384 0 1 77632 180224 1 192320 180224 1 131072 0 1
+both 1 truetype 1 | 4 | 15573 0 1 78213 184320 1 197227 184320 1 134587 0 1
+glyph 2 65536 truetype 0 | |
+bold 2 truetype 0 | |
+oblique 2 truetype 0 | |
+both 2 truetype 0 | |

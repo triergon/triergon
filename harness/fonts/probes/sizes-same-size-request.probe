@@ -1,0 +1,29 @@
+# The twilight zone when one face is requested at the same size twice: the
+# control value program moves twilight point 1 up a pixel, each glyph
+# twilight point 2, and each glyph writes the two into the y of points 0 and
+# 1. Observed: the second request starts again from the twilight zone the
+# control value program leaves, not from what the glyphs left.
+sequence 1000 1000
+heights 1000
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  SVTCA[0]; PUSH 0; SZP2; PUSH 1 1; GC[0]; PUSH 64; ADD; SCFS
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]; PUSH 0; SZP2; PUSH 2 2; GC[0]; PUSH 64; ADD; SCFS
+    PUSH 0 1; GC[0]; PUSH 1; SZP2; SCFS
+    PUSH 1; PUSH 0; SZP2; PUSH 2; GC[0]; PUSH 1; SZP2; SCFS
+  end
+end
+glyph advance 1200
+  contour 0 0, 100 0, 200 0, 300 0
+  program
+    SVTCA[0]; PUSH 0; SZP2; PUSH 2 2; GC[0]; PUSH 64; ADD; SCFS
+    PUSH 0 1; GC[0]; PUSH 1; SZP2; SCFS
+    PUSH 1; PUSH 0; SZP2; PUSH 2; GC[0]; PUSH 1; SZP2; SCFS
+  end
+end

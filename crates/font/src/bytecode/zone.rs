@@ -58,10 +58,17 @@ impl Zone {
         self.ends.clear();
     }
 
-    /// Appends a point at `position` that started at `units`.
-    pub(super) fn push(&mut self, position: Point, units: Point, on_curve: bool) -> Result<()> {
-        self.current.try_push(position).map_err(|e| e.error)?;
-        self.original.try_push(position).map_err(|e| e.error)?;
+    /// Appends a point at `current` whose original position is `original`,
+    /// and `units` in font units.
+    pub(super) fn push(
+        &mut self,
+        current: Point,
+        original: Point,
+        units: Point,
+        on_curve: bool,
+    ) -> Result<()> {
+        self.current.try_push(current).map_err(|e| e.error)?;
+        self.original.try_push(original).map_err(|e| e.error)?;
         self.units.try_push(units).map_err(|e| e.error)?;
         self.flags
             .try_push(if on_curve { ON_CURVE } else { 0 })

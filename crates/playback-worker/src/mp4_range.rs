@@ -21,10 +21,10 @@ use triergon_isobmff::{
     },
 };
 use triergon_playback::{
-    ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, PlayerPolicy,
-    Progress, RawEvent, Selection,
+    ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, Mp4RangePlayer,
+    PlayerPolicy, Progress, RawEvent, Selection,
     io::{SelectedInput, SourceOwner},
-    mp4_open::{Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress},
+    mp4_open::{Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
     mp4_plan::PlanLimits,
 };
 
@@ -134,7 +134,9 @@ enum Seek {
     OpusRoll(i64),
 }
 
-fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
+/// The movie of a complete open transaction, with its input and source.
+#[inline(never)]
+fn open(pool: &Budget, data: &Bytes, cancel: &AtomicBool) -> Result<OpenedMp4<ByteSource>> {
     let id = SourceId(1);
     let input = InputCursor::new(
         pool,
@@ -150,19 +152,39 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
         source: SourceOwner::new(ByteSource::new(id, data.clone(), WINDOW)?),
         format: Format::Mp4,
     };
-    let cancel = AtomicBool::new(false);
-    let work = || WorkBudget::new(WORK);
     let mut open = Mp4Open::new(selected, OpenLimits::default())?;
-    while !matches!(open.advance(&mut work(), &cancel)?, OpenProgress::Ready) {}
-    let mut opened = open.finish()?;
-    let movie = &opened.movie;
+    while !matches!(
+        open.advance(&mut WorkBudget::new(WORK), cancel)?,
+        OpenProgress::Ready
+    ) {}
+    Ok(open.finish()?)
+}
+
+/// The tracks a range session plays: each track's edit plan, the video track
+/// and the audio track.
+struct Tracks {
+    plans: BudgetVec<Option<EncodedEditPlan>>,
+    video: u32,
+    audio: Option<u32>,
+}
+
+/// Checks each track, folds the configurations the session compares and
+/// prepares the edit plans.
+#[inline(never)]
+fn prepare_tracks(
+    pool: &Budget,
+    movie: &Movie,
+    input: &mut InputCursor,
+    cancel: &AtomicBool,
+    result: &mut Work,
+) -> Result<Tracks> {
+    let work = || WorkBudget::new(WORK);
     let major_brand = movie.major_brand();
     let movie_base = movie.header().time_base()?;
     let mut plans = BudgetVec::new(pool);
     plans.try_reserve_exact(movie.tracks().len())?;
     let mut video = None;
     let mut audio = None;
-    let mut result = Work::default();
     for track in movie.tracks() {
         let header = track.header();
         let kind = triergon_isobmff::media_kind(&header.handler);
@@ -220,7 +242,7 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
             }
             let mut config = AacConfigurationJob::new(entry, ConfigurationLimits::default())?;
             loop {
-                match config.poll(&mut work(), &cancel)? {
+                match config.poll(&mut work(), cancel)? {
                     AacConfigurationStep::Yield => {}
                     AacConfigurationStep::Ready(config) => {
                         result.configuration(entry.format, config.bytes.as_ref());
@@ -234,15 +256,15 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
             let mut config = ConfigurationJob::new_range_playback(
                 header,
                 table,
-                &opened.input,
+                input,
                 DescriptionSelection {
                     major_brand,
                     description: descriptions[0].index,
                     limits: ConfigurationLimits::default(),
                 },
             )?;
-            while config.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
-            let config = config.take(&mut opened.input, &cancel)?;
+            while config.poll(input, &mut work(), cancel)? != CursorStatus::Ready {}
+            let config = config.take(input, cancel)?;
             if let Some(codec) = codec {
                 let tag = config.source_description().format;
                 let stream = config.demux();
@@ -266,11 +288,11 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
                     movie_base,
                 },
                 &configs,
-                &opened.input,
+                input,
                 EditLimits::default(),
             )?;
-            while edit.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
-            Some(edit.take(&mut opened.input, &cancel)?)
+            while edit.poll(input, &mut work(), cancel)? != CursorStatus::Ready {}
+            Some(edit.take(input, cancel)?)
         } else {
             None
         };
@@ -280,71 +302,116 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
     if audio.is_none() && tag != *b"dav1" {
         return Err("missing MP4 range audio track".into());
     }
-    let mut range = Mp4RangeOpen::for_media(movie, Some(plans.as_slice()), PlanLimits::default())?;
-    while !range.poll(&mut work(), &cancel)? {}
-    let mut player = range.finish(
-        opened.input,
-        opened.source,
+    Ok(Tracks {
+        plans,
+        video,
+        audio,
+    })
+}
+
+/// The range player over the movie and its edit plans.
+fn range_player<'a>(
+    movie: &'a Movie,
+    plans: &'a [Option<EncodedEditPlan>],
+    input: InputCursor,
+    source: SourceOwner<ByteSource>,
+    cancel: &AtomicBool,
+) -> Result<Mp4RangePlayer<'a, ByteSource>> {
+    let mut range = Mp4RangeOpen::for_media(movie, Some(plans), PlanLimits::default())?;
+    while !range.poll(&mut WorkBudget::new(WORK), cancel)? {}
+    Ok(range.finish(
+        input,
+        source,
         1 << 20,
         Selection::All,
         PlayerPolicy::default(),
-    )?;
+    )?)
+}
+
+/// Plays to the first packet, then seeks back to `seek`.
+#[inline(never)]
+fn seek_to(
+    player: &mut Mp4RangePlayer<'_, ByteSource>,
+    seek: Seek,
+    tracks: &Tracks,
+    result: &mut Work,
+    cancel: &AtomicBool,
+) -> Result<()> {
+    let work = || WorkBudget::new(WORK);
     let mut output = None;
-    if let Some(seek) = seek {
-        loop {
-            let progress = player.read_output(&mut output, &mut work(), &cancel)?;
-            if output
-                .take()
-                .is_some_and(|item| matches!(item.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
-            {
-                break;
-            }
-            match progress {
-                Progress::Ended => return Err("empty stream before seek".into()),
-                Progress::Backpressure { .. } => {
-                    return Err("range playback ran out of space".into());
-                }
-                _ => {}
-            }
+    loop {
+        let progress = player.read_output(&mut output, &mut work(), cancel)?;
+        if output
+            .take()
+            .is_some_and(|item| matches!(item.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+        {
+            break;
         }
-        let (timestamp, recovery) = match seek {
-            Seek::Mov(timestamp) => (timestamp, false),
-            Seek::OpusRoll(timestamp) => (timestamp, true),
-        };
-        let request = Mp4NativeSeekRequest {
-            video,
-            timestamp,
-            limits: SeekLimits::default(),
-        };
-        let mut job = if recovery {
-            player
-                .prepare_seek_with_opus_recovery(request, audio.ok_or("missing MP4 Opus track")?)?
-        } else {
-            player.prepare_seek(request)?
-        };
-        while !job.poll(&mut work(), &cancel)? {}
-        let mut command = job.finish()?;
-        if recovery {
-            let landing = command.landing();
-            let opus = landing.opus_recovery.ok_or("missing Opus recovery")?;
-            let sample_clock = TimeBase::new(1, 48_000)?;
-            let samples = opus
-                .preroll
-                .to_i64_ticks(sample_clock, Rounding::TowardZero)?;
-            if Time::from_ticks(i128::from(samples), sample_clock)? != opus.preroll {
-                return Err("Opus preroll is off the sample clock".into());
+        match progress {
+            Progress::Ended => return Err("empty stream before seek".into()),
+            Progress::Backpressure { .. } => {
+                return Err("range playback ran out of space".into());
             }
-            for field in [
-                landing.selected.occurrence.source.range.start,
-                opus.sync_sample,
-                opus.first_sample,
-                signed(samples),
-            ] {
-                fold(&mut result.digest, field);
-            }
+            _ => {}
         }
-        while !player.apply_seek(&mut command, &mut work(), &cancel)? {}
     }
+    let (timestamp, recovery) = match seek {
+        Seek::Mov(timestamp) => (timestamp, false),
+        Seek::OpusRoll(timestamp) => (timestamp, true),
+    };
+    let request = Mp4NativeSeekRequest {
+        video: tracks.video,
+        timestamp,
+        limits: SeekLimits::default(),
+    };
+    let mut job = if recovery {
+        player.prepare_seek_with_opus_recovery(
+            request,
+            tracks.audio.ok_or("missing MP4 Opus track")?,
+        )?
+    } else {
+        player.prepare_seek(request)?
+    };
+    while !job.poll(&mut work(), cancel)? {}
+    let mut command = job.finish()?;
+    if recovery {
+        let landing = command.landing();
+        let opus = landing.opus_recovery.ok_or("missing Opus recovery")?;
+        let sample_clock = TimeBase::new(1, 48_000)?;
+        let samples = opus
+            .preroll
+            .to_i64_ticks(sample_clock, Rounding::TowardZero)?;
+        if Time::from_ticks(i128::from(samples), sample_clock)? != opus.preroll {
+            return Err("Opus preroll is off the sample clock".into());
+        }
+        for field in [
+            landing.selected.occurrence.source.range.start,
+            opus.sync_sample,
+            opus.first_sample,
+            signed(samples),
+        ] {
+            fold(&mut result.digest, field);
+        }
+    }
+    while !player.apply_seek(&mut command, &mut work(), cancel)? {}
+    Ok(())
+}
+
+fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
+    let cancel = AtomicBool::new(false);
+    let work = || WorkBudget::new(WORK);
+    let OpenedMp4 {
+        movie,
+        mut input,
+        source,
+    } = open(pool, data, &cancel)?;
+    let mut result = Work::default();
+    let tracks = prepare_tracks(pool, &movie, &mut input, &cancel, &mut result)?;
+    let mut player = range_player(&movie, &tracks.plans, input, source, &cancel)?;
+    if let Some(seek) = seek {
+        seek_to(&mut player, seek, &tracks, &mut result, &cancel)?;
+    }
+    let mut output = None;
     loop {
         let progress = player.read_output(&mut output, &mut work(), &cancel)?;
         if let Some(item) = output.take() {
