@@ -8,8 +8,9 @@ use super::energy::MAX_FINE_BITS;
 use super::tables::{
     ALLOC_VECTORS, BANDS, CACHE_BITS, CACHE_CAPS, CACHE_INDEX, EBANDS, LOG_N, LOG2_FRAC,
 };
-use crate::range::{RangeDecoder, divide};
+use crate::range::RangeDecoder;
 use core::ops::Range;
+use triergon_codec::divide;
 
 /// Fractional bits per bit.
 pub(super) const BITRES: i32 = 3;

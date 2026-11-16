@@ -1,11 +1,11 @@
 //! Floor type 1 (Vorbis I section 7): a piecewise linear curve on a dB scale.
 
 use triergon_bitstream::{LsbReader, LsbWindow};
-use triergon_codec::{Budget, BudgetVec};
+use triergon_codec::{Budget, BudgetVec, divide};
 
 use crate::codebook::Codebook;
 use crate::tables::INVERSE_DB;
-use crate::{DecodeError, divide, ilog};
+use crate::{DecodeError, ilog};
 
 /// X positions a floor 1 may list, the two implicit ends included.
 pub(crate) const MAX_POINTS: usize = 65;

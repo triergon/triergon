@@ -3,8 +3,9 @@
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
 `Speaker`s, stream downmix metadata, the codec selectors, the Kaiser-Bessel-derived
-window the AAC and AC-3 filterbanks share, and the inverse MDCT the Vorbis and Opus
-decoders share. It sits in the codec layer below the nine decoders and depends only on
+window the AAC and AC-3 filterbanks share, the inverse MDCT the Vorbis and Opus
+decoders share, and integer division by a run-time divisor without a library call on
+32-bit ARM. It sits in the codec layer below the nine decoders and depends only on
 [triergon-core](../core/README.md), whose storage types it re-exports for the
 decoders' budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`, `Plane`,
 `Colour`) it re-exports. It contains no decoder; sessions and workers drive the
@@ -55,6 +56,7 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
+| `divide`, `divide_u32` | `a / b` rounded towards zero for `b > 0`; on 32-bit ARM, whose baseline has no divide instruction, an exact double division instead of the library routine |
 
 ### Channel order
 

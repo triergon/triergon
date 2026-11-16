@@ -8,8 +8,9 @@ use super::alloc::{
 use super::block_len;
 use super::pvq::{self, MAX_BAND, Spread};
 use super::tables::{BANDS, EBANDS, LOG_N};
-use crate::range::{RangeDecoder, divide, ilog};
+use crate::range::{RangeDecoder, ilog};
 use core::ops::Range;
+use triergon_codec::divide;
 
 /// Normalised folding source of both channels: bins up to the last band's start.
 pub(super) const NORM_LEN: usize = 8 * 100;
