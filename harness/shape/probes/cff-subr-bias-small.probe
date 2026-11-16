@@ -1,0 +1,25 @@
+# The subroutine bias for 1239 local and 1239 global subroutines: 107. As
+# cff-subr-bias, one subroutine short of the larger bias.
+global
+  0 77 rlineto return
+end
+pad-global 1238
+local
+  66 0 rlineto return
+end
+pad-local 1238
+glyph
+  endchar
+end
+glyph
+  100 100 rmoveto -1131 callsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -107 callsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -1131 callgsubr 5 5 rlineto endchar
+end
+glyph
+  100 100 rmoveto -107 callgsubr 5 5 rlineto endchar
+end

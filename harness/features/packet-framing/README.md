@@ -1,7 +1,7 @@
 # Packet framing
 
 This contract compares complete AVC and HEVC packet-framing operations against
-FFmpeg's public bitstream-filter API. All 125 scripts are required, including
+FFmpeg's public bitstream-filter API. All 135 scripts are required, including
 configuration boundaries, state transitions, malformed input and packet metadata.
 The inputs are authored synthetic structures; their codec bodies are opaque framing data.
 
@@ -19,6 +19,13 @@ both whole-operation digest words, including iterations with zero output packets
 Both workers fold eight-byte groups with the same polynomial recurrence and
 process any trailing bytes individually.
 
+`avc-profile-extension-inputs.json` adds the five fixed-header lengths, a
+nonempty configuration update and an extension header declaring an absent entry.
+`avc-receiver-inputs.json` covers buffering-period insertion with in-band sets
+and across a flush, plus a header-only IDR. `cargo xtask framing manifest --record`
+records packet counts and whole-operation folds from the built FFmpeg worker.
+Use `--replace` to intentionally update existing input hashes or folds.
+
 The xtask entry point generates all inputs and delegates reports, paired timing,
 memory collection, isolation and gate-build checks to the shared harness. There
 is no case filter. A baseline comparison cannot be an acceptance run. Workers
@@ -26,7 +33,8 @@ preload identical padded, immutable input templates before timing and memory
 markers, and retain every output until after close. The Rust worker enables the
 framing crate's `reference-trace` feature for comparison-only error codes.
 
-`provenance.json` binds the inputs and observations to their original archive and
-source hashes. The historical measurements used compiler overrides and are not
-current gate results. New qualification requires the pinned stable build and all
-125 cases on native AArch64 Linux.
+`provenance.json` binds the original 125 inputs and observations to their archive
+and source hashes. The two AVC input files and `corpus.json` pin the ten
+additional scripts and their observed folds. The historical measurements used
+compiler overrides. Qualification requires the pinned stable build and all 135
+cases on native AArch64 Linux.

@@ -1,0 +1,25 @@
+# Sizes of zero pixels per em (heights 0 and 20) and of one (40) of a face
+# with a font and control value program. Observed: the size request fails at
+# zero pixels per em, its metrics keep the scale it asked for, and every glyph
+# then loads unscaled and unhinted, in font units, by the default load as by
+# the unhinted one; the linear vertical advance is scaled by the size's scale.
+heights 0 20 40
+modes default outlines advances vertical
+fpgm
+  PUSH 0; FDEF; ENDF
+end
+prep
+  PUSH 0; POP; PUSH 0; POP
+end
+glyph advance 1100
+  contour 105 3, 105 1403, 903 1403 off, 903 3
+  program
+    SVTCA[0]; PUSH 1; MDAP[1]
+  end
+end
+glyph advance 700 lsb 10
+  component 0 offset 31 -17 round
+  component 0 offset 300 0 scale 0.5
+end
+glyph advance 300
+end

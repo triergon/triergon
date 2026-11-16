@@ -9,6 +9,9 @@ pub mod diff;
 pub mod features;
 pub mod gate_build;
 pub mod grade;
+pub mod link_corpus;
+pub mod link_order;
+pub mod link_training;
 pub mod linux;
 #[cfg(test)]
 mod linux_tests;

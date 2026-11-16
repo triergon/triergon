@@ -238,10 +238,8 @@ pub fn timing_valid(
     let Ok(fields) = super::comparison::work_fields(contract) else {
         return false;
     };
-    let work = super::comparison::Work {
-        fields,
-        own: vec![],
-    };
+    let own = super::comparison::own_fields(row.get("expected_time_outputs"), &fields);
+    let work = super::comparison::Work { fields, own };
     timing
         .get("iterations")
         .is_some_and(|count| super::validation::iterations_valid(contract, count))
@@ -683,7 +681,7 @@ pub(crate) fn acceptance_iter(
     }
     match gate_build::pinned_release(root) {
         Ok(pinned) => reasons.extend(
-            gate_build::refusals(identity, &pinned)
+            gate_build::identity_refusals(root, identity, &pinned)
                 .into_iter()
                 .map(|reason| format!("not the gate build: {reason}")),
         ),

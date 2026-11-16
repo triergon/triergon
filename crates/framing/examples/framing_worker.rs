@@ -4,6 +4,6 @@
 #[path = "../../../harness/features/packet-framing/worker.rs"]
 mod worker;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    worker::main(&std::env::args().skip(1).collect::<Vec<_>>())
+fn main() -> std::process::ExitCode {
+    worker::main(std::env::args_os())
 }

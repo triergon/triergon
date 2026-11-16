@@ -1,6 +1,8 @@
 //! A packet the caption extractor refuses leaves it as it was: the frames
 //! afterwards are those of a stream without that packet.
 
+mod nal_streams;
+
 use triergon_core::{Budget, WorkBudget};
 use triergon_subtitles::cc::video::nal::{Codec, Framing};
 use triergon_subtitles::compat::cc::{CaptionExtractor, VideoCoding, VideoPacket};
@@ -120,7 +122,7 @@ fn a_refused_mpeg2_packet_leaves_the_extractor_as_it_was() {
 
 /// An access unit: an SEI NAL unit of `messages` (type and payload), then a
 /// slice NAL unit.
-fn h264_access_unit(messages: &[(u8, Vec<u8>)], slice: [u8; 2]) -> Vec<u8> {
+fn h264_access_unit(messages: &[(u8, Vec<u8>)], slice: &[u8]) -> Vec<u8> {
     let mut au = vec![0, 0, 1, 0x06];
     for (kind, payload) in messages {
         au.push(*kind);
@@ -128,8 +130,35 @@ fn h264_access_unit(messages: &[(u8, Vec<u8>)], slice: [u8; 2]) -> Vec<u8> {
         au.extend_from_slice(payload);
     }
     au.extend_from_slice(&[0x80, 0, 0, 1]);
-    au.extend_from_slice(&slice);
+    au.extend_from_slice(slice);
     au
+}
+
+/// A reference picture with `frame_num` `n` (order count type 2): an IDR
+/// picture after its parameter sets for 0, a P picture otherwise.
+fn h264_slice(n: u8) -> Vec<u8> {
+    use nal_streams::{AvcSlice, AvcSps, annex_b, avc_pps, avc_slice, avc_sps};
+    let slice = AvcSlice {
+        idr: n == 0,
+        reference: true,
+        slice_type: if n == 0 { 2 } else { 0 },
+        frame_num: u32::from(n % 16),
+        ..AvcSlice::default()
+    };
+    let slice = avc_slice(&slice, 2);
+    if n != 0 {
+        return slice;
+    }
+    // Parameter sets without VUI timing, then the slice.
+    let sps = AvcSps {
+        poc_type: 2,
+        timing: None,
+        ..AvcSps::default()
+    };
+    let mut nals = annex_b(&[avc_sps(&sps), avc_pps()]);
+    nals.extend_from_slice(&[0, 0, 1]);
+    nals.extend_from_slice(&slice[..]);
+    nals[3..].to_vec()
 }
 
 /// A T.35 A/53 payload announcing `count` constructs, then `cc_data`.
@@ -143,12 +172,10 @@ fn atsc(count: u8, cc_data: &[u8]) -> Vec<u8> {
 #[test]
 fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
     // IDR, then P pictures, one frame period apart in decode order and
-    // without container durations, so each frame lasts the least step.
+    // without VUI timing or container durations, so each frame lasts the
+    // step between their decode times.
     let units: Vec<_> = (0..40u8)
-        .map(|n| {
-            let slice = if n == 0 { [0x65, 0x88] } else { [0x41, 0xc0] };
-            h264_access_unit(&[(4, atsc(1, &[0xfc, 0x80 | n, 0x80]))], slice)
-        })
+        .map(|n| h264_access_unit(&[(4, atsc(1, &[0xfc, 0x80 | n, 0x80]))], &h264_slice(n)))
         .collect();
     let packets: Vec<_> = units
         .iter()
@@ -163,7 +190,7 @@ fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
     // One tick after the last decode time, and more caption bytes than the
     // pool holds.
     let message = (4, atsc(31, &[0xfc, 0x94, 0x2c].repeat(31)));
-    let bad = h264_access_unit(&vec![message; 40_000], [0x41, 0xc0]);
+    let bad = h264_access_unit(&vec![message; 40_000], &h264_slice(20));
     let refused = [
         Refused {
             before: 20,
@@ -185,5 +212,76 @@ fn a_refused_access_unit_leaves_the_extractor_as_it_was() {
     let expected = extract(coding, 1 << 20, &packets, &[]);
     assert_eq!(expected.len(), 40);
     assert!(expected.iter().all(|frame| frame.1 == Some(3003)));
+    assert_eq!(extract(coding, 1 << 20, &packets, &refused), expected);
+}
+
+#[test]
+fn a_refused_hevc_access_unit_leaves_the_extractor_as_it_was() {
+    use nal_streams::{annex_b, caption_sei, hevc_pps, hevc_slice, hevc_sps};
+    // IDR0, then trailing pictures 1 to 19 in order, each referring to the
+    // one before; then an IDR picture with no_output_of_prior_pics_flag that
+    // repeats the SPS unchanged, and trailing pictures 21 to 29 after it.
+    let units: Vec<_> = (0..30u8)
+        .map(|n| {
+            let mut nals = Vec::new();
+            if n == 0 || n == 20 {
+                nals.extend([hevc_sps(4, 1, 0), hevc_pps()]);
+            }
+            nals.push(caption_sei(&[0x4e, 0x01], n));
+            nals.push(match n {
+                0 => hevc_slice(19, 0, &[], false),
+                20 => hevc_slice(20, 0, &[], true),
+                21.. => hevc_slice(1, u32::from(n - 20), &[-1], false),
+                _ => hevc_slice(1, u32::from(n), &[-1], false),
+            });
+            annex_b(&nals)
+        })
+        .collect();
+    let packets: Vec<_> = units
+        .iter()
+        .enumerate()
+        .map(|(n, data)| VideoPacket {
+            data,
+            pts: Some(n as i64 * 3003),
+            dts: Some(n as i64 * 3003),
+            duration: None,
+        })
+        .collect();
+    // A replacing SPS with other buffer sizes, then more caption bytes than
+    // the pool holds.
+    let mut bad = annex_b(&[hevc_sps(1, 1, 1), hevc_pps()]);
+    bad.extend_from_slice(&[0, 0, 1, 0x4e, 0x01]);
+    let message = atsc(31, &[0xfc, 0x94, 0x2c].repeat(31));
+    for _ in 0..40_000 {
+        bad.push(4);
+        bad.push(u8::try_from(message.len()).expect("short payload"));
+        bad.extend_from_slice(&message);
+    }
+    bad.push(0x80);
+    bad.extend(annex_b(&[hevc_slice(1, 15, &[-1], false)]));
+    let refused = [
+        Refused {
+            before: 15,
+            packet: VideoPacket {
+                data: &bad,
+                pts: Some(14 * 3003 + 1),
+                dts: Some(14 * 3003 + 1),
+                duration: None,
+            },
+            work: u64::MAX,
+        },
+        Refused {
+            before: 25,
+            packet: packets[25],
+            work: 0,
+        },
+    ];
+    let coding = VideoCoding::Nal(Codec::Hevc, Framing::StartCodes);
+    let expected = extract(coding, 1 << 20, &packets, &[]);
+    // The second IDR picture discards picture 19, still waiting: its SPS
+    // repeats the one stored, so it changes nothing, also after the refused
+    // packet's replacing SPS was put back.
+    assert_eq!(expected.len(), 29);
+    assert!(expected.iter().all(|(_, _, data)| data[1] & 0x7f != 19));
     assert_eq!(extract(coding, 1 << 20, &packets, &refused), expected);
 }

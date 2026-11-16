@@ -8,7 +8,7 @@
   "gate": "required",
   "compare_order": 2,
   "contract": [
-    "what libass 0.17.5's shaper reads at its default size: every face of one font file read from memory and loaded at 256 pixels (16384 in 26.6), after libass's GDI face metrics, with a REAL_DIM size request",
+    "what libass 0.17.5's shaper reads at its default size: every face of one font file read from memory and loaded at 256 pixels (16384 in 26.6), after libass's GDI face metrics, with a REAL_DIM size request; and the same load at 15.625 and 10 pixels (1000 and 640 in 26.6), each a case of its own",
     "every glyph's FT_LOAD_DEFAULT load (with FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH and FT_LOAD_IGNORE_TRANSFORM, as ass_shaper.c loads it): metrics.horiAdvance and vertAdvance, which libass's HarfBuzz callbacks report as advances; horiBearingX, horiBearingY, width and height, which they report as glyph extents; then the hinted outline, whose points they report as contour points; a glyph FreeType cannot load folds as absent, and one the candidate cannot load this way ends its operation with an error, so the case fails; packets count glyphs",
     "HarfBuzz positions marks it has no GPOS anchors for (fallback mark positioning) by these extents and contour points, so a face whose default load is open here can place such marks differently from libass; its unhinted outlines, which libass draws, are compared by font-hinting-none",
     "the file is read before each timed and memory operation; the reference library is created once, outside it"

@@ -240,6 +240,83 @@
    "sha256": "ad8c5f58bd770cc5604e55fdd4ea506ea5d5eb56e0aa545e05c961d81f9f2446"
   },
   {
+   "lane": "reader-ogg",
+   "name": "bear.ogv",
+   "path": ".research/fate-samples/ogg/bear.ogv",
+   "bytes": 59943,
+   "sha256": "c6281b645fc9ddcba7ecc8eb16c525758cec498de9645a5e6be44f6a8962ce57"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "empty_theora_packets.ogv",
+   "path": ".research/fate-samples/ogg/empty_theora_packets.ogv",
+   "bytes": 5033,
+   "sha256": "de42934c0ad6049dada4c27132982a09213c24d2d82d80f2959a183e94f1b97b"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "offset_test.ogv",
+   "path": ".research/fate-samples/vp3/offset_test.ogv",
+   "bytes": 211972,
+   "sha256": "83ba8d258cc3a1715be473925faf757469f67d2e29a553cf6d5a521488393f3e"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "ogg-flac/chained-meta.ogg",
+   "path": ".research/fate-samples/ogg-flac/chained-meta.ogg",
+   "bytes": 5277,
+   "sha256": "03809147054f307c79913e25aab5dfa9294773796d591dbc556e0adb98388a7a"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "ogg-opus/chained-meta.ogg",
+   "path": ".research/fate-samples/ogg-opus/chained-meta.ogg",
+   "bytes": 3299,
+   "sha256": "14ef86e6d37476d4008ec33722c406136f261bb76dfb8fad5ddb8d6f64cdbd6c"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "ogg-vorbis/chained-meta.ogg",
+   "path": ".research/fate-samples/ogg-vorbis/chained-meta.ogg",
+   "bytes": 7151,
+   "sha256": "9a664f79d0a201b8733a26a3a178a14f3c07c2f116f4e87738f692a69f187804"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "speex_nb.spx",
+   "path": ".research/speex-generated/speex_nb.spx",
+   "bytes": 2613,
+   "sha256": "7a620f8ac4bcc4e8121e802853e731aa34b81e6149cd6cf547dcf4e604d15d87"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "speex_wb.spx",
+   "path": ".research/speex-generated/speex_wb.spx",
+   "bytes": 1026,
+   "sha256": "e191096259c6e07792e4e9207c58cab205c2e25b495db36b236a49279faa1462"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "speex_uwb_stereo.spx",
+   "path": ".research/speex-generated/speex_uwb_stereo.spx",
+   "bytes": 4546,
+   "sha256": "2cfd837317047e6fb7a81871a99d92f13f8b9c478c2ba75fd76faade89d484ba"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "speex_skeleton.spx",
+   "path": ".research/speex-generated/speex_skeleton.spx",
+   "bytes": 2625,
+   "sha256": "07a5070c8bcc01f545a17acb529879f6cddd06efa0bff9ab53b7befeeafb1e27"
+  },
+  {
+   "lane": "reader-ogg",
+   "name": "chain_speex.spx",
+   "path": ".research/speex-generated/chain_speex.spx",
+   "bytes": 4017,
+   "sha256": "6688b5492f43b4f5812d8acb91dc426c63f0bbe8a31b4b6c1fed081cddff914d"
+  },
+  {
    "lane": "reader-flac",
    "name": "flac_corrupt.flac",
    "path": ".research/elementary/crafted/flac_corrupt.flac",

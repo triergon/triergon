@@ -47,7 +47,7 @@ pub(crate) struct SliceCtx {
 /// Information about RefPicList1[0] for direct prediction.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ColInfo {
-    /// DPB index of the frame store holding RefPicList1[0].
+    /// Position in the decoded picture buffer of the frame store holding RefPicList1[0].
     pub idx: usize,
     /// Parity of RefPicList1[0] (0 frame, 1 top, 2 bottom).
     pub parity: u8,
@@ -57,7 +57,9 @@ pub(crate) struct ColInfo {
 /// The picture being decoded.
 #[derive(Debug)]
 pub(crate) struct CurPic {
-    pub store: usize,
+    /// Position in the decoded picture buffer of the current frame's first field, while
+    /// its second field is decoded into the same frame buffer.
+    pub first_field: Option<usize>,
     pub buf: FrameBuf,
     pub motion: Motion,
     pub mbs: BudgetVec<MbInfo>,
@@ -87,7 +89,8 @@ impl CurPic {
 /// Read-only access to reference frame stores during slice decoding.
 #[derive(Clone, Copy)]
 pub(crate) struct Refs<'a> {
-    pub dpb: &'a [FrameStore],
+    /// The stored frame stores, by position in the decoded picture buffer.
+    pub dpb: &'a [&'a FrameStore],
     /// Stands in for the samples of a store that has none; callers check first.
     pub no_samples: &'a FrameBuf,
 }
@@ -163,8 +166,12 @@ impl<'a> SliceDecoder<'a> {
         let mut br = BitReader::with_end(rbsp, rbsp_len * 8);
         br.seek(s.sh.data_bit_pos);
         let qp = s.sh.slice_qp;
-        let store = pic.store;
-        let self_ref_possible = s.ref_list.iter().flatten().any(|r| r.idx == store);
+        let first_field = pic.first_field;
+        let self_ref_possible = s
+            .ref_list
+            .iter()
+            .flatten()
+            .any(|r| Some(r.idx) == first_field);
         SliceDecoder {
             s,
             pic,

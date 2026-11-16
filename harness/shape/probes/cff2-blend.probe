@@ -1,0 +1,51 @@
+# blend and vsindex at the default instance: ItemVariationData 0 has 2
+# regions, 1 has 3. Font DICT 0's Private DICT leaves vsindex at 0, Font DICT
+# 1's sets 1. Each glyph draws from (100, 100) with operands blend gives.
+format cff2
+variation-data 2 3
+font-dict end
+font-dict vsindex 1 end
+glyph
+end
+glyph # 1: n = 2, k = 2: 2 + 4 + 1 operands
+  100 100 rmoveto 10 20 1 2 3 4 2 blend rlineto
+end
+glyph # 2: n = 1 with two more operands below
+  100 100 rmoveto 10 20 1 2 1 blend rlineto
+end
+glyph # 3: vsindex 1 (k = 3): n = 2: 2 + 6 + 1
+  1 vsindex 100 100 rmoveto 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph fd 1 # 4: the Private DICT's vsindex 1: k = 3
+  100 100 rmoveto 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph fd 1 # 5: vsindex 0 overriding the Private DICT's
+  0 vsindex 100 100 rmoveto 10 20 1 2 3 4 2 blend rlineto
+end
+glyph # 6: too few operands for n = 2, k = 2
+  100 100 rmoveto 1 2 3 2 blend rlineto
+end
+glyph # 7: n = 0
+  100 100 rmoveto 10 20 0 blend rlineto
+end
+glyph # 8: vsindex past the last ItemVariationData
+  5 vsindex 100 100 rmoveto 10 20 1 2 3 4 2 blend rlineto
+end
+glyph # 9: blend with an empty stack
+  100 100 rmoveto blend 10 20 rlineto
+end
+glyph # 10: blend results used by a curve
+  100 100 rmoveto 1 2 3 4 5 6 0 0 0 0 0 0 0 0 0 0 0 0 6 blend rrcurveto
+end
+glyph # 11: vsindex after a blend
+  100 100 rmoveto 10 20 1 2 3 4 2 blend rlineto 1 vsindex 10 20 1 2 3 4 5 6 2 blend rlineto
+end
+glyph # 12: blend in a hint operator, then a mask
+  0 10 1 2 1 blend hstemhm 0 10 hintmask byte:0x15 100 100 rmoveto 10 20 rlineto
+end
+glyph # 13: a negative n
+  100 100 rmoveto 10 20 -1 blend rlineto
+end
+glyph # 14: a fractional n (1.5)
+  100 100 rmoveto 10 20 1 2 fixed:1.5 blend rlineto
+end
