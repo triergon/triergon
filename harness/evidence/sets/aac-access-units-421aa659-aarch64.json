@@ -1,0 +1,25 @@
+{
+ "name": "aac-access-units-421aa659-aarch64",
+ "path": "aac-access-units-421aa659-aarch64",
+ "retention": "retained",
+ "reason": "AAC in MOV (aac-access-units, on demand) at 421aa659, one c6g.4xlarge host (Graviton2) from the gate image, kernel 7.0.0-1014-aws, 64-bit Linux AArch64: parity with codecs aac-access-units, then the 34 workloads timed on CPU 1 with codecs time and their memory under the kernel bound on CPUs 1-15 with codecs memory, as the gate measures a codec workload list; the outputs, ledgers, logs and the workers' SHA-256; for the docs/status.md AAC in MOV rows",
+ "key": "evidence/aac-access-units/421aa659-aarch64/f4dd45ce6fa62e45ce98f01c7a4d4a10efeee7c4f63db14c327c9d73b540939c.tar.zst",
+ "sha256": "f4dd45ce6fa62e45ce98f01c7a4d4a10efeee7c4f63db14c327c9d73b540939c",
+ "bytes": 69199977,
+ "results": [
+  {
+   "path": "benchmark/gate-result.json",
+   "command": "codecs time",
+   "key": "63e3fe3def7ad4d95766777e4aa4f88d4da807ca3e3ef56e82a6cc36daf8236c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "d07ac08f35e1d167e7c5c048ed66a9a224de17c712fc0baabe3abb77d168c818",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
