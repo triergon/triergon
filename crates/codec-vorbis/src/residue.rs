@@ -34,6 +34,12 @@ pub(crate) struct Residue {
     /// How far the last VQ vector of a partition may reach past it: the largest
     /// dimension of a book that does not divide the partition size, else 0.
     overhang: usize,
+    /// `floor(2^32 / classifications) + 1`, for classifications above one: `(word *
+    /// reciprocal) >> 32` is `word / classifications` for every word below 2^26
+    /// (Granlund and Montgomery, "Division by invariant integers using multiplication",
+    /// 1994), and classbook entries are below 2^24. Codewords are split by it, as a
+    /// run-time division is a library call on ARMv7.
+    reciprocal: u32,
 }
 
 /// A channel of a submap and whether its residue is coded in this packet.
@@ -165,6 +171,7 @@ impl Residue {
             books,
             passes,
             overhang,
+            reciprocal: ((1u64 << 32) / u64::from(classifications.max(2)) + 1) as u32,
         })
     }
 
@@ -300,10 +307,11 @@ impl Residue {
         }
         // At most 24 digits: `classifications^per_word` fits the classbook's entries.
         for digit in (0..per_word).rev() {
+            let quotient = ((u64::from(word) * u64::from(self.reciprocal)) >> 32) as u32;
             if let Some(slot) = slots.get_mut(digit) {
-                *slot = (word % classifications) as u8;
+                *slot = (word - quotient * classifications) as u8;
             }
-            word /= classifications;
+            word = quotient;
         }
     }
 
@@ -324,7 +332,8 @@ impl Residue {
                 offset += 1;
             });
         }
-        if !size.is_multiple_of(dimensions) {
+        // Without an overhang every book divides the partition: no remainder to compute.
+        if self.overhang != 0 && !size.is_multiple_of(dimensions) {
             // A last vector that overhangs the partition spills into the next.
             let mut chunks = out.chunks_mut(dimensions).take(size.div_ceil(dimensions));
             return book.vectors(r, chunks.len(), |vector| add(chunks.next(), vector));
