@@ -156,7 +156,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
 - Gate item `codecs-audio` grades the 39 vectors of the aac lane on Linux AArch64 and 32-bit
-  ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`): 38/39 pass on both at `bbdefa70`; the open
+  ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`): 38/39 pass on both at `4213d042`; the open
   case `aac-sce-in-stereo` differs only in the FR plane FFmpeg leaves unwritten in
   single-SCE frames.
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).

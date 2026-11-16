@@ -1,0 +1,18 @@
+{
+ "name": "aac-thumb2-speed-armv7",
+ "path": "aac-thumb2-speed-armv7",
+ "retention": "90 days",
+ "reason": "AAC decoding speed work on 32-bit ARMv7, one c6g.4xlarge host (Graviton2) from the gate image, armv7-userland, kernel 7.0.0-1014-aws: profiles of the codec worker and the FFmpeg decode reference at e43f7a4f and bbe30b3b, user-mode instruction counts of every commit and step with the AAC workloads' output digests compared, quick timing rounds of the AAC workloads, the audio correctness lanes graded as codecs-audio grades them at e43f7a4f and bbe30b3b with each aac vector's per-channel error against FFmpeg, and the code-shape probes; for the pull request and the HE-AAC workloads' ARMv7 cause",
+ "key": "qualification/aac-thumb2-speed-armv7/d3a516818ca87b8bdedab2048ae9b96715fbd8a22c6b18c269fdfc227a72a642.tar.zst",
+ "sha256": "d3a516818ca87b8bdedab2048ae9b96715fbd8a22c6b18c269fdfc227a72a642",
+ "bytes": 672949,
+ "results": [
+  {
+   "path": "timing/v5/mov/gate-result.json",
+   "command": "codecs time",
+   "key": "8adfc8a475df4fabe319d1cd744441b5f3876069466d2b220d84684d08610514",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
