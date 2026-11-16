@@ -95,6 +95,9 @@ pub struct EncodedEditPlan {
     presentation_end: i128,
     count: u64,
     timing: EditTiming,
+    video_prefix: u64,
+    video_last: u64,
+    video_seek_offset: i64,
     opus_timing: Option<Arc<OpusTiming>>,
     dts_scale: Option<u32>,
     dependency_table: bool,
@@ -127,6 +130,9 @@ impl EncodedEditPlan {
     }
     pub(crate) fn edit_ordinal(&self) -> u32 {
         self.edit_ordinal
+    }
+    pub(crate) fn seek_offset(&self) -> i64 {
+        self.video_seek_offset
     }
     pub fn anchor_ticks(&self) -> i128 {
         self.anchor
@@ -227,6 +233,9 @@ impl EncodedEditPlan {
         if source.ordinal == 0 || source.ordinal > self.count {
             return Err(Error::Invalid("encoded edit source ordinal"));
         }
+        if source.ordinal <= self.video_prefix || source.ordinal > self.video_last {
+            return Ok(None);
+        }
         let dts = source
             .dts_ticks
             .ok_or(Error::Unsupported("encoded edit source DTS unknown"))?;
@@ -244,7 +253,7 @@ impl EncodedEditPlan {
                 };
                 (opus.duration(occurrence)?, occurrence + 1)
             }
-            _ => (source.duration_ticks, source.ordinal),
+            _ => (source.duration_ticks, source.ordinal - self.video_prefix),
         };
         let dts_field =
             ClockField::from_exact_ticks(dts.checked_sub(self.anchor).ok_or(Error::Overflow)?)?;
@@ -256,7 +265,7 @@ impl EncodedEditPlan {
         let discard = if audio {
             source_end <= i128::from(self.entry.media_time)
         } else {
-            cts < self.anchor || cts >= self.presentation_end
+            cts < i128::from(self.entry.media_time) || cts >= self.presentation_end
         };
         let packet = PacketView {
             source_ordinal: source.ordinal,
@@ -389,6 +398,7 @@ pub struct EncodedEditJob<'a> {
     end: i128,
     anchor: Option<i128>,
     maximum_cts: Option<i128>,
+    leading_video: Option<LeadingVideoEdit>,
     source_end: i128,
     count: u64,
     frame: u32,
@@ -411,6 +421,20 @@ pub struct EncodedEditJob<'a> {
     recovery_facts: Option<crate::RecoveryFacts>,
     recovery_observation: Option<crate::RecoveryObservation>,
 }
+
+#[derive(Clone, Copy)]
+struct LeadingVideoEdit {
+    gap: i64,
+    prefix: u64,
+    first_decode: i128,
+    overlapping_sync: Option<i128>,
+    first_visible_decode: Option<i128>,
+    last_sample: Option<u64>,
+    waiting_for_sync: bool,
+    last_cts: i128,
+    last_decode_end: i128,
+}
+
 impl<'a> EncodedEditJob<'a> {
     pub fn new(
         context: EncodedEditContext<'a>,
@@ -419,7 +443,7 @@ impl<'a> EncodedEditJob<'a> {
         _profile: EncodedEditProfile,
     ) -> Result<Self> {
         context.stream.kind().require_regular_codec()?;
-        Self::new_description_bound(context, input, limits, 1, false)
+        Self::new_description_bound(context, input, limits, 1, false, false)
     }
     pub fn new_with_configs(
         context: EncodedEditContext<'a>,
@@ -430,7 +454,7 @@ impl<'a> EncodedEditJob<'a> {
     ) -> Result<Self> {
         crate::encoded_configs::validate_configs(context.table, configs, input.budget())?;
         let count = u32::try_from(configs.len()).map_err(|_| Error::Overflow)?;
-        Self::new_description_bound(context, input, limits, count, false)
+        Self::new_description_bound(context, input, limits, count, false, false)
     }
     /// Separate source-preserving SDTP/public-disposable observation. Effective
     /// recovery memberships and unproven group namespaces remain unsupported.
@@ -447,7 +471,7 @@ impl<'a> EncodedEditJob<'a> {
         // already established edit/roll observation, with its raw groups
         // retained unchanged; no new recovery capability is inferred here.
         let dependency_table = context.table.has_dependency_table();
-        Self::new_description_bound(context, input, limits, count, dependency_table)
+        Self::new_description_bound(context, input, limits, count, dependency_table, false)
     }
     /// Bounded regular open/index receiver observation. All actual roll/prol
     /// source records are validated and retained; this is not decoder preroll.
@@ -463,7 +487,8 @@ impl<'a> EncodedEditJob<'a> {
         let dependency = context.table.has_dependency_table();
         let recovery =
             crate::encoded_recovery::RecoveryWalk::new(context.table, limits.max_samples)?;
-        let mut job = Self::new_description_bound(context, input, limits, count, dependency)?;
+        let mut job =
+            Self::new_description_bound(context, input, limits, count, dependency, false)?;
         job.empty_recovery = None;
         job.dependency_recovery = true;
         job.recovery_walk = Some(recovery);
@@ -477,13 +502,14 @@ impl<'a> EncodedEditJob<'a> {
         _profile: crate::EncodedContextProfile,
     ) -> Result<Self> {
         crate::encoded_configs::validate_configs(context.table, configs, input.budget())?;
-        Self::new_recovery_bound(context, input, limits, configs.len())
+        Self::new_recovery_bound(context, input, limits, configs.len(), false)
     }
     fn new_recovery_bound(
         context: EncodedEditContext<'a>,
         input: &InputCursor,
         limits: EncodedEditLimits,
         descriptions: usize,
+        range_playback: bool,
     ) -> Result<Self> {
         let count = u32::try_from(descriptions).map_err(|_| Error::Overflow)?;
         let dependency = context.table.has_dependency_table();
@@ -491,7 +517,8 @@ impl<'a> EncodedEditJob<'a> {
             context.table,
             limits.max_samples,
         )?;
-        let mut out = Self::new_description_bound(context, input, limits, count, dependency)?;
+        let mut out =
+            Self::new_description_bound(context, input, limits, count, dependency, range_playback)?;
         out.empty_recovery = None;
         out.recovery_walk = None;
         out.dependency_recovery = true;
@@ -499,7 +526,7 @@ impl<'a> EncodedEditJob<'a> {
         Ok(out)
     }
     /// Range playback admits leading encoder-delay edits for AC-3, E-AC-3
-    /// and DTS. DTS also supports a leading empty edit before the media edit.
+    /// and DTS. AVC and DTS also support a leading empty edit before the media edit.
     /// AAC uses the sample durations in `stts` and the coded frame length for trim.
     /// Opus uses the edit list for priming and keeps each source duration.
     /// A regular video edit can begin on the presentation tick of a non-sync sample at decode origin.
@@ -510,8 +537,7 @@ impl<'a> EncodedEditJob<'a> {
         limits: EncodedEditLimits,
     ) -> Result<Self> {
         crate::encoded_configs::validate_range_configs(context.table, configs, input.budget())?;
-        let mut job = Self::new_recovery_bound(context, input, limits, configs.len())?;
-        job.range_playback = true;
+        let mut job = Self::new_recovery_bound(context, input, limits, configs.len(), true)?;
         let stream = job.context.stream;
         let kind = match stream.kind() {
             EncodedEntryKind::Aac => {
@@ -568,6 +594,7 @@ impl<'a> EncodedEditJob<'a> {
         limits: EncodedEditLimits,
         descriptions: u32,
         dependency_table: bool,
+        range_playback: bool,
     ) -> Result<Self> {
         if !context.table.raw().bytes().belongs_to(input.budget())
             || !context.edits.raw().bytes().belongs_to(input.budget())
@@ -580,26 +607,28 @@ impl<'a> EncodedEditJob<'a> {
             return Err(Error::ForeignPool);
         }
         let dts = context.stream.dts;
+        let delayed_video = range_playback && context.stream.kind() == EncodedEntryKind::Avc;
         let (edit_ordinal, leading_ticks) = match context.edits.len() {
             1 => (0, 0),
-            2 if dts.is_some() => {
+            2 if dts.is_some() || delayed_video => {
                 let leading = context.edits.entry(0)?;
                 if !leading.is_empty()
                     || leading.segment_duration == 0
                     || leading.rate_integer != 1
                     || leading.rate_fraction != 0
                 {
-                    return Err(Error::Unsupported(
-                        "DTS leading empty rate-one edit required",
-                    ));
+                    let reason = if delayed_video {
+                        "AVC leading empty rate-one edit required"
+                    } else {
+                        "DTS leading empty rate-one edit required"
+                    };
+                    return Err(Error::Unsupported(reason));
                 }
                 (
                     1,
-                    i128::from(
-                        leading
-                            .duration(context.movie_base)?
-                            .to_i64_ticks(context.media_base, Rounding::NearestAway)?,
-                    ),
+                    leading
+                        .duration(context.movie_base)?
+                        .to_i64_ticks(context.media_base, Rounding::NearestAway)?,
                 )
             }
             _ => {
@@ -645,7 +674,7 @@ impl<'a> EncodedEditJob<'a> {
                 return Err(Error::Unsupported("DTS edit needs a coded frame clock"));
             }
             let anchor = i128::from(entry.media_time)
-                .checked_sub(leading_ticks)
+                .checked_sub(i128::from(leading_ticks))
                 .ok_or(Error::Overflow)?;
             (Some(scale), frame.unwrap_or(0), Some(anchor))
         } else {
@@ -678,6 +707,17 @@ impl<'a> EncodedEditJob<'a> {
             end: 0,
             anchor,
             maximum_cts: None,
+            leading_video: (delayed_video && edit_ordinal != 0).then_some(LeadingVideoEdit {
+                gap: leading_ticks,
+                prefix: 0,
+                first_decode: 0,
+                overlapping_sync: None,
+                first_visible_decode: None,
+                last_sample: None,
+                waiting_for_sync: false,
+                last_cts: 0,
+                last_decode_end: 0,
+            }),
             source_end: 0,
             count: 0,
             frame,
@@ -685,7 +725,7 @@ impl<'a> EncodedEditJob<'a> {
             opus_first: 1,
             opus_first_tick: 0,
             opus_durations: BudgetVec::new(input.budget()),
-            range_playback: false,
+            range_playback,
             non_sync_prefix: false,
             sync_after_edit: false,
             aac_program: None,
@@ -825,11 +865,12 @@ impl<'a> EncodedEditJob<'a> {
                 return Ok(CursorStatus::Yield);
             }
             let duration = self.entry.duration(self.context.movie_base)?;
-            let rounding = if self.dts_scale.is_some()
+            let rounding = if self.leading_video.is_some()
+                || self.dts_scale.is_some()
                 || self.context.stream.kind() == EncodedEntryKind::Aac
             {
-                // The MOV view rounds AAC edit duration to the nearest media
-                // tick. This also determines which packet carries the tail trim.
+                // The MOV view rounds these edit durations to the nearest
+                // media tick before choosing the end of the edit.
                 Rounding::NearestAway
             } else {
                 Rounding::Floor
@@ -944,7 +985,15 @@ impl<'a> EncodedEditJob<'a> {
                     return Ok(CursorStatus::Yield);
                 }
                 let presentation_end = self.end;
-                let anchor = self.anchor.ok_or(Error::Unsupported(
+                // A short edit can overlap a single sync sample without
+                // containing its start. MOV retains that packet as discard
+                // and places it at the end of the leading empty edit.
+                let overlapping_sync = self.leading_video.and_then(|video| {
+                    (video.last_sample == Some(video.prefix + 1))
+                        .then_some(video.overlapping_sync)
+                        .flatten()
+                });
+                let anchor = overlapping_sync.or(self.anchor).ok_or(Error::Unsupported(
                     "encoded edit has no presentation anchor",
                 ))?;
                 if self.dts_scale.is_some() {
@@ -983,7 +1032,10 @@ impl<'a> EncodedEditJob<'a> {
                         && anchor == 0
                         && self.end == self.source_end
                         && !self.sync_after_edit;
-                    if !keeps_reordered_tail && self.maximum_cts.is_some_and(|x| x >= self.end) {
+                    if self.leading_video.is_none()
+                        && !keeps_reordered_tail
+                        && self.maximum_cts.is_some_and(|x| x >= self.end)
+                    {
                         return Err(Error::Unsupported(
                             "encoded video tail selection not established",
                         ));
@@ -1009,6 +1061,50 @@ impl<'a> EncodedEditJob<'a> {
                 } else {
                     None
                 };
+                let (anchor, video_prefix, video_last, video_seek_offset) = match self.leading_video
+                {
+                    Some(video) => {
+                        let gap = i128::from(video.gap);
+                        let origin = anchor.checked_sub(gap).ok_or(Error::Overflow)?;
+                        let first = video
+                            .first_decode
+                            .checked_sub(origin)
+                            .ok_or(Error::Overflow)?;
+                        let last = video
+                            .last_decode_end
+                            .max(video.last_cts)
+                            .checked_sub(origin)
+                            .ok_or(Error::Overflow)?;
+                        let end = presentation_end
+                            .checked_sub(i128::from(self.entry.media_time))
+                            .and_then(|duration| duration.checked_add(gap))
+                            .ok_or(Error::Overflow)?;
+                        if first <= i128::from(i64::MIN)
+                            || last > i128::from(i64::MAX)
+                            || end >= i128::from(i64::MAX)
+                        {
+                            // An unrepresentable edited track has no usable
+                            // packets. Other tracks keep their own edits.
+                            (origin, 0, 0, 0)
+                        } else {
+                            // MOV seeks from the decode time of the first displayed
+                            // sample, while packet DTS retains the composition lead.
+                            let first_visible = video
+                                .first_visible_decode
+                                .or(overlapping_sync.map(|_| video.first_decode))
+                                .ok_or(Error::Invalid("missing video presentation start"))?;
+                            let seek_offset =
+                                anchor.checked_sub(first_visible).ok_or(Error::Overflow)?;
+                            (
+                                origin,
+                                video.prefix,
+                                video.last_sample.unwrap_or(self.count),
+                                i64::try_from(seek_offset).map_err(|_| Error::Overflow)?,
+                            )
+                        }
+                    }
+                    None => (anchor, 0, self.count, 0),
+                };
                 self.result = Some(EncodedEditPlan {
                     source_table: self.context.table.raw().clone(),
                     source_edit: self.context.edits.raw().clone(),
@@ -1023,6 +1119,9 @@ impl<'a> EncodedEditJob<'a> {
                     presentation_end,
                     count: self.count,
                     timing,
+                    video_prefix,
+                    video_last,
+                    video_seek_offset,
                     opus_timing,
                     dts_scale: self.dts_scale,
                     dependency_table: self.dependency_table,
@@ -1124,6 +1223,53 @@ impl<'a> EncodedEditJob<'a> {
                     // the prefix even when decoded after its first sample.
                     if self.non_sync_prefix && c <= media_start && s.is_container_sync() {
                         return Err(Error::Unsupported("encoded edit initial source/key origin"));
+                    }
+                    if let Some(video) = &mut self.leading_video {
+                        let duration = i128::from(s.duration_ticks);
+                        // Keep the decode dependencies from the last sync
+                        // sample at or before the media edit's start.
+                        if c <= media_start && s.is_container_sync() {
+                            video.prefix = s.ordinal - 1;
+                            video.first_decode = d;
+                            video.overlapping_sync = (c < media_start
+                                && c.checked_add(duration).ok_or(Error::Overflow)? >= self.end)
+                                .then_some(c);
+                            video.first_visible_decode = None;
+                            video.last_sample = None;
+                            video.waiting_for_sync = false;
+                            video.last_cts = c;
+                            self.anchor = None;
+                        }
+                        let visible = (media_start..self.end).contains(&c);
+                        if video.last_sample.is_some() {
+                            if visible {
+                                return Err(Error::Unsupported(
+                                    "displayed sample after AVC decode tail",
+                                ));
+                            }
+                        } else {
+                            if visible && video.first_visible_decode.is_none() {
+                                video.first_visible_decode = Some(d);
+                            }
+                            video.last_cts = video.last_cts.max(c);
+                            video.last_decode_end =
+                                d.checked_add(duration).ok_or(Error::Overflow)?;
+                            // Continue through a sync boundary so the decoder
+                            // can finish the displayed pictures. An explicit
+                            // composition table can require one further GOP.
+                            if s.is_container_sync()
+                                && (video.waiting_for_sync
+                                    || c.checked_add(duration).ok_or(Error::Overflow)? >= self.end)
+                            {
+                                if video.waiting_for_sync
+                                    || !self.context.table.has_composition_offsets()
+                                {
+                                    video.last_sample = Some(s.ordinal);
+                                } else {
+                                    video.waiting_for_sync = true;
+                                }
+                            }
+                        }
                     }
                     if c >= media_start && self.anchor.is_none_or(|prior| c < prior) {
                         self.anchor = Some(c);
