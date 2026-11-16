@@ -42,6 +42,11 @@ jobs:
         run: git diff --exit-code -- harness/features/mp4-range/corpus.json
       - name: Verify workspace
         run: cargo xtask check
+      - name: Upload worker identity
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: worker-identity-${{ github.run_attempt }}
+          path: target/harness/identity.json
       - name: Keep only the downloads this run used
         id: downloads
         if: always()
