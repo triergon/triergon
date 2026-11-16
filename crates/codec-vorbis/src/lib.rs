@@ -89,6 +89,25 @@ pub(crate) fn ilog(x: u32) -> u32 {
     u32::BITS - x.leading_zeros()
 }
 
+/// `a / b` rounded towards zero, `b > 0`.
+///
+/// The 32-bit ARM targets have no integer divide instruction in their baseline, and the
+/// library routine costs several times a VFP double division there. A double holds both
+/// operands exactly and the rounded quotient never reaches the next integer (that would
+/// take `|a| >= 2^53`), so the truncated double quotient is the integer one.
+#[inline(always)]
+pub(crate) fn divide(a: i32, b: i32) -> i32 {
+    debug_assert!(b > 0);
+    #[cfg(all(target_arch = "arm", target_abi = "eabihf"))]
+    {
+        (f64::from(a) / f64::from(b)) as i32
+    }
+    #[cfg(not(all(target_arch = "arm", target_abi = "eabihf")))]
+    {
+        a / b
+    }
+}
+
 /// Appends `value` to `list`, charging room for it unless reserved.
 pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), StorageError> {
     list.try_push(value).map_err(|refused| refused.error)

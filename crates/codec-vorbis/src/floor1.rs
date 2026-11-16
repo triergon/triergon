@@ -5,7 +5,7 @@ use triergon_codec::{Budget, BudgetVec};
 
 use crate::codebook::Codebook;
 use crate::tables::INVERSE_DB;
-use crate::{DecodeError, ilog};
+use crate::{DecodeError, divide, ilog};
 
 /// X positions a floor 1 may list, the two implicit ends included.
 pub(crate) const MAX_POINTS: usize = 65;
@@ -235,7 +235,7 @@ impl Floor1 {
 /// render_point (section 9.2.6).
 fn render_point(x0: i32, y0: i32, x1: i32, y1: i32, x: i32) -> i32 {
     let dy = y1 - y0;
-    let offset = dy.abs() * (x - x0) / (x1 - x0);
+    let offset = divide(dy.abs() * (x - x0), x1 - x0);
     if dy < 0 { y0 - offset } else { y0 + offset }
 }
 
@@ -252,13 +252,15 @@ pub(crate) fn render_line((x0, y0): (i32, i32), (x1, y1): (i32, i32), spectrum: 
     if start >= end {
         return;
     }
-    let dy = y1 - y0;
+    let (dy, adx) = (y1 - y0, x1 - x0);
+    let base = divide(dy, adx);
     let line = Line {
         y0,
-        adx: x1 - x0,
-        base: dy / (x1 - x0),
+        adx,
+        base,
         sign: if dy < 0 { -1 } else { 1 },
-        ady: dy.abs() % (x1 - x0),
+        // |dy| mod adx, as `|base|` is `|dy| / adx`.
+        ady: dy.abs() - base.abs() * adx,
     };
     let samples = &mut spectrum[start..end];
     if line.base == 0 && line.ady * MIN_RUN <= line.adx {
@@ -300,7 +302,8 @@ impl Line {
             }
             return;
         }
-        let (step, fraction) = (self.adx / self.ady, self.adx % self.ady);
+        let step = divide(self.adx, self.ady);
+        let fraction = self.adx - step * self.ady;
         let (mut y, mut rest, mut slack) = (self.y0, samples, 0);
         while !rest.is_empty() {
             // `slack` is `ady * ceil(j * fraction / ady) - j * fraction` for the next carry.
