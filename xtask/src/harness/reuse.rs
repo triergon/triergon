@@ -154,15 +154,11 @@ impl Key {
     }
 }
 
-/// The result a cited set holds for `key`: the newest kept set whose index entry
-/// lists a result with this key.
+/// The result a cited set holds for `key`: the kept set whose index entry lists a
+/// result with this key. The index lists each result in one kept set at most.
 pub fn cited(root: &Path, key: &Key) -> R<Option<Value>> {
-    let index = crate::checks::read_json(&root.join(crate::evidence::INDEX))?;
-    let sets = index
-        .get("sets")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
-    Ok(sets.iter().rev().find_map(|set| {
+    let sets = crate::evidence::sets(root)?;
+    Ok(sets.iter().find_map(|set| {
         if set.get("retention").and_then(Value::as_str) != Some("retained") {
             return None;
         }
@@ -516,7 +512,6 @@ mod tests {
     use super::*;
 
     fn index(root: &Path, retention: &str, key: &str) {
-        fs::create_dir_all(root.join("harness/evidence")).unwrap();
         let set = Value::object([
             ("name", Value::str("run")),
             ("retention", Value::str(retention)),
@@ -530,11 +525,9 @@ mod tests {
                 ])]),
             ),
         ]);
-        crate::corpus::write_json(
-            &root.join(crate::evidence::INDEX),
-            &Value::object([("sets", Value::Array(vec![set]))]),
-        )
-        .unwrap();
+        let file = root.join(crate::evidence::SETS).join("run.json");
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        crate::corpus::write_json(&file, &set).unwrap();
     }
 
     #[test]

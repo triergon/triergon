@@ -1,0 +1,49 @@
+{
+ "name": "gate-run-armv7-6414f184-20261115-012448-shard-1",
+ "path": "gate-run-armv7-6414f184-20261115-012448-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at 6414f184 on the 32-bit ARMv7 gate target in the armhf user space, one c6g.4xlarge from the gate image, items matroska-zlib and raw-annex-b: the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; matroska-zlib grades 10 of 10, raw-annex-b measures 7 of 7 and fails its grade on the reference run's elapsed time in the parity records; for the reuse of a partial run's results",
+ "key": "evidence/gate-runs/6414f184d5d94d4c5f5525e73a41a5d7e45211d0-armv7-20261115-012448/shard-1/0aeba2c7527825aafe7e1cc30da1fada0750d71410a2d9c7f8c4c40c69668d4a.tar.zst",
+ "sha256": "0aeba2c7527825aafe7e1cc30da1fada0750d71410a2d9c7f8c4c40c69668d4a",
+ "bytes": 5191196,
+ "results": [
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "7ec9bc3e26b94a903d38259ad313760895d5ba85da6a41d0202ec66cd3dde83e",
+   "status": 0,
+   "report_sha256": "87c6f6b7eb029fb61b64b1681a25bb6c03cb201faee916a331a375f30bdb11b3"
+  },
+  {
+   "path": "memory/matroska-zlib/gate-result.json",
+   "command": "report --memory",
+   "key": "76383cb366877c83026859638f798c26c4fea6c6c8dad9165067f74f5a2b8154",
+   "status": 0,
+   "report_sha256": "9133579f8f2bb0060f742db1d17a430cab2b372627de217bb4531a1a2d10401a"
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4f141c34ae029afff23fc901187b774a7c84888f99e5daff2b1023e623fd9a36",
+   "status": 0,
+   "report_sha256": "af54e82925961c172cae5ffd62485802dad5dfa0c8d8eaaf892b975fed03284b"
+  },
+  {
+   "path": "benchmark/matroska-zlib/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4b81bbdbf20a4498b4d4664a8011e3b689da3286fdd2fec02f278dcb033dfdaf",
+   "status": 0,
+   "report_sha256": "7e123e0aa1ecdaab748b0868f208afde6f9a084de44918907f487dae41ff0157"
+  },
+  {
+   "path": "graded/matroska-zlib/gate-result.json",
+   "command": "grade",
+   "key": "517efb6113eb858ecf3962e2db8a90b1585c46dc55ee1ec43f1592bd3d14c427",
+   "status": 0,
+   "report_sha256": "b82d5cb32dfee986471e48434349747cf54f344ba737d897985eae453edababe"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6414f184d5d94d4c5f5525e73a41a5d7e45211d0"
+ }
+}

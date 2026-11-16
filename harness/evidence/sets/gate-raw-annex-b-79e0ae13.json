@@ -1,0 +1,56 @@
+{
+ "name": "gate-raw-annex-b-79e0ae13",
+ "path": "gate-raw-annex-b-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: raw-annex-b's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-raw-annex-b-79e0ae13/72a83617d8541bd35f4ad59dd2f7aebd108279aa195ca7f44b8a7c778d672511.tar.zst",
+ "sha256": "72a83617d8541bd35f4ad59dd2f7aebd108279aa195ca7f44b8a7c778d672511",
+ "bytes": 1885819,
+ "results": [
+  {
+   "path": "gate-raw-annex-b-79e0ae13/aarch64/shard-2/benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "022fb218aadf9a60ee1dc81328094d32a3d8fcaa61c647d4fcfe7e16b9b81783",
+   "status": 0,
+   "report_sha256": "2fbdb9b528bc00a461aced717dded2856eff0e2609914a8e41016b8abd64be12"
+  },
+  {
+   "path": "gate-raw-annex-b-79e0ae13/aarch64/shard-2/graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "477db799a612c77956e7a8f21ee3c8338185e6f33bbacda61071b0bee576a955",
+   "status": 0,
+   "report_sha256": "14f4d58e7635957dc9fe1b54a6da139993e7ee894b4210f9678daa1f47ba3b9c"
+  },
+  {
+   "path": "gate-raw-annex-b-79e0ae13/aarch64/shard-2/memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "9c2a14f921115e57428ce6f487aca001d479cf707957a9dd7df4b01436b5b9a0",
+   "status": 0,
+   "report_sha256": "651908d86c95d9b733093e69b0f77a93cc9fa17d7bfba901b92060f7f29e1803"
+  },
+  {
+   "path": "gate-raw-annex-b-79e0ae13/armv7/shard-2/benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9a0bccaa02db4c92a63174f85906c5f046c34d4b8bd158e7775ceaf3e913de09",
+   "status": 0,
+   "report_sha256": "eafdc6e9cfdfc2dc1b0bc6bf6f607d369cc1399ed7ba342bd8b370b71c243f37"
+  },
+  {
+   "path": "gate-raw-annex-b-79e0ae13/armv7/shard-2/graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "c64c3444648842eb4db5f1ce0887126c94f4fc4de474387b984b9f216e94913d",
+   "status": 0,
+   "report_sha256": "c40491bcabf327fb8ec501b1b60ade8f1ccb03c2b65d8716f565c188b90cdde7"
+  },
+  {
+   "path": "gate-raw-annex-b-79e0ae13/armv7/shard-2/memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "55e2ebbb0e372c39667ec5bd787710175da8691cbd716384eddbfe6c5337775d",
+   "status": 0,
+   "report_sha256": "53d5aa4406980cc946c5ee0a018e06278ca2936fedab65fe252ca96c2b04abdb"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

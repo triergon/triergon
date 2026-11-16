@@ -1,0 +1,12 @@
+{
+ "name": "gate-run-aarch64-79e0ae13",
+ "path": "gate-run-aarch64-79e0ae13",
+ "retention": "retained",
+ "reason": "The sharded gate run at 79e0ae13 on Linux AArch64, on 10 c6g.4xlarge hosts from the images built at 22d55672: the pre-launch gate check, each shard's run log, host log, plan, build identities, step records and step logs, the run summary, and when each host was launched, ready, done and terminated; for the gate tooling's wall times and shard balance only",
+ "key": "evidence/gate-run-aarch64-79e0ae13/b3e4fff20e89cc54f6404088212ba5c1eb20a61acb9a2796d304d54f61ded5a4.tar.zst",
+ "sha256": "b3e4fff20e89cc54f6404088212ba5c1eb20a61acb9a2796d304d54f61ded5a4",
+ "bytes": 489537,
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "name": "memory-gate-regrade-linux-arm64",
+ "path": ".research",
+ "retention": "retained",
+ "reason": "Linux reports re-graded in the memory-gate change",
+ "key": "evidence/memory-gate-regrade-linux-arm64/ac1a1040f541607a7597695e223c7516e0c32360313aff92465711f1249b275e.tar.gz",
+ "sha256": "ac1a1040f541607a7597695e223c7516e0c32360313aff92465711f1249b275e",
+ "bytes": 134301724,
+ "files": [
+  {
+   "path": ".research/aws-linux/exports/18.185.110.164/linux-memory-qualified-B-1793476349716774109/header/report.json",
+   "sha256": "9f00ba0c70b999f9f337f6b838e3e8fae4918219fdb8a30762fbf4b71f20573f"
+  },
+  {
+   "path": ".research/aws-linux/exports/18.185.110.164/linux-memory-qualified-B-1793476349716774109/k0/report.json",
+   "sha256": "647c066df5e0d82d7d6313cc76260e6d83c7da29e73a1ac5a9f9e53000214a7d"
+  },
+  {
+   "path": ".research/aws-linux/exports/18.185.110.164/linux-memory-qualified-B-1793476349716774109/seek/report.json",
+   "sha256": "b414bff00d239a2fbc16d2fcb69b9f6604a45374da16b27996c52b95bb017940"
+  },
+  {
+   "path": ".research/aws-linux/exports/18.185.110.164/linux-memory-qualified-B-1793476349716774109/zlib/report.json",
+   "sha256": "fdc9b288298431e470d1f286e0e427509d5165a3c51aadb091f0467014be785a"
+  },
+  {
+   "path": ".research/aws-linux/exports/18.194.177.174/linux-memory-qualified-A-1793476431300602318/catalogue/report.json",
+   "sha256": "4efff8c021e87bb72d7a471a5d4f3acb04d7e608e7d1518d4faef0198fbd8828"
+  },
+  {
+   "path": ".research/aws-linux/exports/18.194.177.174/linux-memory-qualified-A-1793476431300602318/external/report.json",
+   "sha256": "5e0c7c502029be197d5d856938a34796b27126d5fdf46cd52843bca2562d1b58"
+  }
+ ]
+}

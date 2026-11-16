@@ -1,0 +1,10 @@
+{
+ "name": "aac-program-speaker-mapping",
+ "path": "aac-program-speaker-mapping",
+ "retention": "retained",
+ "reason": "Configured AAC-LC parity, runtime, peak heap and total resident peak with distinct speaker positions",
+ "key": "evidence/aac-program-speaker-mapping/68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf.tar.gz",
+ "sha256": "68233a92037fcb6011d7a198a1c11a735b461268fbf9d9ada0acb8f18a8f1daf",
+ "bytes": 181930058,
+ "source_revision": "fde36dd91d85ca700538421062ceacd45075c5b8"
+}

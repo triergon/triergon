@@ -1,0 +1,9 @@
+{
+ "name": "code-size-4dbbd545-aarch64",
+ "path": "code-size-4dbbd545-aarch64",
+ "retention": "retained",
+ "reason": "Code-size change at 4dbbd545 on AArch64 (c8g.2xlarge): the playback, transport, media, subtitle-cc, ISO BMFF and framing gates and the external vector (30 pairs; kernel-bound memory graded with the module loaded), the worker SHA-256 and .text sizes. The ISO BMFF and framing rows cite it: their workers are byte-identical at 4fc96a49.",
+ "key": "evidence/code-size-4dbbd545-aarch64/da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f.tar.zst",
+ "sha256": "da350a13c27d6b8a2ed6b6ead710808abf4f3224041a0128bae9c339cf25ff8f",
+ "bytes": 65174745
+}

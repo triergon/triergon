@@ -1,0 +1,19 @@
+{
+ "name": "progressive-ts188-comparison-linux-arm64",
+ "retention": "retained",
+ "reason": "MPEG-TS progressive playback in the measured revisions table",
+ "key": "evidence/progressive-ts188-comparison-linux-arm64/f39de6e867932328750624733a85c8aa30a3204a2e39dd194c90f7a1e9d30e24.tar.gz",
+ "sha256": "f39de6e867932328750624733a85c8aa30a3204a2e39dd194c90f7a1e9d30e24",
+ "bytes": 38360452,
+ "files": [
+  {
+   "path": "progressive-ts188-comparison-linux-arm64/progressive-ts188/on-demand-spans.tar.gz",
+   "sha256": "d7da488eda6923e979593cf5a1399556427590f9fb131cfe9ed9444dc61ad43f"
+  },
+  {
+   "path": "progressive-ts188-comparison-linux-arm64/progressive-ts188/rounded-reservation.tar.gz",
+   "sha256": "0186d64805bd75fe48194fa236d31ca3275584d50e04783081fb411dfc7de231"
+  }
+ ],
+ "path": "progressive-ts188-comparison-linux-arm64"
+}

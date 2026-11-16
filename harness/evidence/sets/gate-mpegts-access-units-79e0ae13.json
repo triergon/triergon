@@ -1,0 +1,56 @@
+{
+ "name": "gate-mpegts-access-units-79e0ae13",
+ "path": "gate-mpegts-access-units-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: mpegts-access-units's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-mpegts-access-units-79e0ae13/cb05c21a8f9dfa48a25210a127f502d6ba8929b1827917cff4194fb552b02cbe.tar.zst",
+ "sha256": "cb05c21a8f9dfa48a25210a127f502d6ba8929b1827917cff4194fb552b02cbe",
+ "bytes": 7069621,
+ "results": [
+  {
+   "path": "gate-mpegts-access-units-79e0ae13/aarch64/shard-5/benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8cddb9cad86cba106a5cba7321a9f9df4409db20fe8bedb145a16b035ca7827a",
+   "status": 0,
+   "report_sha256": "c2fc8279496adddbd3a9d770c9331554795867edc87918955af0218bc5fee983"
+  },
+  {
+   "path": "gate-mpegts-access-units-79e0ae13/aarch64/shard-5/graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "b3e35f12bcc4341535475a989695f650c9bef0987f4ddb36e4f64e6090e2be96",
+   "status": 0,
+   "report_sha256": "144edf5428efd1a721eaf8f7c255476db73aad4ca6c2a23cbd723f79ae6f3fe6"
+  },
+  {
+   "path": "gate-mpegts-access-units-79e0ae13/aarch64/shard-5/memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "c1e508dd2c8550961c6f57045876e275380a715a03202526670e58229af1cf0b",
+   "status": 0,
+   "report_sha256": "a2625392f1f16da379852aba8a8ef804f1e94886e796a084acbedeca2932ef64"
+  },
+  {
+   "path": "gate-mpegts-access-units-79e0ae13/armv7/shard-5/benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c849ad9cbbd0250af36e77570f4ed94b066efe578489066aeefc08989e0987ee",
+   "status": 0,
+   "report_sha256": "dea80675823cab162260a8f7091db0f040641d12535590d613b945679bcdc86e"
+  },
+  {
+   "path": "gate-mpegts-access-units-79e0ae13/armv7/shard-5/graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "ac0af071e76ce703fff8829cc2d354c3f3a1c9c35e0bf4ff4849a7cad85d783b",
+   "status": 0,
+   "report_sha256": "6d9d819795ca28315c0046b38af961a94fafdd5386c736a43b76c9e3b77ba927"
+  },
+  {
+   "path": "gate-mpegts-access-units-79e0ae13/armv7/shard-5/memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "609606816b7174300683e4f45d7602bab7a491088dbeb6452a6601af5da458e9",
+   "status": 0,
+   "report_sha256": "b1d31e7cd7386f0e202fbd843a48f0f475177eee3700707c46c04c6fb43bb0d6"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

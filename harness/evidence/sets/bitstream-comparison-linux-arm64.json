@@ -1,0 +1,10 @@
+{
+ "name": "bitstream-comparison-linux-arm64",
+ "path": "bitstream-comparison-linux-arm64",
+ "retention": "retained",
+ "reason": "Cited paired timing, trace identities and corrupted-input comparison of the shared bit reading crate against main at 6c101e523",
+ "key": "evidence/bitstream-comparison-linux-arm64/e8b90048233eedf91c90b3116d7521586b5eb58a684315e56f7bba3401b3e46d.tar.gz",
+ "sha256": "e8b90048233eedf91c90b3116d7521586b5eb58a684315e56f7bba3401b3e46d",
+ "bytes": 845041640,
+ "source_revision": "19e41fbb7ec70cc25959ba890304c32d4bbfd115"
+}

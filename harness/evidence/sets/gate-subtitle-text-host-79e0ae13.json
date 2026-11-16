@@ -1,0 +1,56 @@
+{
+ "name": "gate-subtitle-text-host-79e0ae13",
+ "path": "gate-subtitle-text-host-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: subtitle-text-host's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-subtitle-text-host-79e0ae13/4c8edb811be6cddf913c23125e71da746bddcc7eb514edd50304e75f97d24476.tar.zst",
+ "sha256": "4c8edb811be6cddf913c23125e71da746bddcc7eb514edd50304e75f97d24476",
+ "bytes": 1628776,
+ "results": [
+  {
+   "path": "gate-subtitle-text-host-79e0ae13/aarch64/shard-4/benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6a9b33dab4cdeae053c3032cb946b38a6547ae3fb154a772dfd4a706085c9a93",
+   "status": 0,
+   "report_sha256": "cc94c11d5839edecd272931e47a0de4fe7e6e88b4f6cbcfc1c7ca8dcacb5fb66"
+  },
+  {
+   "path": "gate-subtitle-text-host-79e0ae13/aarch64/shard-4/graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "eba2bdf96f2df9c07675c77cc150dc624e11f7431ca7cfb1b2dbb92f45fa1df0",
+   "status": 1,
+   "report_sha256": "91a9d4be0a08264ef225b921438f3267a38bb04d790b8bfa863aa725e2961451"
+  },
+  {
+   "path": "gate-subtitle-text-host-79e0ae13/aarch64/shard-4/memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "954149ef6252f156c9c5aa0e843a86416da868baa93816e0c81c05661211d1a6",
+   "status": 0,
+   "report_sha256": "3c2e85a69a51d897664606f65c5fa1da68e51f262ec9e41bccff135901d8c127"
+  },
+  {
+   "path": "gate-subtitle-text-host-79e0ae13/armv7/shard-4/benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9c791ee33a7587c9e4d352a3304d8186d4865ba131468a34571e4c6738de924e",
+   "status": 0,
+   "report_sha256": "b6b654d5a404593748cf3505880a7d0a688b13d3133e64702a8e26d28328942d"
+  },
+  {
+   "path": "gate-subtitle-text-host-79e0ae13/armv7/shard-4/graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "07d93efe92f84b5dffc64e1b01fc1c3ea1998f2348d7dffe031a489cfeb38dee",
+   "status": 0,
+   "report_sha256": "3356922f092706f68ad5a87748f48bd214d635bcf4842c0db73df72076de608c"
+  },
+  {
+   "path": "gate-subtitle-text-host-79e0ae13/armv7/shard-4/memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "f2645bccafb242e560cc1832945ea9962f5fba30e3018c540e547fe5fe8fdd33",
+   "status": 0,
+   "report_sha256": "c71ceed7bc91c09139c31c352abee10f7e9b432b45aafa9b351ddd60bb9c642b"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

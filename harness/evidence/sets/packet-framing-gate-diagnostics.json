@@ -1,0 +1,6 @@
+{
+ "name": "packet-framing-gate-diagnostics",
+ "retention": "90 days",
+ "key": "qualification/repository/packet-framing-gate-diagnostics/168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9.tar.gz",
+ "sha256": "168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9"
+}

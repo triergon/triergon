@@ -1,0 +1,56 @@
+{
+ "name": "gate-ass-render-79e0ae13",
+ "path": "gate-ass-render-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: ass-render's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-ass-render-79e0ae13/3be9e41e05ab1cb51b1ea0de21d002cb3cce3e83ecca0ca60fbf1d279a55a526.tar.zst",
+ "sha256": "3be9e41e05ab1cb51b1ea0de21d002cb3cce3e83ecca0ca60fbf1d279a55a526",
+ "bytes": 4705594,
+ "results": [
+  {
+   "path": "gate-ass-render-79e0ae13/aarch64/shard-2/benchmark/ass-render/gate-result.json",
+   "command": "report --benchmark",
+   "key": "497c6d0d5d784881ebb6263912acdebb57d4318d2a0e8973b647faff1ab9af95",
+   "status": 0,
+   "report_sha256": "9e8e2d81634fb9759b937905c64365295962f373e85216240fb6cefa65479b62"
+  },
+  {
+   "path": "gate-ass-render-79e0ae13/aarch64/shard-2/graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "6bc19185a09b99fdc8433ca8abea6675302ca0bc28a3c4b2716cfab9e3c0f521",
+   "status": 0,
+   "report_sha256": "7fa0a08e9f4fad0693b2b02075ea874dc563dd5ef74cf887d30574da6d9c7b83"
+  },
+  {
+   "path": "gate-ass-render-79e0ae13/aarch64/shard-2/memory/ass-render/gate-result.json",
+   "command": "report --memory",
+   "key": "e5a0662b1a42af7eca1cc3aa013529501287d76673a7e04bef49c546873ab3e5",
+   "status": 0,
+   "report_sha256": "d968c19696640bb02d9bff54bd7166d22f2e7dc70056a243494340a6e422816a"
+  },
+  {
+   "path": "gate-ass-render-79e0ae13/armv7/shard-2/benchmark/ass-render/gate-result.json",
+   "command": "report --benchmark",
+   "key": "07bb2bf4d13001d2c6c4d37820b1739517c48b2d94d2a92b399bd04baa9456c1",
+   "status": 0,
+   "report_sha256": "0b6b4a37cd5ba9ef16e76a00aa7b491c75b9f88c68f2539f0e5958735e172e9c"
+  },
+  {
+   "path": "gate-ass-render-79e0ae13/armv7/shard-2/graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "d563eb25d8d22f6722d0446bcb05fa4530763cdd42c4c1de67adf1ef5b17e152",
+   "status": 0,
+   "report_sha256": "7bc02f39549932c62ed65d1e7fcae62501c03e20e2c750e6867f34dc31786530"
+  },
+  {
+   "path": "gate-ass-render-79e0ae13/armv7/shard-2/memory/ass-render/gate-result.json",
+   "command": "report --memory",
+   "key": "45dee4584470ca4b244d704abb26f04413dc25b9e91a781c761b2b241b296a8e",
+   "status": 0,
+   "report_sha256": "b07eb0839c4016c791bb1725507493819a40a50a7caf8ee3e5c07b2157dac549"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

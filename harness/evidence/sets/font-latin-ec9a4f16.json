@@ -1,0 +1,10 @@
+{
+ "name": "font-latin-ec9a4f16",
+ "path": "font-latin-ec9a4f16",
+ "retention": "retained",
+ "reason": "Fonts, shaping and ASS rendering rows of docs/status.md with FreeType's auto-hinter, its 32-bit ARM arithmetic, and CFF DICTs sized, checked and read as FreeType reads them, Linux AArch64 and ARMv7 on a c6g.2xlarge: cargo xtask fonts, shape, ass and raster compare at ec9a4f16 against FreeType 2.15.0, HarfBuzz 14.6.0 with FriBidi 1.0.17 and libass 0.17.5 natively on AArch64 and in the armv7-userland user space, with each run's build log, the crates' and xtask tests, clippy, shape ucd --check and fonts tables --check on AArch64.",
+ "key": "evidence/font-latin-ec9a4f16/cae121896f313cec3378f289f19b28fe1ddb73b8fcb5d0079f71247babb36010.tar.gz",
+ "sha256": "cae121896f313cec3378f289f19b28fe1ddb73b8fcb5d0079f71247babb36010",
+ "bytes": 110396155,
+ "source_revision": "ec9a4f1627b2734efbd4134ceb86c3a71740815d"
+}

@@ -1,0 +1,56 @@
+{
+ "name": "gate-hls-segments-79e0ae13",
+ "path": "gate-hls-segments-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: hls-segments's timing, memory and grade, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-hls-segments-79e0ae13/61c2176506f565709670d8fb4f03dfb97dc316fb2d6fa579e4d2cf27f240e9c3.tar.zst",
+ "sha256": "61c2176506f565709670d8fb4f03dfb97dc316fb2d6fa579e4d2cf27f240e9c3",
+ "bytes": 4317978,
+ "results": [
+  {
+   "path": "gate-hls-segments-79e0ae13/aarch64/shard-7/benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e8ef1a3325641a56086ecbea4d2ee928b32c1276fa15b5bdc6f45cce27b76989",
+   "status": 0,
+   "report_sha256": "b3d3ef5af068e36db3f2039b9fc411b5f8241c57c0db0d1a05d8ca7507c1487c"
+  },
+  {
+   "path": "gate-hls-segments-79e0ae13/aarch64/shard-7/graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "6ae43daa8cd27d10080150b089c9b5dfe50687492103b0e690f3d37ea966a37c",
+   "status": 0,
+   "report_sha256": "099af5a296c6e3804488ce276b57a7e9bd1c10886f0db3bb25c99986ebd5b159"
+  },
+  {
+   "path": "gate-hls-segments-79e0ae13/aarch64/shard-7/memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "1b7bcd658c020b76a5ca3bcf57770ba9db0c538d066f3cc41e5c41e8fdd4f397",
+   "status": 0,
+   "report_sha256": "bcfce6732b230e51c22111577ce2329349bf03d1360c6899224337a81f3329e1"
+  },
+  {
+   "path": "gate-hls-segments-79e0ae13/armv7/shard-7/benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ed8cd439aa4cfe2cf28ed2e6713c8d70398a042b104bfb9b810f6c65bf555a1e",
+   "status": 0,
+   "report_sha256": "e4e40b9fdeacd351eb2d2906297b73bd82d7c34e790b14acb24d9587b7e70a83"
+  },
+  {
+   "path": "gate-hls-segments-79e0ae13/armv7/shard-7/graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "06e3b7807d4939b05781d17744290d9e101b18ecd4f893c20e5077e9b9d9cd05",
+   "status": 0,
+   "report_sha256": "21c22a1bf6e271501a7508cee89a47fa9447541a9d6a5c53a1a06d0466750067"
+  },
+  {
+   "path": "gate-hls-segments-79e0ae13/armv7/shard-7/memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "7ba73549372c79e4cb45b9ed41b3745897b92309a40fca7c93c374793c2ac397",
+   "status": 0,
+   "report_sha256": "1083f4232f28b5c3db84fce5ca87f714727aada411a14ba79ddb8ea0a20231a9"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

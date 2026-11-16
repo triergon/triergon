@@ -1,0 +1,12 @@
+{
+ "name": "gate-run-armv7-8154812e",
+ "path": "gate-run-armv7-8154812e",
+ "retention": "retained",
+ "reason": "The partial sharded gate run at 8154812e on 32-bit ARMv7, 4 c6g.4xlarge hosts: the pre-launch gate check, each shard's run log, host log, plan, build identities, step records and step logs, the run summary, and when each host was launched, ready, done and terminated; for the gate tooling's codec memory split and wall times only",
+ "key": "evidence/gate-run-armv7-8154812e/b3abda80845d0876416a37361b5b4f90204cf3107793d405a82e2d59fd5641e7.tar.zst",
+ "sha256": "b3abda80845d0876416a37361b5b4f90204cf3107793d405a82e2d59fd5641e7",
+ "bytes": 182046,
+ "source_revisions": {
+  "candidate": "8154812e05da374a0f7c173bfd01770d5bd0ca85"
+ }
+}

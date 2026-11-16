@@ -1,0 +1,9 @@
+{
+ "name": "mp4-fragment-subtitles-5c1b2d66-aarch64",
+ "path": "mp4-fragment-subtitles-5c1b2d66-aarch64",
+ "retention": "90 days",
+ "reason": "MP4 range measurement with full index replay",
+ "key": "qualification/mp4-fragment-subtitles-5c1b2d66-aarch64/5b17946f7a0ce79d3df8995c24a497216c5858bf5a49e4c2777682b178da5e6d.tar.gz",
+ "sha256": "5b17946f7a0ce79d3df8995c24a497216c5858bf5a49e4c2777682b178da5e6d",
+ "bytes": 49974009
+}

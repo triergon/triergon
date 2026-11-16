@@ -1,0 +1,224 @@
+{
+ "name": "gate-capture-79e0ae13",
+ "path": "gate-capture-79e0ae13",
+ "retention": "retained",
+ "reason": "Sharded gate run at 79e0ae13 under static-toolchain-runtime-v1 on c6g.4xlarge hosts (Graviton2), Linux AArch64 natively and 32-bit ARMv7 in the armhf user space, kernel 7.0.0-1014-aws: every capture case qualified against the FFmpeg capture references; decoded frames and the generated inputs are left out, and the correctness reports record their hashes, with each shard's build identities, plan, step records and step logs; for the docs/status.md rows it measures",
+ "key": "evidence/gate-capture-79e0ae13/a0bd067815114b690cdd1fe3fea5206e3c78e7bdf886886dc73971b0cd35529b.tar.zst",
+ "sha256": "a0bd067815114b690cdd1fe3fea5206e3c78e7bdf886886dc73971b0cd35529b",
+ "bytes": 80537794,
+ "results": [
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-1/capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "12456983e2b9d964b15dec74245f0e375d2177190d0d530d90a57abc5ff17b8c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-10/capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "1e5bb975b7df9c86dbebd751a6389aa7ef952ce6d43662eb19aa944297758ff8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-10/capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "04578b1886a5e38fe6d3e8d4dd0cfeefbc6bf1ef43f577afcb4496d31a4dfdb5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-10/capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "079c76c5b1192883ab632dd8e838b8bfc488893bd34087d2753fe1f4cde934c9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-2/capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "178c45a5c8a8010a7d7c03a584cd60a9e528e4d7802ade6246fbb9407a8a120f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-3/capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "cef9f49f585122be9cd28f40aea862d41d5ce290e34f8822bd793dbf83e05e32",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-4/capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "08e32b1fee1bbcaabf0b810986e4fcbcb88eb122f0028802f537b76a46985c51",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-5/capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "c13b9896df9f2a6d854fd326bf130c6a878432d02a3c18243689791769f83467",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-6/capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "1d526f2a5265d3cfe082636162127c0ba271e0267c20ab6089981dd03c53c9ad",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-7/capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "11f578f16076b5d731df7bf76a171613dacd2f0ed1499e15d6fe8cebb63b6596",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-8/capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "627cc80761731afcc710a266ffaa791aff68afaf88c6edb2d7b70b46c18b232f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-8/capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "cf732ff0172c78634511a5ea905e98f984fdd70a7401522f530344f716e7a5ed",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-9/capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "e1ea6fc3fbb044a67e1e65be12c1efc182c7e9eb51f885fe48fcf9d98766b67c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-9/capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "5f32a0a92deee7e69e6f55b546c52ca47d739eee43ca1d2e69bcbb72290f2757",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/aarch64/shard-9/capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "711e57b73456298f4f2c8de84532b88ea80d6c12b5e771da482167a9ac32e465",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-1/capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "8a2155eee12e4329c93490c6625a2ec21192ec6b7b5e41504fd4e3bff6bbf4f1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-10/capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "3826b96ef93665b43540c79f090f5c2b96f58a6d446075a605beb2b36bb3eafe",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-10/capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "802778f077533553e66cc85cdf3f0631d8b446176aeefd8a019466468aa48c73",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-10/capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "da6f27561234383e02ab2da04279432c96abb18916fb7c0d0852187f301aa71f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-2/capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "35a015962cdca5049ceb38fe84f4383e418b2f4865901deae1ffe41930a0afa4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-3/capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "a1eb022d973515f33ddb213c3cd38ffe1d0c49f1681ee8a550c9ce30c9b12f29",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-4/capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "955f9c276e69d128470232c1b6503d98582d040b613fa7b3ed68817399dcb215",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-5/capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "be2da52caceb60a124ea2ce52e310c2762f5d4c75dc615125b6a5b204c6c8764",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-6/capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "d6e1bf1bed33ad29a9c34b21f53631a21319cb100ec1483e113f26f5c7050725",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-7/capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "4cb6632d3ba63d4c13a0831cbe96ffbc061b646acf94809e2ccdecd067673b75",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-8/capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "9081c3bd5a5d8187c65354eeaa340e029f5d3923efd96939202442815c55df58",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-8/capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "82a9a710010a2777ee860104b9bd94db6fdd7fd6dce60cf82597a050dc8097a3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-9/capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "457e8ba7f00d0b4ae7cd7e62350754eb2faf9fc78fe0d68d9d11a9eac7900f73",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-9/capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "ddc2bb5d15d6f5d7a11f027a98aafee003dfd6f996c8d29d88fe2e3083c5d331",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "gate-capture-79e0ae13/armv7/shard-9/capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "b854d63839d5c15982b66543ed3d9c16192d7973978c71c7067a81e9d9f1fac5",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": {
+  "candidate": "79e0ae138c71ffc57c73decc88d29ae86b1153d4"
+ }
+}

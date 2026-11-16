@@ -1,0 +1,9 @@
+{
+ "name": "ts-program-buffered-playback",
+ "retention": "retained",
+ "reason": "MPEG-TS program playback measurements in docs/status.md",
+ "key": "evidence/ts-program-buffered-playback/beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a.tar.zst",
+ "sha256": "beb5fa935b0109d0e33dbc3f57c22481c875a4c2b065820dda247535dc431f3a",
+ "bytes": 11567352,
+ "source_revision": "3125c1e61d73a575419f7b653a1dae44a3269dae"
+}

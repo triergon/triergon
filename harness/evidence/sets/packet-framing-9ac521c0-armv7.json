@@ -1,0 +1,11 @@
+{
+ "name": "packet-framing-9ac521c0-armv7",
+ "retention": "retained",
+ "reason": "ARMv7 packet-framing comparison with 5 total RSS nonpasses",
+ "key": "evidence/packet-framing-9ac521c0-armv7/1ab3227a8b703a8cd719f9646b12f5f9ec6e5cd359b6324fe56c13c707ede994.tar.zst",
+ "sha256": "1ab3227a8b703a8cd719f9646b12f5f9ec6e5cd359b6324fe56c13c707ede994",
+ "bytes": 26397876,
+ "source_revisions": {
+  "candidate": "9ac521c0a9c7b884044aee5baf7a928bcd144383"
+ }
+}

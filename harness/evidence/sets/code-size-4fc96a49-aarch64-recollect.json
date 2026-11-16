@@ -1,0 +1,9 @@
+{
+ "name": "code-size-4fc96a49-aarch64-recollect",
+ "path": "code-size-4fc96a49-aarch64-recollect",
+ "retention": "retained",
+ "reason": "Code-size change at 4fc96a49 on AArch64 (c8g.2xlarge), companion to code-size-4fc96a49-aarch64: kernel-bound memory of tags-binary, track-disabled and fate-witch-realtime collected again (30 pairs, the same worker and reference SHA-256), user-mode instruction counts of the Matroska worker at main f426ea65, ce6b5f71, 4fc96a49 and a variant with one demux loop per scan_prefix, Callgrind per-function tables of three cases, and the scripts that ran them.",
+ "key": "evidence/code-size-4fc96a49-aarch64-recollect/606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192.tar.zst",
+ "sha256": "606dad5b6af16fbf3611bfb0669a084a560976ad5bf4ea142fcaac62e5ea8192",
+ "bytes": 1173263
+}

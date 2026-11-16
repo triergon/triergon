@@ -776,7 +776,7 @@ the committed tree; the fixtures `fixtures` and `framing fixtures` generate from
 which the check generates under `target/gate-check`; the manifests the `fonts`,
 `shape`, `raster` and `ass` generators write; the vectors `fetch-vectors` fetches, by
 their pins; and the files of the kept evidence sets unpacked at the repository root
-(`"unpacked_at": "repository"` in the [index](../harness/evidence/index.json)), by
+(`"unpacked_at": "repository"` in the [index](../harness/evidence/sets/)), by
 the set's listing, without fetching any. Where preflight pins an input's hash, its
 source's must match. `tools/gate-aws.sh run` runs it before it launches anything.
 
@@ -1098,10 +1098,10 @@ repository does not generate, with repository-relative paths: evidence set
 `gate-media-inputs` holds the FATE samples, the codec workload inputs and the
 subtitle corpus the gate reads, set `codec-file-workload-inputs` the inputs of
 [file-workloads.json](../harness/codecs/file-workloads.json), and set
-`ogg-reader-inputs` the inputs of the Ogg reader comparison, and set
+`ogg-reader-inputs` the inputs of the Ogg reader comparison, set
 `subtitle-cc-inputs` the closed caption streams `gate-media-inputs` lacks
 (`s3:evidence/SET/SHA.tar.gz`, their keys in the
-[index](../harness/evidence/index.json)); a gate image is built with all four. The image
+[index](../harness/evidence/sets/)); a gate image is built with all four. The image
 is tagged `Name=triergon-gate-TARGET`, and the earlier images of the target and
 their snapshots are removed. Run it again when the reference builds' keys or the media inputs change,
 or to take a new base image.
@@ -1154,8 +1154,8 @@ input hashes, platform and all per-case outcomes. Summaries and identities are k
 in the pull request that changes the result and in [status](status.md), whose
 [measured revisions](status.md#measured-revisions) table names the revision and
 raw-sample SHA-256 behind each cited result. Raw samples are archived by content hash,
-outside the repository. [harness/evidence/index.json](../harness/evidence/index.json)
-lists every archived set:
+outside the repository. The evidence index lists every archived set, one file per set,
+[harness/evidence/sets/SET.json](../harness/evidence/sets/):
 
 - its key and SHA-256;
 - whether it is kept (cited results) or expires after 90 days;
@@ -1169,7 +1169,8 @@ set to the archive location:
    `OUT` ending in `.tar.gz` stores the tar uncompressed in gzip blocks; one ending in
    `.tar.zst` compresses it with the system `zstd`, which suits large sets of reports.
 2. `cargo xtask evidence upload SET OUT` uploads it under `qualification/SET/` and
-   prints its index entry, which lists the fresh [gate results](#reuse) the set holds.
+   prints its index entry, which lists the fresh [gate results](#reuse) the set holds;
+   with its reason filled in, it is the set's file `harness/evidence/sets/SET.json`.
    Every new set starts there. `cargo xtask evidence entry SET OUT` prints the same
    entry and uploads nothing, for a host without archive credentials whose upload
    streams through another machine to the entry's key.
@@ -1181,7 +1182,9 @@ set to the archive location:
    system `zstd`. Packing and fetching stream, hashing and writing each file as it
    passes, so a set larger than memory unpacks on a 32-bit host.
 
-The index also records how identifiers were renamed.
+[harness/evidence/index.json](../harness/evidence/index.json) records where keys lie
+and how identifiers were renamed. A result key is listed by one kept set at most, so
+reuse finds one result for it.
 
 Every revision status cites stays reachable from `main`: `cargo xtask check-revisions`,
 part of `check`, fails when `HEAD` does not reach a cited commit. A pull request that

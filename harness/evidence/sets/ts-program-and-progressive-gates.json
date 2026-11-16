@@ -1,0 +1,10 @@
+{
+ "name": "ts-program-and-progressive-gates",
+ "path": "ts-program-and-progressive-gates",
+ "retention": "retained",
+ "reason": "MPEG-TS program and progressive playback measurements in docs/status.md.",
+ "key": "evidence/ts-program-and-progressive-gates/a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc.tar.gz",
+ "sha256": "a372562b91bb14dce3bbd7117f71deb098f6dba49492c5f4396a70336012d6fc",
+ "bytes": 89667279,
+ "source_revision": "23f68766543bcd57a96e88bfe5350095236ff88c"
+}

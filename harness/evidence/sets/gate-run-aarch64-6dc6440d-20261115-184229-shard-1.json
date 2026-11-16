@@ -1,0 +1,76 @@
+{
+ "name": "gate-run-aarch64-6dc6440d-20261115-184229-shard-1",
+ "path": "gate-run-aarch64-6dc6440d-20261115-184229-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at 6dc6440d on Linux AArch64, three c6g.4xlarge from the gate image, of the items of the workers the merge of the trained link order with main changed, under the link policy static-toolchain-runtime-trained-order-v1: the shard's outputs as tools/gate-aws.sh packs them, with the index entry written on its host; items hls-segments, matroska-audio-clocks, progressive; for their rows, whose workers the later trained-order revisions keep byte for byte",
+ "key": "evidence/gate-runs/6dc6440d0439428bf61ab219fedcc3fea29924ce-aarch64-20261115-184229/shard-1/1fb4f802b1e328883e3650b15e5936445c0a5313c2346a5223cdcf7648767bf1.tar.zst",
+ "sha256": "1fb4f802b1e328883e3650b15e5936445c0a5313c2346a5223cdcf7648767bf1",
+ "bytes": 17169729,
+ "results": [
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "daf6737b467835b81d8de57a2593381b1a158fa483976165b0c1d34382bc4fe5",
+   "status": 0,
+   "report_sha256": "4f795b83e42909e5ed083391788faf3bb9ddfa1f75e6c4d94093bb228b46444f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "dfb763418744dc80f9b221e1e3c93a054724f7ca0b08e69f1f9fee435ec1ad6f",
+   "status": 0,
+   "report_sha256": "ff49c05bc84e461af948012ce386297b6023cfd6e9551ca43901c69e5c9df24a",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "a19303ab1bd2c9f2d125044c5689e77303f2a21eb3d18fe483059c07281ee43b",
+   "status": 0,
+   "report_sha256": "c5d23ecdebbb15afa049aacf9e31e09617a9b9e04ae14e888295187de3df5dea",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "33d3512284327a7b9a8f7777b56cd99a8bf7d58373a9093cfdfb64521f3be690",
+   "status": 0,
+   "report_sha256": "9276649efeb9090d8d1ae5a73257d3c49afc5eab48af9e99bd4a5da303f8295c",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a9fbf8a1225514e866abec972840318a4c8113fde758fee926c7eb2e90962f5f",
+   "status": 0,
+   "report_sha256": "cd02dd802d34d9416c265b4ea2a1cbdfa94cfac2e1a25f0e72694e1e6b622f6e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "cf74c06625514e598501366c4afcd84b46b1d57120340ae22b6ac252395e6345",
+   "status": 0,
+   "report_sha256": "f67352d37a1e73fd1e87ce3b7faecf7b5168c64c8cb37a8f96c49e4198ef1352",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "a5e2c117f843853d94829e9eb2562ac998a12c6c6743616e206d6732efcd7008",
+   "status": 0,
+   "report_sha256": "b9706bb751617f685f36c60d40a7be43ebcff30f5f041431548e33561efd3c06"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "d5603771b9c3f732d7c218e98ad4c7280ebed898c8f09ace96699764a246093a",
+   "status": 0,
+   "report_sha256": "bb05de17c40e47a50a99df1b6f1f8ad333673c82a9b3aac5eed61c1bac9c9684"
+  }
+ ],
+ "source_revisions": {
+  "candidate": "6dc6440d0439428bf61ab219fedcc3fea29924ce"
+ }
+}

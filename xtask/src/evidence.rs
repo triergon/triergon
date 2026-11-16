@@ -1,7 +1,7 @@
 //! Raw evidence kept outside the repository: deterministic packing, uploading,
-//! promoting and fetching the sets named in `harness/evidence/index.json`, in the
-//! archive that `TRIERGON_EVIDENCE_ARCHIVE` names (an `s3://` location reached
-//! with the `aws` CLI).
+//! promoting and fetching the sets the evidence index lists, one file per set in
+//! `harness/evidence/sets/`, in the archive that `TRIERGON_EVIDENCE_ARCHIVE` names
+//! (an `s3://` location reached with the `aws` CLI).
 //!
 //! A pack is a tar with entries sorted by path and zero timestamps and owners. As
 //! a `.tar.gz` it sits in gzip stored blocks with no name or time, so its bytes
@@ -22,7 +22,54 @@ use crate::archive::{TarFiles, TarReader};
 use crate::json::Value;
 use crate::sha256;
 
-pub const INDEX: &str = "harness/evidence/index.json";
+/// The index's own fields: its schema, where keys lie, and how identifiers were
+/// renamed. Nothing reads them but the index's own test.
+#[cfg(test)]
+const INDEX: &str = "harness/evidence/index.json";
+/// The index's sets, one file each, `NAME.json`, in the canonical layout.
+pub const SETS: &str = "harness/evidence/sets";
+
+/// Every set of the index, by name.
+pub fn sets(root: &Path) -> Result<Vec<Value>, String> {
+    let mut names = Vec::new();
+    for entry in fs::read_dir(root.join(SETS)).map_err(|e| format!("{SETS}: {e}"))? {
+        let file = entry.map_err(|e| format!("{SETS}: {e}"))?.file_name();
+        let file = file
+            .to_str()
+            .ok_or_else(|| format!("{SETS}/{} is not a set's file", Path::new(&file).display()))?;
+        let name = file
+            .strip_suffix(".json")
+            .ok_or_else(|| format!("{SETS}/{file} is not a set's file"))?;
+        names.push(name.to_owned());
+    }
+    names.sort();
+    names.iter().map(|name| set(root, name)).collect()
+}
+
+/// The set `name` of the index.
+pub fn set(root: &Path, name: &str) -> Result<Value, String> {
+    let path = set_path(name)?;
+    if !root.join(&path).is_file() {
+        return Err(format!("{name} is not in the evidence index ({path})"));
+    }
+    let set = crate::checks::read_json(&root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
+    if s(&set, "name") != Some(name) {
+        return Err(format!("{path} does not hold set {name}"));
+    }
+    Ok(set)
+}
+
+/// Where set `name` lies, from the repository root.
+fn set_path(name: &str) -> Result<String, String> {
+    if name.is_empty()
+        || !name
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_'))
+    {
+        return Err(format!("{name:?} is not a set's name"));
+    }
+    Ok(format!("{SETS}/{name}.json"))
+}
 
 /// Every regular file under `dir`, hidden ones included, sorted by relative path.
 pub fn files(dir: &Path) -> Result<Vec<(String, PathBuf)>, String> {
@@ -484,31 +531,26 @@ fn gate_results(archive: &Path, compression: Compression) -> Result<Vec<Value>, 
 
 /// `cargo xtask evidence promote SET`: copy an indexed set from `qualification/`
 /// to `evidence/` inside the archive, then record the new key and retention in
-/// the index. Promote a set when a result cites it.
+/// its file. Promote a set when a result cites it.
 pub fn promote(root: &Path, name: &str) -> Result<String, String> {
-    let path = root.join(INDEX);
-    let text = fs::read_to_string(&path).map_err(|e| format!("{INDEX}: {e}"))?;
-    let mut index = crate::json::parse_strict(&text).map_err(|e| format!("{INDEX}: {e}"))?;
-    if crate::json::to_python(&index, Some(1)) + "\n" != text {
-        return Err(format!("{INDEX} is not in its canonical layout"));
+    set(root, name)?;
+    let relative = set_path(name)?;
+    let path = root.join(&relative);
+    let text = fs::read_to_string(&path).map_err(|e| format!("{relative}: {e}"))?;
+    let mut set = crate::json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
+    if crate::json::to_python(&set, Some(1)) + "\n" != text {
+        return Err(format!("{relative} is not in its canonical layout"));
     }
-    let (from, to) = promote_entry(&mut index, name)?;
+    let (from, to) = promote_set(&mut set, name)?;
     let location = archive_location()?;
     aws_cp(&format!("{location}/{from}"), &format!("{location}/{to}"))?;
-    fs::write(&path, crate::json::to_python(&index, Some(1)) + "\n")
-        .map_err(|e| format!("{INDEX}: {e}"))?;
+    fs::write(&path, crate::json::to_python(&set, Some(1)) + "\n")
+        .map_err(|e| format!("{relative}: {e}"))?;
     Ok(format!("{name}: {from} -> {to}"))
 }
 
-/// Rewrite set `name` in the index as kept, returning its old and new keys.
-fn promote_entry(index: &mut Value, name: &str) -> Result<(String, String), String> {
-    let Some(Value::Array(sets)) = members_mut(index, "sets") else {
-        return Err(format!("{INDEX} has no sets"));
-    };
-    let set = sets
-        .iter_mut()
-        .find(|set| s(set, "name") == Some(name))
-        .ok_or_else(|| format!("{name} is not in {INDEX}"))?;
+/// Rewrite set `name` as kept, returning its old and new keys.
+fn promote_set(set: &mut Value, name: &str) -> Result<(String, String), String> {
     let from = s(set, "key").ok_or("set without key")?.to_owned();
     if Retention::of_key(&from) != Some(Retention::Expiring) {
         return Err(format!(
@@ -539,14 +581,7 @@ fn members_mut<'a>(value: &'a mut Value, key: &str) -> Option<&'a mut Value> {
 /// SHA-256 and every file's SHA-256 against the index, and unpack it into DIR
 /// (default `.research/evidence/SET`).
 pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, String> {
-    let index = crate::checks::read_json(&root.join(INDEX))?;
-    let set = index
-        .get("sets")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .find(|set| s(set, "name") == Some(name))
-        .ok_or_else(|| format!("{name} is not in {INDEX}"))?;
+    let set = &set(root, name)?;
     if set
         .get("files")
         .is_some_and(|files| files.as_array().is_none())
@@ -964,38 +999,54 @@ mod tests {
 
     #[test]
     fn promotion_moves_an_expiring_set_under_evidence() {
-        let mut index = crate::json::parse_strict(
-            r#"{"sets": [
-                {"name": "a", "retention": "90 days", "key": "qualification/a/0.tar.gz"},
-                {"name": "b", "retention": "retained", "key": "evidence/b/1.tar.gz"}
-            ]}"#,
-        )
-        .unwrap();
+        let parse = |text| crate::json::parse_strict(text).unwrap();
+        let mut a =
+            parse(r#"{"name": "a", "retention": "90 days", "key": "qualification/a/0.tar.gz"}"#);
         assert_eq!(
-            promote_entry(&mut index, "a").unwrap(),
+            promote_set(&mut a, "a").unwrap(),
             (
                 "qualification/a/0.tar.gz".into(),
                 "evidence/a/0.tar.gz".into()
             )
         );
-        let a = &index.get("sets").and_then(Value::as_array).unwrap()[0];
-        assert_eq!(s(a, "key"), Some("evidence/a/0.tar.gz"));
-        assert_eq!(s(a, "retention"), Some("retained"));
+        assert_eq!(s(&a, "key"), Some("evidence/a/0.tar.gz"));
+        assert_eq!(s(&a, "retention"), Some("retained"));
+        assert!(promote_set(&mut a, "a").unwrap_err().contains("not under"));
+        let mut b =
+            parse(r#"{"name": "b", "retention": "retained", "key": "evidence/b/1.tar.gz"}"#);
+        assert!(promote_set(&mut b, "b").unwrap_err().contains("not under"));
+    }
+
+    #[test]
+    fn a_set_is_read_from_its_own_file_by_name() {
+        let root = crate::walk::scratch("evidence-sets");
+        fs::create_dir_all(root.join(SETS)).unwrap();
+        for (file, name) in [("b", "b"), ("a", "a"), ("c", "other")] {
+            fs::write(
+                root.join(format!("{SETS}/{file}.json")),
+                format!("{{\"name\": \"{name}\"}}\n"),
+            )
+            .unwrap();
+        }
+        assert_eq!(s(&set(&root, "a").unwrap(), "name"), Some("a"));
         assert!(
-            promote_entry(&mut index, "a")
+            set(&root, "d")
                 .unwrap_err()
-                .contains("not under")
+                .contains("not in the evidence index")
         );
-        assert!(
-            promote_entry(&mut index, "b")
-                .unwrap_err()
-                .contains("not under")
-        );
-        assert!(
-            promote_entry(&mut index, "c")
-                .unwrap_err()
-                .contains("not in")
-        );
+        assert!(set(&root, "c").unwrap_err().contains("does not hold set c"));
+        assert!(set(&root, "../a").unwrap_err().contains("not a set's name"));
+        assert!(sets(&root).unwrap_err().contains("does not hold set c"));
+        fs::remove_file(root.join(format!("{SETS}/c.json"))).unwrap();
+        let names: Vec<_> = sets(&root)
+            .unwrap()
+            .iter()
+            .map(|set| s(set, "name").unwrap().to_owned())
+            .collect();
+        assert_eq!(names, ["a", "b"]);
+        fs::write(root.join(format!("{SETS}/notes.txt")), "").unwrap();
+        assert!(sets(&root).unwrap_err().contains("not a set's file"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1007,13 +1058,35 @@ mod tests {
         let Ok(index) = crate::checks::read_json(&root.join(INDEX)) else {
             return;
         };
-        assert_eq!(
-            crate::json::to_python(&index, Some(1)) + "\n",
-            fs::read_to_string(root.join(INDEX)).unwrap(),
-            "{INDEX} must stay in its canonical layout, which `evidence promote` rewrites"
-        );
+        let canonical = |path: &str, value: &Value| {
+            assert_eq!(
+                crate::json::to_python(value, Some(1)) + "\n",
+                fs::read_to_string(root.join(path)).unwrap(),
+                "{path} must stay in its canonical layout, which `evidence promote` rewrites"
+            );
+        };
+        canonical(INDEX, &index);
+        assert!(index.get("sets").is_none(), "{INDEX}: sets lie in {SETS}");
+        let sets = sets(&root).unwrap();
+        assert!(!sets.is_empty());
         let mut paths = std::collections::BTreeSet::new();
-        for set in index.get("sets").and_then(Value::as_array).unwrap() {
+        let mut kept_results = std::collections::BTreeMap::new();
+        for set in &sets {
+            let name = s(set, "name").unwrap();
+            canonical(&set_path(name).unwrap(), set);
+            if s(set, "retention") == Some(Retention::Kept.label()) {
+                for result in set
+                    .get("results")
+                    .and_then(Value::as_array)
+                    .unwrap_or_default()
+                {
+                    let key = s(result, "key").unwrap();
+                    if let Some(other) = kept_results.insert(key.to_owned(), name.to_owned()) {
+                        // Reuse takes a key's result from the one kept set that lists it.
+                        assert_eq!(other, name, "result {key} is kept in {other} and {name}");
+                    }
+                }
+            }
             let sha = s(set, "sha256").unwrap();
             assert!(sha.len() == 64 && sha.bytes().all(|b| b.is_ascii_hexdigit()));
             let key = s(set, "key").unwrap();
