@@ -54,14 +54,10 @@ impl Bounds {
     }
 
     /// Whether `mv` stays inside the coded picture for luma and chroma.
+    /// Halving the luma limits and the vector preserves their order.
     #[inline]
     pub(crate) fn contains(&self, mv: Mv) -> bool {
-        if mv.x < self.lo_x || mv.x > self.hi_x || mv.y < self.lo_y || mv.y > self.hi_y {
-            return false;
-        }
-        // Chroma: the halved vector may round outward by one half-sample.
-        let (cx, cy) = (chroma(mv.x), chroma(mv.y));
-        cx >= self.lo_x / 2 && cx <= self.hi_x / 2 && cy >= self.lo_y / 2 && cy <= self.hi_y / 2
+        (self.lo_x..=self.hi_x).contains(&mv.x) && (self.lo_y..=self.hi_y).contains(&mv.y)
     }
 }
 
@@ -703,6 +699,11 @@ mod tests {
         let b = Bounds::new(&g, 3, 2, 256);
         assert!(b.contains(Mv { x: -96, y: -64 }));
         assert!(!b.contains(Mv { x: 1, y: 0 }));
+        let b = Bounds::new(&g, 1, 1, 16);
+        assert!(b.contains(Mv { x: 15, y: -15 }));
+        assert!(b.contains(Mv { x: -16, y: 15 }));
+        assert!(!b.contains(Mv { x: 16, y: 15 }));
+        assert!(!b.contains(Mv { x: -17, y: 15 }));
     }
 
     #[test]
