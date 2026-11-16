@@ -209,7 +209,7 @@ impl Digest {
     /// A word is exactly one eight-byte group of its little-endian bytes.
     // Initialization, packet metadata, and teardown all emit the same word.
     pub fn word(&mut self, n: u64) {
-        self.fold(&[n], &[]);
+        self.group(&n.to_le_bytes());
     }
     #[inline]
     pub fn signed(&mut self, n: i64) {
