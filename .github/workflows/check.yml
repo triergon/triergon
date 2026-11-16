@@ -173,8 +173,7 @@ jobs:
       - name: Record target sources
         id: target-record
         if: >-
-          always() && steps.target-key.outcome == 'success' &&
-          (github.event_name == 'push' || steps.target.outputs.cache-matched-key == '')
+          always() && steps.target-key.outcome == 'success'
         run: |
           python3 tools/target-cache.py record target
           du -sh target
@@ -251,6 +250,19 @@ jobs:
         run: python3 tools/target-cache.py apply target
       - name: Verify documents and evidence sets
         run: cargo xtask check docs
+      - name: Record target sources
+        id: target-record
+        if: always()
+        run: python3 tools/target-cache.py record target
+      - name: Save target directory
+        if: always() && steps.target-record.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            target
+            !target/harness
+            !target/tmp
+          key: ${{ steps.target-key.outputs.prefix }}${{ github.sha }}
 
   # The one required check: it passes when every part passed, or for a pull request
   # that changes only documents and evidence sets, when `docs` passed.
