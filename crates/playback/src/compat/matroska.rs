@@ -15,7 +15,7 @@ use triergon_matroska::{
 /// # Errors
 ///
 /// The track must exist. A legacy AAC-LC track without initialization must
-/// declare a rate and channel count the AAC-LC ADTS feed can represent.
+/// carry an Audio element with a rate and channel count that fit AAC-LC ADTS.
 pub fn legacy_aac_lc_initialization(
     configuration: &Configuration,
     track: usize,
@@ -51,6 +51,11 @@ pub(crate) fn legacy_aac_lc_parameters(
         || init.origin != InitializationOrigin::InitialTrackEntry
     {
         return Ok(None);
+    }
+    if !descriptor.has_audio_settings() {
+        return Err(Error::Unsupported(
+            "legacy Matroska AAC needs Audio settings",
+        ));
     }
     let frequency = (0..13)
         .find(|&index| {

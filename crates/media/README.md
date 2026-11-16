@@ -10,7 +10,8 @@ the `compat` modules reproduce FFmpeg's choices where a consumer needs them.
 
 The neutral track view identifies the nine deprecated AAC CodecIDs alongside
 `A_AAC`. `Track::legacy_aac_profile` exposes the profile signalled by a deprecated
-tag. The original CodecID and CodecPrivate remain available. See the
+tag. The original CodecID and CodecPrivate remain available.
+`Track::has_audio_settings` reports whether an Audio element is present. See the
 [Matroska audio codec mappings](https://www.ietf.org/archive/id/draft-ietf-cellar-codec-21.html#section-3.4).
 
 ## Usage

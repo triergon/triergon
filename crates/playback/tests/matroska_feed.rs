@@ -307,6 +307,46 @@ fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
 }
 
 #[test]
+fn legacy_aac_lc_uses_defaults_only_with_audio_settings() {
+    use triergon_playback::compat::matroska::legacy_aac_lc_initialization;
+
+    let original = include_bytes!("fixtures/mkv-feed/aac-mpeg4-lc.mkv");
+    let audio = original
+        .windows(4)
+        .position(|bytes| bytes == [0xe1, 0x8d, 0xb5, 0x88])
+        .unwrap();
+    let mut input = original.to_vec();
+    // Replace both audio children with a same-size Void.
+    input[audio + 2..audio + 15].fill(0);
+    input[audio + 2..audio + 4].copy_from_slice(&[0xec, 0x8b]);
+
+    for (element_id, initialization) in [
+        (0xe1, Ok(Some([0x15, 0x88]))),
+        (
+            0xec,
+            Err(Error::Unsupported(
+                "legacy Matroska AAC needs Audio settings",
+            )),
+        ),
+    ] {
+        input[audio] = element_id;
+        let (mut player, _) = player_with_input(&input, 7);
+        let events = collect(&mut player);
+        let configuration = events
+            .iter()
+            .find_map(|output| match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            legacy_aac_lc_initialization(configuration, 0),
+            initialization
+        );
+    }
+}
+
+#[test]
 fn matroska_avc_and_two_aac_tracks_match_complete_feed_packets_and_source_pts() {
     for quantum in [7, 4096] {
         let (mut player, pool) = player(quantum);

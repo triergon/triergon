@@ -38,6 +38,7 @@ pub struct Track {
     packet_prefix: SharedBytes,
     packet_decoder: Option<crate::content_encoding::Decoder>,
     codec_private_present: bool,
+    audio_settings_present: bool,
     /// Complete bounded TrackEntry payload, retaining extensions not interpreted yet.
     pub source_metadata: SharedBytes,
     pub number: u64,
@@ -79,6 +80,11 @@ impl Track {
     /// Whether the TrackEntry wrote a CodecPrivate element, including an empty one.
     pub const fn has_codec_private(&self) -> bool {
         self.codec_private_present
+    }
+
+    /// Whether the TrackEntry contains an Audio element.
+    pub const fn has_audio_settings(&self) -> bool {
+        self.audio_settings_present
     }
 
     /// The profile signalled by a deprecated AAC CodecID on an audio track.

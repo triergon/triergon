@@ -84,6 +84,7 @@ impl TrackJob {
             codec: SharedText::constant(""),
             codec_private: SharedBytes::default(),
             codec_private_present: false,
+            audio_settings_present: false,
             name: SharedText::constant(""),
             language: SharedText::constant("eng"),
             language_bcp47: None,
@@ -267,6 +268,7 @@ impl TrackJob {
                                 self.phase = if child.id == 0xe0 {
                                     TrackPhase::Video
                                 } else {
+                                    t.audio_settings_present = true;
                                     TrackPhase::Audio
                                 };
                             }
