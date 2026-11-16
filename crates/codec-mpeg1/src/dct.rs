@@ -1,6 +1,9 @@
 //! Separable 8×8 DCT-II / DCT-III in 32-bit fixed point with the MPEG
 //! normalisation F(u,v) = ¼·C(u)·C(v)·ΣΣ f(x,y)·cos((2x+1)uπ/16)·cos((2y+1)vπ/16).
-//! Each 1-D pass splits into the even (4-point) and odd (4×4 rotation) halves.
+//! Each 1-D transform splits into the even (4-point) and odd (4×4 rotation)
+//! halves. Its outputs are exact integer sums of the inputs times basis
+//! weights, which lets the inverse run as sums of the basis rows of the
+//! coefficients a block has.
 
 use crate::block::bits;
 
@@ -28,9 +31,10 @@ pub(super) fn magnitude_bound(sum_abs: u32) -> u32 {
     sum_abs.div_ceil(4)
 }
 
-#[inline(always)]
-fn fdct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
-    let round = 1 << (shift - 1);
+/// The 1-D forward transform before rounding: sums and differences of mirrored
+/// inputs, the even outputs from the sums and the odd ones from the differences.
+/// Every output is the sum of the inputs times ±C1..C7.
+const fn fdct_terms(x: [i32; 8]) -> [i32; 8] {
     let (s07, d07) = (x[0] + x[7], x[0] - x[7]);
     let (s16, d16) = (x[1] + x[6], x[1] - x[6]);
     let (s25, d25) = (x[2] + x[5], x[2] - x[5]);
@@ -38,15 +42,21 @@ fn fdct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
     let (t0, t3) = (s07 + s34, s07 - s34);
     let (t1, t2) = (s16 + s25, s16 - s25);
     [
-        ((t0 + t1) * C4 + round) >> shift,
-        (d07 * C1 + d16 * C3 + d25 * C5 + d34 * C7 + round) >> shift,
-        (t3 * C2 + t2 * C6 + round) >> shift,
-        (d07 * C3 - d16 * C7 - d25 * C1 - d34 * C5 + round) >> shift,
-        ((t0 - t1) * C4 + round) >> shift,
-        (d07 * C5 - d16 * C1 + d25 * C7 + d34 * C3 + round) >> shift,
-        (t3 * C6 - t2 * C2 + round) >> shift,
-        (d07 * C7 - d16 * C5 + d25 * C3 - d34 * C1 + round) >> shift,
+        (t0 + t1) * C4,
+        d07 * C1 + d16 * C3 + d25 * C5 + d34 * C7,
+        t3 * C2 + t2 * C6,
+        d07 * C3 - d16 * C7 - d25 * C1 - d34 * C5,
+        (t0 - t1) * C4,
+        d07 * C5 - d16 * C1 + d25 * C7 + d34 * C3,
+        t3 * C6 - t2 * C2,
+        d07 * C7 - d16 * C5 + d25 * C3 - d34 * C1,
     ]
+}
+
+/// One rounded pass of the forward transform.
+#[inline(always)]
+fn fdct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
+    fdct_terms(x).map(|v| (v + (1 << (shift - 1))) >> shift)
 }
 
 /// The 1-D inverse transform before rounding: the even half from the 4-point
@@ -74,8 +84,8 @@ const fn idct_terms(x: [i32; 8]) -> [i32; 8] {
     ]
 }
 
-/// `BASIS[j][k]`: the weight of input `j` in output `k` of [`idct_terms`].
-const BASIS: [[i32; 8]; 8] = {
+/// `INVERSE[j][k]`: the weight of input `j` in output `k` of [`idct_terms`].
+const INVERSE: [[i32; 8]; 8] = {
     let mut basis = [[0; 8]; 8];
     let mut j = 0;
     while j < 8 {
@@ -140,7 +150,7 @@ pub(crate) fn idct(block: &mut [i32; 64], support: u64) {
     let mut rows = [[0i32; 8]; 8];
     for at in bits(support) {
         let (row, x) = (&mut rows[at / 8], block[at]);
-        for (sum, &weight) in row.iter_mut().zip(&BASIS[at % 8]) {
+        for (sum, &weight) in row.iter_mut().zip(&INVERSE[at % 8]) {
             *sum += x * weight;
         }
     }
@@ -156,7 +166,7 @@ pub(crate) fn idct(block: &mut [i32; 64], support: u64) {
     for (i, out) in block.chunks_exact_mut(8).enumerate() {
         let mut sums = [1 << (BITS + PASS - 1); 8];
         for &r in &occupied[..count] {
-            let weight = BASIS[r][i];
+            let weight = INVERSE[r][i];
             for (sum, &v) in sums.iter_mut().zip(&rows[r]) {
                 *sum += v * weight;
             }
@@ -283,6 +293,28 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn forward_rows_equal_the_butterfly() {
+        let mut rng = Lcg(5);
+        for _ in 0..20_000 {
+            let input: [i32; 64] = std::array::from_fn(|_| rng.next(-255, 255));
+            let mut rows = [0; 64];
+            for (out, row) in rows.chunks_exact_mut(8).zip(input.chunks_exact(8)) {
+                out.copy_from_slice(&fdct_1d(row.try_into().unwrap(), BITS - PASS));
+            }
+            let mut wanted = [0; 64];
+            for c in 0..8 {
+                let column = fdct_1d(std::array::from_fn(|r| rows[r * 8 + c]), BITS + PASS);
+                for r in 0..8 {
+                    wanted[r * 8 + c] = column[r];
+                }
+            }
+            let mut got = input;
+            fdct(&mut got);
+            assert_eq!(got, wanted, "{input:?}");
+        }
     }
 
     #[test]

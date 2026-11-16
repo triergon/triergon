@@ -609,13 +609,14 @@ impl Search<'_> {
         let hi_y = b.hi_y.div_euclid(8).min(COARSE_RADIUS);
         let mut best = [(u32::MAX, 0i32, 0i32); COARSE_KEEP];
         let span = (hi_x - lo_x + 1).max(0) as usize;
-        let mut sads = [0u16; 2 * COARSE_RADIUS as usize + 1];
         for dy in lo_y..=hi_y {
             let ry = (y0 as i32 + dy) as usize;
             // Sliding correlation: for every block sample, one contiguous pass
             // over all horizontal displacements of this row (vectorises over dx).
+            // Clearing the whole array, of a size known when compiling, takes a
+            // few vector stores rather than a call.
+            let mut sads = [0u16; 2 * COARSE_RADIUS as usize + 1];
             let sads = &mut sads[..span];
-            sads.fill(0);
             for r in 0..4 {
                 let start = (ry + r) * width + (x0 as i32 + lo_x) as usize;
                 let line = &coarse.reference[start..start + span + 3];
