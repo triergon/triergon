@@ -64,7 +64,7 @@ pub(crate) struct CurPic {
     pub motion: Motion,
     pub mbs: BudgetVec<MbInfo>,
     /// Width in MBs and height in MBs of this picture (field: half the frame height).
-    pub w: usize,
+    pub w: MbWidth,
     pub h: usize,
     /// 0 frame, 1 top field, 2 bottom field.
     pub structure: u8,
@@ -206,16 +206,17 @@ impl<'a> SliceDecoder<'a> {
     }
 
     pub(crate) fn pic_size(&self) -> usize {
-        self.pic.w * self.pic.h
+        self.pic.w.get() * self.pic.h
     }
 
     /// Compute neighbouring MB addresses (6.4.9 non-MBAFF, 6.4.10 MBAFF).
     pub(crate) fn compute_nb(&mut self) {
-        let w = self.pic.w;
+        let cols = self.pic.w;
+        let w = cols.get();
         let cur = self.cur;
         let mut nb = NbAddr::default();
         if !self.pic.mbaff {
-            let x = cur % w;
+            let x = cols.split(cur).0;
             if x > 0 && self.avail(cur - 1) {
                 nb.a = Some(cur - 1);
             }
@@ -232,7 +233,7 @@ impl<'a> SliceDecoder<'a> {
             }
         } else {
             let pair = cur / 2;
-            let x = pair % w;
+            let x = cols.split(pair).0;
             if x > 0 && self.avail(2 * (pair - 1)) {
                 nb.a = Some(2 * (pair - 1));
             }
@@ -257,9 +258,7 @@ impl<'a> SliceDecoder<'a> {
         let sy = p.buf.width;
         let sc = p.buf.cwidth;
         if p.mbaff {
-            let pair = addr / 2;
-            let mbx = pair % p.w;
-            let py = pair / p.w;
+            let (mbx, py) = p.w.split(addr / 2);
             let bot = addr & 1;
             if p.mbs[addr].field {
                 MbGeom {
@@ -283,8 +282,7 @@ impl<'a> SliceDecoder<'a> {
                 }
             }
         } else {
-            let mbx = addr % p.w;
-            let mby = addr / p.w;
+            let (mbx, mby) = p.w.split(addr);
             if p.structure == 0 {
                 MbGeom {
                     mbx,
@@ -339,6 +337,8 @@ impl<'a> SliceDecoder<'a> {
     /// (max 16x16) or chroma (max 8x8). Returns (mbAddrN, xW, yW).
     #[inline]
     pub(crate) fn loc(&self, xn: i32, yn: i32, maxw: i32, maxh: i32) -> Option<(usize, i32, i32)> {
+        // xW and yW (6-34, 6-35) as masks: maxW and maxH are 16 or 8 here.
+        debug_assert!(maxw.count_ones() == 1 && maxh.count_ones() == 1);
         let cur = self.cur;
         let nb = &self.nb;
         if !self.pic.mbaff {
@@ -361,7 +361,7 @@ impl<'a> SliceDecoder<'a> {
             } else {
                 None
             }?;
-            return Some((addr, (xn + maxw) % maxw, (yn + maxh) % maxh));
+            return Some((addr, (xn + maxw) & (maxw - 1), (yn + maxh) & (maxh - 1)));
         }
         if yn >= maxh {
             return None;
@@ -500,7 +500,7 @@ impl<'a> SliceDecoder<'a> {
                 ym = yn;
             }
         }
-        Some((addr, (xn + maxw) % maxw, (ym + maxh) % maxh))
+        Some((addr, (xn + maxw) & (maxw - 1), (ym + maxh) & (maxh - 1)))
     }
 
     /// Left neighbour MB (A) for MB-level contexts (6.4.11.1): the MB covering (-1, 0).
@@ -517,8 +517,8 @@ impl<'a> SliceDecoder<'a> {
     /// MBAFF inference of mb_field_decoding_flag when absent for the pair (7.4.4).
     fn infer_field(&self) -> bool {
         let pair = self.cur / 2;
-        let w = self.pic.w;
-        let x = pair % w;
+        let w = self.pic.w.get();
+        let x = self.pic.w.split(pair).0;
         if x > 0 && self.avail(2 * (pair - 1)) {
             return self.pic.mbs[2 * (pair - 1)].field;
         }
