@@ -9,14 +9,24 @@ permissions:
   contents: read
 
 jobs:
-  check:
+  # `cargo xtask check` in its four parts, side by side. Each part prepares what it
+  # reads (`cargo xtask prepare-check PART`) and runs its steps of the full check
+  # (`cargo xtask check PART`); together they run every step.
+  part:
+    name: ${{ matrix.part }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [lint, test, variants, parity]
     env:
       CARGO_INCREMENTAL: '0'
       # Pinned downloads, kept under their SHA-256 so an upstream outage does not
       # stop the checks. Every entry is verified against its pin before use.
       TRIERGON_DOWNLOAD_CACHE: /home/runner/.cache/triergon-downloads
+      # The reference builds the parity part prepares; lint reads FreeType and HarfBuzz.
+      REFERENCES: ffmpeg-matroska ffmpeg-formats ffmpeg-video freetype harfbuzz libass
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -26,8 +36,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: /home/runner/.cache/triergon-downloads
-          key: pinned-downloads
-          restore-keys: pinned-downloads-
+          key: pinned-downloads-${{ matrix.part }}
+          restore-keys: |
+            pinned-downloads-${{ matrix.part }}-
+            pinned-downloads-
       - name: Install check dependencies
         run: |
           sudo apt-get update
@@ -36,12 +48,117 @@ jobs:
           rustc -vV
           mkdir -p "$TRIERGON_DOWNLOAD_CACHE"
           touch "$RUNNER_TEMP/downloads-start"
-      - name: Prepare pinned reference and fixtures
-        run: cargo xtask prepare-check || cargo xtask prepare-check
+      # The target directory of an earlier run of this part, made by the same Rust
+      # toolchain, C compiler, linker and C runtime, so that output cargo reuses
+      # (a linked test or worker included) is what this host would build.
+      # tools/target-cache.py makes cargo rebuild everything whose tracked sources
+      # differ from the ones that run built.
+      - name: Target cache key
+        id: target-key
+        run: |
+          {
+            rustc -vV
+            cc --version
+            ld --version
+            dpkg-query -W 'libc6*' 'libgcc*' 'gcc*' 'binutils*' || true
+          } > "$RUNNER_TEMP/toolchain"
+          cat "$RUNNER_TEMP/toolchain"
+          toolchain=$(sha256sum < "$RUNNER_TEMP/toolchain" | cut -c1-32)
+          echo "prefix=target-${{ matrix.part }}-$ImageOS-$toolchain-" >> "$GITHUB_OUTPUT"
+      - name: Restore target directory
+        id: target
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          # The same paths as the save below: they are part of the cache's identity.
+          path: |
+            target
+            !target/harness
+            !target/tmp
+          key: ${{ steps.target-key.outputs.prefix }}${{ github.sha }}
+          restore-keys: ${{ steps.target-key.outputs.prefix }}
+      - name: Date sources by their content
+        run: python3 tools/target-cache.py apply target
+      # The packed reference builds, keyed by `cargo xtask references keys`: the
+      # pinned sources, configure flags, compilers and installed packages. Every
+      # pack is checked against its key and its installed tree when restored; one
+      # that fails is removed and the reference built from source.
+      - name: Reference cache key
+        id: references-key
+        if: matrix.part == 'lint' || matrix.part == 'parity'
+        run: |
+          cargo xtask references keys $REFERENCES | tee "$RUNNER_TEMP/references"
+          key=$(cut -d' ' -f1,2 "$RUNNER_TEMP/references" | sha256sum | cut -c1-32)
+          echo "prefix=references-$ImageOS-" >> "$GITHUB_OUTPUT"
+          echo "key=references-$ImageOS-$key" >> "$GITHUB_OUTPUT"
+      - name: Restore reference builds
+        id: references
+        if: steps.references-key.outputs.key != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: .research/reference-cache
+          key: ${{ steps.references-key.outputs.key }}
+          restore-keys: ${{ steps.references-key.outputs.prefix }}
+      - name: Prepare pinned references and fixtures
+        id: prepare
+        run: >-
+          cargo xtask prepare-check ${{ matrix.part }} ||
+          cargo xtask prepare-check ${{ matrix.part }}
       - name: Verify the committed MP4 range manifest
+        if: matrix.part == 'test' || matrix.part == 'parity'
         run: git diff --exit-code -- harness/features/mp4-range/corpus.json
       - name: Verify workspace
-        run: cargo xtask check
+        run: cargo xtask check ${{ matrix.part }}
+      - name: Record worker identity
+        if: matrix.part == 'parity'
+        run: |
+          {
+            echo '```'
+            sha256sum target/harness/identity.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload worker identity
+        if: matrix.part == 'parity'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: worker-identity-${{ github.run_attempt }}
+          path: target/harness/identity.json
+      - name: Pack reference builds
+        id: pack
+        if: >-
+          always() && matrix.part == 'parity' && steps.prepare.outcome == 'success' &&
+          steps.references.outputs.cache-hit != 'true'
+        run: |
+          cargo xtask references pack $REFERENCES
+          # Keep only the packs of the current keys.
+          cargo xtask references keys $REFERENCES |
+            awk '{ print ".research/reference-cache/" $1 "/" $2 ".tar.zst" }' > "$RUNNER_TEMP/packs"
+          find .research/reference-cache -type f | grep -vxF -f "$RUNNER_TEMP/packs" | xargs -r rm -v
+          du -sh .research/reference-cache
+      - name: Save reference builds
+        if: always() && steps.pack.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: .research/reference-cache
+          key: ${{ steps.references-key.outputs.key }}
+      # Saved for every push to main, which every pull request can restore, and for
+      # a pull request only when nothing could be restored.
+      - name: Record target sources
+        id: target-record
+        if: >-
+          always() && steps.target-key.outcome == 'success' &&
+          (github.event_name == 'push' || steps.target.outputs.cache-matched-key == '')
+        run: |
+          python3 tools/target-cache.py record target
+          du -sh target
+      - name: Save target directory
+        if: always() && steps.target-record.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            target
+            !target/harness
+            !target/tmp
+          key: ${{ steps.target-key.outputs.prefix }}${{ github.sha }}
       - name: Keep only the downloads this run used
         id: downloads
         if: always()
@@ -52,10 +169,19 @@ jobs:
             find "$TRIERGON_DOWNLOAD_CACHE" -type f ! -newer "$RUNNER_TEMP/downloads-start" -delete
           fi
           key=$(ls "$TRIERGON_DOWNLOAD_CACHE" | sort | sha256sum | cut -c1-16)
-          echo "key=pinned-downloads-$key" >> "$GITHUB_OUTPUT"
+          echo "key=pinned-downloads-${{ matrix.part }}-$key" >> "$GITHUB_OUTPUT"
       - name: Save pinned downloads
         if: always() && steps.downloads.outputs.key != ''
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: /home/runner/.cache/triergon-downloads
           key: ${{ steps.downloads.outputs.key }}
+
+  # The one required check: it passes only when every part passed.
+  check:
+    if: always()
+    needs: part
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every part passed
+        run: test "${{ needs.part.result }}" = success
