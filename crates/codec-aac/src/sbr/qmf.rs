@@ -145,11 +145,17 @@ impl Analysis {
         for n in 0..32 {
             self.x[p + 31 - n] = input[n] * scale;
         }
-        let x: &[f32; 320] = self.x[p..p + 320].try_into().expect("320 samples");
+        // each sum in a register over its five taps x[64j + n] w[64j + n], in tap order, four
+        // sums a block
+        let x = &self.x[p..p + 320];
         let w = &self.t.analysis_win;
-        // each sum in a register over its five taps, in tap order
-        let u: [f32; 64] =
-            std::array::from_fn(|n| (0..5).fold(0.0, |u, j| u + x[64 * j + n] * w[64 * j + n]));
+        let x: [&[[f32; 4]]; 5] = std::array::from_fn(|j| x[64 * j..][..64].as_chunks().0);
+        let w: [&[[f32; 4]]; 5] = std::array::from_fn(|j| w[64 * j..][..64].as_chunks().0);
+        let mut u = [[0f32; 4]; 16];
+        for (b, u) in u.iter_mut().enumerate() {
+            *u = std::array::from_fn(|i| (0..5).fold(0.0, |u, j| u + x[j][b][i] * w[j][b][i]));
+        }
+        let u = u.as_flattened();
         // the DST-IV as a DCT-IV of the reversed input, u[31 - n] + u[32 + n]
         let d: [f32; 32] = std::array::from_fn(|n| u[n] - u[63 - n]);
         let r: [f32; 32] = std::array::from_fn(|n| u[31 - n] + u[32 + n]);
@@ -227,14 +233,23 @@ impl Synthesis {
             v[127 - 2 * k] = co - so;
             v[2 * k] = co + so;
         }
-        let v: &[f32; 1280] = self.v[p..p + 1280].try_into().expect("1280 samples");
+        // Each output's sum in a register over its ten taps, in tap order, four outputs a
+        // block: tap 2i reads v[256i + n] and w[128i + n], tap 2i + 1 v[256i + 192 + n] and
+        // w[128i + 64 + n].
+        let v = &self.v[p..p + 1280];
         let w = &self.t.synthesis_win;
-        // each sum in a register over its ten taps, in tap order
-        for (n, out) in out[..64].iter_mut().enumerate() {
-            let acc = (0..5).fold(0.0, |acc, i| {
-                acc + (v[256 * i + n] * w[128 * i + n] + v[256 * i + 192 + n] * w[128 * i + 64 + n])
-            });
-            *out = acc * scale;
+        let v: [&[[f32; 4]]; 10] =
+            std::array::from_fn(|t| v[256 * (t / 2) + 192 * (t % 2)..][..64].as_chunks().0);
+        let w: [&[[f32; 4]]; 10] =
+            std::array::from_fn(|t| w[128 * (t / 2) + 64 * (t % 2)..][..64].as_chunks().0);
+        for (b, out) in out[..64].as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            for (j, out) in out.iter_mut().enumerate() {
+                let acc = (0..5).fold(0.0, |acc, i| {
+                    acc + (v[2 * i][b][j] * w[2 * i][b][j]
+                        + v[2 * i + 1][b][j] * w[2 * i + 1][b][j])
+                });
+                *out = acc * scale;
+            }
         }
     }
 }
