@@ -1,5 +1,6 @@
-//! The gate build: workers compiled by the toolchain in `rust-toolchain.toml` with no
-//! extra compiler configuration, workers and references linked under [`LINK_POLICY`].
+//! The gate build: workers compiled by the toolchain in `rust-toolchain.toml`, or by the
+//! pinned nightly ([`crate::NIGHTLY`]) for a worker marked to use it, with no extra
+//! compiler configuration; workers and references linked under [`LINK_POLICY`].
 //!
 //! Compiler version and flags move a runtime bound by more than a gate's margin, so a
 //! gate result only means something for one build. `build-workers` refuses any other
@@ -39,6 +40,19 @@ pub fn compiler(root: &Path, search_path: Option<&OsStr>) -> Result<String, Stri
         return Err(format!("rustc -vV: {}", output.status));
     }
     String::from_utf8(output.stdout).map_err(|e| format!("rustc -vV: {e}"))
+}
+
+/// `rustc -vV` of the rustup toolchain `toolchain`, run from `root`.
+pub fn toolchain_compiler(root: &Path, toolchain: &str) -> Result<String, String> {
+    let output = Command::new("rustc")
+        .args([&format!("+{toolchain}"), "-vV"])
+        .current_dir(root)
+        .output()
+        .map_err(|e| format!("rustc +{toolchain}: {e}"))?;
+    if !output.status.success() {
+        return Err(format!("rustc +{toolchain} -vV: {}", output.status));
+    }
+    String::from_utf8(output.stdout).map_err(|e| format!("rustc +{toolchain} -vV: {e}"))
 }
 
 /// One `key: value` field of `rustc -vV`.
@@ -391,7 +405,45 @@ pub fn refusals(identity: &Value, pinned: &str) -> Vec<String> {
         Some(found) => reasons.push(format!("link policy {found}, not {LINK_POLICY}")),
         None => reasons.push("records no link policy".to_owned()),
     }
+    if let Some(Value::Object(candidates)) = identity.get("additional_candidates") {
+        for (name, record) in candidates {
+            if let Some(reason) = toolchain_refusal(name, record, pinned) {
+                reasons.push(reason);
+            }
+        }
+    }
     reasons
+}
+
+/// Why the compiler a worker's record names is not the one the gate build gives that
+/// worker: the pinned release, or the pinned nightly for a worker marked to use it.
+fn toolchain_refusal(name: &str, record: &Value, pinned: &str) -> Option<String> {
+    let Ok(spec) = super::build::candidate(name) else {
+        return Some(format!("{name} is no measurement worker"));
+    };
+    let expected = spec.toolchain(pinned);
+    let Some(toolchain) = record.get("toolchain").and_then(Value::as_str) else {
+        return Some(format!("{name} records no toolchain"));
+    };
+    if toolchain != expected {
+        return Some(format!("{name} built by {toolchain}, not {expected}"));
+    }
+    let found = record
+        .get("rustc")
+        .and_then(Value::as_str)
+        .and_then(release);
+    let matches = |release: &str| {
+        if spec.nightly {
+            release.ends_with("-nightly")
+        } else {
+            release == pinned
+        }
+    };
+    match found {
+        Some(release) if matches(release) => None,
+        Some(release) => Some(format!("{name} built by rustc {release}, not {expected}")),
+        None => Some(format!("{name} records no compiler")),
+    }
 }
 
 /// Why the build `identity.json` records is not the gate build: [`refusals`], and
@@ -424,11 +476,25 @@ pub fn name(identity: &Value) -> String {
     {
         overrides.extend(keys.iter().filter_map(Value::as_str).map(str::to_owned));
     }
-    if overrides.is_empty() {
+    let mut line = if overrides.is_empty() {
         format!("rustc {compiler}, default flags")
     } else {
         format!("rustc {compiler}, {}", overrides.join(", "))
+    };
+    if let Some(Value::Object(candidates)) = identity.get("additional_candidates") {
+        let other: Vec<String> = candidates
+            .iter()
+            .filter_map(|(name, record)| {
+                let toolchain = record.get("toolchain").and_then(Value::as_str)?;
+                (Some(toolchain) != release(identity.get("rustc")?.as_str()?))
+                    .then(|| format!("{name} by {toolchain}"))
+            })
+            .collect();
+        if !other.is_empty() {
+            line.push_str(&format!("; {}", other.join(", ")));
+        }
     }
+    line
 }
 
 /// One line naming a record's build and whether it is the gate build.
@@ -477,6 +543,12 @@ fn bound(records: Option<&Value>, sha: &str) -> bool {
 /// a worker and the reference a comparison reference of the gate build recorded in
 /// `target/harness/identity.json`.
 pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<String> {
+    workers_refusals(root, &[candidate], reference)
+}
+
+/// [`pair_refusals`] for a measurement whose workloads are split among `candidates`:
+/// each must be a worker of the recorded build.
+pub fn workers_refusals(root: &Path, candidates: &[&Path], reference: &Path) -> Vec<String> {
     let identity = match read_json(&root.join("target/harness/identity.json")) {
         Ok(identity) => identity,
         Err(error) => return vec![format!("no build identity: {error}")],
@@ -486,11 +558,14 @@ pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<Str
         Err(error) => vec![error],
     };
     let digest = |path: &Path| std::fs::read(path).map(|bytes| sha256::hex(&bytes)).ok();
-    if !digest(candidate).is_some_and(|sha| bound(identity.get("additional_candidates"), &sha)) {
-        reasons.push(format!(
-            "{} is not a worker of the recorded build",
-            candidate.display()
-        ));
+    for candidate in candidates {
+        if !digest(candidate).is_some_and(|sha| bound(identity.get("additional_candidates"), &sha))
+        {
+            reasons.push(format!(
+                "{} is not a worker of the recorded build",
+                candidate.display()
+            ));
+        }
     }
     if !digest(reference).is_some_and(|sha| bound(identity.get("comparison_references"), &sha)) {
         reasons.push(format!(
@@ -915,21 +990,78 @@ mod tests {
         let digest = |text: &str| sha256::hex(text.as_bytes());
         let mut identity = record("", None);
         if let Value::Object(fields) = &mut identity {
-            let entry = |sha: String| {
+            let entry = |name: &str, sha: String| {
                 Value::object([(
-                    "w",
-                    Value::object([("sha256", Value::str(sha)), ("link_order", Value::Null)]),
+                    name,
+                    Value::object([
+                        ("sha256", Value::str(sha)),
+                        ("link_order", Value::Null),
+                        ("toolchain", Value::str(PIN)),
+                        ("rustc", Value::str(format!("rustc\nrelease: {PIN}\n"))),
+                    ]),
                 )])
             };
             fields.push(("candidate_link_order".into(), Value::Null));
-            fields.push(("additional_candidates".into(), entry(digest("worker"))));
-            fields.push(("comparison_references".into(), entry(digest("reference"))));
+            fields.push((
+                "additional_candidates".into(),
+                entry("font-worker", digest("worker")),
+            ));
+            fields.push((
+                "comparison_references".into(),
+                entry("ffmpeg-worker", digest("reference")),
+            ));
         }
         crate::corpus::write_json(&tree.join("target/harness/identity.json"), &identity).unwrap();
         assert!(pair_refusals(&tree, &worker, &reference).is_empty());
         assert_eq!(pair_refusals(&tree, &other, &reference).len(), 1);
         assert_eq!(pair_refusals(&tree, &worker, &other).len(), 1);
         fs::remove_dir_all(&tree).unwrap();
+    }
+
+    #[test]
+    fn each_worker_is_held_to_its_own_toolchain() {
+        let worker = |toolchain: &str, release: &str| {
+            Value::object([
+                ("toolchain", Value::str(toolchain)),
+                ("rustc", Value::str(format!("rustc\nrelease: {release}\n"))),
+            ])
+        };
+        let nightly = crate::NIGHTLY;
+        assert_eq!(
+            toolchain_refusal("font-worker", &worker(PIN, PIN), PIN),
+            None
+        );
+        assert_eq!(
+            toolchain_refusal("codec-aac-worker", &worker(nightly, "1.100.0-nightly"), PIN),
+            None
+        );
+        for (name, record) in [
+            ("codec-aac-worker", worker(PIN, PIN)),
+            ("codec-aac-worker", worker(nightly, PIN)),
+            ("codec-worker", worker(nightly, "1.100.0-nightly")),
+            ("font-worker", worker(nightly, "1.100.0-nightly")),
+            ("font-worker", worker(PIN, "1.98.0")),
+            ("font-worker", Value::object([("rustc", Value::str(PIN))])),
+            ("no-such-worker", worker(PIN, PIN)),
+        ] {
+            assert!(
+                toolchain_refusal(name, &record, PIN).is_some(),
+                "{name} {record:?}"
+            );
+        }
+        let mut identity = record("", None);
+        if let Value::Object(fields) = &mut identity {
+            fields.push((
+                "additional_candidates".into(),
+                Value::object([("codec-aac-worker", worker(PIN, PIN))]),
+            ));
+        }
+        assert_eq!(refusals(&identity, PIN).len(), 1);
+        assert!(
+            name(&identity).ends_with("default flags"),
+            "{}",
+            name(&identity)
+        );
     }
 
     #[test]

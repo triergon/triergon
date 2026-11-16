@@ -1,0 +1,46 @@
+{
+ "name": "gate-run-aarch64-7f32411b-20261116-112713-shard-1",
+ "path": "gate-run-aarch64-7f32411b-20261116-112713-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 7f32411b on three c6g.4xlarge hosts, Linux AArch64, shard 1 of the codec items (codecs, codecs-audio, ogg-readers, codec-workloads, codec-file-workloads and their memory cases, tests, tests-release, isobmff-reader) with the codec-derived streams input, the codec worker and the AAC decode example built by the pinned nightly with codec-aac's simd feature: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results); cited by docs/status.md. Its tests/checked step fails on one xtask unit test of the build identity, fixed and rerun at a later revision.",
+ "key": "evidence/gate-runs/7f32411b5519e7fb0cae303ae8eea73450b24c03-aarch64-20261116-112713/shard-1/dcb77231d013509b8846fa22a437b419a3bf77816ab33c38346ee19ec7016e5d.tar.zst",
+ "sha256": "dcb77231d013509b8846fa22a437b419a3bf77816ab33c38346ee19ec7016e5d",
+ "bytes": 7468721,
+ "results": [
+  {
+   "path": "memory/codec-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "25109f3a362ac418413db1a5549a8ee3b70419d1b31aa66f7ebbb27883b1193b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "16f58f773f73c931d011275d31b53a0561c2e4d0c0928555ee93c251aec4b07f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "912cb5d4ecfaea4044e81c54f5742a732c3efa2936a480e21806013fd8c8e1be",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "834cff012678a9eede938814c0399a10295878d23ee89cbd286cf54fe58d66ac",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "757a9e3cd784ffc1415b7b0b42b3043b6025a5c9010a4afab8c82f2d6c42449d",
+   "status": 101,
+   "report_sha256": null
+  }
+ ]
+}

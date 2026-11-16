@@ -454,7 +454,7 @@ summarise() {
     repository=$(repository_path "$target"); inside=$(inside_command "$target")
     for i in $(seq 1 "$count"); do
         [ -f "$out/shard-$i/shard.json" ] || continue
-        (cd "$out" && COPYFILE_DISABLE=1 tar -cf - "shard-$i"/shard.json "shard-$i"/steps "shard-$i"/identity-*.json) |
+        (cd "$out" && COPYFILE_DISABLE=1 tar --no-xattrs -cf - "shard-$i"/shard.json "shard-$i"/steps "shard-$i"/identity-*.json) |
             on "$host" "mkdir -p $repository/.research/gate/shards && tar -xf - -C $repository/.research/gate/shards"
         shards="$shards .research/gate/shards/shard-$i"
     done

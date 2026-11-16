@@ -1,7 +1,7 @@
 [package]
 name = "codec-worker"
 version = "0.0.0"
-description = "Decoder measurement worker: decode, letterbox and downmix through the session decoders"
+description = "Decoder measurement workers: decode, letterbox and downmix through the session decoders, and a worker with the AAC decode operations alone"
 repository.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -21,6 +21,9 @@ triergon-session = { path = "../session", features = ["codecs"] }
 [features]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
 simd = ["triergon-session/simd"]
+# Nightly-only explicit SIMD forms of the AAC decoder's SBR QMF banks; the gate build
+# builds `codec-aac-worker` with it.
+aac-simd = ["triergon-session/aac-simd"]
 
 [lints]
 workspace = true
