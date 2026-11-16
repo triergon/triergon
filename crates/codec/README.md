@@ -57,6 +57,7 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
 | `divide`, `divide_u32` | `a / b` rounded towards zero for `b > 0`; on 32-bit ARM, whose baseline has no divide instruction, an exact double division instead of the library routine |
+| `Divisor` | quotient and remainder by one divisor fixed at run time, as a multiplication and a shift, exact while dividend times divisor stays below 2^31 |
 
 ### Channel order
 
