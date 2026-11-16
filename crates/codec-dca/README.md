@@ -110,6 +110,10 @@ files.
   vectors do not reach. Every sample is compared from sample 0: exact rate, layout and
   count; per channel RMS ≤ 8.8e-6 and max |diff| ≤ 6.1035e-5
   (`harness/codecs/numeric-rules.json`).
+- Gate item `codecs-audio` grades the 23 core streams on Linux AArch64 and 32-bit ARMv7
+  (`thumbv7neon-unknown-linux-gnueabihf`): 22/22 pass on both at `bbdefa70`;
+  `xll_51_24_48_none` carries no core substream, only the lossless extension this decoder
+  does not implement, and is counted out of set.
 - `cargo test -p triergon-codec-dca` checks the synthetic scenarios against stored FFmpeg
   fingerprints (`tests/data/synthetic.fp`), packing equivalence, layouts, typed errors and
   corruption without panics; `tests/vectors.rs` checks the FATE vectors when present.

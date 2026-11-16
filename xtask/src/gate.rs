@@ -686,7 +686,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
     let audio_run = format!("{out}/codecs-audio-grade.jsonl");
     items.push(Item {
         name: "codecs-audio".into(),
-        weight: 5,
+        weight: 1,
         steps: vec![
             step(
                 "codec-audio-bin",

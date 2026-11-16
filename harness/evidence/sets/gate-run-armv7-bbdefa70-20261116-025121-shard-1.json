@@ -1,0 +1,9 @@
+{
+ "name": "gate-run-armv7-bbdefa70-20261116-025121-shard-1",
+ "path": "gate-run-armv7-bbdefa70-20261116-025121-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at bbdefa70 on one c6g.4xlarge, 32-bit ARMv7 (thumbv7neon-unknown-linux-gnueabihf): the item codecs-audio, grading the aac, ac3, eac3 and dts correctness lanes against the decode profile's FFmpeg 9.0.2 (rows, summary, step records, logs, build identities); cited by docs/status.md",
+ "key": "evidence/gate-runs/bbdefa706033fb0e715b4ab5dd94b2cfdced4eeb-armv7-20261116-025121/shard-1/6e3e725f8e08b3801b0a04741c7b2c00eb74f537f5079cce55dec4dcb5610e5c.tar.zst",
+ "sha256": "6e3e725f8e08b3801b0a04741c7b2c00eb74f537f5079cce55dec4dcb5610e5c",
+ "bytes": 1078071
+}
