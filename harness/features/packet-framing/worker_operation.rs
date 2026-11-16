@@ -146,8 +146,8 @@ fn packet_digest(hash: &mut Digest, kind: u64, input: i64, ordinal: u64, packet:
     }
 }
 
-fn receive_failure(hash: &mut Digest, input: usize, code: i32) {
-    hash.fold(&[3, input as u64, i64::from(code) as u64], &[]);
+fn receive_failure_words(input: usize, code: i32) -> [u64; 3] {
+    [3, input as u64, i64::from(code) as u64]
 }
 
 fn retain_output<T>(kept: &mut BudgetVec<T>, value: T, following: &[Event]) -> Result<()> {
@@ -247,7 +247,9 @@ fn operation(case: &Case) -> Result<Outcome> {
             match avc_into(&case.pool, raw.clone(), *extra_offset, true, &mut update) {
                 Ok(()) => (),
                 Err((_, Some(code))) => {
-                    receive_failure(&mut outcome.digest, index, code);
+                    outcome
+                        .digest
+                        .fold(&receive_failure_words(index, code), &[]);
                     continue;
                 }
                 Err((error, None)) => return Err(error),
@@ -296,11 +298,8 @@ fn operation(case: &Case) -> Result<Outcome> {
                 }
                 Err(error) => {
                     if let Some(rejection) = job.take_receiver_rejection() {
-                        receive_failure(
-                            &mut outcome.digest,
-                            index,
-                            rejection.native_receive_result(),
-                        );
+                        let words = receive_failure_words(index, rejection.native_receive_result());
+                        outcome.digest.fold(&words, &[]);
                         break;
                     }
                     return Err(error);
