@@ -17,6 +17,13 @@ cargo xtask prepare-check         # once: pinned references (FFmpeg, FreeType,
 cargo xtask check                 # everything CI runs
 ```
 
+CI runs the check in four parts as parallel jobs, each after `cargo xtask prepare-check
+PART`: `cargo xtask check lint`, `test`, `variants` and `parity`; the required `check`
+status passes only when all four pass. Each part runs locally the same way. The jobs
+restore the packed reference builds (`cargo xtask references`) and the target
+directory of an earlier run; `tools/target-cache.py` marks every tracked file whose
+content differs from that run's as new, so cargo rebuilds whatever reads it.
+
 Set `CARGO_INCREMENTAL=0` for direct cargo commands; the reference builds and
 benchmarks assume it.
 

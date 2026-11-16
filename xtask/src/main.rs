@@ -49,11 +49,17 @@ use std::process::{Command, ExitCode};
 const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
-  check          everything CI runs: format, tests, lints, builds and the checks below
+  check          [PART]   everything CI runs: format, tests, lints, builds and the checks
+                 below; PART runs one of its parts, which CI runs as separate jobs: lint
+                 (format, lints, rustdoc and the repository checks), test (the workspace
+                 tests), variants (the reference-trace tests, the release build, the
+                 nightly SIMD tests and the core time oracle) or parity (the worker tests,
+                 the required feature reports, the fuzz smoke rounds and the link orders)
   check-simd     clippy and tests of the opt-in HEVC SIMD path on the pinned nightly
-  prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz, FriBidi and
-                 libass references, the fixtures, the required vectors, the font corpus and
-                 the workers (built with the reference first on PATH)
+  prepare-check  [PART]   once before `check`: the pinned FFmpeg, FreeType, HarfBuzz,
+                 FriBidi and libass references, the fixtures, the required vectors, the font
+                 corpus and the workers (built with the reference first on PATH); with
+                 PART, only what that part of `check` reads
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -174,7 +180,11 @@ fn main() -> ExitCode {
         return generator_main(&root, generator, &args[1..]);
     }
     let result = match args.first().map(String::as_str) {
-        Some("check") => check(&root),
+        Some("check") => match &args[1..] {
+            [] => check(&root, None),
+            [part] => Part::named(part).and_then(|part| check(&root, Some(part))),
+            _ => Err(USAGE.to_owned()),
+        },
         Some("progressive") => {
             return match progressive_bench::main(&root, &args[1..]) {
                 Ok(code) => ExitCode::from(code as u8),
@@ -184,8 +194,12 @@ fn main() -> ExitCode {
                 }
             };
         }
-        Some("check-simd") => check_simd(&root),
-        Some("prepare-check") => prepare_check(),
+        Some("check-simd") => simd_lints(&root).and_then(|()| simd_tests(&root)),
+        Some("prepare-check") => match &args[1..] {
+            [] => prepare_check(None),
+            [part] => Part::named(part).and_then(|part| prepare_check(Some(part))),
+            _ => Err(USAGE.to_owned()),
+        },
         Some("check-links") => check_links(&root),
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
@@ -956,30 +970,35 @@ fn run(command: &mut Command) -> Task {
 /// and code generation do not change underneath the checks and measurements.
 pub(crate) const NIGHTLY: &str = "nightly-2026-10-17";
 
-/// Everything `check` needs once: each step runs as its own `cargo xtask`
-/// command with the pinned reference first on `PATH`, so the worker build
-/// records that reference.
-fn prepare_check() -> Task {
+/// Everything `check` needs once, or what one part of it reads: each step runs as
+/// its own `cargo xtask` command with the pinned reference first on `PATH`, so the
+/// worker build records that reference.
+fn prepare_check(part: Option<Part>) -> Task {
+    let steps: &[&[&str]] = match part {
+        None | Some(Part::Parity) => &[
+            &["prepare-ffmpeg"],
+            &["prepare-ffmpeg", "--profile", "formats"],
+            &["fixtures"],
+            &["fetch-vectors"],
+            &["fonts", "prepare"],
+            &["fonts", "fetch"],
+            &["shape", "prepare"],
+            &["raster", "prepare"],
+            &["build-workers"],
+        ],
+        // The table checks read the unpacked FreeType and HarfBuzz releases.
+        Some(Part::Lint) => &[&["fonts", "prepare"], &["shape", "prepare"]],
+        Some(Part::Test | Part::Variants) => &[&["fixtures"], &["fetch-vectors"]],
+    };
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-    for step in [
-        &["prepare-ffmpeg"][..],
-        &["prepare-ffmpeg", "--profile", "formats"],
-        &["fixtures"],
-        &["fetch-vectors"],
-        &["fonts", "prepare"],
-        &["fonts", "fetch"],
-        &["shape", "prepare"],
-        &["raster", "prepare"],
-        &["build-workers"],
-    ] {
-        run(Command::new(&exe).args(step))?;
+    for step in steps {
+        run(Command::new(&exe).args(*step))?;
     }
     Ok(())
 }
 
-/// The opt-in nightly `std::simd` path of the HEVC decoder must decode exactly as
-/// the scalar default does (the conformance tests compare both with FFmpeg digests).
-fn check_simd(root: &Path) -> Task {
+/// The pinned nightly with clippy, for the opt-in `std::simd` path.
+fn simd_toolchain() -> Task {
     run(Command::new("rustup")
         .args([
             "toolchain",
@@ -990,12 +1009,15 @@ fn check_simd(root: &Path) -> Task {
             "--component",
             "clippy",
         ])
-        .args(harness::gate_build::target_args()?))?;
-    let toolchain = format!("+{NIGHTLY}");
-    let features = "triergon-codec-hevc/simd,codec-worker/simd";
+        .args(harness::gate_build::target_args()?))
+}
+
+/// Clippy over the opt-in nightly `std::simd` path of the HEVC decoder.
+fn simd_lints(root: &Path) -> Task {
+    simd_toolchain()?;
     cargo(
         root,
-        Some(&toolchain),
+        Some(&format!("+{NIGHTLY}")),
         &[
             "clippy",
             "-p",
@@ -1003,17 +1025,23 @@ fn check_simd(root: &Path) -> Task {
             "-p",
             "codec-worker",
             "--features",
-            features,
+            "triergon-codec-hevc/simd,codec-worker/simd",
             "--all-targets",
             "--locked",
             "--",
             "-D",
             "warnings",
         ],
-    )?;
+    )
+}
+
+/// The opt-in nightly `std::simd` path of the HEVC decoder must decode exactly as
+/// the scalar default does (the conformance tests compare both with FFmpeg digests).
+fn simd_tests(root: &Path) -> Task {
+    simd_toolchain()?;
     cargo_for_workers(
         root,
-        Some(&toolchain),
+        Some(&format!("+{NIGHTLY}")),
         &[
             "test",
             "-p",
@@ -1245,113 +1273,178 @@ fn link_order(root: &Path, args: &[String]) -> Task {
     }
 }
 
-fn check(root: &Path) -> Task {
-    cargo(root, None, &["fmt", "--all", "--check"])?;
-    cargo_for_workers(root, None, &["test", "--workspace", "--locked"])?;
-    for package in REFERENCE_TRACE_CRATES {
-        cargo_for_workers(
-            root,
-            None,
-            &[
-                "test",
-                "-p",
-                package,
-                "--features",
-                "reference-trace",
-                "--locked",
-            ],
-        )?;
+/// A part of `cargo xtask check`. CI runs each part as its own job; `check` alone
+/// runs every step of every part, in the order of [`check`].
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Part {
+    /// Formatting, lints, rustdoc, the generated tables and the repository checks.
+    Lint,
+    /// The workspace tests.
+    Test,
+    /// The workspace in its other configurations: the reference-trace tests, the
+    /// release build, the nightly SIMD tests and the core time oracle.
+    Variants,
+    /// The built workers against the references: the worker tests, the required
+    /// feature reports, the fuzz smoke rounds and the trained link orders.
+    Parity,
+}
+
+impl Part {
+    fn named(name: &str) -> Result<Self, String> {
+        match name {
+            "lint" => Ok(Self::Lint),
+            "test" => Ok(Self::Test),
+            "variants" => Ok(Self::Variants),
+            "parity" => Ok(Self::Parity),
+            _ => Err(format!(
+                "{name}: no such part of check (lint, test, variants or parity)\n{USAGE}"
+            )),
+        }
     }
-    cargo(
-        root,
-        None,
-        &[
-            "clippy",
-            "--workspace",
-            "--all-targets",
-            "--locked",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    )?;
-    cargo(
-        root,
-        None,
-        &["check", "--workspace", "--no-default-features", "--locked"],
-    )?;
-    run(Command::new("cargo")
-        .args(["doc", "--workspace", "--no-deps", "--locked"])
-        .env("CARGO_INCREMENTAL", "0")
-        .env("RUSTDOCFLAGS", "-D warnings")
-        .current_dir(root))?;
-    // Workspace feature unification can change the prepared worker binaries.
-    // Keep this build separate from the workers checked against their identities.
-    cargo_for_workers(
-        root,
-        None,
-        &[
-            "build",
-            "--workspace",
-            "--release",
-            "--locked",
-            "--target-dir",
-            "target/check-release",
-        ],
-    )?;
-    for package in REFERENCE_TRACE_CRATES {
+}
+
+type Step = fn(&Path) -> Task;
+
+/// Every step of `check`, in order, with the part it belongs to.
+const CHECK: &[(Part, Step)] = &[
+    (Part::Lint, |root| {
+        cargo(root, None, &["fmt", "--all", "--check"])
+    }),
+    (Part::Test, |root| {
+        cargo_for_workers(root, None, &["test", "--workspace", "--locked"])
+    }),
+    (Part::Variants, |root| {
+        for package in REFERENCE_TRACE_CRATES {
+            cargo_for_workers(
+                root,
+                None,
+                &[
+                    "test",
+                    "-p",
+                    package,
+                    "--features",
+                    "reference-trace",
+                    "--locked",
+                ],
+            )?;
+        }
+        Ok(())
+    }),
+    (Part::Lint, |root| {
         cargo(
             root,
             None,
             &[
                 "clippy",
-                "-p",
-                package,
-                "--features",
-                "reference-trace",
+                "--workspace",
                 "--all-targets",
                 "--locked",
                 "--",
                 "-D",
                 "warnings",
             ],
-        )?;
-        run(Command::new("cargo")
-            .args([
-                "doc",
-                "-p",
-                package,
-                "--features",
-                "reference-trace",
-                "--no-deps",
+        )
+    }),
+    (Part::Lint, |root| {
+        cargo(
+            root,
+            None,
+            &["check", "--workspace", "--no-default-features", "--locked"],
+        )
+    }),
+    (Part::Lint, |root| rustdoc(root, &["--workspace"])),
+    // Workspace feature unification can change the prepared worker binaries.
+    // Keep this build separate from the workers checked against their identities.
+    (Part::Variants, |root| {
+        cargo_for_workers(
+            root,
+            None,
+            &[
+                "build",
+                "--workspace",
+                "--release",
                 "--locked",
-            ])
-            .env("CARGO_INCREMENTAL", "0")
-            .env("RUSTDOCFLAGS", "-D warnings")
-            .current_dir(root))?;
-    }
-    check_simd(root)?;
-    println!("$ cargo xtask worker-tests");
-    worker_tests::run(root, None)?;
+                "--target-dir",
+                "target/check-release",
+            ],
+        )
+    }),
+    (Part::Lint, |root| {
+        for package in REFERENCE_TRACE_CRATES {
+            cargo(
+                root,
+                None,
+                &[
+                    "clippy",
+                    "-p",
+                    package,
+                    "--features",
+                    "reference-trace",
+                    "--all-targets",
+                    "--locked",
+                    "--",
+                    "-D",
+                    "warnings",
+                ],
+            )?;
+            rustdoc(root, &["-p", package, "--features", "reference-trace"])?;
+        }
+        Ok(())
+    }),
+    (Part::Lint, simd_lints),
+    (Part::Variants, simd_tests),
+    (Part::Parity, |root| {
+        println!("$ cargo xtask worker-tests");
+        worker_tests::run(root, None)
+    }),
     // The Unicode and glyph-name tables are what their generators write.
-    println!("$ cargo xtask shape ucd --check");
-    shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
-    println!("$ cargo xtask fonts tables --check");
-    fonts::main(root, &["tables".to_owned(), "--check".to_owned()])?;
-    check_features(root)?;
-    check_safety(root)?;
-    check_design(root)?;
-    check_links(root)?;
-    check_revisions(root)?;
-    println!("$ cargo xtask link-order check");
-    harness::link_training::check(root)?;
-    let mut core_time = Command::new("python3");
-    core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
-    let target = harness::gate_build::worker_target()?;
-    if target != harness::gate_build::host()? {
-        core_time.args(["--target", target]);
+    (Part::Lint, |root| {
+        println!("$ cargo xtask shape ucd --check");
+        shape::main(root, &["ucd".to_owned(), "--check".to_owned()])
+    }),
+    (Part::Lint, |root| {
+        println!("$ cargo xtask fonts tables --check");
+        fonts::main(root, &["tables".to_owned(), "--check".to_owned()])
+    }),
+    (Part::Parity, check_features),
+    (Part::Lint, check_safety),
+    (Part::Lint, check_design),
+    (Part::Lint, check_links),
+    (Part::Lint, check_revisions),
+    (Part::Parity, |root| {
+        println!("$ cargo xtask link-order check");
+        harness::link_training::check(root)
+    }),
+    (Part::Variants, |root| {
+        let mut core_time = Command::new("python3");
+        core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
+        let target = harness::gate_build::worker_target()?;
+        if target != harness::gate_build::host()? {
+            core_time.args(["--target", target]);
+        }
+        run(core_time.current_dir(root))
+    }),
+];
+
+/// Every step of `check`, or those of one part.
+fn check(root: &Path, part: Option<Part>) -> Task {
+    for &(owner, step) in CHECK {
+        if part.is_none_or(|part| part == owner) {
+            step(root)?;
+        }
     }
-    run(core_time.current_dir(root))
+    Ok(())
+}
+
+/// `cargo doc ARGS --no-deps --locked` with warnings denied.
+fn rustdoc(root: &Path, args: &[&str]) -> Task {
+    run(Command::new("cargo")
+        .arg("doc")
+        .args(args)
+        .args(["--no-deps", "--locked"])
+        .env("CARGO_INCREMENTAL", "0")
+        .env("RUSTDOCFLAGS", "-D warnings")
+        .current_dir(root))
 }
 
 #[cfg(test)]
