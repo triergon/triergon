@@ -22,7 +22,7 @@
 //! playback frames access units through `triergon-framing`. FLAC, MPEG audio, Vorbis
 //! and Opus lanes read their file format as a player does, through `AnyReader` and the
 //! session's track decoder, as the reference reads them through its demuxer.
-//! `packets` prints what a container reader emits per packet ([`packets`]).
+//! `packets` prints what a container reader emits per packet.
 #![forbid(unsafe_code)]
 mod aac_access_units;
 mod isobmff_packets;
