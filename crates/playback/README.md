@@ -148,7 +148,9 @@ retained memory is charged to a `triergon_core::Budget`. `Backpressure` is
 retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
 defaults to 16 FIFO slots (at most 64), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
-that use `Player::read_output` with one caller-owned slot.
+that use `Player::read_output` with one caller-owned slot. The player matches
+each engine step where the engine wrote it, so a step without an event moves no
+event-sized value (an MP4 packet event is 640 bytes on 32-bit ARM).
 Transport carrier, section and PES outputs use the budget of their retained
 storage for pool identity.
 

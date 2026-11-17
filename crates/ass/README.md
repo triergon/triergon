@@ -460,14 +460,14 @@ panics.
   the renderer slightly: in 12 cases libass opens the default font file inside
   its span, which the renderer reads before its own, and libass's side copies
   the script inside its span.
-- Measured at `69d4d0f8` on c6g.4xlarge hosts, under the kernel RSS bound,
+- Measured at `eaff16ba` on c6g.4xlarge hosts, under the kernel RSS bound,
   every case is within the runtime ceiling of
   [docs/quality.md](../../docs/quality.md) and lower than libass in peak heap
   and total RSS. On Linux AArch64 the 100 `ass-render` cases have a highest
-  upper bound of 1.0785, peak heap ≤0.9485 and total RSS ≤0.9971. On ARMv7
-  (`thumbv7neon-unknown-linux-gnueabihf`) the highest upper bound is 0.7964
-  for `ass-render` and 0.7293 for `ass-render-host`, with peak heap ≤0.9754
-  and total RSS ≤0.9981 over all 104 cases.
+  upper bound of 1.0256 (`cache-keys-ass-720p`), peak heap ≤0.9485 and total
+  RSS ≤0.9972. On ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`) the highest
+  upper bound is 0.8002 for `ass-render` and 0.7315 for `ass-render-host`,
+  with peak heap ≤0.9754 and total RSS ≤0.9975 over all 104 cases.
   [docs/status.md](../../docs/status.md) names the evidence.
 - `cargo xtask ass equivalence --base REV` renders the `ass-render`
   fixtures at their frames and every 40 ms, mutations of them with varied
