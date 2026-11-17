@@ -183,14 +183,30 @@ fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> R
         return Ok(kind == 17 || pts >= lower);
     }
     let timing = packet.timing;
-    if timing
+    let Some(duration) = timing
         .duration_ticks
         .or(timing.default_duration_ns)
-        .is_none_or(|value| value == 0)
-    {
+        .filter(|&value| value != 0)
+    else {
         // The Block timestamp locates only the first frame in a lace
         // (RFC 9559 §10.3.5). Keep untimed laces and their anchor together.
         return Ok(pts >= lower || timing.frames > 1);
+    };
+    if packet.discard_padding_ns < 0 && timing.frames > 1 {
+        // Leading DiscardPadding covers the whole Block (RFC 9559 §5.1.3.5.7).
+        // Keep the earlier frames of an overlapping lace so the decoder has
+        // their sample counts when applying the trim.
+        let start = timing.source_base_ns()?;
+        let multiplier = if timing.duration_ticks.is_some() {
+            timing.scale_ns
+        } else {
+            u64::from(timing.frames)
+        };
+        let end = i128::from(duration)
+            .checked_mul(i128::from(multiplier))
+            .and_then(|duration| start.checked_add(duration))
+            .ok_or(Error::Overflow)?;
+        return Ok(end > i128::from(lower));
     }
     let duration = packet
         .duration_ns

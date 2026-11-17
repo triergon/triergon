@@ -341,35 +341,45 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
 fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
     const A: &[u8] = b"first";
     const B: &[u8] = b"next!";
-    let audio = element(
-        0xae,
-        &[
-            uint(0xd7, 2),
-            uint(0x73c5, 2),
-            uint(0x83, 2),
-            element(0x86, b"A_OPUS"),
-            element(0xe1, &element(0xb5, &48_000_f64.to_be_bytes())),
-            uint(0x56aa, 6_500_000),
-            uint(0x56bb, 80_000_000),
-        ]
-        .concat(),
-    );
-    let tracks = element(
-        0x1654ae6b,
-        &[track(1, 1, &[]), audio, track(3, 17, &[])].concat(),
-    );
     let second = cluster(2000, simple(1, 0, 0x80, b"target"));
     let cancel = AtomicBool::new(false);
-    for (duration, first_frame) in [
-        (Some(0), 0),
-        (None, 0),
-        (Some(10), 2),
-        (Some(20), 1),
-        (Some(40), 0),
+    for (duration, default_duration, padding, first_frame) in [
+        (Some(0), None, 0_i64, 0),
+        (None, None, 0, 0),
+        (Some(10), None, 0, 2),
+        (Some(20), None, 0, 1),
+        (Some(40), None, 0, 0),
+        (Some(10), None, -5_000_000, 2),
+        (Some(20), None, -15_000_000, 0),
+        (None, Some(10_000_000), -15_000_000, 0),
+        (Some(20), None, 15_000_000, 1),
     ] {
+        let audio = element(
+            0xae,
+            &[
+                uint(0xd7, 2),
+                uint(0x73c5, 2),
+                uint(0x83, 2),
+                element(0x86, b"A_OPUS"),
+                element(0xe1, &element(0xb5, &48_000_f64.to_be_bytes())),
+                uint(0x56aa, 6_500_000),
+                uint(0x56bb, 80_000_000),
+                default_duration
+                    .map(|ns| uint(0x23e383, ns))
+                    .unwrap_or_default(),
+            ]
+            .concat(),
+        );
+        let tracks = element(
+            0x1654ae6b,
+            &[track(1, 1, &[]), audio, track(3, 17, &[])].concat(),
+        );
         let mut block_group = element(0xa1, &[&[0x82, 0x03, 0xde, 4, 1][..], A, B].concat());
         if let Some(duration) = duration {
             block_group.extend(uint(0x9b, duration));
+        }
+        if padding != 0 {
+            block_group.extend(element(0x75a2, &padding.to_be_bytes()));
         }
         let first = cluster(
             1000,
@@ -419,6 +429,7 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
             while let Some(packet) = reader.next_typed_packet(&cancel).unwrap() {
                 let packet = packet.packet;
                 if packet.track == 1 {
+                    assert_eq!(packet.discard_padding_ns, padding);
                     audio_packets.push((
                         packet.timing.frame,
                         packet.timing.duration_ticks,
@@ -436,7 +447,10 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
                 (
                     1,
                     duration,
-                    duration.map(|ticks| start + ticks as i64 * 500_000),
+                    duration
+                        .map(|ticks| ticks * 500_000)
+                        .or(default_duration)
+                        .map(|ns| start + ns as i64),
                     B.to_vec(),
                 ),
             ];
@@ -448,7 +462,7 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
             assert_eq!(
                 audio_packets,
                 expected[first_frame..],
-                "duration {duration:?}, block-start seek {at_block_start}"
+                "duration {duration:?}, default {default_duration:?}, padding {padding}, block-start seek {at_block_start}"
             );
             audio_packets.clear();
         }

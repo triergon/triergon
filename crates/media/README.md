@@ -187,7 +187,8 @@ each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's pac
 clock. `compat::seek::at_block_start` selects complete audio blocks by their start
 in the comparison clock during subtitle seek recovery. The ordinary playback seek
 uses packet overlap and retains untimed laces so their timestamps can be derived
-from the audio.
+from the audio. An overlapping lace with leading discard padding keeps all its
+frames so a decoder can apply the block-wide trim using their sample counts.
 `compat::block_additions` builds readers that admit WebM VP9's implicit
 ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
 projects block additions to the packet side data and HDR10+ events FFmpeg attaches
