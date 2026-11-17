@@ -769,7 +769,14 @@ impl PacketBatchJob {
                         // all subtitle packets in this prefix, including known
                         // ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
-                        let keep = keep_recovery_packet(kind, packet.pts_ns, lower);
+                        // The Block timestamp only locates the first frame in
+                        // a lace (RFC 9559 §10.3.5). Without a positive duration,
+                        // keep the contiguous audio and its first timestamp for
+                        // the caller to recover sample positions.
+                        let keep = keep_recovery_packet(kind, packet.pts_ns, lower)
+                            || (kind == 2
+                                && packet.timing.frames > 1
+                                && matches!(packet.duration_ns, None | Some(0)));
                         if !keep {
                             drop(self.staged.take(self.publish)?);
                             self.publish += 1;

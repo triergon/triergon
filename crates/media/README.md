@@ -160,9 +160,11 @@ symbols and checksum chunks.
 **Seeking.** Requests name a track index (must be video) and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
-replays the whole landing Cluster so interleaved audio before the keyframe is kept;
-when subtitle tracks exist it also recovers earlier subtitle packets that are
-still in range. A cue is checked against the real Cluster, track, timestamp and
+replays the whole landing Cluster so interleaved audio before the keyframe is kept.
+When subtitle tracks are present, the reader also recovers earlier subtitles in
+the replay range. That prefix keeps complete audio laces without a positive
+packet duration, including the first frame's source timestamp.
+A cue is checked against the real Cluster, track, timestamp and
 keyframe; a forged index fails instead of landing elsewhere. The gap after the
 last cue is scanned for uncued keyframes. The `SeekReceipt` reports `actual_ns`,
 `used_index`, `scanned_bytes`, `preroll_ns`, `discard_until_ns` (decode, but do

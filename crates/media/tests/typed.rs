@@ -1,7 +1,8 @@
 //! Runtime contracts for the typed reader.
 #[path = "support/ebml.rs"]
 mod ebml;
-use ebml::{element, mkv, track, uint};
+use ebml::{cluster, element, mkv, simple, track, uint};
+use std::io::Cursor;
 use std::sync::atomic::AtomicBool;
 use triergon_core::Step;
 use triergon_core::{
@@ -9,7 +10,7 @@ use triergon_core::{
 };
 use triergon_matroska::{
     Error, Limits,
-    typed::{Event, Reader},
+    typed::{BlockingReader, Event, Reader},
 };
 
 const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
@@ -334,6 +335,102 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
     assert!(!packets.is_empty());
     assert_eq!(packets[0].packet.track, 1);
     assert_eq!(packets[0].packet.data.as_ref(), b"A");
+}
+
+#[test]
+fn playback_recovery_keeps_audio_laces_without_positive_duration() {
+    const A: &[u8] = b"first";
+    const B: &[u8] = b"next!";
+    let audio = element(
+        0xae,
+        &[
+            uint(0xd7, 2),
+            uint(0x73c5, 2),
+            uint(0x83, 2),
+            element(0x86, b"A_OPUS"),
+            element(0xe1, &element(0xb5, &48_000_f64.to_be_bytes())),
+            uint(0x56aa, 6_500_000),
+            uint(0x56bb, 80_000_000),
+        ]
+        .concat(),
+    );
+    let tracks = element(
+        0x1654ae6b,
+        &[track(1, 1, &[]), audio, track(3, 17, &[])].concat(),
+    );
+    let second = cluster(2000, simple(1, 0, 0x80, b"target"));
+    let cancel = AtomicBool::new(false);
+    for (duration, expected_frames) in [(Some(0), 2), (None, 2), (Some(10), 0)] {
+        let mut block_group = element(0xa1, &[&[0x82, 0x03, 0xde, 4, 1][..], A, B].concat());
+        if let Some(duration) = duration {
+            block_group.extend(uint(0x9b, duration));
+        }
+        let first = cluster(
+            1000,
+            [
+                simple(1, 0, 0x80, b"earlier"),
+                simple(3, 900, 0x80, b"subtitle"),
+                element(0xa0, &block_group),
+            ]
+            .concat(),
+        );
+        let cue = element(
+            0xbb,
+            &[
+                uint(0xb3, 2000),
+                element(
+                    0xb7,
+                    &[
+                        uint(0xf7, 1),
+                        uint(0xf1, (tracks.len() + first.len()) as u64),
+                    ]
+                    .concat(),
+                ),
+            ]
+            .concat(),
+        );
+        let cues = element(0x1c53bb6b, &cue);
+        let raw = mkv(&[tracks.as_slice(), &first, &second, &cues].concat());
+        let mut reader =
+            BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
+        let mut audio_packets = Vec::new();
+        for _ in 0..2 {
+            let landed = reader.seek_for_playback(0, 2_080_000_000, &cancel).unwrap();
+            assert_eq!(landed.actual_ns, 2_000_000_000);
+            assert_eq!(landed.preroll_ns, 80_000_000);
+            assert!(!landed.replays_from_start, "{landed:?}");
+            let mut other_packets = Vec::new();
+            while let Some(packet) = reader.next_typed_packet(&cancel).unwrap() {
+                let packet = packet.packet;
+                if packet.track == 1 {
+                    audio_packets.push((
+                        packet.timing.frame,
+                        packet.timing.duration_ticks,
+                        packet.pts_ns,
+                        packet.data.as_ref().to_vec(),
+                    ));
+                } else {
+                    other_packets.push(packet.data.as_ref().to_vec());
+                }
+            }
+            assert_eq!(other_packets, [b"subtitle".to_vec(), b"target".to_vec()]);
+            assert_eq!(
+                audio_packets.len(),
+                expected_frames,
+                "duration {duration:?}"
+            );
+            if expected_frames != 0 {
+                assert_eq!(
+                    audio_packets.as_slice(),
+                    [
+                        (0, duration, Some(1_983_500_000), A.to_vec()),
+                        (1, duration, duration.map(|_| 1_983_500_000), B.to_vec()),
+                    ],
+                );
+            }
+            audio_packets.clear();
+        }
+    }
 }
 
 #[test]
