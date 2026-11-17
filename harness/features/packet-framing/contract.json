@@ -166,16 +166,6 @@
     {
       "bound": "total_rss",
       "targets": [
-        "aarch64-unknown-linux-gnu"
-      ],
-      "cases": [
-        "avc-bad-update"
-      ],
-      "cause": "The candidate's resident executable text grows from 152 to 216 KiB during the malformed update, where the reference's stays at 320 KiB: median resident pages 443 at entry and 459 at peak against the reference's 450 and 451, at be0eff89 (evidence set framing-bad-update-mappings-be0eff89); 1.0267 at a73350ca."
-    },
-    {
-      "bound": "total_rss",
-      "targets": [
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
       "cases": [
@@ -315,7 +305,7 @@
         "avc-buffering-period-across-flush",
         "avc-header-only-idr"
       ],
-      "cause": "libc's resident code: before main, the Rust runtime's main-thread stack-guard lookup reads /proc/self/maps through glibc's pthread_getattr_np and sscanf, which brings libc's printf and scanf code into the fault-around windows, 15 to 31 more pages of libc than the reference holds at the same load address (4a932ef9); every case above 1.0 at a73350ca, worst 1.0948."
+      "cause": "Before main, the Rust runtime's main-thread stack-guard lookup reads /proc/self/maps through glibc's pthread_getattr_np and sscanf. The resulting faults load 15 to 31 more pages of libc than the reference holds at the same load address (4a932ef9). All 135 cases remain above 1.0 at f6de9851, with avc-header-only-idr highest at 1.0836."
     }
   ]
 }
