@@ -1,0 +1,9 @@
+{
+ "name": "link-order-code-size",
+ "path": "link-order-code-size",
+ "retention": "retained",
+ "reason": "Code size against the trained link order, at 2a6a07a7 and 2b196e9c on c6g.4xlarge hosts (Graviton2) from the gate images, both targets: text sizes and largest functions of the ordered workers, the peak RSS (/usr/bin/time, median of 5 or 7 runs from an evicted page cache) of each link-order training operation for workers linked by the default linker, in their trained orders and built with opt-level s and z, user-mode instruction counts of 2b196e9c against 2a6a07a7 on the same operations, same-code listings of every worker, the per-case total RSS, heap and runtime comparisons of the gate runs cited beside it, and the scripts that made them; for the docs/status.md and docs/quality.md account of what code size recovers",
+ "key": "evidence/link-order-code-size/39ea31fe8e47d1250d407aea7d2c2163bec09d29ee1449373f5e4144078f2834.tar.gz",
+ "sha256": "39ea31fe8e47d1250d407aea7d2c2163bec09d29ee1449373f5e4144078f2834",
+ "bytes": 289323
+}

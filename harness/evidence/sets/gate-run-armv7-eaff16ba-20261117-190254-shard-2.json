@@ -1,0 +1,18 @@
+{
+ "name": "gate-run-armv7-eaff16ba-20261117-190254-shard-2",
+ "path": "gate-run-armv7-eaff16ba-20261117-190254-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at eaff16ba (the generic tile fill's rows stored as whole arrays, on main 2a6a07a7) on two c6g.4xlarge hosts, ARMv7, shard 2 of 2 of the items the rasteriser reaches (ass-render, ass-render-host, font-shape-raster-ass, tests, tests-release), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, graded reports, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/eaff16ba93a73b4a45499eeaa18bc4cba5c6d2c6-armv7-20261117-190254/shard-2/e9aba1e10dcec702793aa07d446d763705ade2cc33e3ea9ed74a02fb5983ee78.tar.zst",
+ "sha256": "e9aba1e10dcec702793aa07d446d763705ade2cc33e3ea9ed74a02fb5983ee78",
+ "bytes": 7200280,
+ "results": [
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "7b0d4597b9a1bf0a51fd59457616560173d35e40565740ba7dcfb6c45f0ec3fc",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

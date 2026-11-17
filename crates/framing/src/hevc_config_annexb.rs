@@ -1,5 +1,6 @@
 //! Complete ordered hvcC NAL framing. Source configuration remains available;
 //! unknown arrays, duplicates and mismatches are never filtered or repaired.
+use crate::annexb::START_CODE;
 use crate::{BuildStep, HvcConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -174,7 +175,7 @@ impl HvcAnnexBWriter {
                         .ok_or(Error::Invalid("missing hvcC framing builder"))?;
                     if self.nal_offset < 4 {
                         out.try_extend_from_slice(
-                            &[0, 0, 0, 1][self.nal_offset..self.nal_offset + count],
+                            &START_CODE[self.nal_offset..self.nal_offset + count],
                         )?;
                     } else {
                         let start = self.nal_offset - 4;
