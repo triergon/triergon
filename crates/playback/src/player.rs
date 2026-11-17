@@ -1202,48 +1202,51 @@ impl<S: Source> Player<S> {
             return Ok(Progress::Yield);
         }
         let engine = self.engine.as_mut().ok_or(Error::Closed)?;
+        // A step is as large as the largest event, an MP4 packet, and most steps are
+        // yields: each engine writes its result in place and the match below moves
+        // only an event out of it, where `?` or a temporary would move every step.
         let step = if let Engine::Matroska(matroska) = engine {
             match matroska.step(w, &self.cancel)? {
                 triergon_matroska::incremental::ParseStep::Event(event) => {
                     let source = engine.source();
                     return self.accept_event::<READY>(source, RawEvent::Matroska(event), w, slot);
                 }
-                step => BackendStep::from_matroska(step),
+                step => Ok(BackendStep::from_matroska(step)),
             }
         } else if let Some(cursor) = cursor {
-            engine.poll_mp4_range(cursor, w, &self.cancel)?
+            engine.poll_mp4_range(cursor, w, &self.cancel)
         } else {
-            let step = engine.poll(w, &self.cancel);
-            let skipped = engine.take_suppressed_events();
-            if skipped != 0 {
-                let events = self.events.checked_add(skipped).ok_or(Error::Overflow)?;
-                Self::check_event_limit(events, self.policy.maximum_events)?;
-                self.events = events;
-            }
-            step?
+            engine.poll(w, &self.cancel)
         };
+        let skipped = engine.take_suppressed_events();
+        if skipped != 0 {
+            let events = self.events.checked_add(skipped).ok_or(Error::Overflow)?;
+            Self::check_event_limit(events, self.policy.maximum_events)?;
+            self.events = events;
+        }
         match step {
-            BackendStep::Event(event) => {
+            Ok(BackendStep::Event(event)) => {
                 let source = engine.source();
                 self.accept_event::<READY>(source, event, w, slot)
             }
-            BackendStep::NeedInput(r) => {
+            Ok(BackendStep::NeedInput(r)) => {
                 self.request = Some(r.clone());
                 Ok(Progress::NeedInput(r))
             }
-            BackendStep::Yield => Ok(Progress::Yield),
-            BackendStep::AwaitEntity => Ok(Progress::AwaitEntity),
-            BackendStep::End => {
+            Ok(BackendStep::Yield) => Ok(Progress::Yield),
+            Ok(BackendStep::AwaitEntity) => Ok(Progress::AwaitEntity),
+            Ok(BackendStep::End) => {
                 self.state = State::Ended;
                 Ok(Progress::Ended)
             }
-            BackendStep::Backpressure {
+            Ok(BackendStep::Backpressure {
                 requested,
                 available,
-            } => Ok(Progress::Backpressure {
+            }) => Ok(Progress::Backpressure {
                 requested,
                 available,
             }),
+            Err(error) => Err(error),
         }
     }
 
