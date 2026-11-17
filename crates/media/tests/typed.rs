@@ -338,7 +338,7 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
 }
 
 #[test]
-fn playback_recovery_keeps_audio_laces_without_positive_duration() {
+fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
     const A: &[u8] = b"first";
     const B: &[u8] = b"next!";
     let audio = element(
@@ -360,7 +360,13 @@ fn playback_recovery_keeps_audio_laces_without_positive_duration() {
     );
     let second = cluster(2000, simple(1, 0, 0x80, b"target"));
     let cancel = AtomicBool::new(false);
-    for (duration, expected_frames) in [(Some(0), 2), (None, 2), (Some(10), 0)] {
+    for (duration, first_frame) in [
+        (Some(0), 0),
+        (None, 0),
+        (Some(10), 2),
+        (Some(20), 1),
+        (Some(40), 0),
+    ] {
         let mut block_group = element(0xa1, &[&[0x82, 0x03, 0xde, 4, 1][..], A, B].concat());
         if let Some(duration) = duration {
             block_group.extend(uint(0x9b, duration));
@@ -414,20 +420,21 @@ fn playback_recovery_keeps_audio_laces_without_positive_duration() {
                 }
             }
             assert_eq!(other_packets, [b"subtitle".to_vec(), b"target".to_vec()]);
+            let start = 1_983_500_000;
+            let expected = [
+                (0, duration, Some(start), A.to_vec()),
+                (
+                    1,
+                    duration,
+                    duration.map(|ticks| start + ticks as i64 * 500_000),
+                    B.to_vec(),
+                ),
+            ];
             assert_eq!(
-                audio_packets.len(),
-                expected_frames,
+                audio_packets,
+                expected[first_frame..],
                 "duration {duration:?}"
             );
-            if expected_frames != 0 {
-                assert_eq!(
-                    audio_packets.as_slice(),
-                    [
-                        (0, duration, Some(1_983_500_000), A.to_vec()),
-                        (1, duration, duration.map(|_| 1_983_500_000), B.to_vec()),
-                    ],
-                );
-            }
             audio_packets.clear();
         }
     }

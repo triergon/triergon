@@ -301,7 +301,7 @@ impl SimplePacketJob {
             if let Some(lower) = prefix {
                 let packet = self.staged.as_ref().required("missing staged packet")?;
                 let kind = self.configuration(borrowed)?.tracks()[packet.track].kind;
-                if !keep_recovery_packet(kind, packet.pts_ns, lower) {
+                if !keep_recovery_packet(kind, packet, lower) {
                     self.staged = None;
                     self.phase = SimplePhase::Done;
                     check(cancel)?;

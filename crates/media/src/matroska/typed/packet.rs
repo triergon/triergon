@@ -158,8 +158,20 @@ fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
     }
     Ok(())
 }
-fn keep_recovery_packet(kind: u64, pts: Option<i64>, lower: i64) -> bool {
-    kind == 17 || pts.is_none_or(|pts| pts >= lower)
+fn keep_recovery_packet(kind: u64, packet: &Packet, lower: i64) -> bool {
+    let Some(pts) = packet.pts_ns else {
+        return true;
+    };
+    kind == 17
+        || pts >= lower
+        || (kind == 2
+            && match packet.duration_ns {
+                // A Block timestamp only locates the first frame in a lace
+                // (RFC 9559 §10.3.5). Leave untimed contiguous audio and its
+                // anchor for the caller to recover the sample positions.
+                None | Some(0) => packet.timing.frames > 1,
+                Some(duration) => i128::from(pts) + i128::from(duration) > i128::from(lower),
+            })
 }
 
 #[derive(Clone, Debug)]
@@ -769,14 +781,7 @@ impl PacketBatchJob {
                         // all subtitle packets in this prefix, including known
                         // ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
-                        // The Block timestamp only locates the first frame in
-                        // a lace (RFC 9559 §10.3.5). Without a positive duration,
-                        // keep the contiguous audio and its first timestamp for
-                        // the caller to recover sample positions.
-                        let keep = keep_recovery_packet(kind, packet.pts_ns, lower)
-                            || (kind == 2
-                                && packet.timing.frames > 1
-                                && matches!(packet.duration_ns, None | Some(0)));
+                        let keep = keep_recovery_packet(kind, packet, lower);
                         if !keep {
                             drop(self.staged.take(self.publish)?);
                             self.publish += 1;

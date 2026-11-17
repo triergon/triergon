@@ -162,8 +162,8 @@ nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
 replays the whole landing Cluster so interleaved audio before the keyframe is kept.
 When subtitle tracks are present, the reader also recovers earlier subtitles in
-the replay range. That prefix keeps complete audio laces without a positive
-packet duration, including the first frame's source timestamp.
+the replay range. That prefix keeps timed audio that overlaps the replay cutoff
+and complete audio laces without a positive packet duration.
 A cue is checked against the real Cluster, track, timestamp and
 keyframe; a forged index fails instead of landing elsewhere. The gap after the
 last cue is scanned for uncued keyframes. The `SeekReceipt` reports `actual_ns`,
