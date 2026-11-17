@@ -125,6 +125,23 @@ measurements, and `closing-run-ratios-1c64b775` every timed case's paired median
 bounds, the cases with a bound above 1.05, and per feature and target the worst runtime,
 heap and total RSS bounds. The rows above keep the revisions they name.
 
+At `2b196e9c`, which keeps `Time`'s 256-bit fallbacks out of line, one more full sharded gate
+run per target was measured the same way. It measured every item again but the capture
+cases' timing, which it reused from `1c64b775`: the change leaves the capture worker byte
+for byte unchanged, as it does the ASS, font, packet framing, rasterising and shaping
+workers. On Linux AArch64 the grades of `ass-render-host`, `subtitle-dvd-host` and
+`subtitle-text-host` fail, each only on its contract's listed open cases; no grade fails
+on ARMv7. The capture memory steps fail on both targets without measuring:
+`capture qualify --stage memory` reads the records of its timing step, and a reused timing
+step writes none. No runtime or memory bound crosses its limit; per feature,
+the median change of the case medians against `1c64b775` lies within −1.6% and +1.9%
+(+8.1% for the five `subtitle-dvd-host` cases, whose operations take microseconds), as do
+the features whose workers are unchanged, and the changed workers' user-mode instruction
+counts on the link-order training operations are within 0.05% of `2a6a07a7`'s. Sets
+`gate-run-aarch64-2b196e9c-20261117-192110-shard-1` to `-8` and
+`gate-run-armv7-2b196e9c-20261117-192033-shard-1` to `-8` hold the shards' outputs, and
+`link-order-code-size` the instruction counts and the per-feature comparisons.
+
 The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
 legacy AAC-LC, MP4 forward and range, TS program, MPEG-TS progressive playback and raw
 Annex B) come from one partial gate run per target of the nine items whose workers link
@@ -800,6 +817,27 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Ceiling gate run, ARMv7, shard 8 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`f1f605eb8482b8d0bdaa3e5219b417e61739ba1cdf00c82abdde7f940ce39561`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-8.json) |
 | Ceiling run's AAC in MOV, ARMv7 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`5c39ee676cf55ec28958f97ddde6a6246c0a331e93ad10f8c3156471013f6056`](../harness/evidence/sets/aac-access-units-1c64b775-armv7.json) |
 | Per-case runtime ratios of the ceiling gate runs and AAC in MOV, both targets | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`3fa6a4bb337c9d4a8931582f73f714b6d3d3a8d910430e1b7ec14cd5d7513131`](../harness/evidence/sets/closing-run-ratios-1c64b775.json) |
+| Code-size gate run, Linux AArch64, shard 1 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`dec8229f2f41eaffe5cd5d4110d5306f3418ac8b4842cd6b764a3100b14b01dd`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-1.json) |
+| Code-size gate run, Linux AArch64, shard 2 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`d486987aeabfedbe7ed61ae3b347d8859f021cae83bd5c0be951bad1d0100ca9`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-2.json) |
+| Code-size gate run, Linux AArch64, shard 3 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`7bfaefc0df192c120f1ccc531ad77691ac112e0ee2171735ce53e60fa811273a`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-3.json) |
+| Code-size gate run, Linux AArch64, shard 4 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`b1b480fd6d66a2adca83874b2176fc70d84eb7e04edf8ec9bc6cd9fca4bbdb6f`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-4.json) |
+| Code-size gate run, Linux AArch64, shard 5 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`3ece32ad060ae9518974c255fdbf466a6aba26ec4bdaf0ebf20cda25e679e2f9`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-5.json) |
+| Code-size gate run, Linux AArch64, shard 6 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`64d267f51a12827ccfbc5eb4e23bfab72890d5b3cfffa4475d6a524b0552f196`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-6.json) |
+| Code-size gate run, Linux AArch64, shard 7 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`a106230d2c951bc7d27d03c5b3163f3dd6614f382a8201c1389ca42b43537e0d`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-7.json) |
+| Code-size gate run, Linux AArch64, shard 8 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`e9ad8b02bad07b86c41b02204b3c28a66f21ad8a581dc0a6bea2fea2caa3161b`](../harness/evidence/sets/gate-run-aarch64-2b196e9c-20261117-192110-shard-8.json) |
+| Code-size gate run, ARMv7, shard 1 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`d15127d61f8848c1b3b89dbc2e7745dc0107556539bb83e0bdbfe2087b8f94c8`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-1.json) |
+| Code-size gate run, ARMv7, shard 2 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`84489028480912bdba965a2a33a3972b0e9c0bc7e16f593af9b7ffbf293cfffc`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-2.json) |
+| Code-size gate run, ARMv7, shard 3 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`63fb39c1c8422e3ecce943638dddad69895314762c62ad1a3b2c0084905926b3`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-3.json) |
+| Code-size gate run, ARMv7, shard 4 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`538bd6c347b76aae54a60f85783f40720f149e31ae5a2c22c532ff1f025d2559`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-4.json) |
+| Code-size gate run, ARMv7, shard 5 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`f6f3ac9d66a7a42c271a8b482d05773a413ca44cdf245422b4f07372e94e0392`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-5.json) |
+| Code-size gate run, ARMv7, shard 6 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`200b7139822f8fc9edccf0efb5dd5d5cf1ed4488bdfef90b5a96d3c6e072180e`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-6.json) |
+| Code-size gate run, ARMv7, shard 7 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`421106aa25e7b3ab431fcafd27a0099711f5f6f1c1f6ac8692015dca9fb59cfa`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-7.json) |
+| Code-size gate run, ARMv7, shard 8 of 8 | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`f2f78eb52b940ea67cf87b8ae185327614e3df5cf1c1477a03526380f571cfd8`](../harness/evidence/sets/gate-run-armv7-2b196e9c-20261117-192033-shard-8.json) |
+| Ordered workers without their trained orders, Linux AArch64 | `e21f800e152edda037157d121512988f0184d5f3` | [`f92932325ff24c751c92992084d4eb60b60169daa6ae4c2988045f226ef3add3`](../harness/evidence/sets/gate-run-aarch64-e21f800e-20261117-184759-shard-1.json) |
+| Ordered workers without their trained orders, ARMv7 | `e21f800e152edda037157d121512988f0184d5f3` | [`f6694d99b2beec8bd4696c7da415512e5d9a016ba69153151cf21d83a60ed701`](../harness/evidence/sets/gate-run-armv7-e21f800e-20261117-184730-shard-1.json) |
+| Ordered workers without their trained orders after the code-size change, Linux AArch64 | `d18904f950fee2d00da37901cf9d36b6cf9d46a6` | [`8d2cfccfd6f0cffe114bc7b9990264ec592a247ea432937a4ad1d919349afdcc`](../harness/evidence/sets/gate-run-aarch64-d18904f9-20261117-192309-shard-1.json) |
+| Ordered workers without their trained orders after the code-size change, ARMv7 | `d18904f950fee2d00da37901cf9d36b6cf9d46a6` | [`f1d1cc8dabc6cfec0d885ba7e779b2501f9620fda5f43783a58698fd69e6faf6`](../harness/evidence/sets/gate-run-armv7-d18904f9-20261117-192245-shard-1.json) |
+| Code size against the trained orders: sizes, resident probes, instruction counts and per-case comparisons, both targets | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`39ea31fe8e47d1250d407aea7d2c2163bec09d29ee1449373f5e4144078f2834`](../harness/evidence/sets/link-order-code-size.json) |
 | Packet framing, Linux AArch64 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`457b9b996902aa4b5b51bc40497ffc6d02404b890f2dd3d370f1654af49fc796`](../harness/evidence/sets/gate-run-aarch64-384de6c9-20261117-193302-shard-1.json) |
 | Packet framing, ARMv7 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170`](../harness/evidence/sets/gate-run-armv7-384de6c9-20261117-193351-shard-1.json) |
 | Earlier: Packet framing, Linux AArch64 | `d79071d48bc45ca5f66a922849daa15ad5a02d1c` | [`f34c5dcfd258842207b7579e0035f40e099910851ebf5814e966e1db0038a211`](../harness/evidence/sets/gate-run-aarch64-d79071d4-20261116-204903-shard-1.json) |
@@ -1554,12 +1592,27 @@ worker's code is resident is set by where the functions an operation runs lie am
 about 250 KB of the playback worker's code, which module order spreads over most of its
 windows. The media, playback, Matroska playback and transport workers link with `lld`
 in their trained orders ([quality](quality.md#measuring-performance)), which keep the
-functions the training corpus runs together. Against main's builds, linked by the
-toolchain's default linker on the same images, MP4 forward's total RSS bound falls from 1.0856 (0/46 lower) at `7c4057c5`
-to 0.9911 (46/46 lower) at `6dc6440d`, MP4 range's from 1.0742 (0/51 lower) to 0.9173
-(51/51 lower), and the six Matroska feature groups' from 1.0464 (110/115 lower) at
-`f71495ea` to 0.9498 (115/115 lower) at `d2c391b8`, whose media worker `6dc6440d`
-keeps byte for byte.
+functions the training corpus runs together. Linked by the toolchain's default linker
+instead, at `e21f800e` (`2a6a07a7` with every trained order removed) on the same images,
+whose ordered results are those of `1c64b775` with the same workers, MP4 forward's total
+RSS bound rises from 0.9893 (51/51 lower) to 1.1158 (0/51), MP4 range's from 0.9233
+(64/64) to 1.0920 (0/64), Matroska demux's from 0.9045 (12/12) to 1.0209 (10/12), Matroska
+zlib's from 0.9450 (10/10) to 1.0110 (8/10) and Matroska legacy AAC's from 0.9555 (4/4) to
+1.0172 (0/4); on Linux AArch64 packet framing's rises from 1.0290 (134/135) to 1.0469
+(0/135), and every other item stays lower. The median case of an item holds 88 to 672 KiB
+more on ARMv7, and 92 to 608 KiB more on Linux AArch64, without its order.
+
+Making the workers smaller does not close this. The functions the training corpus runs lie
+in every 64 KiB window of each ordered worker's code (11 of the media worker's 11 on
+ARMv7, 22 of the playback worker's 23), and packed they fill 6 and 16. Built with
+`opt-level = "s"` or `"z"` and linked without their orders, the ordered workers' images
+are 12 to 23% smaller, and the median training operation of each worker and target
+recovers 21 to 64% of the peak resident memory its order saves, some none. At `2b196e9c`,
+whose 256-bit time arithmetic is out of line, the ARMv7 playback worker's code is 2.1%
+smaller and its unordered MP4 cases hold a median of 104 to 118 KiB less; linked without
+the orders at `d18904f9`, MP4 forward (1.0581, 0/51 lower), MP4 range (1.0548, 1/64),
+Matroska demux (10/12) and legacy AAC (0/4) still fail on ARMv7, and packet framing
+(1.0493, 0/135) on Linux AArch64.
 
 At `79e0ae13` packet framing's total RSS is lower than the reference's in all 125 cases
 (worst 0.9972). At `4a932ef9` it was lower in 73, with a worst bound of
