@@ -158,20 +158,63 @@ fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
     }
     Ok(())
 }
-fn keep_recovery_packet(kind: u64, packet: &Packet, lower: i64) -> bool {
+fn keep_recovery_packet(kind: u64, packet: &Packet, lower: i64) -> Result<bool> {
     let Some(pts) = packet.pts_ns else {
-        return true;
+        return Ok(true);
     };
-    kind == 17
-        || pts >= lower
-        || (kind == 2
-            && match packet.duration_ns {
-                // A Block timestamp only locates the first frame in a lace
-                // (RFC 9559 §10.3.5). Leave untimed contiguous audio and its
-                // anchor for the caller to recover the sample positions.
-                None | Some(0) => packet.timing.frames > 1,
-                Some(duration) => i128::from(pts) + i128::from(duration) > i128::from(lower),
-            })
+    if kind != 2 {
+        return Ok(kind == 17 || pts >= lower);
+    }
+    let timing = packet.timing;
+    if timing
+        .duration_ticks
+        .or(timing.default_duration_ns)
+        .is_none_or(|value| value == 0)
+    {
+        // The Block timestamp locates only the first frame in a lace
+        // (RFC 9559 §10.3.5). Keep untimed laces and their anchor together.
+        return Ok(pts >= lower || timing.frames > 1);
+    }
+    let duration = packet
+        .duration_ns
+        .required("missing timed audio duration")?;
+    let rounded_delta = i128::from(pts) + i128::from(duration) - i128::from(lower);
+    // Rounding the start and duration can move their sum by up to 1 ns.
+    if !(0..=1).contains(&rounded_delta) {
+        return Ok(rounded_delta > 0);
+    }
+    let source = timing.source()?;
+    let pts = source.pts.required("missing timed audio start")?;
+    let duration = source.duration.required("missing timed audio duration")?;
+    let end = Time::new(pts.numerator(), u128::from(pts.denominator()))?.checked_add(Time::new(
+        duration.numerator(),
+        u128::from(duration.denominator()),
+    )?)?;
+    Ok(end > Time::new(i128::from(lower), 1)?)
+}
+
+#[cfg(test)]
+#[test]
+fn recovery_uses_the_exact_end_of_a_fractional_audio_lace() {
+    let timing = BlockTiming {
+        timestamp_ticks: 0,
+        scale_ns: 1,
+        codec_delay_ns: 0,
+        default_duration_ns: None,
+        duration_ticks: Some(40_000_001),
+        frame: 1,
+        frames: 2,
+    };
+    let packet = super::super::PacketFields::new(0, timing, true, 0)
+        .unwrap()
+        .finish(PacketData {
+            storage: SharedBytes::default(),
+            range: 0..0,
+        });
+    assert_eq!(packet.pts_ns, Some(20_000_001));
+    assert_eq!(packet.duration_ns, Some(20_000_001));
+    assert!(!keep_recovery_packet(2, &packet, 40_000_001).unwrap());
+    assert!(keep_recovery_packet(2, &packet, 40_000_000).unwrap());
 }
 
 #[derive(Clone, Debug)]
@@ -781,7 +824,7 @@ impl PacketBatchJob {
                         // all subtitle packets in this prefix, including known
                         // ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
-                        let keep = keep_recovery_packet(kind, packet, lower);
+                        let keep = keep_recovery_packet(kind, packet, lower)?;
                         if !keep {
                             drop(self.staged.take(self.publish)?);
                             self.publish += 1;
