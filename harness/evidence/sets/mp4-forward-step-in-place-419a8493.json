@@ -1,0 +1,9 @@
+{
+ "name": "mp4-forward-step-in-place-419a8493",
+ "path": "mp4-forward-step-in-place-419a8493",
+ "retention": "retained",
+ "reason": "Cause and counts of the player's in-place engine step, one c6g.4xlarge host (Graviton2) per target from the gate images: on 32-bit ARMv7, perf stat user-mode instructions and cycles per operation of the gate build of playback-worker at main 2a6a07a7 and at 419a8493 and of the ffmpeg-formats reference on mp4-forward progressive-ten-sequential-batches, progressive-f-explicit and progressive-pending-pair, perf records of all three with symbol reports, and the callers of memcpy and the integer division routines by sampled link register; whole-process counts at main and at the change of the MP4 forward, Matroska legacy AAC and audio clock, raw Annex B and progressive TS cases on both targets, with digests; trace identities of playback-worker and playback-matroska-worker at main and at the change; the gate run at 419a8493 per feature against closing-run-ratios-1c64b775; binaries' SHA-256, toolchain and host details; cited by docs/status.md for the ARMv7 timing of progressive-ten-sequential-batches.",
+ "key": "evidence/mp4-forward-step-in-place-419a8493/96aeea926560974d0ce1cd531021888aa5c84fd9c2ebfbefa8d6038d5cfa64ed.tar.gz",
+ "sha256": "96aeea926560974d0ce1cd531021888aa5c84fd9c2ebfbefa8d6038d5cfa64ed",
+ "bytes": 247846
+}
