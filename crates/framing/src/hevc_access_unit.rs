@@ -1,12 +1,11 @@
 //! A four-byte-start-code HEVC feed over complete length-prefixed samples.
+use crate::annexb::START_CODE;
 use crate::{
     AvcAnnexBLimits, BuildStep, Codec, HvcConfigNal, HvcConfiguration, NalHeader,
     split_length_prefixed,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
-
-const START_CODE: &[u8; 4] = &[0, 0, 0, 1];
 
 /// The NAL count bounds the sample. The output byte bound includes prepended
 /// parameter sets from the separately bounded configuration record.

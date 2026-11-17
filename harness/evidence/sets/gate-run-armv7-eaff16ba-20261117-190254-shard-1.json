@@ -1,0 +1,64 @@
+{
+ "name": "gate-run-armv7-eaff16ba-20261117-190254-shard-1",
+ "path": "gate-run-armv7-eaff16ba-20261117-190254-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at eaff16ba (the generic tile fill's rows stored as whole arrays, on main 2a6a07a7) on two c6g.4xlarge hosts, ARMv7, shard 1 of 2 of the items the rasteriser reaches (ass-render, ass-render-host, font-shape-raster-ass, tests, tests-release), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker by stable: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, graded reports, gate results); cited by docs/status.md.",
+ "key": "evidence/gate-runs/eaff16ba93a73b4a45499eeaa18bc4cba5c6d2c6-armv7-20261117-190254/shard-1/eccc19b86a4bc99d8fca9306ccc1555fdced1cd8150acc75b0aabd0b7c3432a4.tar.zst",
+ "sha256": "eccc19b86a4bc99d8fca9306ccc1555fdced1cd8150acc75b0aabd0b7c3432a4",
+ "bytes": 21996487,
+ "results": [
+  {
+   "path": "memory/ass-render-host/gate-result.json",
+   "command": "report --memory",
+   "key": "dfa264a2242e416db51febd1236b9265620346d66577799e30944f447c368880",
+   "status": 0,
+   "report_sha256": "1bc1282f3a1d43445b953c8044814533ab924ceae20616bbe52acee10d6037bf",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ass-render/gate-result.json",
+   "command": "report --memory",
+   "key": "bd79e5514123d99ead5a8b3976aa140d41f22df92df44197f3e58eff2084991b",
+   "status": 0,
+   "report_sha256": "51949b73b5ec90f6c4d02a12bd71c744d0968479ef6ba33f96905d1b3c00fa86",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "51983e00a8ca3ee7f2901e1e9edba2b58141f0c2314fea0a7cdcb222b83482b2",
+   "status": 0,
+   "report_sha256": "34f8ce6335e12dc26c064ddcf73115fbd89bbe205def21f4f85ac5ed2cfd7409",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c303e9c69a5536d7262e54f855ce0f0a02f0ad6383d705015211fe320c0457fc",
+   "status": 0,
+   "report_sha256": "a01387e78bf682bba884394edc15248733a77b976761e4f6bd2b949e79259614",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/ass-render-host/gate-result.json",
+   "command": "grade",
+   "key": "808dc434a39156c8f4fc6f640c354184d014ad51e7942df343d0d60bf54af1d4",
+   "status": 0,
+   "report_sha256": "7869ae3d730c49b6b7a5821f5d02ce47c665014fd9b4df3810b747f32e8152c8"
+  },
+  {
+   "path": "graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "f3250b849f392ad2b91563d090285db4766d8956caea0daa8778e19466ca8ab1",
+   "status": 0,
+   "report_sha256": "2088ab2e3d19e465f139bfa4560659bb90f1ac09412bcd2d528c22a99ed3e5c4"
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "7632150dde18704cefd8c827b106c4603e9baf2ad12d549284e43e1dcbfb3bb3",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

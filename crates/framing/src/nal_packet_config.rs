@@ -1,6 +1,7 @@
 //! Bounded initialization-extradata view of the same pinned packet receiver.
 use crate::nal_packet::{
-    NalConfigurationRefusal, copy_annex_b_segment, freeze_annex_b_output, reserve_annex_b_output,
+    NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, freeze_annex_b_output,
+    start_annex_b_output,
 };
 use crate::{AvcConfigArrayKind, BuildStep, NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,9 +52,23 @@ impl NalPacketConfigRejection {
         -1_094_995_529
     }
 }
+#[derive(Clone, Copy)]
+enum Phase {
+    /// Admit the HEVC decoder arrays.
+    Arrays,
+    /// Size the output, NAL by NAL or from the record's validated extent.
+    Size,
+    /// Charge and allocate the output.
+    Reserve,
+    /// Copy the start codes and NAL payloads.
+    Copy,
+    /// Publish the output.
+    Publish,
+    /// Published: every later step reports completion.
+    Complete,
+}
+
 pub struct NalPacketConfigWriter<'a> {
-    // A pool's limit is immutable; the output vector holds the pool handle.
-    pool_limit: usize,
     config: &'a NalPacketConfiguration,
     length_prefixed: bool,
     output: Option<BudgetVec<u8>>,
@@ -62,7 +77,7 @@ pub struct NalPacketConfigWriter<'a> {
     array: usize,
     index: usize,
     copied: usize,
-    phase: u8,
+    phase: Phase,
     failure: Option<Error>,
     rejected_array: Option<u8>,
     rejection_taken: bool,
@@ -77,16 +92,15 @@ impl<'a> NalPacketConfigWriter<'a> {
             return Err(Error::ForeignPool);
         }
         Ok(Self {
-            pool_limit: pool.limit(),
             config: configuration,
             length_prefixed: configuration.width().is_some(),
-            output: Some(BudgetVec::new(pool)),
+            output: None,
             maximum: maximum_output_bytes,
             total: 0,
             array: 0,
             index: 0,
             copied: 0,
-            phase: 0,
+            phase: Phase::Arrays,
             failure: None,
             rejected_array: None,
             rejection_taken: false,
@@ -152,15 +166,15 @@ impl<'a> NalPacketConfigWriter<'a> {
                 return Err(Error::Cancelled);
             }
             match self.phase {
-                0 => match self.config.admit_hevc_arrays(&mut self.array, work) {
-                    Ok(true) => self.phase = 1,
+                Phase::Arrays => match self.config.admit_hevc_arrays(&mut self.array, work) {
+                    Ok(true) => self.phase = Phase::Size,
                     Ok(false) => return Ok(BuildStep::Yield),
                     Err(declared) => {
                         self.rejected_array = Some(declared);
                         return Err(Error::Unsupported("pinned HEVC decoder array type"));
                     }
                 },
-                1 => {
+                Phase::Size => {
                     // A successful full sizing pass can use the validated extent.
                     // Keep the incremental walk for short work budgets and to
                     // report the first NAL that crosses the output limit.
@@ -170,7 +184,7 @@ impl<'a> NalPacketConfigWriter<'a> {
                         && work.try_charge(charge)
                     {
                         self.total = len;
-                        self.phase = 2;
+                        self.phase = Phase::Reserve;
                         continue;
                     }
                     if !work.try_charge(1) {
@@ -195,41 +209,49 @@ impl<'a> NalPacketConfigWriter<'a> {
                         }
                         self.index += 1;
                     } else {
-                        self.phase = 2;
+                        self.phase = Phase::Reserve;
                         self.index = 0;
                     }
                 }
-                2 => {
+                Phase::Reserve => {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    reserve_annex_b_output(
-                        self.output
-                            .as_mut()
-                            .ok_or(Error::Invalid("missing config output"))?,
+                    self.output = Some(start_annex_b_output(
+                        self.config.bytes().budget(),
                         self.total,
-                        self.pool_limit,
-                    )?;
-                    self.phase = 3;
+                    )?);
+                    self.phase = Phase::Copy;
                 }
-                3 => {
+                Phase::Copy => {
+                    let output = self
+                        .output
+                        .as_mut()
+                        .ok_or(Error::Invalid("missing config output"))?;
+                    let (config, length_prefixed) = (self.config, self.length_prefixed);
+                    if self.index == 0 && self.copied == 0 {
+                        let entries = if length_prefixed {
+                            config.config_nal_count()
+                        } else {
+                            1
+                        };
+                        let copies = (0..)
+                            .map_while(|index| Self::nal(config, length_prefixed, index))
+                            .filter(|&(selected, ..)| selected)
+                            .map(|(_, payload, prefix)| Ok((prefix, payload)));
+                        if copy_annex_b_whole(output, self.total, entries, copies, work, cancel)? {
+                            self.phase = Phase::Publish;
+                            continue;
+                        }
+                    }
                     let Some((selected, b, prefix)) =
-                        Self::nal(self.config, self.length_prefixed, self.index)
+                        Self::nal(config, length_prefixed, self.index)
                     else {
-                        self.phase = 4;
+                        self.phase = Phase::Publish;
                         continue;
                     };
                     if selected
-                        && !copy_annex_b_segment(
-                            prefix,
-                            b,
-                            self.output
-                                .as_mut()
-                                .ok_or(Error::Invalid("missing config output"))?,
-                            &mut self.copied,
-                            work,
-                            cancel,
-                        )?
+                        && !copy_annex_b_segment(prefix, b, output, &mut self.copied, work, cancel)?
                     {
                         return Ok(BuildStep::Yield);
                     }
@@ -239,19 +261,19 @@ impl<'a> NalPacketConfigWriter<'a> {
                     self.index += 1;
                     self.copied = 0;
                 }
-                4 => {
+                Phase::Publish => {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
                     let bytes = freeze_annex_b_output(&mut self.output, "missing config output")?;
-                    self.phase = 5;
+                    self.phase = Phase::Complete;
                     return Ok(BuildStep::Ready(NalPacketConfigOutput {
                         bytes,
                         source: self.config.bytes().clone(),
                         source_refusal: self.config.refusal(),
                     }));
                 }
-                _ => return Ok(BuildStep::Complete),
+                Phase::Complete => return Ok(BuildStep::Complete),
             }
         }
     }

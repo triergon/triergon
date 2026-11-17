@@ -1,12 +1,11 @@
 //! A four-byte-start-code AVC feed, over complete length-prefixed samples.
+use crate::annexb::START_CODE;
 use crate::{
     AvcConfigArrayKind, AvcConfigNal, AvcConfiguration, BuildStep, Codec, NalHeader,
     split_length_prefixed,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
-
-const START_CODE: &[u8; 4] = &[0, 0, 0, 1];
 
 /// Holds one bounded record. A random-access feed uses its SPS and PPS arrays.
 pub struct AvcAnnexBConfig {
@@ -137,7 +136,7 @@ impl<'a> Iterator for AnnexBSegments<'a> {
             nal
         };
         self.pending_payload = Some(payload);
-        Some(START_CODE)
+        Some(&START_CODE)
     }
 }
 
