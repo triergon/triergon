@@ -184,7 +184,11 @@ incomplete/zero primaries); values that cannot fit return `Overflow`.
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
 each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's packet
-clock. `compat::block_additions` builds readers that admit WebM VP9's implicit
+clock. `compat::seek::at_block_start` selects complete audio blocks by their start
+in the comparison clock during subtitle seek recovery. The ordinary playback seek
+uses packet overlap and retains untimed laces so their timestamps can be derived
+from the audio.
+`compat::block_additions` builds readers that admit WebM VP9's implicit
 ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
 projects block additions to the packet side data and HDR10+ events FFmpeg attaches
 to packets. Comparison-only projections (`Colour::trace_fields`) are compiled only

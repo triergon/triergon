@@ -900,7 +900,16 @@ fn seek_plan_uses_all_track_preroll_negative_floor_and_keeps_extreme_unselected_
         codec_state: 0,
     };
     let cues = [cue(0, 1, 100), cue(u64::MAX, 1, 200), cue(u64::MAX, 2, 300)];
-    let mut plan = seek::SeekPlanJob::new(config.unwrap(), 0, 0, true, 3, 100).unwrap();
+    let mut plan = seek::SeekPlanJob::new(
+        config.unwrap(),
+        0,
+        0,
+        true,
+        3,
+        100,
+        seek::RecoveryAudio::Overlap,
+    )
+    .unwrap();
     let mut result = None;
     for _ in 0..1000 {
         match plan
@@ -1068,6 +1077,50 @@ fn blocking_feeder_retries_freeze_without_reading_again_and_observes_known_eof()
             .unwrap(),
         triergon_core::Step::End(_)
     ));
+}
+
+#[test]
+fn blocking_reposition_observes_cancellation_during_seek() {
+    use std::io::{Read, Seek, SeekFrom};
+    use std::sync::atomic::Ordering;
+
+    struct CancelOnSeek<'a>(&'a AtomicBool);
+    impl Read for CancelOnSeek<'_> {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            panic!("reposition does not read");
+        }
+    }
+    impl Seek for CancelOnSeek<'_> {
+        fn seek(&mut self, from: SeekFrom) -> std::io::Result<u64> {
+            assert_eq!(from, SeekFrom::Start(6));
+            self.0.store(true, Ordering::Relaxed);
+            Ok(6)
+        }
+    }
+
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(4096).unwrap();
+    let mut input = InputCursor::new(
+        &pool,
+        SourceId(32),
+        SourceCapabilities {
+            length: Some(8),
+            random_access: true,
+        },
+        4,
+    )
+    .unwrap();
+    let request = input.request_range(6).unwrap();
+    let mut feeder = blocking::InputFeeder::new(CancelOnSeek(&cancel), 4).unwrap();
+    assert!(matches!(
+        feeder.synchronize_seekable_position(&mut input, &request, &cancel),
+        Err(Error::Cancelled)
+    ));
+    cancel.store(false, Ordering::Relaxed);
+    feeder
+        .synchronize_seekable_position(&mut input, &request, &cancel)
+        .unwrap();
+    assert!(!cancel.load(Ordering::Relaxed));
 }
 
 #[test]
@@ -1392,6 +1445,7 @@ fn playback_preroll_plan_validates_video_but_replays_the_earlier_interleaved_aud
         true,
         1_000_000,
         anchor.offset(),
+        seek::RecoveryAudio::Overlap,
     )
     .unwrap();
     let mut result = None;

@@ -276,7 +276,14 @@ fn recovery_prefix_still_drops_early_video_and_keeps_unknown_second_lace() {
     for _ in 0..1000 {
         let mut work = WorkBudget::new(1);
         match job
-            .step_ready(Some(1), &mut work, &AtomicBool::new(false))
+            .step_ready(
+                Some(packet::RecoveryCutoff {
+                    lower_ns: 1,
+                    block_start_ticks: None,
+                }),
+                &mut work,
+                &AtomicBool::new(false),
+            )
             .unwrap()
         {
             ParseStep::Yield => (),

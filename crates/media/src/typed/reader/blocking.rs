@@ -22,6 +22,27 @@ pub struct BlockingReader<R: Read> {
     input: InputFeeder<R>,
     seek: Option<Seeking<R>>,
 }
+
+/// Seek for playback with audio selected by whole block in the prefix
+/// recovered for subtitles. Packet timing and the video landing stay in the
+/// normal reader's source clock.
+pub fn at_block_start<R: Read>(
+    reader: &mut BlockingReader<R>,
+    track: usize,
+    requested_ns: i64,
+    cancel: &AtomicBool,
+) -> Result<crate::matroska::SeekReceipt> {
+    reader.seek(
+        SeekRequest {
+            track,
+            requested_ns,
+            playback_preroll: true,
+        },
+        RecoveryAudio::BlockStart,
+        cancel,
+    )
+}
+
 impl<R: Read> BlockingReader<R> {
     pub fn open(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
@@ -270,6 +291,7 @@ impl<R: Read> BlockingReader<R> {
                 requested_ns,
                 playback_preroll: false,
             },
+            RecoveryAudio::Overlap,
             cancel,
         )
     }
@@ -285,22 +307,21 @@ impl<R: Read> BlockingReader<R> {
                 requested_ns,
                 playback_preroll: true,
             },
+            RecoveryAudio::Overlap,
             cancel,
         )
     }
     fn seek(
         &mut self,
         request: SeekRequest,
+        audio: RecoveryAudio,
         cancel: &AtomicBool,
     ) -> Result<crate::matroska::SeekReceipt> {
-        if self.reader.failed || self.reader.pending_seek() != Some(request) {
-            if request.playback_preroll {
-                self.reader
-                    .seek_for_playback(request.track, request.requested_ns)?;
-            } else {
-                self.reader
-                    .seek_previous(request.track, request.requested_ns)?;
-            }
+        if self.reader.failed
+            || self.reader.pending_seek() != Some(request)
+            || self.reader.recovery_audio != audio
+        {
+            self.reader.begin_seek(request, audio)?;
         }
         loop {
             // Lent for this poll only; see EpochRestoreJob::try_owned_prefix.

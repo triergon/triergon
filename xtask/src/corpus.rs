@@ -1592,6 +1592,145 @@ fn seek_case(source: &Source, c: SeekCase) -> Result<Vec<u8>, String> {
     Ok(cat([&header(), &e(SEGMENT, &body)]))
 }
 
+fn subtitle_recovery_lace(
+    source: &Source,
+    block_ticks: i16,
+    duration: Option<u64>,
+    second_audio: Option<(u64, u32)>,
+    tick_ms: i16,
+) -> Result<Vec<u8>, String> {
+    let picture = source.video_packet(true)?;
+    let avcc = source.track_field(|_| true, "private")?;
+    let track = |number, kind, codec: &[u8], fields: &[u8]| {
+        e(
+            0xae,
+            &cat([
+                &u(0xd7, number),
+                &u(0x73c5, number),
+                &u(0x83, kind),
+                &e(0x86, codec),
+                fields,
+            ]),
+        )
+    };
+    let video = track(
+        1,
+        1,
+        b"V_MPEG4/ISO/AVC",
+        &cat([
+            &e(0x63a2, &avcc),
+            &u(0x23e383, 125_000_000),
+            &e(0xe0, &cat([&u(0xb0, 160), &u(0xba, 96)])),
+        ]),
+    );
+    let audio_track = |number, delay_ns, pre_skip: u16, input_rate: u32| {
+        // Two channels, zero gain and mapping family zero.
+        let mut opus_head = *b"OpusHead\x01\x02\0\0\0\0\0\0\0\0\0";
+        opus_head[10..12].copy_from_slice(&pre_skip.to_le_bytes());
+        opus_head[12..16].copy_from_slice(&input_rate.to_le_bytes());
+        track(
+            number,
+            2,
+            b"A_OPUS",
+            &cat([
+                &e(0x63a2, &opus_head),
+                &u(0x56aa, delay_ns),
+                &u(0x56bb, 80_000_000),
+                &e(
+                    0xe1,
+                    &cat([&u(0x9f, 2), &float64(0xb5, f64::from(input_rate))]),
+                ),
+            ]),
+        )
+    };
+    let audio = if second_audio.is_some() {
+        audio_track(2, 6_875_000, 330, 48_000)
+    } else {
+        audio_track(2, 6_500_000, 312, 48_000)
+    };
+    let subtitles = track(3, 17, b"S_TEXT/UTF8", &[]);
+    let additional_track =
+        second_audio.map_or_else(Vec::new, |(delay, rate)| audio_track(4, delay, 360, rate));
+    let tracks = e(
+        TRACKS,
+        &cat([&video, &audio, &subtitles, &additional_track]),
+    );
+    let block = |number: u8, offset_ms: i16, payload: &[u8]| {
+        e(
+            0xa3,
+            &cat([
+                &[0x80 | number],
+                &(offset_ms / tick_ms).to_be_bytes(),
+                &[0x80],
+                payload,
+            ]),
+        )
+    };
+    let silence = b"\xf8\xff\xfe"; // 20 ms Opus packet
+    let mut group = e(
+        0xa1,
+        &cat([
+            &[0x82],
+            &(block_ticks / tick_ms).to_be_bytes(),
+            &[4, 1],
+            silence,
+            silence,
+        ]),
+    );
+    let tick_ms = tick_ms as u64;
+    if let Some(duration) = duration {
+        group.extend(u(0x9b, duration / tick_ms));
+    }
+    let first = e(
+        CLUSTER,
+        &cat([
+            &u(0xe7, 1000 / tick_ms),
+            &block(1, 0, &picture),
+            &block(3, 900, b"Subtitle across a seek"),
+            &e(0xa0, &group),
+        ]),
+    );
+    let second_audio_packet = second_audio.map_or_else(Vec::new, |_| block(4, 110, silence));
+    let second = e(
+        CLUSTER,
+        &cat([
+            &u(0xe7, 2000 / tick_ms),
+            &block(1, 0, &picture),
+            &block(2, 30, silence),
+            &block(2, 50, silence),
+            &block(2, 70, silence),
+            &block(2, 90, silence),
+            &second_audio_packet,
+        ]),
+    );
+    let cue = |time, position| {
+        e(
+            0xbb,
+            &cat([
+                &u(0xb3, time),
+                &e(0xb7, &cat([&u(0xf7, 1), &u(0xf1, position)])),
+            ]),
+        )
+    };
+    let info = if tick_ms == 1 {
+        Vec::new()
+    } else {
+        e(INFO, &u(0x2ad7b1, tick_ms * 1_000_000))
+    };
+    let first_offset = (info.len() + tracks.len()) as u64;
+    let cues = e(
+        0x1c53bb6b,
+        &cat([
+            &cue(1000 / tick_ms, first_offset),
+            &cue(2000 / tick_ms, first_offset + first.len() as u64),
+        ]),
+    );
+    Ok(cat([
+        &header(),
+        &e(SEGMENT, &cat([&info, &tracks, &first, &second, &cues])),
+    ]))
+}
+
 fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
     let output = paths.fixtures("seek-fixtures")?;
     let d = SeekCase::default();
@@ -1652,6 +1791,62 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
             vec![("seek_target_ns", Value::int(7_500_000_000i64))],
         ));
     }
+    let mut recovery_cases = Vec::new();
+    for (duration_name, duration) in [("zero", Some(0)), ("omitted", None), ("timed", Some(40))] {
+        for (position, block_ticks) in [("before-cutoff", 999), ("at-cutoff", 1000)] {
+            recovery_cases.push((
+                format!("{duration_name}-{position}"),
+                block_ticks,
+                duration,
+                None,
+                1,
+            ));
+        }
+    }
+    recovery_cases.extend([
+        (
+            "two-tracks-before-cutoff".into(),
+            998,
+            None,
+            Some((7_500_000, 48_000)),
+            1,
+        ),
+        (
+            "two-tracks-at-cutoff".into(),
+            999,
+            None,
+            Some((7_500_000, 48_000)),
+            1,
+        ),
+        (
+            "two-tracks-fractional-padding".into(),
+            999,
+            None,
+            Some((7_499_900, 48_000)),
+            1,
+        ),
+        (
+            "two-tracks-input-rate".into(),
+            998,
+            None,
+            Some((7_500_000, 16_000)),
+            1,
+        ),
+        ("padding-rounds-to-zero".into(), 1000, None, None, 20),
+        ("padding-rounds-to-one-tick".into(), 1000, None, None, 10),
+    ]);
+    for (detail, block_ticks, duration, second_audio, tick_ms) in recovery_cases {
+        let name = format!("cues-opus-{detail}");
+        let data = subtitle_recovery_lace(source, block_ticks, duration, second_audio, tick_ms)?;
+        let file = format!("{name}.mkv");
+        write(&output.join(&file), &data)?;
+        rows.push(authored(
+            &name,
+            &file,
+            &data,
+            vec![("seek_target_ns", Value::int(2_080_000_000i64))],
+        ));
+    }
     let contract = delivery_contract(
         "matroska-cues-preroll",
         "container-seek-preroll-v1",
@@ -1661,6 +1856,9 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
             "sparse and absent index fallback",
             "all-track SeekPreRoll and codec delay",
             "all packets after seek including decode-only preroll",
+            "whole audio block selection at the subtitle-recovery cutoff, with zero, omitted and positive lace durations",
+            "subtitle-recovery cutoff across audio tracks with distinct initial padding and sample rates",
+            "subtitle replay when initial padding rounds to zero or one Segment tick",
             "fresh, repeated and after-EOF seeks",
             "unknown Cluster lengths",
             "seek cancellation, I/O failures and malformed indexes",

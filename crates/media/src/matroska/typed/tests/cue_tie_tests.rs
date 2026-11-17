@@ -298,6 +298,7 @@ fn cue_ties_select_the_observed_earliest_cluster_from_real_wire_positions() {
                         playback,
                         1_000_000,
                         points.iter().map(|point| point.cue.cluster).min().unwrap(),
+                        seek::RecoveryAudio::Overlap,
                     )
                     .unwrap();
                     let mut result = None;

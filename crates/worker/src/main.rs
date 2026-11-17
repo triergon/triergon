@@ -14,6 +14,7 @@ use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex, quoted,
 };
+use triergon_matroska::compat::seek::at_block_start;
 use triergon_matroska::timing::ExactTime;
 use triergon_matroska::{Limits, compat::clock::packet_timing, typed::BlockingReader as Demuxer};
 
@@ -324,7 +325,7 @@ fn run(
     for _ in 0..iterations {
         let mut d = open_owned(std::mem::take(data), Limits::default())?;
         let initial_trim = if let Some(target) = seek {
-            d.seek_for_playback(0, target, &cancel)?.replays_from_start
+            at_block_start(&mut d, 0, target, &cancel)?.replays_from_start
         } else {
             true
         };
@@ -589,8 +590,8 @@ fn seek_trace(data: Vec<u8>, words: &[String]) -> Outcome {
     if words.get(1).is_some_and(|value| value == "after-eof") {
         while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
     }
-    let receipt = demux.seek_for_playback(0, target, &AtomicBool::new(false))?;
-    trace(demux, receipt.replays_from_start, false, 0)
+    let landing = at_block_start(&mut demux, 0, target, &AtomicBool::new(false))?;
+    trace(demux, landing.replays_from_start, false, 0)
 }
 
 /// `inflate FILE [OUTPUT_BYTES [EXPANSION_RATIO [WORK]]]`.

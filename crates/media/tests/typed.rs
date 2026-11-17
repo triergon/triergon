@@ -400,8 +400,18 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
         let mut reader =
             BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
         let mut audio_packets = Vec::new();
-        for _ in 0..2 {
-            let landed = reader.seek_for_playback(0, 2_080_000_000, &cancel).unwrap();
+        for at_block_start in [false, true, false] {
+            let landed = if at_block_start {
+                triergon_matroska::compat::seek::at_block_start(
+                    &mut reader,
+                    0,
+                    2_080_000_000,
+                    &cancel,
+                )
+                .unwrap()
+            } else {
+                reader.seek_for_playback(0, 2_080_000_000, &cancel).unwrap()
+            };
             assert_eq!(landed.actual_ns, 2_000_000_000);
             assert_eq!(landed.preroll_ns, 80_000_000);
             assert!(!landed.replays_from_start, "{landed:?}");
@@ -430,10 +440,15 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
                     B.to_vec(),
                 ),
             ];
+            let first_frame = if at_block_start {
+                expected.len()
+            } else {
+                first_frame
+            };
             assert_eq!(
                 audio_packets,
                 expected[first_frame..],
-                "duration {duration:?}"
+                "duration {duration:?}, block-start seek {at_block_start}"
             );
             audio_packets.clear();
         }

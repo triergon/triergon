@@ -158,7 +158,24 @@ fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
     }
     Ok(())
 }
-fn keep_recovery_packet(kind: u64, packet: &Packet, lower: i64) -> Result<bool> {
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RecoveryCutoff {
+    pub(crate) lower_ns: i64,
+    pub(crate) block_start_ticks: Option<i64>,
+}
+
+fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> Result<bool> {
+    let lower = cutoff.lower_ns;
+    if kind == 2
+        && let Some(cutoff_ticks) = cutoff.block_start_ticks
+    {
+        let timing = packet.timing;
+        return Ok(crate::packet_clock::block_start_ticks(
+            timing.timestamp_ticks,
+            timing.codec_delay_ns,
+            timing.scale_ns,
+        )? >= i128::from(cutoff_ticks));
+    }
     let Some(pts) = packet.pts_ns else {
         return Ok(true);
     };
@@ -213,8 +230,12 @@ fn recovery_uses_the_exact_end_of_a_fractional_audio_lace() {
         });
     assert_eq!(packet.pts_ns, Some(20_000_001));
     assert_eq!(packet.duration_ns, Some(20_000_001));
-    assert!(!keep_recovery_packet(2, &packet, 40_000_001).unwrap());
-    assert!(keep_recovery_packet(2, &packet, 40_000_000).unwrap());
+    let cutoff = |lower_ns| RecoveryCutoff {
+        lower_ns,
+        block_start_ticks: None,
+    };
+    assert!(!keep_recovery_packet(2, &packet, cutoff(40_000_001)).unwrap());
+    assert!(keep_recovery_packet(2, &packet, cutoff(40_000_000)).unwrap());
 }
 
 #[derive(Clone, Debug)]
@@ -487,7 +508,7 @@ impl PacketBatchJob {
     /// TypedPacket through the batch parser's Result/ParseStep return slot.
     pub(crate) fn step_ready(
         &mut self,
-        prefix_ns: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<()>> {
@@ -496,7 +517,7 @@ impl PacketBatchJob {
                 "packet batch requires replacement after error",
             ));
         }
-        let result = self.advance(prefix_ns, work, cancel);
+        let result = self.advance(prefix, work, cancel);
         match result {
             Err(Error::Backpressure {
                 requested,
@@ -514,7 +535,7 @@ impl PacketBatchJob {
     }
     fn advance(
         &mut self,
-        prefix_ns: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<()>> {
@@ -816,7 +837,7 @@ impl PacketBatchJob {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
-                    if let Some(lower) = prefix_ns {
+                    if let Some(cutoff) = prefix {
                         let packet = self.staged.peek(self.publish)?;
                         let kind = self.live_configuration()?.tracks()[packet.track].kind;
                         // Consumer recovery selection at the real replay input
@@ -824,7 +845,7 @@ impl PacketBatchJob {
                         // all subtitle packets in this prefix, including known
                         // ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
-                        let keep = keep_recovery_packet(kind, packet, lower)?;
+                        let keep = keep_recovery_packet(kind, packet, cutoff)?;
                         if !keep {
                             drop(self.staged.take(self.publish)?);
                             self.publish += 1;

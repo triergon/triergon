@@ -24,6 +24,18 @@ pub mod clock {
     pub use crate::packet_clock::packet_timing;
 }
 
+/// Playback seeks with audio selection by Block timestamp in subtitle
+/// recovery. The cutoff uses the comparison clock's Segment ticks and the
+/// longest audio delay, rounded through each track's initial sample count.
+/// The rounded delay bounds the earlier subtitle scan. When it rounds to zero
+/// there is no extra scan. All frames in a lace follow its Block's timestamp
+/// in that clock.
+///
+/// Reference: Matroska playback seek observations with FFmpeg 9.0.2.
+pub mod seek {
+    pub use crate::typed::reader::blocking::at_block_start;
+}
+
 /// Block additions as FFmpeg's Matroska demuxer accepts and exports them.
 ///
 /// The reader refuses a BlockAddID above the track's MaxBlockAdditionID.

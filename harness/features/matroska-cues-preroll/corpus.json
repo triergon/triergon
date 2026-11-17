@@ -64,6 +64,102 @@
       "sha256": "7f8bb1773ab0db5442851b7b435b90085aae0a34543cdc1f83e2157f4a87dccb",
       "rights": "authored-synthetic",
       "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-opus-zero-before-cutoff",
+      "profile": "cues-opus-zero-before-cutoff",
+      "file": "cues-opus-zero-before-cutoff.mkv",
+      "sha256": "2ea1901732df5244313d752713aea15f8e52c64d54381b8e5fc3194d1f665c48",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-zero-at-cutoff",
+      "profile": "cues-opus-zero-at-cutoff",
+      "file": "cues-opus-zero-at-cutoff.mkv",
+      "sha256": "81d052506a69d24809b02c73807864a4d997edab77fb7f6edeac8e6452f002b4",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-omitted-before-cutoff",
+      "profile": "cues-opus-omitted-before-cutoff",
+      "file": "cues-opus-omitted-before-cutoff.mkv",
+      "sha256": "7c0cfd444f757c50409c8e327690ac4c8eca6d3ef9c36aedcd18e9919ad1537d",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-omitted-at-cutoff",
+      "profile": "cues-opus-omitted-at-cutoff",
+      "file": "cues-opus-omitted-at-cutoff.mkv",
+      "sha256": "eb62f5619b17d6d39b262cf4b947db7fb7e594dd16a9c7a49945714425a1cbe5",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-timed-before-cutoff",
+      "profile": "cues-opus-timed-before-cutoff",
+      "file": "cues-opus-timed-before-cutoff.mkv",
+      "sha256": "a7ab143cc44cd44ba2c479e81a09a9aa3e11eab7242142f97e4183e71276843d",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-timed-at-cutoff",
+      "profile": "cues-opus-timed-at-cutoff",
+      "file": "cues-opus-timed-at-cutoff.mkv",
+      "sha256": "bdf3f3fe43d995f2e8c537c54cacf369a819322e95be374d81e5d21033d09eb4",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-before-cutoff",
+      "profile": "cues-opus-two-tracks-before-cutoff",
+      "file": "cues-opus-two-tracks-before-cutoff.mkv",
+      "sha256": "a414434f425e39bcaf65addbc4536831d7416e61da35b0bbac6b60fcff79e45d",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-at-cutoff",
+      "profile": "cues-opus-two-tracks-at-cutoff",
+      "file": "cues-opus-two-tracks-at-cutoff.mkv",
+      "sha256": "840dfcb4fdc249d664d20332bb65b7c8d43ad257969e691a28ea8f6e4ff8cbd7",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-fractional-padding",
+      "profile": "cues-opus-two-tracks-fractional-padding",
+      "file": "cues-opus-two-tracks-fractional-padding.mkv",
+      "sha256": "6a0774374fa60f2753055e84a2b36a962afacc69098ec8553097550fe27b06ec",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-input-rate",
+      "profile": "cues-opus-two-tracks-input-rate",
+      "file": "cues-opus-two-tracks-input-rate.mkv",
+      "sha256": "d7257284f3d7496d624af54a3f055bb3c5fc74f0d03dd50f6ae8e031c6bb8cb3",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-padding-rounds-to-zero",
+      "profile": "cues-opus-padding-rounds-to-zero",
+      "file": "cues-opus-padding-rounds-to-zero.mkv",
+      "sha256": "d7d03c03da6b7e154020efcf8dbcb7204bd504f3bfd609c60c6b38127eafe2a7",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-padding-rounds-to-one-tick",
+      "profile": "cues-opus-padding-rounds-to-one-tick",
+      "file": "cues-opus-padding-rounds-to-one-tick.mkv",
+      "sha256": "dd55d802324d7967c7ef195ce8ce9b37afb83157b3b182092447eec1fe0c457f",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
     }
   ]
 }
