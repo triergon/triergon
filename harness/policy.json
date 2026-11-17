@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "runtime": {
-    "ratio_max": 1.2,
+    "ratio_max": 1.1,
     "bound": "per-case upper bound of the paired 95% bootstrap interval of candidate/reference time",
     "optimisation_target": 0.8,
     "minimum_pairs": 30,

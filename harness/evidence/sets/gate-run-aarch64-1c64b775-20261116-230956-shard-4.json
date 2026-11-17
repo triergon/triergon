@@ -1,0 +1,154 @@
+{
+ "name": "gate-run-aarch64-1c64b775-20261116-230956-shard-4",
+ "path": "gate-run-aarch64-1c64b775-20261116-230956-shard-4",
+ "retention": "retained",
+ "reason": "Full gate run at 1c64b775 under static-toolchain-runtime-trained-order-v1, shard 4 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, Linux AArch64: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the run the runtime ceiling is set on",
+ "key": "evidence/gate-runs/1c64b77588fe3ec635b2bb31519dc23e2f365db7-aarch64-20261116-230956/shard-4/575ddca2287dec5f1b3a97946fce12c70432bc4c2c5813506c8efd7ea43c099f.tar.zst",
+ "sha256": "575ddca2287dec5f1b3a97946fce12c70432bc4c2c5813506c8efd7ea43c099f",
+ "bytes": 97434210,
+ "results": [
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "0b253f898abb39bf983b31f1767f4d00627c2c85f93e7212f1d0f6df1aa80408",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "d077d73982a248d31cde325f17a2a53b672dfdeef510183f6ce3f627724a7c15",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "0c7fa1c4a5f24382de444c590b815c9e4639edfe9e3c1f5427fdd984b959e042",
+   "status": 0,
+   "report_sha256": "3db262c62333b6bfdb97db79d71ca0dcbb9ac40d6e4f7a5fb51c9bdecddfbfc9",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "d82dc5902160ef560c4fe6c98961bc69761f32a25b7eb41f9327857e220d0f60",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "242fead5f93efe1ea140a8f67e03de054d5ac6874d22fb46704aebdc82dafa7d",
+   "status": 0,
+   "report_sha256": "63018149b76a96ea55a2fa3fe85794f8c65ae465be28859cce5badd53ff5d725",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "a5161e95b4ba0821bf89cf27c431fc44a8274cefaeb77d31f60099a954273f9b",
+   "status": 0,
+   "report_sha256": "915c57bcaf4e4c434f943fa09f08f9b2a54bba648e26d0b28de809fdf44c6612",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "2405a668c7b033f052e20a5fa78a8b02bac727919c2607c401bdf86ea896ffb4",
+   "status": 0,
+   "report_sha256": "9556cb1da6c83426fc49ea7229734ddcabdac7fb185f64c5e51f8b94b02c7466",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "3e49e74d5532c87b8d0975dc39f98418e5bbdd103e8db68b850da6125ce953fd",
+   "status": 0,
+   "report_sha256": "dd7ff2031fbd838954201039eed24c9b438eba37fe692ec37af0ad5880c896e6",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "f875bd43db41a9819e6db9363b81b5f6a03f41a185857eca9fe19143be455293",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "d478b74997691d7ac335285a6a914dd974feb6d548862806ae551006b2b4ead8",
+   "status": 0,
+   "report_sha256": "47c0be75b9f4c95633681554a8cccd1735a4846eb9858d83d88c521a07c3a72e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e36e45b0d0c79ff56c784cd681439f66579822091b5cd8ec110d07d3e4d18d94",
+   "status": 0,
+   "report_sha256": "c302a95e948627f8a4ec9b951076cbf3e5b29f23373e547d6021e2166ef08c8b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "00e98463d7fe2b576fd14dd9b1920f119dd8a9e2ae4f16520c7590e0150a7fcc",
+   "status": 0,
+   "report_sha256": "d824ed8e64bb0dd562b39fbc739ad3187dafc28a14e545f81691daed12d28d53",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7abd0976973bccb5c875c1ec3b49c8de5a3353c83db686307de0db7d1586644a",
+   "status": 0,
+   "report_sha256": "70ad1348cd2effdb728b3eab4c7a009741dec66a8cfdaa1fc0dea86397983b1b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "105a9ad2f1d6028f1aa65ef6e00ef73c541c9c3e5a2004183aa11ab26406a4c4",
+   "status": 0,
+   "report_sha256": "d7a77aa9215c93ba76c3ed63421cbd43b866f00da66830694195bfc2099f2e2e",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "ba56672d5a73197662ec67d4395a9ab5349d58c82d5a4bb3cb544ce72cb6d9e3",
+   "status": 1,
+   "report_sha256": "c01ac06e42df586ea8484a8dcb03f231d6fd8d0e00e76720e7843e0663a9a82a"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "269f4dc0b7d924e631b38a543d625dc6d83bb1634c1fb44f5cddc0fd91089f15",
+   "status": 0,
+   "report_sha256": "92cca1efebe8e58b79b7bbb872164dc5b22884c528f672f76ed108f2fe08f104"
+  },
+  {
+   "path": "graded/isobmff-3/gate-result.json",
+   "command": "grade",
+   "key": "c7a434409e32898af30558f630b13f339695441982fbe32d4ca4d37fb63ba9c4",
+   "status": 0,
+   "report_sha256": "b9268a64b0753f053b59884c07c311f79395ba22cf0aa0ba1fd73cd0901e19c8"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "15e65a90bfa0ae0858a253d8c797168849cea6775fa8eed797af09b7bf387750",
+   "status": 0,
+   "report_sha256": "69630e090d7d9ea2b739834d421ca45228be4a7cf93e72035062724f0c5b365e"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "40f073085b6395f2d94ce73046d9b10ef9ea236921dc13501413d09e390f438c",
+   "status": 0,
+   "report_sha256": "8473c18c80a9f66b359a08a10822ee41fc592e7ac068391562e158f964c76599"
+  }
+ ]
+}

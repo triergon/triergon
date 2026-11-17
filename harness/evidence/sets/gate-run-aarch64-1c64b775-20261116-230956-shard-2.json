@@ -1,0 +1,163 @@
+{
+ "name": "gate-run-aarch64-1c64b775-20261116-230956-shard-2",
+ "path": "gate-run-aarch64-1c64b775-20261116-230956-shard-2",
+ "retention": "retained",
+ "reason": "Full gate run at 1c64b775 under static-toolchain-runtime-trained-order-v1, shard 2 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, Linux AArch64: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the run the runtime ceiling is set on",
+ "key": "evidence/gate-runs/1c64b77588fe3ec635b2bb31519dc23e2f365db7-aarch64-20261116-230956/shard-2/c7f8e3cb7911c140afaf02e00cdcc162e9dd257f6e56f06b1daab39ed732d540.tar.zst",
+ "sha256": "c7f8e3cb7911c140afaf02e00cdcc162e9dd257f6e56f06b1daab39ed732d540",
+ "bytes": 484366608,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "83ef363eaababeb3408fb3afd58ff59c3e29d84676f6d23f0d8ed9dfcb451a07",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "ce75119403a3839f9f75898c58e6458da6ff33ccfed07d6b4413bc02a9de9039",
+   "status": 0,
+   "report_sha256": "e62e9570bd867202ce6b65583831298d71d48fbabd50c8e371997a964408d6b1",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "c07292add40950a3e1cedb27bae24d89f26619310d707887ebeaea21847fb454",
+   "status": 0,
+   "report_sha256": "0e01b8dd1fc0621ea94c2785308fec94e1c4ea6d75e5896c083963620c527445",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ass-render-host/gate-result.json",
+   "command": "report --memory",
+   "key": "0be70e405bc3ccddd3e449571dfa366d4e786a432e7f9201eb807cf3c74fe595",
+   "status": 0,
+   "report_sha256": "ba78cd444f9f387bc0df4c35d432f7cd46a106e4b303288bc72843418b464937",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "5723d99de265ace87244e962b7b35787adbc610918c63000d7ec0854fac719d8",
+   "status": 0,
+   "report_sha256": "aad733e288802a7e0c9059a65573dba4d956afa545f94668f9dad9476a0a756f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "69b8c2806bc87ce20c1f8b8335f0b4989e7395bc2d7f8ceadfd5280c15f90943",
+   "status": 0,
+   "report_sha256": "dfed3d5c67db890874e40ee7cb26d23d55f43ec6eaacd887f9a5f2e0a930bcfc",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "6cb4a87c267f26d4182b3d41d6ca03277900f2c6d8dd896a050f48ff6340187a",
+   "status": 0,
+   "report_sha256": "5f8bc4d8522955ed2ef81fdf70f29800d0e40969b050aab28a09e8e86487b380",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "62cadd6eb579240931a6752d252c9e6218d3511ac7612696f25c025db33084ce",
+   "status": 0,
+   "report_sha256": "bdb4e627805cdc9dc06b02bd73d7f6f35a077f8feaded325f7a3b02d54d747b5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "899d28b8ee23e90bd2a8aa44aeaffd6228109920eb8dcecb80fa536ec1192f11",
+   "status": 0,
+   "report_sha256": "b158c61f4fbfd6e95dade64a61e70575def546aec5bb363affd6281b9293c6f5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4ac66de9811c75604c6fc41c9f8abe079ca153b73696fa9922465f43057bbea2",
+   "status": 0,
+   "report_sha256": "789371fb1434af3ef44ff28bc19fb023480240da355870806d2361a2b9fb0d57",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "01f3dbeb5188d65829133962e60affdb5dace598a694bdfe131f85d4b038845d",
+   "status": 0,
+   "report_sha256": "7628114c2acd54bd375557d5ddd7950268ad25be44a8123b764f7f78e3a292f7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "d71339b52efb7dca341a0761a15e1438659c1704e4204a7fa4b10439d9cf641a",
+   "status": 0,
+   "report_sha256": "7759fdfa0633a69cd66fda7c43f8cd663f82ff9e3b46059ecad8ee52d80353d4",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ade5efd2c237729c84b18b7a4289d412982771112be962dbdc598b6949512532",
+   "status": 0,
+   "report_sha256": "a47971667c3cb60d8d315e6a96a555cc45fc6b15470e215327b0ea043b648098",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "73210419d92ab21453aff5a72a52028e58ac478d5be372cea028a37c63e96074",
+   "status": 0,
+   "report_sha256": "e75d05fec53403e6cee3f5627a967787339234d7fe3a80e2b07c9a5c0efc905f"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "34a9ffdf136571f66ec596e38afe5a136ae93c586c6f90635bda41f29118487c",
+   "status": 0,
+   "report_sha256": "172148325f761b90d83cd470c9a97b2d0658c9adec15899258f30ec9c07e8fd5"
+  },
+  {
+   "path": "graded/ass-render-host/gate-result.json",
+   "command": "grade",
+   "key": "430b6329e8803427d79c67d2b796fcf134b25fa47d80e0c64be07c927cc0585d",
+   "status": 1,
+   "report_sha256": "247043bd0233523ff6a392bb0fee42b48fa871f750a7b6a78b31a913ed84ceee"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "18f06f656916c21f81d11f4941457bef161c8c4740897d237a06cc0f64a0bd96",
+   "status": 0,
+   "report_sha256": "f41d129a25caef9d7927a6f968f32477b7f3742c365b4b84c523ced1eca4e64a"
+  },
+  {
+   "path": "graded/isobmff-1/gate-result.json",
+   "command": "grade",
+   "key": "9cf4452caecaa353c8a6df391709d63d4542aefcdf6b0fef9c3b2a2406410338",
+   "status": 0,
+   "report_sha256": "dd90ead7191e7fe95304b889412b4df96babbf9e5307d35a8087f70ab9053021"
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "8b0f8f51876e9b43f8dd2cbec090ee75dca9deed4374ed1dee69694cc14c64d0",
+   "status": 0,
+   "report_sha256": "b0a80b9767c9a33275a9ea54bf4cf9d91d7a5ade94e44b6914920f97f0eb1e7d"
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "a35d5fdd1f94eac6a953083c31f933b8f105c5a19e9a16eefed14f23f62e297b",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
