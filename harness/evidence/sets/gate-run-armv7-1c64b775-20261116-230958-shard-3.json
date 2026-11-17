@@ -1,0 +1,147 @@
+{
+ "name": "gate-run-armv7-1c64b775-20261116-230958-shard-3",
+ "path": "gate-run-armv7-1c64b775-20261116-230958-shard-3",
+ "retention": "retained",
+ "reason": "Full gate run at 1c64b775 under static-toolchain-runtime-trained-order-v1, shard 3 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, 32-bit ARMv7: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, no result reused; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the run the runtime ceiling is set on",
+ "key": "evidence/gate-runs/1c64b77588fe3ec635b2bb31519dc23e2f365db7-armv7-20261116-230958/shard-3/fce6358f83e7551a250ebebba63976ced5441f270613abb8b5304ec8a1bdcc9c.tar.zst",
+ "sha256": "fce6358f83e7551a250ebebba63976ced5441f270613abb8b5304ec8a1bdcc9c",
+ "bytes": 382314963,
+ "results": [
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "5e1c7347566ed0b332a92322c22e8429e73ff13f66a2a132cba0569a6e94d284",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "ac492779d810fd54ac4fd6d68169560302c1370f1001aede15b44a05f83cb586",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "2a0c6c2deb59a74aa62283769da99f9ac2d2a33bfec601f04a6f5d0da343c254",
+   "status": 0,
+   "report_sha256": "5a8423974996d5cf80458ca614450691a4903d8cd841c2a0a80cb6393f148ec6",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "d47ca0bb9e86f0adc839edc00ad38d5f7884e229a28ab01ac7fe4bce460d7c9f",
+   "status": 0,
+   "report_sha256": "dce7c16a35a6391fdd93b8c5ba9af104015bf8e993e74ef9fa4b0adf5c32a16a",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "57aba8139fac91ac6d050180da157a0e24a97e3436bf9b34c3a4d0ddb98fee95",
+   "status": 0,
+   "report_sha256": "70149c186fdf6aa5dfbef4f4d997a6f2ed13cd495b8d208315fc94ee12d3fe10",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "dbd567a2367f08b78b7947bde9a9fe85479fcbb09b3530133996ee4539947203",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "733916a173c431aa1a6ca843f4429fb2935cd16e689ddcf2edf0fb0e7aacd944",
+   "status": 0,
+   "report_sha256": "016353bea9e55d07395b3a881a23d901f7c144df8e96a44a991082a399f64523",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "cae9a9965b236acdad56041bbb023778f34d116699cf7ef47863513cf06ae651",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "e230c5907ac7c3eafe9f4ff7c3f57e4ec70c04d82336aac078c01edfa1d5205d",
+   "status": 0,
+   "report_sha256": "1e347361740d9a73490cfae71d379de559c5ae1424c2a0b919ff55dd5cd97b4c",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "aec2addc3ec60e725d489c134aea870b1238565d5d2ad3feee8545bd12420cb3",
+   "status": 0,
+   "report_sha256": "6a50cfef7c4f597424c6e455d5d034074613f30580b72c31ca9c46dad83cbbbc",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7c6b7b22e74f09ee7ef295c53fb7a757a4cb8d8d8120f1e6c5a6af331b8b8be2",
+   "status": 0,
+   "report_sha256": "c55f4844c2e213cf1ff841a705f7324f0534d222ef12a86fd297fa2d42849449",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "91b25092a414e43924b86bffaf4f6e418855f9f9db7c3caf5b33d5f17add2d96",
+   "status": 0,
+   "report_sha256": "94735c6207a201b34cd0b70d772076091426b3a47b7bcc3f49f9cf490564bcf3",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "82bbe8afaaa334c7ea1194c90f1936bed1c50392ac00aa80b8faf0950322ddaf",
+   "status": 0,
+   "report_sha256": "044834412089e4f515227e2dda51e7c0d7d36c3419c967ed80bbef81b7454fc5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "97f61415ccb5ab893746c8cccdfe82bb3eba157593dd342ded1e4c60e42b051a",
+   "status": 0,
+   "report_sha256": "79487befac891e991aeac106ca20f13b8bc141fbc72f105c0bbb42d49a1c978b",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "8687235549d45765fdf2097361259e6e4662392c377913818f0f43f2412aeb10",
+   "status": 0,
+   "report_sha256": "8a7f468a928134bc187ea61953e6e55e47a5e3c4674f4e1bf6d21bf42bd2e1bc"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "9966e9195ba1eca12a806c0a030f4f5aacdddf310fca8cfe1e53064b1f04a668",
+   "status": 0,
+   "report_sha256": "1a5fa09ebc326d76280c737e808e831ea07a0d56d8e9029ee92ecf41d41a87ad"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "c711aee6bf6d118819499630ecf94a0e60b338453ed9383b37b1d09a7792be64",
+   "status": 0,
+   "report_sha256": "f2fe286b53a01fd1a4867ae2d06cc36576994147494c4643dfd27c32d64d5b0f"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "3309aa7d028c8cb8e477f077506e3c8c6843b7d93b9e11733069a782bd75b2a9",
+   "status": 0,
+   "report_sha256": "6ebdd981ae4efdd7fb0fbcde00f409a448275a33e4504d6e9a53f947f2b3eeab"
+  }
+ ]
+}

@@ -106,6 +106,25 @@ bounds with, per feature and target, the cases whose median or bound is above 1.
 bound is above 1.20, the [ceiling](quality.md#gates) and 1.05, and the median of the case
 medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
 
+The runtime [ceiling](quality.md#gates) is set on one more full sharded gate run per target
+at `1c64b775`, measured as the `a73350ca` run was, with set `codec-derived-streams` unpacked
+on its hosts, and on AAC in MOV measured at that revision on one more c6g.4xlarge per
+target; no result was reused. Linux AArch64 ran 156 steps and ARMv7 153. On Linux AArch64
+the grades of `ass-render-host`, `subtitle-dvd-host` and `subtitle-text-host` fail, each only
+on its contract's listed open cases; no step fails on ARMv7. Of 4,316 timed cases on Linux
+AArch64 and 4,362 on ARMv7, none has a runtime bound above the ceiling. The highest are
+`ass-render`'s `cache-keys-ass-720p` at 1.0817 (median 1.0782) on Linux AArch64 and
+`aac-hev2-stereo` at 1.0755 (median 1.0711) on ARMv7, where `h264-high-1080p` reaches
+1.0426, `hevc-irap_repeat` 1.0133 and AAC in MOV 1.0176. The only memory bounds above 1.0
+are packet framing's total RSS, listed in its contract's `open_bounds`: one case at 1.0290
+on Linux AArch64, all 135 up to 1.0823 on ARMv7. Sets
+`gate-run-aarch64-1c64b775-20261116-230956-shard-1` to `-8` and
+`gate-run-armv7-1c64b775-20261116-230958-shard-1` to `-8` hold the shards' outputs, build
+identities, plans, step records and logs, `aac-access-units-1c64b775-TARGET` the AAC in MOV
+measurements, and `closing-run-ratios-1c64b775` every timed case's paired median and 95%
+bounds, the cases with a bound above 1.05, and per feature and target the worst runtime,
+heap and total RSS bounds. The rows above keep the revisions they name.
+
 The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
 tests, come from one partial gate run per target of the 33 items those workers serve: the
 15 capture cases, the six Matroska feature groups and the external HDR vector, every
@@ -727,6 +746,25 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Full gate run, ARMv7, shard 8 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`2154275af63ffe7e42974a6576f416a8e8bdbe130728b24ed3670ba4a001f49d`](../harness/evidence/sets/gate-run-armv7-a73350ca-20261116-022908-shard-8.json) |
 | AAC in MOV, ARMv7 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`ac664cca8d09697977201d5538a7542e925bdc4bd4ac75b106af4ee94872b698`](../harness/evidence/sets/aac-access-units-a73350ca-armv7.json) |
 | Per-case runtime ratios of the full gate runs and AAC in MOV, both targets | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`74bd0b90c8f4697c0e624136fcc511808a33d57158aaa27aa8a25e734ffcb3bb`](../harness/evidence/sets/closing-run-ratios-a73350ca.json) |
+| Ceiling gate run, Linux AArch64, shard 1 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`29a8bac6d12ea636d8d35b10ba625f01ee7795b8f37ab4db73aef4d4ff36df83`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-1.json) |
+| Ceiling gate run, Linux AArch64, shard 2 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`c7f8e3cb7911c140afaf02e00cdcc162e9dd257f6e56f06b1daab39ed732d540`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-2.json) |
+| Ceiling gate run, Linux AArch64, shard 3 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`7d449810df566d09c1b8f3cc1c5331542a370c6e0f90bcb6dc9041c7763843b4`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-3.json) |
+| Ceiling gate run, Linux AArch64, shard 4 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`575ddca2287dec5f1b3a97946fce12c70432bc4c2c5813506c8efd7ea43c099f`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-4.json) |
+| Ceiling gate run, Linux AArch64, shard 5 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`2885668abec21175b65a7ab47de111e5b3e37696bd4a9a7daa9444902624e592`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-5.json) |
+| Ceiling gate run, Linux AArch64, shard 6 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`c48836af7f466c6f48d28afd3140eab6ad9569de3509317643d2088cf87d7168`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-6.json) |
+| Ceiling gate run, Linux AArch64, shard 7 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`5764ddc3aacb6d2206fd55a893bab332f1e4a2ac8a1ec8b95ad7f95eb86e8722`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-7.json) |
+| Ceiling gate run, Linux AArch64, shard 8 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`b5946a929528bfb53c240041041925ad14926315ff5aa91580375be68e4cf73d`](../harness/evidence/sets/gate-run-aarch64-1c64b775-20261116-230956-shard-8.json) |
+| Ceiling run's AAC in MOV, Linux AArch64 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`4090aaedc07e54cc64f24438aca0e1a5cde600386cf7b4ea349a1a69774b710b`](../harness/evidence/sets/aac-access-units-1c64b775-aarch64.json) |
+| Ceiling gate run, ARMv7, shard 1 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`c3876f378296f68061674d99222b830a87c04f71af8642ca7339ddaaa9a99dbb`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-1.json) |
+| Ceiling gate run, ARMv7, shard 2 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`b16e7152f357c901a435198e43c16f0c5d75568f8b7ec17341311359eb0dd473`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-2.json) |
+| Ceiling gate run, ARMv7, shard 3 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`fce6358f83e7551a250ebebba63976ced5441f270613abb8b5304ec8a1bdcc9c`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-3.json) |
+| Ceiling gate run, ARMv7, shard 4 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`bccff9c8634f1174f6ab0ea4f0e11f90d41862e79cd73b77abe7feed30e6f323`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-4.json) |
+| Ceiling gate run, ARMv7, shard 5 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`93c5d316272d28ce7e676c34ca3fb0ebdac35051bc4ade5e70c10f01a25321a6`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-5.json) |
+| Ceiling gate run, ARMv7, shard 6 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`73120b0c40c5a581fdcb5b93dae4953491688375f87591a60e1a544be796c664`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-6.json) |
+| Ceiling gate run, ARMv7, shard 7 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`3caea6a25bc74221c36c28a946ed9d4808c3f3b88d75e83d588821f3f6f70784`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-7.json) |
+| Ceiling gate run, ARMv7, shard 8 of 8 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`f1f605eb8482b8d0bdaa3e5219b417e61739ba1cdf00c82abdde7f940ce39561`](../harness/evidence/sets/gate-run-armv7-1c64b775-20261116-230958-shard-8.json) |
+| Ceiling run's AAC in MOV, ARMv7 | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`5c39ee676cf55ec28958f97ddde6a6246c0a331e93ad10f8c3156471013f6056`](../harness/evidence/sets/aac-access-units-1c64b775-armv7.json) |
+| Per-case runtime ratios of the ceiling gate runs and AAC in MOV, both targets | `1c64b77588fe3ec635b2bb31519dc23e2f365db7` | [`3fa6a4bb337c9d4a8931582f73f714b6d3d3a8d910430e1b7ec14cd5d7513131`](../harness/evidence/sets/closing-run-ratios-1c64b775.json) |
 | Packet framing, Linux AArch64 | `d79071d48bc45ca5f66a922849daa15ad5a02d1c` | [`f34c5dcfd258842207b7579e0035f40e099910851ebf5814e966e1db0038a211`](../harness/evidence/sets/gate-run-aarch64-d79071d4-20261116-204903-shard-1.json) |
 | Packet framing, ARMv7 | `9870b6940b733dffcc5b63826fb785dbcfcd0027` | [`d04220edf917c952af02eaa5289777d9a6053dc4f22a9d1ff975a4158150342f`](../harness/evidence/sets/gate-run-armv7-9870b694-20261116-202556-shard-1.json) |
 | Earlier: Packet framing, Linux AArch64 | `d915aa196a33328e07ecfb3ccc858a04585b2f31` | [`af871e6591be476a190154e041a4f54c72609797cb86fbd2fdc374fa2ad58d09`](../harness/evidence/sets/gate-run-aarch64-d915aa19-20261116-064738-shard-1.json) |
