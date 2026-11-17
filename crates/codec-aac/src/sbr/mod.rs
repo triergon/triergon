@@ -1113,6 +1113,17 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
 
 /// The prediction coefficients ([`predictor`]) of each band of `xl`, into `alpha`.
 fn predictors(xl: &[[Cpx; XL_LEN]], alpha: &mut [(Cpx, Cpx)]) {
+    #[cfg(feature = "simd")]
+    {
+        for (rows, alpha) in xl.chunks(4).zip(alpha.chunks_mut(4)) {
+            // a short last group repeats its last band in the spare lanes
+            let lanes: [&[Cpx; XL_LEN]; 4] = std::array::from_fn(|j| &rows[j.min(rows.len() - 1)]);
+            for (a, sums) in alpha.iter_mut().zip(simd::covariance4(lanes)) {
+                *a = predictor(&sums);
+            }
+        }
+    }
+    #[cfg(not(feature = "simd"))]
     for (x, a) in xl.iter().zip(alpha) {
         *a = predictor(&covariance(x));
     }
@@ -1130,6 +1141,10 @@ struct Covariance {
 }
 
 /// The covariances of one band, each summed in time order from zero.
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
 fn covariance(x: &[Cpx; XL_LEN]) -> Covariance {
     let mut r01 = Cpx::default();
     let mut r02 = Cpx::default();

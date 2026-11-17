@@ -1,11 +1,12 @@
-//! `std::simd` forms of the SBR QMF banks' windowing and shuffles, used with the `simd`
-//! feature (nightly).
+//! `std::simd` forms of the SBR QMF banks' windowing and shuffles and of the covariances
+//! HF generation predicts from, used with the `simd` feature (nightly).
 //!
 //! Every lane performs the scalar code's operations in the scalar code's order, so the
 //! results equal the scalar code's wherever the vector unit follows IEEE 754 (AArch64).
 //! ARMv7 NEON flushes subnormal operands and results to zero, so there the results can
 //! differ from the scalar code's for subnormal values.
 
+use super::{Covariance, XL_LEN};
 use crate::fft::Cpx;
 use std::simd::{f32x4, simd_swizzle};
 
@@ -122,6 +123,52 @@ pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut 
     }
 }
 
+/// The covariances of [`super::covariance`] for four bands, lane j from band `x[j]`. Each
+/// lane adds the scalar code's terms in its order. The bands are transposed two slots at a
+/// time, so that every vector holds one slot's real or imaginary parts of the four bands.
+pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
+    let mut re = [V::splat(0.0); XL_LEN];
+    let mut im = [V::splat(0.0); XL_LEN];
+    for n in (0..XL_LEN).step_by(2) {
+        let [a, b, c, d] = x.map(|x| ld2(x, n));
+        let (ab_lo, cd_lo) = (
+            simd_swizzle!(a, b, [0, 4, 1, 5]),
+            simd_swizzle!(c, d, [0, 4, 1, 5]),
+        );
+        let (ab_hi, cd_hi) = (
+            simd_swizzle!(a, b, [2, 6, 3, 7]),
+            simd_swizzle!(c, d, [2, 6, 3, 7]),
+        );
+        re[n] = simd_swizzle!(ab_lo, cd_lo, [0, 1, 4, 5]);
+        im[n] = simd_swizzle!(ab_lo, cd_lo, [2, 3, 6, 7]);
+        re[n + 1] = simd_swizzle!(ab_hi, cd_hi, [0, 1, 4, 5]);
+        im[n + 1] = simd_swizzle!(ab_hi, cd_hi, [2, 3, 6, 7]);
+    }
+    let zero = V::splat(0.0);
+    let (mut r01re, mut r01im, mut r02re, mut r02im) = (zero, zero, zero, zero);
+    let (mut r11, mut r12re, mut r12im, mut r22) = (zero, zero, zero, zero);
+    for n in 0..XL_LEN - 2 {
+        let (ar, ai) = (re[n + 2], im[n + 2]);
+        let (br, bi) = (re[n + 1], im[n + 1]);
+        let (cr, ci) = (re[n], im[n]);
+        r01re += ar * br + ai * bi;
+        r01im += ai * br - ar * bi;
+        r02re += ar * cr + ai * ci;
+        r02im += ai * cr - ar * ci;
+        r11 += br * br + bi * bi;
+        r12re += br * cr + bi * ci;
+        r12im += bi * cr - br * ci;
+        r22 += cr * cr + ci * ci;
+    }
+    std::array::from_fn(|j| Covariance {
+        r01: Cpx::new(r01re[j], r01im[j]),
+        r02: Cpx::new(r02re[j], r02im[j]),
+        r11: r11[j],
+        r12: Cpx::new(r12re[j], r12im[j]),
+        r22: r22[j],
+    })
+}
+
 #[cfg(test)]
 // the scalar forms are written index-style, as the default code's loops are
 #[allow(clippy::needless_range_loop)]
@@ -205,5 +252,31 @@ mod tests {
             })
             .collect();
         assert_eq!(bits(&out), bits(&scalar));
+    }
+
+    fn cpx(seed: u32, n: usize) -> Vec<Cpx> {
+        let re = values(seed, n);
+        let im = values(seed + 1000, n);
+        re.into_iter()
+            .zip(im)
+            .map(|(re, im)| Cpx::new(re, im))
+            .collect()
+    }
+
+    fn cpx_bits(v: &[Cpx]) -> Vec<(u32, u32)> {
+        v.iter().map(|c| (c.re.to_bits(), c.im.to_bits())).collect()
+    }
+
+    #[test]
+    fn covariance_kernel_equals_the_scalar_arithmetic() {
+        let bands: Vec<[Cpx; XL_LEN]> = (0..4)
+            .map(|j| cpx(20 + j, XL_LEN).try_into().unwrap())
+            .collect();
+        let sums = covariance4(std::array::from_fn(|j| &bands[j]));
+        for (band, sums) in bands.iter().zip(sums) {
+            let scalar = super::super::covariance(band);
+            let parts = |c: &Covariance| cpx_bits(&[c.r01, c.r02, c.r12, Cpx::new(c.r11, c.r22)]);
+            assert_eq!(parts(&sums), parts(&scalar));
+        }
     }
 }
