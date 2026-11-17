@@ -173,14 +173,12 @@ pub(super) fn fill_generic(tile: &mut TileMut<'_>, lines: &[Line], winding: i32)
 
     let mut cur = (256 * i32::from(winding as i8)) as i16;
     let stride = tile.stride;
-    for y in 0..TILE {
-        cur = cur.wrapping_add(delta[y]);
-        let out = &mut tile.data[y * stride..][..TILE];
-        for x in 0..TILE {
-            let val = res[y][x].wrapping_add(cur);
-            let val = val.max(val.wrapping_neg());
-            out[x] = val.min(255) as u8;
-        }
+    for (y, (row, delta)) in res.iter().zip(&delta).enumerate() {
+        cur = cur.wrapping_add(*delta);
+        // A whole row at a time, as an array: inlined here, the same work
+        // written per pixel compiles to scalar stores on AArch64.
+        let row = row.map(|sum| sum.wrapping_add(cur).wrapping_abs().min(255) as u8);
+        tile.data[y * stride..][..TILE].copy_from_slice(&row);
     }
 }
 
