@@ -1,5 +1,6 @@
-//! `std::simd` forms of the SBR QMF banks' windowing and shuffles and of the covariances
-//! HF generation predicts from, used with the `simd` feature (nightly).
+//! `std::simd` forms of the SBR QMF banks' windowing and shuffles, of the covariances HF
+//! generation predicts from, and of the Parametric Stereo hybrid filters, used with the
+//! `simd` feature (nightly).
 //!
 //! Every lane performs the scalar code's operations in the scalar code's order, so the
 //! results equal the scalar code's wherever the vector unit follows IEEE 754 (AArch64).
@@ -169,6 +170,39 @@ pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
     })
 }
 
+/// One Parametric Stereo hybrid filter over a frame: `out[t] = sum_d f[d] e[t + 12 - d]`,
+/// t < 32, each sum from zero in tap order, with the real taps alone when `real` (a
+/// mirror pair). Four slots a vector, real and imaginary parts apart.
+pub(super) fn hybrid_filter(f: &[Cpx; 13], e: &[Cpx; 44], real: bool, out: &mut [Cpx; 32]) {
+    let mut re = [0f32; 44];
+    let mut im = [0f32; 44];
+    for ((r, i), v) in re.iter_mut().zip(im.iter_mut()).zip(e) {
+        *r = v.re;
+        *i = v.im;
+    }
+    for (b, out) in out.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+        let t = 4 * b;
+        let (mut acc_re, mut acc_im) = (V::splat(0.0), V::splat(0.0));
+        for (d, c) in f.iter().enumerate() {
+            let (vr, vi) = (ld(&re, t + 12 - d), ld(&im, t + 12 - d));
+            let (cr, ci) = (V::splat(c.re), V::splat(c.im));
+            if real {
+                acc_re += cr * vr;
+                acc_im += cr * vi;
+            } else {
+                acc_re += cr * vr - ci * vi;
+                acc_im += cr * vi + ci * vr;
+            }
+        }
+        for (o, (r, i)) in out
+            .iter_mut()
+            .zip(acc_re.to_array().into_iter().zip(acc_im.to_array()))
+        {
+            *o = Cpx::new(r, i);
+        }
+    }
+}
+
 #[cfg(test)]
 // the scalar forms are written index-style, as the default code's loops are
 #[allow(clippy::needless_range_loop)]
@@ -277,6 +311,33 @@ mod tests {
             let scalar = super::super::covariance(band);
             let parts = |c: &Covariance| cpx_bits(&[c.r01, c.r02, c.r12, Cpx::new(c.r11, c.r22)]);
             assert_eq!(parts(&sums), parts(&scalar));
+        }
+    }
+
+    #[test]
+    fn hybrid_filter_equals_the_scalar_arithmetic() {
+        let f: [Cpx; 13] = cpx(30, 13).try_into().unwrap();
+        let e: [Cpx; 44] = cpx(31, 44).try_into().unwrap();
+        for real in [false, true] {
+            let mut out = [Cpx::default(); 32];
+            hybrid_filter(&f, &e, real, &mut out);
+            let scalar: Vec<Cpx> = (0..32)
+                .map(|t| {
+                    let mut acc = Cpx::default();
+                    for (c, v) in f.iter().zip(e[t..t + 13].iter().rev()) {
+                        if real {
+                            acc.re += c.re * v.re;
+                            acc.im += c.re * v.im;
+                        } else {
+                            let p = c.mul(*v);
+                            acc.re += p.re;
+                            acc.im += p.im;
+                        }
+                    }
+                    acc
+                })
+                .collect();
+            assert_eq!(cpx_bits(&out), cpx_bits(&scalar), "real taps {real}");
         }
     }
 }

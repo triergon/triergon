@@ -356,6 +356,9 @@ impl Synth {
             let f = &lay.taps[i];
             let e = &ext[band.qmf];
             let pair = f[6].im == 0.0 && f[5].im == 0.0;
+            #[cfg(feature = "simd")]
+            crate::sbr::simd::hybrid_filter(f, e, pair, out);
+            #[cfg(not(feature = "simd"))]
             for (t, o) in out.iter_mut().enumerate() {
                 // M[t] = sum_d f[d] X[t - d], X[t'] at e[t' + 6]
                 let w = &e[t..t + 13];
