@@ -42,20 +42,19 @@ framing_worker::worker::operation::avc_into
 <triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
 <triergon_framing::avc_config::AvcConfigParser>::advance
 <triergon_framing::avc_config::AvcConfigParser>::publication_ready
-triergon_framing::nal_packet::reserve_annex_b_output
-<triergon_core::bytes::BudgetVec<u8>>::reallocate
-triergon_core::bytes::charge_replacement
-triergon_core::bytes::settle_replacement
+triergon_framing::nal_packet::start_annex_b_output
 <triergon_framing::nal_packet_config::NalPacketConfigWriter>::nal
-triergon_framing::nal_packet::copy_annex_b_segment
 triergon_framing::nal_packet::freeze_annex_b_output
 <framing_worker::worker::model::Digest>::blob
 <triergon_framing::nal_packet::NalPacketJob>::step_into
 <triergon_framing::nal_packet::PacketPlan>::append
 <triergon_framing::nal_packet::PacketPlan>::check_storage_bound
 <triergon_framing::nal_packet::PacketState>::config
+triergon_framing::nal_packet::copy_annex_b_segment
 framing_worker::worker::operation::packet_digest
 <triergon_core::bytes::BudgetVec<triergon_framing::nal_packet::NalPacketOutput>>::reallocate
+triergon_core::bytes::charge_replacement
+triergon_core::bytes::settle_replacement
 core::ptr::drop_glue::<triergon_framing::nal_packet::NalPacketSession>
 <alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
 core::ptr::drop_glue::<framing_worker::worker::operation::Retained>

@@ -2,6 +2,10 @@ use crate::{NalFacts, NalUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+/// The four-byte start code written before every NAL unit; a three-byte code
+/// is its last three bytes.
+pub(crate) const START_CODE: [u8; 4] = [0, 0, 0, 1];
+
 /// A work-bounded operation with no external input requests. `Ready` occurs
 /// exactly once; subsequent calls return `Complete` unless cancelled/failed.
 #[derive(Debug)]
@@ -137,7 +141,7 @@ impl AnnexBWriter {
                 .as_mut()
                 .ok_or(Error::Invalid("missing Annex B builder"))?;
             if self.copied < 4 {
-                output.try_extend_from_slice(&[0, 0, 0, 1][self.copied..self.copied + count])?;
+                output.try_extend_from_slice(&START_CODE[self.copied..self.copied + count])?;
             } else {
                 let input = self
                     .input
