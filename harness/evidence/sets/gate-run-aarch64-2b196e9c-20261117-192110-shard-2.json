@@ -1,0 +1,149 @@
+{
+ "name": "gate-run-aarch64-2b196e9c-20261117-192110-shard-2",
+ "path": "gate-run-aarch64-2b196e9c-20261117-192110-shard-2",
+ "retention": "retained",
+ "reason": "Full gate run at 2b196e9c under static-toolchain-runtime-trained-order-v1, shard 2 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, Linux AArch64: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, the capture cases' timing reused from the 1c64b775 run, every other result measured; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the code-size change",
+ "key": "evidence/gate-runs/2b196e9c94f6341af49ef5acd46b08ace399e551-aarch64-20261117-192110/shard-2/d486987aeabfedbe7ed61ae3b347d8859f021cae83bd5c0be951bad1d0100ca9.tar.zst",
+ "sha256": "d486987aeabfedbe7ed61ae3b347d8859f021cae83bd5c0be951bad1d0100ca9",
+ "bytes": 127224015,
+ "results": [
+  {
+   "path": "memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "25ad76f686e0b2fa1c2878952a457a0075fc0e1b2333c69d3fcc738a7189570b",
+   "status": 0,
+   "report_sha256": "8108f831152003b5b2d2657c9bc27e06af096a41a7956f27946978b1af84dc80",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "139389dabe9f992f6a4c8a9d83b63148bff025b27281aaf372443896a5bcc512",
+   "status": 0,
+   "report_sha256": "7e32e5c86dee40fd7d32d8cc9f2a6710fe1a3c1bc183e0dffeeacaccdd6e573c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ass-render-host/gate-result.json",
+   "command": "report --memory",
+   "key": "dc0cf5559cf6189e1b27e74ea8dfe6ec48a6d51130ed49d4533683c9434fcb01",
+   "status": 0,
+   "report_sha256": "31d4e5039dbb674de2e04a9f045576dea7a0973393ef21f396eb58b6b88cd228",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "a21c528195e53c78cfacf6fe915acf96c33356734409bbc3df8cc51c57707870",
+   "status": 0,
+   "report_sha256": "74ef11ea597ddeadcf2844ffaafc42a03924cb827d7087d26911c7f5cb254863",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "80faac2c7892edcf695ca9ca78557369fac9666f8328d928cf83ab3018832157",
+   "status": 0,
+   "report_sha256": "3a8d6adb348903ab6bb0867ba6835f77c61cad2301215c935694c8640519801e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "145cfa506a3920889d1ca3cd908dd0ed83a5da148520abec37866d1efb4ddbf3",
+   "status": 0,
+   "report_sha256": "042e73a87c498a11c3e56a724fb7784267bdb8f77c5f048d16d4048843a4082f",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "00fc5aba30f9efc58eada54bc3f66ab57ba9abd348a36b2eae426e507279fb00",
+   "status": 0,
+   "report_sha256": "b8acf5daa602cf903a12c1a15c13b5bc9165155e548cd340e020d7fb05a7f2b6",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7e66283944e8b6f78b6fd3f1fdb7808da88990175e0579ba5ebcaf2d5f604ce6",
+   "status": 0,
+   "report_sha256": "fe3cc12f0cbcac011cfa7547b2cf3c7f949cceb765ad1c6709e26d5411289b26",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "73f8adb48d9ae48a1a6b9ff5011f92854b18c4d8d7e4efcafa0870f338e96844",
+   "status": 0,
+   "report_sha256": "3a7ac3555758448315035ae441912602d2de24c709121f7dbc5e8e654f73180b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c20b207eeac657534681d3eaf331ad50287ed6503085683dfd7b3811ce398062",
+   "status": 0,
+   "report_sha256": "23864e928bd3c50035a176c7b24644464b84444213a07e2e1f388c883e6921f3",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "78e622c9a66b1342ceb1d4881c09ee814251bbc58346eef7502fe8f6908b707f",
+   "status": 0,
+   "report_sha256": "79e63920a314ef40ca27c920b0a19f92ada99f36bf1d4e12677877e1d919b9ba",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "d07224cbfafd7ef4cf2638a9748cad870ba751e31e3fe1dbbe8fb51f006adec5",
+   "status": 0,
+   "report_sha256": "54c028939fc64b2461bf1c456ea273008ce67ed1cf1a828e92946a10a5c6e4ff",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "e91094d4d132c9136ce312fcf337c4d461735225888f45e8bc0b8651cbce59e3",
+   "status": 0,
+   "report_sha256": "0037c893a84243f6bba1511913bd0c6efab7f908c2afc8fe8a1e4424396901cb"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "0672bc1531b5fc422dbaf7f3febb8b2134fcd209bc7b545a6a49a38403478ad1",
+   "status": 0,
+   "report_sha256": "4852b810ea2add2107130fd45125f34da14763c8cc768a5636cd9512c546c667"
+  },
+  {
+   "path": "graded/ass-render-host/gate-result.json",
+   "command": "grade",
+   "key": "2a2440cde38577c2d17fed5f1f47d49ebcc237428aacfad04e1ae720706837ba",
+   "status": 1,
+   "report_sha256": "c6b7e9e024978257cf65433da52f80548ae684715a0719e8a8a249600f7f31bd"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "f0db11ff12d3fee1df79f776fd5507a39b57faea263c0b19c7e1dc2d7a0f333d",
+   "status": 0,
+   "report_sha256": "67a7c70b6ef452e88957e7502314b72a9d18c8dae1e004f4463b674d1acf9b34"
+  },
+  {
+   "path": "graded/isobmff-1/gate-result.json",
+   "command": "grade",
+   "key": "a0676f856c7a1c9e06b7486592c3cc2085abc99a331138253a07d21b45fcfa1f",
+   "status": 0,
+   "report_sha256": "e134f6b9aa07f44cea4be72b6320c284f45ef50b57308b01ebd7293fbbea551f"
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "f2e29e3dae14df8229e311f05c38d36a2bdeeac1275ccf143b62c55a130cf2a6",
+   "status": 0,
+   "report_sha256": "a4d97eac627d3576c6710e16970c2a306ac75cab0df38e30586f6933b197a527"
+  }
+ ]
+}

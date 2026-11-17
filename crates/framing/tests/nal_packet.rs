@@ -1536,3 +1536,85 @@ fn nonclone_canonical_metadata_keeps_exact_and_unknown_clocks_without_projection
     );
     assert_eq!(*out.source().fields.marker, 42);
 }
+
+/// Frames `source` in steps of `quantum` work, returning the output and the work
+/// every step spent.
+fn run_spending(
+    session: &mut NalPacketSession,
+    source: NalPacket,
+    quantum: u64,
+) -> (NalPacketOutput, u64) {
+    let mut job = session.packet(source, None).unwrap();
+    let mut spent = 0;
+    for _ in 0..100_000 {
+        let mut work = WorkBudget::new(quantum);
+        let step = job.step(&mut work, &AtomicBool::new(false)).unwrap();
+        spent += work.spent();
+        match step {
+            BuildStep::Ready(output) => return (output, spent),
+            BuildStep::Yield => {}
+            BuildStep::Complete => panic!("no packet publication"),
+        }
+    }
+    panic!("bounded packet job stalled")
+}
+
+#[test]
+fn one_pass_and_segment_copies_publish_the_same_bytes_for_the_same_work() {
+    // Injected configuration sets, three- and four-byte start codes, and a
+    // payload larger than one copy chunk, which only the segment copy takes.
+    let long = [&[0x41_u8][..], &[0x9a; 5000]].concat();
+    let (vps, irap, trail) = (hn(32), hn(19), hn(1));
+    let cases: [(Codec, Vec<&[u8]>); 3] = [
+        (Codec::Avc, vec![IDR, NON, NON]),
+        (Codec::Avc, vec![IDR, &long]),
+        (Codec::Hevc, vec![&vps, &irap, &trail]),
+    ];
+    for (codec, nals) in cases {
+        let mut charged = Vec::new();
+        for quantum in [1, 2, 7, 4096, 1 << 20] {
+            let p = pool();
+            let configuration = match codec {
+                Codec::Avc => NalPacketConfiguration::Avc(avc(&p, 128)),
+                Codec::Hevc => NalPacketConfiguration::Hevc(hevc(&p)),
+            };
+            let mut s = NalPacketSession::new(&p, configuration, limits()).unwrap();
+            let (output, spent) = run_spending(&mut s, packet(&p, &nals), quantum);
+            charged.push((output.bytes().to_vec(), spent));
+        }
+        assert!(
+            charged.windows(2).all(|pair| pair[0] == pair[1]),
+            "{codec:?}: {:?}",
+            charged.iter().map(|(_, spent)| spent).collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn configuration_publication_spends_the_same_work_in_any_steps() {
+    for codec in [Codec::Avc, Codec::Hevc] {
+        let mut published = Vec::new();
+        for quantum in [1, 3, 4096] {
+            let p = pool();
+            let configuration = match codec {
+                Codec::Avc => NalPacketConfiguration::Avc(avc(&p, 128)),
+                Codec::Hevc => NalPacketConfiguration::Hevc(hevc(&p)),
+            };
+            let mut writer = NalPacketConfigWriter::new(&p, &configuration, 1 << 16).unwrap();
+            let mut spent = 0;
+            let bytes = loop {
+                let mut work = WorkBudget::new(quantum);
+                let step = writer.step(&mut work, &AtomicBool::new(false)).unwrap();
+                spent += work.spent();
+                if let BuildStep::Ready(output) = step {
+                    break output.bytes().to_vec();
+                }
+            };
+            published.push((bytes, spent));
+        }
+        assert!(
+            published.windows(2).all(|pair| pair[0] == pair[1]),
+            "{codec:?}: {published:?}"
+        );
+    }
+}

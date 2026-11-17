@@ -100,19 +100,8 @@ pub struct ByteStorageAddress(usize);
 
 impl Bytes {
     pub fn copy_from_slice(budget: &Budget, input: &[u8]) -> Result<Self> {
-        let size = input
-            .len()
-            .checked_add(STORAGE_BYTES)
-            .ok_or(Error::Overflow)?;
-        let mut charge = budget.reserve(size)?;
-        let mut data = Vec::new();
-        data.try_reserve_exact(input.len())
-            .map_err(|_| Error::Allocation)?;
-        charge.grow_to(
-            data.capacity()
-                .checked_add(STORAGE_BYTES)
-                .ok_or(Error::Overflow)?,
-        )?;
+        let BudgetVec { mut data, charge } =
+            BudgetVec::try_with_owner_capacity(budget, input.len())?;
         data.extend_from_slice(input);
         Ok(Self::from_storage(data, charge))
     }
@@ -704,6 +693,24 @@ pub struct FreezeError {
     pub buffer: BudgetVec<u8>,
 }
 impl BudgetVec<u8> {
+    /// An empty buffer of `capacity` bytes for output whose size is known
+    /// before it is written. Its capacity and the shared-owner header that
+    /// [`freeze`](Self::freeze) adds are charged in one claim, so filling it
+    /// within that capacity and freezing it charge nothing more.
+    pub fn try_with_owner_capacity(budget: &Budget, capacity: usize) -> Result<Self> {
+        let mut charge =
+            budget.reserve(capacity.checked_add(STORAGE_BYTES).ok_or(Error::Overflow)?)?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(capacity)
+            .map_err(|_| Error::Allocation)?;
+        // An allocator may hold more than was asked for; charge all of it.
+        charge.grow_to(
+            data.capacity()
+                .checked_add(STORAGE_BYTES)
+                .ok_or(Error::Overflow)?,
+        )?;
+        Ok(Self { data, charge })
+    }
     /// Appends an LZ-style repetition from already materialized history. The
     /// destination is reserved before any bytes change, including when the
     /// repeated source overlaps the destination. Callers bound copy work.
@@ -795,6 +802,30 @@ mod tests {
         // Beyond the pool even exactly: refused, and the vector unchanged.
         assert!(vec.try_reserve(100).is_err());
         assert_eq!((vec.len(), vec.capacity()), (16, 17));
+    }
+
+    #[test]
+    fn an_owner_capacity_buffer_is_charged_once_for_its_frozen_owner() {
+        let pool = Budget::new(1 << 16).unwrap();
+        let mut buffer = BudgetVec::try_with_owner_capacity(&pool, 6).unwrap();
+        let charged = pool.used();
+        assert_eq!(
+            charged,
+            Budget::control_storage_bytes() + 6 + Bytes::owner_overhead_bytes()
+        );
+        buffer.try_extend_from_slice(b"abc").unwrap();
+        buffer.try_extend_from_slice(b"def").unwrap();
+        let bytes = buffer.freeze().unwrap();
+        assert_eq!(pool.used(), charged);
+        assert_eq!(bytes.as_ref(), b"abcdef");
+        assert_eq!(
+            bytes.retained_storage_bytes() + Budget::control_storage_bytes(),
+            charged
+        );
+        // Beyond the pool, the claim is refused before anything is allocated.
+        assert!(BudgetVec::try_with_owner_capacity(&pool, 1 << 16).is_err());
+        drop(bytes);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
     #[test]

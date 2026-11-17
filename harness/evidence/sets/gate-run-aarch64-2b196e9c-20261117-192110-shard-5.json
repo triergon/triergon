@@ -1,0 +1,80 @@
+{
+ "name": "gate-run-aarch64-2b196e9c-20261117-192110-shard-5",
+ "path": "gate-run-aarch64-2b196e9c-20261117-192110-shard-5",
+ "retention": "retained",
+ "reason": "Full gate run at 2b196e9c under static-toolchain-runtime-trained-order-v1, shard 5 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, Linux AArch64: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, the capture cases' timing reused from the 1c64b775 run, every other result measured; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the code-size change",
+ "key": "evidence/gate-runs/2b196e9c94f6341af49ef5acd46b08ace399e551-aarch64-20261117-192110/shard-5/3ece32ad060ae9518974c255fdbf466a6aba26ec4bdaf0ebf20cda25e679e2f9.tar.zst",
+ "sha256": "3ece32ad060ae9518974c255fdbf466a6aba26ec4bdaf0ebf20cda25e679e2f9",
+ "bytes": 45106872,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "627340a5e6fb5513c1d57735495b16eb7ad75e6e00430efd749fd962962a2d2a",
+   "status": 0,
+   "report_sha256": "7a40a5da4511162faec3a8b3fcb171ee5a06ba799ad297631ef3cdbddcd48dfd",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "8a2fb292c8dea3730cddbe385539834ce88341dab94b0b52ad5470744b04a195",
+   "status": 0,
+   "report_sha256": "007faf43ec61b22c8b8065c0499d9896d25a310b0163949a5d81ee708f331fc2",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "67bef2affb180933bc6bda69323947bbc9d32081e3b24b5649f9bebdb6a05076",
+   "status": 0,
+   "report_sha256": "d4ae48ab3c61e75e9771b4a35549116646da8476e5b7a2abd8bdfccc198c2205",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c345388341fe33b43d2c9ade0381d3a6e5e2e4023d7876c541ded2a0bb2147f2",
+   "status": 0,
+   "report_sha256": "7810c3937a6d6b54916d988ec9eedd922ec3d17edc8e403aa285f5f52e799653",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "d2987400b5217cd0408c6d0e9d4df6069b2c8d80775bb6a6b780f6f07d7a1ad0",
+   "status": 0,
+   "report_sha256": "7a74bc49aed9aca36119310bebf65dfebdec29be3c99fedbdebd31b0b6a79fe9",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "eaa7e08b0fa9470555c73065bf24948b1e92baca4c9c31dc46b432f31880b238",
+   "status": 0,
+   "report_sha256": "a606157c83c30461dc4ee23e3bb4269f7453c4f9da08566a81583d6e9e955301",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "b10dad8e57c3733ae5182da13f6ca172417cf5b15d00dafd2d4c5772c9bdb9a6",
+   "status": 0,
+   "report_sha256": "6f0914737ee1de8022194b5850dfd52cdce8e740043d4aca453c1b2c7f54d2b1"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "9550e801e32db681d15983e6d9609f1049febc524482989152af169b287f2ad3",
+   "status": 0,
+   "report_sha256": "aeda425bc46b6a07ddee3796d1e91d797b833ded3135410c5fb2e3a2ee43ddae"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "0172002b846a957e36bb12ddd01ca4a7145b8b80ea7c428ceac20b4259f7acf8",
+   "status": 0,
+   "report_sha256": "95332234e81bbec4666d12fa8a55b962f681dbd952381e10a4557690f9e2b59c"
+  }
+ ]
+}

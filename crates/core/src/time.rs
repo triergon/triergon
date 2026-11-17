@@ -275,9 +275,15 @@ impl Time {
                     .ok_or(Error::Invalid("time denominator"))?,
             });
         }
+        Self::reduced_wide(magnitude, denominator, numerator < 0)
+    }
+    /// [`new`](Self::new) for a magnitude or denominator beyond 64 bits.
+    #[cold]
+    #[inline(never)]
+    fn reduced_wide(magnitude: u128, denominator: u128, negative: bool) -> Result<Self> {
         let divisor = gcd(magnitude, denominator);
         Ok(Self {
-            numerator: signed(magnitude / divisor, numerator < 0)?,
+            numerator: signed(magnitude / divisor, negative)?,
             denominator: NonZeroU128::new(denominator / divisor)
                 .ok_or(Error::Invalid("time denominator"))?,
         })
@@ -343,6 +349,19 @@ impl Time {
         if let Some((numerator, denominator)) = fast() {
             return Self::new(numerator, denominator);
         }
+        self.combine_wide(other, left_factor, right_factor, subtract)
+    }
+    /// [`combine`](Self::combine) through 256-bit intermediates, for operands
+    /// whose cross products or common denominator overflow 128 bits.
+    #[cold]
+    #[inline(never)]
+    fn combine_wide(
+        self,
+        other: Self,
+        left_factor: u128,
+        right_factor: u128,
+        subtract: bool,
+    ) -> Result<Self> {
         let left = Wide::product(self.numerator.unsigned_abs(), left_factor);
         let right = Wide::product(other.numerator.unsigned_abs(), right_factor);
         let left_negative = self.numerator < 0;
@@ -424,13 +443,9 @@ impl Time {
         ) {
             return rounded(n / d, n % d != 0, n % d >= d - n % d, negative, rounding);
         }
-        let numerator = Wide::product(numerator, scale);
-        let denominator = Wide::product(denominator, divisor);
-        let (quotient, remainder) = numerator.div_rem(denominator);
-        rounded(
-            quotient.to_u128().ok_or(Error::Overflow)?,
-            remainder != Wide::ZERO,
-            remainder >= denominator.sub(remainder),
+        wide_quotient(
+            [numerator, scale],
+            [denominator, divisor],
             negative,
             rounding,
         )
@@ -441,6 +456,28 @@ impl Time {
     pub fn to_nanoseconds(self, rounding: Rounding) -> Result<i64> {
         self.to_i64_ticks(TimeBase::NANOSECONDS, rounding)
     }
+}
+
+/// The product of `numerator` over the product of `denominator`, rounded,
+/// through 256-bit intermediates, for products that overflow 128 bits.
+#[cold]
+#[inline(never)]
+fn wide_quotient(
+    numerator: [u128; 2],
+    denominator: [u128; 2],
+    negative: bool,
+    rounding: Rounding,
+) -> Result<i128> {
+    let numerator = Wide::product(numerator[0], numerator[1]);
+    let denominator = Wide::product(denominator[0], denominator[1]);
+    let (quotient, remainder) = numerator.div_rem(denominator);
+    rounded(
+        quotient.to_u128().ok_or(Error::Overflow)?,
+        remainder != Wide::ZERO,
+        remainder >= denominator.sub(remainder),
+        negative,
+        rounding,
+    )
 }
 
 fn rounded(
@@ -479,12 +516,20 @@ fn signed(magnitude: u128, negative: bool) -> Result<i128> {
     }
 }
 
-fn positive_cmp(mut a: u128, mut b: u128, mut c: u128, mut d: u128) -> Ordering {
+fn positive_cmp(a: u128, b: u128, c: u128, d: u128) -> Ordering {
     if let Some(left) = a.checked_mul(d)
         && let Some(right) = c.checked_mul(b)
     {
         return left.cmp(&right);
     }
+    continued_fraction_cmp(a, b, c, d)
+}
+
+/// [`positive_cmp`] for cross products beyond 128 bits: compares the continued
+/// fraction expansions of `a / b` and `c / d` term by term.
+#[cold]
+#[inline(never)]
+fn continued_fraction_cmp(mut a: u128, mut b: u128, mut c: u128, mut d: u128) -> Ordering {
     let mut reverse = false;
     loop {
         let ordering = (a / b).cmp(&(c / d));
