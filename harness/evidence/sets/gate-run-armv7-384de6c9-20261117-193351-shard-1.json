@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-384de6c9-20261117-193351-shard-1",
+ "path": "gate-run-armv7-384de6c9-20261117-193351-shard-1",
+ "retention": "retained",
+ "reason": "A partial gate run at 384de6c9 on 32-bit ARMv7, c6g.4xlarge, item framing on one host from the gate image: packet framing's 135 cases with timing on CPU 1, kernel-bound memory and the grade, the framing worker linked in module order; the shard's outputs as tools/gate-aws.sh archives them, with the index entry it wrote; for the packet framing rows of docs/status.md",
+ "key": "evidence/gate-runs/384de6c9347bee64e797bc3cdc49a5801ddd3f66-armv7-20261117-193351/shard-1/f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170.tar.zst",
+ "sha256": "f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170",
+ "bytes": 15515967,
+ "results": [
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "da2e452463a0b12a46a439c1c5a3dd0a511b69082b994d365b4ca1c475525258",
+   "status": 0,
+   "report_sha256": "2b3d58356c66bca3a15bf6348f0056fe3cc0b49c33eb8b46fbfda8adfe8fe102",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0e1dafc9487aa508b72c440f7eb8ead96f778e356e556c7b5e784bd80636c06a",
+   "status": 0,
+   "report_sha256": "9491585b7961c9325e2a450e3524b04c26946e3a4806245042baa7727278ca6e",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "40335a8f8bcc1c391f02bea74ae9313d8e1e2d6a595c76d94c12d622bf0c4ab8",
+   "status": 0,
+   "report_sha256": "8e8d4038703913c44b7239026fb4a3586efcf1ea96c2f458a1bd05c406fb0551"
+  }
+ ]
+}

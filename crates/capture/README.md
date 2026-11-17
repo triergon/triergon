@@ -29,6 +29,11 @@ component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session` also g
 `geometry()`, `converted()` (the last converted input), `reconstruction()` and
 `vbv_underflow_bits()`.
 
+`Session::open` selects the chroma conversion by width on every platform. To
+match the reference conversion in the capture suite, use `Session::open` on
+32-bit ARMv7 and `Session::open_filtered` on AArch64 Linux. The filtered
+constructor uses the centre-sited chroma filter at every width.
+
 ## Supported
 
 | Stage | Behaviour |
@@ -69,11 +74,8 @@ Multiplex differences (PMT stream type, SDT provider) are listed under
 ## Conformance
 
 The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an
-I/P GOP of 30, `mpegts`) driven by the capture build of `harness/reference.c`. Its
-conversion follows the target it is built for. `Session::open` uses the
-width-dependent conversion and `Session::open_filtered` uses the centre-sited
-chroma filter at every width. The capture worker uses the filtered conversion on
-AArch64 Linux. The
+I/P GOP of 30, `mpegts`) driven by the capture build of `harness/reference.c`.
+The capture worker selects the constructor for the target. The capture
 contract and required cases live in `harness/capture/contract.json` and
 `harness/capture/cases.json`; `harness/capture/` runs both pipelines and applies
 the per-stage rules documented in [triergon-pixel](../pixel/README.md#conformance)

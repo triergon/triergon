@@ -5,13 +5,13 @@ use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacket, NalPacketJob, NalPacketOutput,
     NalPacketProgress, NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketInput,
     PacketPhase, PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment,
-    empty_packet_segments, freeze_annex_b_output, reserve_annex_b_output,
+    copy_annex_b_whole, empty_packet_segments, freeze_annex_b_output, start_annex_b_output,
 };
 use crate::header::NalHeaderError;
 use crate::{AvcConfigArrayKind, Codec, NalHeader, header::avc};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
+use triergon_core::{Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
 
 /// Outcome of one phase step.
 type Step = ControlFlow<NalPacketProgress>;
@@ -756,12 +756,7 @@ impl PacketEmission {
             self.phase = EmissionPhase::Freeze;
             return Ok(NEXT);
         }
-        let pool = bytes.budget();
-        reserve_annex_b_output(
-            self.output.get_or_insert_with(|| BudgetVec::new(pool)),
-            state.total,
-            pool.limit(),
-        )?;
+        self.output = Some(start_annex_b_output(bytes.budget(), state.total)?);
         self.phase = EmissionPhase::Copy;
         Ok(NEXT)
     }
@@ -780,24 +775,26 @@ impl PacketEmission {
             .output
             .as_mut()
             .ok_or(Error::Invalid("missing packet buffer"))?;
+        if self.copy_segment == 0
+            && self.copied == 0
+            && copy_annex_b_whole(
+                buffer,
+                state.total,
+                parts.len(),
+                parts.iter().map(|part| part.copy(bytes, configuration)),
+                work,
+                cancel,
+            )?
+        {
+            self.copy_segment = parts.len();
+        }
         while let Some(part) = parts.get(self.copy_segment) {
             if self.copied < part.framed_len() {
                 if work.remaining() == 0 {
                     return Ok(YIELD);
                 }
-                let payload = part
-                    .backing(bytes, configuration)
-                    .as_ref()
-                    .get(part.source_range())
-                    .ok_or(Error::Invalid("packet segment range"))?;
-                if !copy_annex_b_segment(
-                    usize::from(part.prefix_bytes()),
-                    payload,
-                    buffer,
-                    &mut self.copied,
-                    work,
-                    cancel,
-                )? {
+                let (prefix, payload) = part.copy(bytes, configuration)?;
+                if !copy_annex_b_segment(prefix, payload, buffer, &mut self.copied, work, cancel)? {
                     return Ok(YIELD);
                 }
             }

@@ -4,12 +4,16 @@
 mod phases;
 use phases::AvcBufferingLookahead;
 
+use crate::annexb::START_CODE;
 use crate::header::NalHeaderError;
 use crate::inline_storage::InlineStorage;
 use crate::{AvcConfigArrayKind, AvcConfiguration, BuildStep, Codec, HvcConfiguration, LengthSize};
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, WorkBudget};
+
+/// The most bytes copied between two work and cancellation checkpoints.
+const COPY_CHUNK: usize = 4096;
 
 /// Resume copying one start code and its payload without crossing a work or
 /// cancellation checkpoint. The cursor is relative to the start code.
@@ -25,8 +29,8 @@ pub(crate) fn copy_annex_b_segment(
     let end = payload.len().checked_add(prefix).ok_or(Error::Overflow)?;
     // A segment that fits one chunk and the remaining work is copied in one
     // pass, with the charge and cancellation check of the chunked copy.
-    if *copied == 0 && end != 0 && end <= 4096 && end as u64 <= work.remaining() {
-        output.try_extend_from_slice(&[0, 0, 0, 1][4 - prefix..])?;
+    if *copied == 0 && end != 0 && end <= COPY_CHUNK && end as u64 <= work.remaining() {
+        output.try_extend_from_slice(&START_CODE[4 - prefix..])?;
         output.try_extend_from_slice(payload)?;
         work.take(end as u64);
         *copied = end;
@@ -37,11 +41,11 @@ pub(crate) fn copy_annex_b_segment(
     }
     while *copied < end {
         let remaining = if *copied < prefix {
-            &[0, 0, 0, 1][4 - prefix + *copied..]
+            &START_CODE[4 - prefix + *copied..]
         } else {
             &payload[*copied - prefix..]
         };
-        let count = (work.remaining().min(4096) as usize).min(remaining.len());
+        let count = (work.remaining().min(COPY_CHUNK as u64) as usize).min(remaining.len());
         if count == 0 {
             return Ok(false);
         }
@@ -55,24 +59,50 @@ pub(crate) fn copy_annex_b_segment(
     Ok(true)
 }
 
-/// Reserve the payload while leaving room for the charged result header.
-#[inline(never)]
-pub(crate) fn reserve_annex_b_output(
+/// Copy every entry, each a start-code length and a payload, in one pass when
+/// the output fits one chunk and the remaining work. The pass charges what the
+/// entry-by-entry copy charges: the output bytes and one unit for each of
+/// `entries` walked, `output_len` and `entries` counting entries that copy
+/// nothing. Returns false, without copying or charging, otherwise.
+pub(crate) fn copy_annex_b_whole<'a>(
     output: &mut BudgetVec<u8>,
-    bytes: usize,
-    pool_limit: usize,
-) -> Result<()> {
+    output_len: usize,
+    entries: usize,
+    copies: impl IntoIterator<Item = Result<(usize, &'a [u8])>>,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> Result<bool> {
+    let units = output_len.checked_add(entries).ok_or(Error::Overflow)? as u64;
+    if output_len > COPY_CHUNK || units > work.remaining() {
+        return Ok(false);
+    }
+    for copy in copies {
+        let (prefix, payload) = copy?;
+        output.try_extend_from_slice(&START_CODE[4 - prefix..])?;
+        output.try_extend_from_slice(payload)?;
+    }
+    work.take(units);
+    if cancel.load(Ordering::Relaxed) {
+        return Err(Error::Cancelled);
+    }
+    Ok(true)
+}
+
+/// Start an output of exactly `bytes`, charged together with the header of the
+/// shared owner it is published in.
+#[inline(never)]
+pub(crate) fn start_annex_b_output(pool: &Budget, bytes: usize) -> Result<BudgetVec<u8>> {
     let minimum = bytes
         .checked_add(Bytes::owner_overhead_bytes())
         .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
         .ok_or(Error::Overflow)?;
-    if minimum > pool_limit {
+    if minimum > pool.limit() {
         return Err(Error::Limit {
             requested: minimum,
-            maximum: pool_limit,
+            maximum: pool.limit(),
         });
     }
-    output.try_reserve_exact(bytes)
+    BudgetVec::try_with_owner_capacity(pool, bytes)
 }
 
 /// Retain the charged bytes for retry if publishing the result fails.
@@ -202,6 +232,10 @@ impl NalPacketConfiguration {
             Some(_) => Ok(false),
             None => Ok(true),
         }
+    }
+    /// Number of configuration NALs; zero for passthrough.
+    pub(crate) fn config_nal_count(&self) -> usize {
+        self.record().config_nal_count()
     }
     /// Configuration NAL, or None past the last NAL or for passthrough.
     pub(crate) fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
@@ -715,6 +749,14 @@ impl NalPacketSegment {
         } else {
             packet
         }
+    }
+    /// The start-code length and payload this segment copies into the output.
+    fn copy<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<(usize, &'a [u8])> {
+        let payload = self
+            .backing(packet, configuration)
+            .get(self.source_range())
+            .ok_or(Error::Invalid("packet segment range"))?;
+        Ok((usize::from(self.prefix_bytes()), payload))
     }
 }
 

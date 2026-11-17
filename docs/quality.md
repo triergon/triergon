@@ -585,6 +585,13 @@ may override that count for diagnostic comparisons.
   ordered worker therefore reflects the linker, the module order and the trained order
   together. Which workers take an order on which target is what
   `harness/link-order/training.json` gives; [status](status.md) has their results.
+  A smaller worker does not take the order's place. Linked by the default linker, the
+  functions the training corpus runs lie in every 64 KiB window of each ordered worker's
+  code; packed, they fill 6 of the media worker's 11 on ARMv7. Built for size (`opt-level = "s"` or
+  `"z"`), the ordered workers' images are 12 to 23% smaller, yet linked without the
+  order they keep most of the resident memory the order saves: per worker and target,
+  the median training operation recovers 21 to 64% of it, and some recover none
+  ([status](status.md#32-bit-armv7)).
   - The trained order of a worker for a target, `harness/link-order/TARGET/WORKER.txt`,
     lists by demangled name the functions a training corpus runs in the release
     worker, in the order the operations first run them, and names in its header the

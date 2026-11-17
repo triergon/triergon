@@ -1,0 +1,9 @@
+{
+ "name": "ass-cache-keys-stage-eaff16ba",
+ "path": "ass-cache-keys-stage-eaff16ba",
+ "retention": "retained",
+ "reason": "Cause and counts of the generic tile fill's row stores, one c6g.4xlarge host (Graviton2) from the Linux AArch64 gate image: perf stat user-mode instructions, cycles, branch misses and L1 data misses of ass-worker at main 2a6a07a7 and at eaff16ba and of libass-player-worker on cache-keys-ass-720p and cache-keys-ass-1080p, 20 iterations on one CPU, with cycle profiles by symbol and the annotated fill closure of each candidate build; the fold digests of every ass-render and ass-render-host fixture from both builds (104, all identical); timed-span ratios against the reference in 8 interleaved pairs; the scripts, workers' SHA-256 and host details; cited by docs/status.md for the Linux AArch64 runtime of ass-render.",
+ "key": "evidence/ass-cache-keys-stage-eaff16ba/9341333fdf92ca22f395d91ff587514d51fd68c5f6c1402793f87cf17391e95e.tar.gz",
+ "sha256": "9341333fdf92ca22f395d91ff587514d51fd68c5f6c1402793f87cf17391e95e",
+ "bytes": 185889
+}

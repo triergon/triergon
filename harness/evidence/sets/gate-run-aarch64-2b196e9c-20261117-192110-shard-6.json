@@ -1,0 +1,87 @@
+{
+ "name": "gate-run-aarch64-2b196e9c-20261117-192110-shard-6",
+ "path": "gate-run-aarch64-2b196e9c-20261117-192110-shard-6",
+ "retention": "retained",
+ "reason": "Full gate run at 2b196e9c under static-toolchain-runtime-trained-order-v1, shard 6 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, Linux AArch64: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, the capture cases' timing reused from the 1c64b775 run, every other result measured; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the code-size change",
+ "key": "evidence/gate-runs/2b196e9c94f6341af49ef5acd46b08ace399e551-aarch64-20261117-192110/shard-6/64d267f51a12827ccfbc5eb4e23bfab72890d5b3cfffa4475d6a524b0552f196.tar.zst",
+ "sha256": "64d267f51a12827ccfbc5eb4e23bfab72890d5b3cfffa4475d6a524b0552f196",
+ "bytes": 28510466,
+ "results": [
+  {
+   "path": "memory/matroska-demux/gate-result.json",
+   "command": "report --memory",
+   "key": "810d71f6610a14b3f28b17c5600d8de9e5fabb65bdb8160ae7adc8ab66659bcf",
+   "status": 0,
+   "report_sha256": "fba4ab977bba5400d7ddea3a39ecb1fe33f44bbd488867d02600b10e427ff805",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "fd9e2b903d1934df4be33056e7a66d006d620cfab11f7104c99b944fef4b4bf1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/ass-render/gate-result.json",
+   "command": "report --memory",
+   "key": "fa21ee6fee577729c0f8db3e0c473edabf4f6fac1138984b049e126d665a8469",
+   "status": 0,
+   "report_sha256": "c47eb6ae31de62727b2f5d9bc9a26a93f90bff419b08821c3c86a94c24a2c74c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "640550204565df6a785f2dd6b9adffbbeaf6b17e364c7d6225ca1b10c03c9762",
+   "status": 0,
+   "report_sha256": "e3e977ce472762b320ff9b638ccbc15f5ca333085a507b445a30de56f2ba0a7f",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-demux/gate-result.json",
+   "command": "report --benchmark",
+   "key": "be0fbd9f73ffc86cb08c4a75f482f681ec281d4bbfb233398fc557b424511a43",
+   "status": 0,
+   "report_sha256": "00233728486647a29f22c0e4524207798702c7507445804311a12a6097e5aa39",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render/gate-result.json",
+   "command": "report --benchmark",
+   "key": "96228f08c05c0784b04d86e6fa3a5340901638e41908515765dfd41b62680280",
+   "status": 0,
+   "report_sha256": "62fcd895a361f15133a5c4263288018aa4fd8d9ce4f19cb4eff7137f90719e95",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c59aba4c9153b1233c05f0bda2be5783acee704a36b1315b07b1deff1483b1b0",
+   "status": 0,
+   "report_sha256": "9cc90a2fd639d7ce46382a5de790d96575d87a1bd5f4a66d0a7ef1e0959e3723",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "5cd81bef220bd6242e7f1c5ac1505c18967b3a3704c352618cedef3081ef0a99",
+   "status": 0,
+   "report_sha256": "e6d17ddc37d690520c6405af2aa5516355b795d4358268bfee4689a835e11565"
+  },
+  {
+   "path": "graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "080ba72230afd7a76c9197f3850f4018418d36169d9bed7856aed6c63b2440ae",
+   "status": 0,
+   "report_sha256": "052c2d264f8f872ed4ecc33d073af165203ace1a1fe8db3c62bd3a4ac527edc2"
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "068f2e6cc07ad50f4805be3dba191cddeb47fdfababe0bf7fbfe54fdb976b4e0",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

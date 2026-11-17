@@ -1,0 +1,94 @@
+{
+ "name": "gate-run-armv7-2b196e9c-20261117-192033-shard-8",
+ "path": "gate-run-armv7-2b196e9c-20261117-192033-shard-8",
+ "retention": "retained",
+ "reason": "Full gate run at 2b196e9c under static-toolchain-runtime-trained-order-v1, shard 8 of 8, c6g.4xlarge hosts (Graviton2) from the gate images, kernel 7.0.0-1014-aws, set codec-derived-streams unpacked, 32-bit ARMv7: every item of the shard, timing on CPU 1 and kernel-bound memory on CPUs 1-15, the capture cases' timing reused from the 1c64b775 run, every other result measured; the shard outputs, build identities, plan, step records and logs; for the docs/status.md record of the code-size change",
+ "key": "evidence/gate-runs/2b196e9c94f6341af49ef5acd46b08ace399e551-armv7-20261117-192033/shard-8/f2f78eb52b940ea67cf87b8ae185327614e3df5cf1c1477a03526380f571cfd8.tar.zst",
+ "sha256": "f2f78eb52b940ea67cf87b8ae185327614e3df5cf1c1477a03526380f571cfd8",
+ "bytes": 28857410,
+ "results": [
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "388e90e7a28e04277dea34d0ad510b4c446be9e4c966fb067750d8bb69fa8505",
+   "status": 0,
+   "report_sha256": "2eaa6920c95ec24dc6c1bfdfad9bf53a6f70604263fa08164293e998e664584a",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --memory",
+   "key": "62ee527a12e36a134b19a6454d7549b19b153ff4291d13ff25bc340ca3b37ac8",
+   "status": 0,
+   "report_sha256": "293fab096bf8d6ac1dca2e88d01e95edc558e1f22a68381c6edaada56b117a5d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "a5d4689fd2090996b681b5e43de16435ece3222b1939eae79c0743bd8cd4c993",
+   "status": 0,
+   "report_sha256": "f520258cb80dcb979482a66152f977c7eecf1f7ca064c735623d10ea8915e720",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e7aaa2b1fe9c0404ccb1db0ba8a80cab2e134c8c578e70bd7032415668f34e43",
+   "status": 0,
+   "report_sha256": "449ad9be745ea4c271934d15182910c8b91a2d716d934f0a68549b1675333a88",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --benchmark",
+   "key": "277951558a7070d7f9f960467f36260505811de525a3cf68531abf930960184c",
+   "status": 0,
+   "report_sha256": "be9cc206eb8d87eb6183c292ab06a1857b34906065ef8760e1f9da648bceaa9a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b09e3a059b26adf99f5e93cbe0b4e2bba75a2c6bccb425747f48fa9805f3ff4d",
+   "status": 0,
+   "report_sha256": "1919ac0ca5e9ab7a6dfbd2fdc96af541b367e0d76ad29625db6753e9da234063",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "25d5221f25b68d8d01cd359d3860512ac6636c7121b9ba94664ed06ceba2d346",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "35d679af8a385612dfea19d5a89569e96f0e3ccef49c6850b951997cf04957c1",
+   "status": 0,
+   "report_sha256": "b6cfa415f9e0d5979f62981385d49237260b35b337cd3ef66aa49604e60a0d26"
+  },
+  {
+   "path": "graded/subtitle-pgs-capsules/gate-result.json",
+   "command": "grade",
+   "key": "303b8dcc681ac7082a3148d037cdb32dbdbc85ec743ef0f0ffe97e15ebb2b5c3",
+   "status": 0,
+   "report_sha256": "0aade2030f823836ab9ee315756735509d12c309df615112b2e9ab47066684b7"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "11c2727f74117db7402f7ccd3f186bb0d9f986e63192c31f4d5e8967258715bc",
+   "status": 0,
+   "report_sha256": "198d2e111589858c4312d3c58e08d603923facd617a0c8d20161422090def7d9"
+  },
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "78f669aaa17612725e63337700921cb0664d88f60a7fe206fbded4b080302311",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

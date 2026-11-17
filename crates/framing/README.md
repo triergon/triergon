@@ -134,7 +134,10 @@ one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
 Stateful packet jobs charge heap segment storage to the caller's pool and
-share the original payload for passthrough packets. A `NalPacketSession`
+share the original payload for passthrough packets. A packet or configuration
+output is sized before it is written and charged once, with the shared owner it
+is published in; one of at most 4096 bytes that the remaining work covers is
+copied in one pass, charged as its NAL-by-NAL copy is. A `NalPacketSession`
 frames packets, configuration records and outputs of at most 4 GiB − 1 bytes
 (`NalPacketLimits::MAXIMUM_SPAN`), whatever its limits allow; its segment
 descriptors are 16 bytes.
