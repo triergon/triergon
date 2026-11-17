@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-ratios-eaff16ba",
+ "path": "ass-render-ratios-eaff16ba",
+ "retention": "retained",
+ "reason": "Per-case runtime and memory of ass-render and ass-render-host from the partial gate runs at eaff16ba, both targets, computed on a host from the shard archives (fetched and verified there): every case's paired runtime median and 95% bounds and its heap and total RSS bounds (cases-a64.jsonl, cases-arm.jsonl), and per target the median of case medians, the cases above 1.0 and 1.05, the highest bounds, the largest median changes against the full runs at 1c64b775 (set closing-run-ratios-1c64b775) and the worst memory bounds (compare-TARGET.txt), with the scripts; for docs/status.md.",
+ "key": "evidence/ass-render-ratios-eaff16ba/bdc6aa490d98d1b1ece191719ee94454d1358ead0ac83b0eefb6f17be25331d2.tar.gz",
+ "sha256": "bdc6aa490d98d1b1ece191719ee94454d1358ead0ac83b0eefb6f17be25331d2",
+ "bytes": 67612
+}
