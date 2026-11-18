@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-aarch64-f1734121-20261118-003728-shard-1",
+ "path": "gate-run-aarch64-f1734121-20261118-003728-shard-1",
+ "retention": "retained",
+ "reason": "Matroska qualification at f1734121 on AArch64 Linux, c6g.4xlarge. The set holds the shard's full comparison, paired timing and kernel-bound memory reports, with worker identities and input hashes.",
+ "key": "evidence/gate-runs/f17341212c4e17c76f61d4161ad40d570c9ef9c0-aarch64-20261118-003728/shard-1/393f4e40eaaa868a073a7e71cfeb212532b240b2936c19dbeeca0e59777f5e89.tar.zst",
+ "sha256": "393f4e40eaaa868a073a7e71cfeb212532b240b2936c19dbeeca0e59777f5e89",
+ "bytes": 8163749,
+ "results": [
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "510e7744bd14ea9825e87fff23f98c11bd276a6aec47b0d71e4b361ec654e23e",
+   "status": 0,
+   "report_sha256": "6ae149e31b6705f3d534873b44eb3a4ed5c70e53a25998e3b1d4bbf25d396430",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a7b8325736ceb7cd99669483606f41d07ea0576cbaff3cc4591c406c7c869b11",
+   "status": 0,
+   "report_sha256": "5de5572607d4dcd9c9d20905af337574887643b6d45b8c18e9053ab18f630fec",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "d13c797b4eaf4b36477c23692710ee4b90db32f0c67b2de8cc20feb9d35c1298",
+   "status": 0,
+   "report_sha256": "38a6615b5d0a2434815f49a9d4f818b1a4221d899f1d02e8ca6e13377d6ad1d2"
+  }
+ ],
+ "source_revisions": [
+  "f17341212c4e17c76f61d4161ad40d570c9ef9c0"
+ ]
+}

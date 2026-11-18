@@ -1,0 +1,60 @@
+{
+ "name": "gate-run-aarch64-f1734121-20261118-003728-shard-3",
+ "path": "gate-run-aarch64-f1734121-20261118-003728-shard-3",
+ "retention": "retained",
+ "reason": "Matroska qualification at f1734121 on AArch64 Linux, c6g.4xlarge. The set holds the shard's full comparison, paired timing and kernel-bound memory reports, with worker identities and input hashes.",
+ "key": "evidence/gate-runs/f17341212c4e17c76f61d4161ad40d570c9ef9c0-aarch64-20261118-003728/shard-3/e03232be4430ec85078bcd3610c5b2bd7cda4d68f421dc3068e48fc85ccc2f8a.tar.zst",
+ "sha256": "e03232be4430ec85078bcd3610c5b2bd7cda4d68f421dc3068e48fc85ccc2f8a",
+ "bytes": 9335733,
+ "results": [
+  {
+   "path": "memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "3d887b1b0e37230d8f96844c1911bbbe362bfb8cce0eafbc386d57f969b60c1c",
+   "status": 0,
+   "report_sha256": "1e8310352fbb0f3ae91a3a933f4b2cdd986ff0a909701c224b1791c7111b98b2",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-header-removal/gate-result.json",
+   "command": "report --memory",
+   "key": "cc5e88bb70a41167eb8962060e1bbbd76b82a12fa3db7e3a5e1b87f2106d5f7e",
+   "status": 0,
+   "report_sha256": "747eac83a77c5534fe3e305f97e0bbfd219f4d40a7981e37510398d6c256fa7e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9bd43b9be427b636037f735b8be154f33bb0463f704b9f1f81b71b353ff46df1",
+   "status": 0,
+   "report_sha256": "76e795dbf937eaa567c13d14522fa646f0a5923d713045b29bb3da9e722a97c1",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-header-removal/gate-result.json",
+   "command": "report --benchmark",
+   "key": "5bd5dd13124e29493f6459e609b04a43cb47b7bccc42239cecfe86b2ef2c40d9",
+   "status": 0,
+   "report_sha256": "23961a20e7ee40efc8b88ec08bf6b4933df24b3b7d21f98ecb21cf41c9541a20",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "c605b97c7ec52570edb3f7ab88951dc2e433438eba252e5e4da209f8009dd5ef",
+   "status": 0,
+   "report_sha256": "0f66d929c2dee72efa7582a45af3a90de2c221c977a1118a52e589dc84b3fd68"
+  },
+  {
+   "path": "graded/matroska-header-removal/gate-result.json",
+   "command": "grade",
+   "key": "5559e0d7080e95bb9457b44427537fdbdb8ca6917c5946482ab42d357c9e80dd",
+   "status": 0,
+   "report_sha256": "0a9c61b8a7b096d03e12f707304dbd135c348141444a359cb8b59601d10c9a1a"
+  }
+ ],
+ "source_revisions": [
+  "f17341212c4e17c76f61d4161ad40d570c9ef9c0"
+ ]
+}

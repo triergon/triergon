@@ -1,0 +1,83 @@
+{
+ "name": "gate-run-armv7-f1734121-20261118-003710-shard-2",
+ "path": "gate-run-armv7-f1734121-20261118-003710-shard-2",
+ "retention": "retained",
+ "reason": "Matroska qualification at f1734121 on 32-bit ARMv7 Linux, c6g.4xlarge. The set holds the shard's full comparison, paired timing and kernel-bound memory reports, with worker identities and input hashes.",
+ "key": "evidence/gate-runs/f17341212c4e17c76f61d4161ad40d570c9ef9c0-armv7-20261118-003710/shard-2/f3703634cc5234e3c4fd599c3f4513ce3c6b5c372059748467b8e88923c8341a.tar.zst",
+ "sha256": "f3703634cc5234e3c4fd599c3f4513ce3c6b5c372059748467b8e88923c8341a",
+ "bytes": 12203076,
+ "results": [
+  {
+   "path": "memory/matroska-demux/gate-result.json",
+   "command": "report --memory",
+   "key": "29dbb68e278711c444c063114837f95dc8bbc3d43a2e4f6548101e13191b8344",
+   "status": 0,
+   "report_sha256": "b266751e65d4110ebfa485ec211425d4f5a61ae187e020cc4e8c957296c383ee",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-zlib/gate-result.json",
+   "command": "report --memory",
+   "key": "aeaa557e8d24b37fc737ef4521928bd459d62a880bbc0e650b2448ecfe64ec94",
+   "status": 0,
+   "report_sha256": "99ae38740f1c4b4b80eb7a4e6bffbc63255d71ae6a66db45189fa30f1e59677c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-colour/gate-result.json",
+   "command": "report --memory",
+   "key": "c98d8b2cf86d3587fe6a901a99098a7b499940da373f52b6ea044d4bfc8ca703",
+   "status": 0,
+   "report_sha256": "e7ab03e5b0393c82dfc918c48b82c2596fe785d032db04aa8f17a797ec701a25",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-demux/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b40cffadaef5b087a1e7296269ace3c931d7902216c006e375d04c4de066d64c",
+   "status": 0,
+   "report_sha256": "860ac8942a4052085bc2d311058de72a3cd0166cb97b0a3a498224901126b004",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-zlib/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0f5d44d42cbe51f9ab8f3af1279fee31f4765505108a9adb4277f4d5c8a4b4af",
+   "status": 0,
+   "report_sha256": "8f5681958f87232955234c6b2bec46e84e0fafd7eb37263b903919e8294c902b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-colour/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b4ca8159d1cd334e0e7116263c61ac1d59d074ab0b103b24785022e3fe0b1389",
+   "status": 0,
+   "report_sha256": "6574df37c744363d954620662af4a4ca2ae5e268985963fa3b28afcf0e36f40f",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "964235f57e4e39e3f35d1af5e916fabf4bc466198b6f37aabcf21f13cdb06d1d",
+   "status": 0,
+   "report_sha256": "83d319bc433ece3ffe2bb78c64ada6ede70d1076922ad69e3c147c58f2c84695"
+  },
+  {
+   "path": "graded/matroska-zlib/gate-result.json",
+   "command": "grade",
+   "key": "5d094709c602480012ace5a1db82cfae278558f5ab4b6a946f67470ad53b3a37",
+   "status": 0,
+   "report_sha256": "b6f76a570eebc88871821cacad13628e1e3ef2233627eef8371fe86a3c9ee84d"
+  },
+  {
+   "path": "graded/matroska-colour/gate-result.json",
+   "command": "grade",
+   "key": "0ac56faf2ceed013b818c37890899f00d246884a8802b678dcbb21bd1f097720",
+   "status": 0,
+   "report_sha256": "bd74d2cef24adf3220a038457c728f3759cc495a6b5e6860e7af6189e0820f8b"
+  }
+ ],
+ "source_revisions": [
+  "f17341212c4e17c76f61d4161ad40d570c9ef9c0"
+ ]
+}

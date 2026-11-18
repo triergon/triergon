@@ -1,0 +1,106 @@
+{
+ "name": "gate-run-aarch64-f1734121-20261118-003728-shard-4",
+ "path": "gate-run-aarch64-f1734121-20261118-003728-shard-4",
+ "retention": "retained",
+ "reason": "Matroska qualification at f1734121 on AArch64 Linux, c6g.4xlarge. The set holds the shard's full comparison, paired timing and kernel-bound memory reports, with worker identities and input hashes.",
+ "key": "evidence/gate-runs/f17341212c4e17c76f61d4161ad40d570c9ef9c0-aarch64-20261118-003728/shard-4/c638df40dfba0559dc26676beef4ab9d60c34191c0f5d816b11f052f8259f039.tar.zst",
+ "sha256": "c638df40dfba0559dc26676beef4ab9d60c34191c0f5d816b11f052f8259f039",
+ "bytes": 11046724,
+ "results": [
+  {
+   "path": "memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "4ac88829206e6bbf39b5d3082985be91618d8f2f3d937a26640c569a99d4427c",
+   "status": 0,
+   "report_sha256": "d149401841dfcc82431c7251241fc491f38629915ec867165af87e0efe8a7db7",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "45b225913646d8ad5141989ce38fb315e75d7f7ae056eab097cc7050e56ff976",
+   "status": 0,
+   "report_sha256": "7b33e519979ee3c7e118446ec78456c9702ac0b81cc5b3c25eeccddb6a9b5976",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "e24771853fc588cfa992eb4b4f9ae3ee0ffc815155103c0ba62152f9ca272e2d",
+   "status": 0,
+   "report_sha256": "92d0be34e947a306a5397942ef9dbe70fc50a44d4f40fdd93189012737e5c2e6",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "f17505d43cfa7fac15f955d30b53cdc7b2dd43c0d02fa0e9d160812e7ec6c76c",
+   "status": 0,
+   "report_sha256": "28a58ea102870fbb4a453bbdaf66f9976d1d2603db73a6d06702e7fd791ad99b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "bec8780454da443a5fcb8a40c2dd5f4e7b3ecc5f97d541aeab53e3ea2a5e9357",
+   "status": 0,
+   "report_sha256": "af47b4e7fe9ba576303a1afe1f82440017cb30bde18b73a5fca2595813f8410d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ba81b6dd599752cbea2b3ba1867566973722514392beb3638421bc41174bf0ae",
+   "status": 0,
+   "report_sha256": "f45cb12e031fd2db4616a7ed7d6040a6854de3ea2c6a4521c272419a41e0becd",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b50fef1e9f4bdf7e3aa48ea6f6a1eed42e5e16539447c6914587f16c2b80df40",
+   "status": 0,
+   "report_sha256": "dce92adb16562d9ba33d1cbe6cc1862899f15854c542db6feaf75a6b4adc436c",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0aef7bb2b240f68f58c1d543808995f251c2f54d0ca27f4078ed03ac2b1f33b5",
+   "status": 0,
+   "report_sha256": "9dda3b49f0e18fe0d4ea1263b8be196521dac290a282d57a909e1d41c385a619",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "1f8bed60bd8ca203e4b73e4d942fde462dc101427f094870319deda2fc08e827",
+   "status": 0,
+   "report_sha256": "079816c6adcf09c26502499269d584f676d06d117d9deb4f4d8b47cbc36b4e35"
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "5046b68b276a98d65eab154a0da4301ae9e246ac2c8d1cee3ee4cc37ef39e445",
+   "status": 0,
+   "report_sha256": "97c9cf6dbf53ddd83f8252b38d37d701374b3f8b451356df528edebf8c67c0f5"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "4e27eefb46157ce085d43476d48e376af135c30f017a02f73a6de4c73188c898",
+   "status": 0,
+   "report_sha256": "4c249bf75e2f3297c7b5f377bd75cdb2512e970d99456f48386e74b17da1776b"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "36e68d0825cdf2bcdb9903f642f14039e663691e0d4d8433562151290d46de34",
+   "status": 0,
+   "report_sha256": "ff257da2b03beb87b15bc6d13305b19e22c6c2e6d4985162a26104ccc2b91615"
+  }
+ ],
+ "source_revisions": [
+  "f17341212c4e17c76f61d4161ad40d570c9ef9c0"
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-armv7-f1734121-20261118-003710-shard-1",
+ "path": "gate-run-armv7-f1734121-20261118-003710-shard-1",
+ "retention": "retained",
+ "reason": "Matroska qualification at f1734121 on 32-bit ARMv7 Linux, c6g.4xlarge. The set holds the shard's full comparison, paired timing and kernel-bound memory reports, with worker identities and input hashes.",
+ "key": "evidence/gate-runs/f17341212c4e17c76f61d4161ad40d570c9ef9c0-armv7-20261118-003710/shard-1/0dc69349973063ce7757a01e4fa41b4634ce9a3ce9b037ed943e633ca32126ee.tar.zst",
+ "sha256": "0dc69349973063ce7757a01e4fa41b4634ce9a3ce9b037ed943e633ca32126ee",
+ "bytes": 7452179,
+ "results": [
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "bdbe6787b96b8b74a7bc963c71147cbbe0073505a7a0c1dbaf9477a6f6a4b76b",
+   "status": 0,
+   "report_sha256": "5d3efc2d262d80606a52e95b0fdaea6660a6503cd0782b3cf81ea4c3c857243f",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "886351671a32f2018f31cc2347ccf365a756b05ee64b942396d34c57979845a3",
+   "status": 0,
+   "report_sha256": "9b4a88df48571b90d05d73b87d3976189f87a8834edec10d8c04643a0c3acaab",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "e54b7779bb4d48bb1465fe99330344728c4557beb48835e7105e76b2277d8157",
+   "status": 0,
+   "report_sha256": "5284742bb44103e32f6c1f7af93d8c5d04e1e889a1294b09351221928a55d0bf"
+  }
+ ],
+ "source_revisions": [
+  "f17341212c4e17c76f61d4161ad40d570c9ef9c0"
+ ]
+}
