@@ -2,7 +2,7 @@
  "name": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-4",
  "path": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-4",
  "retention": "retained",
- "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 4 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured, archived by hand as collect() does; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 4 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
  "key": "evidence/gate-runs/f7b1d8eb17554e4710c4f475d615bbf83206453c-aarch64-20261118-104434/shard-4/51c7411ccb6d72d98e98ddb4609f490b4ccc1bb3d85db9e60167f0fad7292f7f.tar.zst",
  "sha256": "51c7411ccb6d72d98e98ddb4609f490b4ccc1bb3d85db9e60167f0fad7292f7f",
  "bytes": 421795763,
