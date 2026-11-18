@@ -462,7 +462,7 @@ fn same_preroll_packet(packet: &Value, source: &Value) -> bool {
         && fields.iter().all(|(key, observed)| {
             source.get(key).is_some_and(|expected| {
                 // Start padding is applied once at the beginning of the source.
-                key == "trim_start_samples" || super::diff::equal(observed, expected)
+                key == "trim_start_samples" || super::validation::same(observed, expected)
             })
         })
 }
@@ -483,7 +483,7 @@ fn playback_preroll_matches(
     let tracks = track_info.as_array().ok_or("invalid seek tracks")?;
     if !actual
         .get("tracks")
-        .is_some_and(|actual| super::diff::equal(actual, track_info))
+        .is_some_and(|actual| super::validation::same(actual, track_info))
     {
         return Err("playback seek tracks differ");
     }
@@ -528,7 +528,7 @@ fn playback_preroll_matches(
         let track = track_index(packet)?;
         if wanted
             .peek()
-            .is_some_and(|expected| super::diff::equal(packet, expected))
+            .is_some_and(|expected| super::validation::same(packet, expected))
         {
             emitted[track] = true;
             wanted.next();
@@ -577,6 +577,7 @@ fn playback_seek_keeps_the_full_reference_sequence() {
         Value::object([
             ("track", Value::int(track)),
             ("pts_ns", pts),
+            ("key", Value::Bool(true)),
             ("trim_start_samples", Value::int(start_trim)),
             ("payload", Value::str(payload)),
         ])
@@ -597,6 +598,8 @@ fn playback_seek_keeps_the_full_reference_sequence() {
     let video = packet(0, Value::int(20), 0, "video");
     let audio = packet(1, Value::int(21), 0, "audio");
     let seek = trace(vec![video.clone(), audio.clone()]);
+    let mut integer_key = audio.clone();
+    super::validation::put(&mut integer_key, "key", Value::int(1)).unwrap();
     let earlier = packet(1, Value::int(18), 0, "preroll");
     let untimed = packet(1, Value::Null, 0, "same lace");
     let source = trace(vec![
@@ -619,6 +622,7 @@ fn playback_seek_keeps_the_full_reference_sequence() {
         vec![video.clone(), earlier.clone()],
         vec![earlier.clone(), audio.clone(), video.clone()],
         vec![video.clone(), audio.clone(), earlier.clone()],
+        vec![video.clone(), integer_key],
         vec![packet(1, Value::int(18), 0, "other bytes"), video, audio],
     ] {
         assert!(playback_preroll_matches(&trace(packets), &seek, &source, 22).is_err());
