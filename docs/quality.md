@@ -407,7 +407,8 @@ that reference trace in order. Additional audio or subtitle preroll must occur
 before the seek target and before that track's first reference seek packet in
 the sequential trace. Its packet fields must match the sequential reference in
 source order, with initial trim cleared. An untimestamped continuation must
-follow timestamped preroll for that track.
+include the preceding timestamped packet for that track from the sequential
+trace in the added preroll.
 A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `matroska-audio-clocks` do with `playback-matroska-worker`
 and the `video` reference and `hls-segments` with `playback-worker` and the `formats` reference, the six bitmap, caption and teletext `subtitle-*` features with
