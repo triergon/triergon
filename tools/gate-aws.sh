@@ -28,7 +28,8 @@
 #       archive (.tar.gz, repository-relative paths), is unpacked at each host's
 #       repository root before it gets ready, for inputs the image lacks. Each
 #       host gets an address of every kept set a reused step may restore its
-#       outputs from (.research/evidence-addresses)
+#       outputs from (.research/evidence-addresses), signed again and handed over
+#       at every poll, since an address lasts no longer than these credentials
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
 # start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to, which must be
@@ -93,6 +94,8 @@ systemctl enable --now triergon-expire.timer
 # disturb what it times on CPU 1.
 POLL=60
 STATE=
+ADDRESSES=
+REFRESHER=
 RUN_OBJECT=
 RUN_NAME=
 NAME=
@@ -103,6 +106,25 @@ say() { echo "$(date -u +%FT%TZ) $*"; }
 tags() { echo "ResourceType=$1,Tags=[{Key=Project,Value=triergon},{Key=Name,Value=$2}]"; }
 presign() { aws s3 presign "$ARCHIVE/$1" --expires-in 86400; }
 archived() { aws s3 ls "$ARCHIVE/$1" >/dev/null 2>&1 < /dev/null; }
+
+# Presign each kept set in STATE/restorable, which a reused gate step may restore
+# its outputs from, into STATE/evidence-addresses. An address lasts only as long as
+# the credentials that signed it, an hour or less from SSO, so a run signs them
+# again every poll and each poll hands a host the current file (hand_addresses).
+sign_addresses() {
+    local set key url
+    while read -r set key; do
+        url=$(presign "$key" < /dev/null) || return 1
+        echo "$set $url"
+    done < "$STATE/restorable" > "$STATE/evidence-addresses.new" &&
+        mv "$STATE/evidence-addresses.new" "$STATE/evidence-addresses"
+}
+# Give host I the current addresses, at ADDRESSES in its repository.
+hand_addresses() {
+    [ -n "$ADDRESSES" ] && [ -f "$STATE/evidence-addresses" ] || return 0
+    on "$1" "mkdir -p ${ADDRESSES%/*} && taskset -c 0 cat > $ADDRESSES.new && mv $ADDRESSES.new $ADDRESSES" \
+        < "$STATE/evidence-addresses"
+}
 
 # A key pair and a security group for this session, removed on exit.
 session() {
@@ -126,6 +148,7 @@ session() {
 
 teardown() {
     local removed=1 live
+    [ -z "$REFRESHER" ] || kill "$REFRESHER" 2>/dev/null || true
     if [ ${#INSTANCES[@]} -gt 0 ]; then
         # Hosts terminated earlier may no longer exist; only the others are named.
         live=$(aws ec2 describe-instances \
@@ -232,6 +255,7 @@ detached() {
     while sleep "$POLL"; do
         if state=$(on "$i" "taskset -c 0 tail -1 ~/gate-host.log; taskset -c 0 pgrep -f '[g]ate-host.sh' >/dev/null && echo running; true" 2>/dev/null); then
             failures=0
+            hand_addresses "$i" 2>/dev/null || true
             case $state in *"$marker"*) return 0;; esac
             case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
         else
@@ -387,8 +411,7 @@ shard() {
             { say "host $i: could not unpack $input"; return 1; }
         say "host $i: unpacked $input"
     done
-    on "$i" "mkdir -p $(repository_path "$target")/.research && cat > $(repository_path "$target")/.research/evidence-addresses" \
-        < "$STATE/evidence-addresses" || { say "host $i: could not copy the evidence addresses"; return 1; }
+    hand_addresses "$i" || { say "host $i: could not copy the evidence addresses"; return 1; }
     detached "$i" "READY" ready "$i/$count"
     detached "$i" "DONE" run "$i/$count" ".research/gate/$revision" "$full"
     touch "$out/shard-$i/finished"
@@ -527,10 +550,12 @@ run() {
     # A step that reuses a result whose outputs a later step reads (a capture
     # timing stage's records) restores them from its kept set, which the hosts
     # download through these addresses (`cargo xtask evidence restorable`).
-    local set key
-    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask evidence restorable) |
-        while read -r set key; do echo "$set $(presign "$key" < /dev/null)"; done > "$STATE/evidence-addresses"
-    say "addresses of $(wc -l < "$STATE/evidence-addresses" | tr -d ' ') kept sets the hosts may restore from"
+    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask evidence restorable) > "$STATE/restorable"
+    sign_addresses
+    ADDRESSES="$(repository_path "$target")/.research/evidence-addresses"
+    (while sleep "$POLL"; do sign_addresses || say "could not sign the evidence addresses again"; done) &
+    REFRESHER=$!
+    say "addresses of $(wc -l < "$STATE/restorable" | tr -d ' ') kept sets the hosts may restore from"
     mkdir -p "$out"
     rm -f "$out/ended" "$out/summary-host" "$out"/terminated-* "$out"/shard-*/finished "$out"/shard-*/verified
     rmdir "$out/.release" 2>/dev/null || true
