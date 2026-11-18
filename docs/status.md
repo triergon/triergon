@@ -922,6 +922,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-4.json) |
 | Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`948a0bb2163eedf3b29a575da0deaed39993a7ce161c08fd1d2c459214dfb7cd`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-5.json) |
 | Filtered capture conversion probes, Linux AArch64 | `e12863c88f5050781e20254fc8efd8cee12fac9b` | [`809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55`](../harness/evidence/sets/capture-filtered-probes-aarch64.json) |
+| Capture conversion probes, 32-bit ARMv7 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`e3dfbf4a9da1d68be300175dff29845dd8ccbb36b3f09d458eb8b9c7f9ebf7a3`](../harness/evidence/sets/capture-native-widths-armv7.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 1 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`1d1edc8d28e39be46f7fd81ce3341ba288ed476569d1fd467bf0af1026cc67d8`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-1.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 2 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`6a2448ea7b893cfa1f37fae38890d30139ab64ca251bc76ca1056ce4248ab35f`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-2.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 3 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`d03906a29e384369a704de659412a4ce65e8039a3b2bc280acfa66c07b58681c`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-3.json) |
@@ -1683,6 +1684,13 @@ bytes. At RGB (0, 85, 170) the reference produces luma 76. Without that term
 the converter produces 75.
 [`capture-filtered-probes-aarch64`](../harness/evidence/sets/capture-filtered-probes-aarch64.json)
 holds these checks at `e12863c8`.
+
+On the 32-bit ARMv7 gate image, `Session::open` matches the pinned conversion
+sample for sample at 42 combinations of widths 2 through 14, heights 2, 4 and 6,
+and both orientations. The same check passes at 480×270 and 960×540 in both
+orientations, where it exercises the block path.
+[`capture-native-widths-armv7`](../harness/evidence/sets/capture-native-widths-armv7.json)
+holds these checks at `a34b98d0`.
 
 Compared with `f8e1c4d9`, the filtered conversion changes the capture output
 folds on all 15 Linux AArch64 cases. All 15 ARMv7 output folds and all
