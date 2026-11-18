@@ -182,7 +182,11 @@ fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> R
     if kind != 2 {
         return Ok(kind == 17 || pts >= lower);
     }
-    let timing = packet.timing;
+    let mut timing = packet.timing;
+    let zero_block_duration = timing.duration_ticks == Some(0);
+    if zero_block_duration {
+        timing.duration_ticks = None;
+    }
     let Some(duration) = timing
         .duration_ticks
         .or(timing.default_duration_ns)
@@ -208,6 +212,9 @@ fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> R
             .ok_or(Error::Overflow)?;
         return Ok(end > i128::from(lower));
     }
+    if zero_block_duration {
+        return recovery_overlaps(timing, lower);
+    }
     let duration = packet
         .duration_ns
         .required("missing timed audio duration")?;
@@ -216,6 +223,10 @@ fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> R
     if !(0..=1).contains(&rounded_delta) {
         return Ok(rounded_delta > 0);
     }
+    recovery_overlaps(timing, lower)
+}
+
+fn recovery_overlaps(timing: BlockTiming, lower: i64) -> Result<bool> {
     let source = timing.source()?;
     let pts = source.pts.required("missing timed audio start")?;
     let duration = source.duration.required("missing timed audio duration")?;

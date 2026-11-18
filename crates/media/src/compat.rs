@@ -31,7 +31,7 @@ pub mod clock {
 /// there is no extra scan. All frames in a lace follow its Block's timestamp
 /// in that clock.
 ///
-/// Reference: Matroska playback seek observations with FFmpeg 9.0.2.
+/// Reference: Matroska playback seek observations at FFmpeg revision `d32b387f`.
 pub mod seek {
     pub use crate::typed::reader::blocking::at_block_start;
 }

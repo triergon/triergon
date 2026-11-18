@@ -346,6 +346,8 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
     for (duration, default_duration, padding, first_frame) in [
         (Some(0), None, 0_i64, 0),
         (None, None, 0, 0),
+        (Some(0), Some(10_000_000), 0, 1),
+        (Some(0), Some(10_000_000), -15_000_000, 0),
         (Some(10), None, 0, 2),
         (Some(20), None, 0, 1),
         (Some(40), None, 0, 0),

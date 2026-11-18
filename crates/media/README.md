@@ -164,6 +164,10 @@ replays the landing Cluster, including interleaved audio before the keyframe.
 When the reader recovers earlier subtitles, it filters the replay prefix up
 to the destination keyframe. It keeps complete untimed audio laces and audio
 with a known end past the cutoff, even when the packet starts before it.
+For overlap, a zero BlockDuration falls back to the track's DefaultDuration.
+Returned packets retain the declared block timing. Recovery can fail with
+`missing timed audio duration` if a timed packet has no duration, or
+`Error::Overflow` if its timing exceeds the supported range.
 A cue is checked against the real Cluster, track, timestamp and
 keyframe; a forged index fails instead of landing elsewhere. The gap after the
 last cue is scanned for uncued keyframes. The `SeekReceipt` reports `actual_ns`,
