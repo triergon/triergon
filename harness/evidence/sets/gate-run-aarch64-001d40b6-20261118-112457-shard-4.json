@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-aarch64-001d40b6-20261118-112457-shard-4",
+ "path": "gate-run-aarch64-001d40b6-20261118-112457-shard-4",
+ "retention": "retained",
+ "reason": "Capture filtered conversion at 001d40b6 on Linux AArch64, c6g.4xlarge. Shard 4 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-aarch64-20261118-112457/shard-4/27f8ab1c910345a8103e276e47e27869ed3a7f8e07b0854773a5de8df65437ab.tar.zst",
+ "sha256": "27f8ab1c910345a8103e276e47e27869ed3a7f8e07b0854773a5de8df65437ab",
+ "bytes": 420203409,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b558ff864cf3949446a6f6c82b8d236d41ee5d41153bb1684e75993749266e7b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6d01f331f8b782a975dfe735cd3e4b6cbb738eb7d0469bd2fac5d26a365451c0",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "40a1da43a52854b3717486af9244f7373a06edcb03215bf3382e9dda198a42d6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "6f0c965e3f3d6f6025285f092f06be905cb252b395d70d5600a981e824b71efd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "19fd9dba697e786a5d4266091c0adf6cc053fb78497e1fd4a0347cefdfd25d17",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "a8927814b724ce23b7ac989112578705a459c6697f1d4a1eaaf336e889117922",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

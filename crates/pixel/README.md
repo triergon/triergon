@@ -63,7 +63,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 |---|---|
 | Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar`, `Colour` (H.273 `matrix` code and `full_range`) |
 | Coded picture | `Picture` at the macroblock-aligned size of a `Geometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
-| RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; FFmpeg's ARMv7 result, which depends on the width |
+| RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; width-dependent conversion or filtering at every width |
 | Letterbox input | 4:2:0, 8-bit and high bit depth (10-bit verified); limited and full range |
 | Palette Y'CbCr → RGB | `YcbcrMatrix::BT601` and `BT709`, studio range in, full range out, `ChannelRounding::Nearest` or `HalfDown`; `rgb(y, cr, cb, rounding)` gives `0xRRGGBB` |
 | Letterbox matrices | H.273 codes 1 (BT.709), 4 (FCC), 7 (SMPTE 240M) and 9 (BT.2020 NCL) select their coefficients; every other code uses BT.601. The same-size 8-bit path also maps code 10 to BT.2020 |
@@ -75,30 +75,29 @@ size fields (at most 4094) and refuses others with `Error::Geometry`. The coded 
 rounds each dimension up to 16; `luma_stride` is `16 × macroblock_width()` and
 `chroma_stride` half of it.
 
-**RGBA → YUV.** The conversion is the one FFmpeg 9.0.2's `swscale` (`SWS_BILINEAR`,
-RGBA to NV12) gives when built for 32-bit ARMv7, on every target. Its result depends
-on the width:
+**RGBA → YUV.** `Converter::new` follows the width-dependent output of FFmpeg
+9.0.2's `swscale` (`SWS_BILINEAR`, RGBA to NV12) on 32-bit ARMv7.
 
 - Widths of at least 16 that are a multiple of 4 take the block path: luma is
   `(66 R + 129 G + 25 B + 4224) >> 8`; each chroma sample comes from the 2×2 block it
   covers, every channel averaged as `(sum + 2) >> 2`, then
   `Cb = (−19 R − 37 G + 56 B + 16448) >> 7` and `Cr = (56 R − 47 G − 9 B + 16448) >> 7`.
-- Every other width takes the filtered path: fixed-point coefficients scaled by 2^16
-  carry the 219/255 (luma) and 224/255 (chroma) range factors, each chroma row sums
-  to zero so neutral grey maps to exactly 128, and chroma is the mean of each
-  horizontal pixel pair, decimated vertically with centre-sited taps 1/8, 3/8, 3/8,
-  1/8 over rows 2k−1 … 2k+2 with the edge rows replicated, rounded once. Below a
-  width of 16 the reference is FFmpeg's ARMv7 build. At widths of 2 modulo 4
-  from 18 up, FFmpeg's ARMv7 build faults, and the reference is its AArch64 build.
-  The [conversion probe](../../harness/capture/README.md#short-frames) compares
-  the short-frame rules at the widths each reference produces.
+- Every other width takes the filtered path. It averages each horizontal pixel pair
+  and rounds the chroma terms to six fractional bits. The vertical filter applies
+  centre-sited taps 1/8, 3/8, 3/8 and 1/8 over rows 2k−1 … 2k+2 with edge rows
+  replicated. It rounds to eight bits after filtering. Below width 16 the reference
+  is FFmpeg's ARMv7 build. At widths of 2 modulo 4 from 18 up that build faults, and
+  the reference is its AArch64 build. The
+  [conversion probe](../../harness/capture/README.md#short-frames) checks these
+  cases sample for sample.
 
 On the filtered path, a 2-row picture takes chroma from the lower row. A 4-row
-picture averages each pair of rows. In a 6-row picture, the top chroma row
-uses the first three rows with weights 3/7, 3/7 and 1/7. The other two rows
-use the usual four taps.
+picture averages each pair of rows. The first chroma row of a 6-row picture
+uses weights 1755, 1756 and 585 divided by 4096. The other two rows use the
+usual four taps.
 
-FFmpeg built for AArch64 takes the filtered path at every width. Input shorter than
+Use `Converter::filtered` to use this filter at every width, as FFmpeg's AArch64
+build does. Input shorter than
 `width × height × 4` is `Error::InputLength`; longer input is ignored past that
 length. `convert` replicates the coded padding.
 

@@ -20,11 +20,10 @@ cargo xtask capture summarize DIR
 
 The comparison runs on native Linux AArch64 and in the 32-bit ARMv7 user space
 ([quality](../../docs/quality.md#32-bit-armv7)), each with its own reference build.
-The reference's conversion follows its target, and the converter follows the ARMv7
-build: the contract's `open_cases` list the AArch64 build's conversion of all 15
-cases. `qualify` still compares and reports them as failing and marks them
-`open_on_target`. It refuses a listed id that is not in the cases file, and fails
-once every case is measured if a listed case passes.
+For Linux AArch64 the capture worker opens the session with
+`Session::open_filtered`, which uses the centre-sited filter at every width.
+For ARMv7 it uses `Session::open`, whose policy depends on the width.
+Conversion, encoding and muxing are compared on all 15 cases on both targets.
 
 The gate times and measures memory in separate runs: the same command with
 `--stage timing --out TIMING` under `taskset -c 1`, then with `--stage memory --timing
@@ -44,14 +43,24 @@ total resident peak RSS. It also reports resident growth as a diagnostic.
 
 The conversion probe checks every luma and chroma sample at the seven even
 widths below 16, in both row orientations, at heights 2, 4 and 6. Each size and
-orientation uses a red impulse in each source row and 32 pseudo-random pictures.
-The AArch64 Linux probe also checks widths 18, 22, 34, 66, 258, 958 and 4094,
-where the converter uses the filtered fallback. The outputs must agree within
-one sample value. Build the capture reference for the target as above and give
-the test a fresh output directory.
+orientation uses a solid picture at the luma rounding boundary, a red impulse
+in each source row and 32 pseudo-random pictures.
+The AArch64 probe also checks widths 18, 22, 34, 66, 258, 958 and 4094 using
+`Converter::filtered`.
+
+`capture_resolutions_against_reference` compares one 480×270 and one 960×540
+picture in both row orientations. On AArch64 it uses `Session::open_filtered`.
+On ARMv7 it uses the block path through `Session::open`. Both probes require
+exact sample equality against the pinned reference for that target. The AArch64
+parameter recovery test uses two-row frames to recover the chroma coefficients
+and six-row frames to recover the first vertical filter row. Build the capture
+reference for the target as above and give the tests a fresh output directory.
 
 ```sh
 CAPTURE_REFERENCE="$PWD/target/harness/ffmpeg-capture-worker" \
 CAPTURE_PROBE_DIR="$PWD/.research/short-capture" \
 CARGO_INCREMENTAL=0 cargo test --release -p capture-worker --test short_chroma -- --ignored
 ```
+
+In the ARMv7 gate user space, add `--target thumbv7neon-unknown-linux-gnueabihf`
+before `--` to run both comparison tests with the gate's Thumb-2 build.

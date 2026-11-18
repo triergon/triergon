@@ -1,0 +1,12 @@
+{
+ "name": "capture-native-widths-armv7",
+ "path": "capture-native-widths-armv7",
+ "retention": "retained",
+ "reason": "Byte-exact capture conversion at 42 short-frame width, height and orientation combinations and four full-resolution combinations through the default session on the 32-bit ARMv7 gate image.",
+ "key": "evidence/capture-native-widths/e3dfbf4a9da1d68be300175dff29845dd8ccbb36b3f09d458eb8b9c7f9ebf7a3.tar.zst",
+ "sha256": "e3dfbf4a9da1d68be300175dff29845dd8ccbb36b3f09d458eb8b9c7f9ebf7a3",
+ "bytes": 4669851,
+ "source_revisions": [
+  "a34b98d0f3a83f23a6472e7b32f4a650a62740b2"
+ ]
+}

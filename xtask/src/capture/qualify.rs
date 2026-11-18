@@ -115,7 +115,12 @@ pub fn gate_key(root: &Path, a: &Options) -> Result<crate::harness::reuse::Key, 
     if let Some(small) = &a.reference_small {
         workers.push(("reference-small", Path::new(small)));
     }
-    let mut files = vec![a.cases.clone(), generator, PathBuf::from(&a.observer)];
+    let mut files = vec![
+        a.cases.clone(),
+        root.join("harness/capture/contract.json"),
+        generator,
+        PathBuf::from(&a.observer),
+    ];
     if let Stage::Memory { timing } = &a.stage {
         // A memory run measures what its timing run recorded.
         let mut recorded = vec![timing.join("identity.json")];
@@ -376,8 +381,10 @@ impl MeasuredCase {
         Ok(copy)
     }
 
-    /// The case `--stage timing` recorded in `timing/ID/timing.json`.
-    fn read(timing: &Path, case: &Value) -> Result<Self, String> {
+    /// The case `--stage timing` recorded in `timing/ID/timing.json`, measured at
+    /// `input`: this run's copy of the input it timed, which may lie elsewhere
+    /// than the timing run's when that run's records were restored.
+    fn read(timing: &Path, case: &Value, input: &Path) -> Result<Self, String> {
         let id = python::str(case.get("id").unwrap_or(&Value::Null));
         let path = timing.join(&id).join(TIMING_RECORD);
         let Value::Object(record) =
@@ -387,20 +394,19 @@ impl MeasuredCase {
         };
         let measured = Self {
             id,
-            input: PathBuf::new(),
+            input: input.to_path_buf(),
             record,
         };
         if !crate::harness::diff::equal(measured.field("case"), case) {
             return Err(format!("{}: records another case", path.display()));
         }
-        let input = PathBuf::from(python::str(measured.field("input")));
-        if file_sha(&input).ok().as_deref() != measured.field("input_sha256").as_str() {
+        if file_sha(input).ok().as_deref() != measured.field("input_sha256").as_str() {
             return Err(format!(
                 "{}: its input changed since timing",
                 input.display()
             ));
         }
-        Ok(Self { input, ..measured })
+        Ok(measured)
     }
 }
 
@@ -417,6 +423,45 @@ impl Drop for InputCopies {
     }
 }
 
+/// The case's input under `--inputs`, generated if it is not there yet. It is
+/// written beside its place and moved in, so a step that runs beside another
+/// never reads a part of it.
+fn input(root: &Path, a: &Options, case: &Value) -> Result<PathBuf, String> {
+    let text = |key: &str| python::str(case.get(key).unwrap_or(&Value::Null));
+    let path = a.inputs.join(format!(
+        "{}-{}x{}-{}.rgba",
+        text("content"),
+        text("width"),
+        text("height"),
+        text("frames")
+    ));
+    if path.exists() {
+        return Ok(path);
+    }
+    let mut partial = path.as_os_str().to_owned();
+    partial.push(format!(".{}.part", std::process::id()));
+    let partial = PathBuf::from(partial);
+    let generator = python::path(&root.join("harness/capture/generate_inputs.py"));
+    let python = python::interpreter();
+    let status = Command::new(&python)
+        .args([
+            generator,
+            text("content"),
+            text("width"),
+            text("height"),
+            text("frames"),
+        ])
+        .arg(python::path(&partial))
+        .status()
+        .map_err(|e| format!("{python}: {e}"))?;
+    if !status.success() {
+        let _ = fs::remove_file(&partial);
+        return Err(format!("input generation failed: {status}"));
+    }
+    fs::rename(&partial, &path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(path)
+}
+
 /// Generate the case's input if needed, compare both workers' outputs and time
 /// them.
 fn correctness_and_timing(
@@ -427,36 +472,11 @@ fn correctness_and_timing(
     refusals: &[String],
     case: &Value,
 ) -> Result<MeasuredCase, String> {
-    let text = |key: &str| python::str(case.get(key).unwrap_or(&Value::Null));
-    let id = text("id");
+    let id = python::str(case.get("id").unwrap_or(&Value::Null));
     let directory = a.out.join(&id);
     fs::create_dir_all(&directory).map_err(|e| format!("{}: {e}", directory.display()))?;
-    let path = a.inputs.join(format!(
-        "{}-{}x{}-{}.rgba",
-        text("content"),
-        text("width"),
-        text("height"),
-        text("frames")
-    ));
+    let path = input(root, a, case)?;
     let path_text = python::path(&path);
-    if !path.exists() {
-        let generator = python::path(&root.join("harness/capture/generate_inputs.py"));
-        let python = python::interpreter();
-        let status = Command::new(&python)
-            .args([
-                generator,
-                text("content"),
-                text("width"),
-                text("height"),
-                text("frames"),
-            ])
-            .arg(&path_text)
-            .status()
-            .map_err(|e| format!("{python}: {e}"))?;
-        if !status.success() {
-            return Err(format!("input generation failed: {status}"));
-        }
-    }
     let mut record = vec![
         ("case".to_owned(), case.clone()),
         ("input".to_owned(), Value::str(path_text.as_str())),
@@ -620,87 +640,248 @@ fn finish_case(
     Ok(line)
 }
 
-/// Collect the memory of every case in one collection, side by side, each slot
-/// measuring its own copies of the gate build's workers, and finish each case.
+/// A run's cases before their memory: measured in this run, or read from the
+/// records of its timing run.
+struct Prepared {
+    refusals: Vec<String>,
+    open: Vec<String>,
+    cases: Vec<MeasuredCase>,
+}
+
+impl Prepared {
+    fn parity_failures(&self) -> Vec<String> {
+        self.cases
+            .iter()
+            .flat_map(|case| {
+                failing_parity(&case.id, case.correctness(), self.open.contains(&case.id))
+            })
+            .collect()
+    }
+
+    /// A listed open case whose conversion now passes fails the run once every
+    /// case is measured, so the list cannot go stale.
+    fn still_open(&self) -> Result<(), String> {
+        let now_passing: Vec<&str> = self
+            .cases
+            .iter()
+            .filter(|case| {
+                self.open.contains(&case.id)
+                    && case
+                        .correctness()
+                        .get("conversion")
+                        .is_some_and(Value::truthy)
+            })
+            .map(|case| case.id.as_str())
+            .collect();
+        if now_passing.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "listed open cases now pass; remove them from open_cases: {}",
+                now_passing.join(", ")
+            ))
+        }
+    }
+}
+
+/// What one run's memory collection reads: its workers, pairs, and each case's
+/// input and worker arguments.
+struct MemorySetup<'a> {
+    workers: memory::WorkerPaths<'a>,
+    pairs: Pairs,
+    seed: u64,
+    /// Removed once the collection ends.
+    _copies: Option<InputCopies>,
+    inputs: Vec<PathBuf>,
+    arguments: Vec<Vec<String>>,
+}
+
+/// Collect the memory of every case of `runs` in one collection, side by side on
+/// the CPUs this process may use, each slot measuring its own copies of the gate
+/// build's workers, and finish each case: each run's summary lines.
 fn memory_stage(
     root: &Path,
-    a: &Options,
-    refusals: &[String],
-    open: &[String],
-    measured_cases: Vec<MeasuredCase>,
-) -> Result<Vec<Value>, String> {
-    let workers = memory::WorkerPaths {
-        candidate: Path::new(&a.candidate),
-        reference: Path::new(&a.reference),
-        registered: refusals.is_empty(),
-    };
-    let pairs = Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop);
+    runs: Vec<(&Options, Prepared)>,
+) -> Result<Vec<Result<Vec<Value>, String>>, String> {
     // Cases of one generated input would share its file and so run one after
     // another; side by side, each measures its own copy, of the same bytes.
     let side_by_side = gate_build::allowed_cpu_list().is_none_or(|cpus| cpus.len() > 1);
-    let copies = side_by_side.then(|| {
-        InputCopies(
-            a.inputs
-                .join(format!(".memory-copies-{}", std::process::id())),
-        )
-    });
-    let mut inputs = Vec::new();
-    for measured in &measured_cases {
-        inputs.push(match (&copies, measured.correctness().get("outputs")) {
-            (Some(copies), Some(_)) => measured.copy_input(&copies.0)?,
-            _ => measured.input.clone(),
+    let mut setups = Vec::new();
+    for (run, (a, prepared)) in runs.iter().enumerate() {
+        let copies = side_by_side.then(|| {
+            InputCopies(
+                a.inputs
+                    .join(format!(".memory-copies-{}-{run}", std::process::id())),
+            )
+        });
+        let mut inputs = Vec::new();
+        for measured in &prepared.cases {
+            inputs.push(match (&copies, measured.correctness().get("outputs")) {
+                (Some(copies), Some(_)) => measured.copy_input(&copies.0)?,
+                _ => measured.input.clone(),
+            });
+        }
+        let arguments = prepared
+            .cases
+            .iter()
+            .zip(&inputs)
+            .map(|(measured, input)| measured.memory_arguments(input))
+            .collect();
+        setups.push(MemorySetup {
+            workers: memory::WorkerPaths {
+                candidate: Path::new(&a.candidate),
+                reference: Path::new(&a.reference),
+                registered: prepared.refusals.is_empty(),
+            },
+            pairs: Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop),
+            seed: a.seed + MEMORY_SEED,
+            _copies: copies,
+            inputs,
+            arguments,
         });
     }
-    let arguments: Vec<Vec<String>> = measured_cases
-        .iter()
-        .zip(&inputs)
-        .map(|(measured, input)| measured.memory_arguments(input))
-        .collect();
     let mut jobs = Vec::new();
     let mut collected = Vec::new();
-    for (index, ((measured, args), path)) in measured_cases
+    for (run, ((_, prepared), setup)) in runs.iter().zip(&setups).enumerate() {
+        let MemorySetup {
+            workers,
+            pairs,
+            seed,
+            ..
+        } = *setup;
+        for (case, ((measured, args), path)) in prepared
+            .cases
+            .iter()
+            .zip(&setup.arguments)
+            .zip(&setup.inputs)
+            .enumerate()
+        {
+            let Some(outputs) = measured.correctness().get("outputs") else {
+                continue;
+            };
+            jobs.push(memory::Job::new(&workers, [path.clone()], move |slot| {
+                memory::collect_command(
+                    slot,
+                    root,
+                    workers,
+                    path,
+                    pairs,
+                    seed,
+                    args,
+                    outputs,
+                    SESSION_TIMEOUT,
+                )
+            }));
+            collected.push((run, case));
+        }
+    }
+    let mut memories: Vec<Vec<Option<Result<Value, String>>>> = runs
         .iter()
-        .zip(&arguments)
-        .zip(&inputs)
-        .enumerate()
-    {
-        let Some(outputs) = measured.correctness().get("outputs") else {
-            continue;
-        };
-        jobs.push(memory::Job::new(&workers, [path.clone()], move |slot| {
-            memory::collect_command(
-                slot,
-                root,
-                workers,
-                path,
-                pairs,
-                a.seed + MEMORY_SEED,
-                args,
-                outputs,
-                SESSION_TIMEOUT,
-            )
-        }));
-        collected.push(index);
+        .map(|(_, prepared)| prepared.cases.iter().map(|_| None).collect())
+        .collect();
+    for ((run, case), memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
+        memories[run][case] = Some(memory);
     }
-    let mut memories: Vec<Option<Value>> = vec![None; measured_cases.len()];
-    for (index, memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
-        memories[index] = Some(memory?);
-    }
-    drop(copies);
-    measured_cases
+    drop(setups);
+    Ok(runs
         .into_iter()
         .zip(memories)
-        .map(|(measured, memory)| {
-            let memory = memory.unwrap_or_else(|| {
-                Value::object([("status", Value::str("missing-correctness-output"))])
-            });
-            let open_on_target = open.contains(&measured.id);
-            finish_case(a, measured, memory, open_on_target)
+        .map(|((a, prepared), memories)| {
+            let open = prepared.open;
+            prepared
+                .cases
+                .into_iter()
+                .zip(memories)
+                .map(|(measured, memory)| {
+                    let memory = memory.transpose()?.unwrap_or_else(|| {
+                        Value::object([("status", Value::str("missing-correctness-output"))])
+                    });
+                    let open_on_target = open.contains(&measured.id);
+                    finish_case(a, measured, memory, open_on_target)
+                })
+                .collect()
         })
+        .collect())
+}
+
+/// Several `--stage memory` runs in one process: every case of every run in one
+/// collection, as one run of all their cases collects them, while each run reads
+/// its own timing run and writes its own summary. Each run's result, in order.
+pub fn run_memory(root: &Path, runs: &[&Options]) -> Vec<Result<(), String>> {
+    let mut results: Vec<Option<Result<(), String>>> = runs.iter().map(|_| None).collect();
+    let (mut ready, mut measuring) = (Vec::new(), Vec::new());
+    for (index, a) in runs.iter().enumerate() {
+        match prepare(root, a) {
+            Ok(prepared) => {
+                measuring.push((index, prepared.parity_failures(), prepared.still_open()));
+                ready.push((*a, prepared));
+            }
+            Err(error) => results[index] = Some(Err(error)),
+        }
+    }
+    match memory_stage(root, ready) {
+        Ok(summaries) => {
+            for ((index, failing, still_open), summary) in measuring.into_iter().zip(summaries) {
+                results[index] = Some(
+                    summary.and_then(|summary| finish(runs[index], summary, failing, still_open)),
+                );
+            }
+        }
+        Err(error) => {
+            for (index, _, _) in measuring {
+                results[index] = Some(Err(error.clone()));
+            }
+        }
+    }
+    results
+        .into_iter()
+        .map(|result| result.expect("every run has a result"))
         .collect()
 }
 
 pub fn run(root: &Path, a: &Options) -> Result<(), String> {
+    let prepared = prepare(root, a)?;
+    let failing = prepared.parity_failures();
+    let still_open = prepared.still_open();
+    if matches!(a.stage, Stage::Timing) {
+        return finish_requirements(&failing, still_open);
+    }
+    let summary = memory_stage(root, vec![(a, prepared)])?
+        .pop()
+        .expect("one run")?;
+    finish(a, summary, failing, still_open)
+}
+
+/// Write the summary before reporting failed requirements.
+fn finish(
+    a: &Options,
+    summary: Vec<Value>,
+    mut failing: Vec<String>,
+    still_open: Result<(), String>,
+) -> Result<(), String> {
+    failing.extend(failing_bounds(&summary));
+    write(
+        &a.out.join("summary.json"),
+        json::to_python(&Value::Array(summary), Some(1)),
+    )?;
+    finish_requirements(&failing, still_open)
+}
+
+fn finish_requirements(failing: &[String], still_open: Result<(), String>) -> Result<(), String> {
+    for line in failing {
+        println!("{line}");
+    }
+    still_open?;
+    if failing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("{} capture requirements fail", failing.len()))
+    }
+}
+
+/// Write the run's identity, then measure its cases' correctness and timing, or,
+/// at `--stage memory`, read what its timing run recorded of them.
+fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     for dir in [&a.out, &a.inputs] {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
@@ -773,32 +954,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     // one collection, so timing never runs beside memory. `--stage` runs either
     // half alone: timing on one CPU, memory on the CPUs its slots may use.
     let measured_cases = match &a.stage {
-        Stage::Memory { timing } => {
-            let recorded = timing.join("identity.json");
-            let recorded = crate::checks::read_json(&recorded)
-                .map_err(|e| format!("{}: {e}", recorded.display()))?;
-            let unstamped = |identity: &Value| match identity {
-                Value::Object(fields) => Value::Object(
-                    fields
-                        .iter()
-                        // What differs between the two runs by design.
-                        .filter(|(k, _)| !["utc", "stage", "cpus"].contains(&k.as_str()))
-                        .cloned()
-                        .collect(),
-                ),
-                other => other.clone(),
-            };
-            if !crate::harness::diff::equal(&unstamped(&recorded), &unstamped(&identity)) {
-                return Err(format!(
-                    "{}: timed other sources, workers, cases or host",
-                    timing.display()
-                ));
-            }
-            cases
-                .iter()
-                .map(|case| MeasuredCase::read(timing, case))
-                .collect::<Result<Vec<_>, _>>()?
-        }
+        Stage::Memory { timing } => timed_cases(root, a, timing, &identity, &cases)?,
         Stage::Timing | Stage::Both => {
             let mut measured = Vec::new();
             for case in &cases {
@@ -814,47 +970,95 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             measured
         }
     };
-    // A listed open case whose conversion now passes fails the run once every
-    // case is measured, so the list cannot go stale.
-    let now_passing: Vec<String> = measured_cases
-        .iter()
-        .filter(|case| {
-            open.contains(&case.id)
-                && case
-                    .correctness()
-                    .get("conversion")
-                    .is_some_and(Value::truthy)
-        })
-        .map(|case| case.id.clone())
-        .collect();
-    let still_open = || {
-        if now_passing.is_empty() {
-            Ok(())
-        } else {
-            Err(format!(
-                "listed open cases now pass; remove them from open_cases: {}",
-                now_passing.join(", ")
-            ))
-        }
+    Ok(Prepared {
+        refusals,
+        open,
+        cases: measured_cases,
+    })
+}
+
+/// The fields of a timing run's identity that a memory run must share. A timing
+/// run of this gate run shares all but what differs by design: the time, stage
+/// and CPUs. A reused one shares what its gate key binds: the bytes of the
+/// workers, the observer and the cases, and the host class (system, machine and
+/// kernel release), with whether the builds were refused, since a refused build
+/// has no gate result to pair with. The sources it hashes beyond those may differ
+/// (a README, say), as may the host's name and kernel build.
+fn comparable(identity: &Value, reused: bool) -> Value {
+    const BOUND: [&str; 6] = [
+        "build_refusals",
+        "candidate_sha256",
+        "reference_sha256",
+        "reference_small_sha256",
+        "observer_sha256",
+        "cases_sha256",
+    ];
+    const HOST_BOUND: [&str; 3] = ["system", "machine", "release"];
+    let Value::Object(fields) = identity else {
+        return identity.clone();
     };
-    if matches!(a.stage, Stage::Timing) {
-        return still_open();
+    let fields = fields.iter().filter_map(|(k, v)| match (k.as_str(), v) {
+        ("utc" | "stage" | "cpus", _) => None,
+        ("host", Value::Object(host)) if reused => Some((
+            k.clone(),
+            Value::Object(
+                host.iter()
+                    .filter(|(k, _)| HOST_BOUND.contains(&k.as_str()))
+                    .cloned()
+                    .collect(),
+            ),
+        )),
+        _ if reused && k != "host" && !BOUND.contains(&k.as_str()) => None,
+        _ => Some((k.clone(), v.clone())),
+    });
+    Value::Object(fields.collect())
+}
+
+/// The cases the timing run in `timing` recorded, for a memory run with
+/// `identity` to measure: that run must have timed the same workers, cases and
+/// host ([`comparable`]). Each case is measured at its input under
+/// `--inputs`, generated again if this run lacks it, with the hash its timing
+/// recorded.
+fn timed_cases(
+    root: &Path,
+    a: &Options,
+    timing: &Path,
+    identity: &Value,
+    cases: &[Value],
+) -> Result<Vec<MeasuredCase>, String> {
+    let recorded = timing.join("identity.json");
+    let recorded =
+        crate::checks::read_json(&recorded).map_err(|e| format!("{}: {e}", recorded.display()))?;
+    let reused = crate::harness::reuse::was_reused(timing);
+    if !crate::harness::diff::equal(
+        &comparable(&recorded, reused),
+        &comparable(identity, reused),
+    ) {
+        return Err(format!(
+            "{}: timed other sources, workers, cases or host",
+            timing.display()
+        ));
     }
-    let summary = memory_stage(root, a, &refusals, &open, measured_cases)?;
-    let failing = failing_bounds(&summary);
-    write(
-        &a.out.join("summary.json"),
-        json::to_python(&Value::Array(summary), Some(1)),
-    )?;
-    for line in &failing {
-        println!("{line}");
-    }
-    still_open()?;
-    if failing.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("{} capture bounds fail", failing.len()))
-    }
+    cases
+        .iter()
+        .map(|case| MeasuredCase::read(timing, case, &input(root, a, case)?))
+        .collect()
+}
+
+/// A listed open conversion still requires mux and encoder parity.
+fn failing_parity<'a>(
+    id: &'a str,
+    correctness: &'a Value,
+    open_conversion: bool,
+) -> impl Iterator<Item = String> + 'a {
+    ["conversion", "mux", "encoder"]
+        .into_iter()
+        .filter(move |part| {
+            let passes = matches!(correctness.get(part), Some(Value::Bool(true)));
+            let exception = open_conversion && *part == "conversion";
+            !(passes || exception)
+        })
+        .map(move |part| format!("capture: {id}: {part} parity fails"))
 }
 
 /// One line per bound a case of `summary` fails, but for the cases open on this
@@ -923,6 +1127,27 @@ fn listed_open(contract: &Value, target: &str, ids: &[&str]) -> Result<Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_an_open_conversion_may_fail_capture_parity() {
+        let verdict =
+            json::parse(r#"{"conversion": false, "mux": true, "encoder": true}"#).unwrap();
+        assert_eq!(
+            failing_parity("picture", &verdict, false).collect::<Vec<_>>(),
+            ["capture: picture: conversion parity fails"]
+        );
+        assert_eq!(failing_parity("picture", &verdict, true).count(), 0);
+
+        let invalid =
+            json::parse(r#"{"conversion": false, "mux": false, "encoder": false}"#).unwrap();
+        assert_eq!(
+            failing_parity("picture", &invalid, true).collect::<Vec<_>>(),
+            [
+                "capture: picture: mux parity fails",
+                "capture: picture: encoder parity fails",
+            ]
+        );
+    }
 
     #[test]
     fn a_failing_capture_bound_fails_unless_its_case_is_open_on_the_target() {
@@ -1000,7 +1225,7 @@ mod tests {
             json::to_python(&record, Some(1)),
         )
         .unwrap();
-        let read = MeasuredCase::read(&dir.join("timing"), &case).unwrap();
+        let read = MeasuredCase::read(&dir.join("timing"), &case, &input).unwrap();
         assert_eq!(read.input, input);
         assert_eq!(
             read.memory_arguments(&input).last(),
@@ -1016,13 +1241,198 @@ mod tests {
             "copies are removed with the run"
         );
         let other = json::parse(r#"{"id": "noise", "content": "bars"}"#).unwrap();
-        assert!(MeasuredCase::read(&dir.join("timing"), &other).is_err());
+        assert!(MeasuredCase::read(&dir.join("timing"), &other, &input).is_err());
         fs::write(&input, b"changed").unwrap();
-        let error = MeasuredCase::read(&dir.join("timing"), &case)
+        let error = MeasuredCase::read(&dir.join("timing"), &case, &input)
             .err()
             .unwrap();
         assert!(error.contains("changed since timing"), "{error}");
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A gate run that reuses a case's timing restores the records that run wrote
+    /// from its kept set, and the memory stage measures those cases: at this
+    /// run's copy of each input, on another host of the class.
+    #[test]
+    fn a_memory_run_measures_the_cases_of_a_reused_timing_run() {
+        use crate::harness::reuse;
+        let root = crate::walk::scratch("capture-reused-timing");
+        let case = json::parse(
+            r#"{"id": "c01", "content": "noise", "width": 64, "height": 48, "frames": 2}"#,
+        )
+        .unwrap();
+        // The sources a run hashes include files its gate key does not bind, such as
+        // the capture crate's README, which may change between the two runs.
+        let identity = |node: &str, candidate: &str, readme: &str| {
+            Value::object([
+                ("source_digest", Value::str(readme)),
+                (
+                    "source_manifest",
+                    Value::object([("crates/capture/README.md", Value::str(readme))]),
+                ),
+                ("candidate_sha256", Value::str(candidate)),
+                ("cpus", Value::str("1")),
+                (
+                    "host",
+                    Value::object([
+                        ("node", Value::str(node)),
+                        ("release", Value::str("7.0")),
+                        ("version", Value::str(format!("#1 {node}"))),
+                    ]),
+                ),
+                ("stage", Value::str("timing")),
+                ("utc", Value::float(1.0)),
+            ])
+        };
+        // What the earlier run's timing stage wrote, at its own revision's paths.
+        let earlier = root.join("earlier");
+        let timed = earlier.join(".research/gate/old/capture-inputs/noise-64x48-2.rgba");
+        fs::create_dir_all(timed.parent().unwrap()).unwrap();
+        fs::write(&timed, b"pixels").unwrap();
+        let step = earlier.join("run/capture-c01-timing");
+        fs::create_dir_all(step.join("c01")).unwrap();
+        let record = Value::object([
+            ("case", case.clone()),
+            ("input", Value::str(python::path(&timed))),
+            ("input_sha256", Value::str(file_sha(&timed).unwrap())),
+            (
+                "correctness_summary",
+                Value::object([("pipeline", Value::Bool(true))]),
+            ),
+            ("runtime", Value::object([("gate_pass", Value::Bool(true))])),
+        ]);
+        fs::write(
+            step.join("c01").join(TIMING_RECORD),
+            json::to_python(&record, Some(1)),
+        )
+        .unwrap();
+        fs::write(
+            step.join("identity.json"),
+            json::to_python(&identity("ip-a", "c0", "readme-1"), Some(1)),
+        )
+        .unwrap();
+        let key = reuse::Key {
+            sha256: "t".repeat(64),
+            components: Value::object([("command", Value::str("capture qualify"))]),
+        };
+        reuse::record(&step, &key, 0, None).unwrap();
+        // That run's outputs, packed, kept and in this host's cache.
+        let pack = root.join("pack.tar.gz");
+        crate::evidence::pack_command(&earlier.join("run"), &pack).unwrap();
+        let sha = file_sha(&pack).unwrap();
+        let cache = root.join(".research/evidence-cache");
+        fs::create_dir_all(&cache).unwrap();
+        fs::rename(&pack, cache.join(format!("{sha}.tar.gz"))).unwrap();
+        let set = Value::object([
+            ("name", Value::str("earlier-run")),
+            ("retention", Value::str("retained")),
+            (
+                "key",
+                Value::str(format!("evidence/earlier-run/{sha}.tar.gz")),
+            ),
+            ("sha256", Value::str(&sha)),
+            (
+                "results",
+                Value::Array(vec![Value::object([
+                    ("path", Value::str("capture-c01-timing/gate-result.json")),
+                    ("command", Value::str("capture qualify")),
+                    ("key", Value::str(&key.sha256)),
+                    ("status", Value::int(0)),
+                ])]),
+            ),
+        ]);
+        let index = root.join(crate::evidence::SETS).join("earlier-run.json");
+        fs::create_dir_all(index.parent().unwrap()).unwrap();
+        crate::corpus::write_json(&index, &set).unwrap();
+
+        // This run reuses the timing step: its records are restored, nothing is timed.
+        let timing = root.join(".research/gate/new/capture-c01-timing");
+        let status =
+            reuse::restoring_step(&root, &timing, &key, false, || panic!("timed again")).unwrap();
+        assert_eq!(status, 0);
+        assert!(reuse::was_reused(&timing));
+        assert!(timing.join("c01").join(TIMING_RECORD).is_file());
+        assert!(timing.join("identity.json").is_file());
+
+        // Its memory stage reads them, at this run's copy of the input, though the
+        // README changed and the host is another of the class.
+        let inputs = root.join(".research/gate/new/capture-inputs");
+        fs::create_dir_all(&inputs).unwrap();
+        fs::write(inputs.join("noise-64x48-2.rgba"), b"pixels").unwrap();
+        let options = Options {
+            candidate: String::new(),
+            reference: String::new(),
+            reference_small: None,
+            oracle_bin: String::new(),
+            observer: String::new(),
+            cases: PathBuf::new(),
+            only: vec!["c01".into()],
+            inputs: inputs.clone(),
+            out: root.join(".research/gate/new/capture-c01"),
+            pairs: 30,
+            iterations: 3,
+            memory_pairs: 30,
+            seed: 0,
+            early_stop: true,
+            stage: Stage::Memory {
+                timing: timing.clone(),
+            },
+        };
+        let mut now = identity("ip-b", "c0", "readme-2");
+        if let Value::Object(fields) = &mut now {
+            fields.retain(|(k, _)| k != "stage");
+            fields.push(("stage".into(), Value::str("memory")));
+        }
+        let cases = [case.clone()];
+        let measured = timed_cases(&root, &options, &timing, &now, &cases).unwrap();
+        assert_eq!(measured.len(), 1);
+        assert_eq!(measured[0].input, inputs.join("noise-64x48-2.rgba"));
+        assert_eq!(
+            measured[0].correctness().get("pipeline"),
+            Some(&Value::Bool(true))
+        );
+        assert_eq!(
+            measured[0].memory_arguments(&measured[0].input).last(),
+            Some(&python::path(&inputs.join("noise-64x48-2.rgba")))
+        );
+        // Other workers, another kernel, or other input bytes are refused.
+        let mut kernel = now.clone();
+        if let Value::Object(fields) = &mut kernel
+            && let Some((_, Value::Object(host))) = fields.iter_mut().find(|(k, _)| k == "host")
+        {
+            host.retain(|(k, _)| k != "release");
+            host.push(("release".into(), Value::str("7.1")));
+        }
+        assert!(timed_cases(&root, &options, &timing, &kernel, &cases).is_err());
+        let other = identity("ip-b", "c1", "readme-2");
+        assert!(timed_cases(&root, &options, &timing, &other, &cases).is_err());
+        fs::write(inputs.join("noise-64x48-2.rgba"), b"other").unwrap();
+        let error = timed_cases(&root, &options, &timing, &now, &cases)
+            .err()
+            .unwrap();
+        assert!(error.contains("changed since timing"), "{error}");
+        // Only a reused timing run may come from another host or other sources.
+        let measured_here = root.join("measured-here");
+        fs::create_dir_all(&measured_here).unwrap();
+        for file in ["identity.json", "c01/timing.json"] {
+            let to = measured_here.join(file);
+            fs::create_dir_all(to.parent().unwrap()).unwrap();
+            fs::copy(timing.join(file), to).unwrap();
+        }
+        fs::write(inputs.join("noise-64x48-2.rgba"), b"pixels").unwrap();
+        reuse::record(&measured_here, &key, 0, None).unwrap();
+        let here = |readme: &str| {
+            let mut identity = identity("ip-a", "c0", readme);
+            if let Value::Object(fields) = &mut identity {
+                fields.retain(|(k, _)| k != "stage");
+                fields.push(("stage".into(), Value::str("memory")));
+            }
+            identity
+        };
+        assert!(timed_cases(&root, &options, &measured_here, &here("readme-1"), &cases).is_ok());
+        assert!(timed_cases(&root, &options, &measured_here, &here("readme-2"), &cases).is_err());
+        assert!(timed_cases(&root, &options, &measured_here, &now, &cases).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

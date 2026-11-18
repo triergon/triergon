@@ -1,0 +1,70 @@
+{
+ "name": "gate-run-aarch64-e5f6c971-20261118-172954-shard-5",
+ "path": "gate-run-aarch64-e5f6c971-20261118-172954-shard-5",
+ "retention": "retained",
+ "reason": "Linux AArch64 capture at e5f6c971, run 20261118-172954, shard 5 of 5. A lost SSH connection left shards 2 and 3 without archives.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-aarch64-20261118-172954/shard-5/1f1e5b86572b312841749df4e6759f22028574095b74123eb8d241c9357a7519.tar.zst",
+ "sha256": "1f1e5b86572b312841749df4e6759f22028574095b74123eb8d241c9357a7519",
+ "bytes": 421382010,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "9ed4c1429f80b707c9033f896e7c7559dbeefafa73339087b3d7a2c7bf96cfa1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "7042ae2f760ab60a45d9fe32e364928acc26915b2f69736c5d8592eaa23341d4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "4573f2d135d4142cb34a8a3eb6ad54f5efa62c79b3ede6cb04eb7d52cd425813",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "af9afe285bd1864b8ca6b6eef22f40cbb43b6b22237906150797ee82ddbb542d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "4f0d68dd94911b8db29d1d1deb17aac0bed8fd7ee7a39c286bcf138f51fc1670",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b6b50279adcb2ef4ee5f8856d6e980c7139e10c963b9f47ca2593b37476daafb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "bf96096096102fc243a4186c6dda803cf1b56988dac637f18922d3613cc0e9f2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5257e78d0bbae369b7ed560ebf03cb0b4732a5eebeb01facb805d77e07695b1d",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}

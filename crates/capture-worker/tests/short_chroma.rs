@@ -25,7 +25,7 @@ fn short_filtered_frames_against_reference() {
                 let dir = root.join(&geometry);
                 fs::create_dir(&dir).unwrap();
                 let input = dir.join("input.rgba");
-                let mut rgba = Vec::new();
+                let mut rgba = [0_u8, 85, 170, 255].repeat(width * height);
                 for pulse in 0..height {
                     for row in 0..height {
                         let pixel: [u8; 4] = if row == pulse {
@@ -43,7 +43,7 @@ fn short_filtered_frames_against_reference() {
                     rgba.push(random.to_le_bytes()[0]);
                 }
                 fs::write(&input, rgba).unwrap();
-                let frames = height + 32;
+                let frames = height + 33;
                 let args = [width, height, flip, frames].map(|value| value.to_string());
                 let mut planes = Vec::new();
                 for (role, worker) in [("reference", &*reference), ("candidate", candidate)] {
@@ -58,6 +58,7 @@ fn short_filtered_frames_against_reference() {
                     assert!(result.success(), "{role} on {geometry}: {result}");
                     let data = fs::read(output).unwrap();
                     assert_eq!(data.len(), width * height * 3 / 2 * frames);
+                    assert_eq!(data[0], 76, "{role} luma rounding on {geometry}");
                     planes.push(data);
                 }
                 let max_error = planes[0]
@@ -66,11 +67,204 @@ fn short_filtered_frames_against_reference() {
                     .map(|(a, b)| a.abs_diff(*b))
                     .max()
                     .unwrap();
-                assert!(
-                    max_error <= 1,
-                    "{geometry}: maximum sample error {max_error}"
-                );
+                assert_eq!(max_error, 0, "{geometry}: maximum sample error");
             }
         }
     }
+}
+
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+#[test]
+#[ignore = "requires the pinned capture reference worker for this target"]
+fn capture_resolutions_against_reference() {
+    use triergon_capture::pixel::Orientation;
+    use triergon_capture::{Session, SessionConfig};
+
+    let reference = PathBuf::from(env::var_os("CAPTURE_REFERENCE").expect("set CAPTURE_REFERENCE"));
+    let mut root = PathBuf::from(env::var_os("CAPTURE_PROBE_DIR").expect("set CAPTURE_PROBE_DIR"));
+    root.set_extension("resolutions");
+    fs::create_dir(&root).unwrap();
+    let mut random = 0x401c_123b_u32;
+    for (w, h) in [(480, 270), (960, 540)] {
+        let mut rgba = vec![0; w as usize * h as usize * 4];
+        for byte in &mut rgba {
+            random ^= random << 13;
+            random ^= random >> 17;
+            random ^= random << 5;
+            *byte = random.to_le_bytes()[0];
+        }
+        let input = root.join(format!("{w}x{h}.rgba"));
+        fs::write(&input, &rgba).unwrap();
+        let cfg = SessionConfig::with_rate_rule(w, h, 2_500_000);
+        for (flip, orientation) in [(0, Orientation::TopDown), (1, Orientation::BottomUp)] {
+            let output = root.join(format!("{w}x{h}-flip{flip}.yuv"));
+            let status = Command::new(&reference)
+                .arg("convert")
+                .args([w, h, flip, 1].map(|arg| arg.to_string()))
+                .arg(&input)
+                .arg(&output)
+                .status()
+                .unwrap();
+            assert!(status.success(), "{w}x{h}, flip {flip}: {status}");
+
+            let mut candidate = if cfg!(target_arch = "aarch64") {
+                Session::open_filtered(&cfg)
+            } else {
+                Session::open(&cfg)
+            }
+            .unwrap();
+            candidate
+                .encode(&rgba, orientation, &mut Vec::new())
+                .unwrap();
+            let expected = fs::read(&output).unwrap();
+            let actual = candidate.converted().visible_yuv420();
+            assert_eq!(actual.len(), expected.len());
+            assert!(
+                actual == expected,
+                "{w}x{h}, flip {flip}: first different sample {:?}",
+                actual
+                    .iter()
+                    .zip(expected)
+                    .position(|(actual, expected)| *actual != expected)
+            );
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[test]
+#[ignore = "requires the pinned AArch64 capture reference worker"]
+fn recover_filtered_rounding_parameters() {
+    let reference = PathBuf::from(env::var_os("CAPTURE_REFERENCE").expect("set CAPTURE_REFERENCE"));
+    let mut root = PathBuf::from(env::var_os("CAPTURE_PROBE_DIR").expect("set CAPTURE_PROBE_DIR"));
+    root.set_extension("rounding");
+    fs::create_dir(&root).unwrap();
+    let (pairs, chroma) = reference_chroma_rows(&reference, &root, 2, 220);
+
+    let mut recovered = [[0; 3]; 2];
+    // Rounded nominal coefficients at fifteen fractional bits. Search nearby
+    // integer coefficients against the reference's single-row chroma output.
+    for (plane, nominal) in [[-4857, -9535, 14392], [14392, -12052, -2340]]
+        .into_iter()
+        .enumerate()
+    {
+        let mut observations: Vec<_> = pairs[1]
+            .iter()
+            .copied()
+            .zip(chroma[plane].iter().copied())
+            .collect();
+        observations.sort_unstable_by_key(|&(sample, _)| {
+            // Colour sums near a rounding boundary constrain the candidates first.
+            ((dot(nominal, sample) + 512) & 65535).abs_diff(32768)
+        });
+        let mut matches = Vec::new();
+        for red in nominal[0] - 16..=nominal[0] + 16 {
+            for green in nominal[1] - 16..=nominal[1] + 16 {
+                for blue in nominal[2] - 16..=nominal[2] + 16 {
+                    let matrix = [red, green, blue];
+                    if observations
+                        .iter()
+                        .all(|&(sample, value)| (dot(matrix, sample) + 33280) >> 16 == value)
+                    {
+                        matches.push(matrix);
+                    }
+                }
+            }
+        }
+        let [matrix] = matches.as_slice() else {
+            panic!("expected one matrix row for plane {plane}, got {matches:?}");
+        };
+        recovered[plane] = *matrix;
+    }
+    assert_eq!(recovered, [[-4865, -9528, 14392], [14392, -12061, -2332]]);
+
+    let (pairs, chroma) = reference_chroma_rows(&reference, &root, 6, 160);
+    let mut observations = Vec::new();
+    for (matrix, plane) in recovered.into_iter().zip(chroma) {
+        observations.extend(plane.into_iter().enumerate().map(|(sample, value)| {
+            (
+                std::array::from_fn(|row| (dot(matrix, pairs[row][sample]) + 512) >> 10),
+                value,
+            )
+        }));
+    }
+    let mut matches = Vec::new();
+    // An impulse gives 3:3:1 at eight bits. Resolve the two nearby weights
+    // at twelve bits and get the third from their normalized sum.
+    for first in 1751..=1759 {
+        for second in 1751..=1759 {
+            let taps = [first, second, 4096 - first - second];
+            if observations
+                .iter()
+                .all(|&(sample, value)| (dot(taps, sample) + (32 << 12)) >> 18 == value)
+            {
+                matches.push(taps);
+            }
+        }
+    }
+    assert_eq!(matches, [[1755, 1756, 585]]);
+}
+
+#[cfg(target_arch = "aarch64")]
+fn dot(coefficients: [i32; 3], sample: [i32; 3]) -> i32 {
+    coefficients
+        .into_iter()
+        .zip(sample)
+        .map(|(a, b)| a * b)
+        .sum()
+}
+
+#[cfg(target_arch = "aarch64")]
+fn reference_chroma_rows(
+    reference: &Path,
+    dir: &Path,
+    height: usize,
+    frames: usize,
+) -> ([Vec<[i32; 3]>; 3], [Vec<i32>; 2]) {
+    const WIDTH: usize = 480;
+    let pixels = WIDTH * height;
+    let input = dir.join(format!("{height}-rows.rgba"));
+    let output = dir.join(format!("{height}-rows.yuv"));
+    let mut rgba = vec![0; pixels * frames * 4];
+    let mut random = 0x23a9_0d79_u32;
+    for byte in &mut rgba {
+        random ^= random << 13;
+        random ^= random >> 17;
+        random ^= random << 5;
+        *byte = random.to_le_bytes()[0];
+    }
+    fs::write(&input, &rgba).unwrap();
+    let status = Command::new(reference)
+        .arg("convert")
+        .args([WIDTH, height, 0, frames].map(|arg| arg.to_string()))
+        .arg(&input)
+        .arg(&output)
+        .status()
+        .unwrap();
+    assert!(status.success(), "{height} rows: {status}");
+    let yuv = fs::read(output).unwrap();
+    assert_eq!(yuv.len(), pixels * frames * 3 / 2);
+    let mut pairs = std::array::from_fn(|_| Vec::with_capacity(frames * WIDTH / 2));
+    let mut chroma = std::array::from_fn(|_| Vec::with_capacity(frames * WIDTH / 2));
+    for (rgba, yuv) in rgba
+        .chunks_exact(pixels * 4)
+        .zip(yuv.chunks_exact(pixels * 3 / 2))
+    {
+        for (input, pairs) in rgba.chunks_exact(WIDTH * 4).zip(&mut pairs) {
+            pairs.extend(input.chunks_exact(8).map(|pair| {
+                std::array::from_fn(|channel| {
+                    i32::from(pair[channel]) + i32::from(pair[channel + 4])
+                })
+            }));
+        }
+        for (plane_index, samples) in chroma.iter_mut().enumerate() {
+            let offset = pixels + plane_index * pixels / 4;
+            samples.extend(
+                yuv[offset..offset + WIDTH / 2]
+                    .iter()
+                    .map(|&value| i32::from(value) - 128),
+            );
+        }
+    }
+    (pairs, chroma)
 }

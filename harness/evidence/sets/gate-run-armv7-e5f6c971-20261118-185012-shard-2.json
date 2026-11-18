@@ -1,0 +1,70 @@
+{
+ "name": "gate-run-armv7-e5f6c971-20261118-185012-shard-2",
+ "path": "gate-run-armv7-e5f6c971-20261118-185012-shard-2",
+ "retention": "retained",
+ "reason": "32-bit ARMv7 capture at e5f6c971, run 20261118-185012, shard 2 of 5. Parity, paired runtime and kernel-bound memory from the complete 15-case run.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-armv7-20261118-185012/shard-2/4046625b77739a7cbeabb3f739894da3f7938a7f0e348662bb2197a4e40659c6.tar.zst",
+ "sha256": "4046625b77739a7cbeabb3f739894da3f7938a7f0e348662bb2197a4e40659c6",
+ "bytes": 417899153,
+ "results": [
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "66b68a7274817e022c74472eda6b45ad769da80a9a976afbd44dc4b58045ed9a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "3b622ebc9f20f4e224f27bd841381a4856ca1c1029fae620daf4dda5c038eb3a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "d2d4047853db5c8104a4145ba6b77a74536e70240909e0ab7b3ec99dcd565328",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "3f5b7ea53bad5a71f07a68f689433e0286ee8583cf430f77b077174e50687836",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "c3b0cf27ff2931dc9dfbdbf836dc38e30bf6aa0df4e9809461e4f1f69054b53c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2fc23402e606ac17d30d43a9b6d8f6a52133c5d9daad899685980d634f038c7a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "418d24e59309442c7284bb0aeab1fa87c6808a8e3f672511e42e5bc7969558c7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "eefb1ea27e351b8a877f35b5a85beafe1382a7513b0ef88f8a381049d81d4f09",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}

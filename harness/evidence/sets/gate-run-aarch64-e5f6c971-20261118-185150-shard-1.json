@@ -1,0 +1,70 @@
+{
+ "name": "gate-run-aarch64-e5f6c971-20261118-185150-shard-1",
+ "path": "gate-run-aarch64-e5f6c971-20261118-185150-shard-1",
+ "retention": "retained",
+ "reason": "Linux AArch64 capture at e5f6c971, run 20261118-185150, shard 1 of 2. Measures the four cases from shard 2 of run 20261118-172954 after a lost SSH connection left it without an archive.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-aarch64-20261118-185150/shard-1/cf1c358e58f949990bff912cf3e9ab8e418db02fc37e90db86750290a9d57520.tar.zst",
+ "sha256": "cf1c358e58f949990bff912cf3e9ab8e418db02fc37e90db86750290a9d57520",
+ "bytes": 414398568,
+ "results": [
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "aaf5c29ea9cf2fbc3afab025e5d441cc33771ebd95585058b23bf5ee7deb0920",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "01e9bdaec3a49e85238d72139bd86aec96552a6f7c0ee8c1e720a53c8c206164",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6bc1d521bef7eabdb02f17f82c17c57198741c945b96978511b68a05c9115fdb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "84f6a02b88bd198d8bcab84695c8f85c0205d58f392ef8690d4b2d9a9082273e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "d565bc75229f8bfcb3ba139e477c1aa8936ba3e692502f00cd03ee3a80a85447",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "a7fd707e77dba6d0c09c2b9ca26d6594d8d93ebad4750e49f221490c7dac4040",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "1a03e89663a9525785a4ed7e1a56268b22aedd6e01fe201f7a046ba73751d551",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "15c51619626c6406f8cbbdc52c640377adb91f392c2b2ba1bd718da588f857a2",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}
