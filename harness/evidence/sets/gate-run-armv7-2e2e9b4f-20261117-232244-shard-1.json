@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-2e2e9b4f-20261117-232244-shard-1",
+ "path": "gate-run-armv7-2e2e9b4f-20261117-232244-shard-1",
+ "retention": "retained",
+ "reason": "Capture at 2e2e9b4f on 32-bit ARMv7 Linux, c6g.4xlarge. This set contains conversion, encoding and mux comparisons, paired runtime and kernel-bound memory, and worker build identities.",
+ "key": "evidence/gate-runs/2e2e9b4faf0364b276b51abfdb6716f828ab96fb-armv7-20261117-232244/shard-1/3b5fe396a7f6e7eb0b9e002687c6ad65db53b4777e99b2992e529d89c3b380ca.tar.zst",
+ "sha256": "3b5fe396a7f6e7eb0b9e002687c6ad65db53b4777e99b2992e529d89c3b380ca",
+ "bytes": 360976661,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "db53120962bafad96714deaa7112895bedccf47728da2bc0442bb5a40dfa3722",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "4a571059a20ab8b6fcb8f02a360258ec6ef6202a9c12cd5849652fec6f0b0974",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "2e2e9b4faf0364b276b51abfdb6716f828ab96fb"
+ ]
+}

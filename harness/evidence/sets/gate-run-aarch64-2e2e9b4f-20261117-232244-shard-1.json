@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-2e2e9b4f-20261117-232244-shard-1",
+ "path": "gate-run-aarch64-2e2e9b4f-20261117-232244-shard-1",
+ "retention": "retained",
+ "reason": "Capture at 2e2e9b4f on AArch64 Linux, c6g.4xlarge. This set contains conversion, encoding and mux comparisons, paired runtime and kernel-bound memory, and worker build identities.",
+ "key": "evidence/gate-runs/2e2e9b4faf0364b276b51abfdb6716f828ab96fb-aarch64-20261117-232244/shard-1/772388b70251eaa0c414a7622bc37655ad44d39e065d3b8bd417509a40d26916.tar.zst",
+ "sha256": "772388b70251eaa0c414a7622bc37655ad44d39e065d3b8bd417509a40d26916",
+ "bytes": 358434254,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "74b20937a1a2ea8d0f13bb8eb5ffd24f1da553d0deb963c191e9023ef6c8535f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c7220c105d0c1eee107996ce5114e08cae93c397b2671f52b8a12d0d0fadfe1d",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "2e2e9b4faf0364b276b51abfdb6716f828ab96fb"
+ ]
+}

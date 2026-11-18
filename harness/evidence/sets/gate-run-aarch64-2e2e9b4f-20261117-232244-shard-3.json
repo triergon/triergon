@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-aarch64-2e2e9b4f-20261117-232244-shard-3",
+ "path": "gate-run-aarch64-2e2e9b4f-20261117-232244-shard-3",
+ "retention": "retained",
+ "reason": "Capture at 2e2e9b4f on AArch64 Linux, c6g.4xlarge. This set contains conversion, encoding and mux comparisons, paired runtime and kernel-bound memory, and worker build identities.",
+ "key": "evidence/gate-runs/2e2e9b4faf0364b276b51abfdb6716f828ab96fb-aarch64-20261117-232244/shard-3/fb3f91c9bd2daef5498050896b5db44cd2bef4b1ef6f7523511733ae373c1569.tar.zst",
+ "sha256": "fb3f91c9bd2daef5498050896b5db44cd2bef4b1ef6f7523511733ae373c1569",
+ "bytes": 316274217,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "59407318271523d9deffb0dd8a0ffcce5fdef67e7f1d5003635d31b26ddf6ac7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "6939ed2e9a5a667d805f628ae7cc17eac3b433b9f32e119f2c4b12859c5ddb8a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "80c47fe089a2597bd5db902319672ea58631b7c6e0f9263ceda029d74fd5a7f7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "5fe6db0275a7e5e3a186556388c3ca72e77dbf672d77a0ccd38b65de90b75d78",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "e69109f078fbd4338c92432825c0ff042518dac8beba004fe225974201b22944",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e74d9cad9b8553a2320f3b25f1168321e5858ec8375315ebe0ffd9ebfb5e5ef8",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "2e2e9b4faf0364b276b51abfdb6716f828ab96fb"
+ ]
+}

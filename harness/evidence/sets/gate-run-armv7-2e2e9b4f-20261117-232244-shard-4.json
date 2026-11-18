@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-2e2e9b4f-20261117-232244-shard-4",
+ "path": "gate-run-armv7-2e2e9b4f-20261117-232244-shard-4",
+ "retention": "retained",
+ "reason": "Capture at 2e2e9b4f on 32-bit ARMv7 Linux, c6g.4xlarge. This set contains conversion, encoding and mux comparisons, paired runtime and kernel-bound memory, and worker build identities.",
+ "key": "evidence/gate-runs/2e2e9b4faf0364b276b51abfdb6716f828ab96fb-armv7-20261117-232244/shard-4/78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb.tar.zst",
+ "sha256": "78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb",
+ "bytes": 423446088,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "860991363fb5f42882cdae29e85850811e83016888ad56dbcc8e46a31e692b77",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "fbd4c1f188dc489ae87aeb4e4f3cb3a0fe45d3cf6d38e33e320c5e1451ea7d25",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "7a2a289d07ad1119df19dca1bbc019e2a29dced62bd9485759928955721205cc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "1e30f60522c0c304c01338070c795a0c23af20100613afce3c59a82d02390deb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "aa844ee4389fcf85de443ebb83f35f23fd1ba6c5ba729eb10132ae20b94be022",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "e99a5729e69b812d5ce2b958d2ad15ccc50c1d685d0c912cf7f9fdf51c6e0f3a",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "2e2e9b4faf0364b276b51abfdb6716f828ab96fb"
+ ]
+}
