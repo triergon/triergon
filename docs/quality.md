@@ -847,7 +847,12 @@ On one host, a shard's run is:
 3. It [proves](../harness/rss-bound/README.md) the kernel bound, rebuilds the workers
    with the proof, checks them with `cargo xtask gate preflight --kernel`, and collects
    memory on the remaining CPUs (`taskset -c 1-15` on a 16-CPU host, `cargo xtask gate
-   run --stage memory`).
+   run --stage memory`). The shard's capture memory steps run as one `capture qualify`,
+   their runs joined by `--and`, so every case is one job of a single collection, side
+   by side as in a run of all cases (see [Memory in parallel](#memory-in-parallel)).
+   Each run still reads its own timing records, writes its own output and gate result
+   and is reused on its own; each step's record takes the status of its gate result and
+   names the batch (`memory-capture`), whose log is `logs/memory-capture.log`.
 4. It grades with the module loaded. Grades measure nothing, so several run at once,
    from a release build of xtask.
 

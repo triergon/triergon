@@ -97,6 +97,10 @@ struct Step {
     /// The program and its arguments; `xtask` means this program.
     command: Vec<String>,
     environment: Vec<(&'static str, &'static str)>,
+    /// Memory steps of a shard in one batch run as one command, [`CAPTURE_QUALIFY`]
+    /// with each step's arguments joined by `--and`, so they measure side by side
+    /// in one collection; each still writes its own result and step record.
+    batch: Option<&'static str>,
 }
 
 #[derive(Debug)]
@@ -280,6 +284,10 @@ const SUMMARY_OUTPUT: &str = "OUT";
 const ISOBMFF_SEEK_WEIGHT: u32 = 14;
 /// The capture cases, which the capture items split between them.
 const CAPTURE_CASES: &str = "harness/capture/cases.json";
+/// The command of every capture step, and so of their memory batch.
+const CAPTURE_QUALIFY: [&str; 3] = ["xtask", "capture", "qualify"];
+/// The batch of the capture items' memory steps.
+const CAPTURE_MEMORY: &str = "memory-capture";
 /// The decode reference's programs, the codecs' and capture's independent decoder.
 const FFMPEG_BIN: &str = ".research/reference-decode/install/bin";
 /// The formats reference's `ffprobe`, which the neutral ISO BMFF reader is compared with.
@@ -309,6 +317,7 @@ fn step(name: impl Into<String>, stage: Stage, placement: Placement, command: Ve
         placement,
         command,
         environment: Vec::new(),
+        batch: None,
     }
 }
 
@@ -851,14 +860,14 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
 
     // Each capture case on its own: one is up to a quarter of an hour on ARMv7. Its
     // correctness and timing run in the timing stage, and its memory, from the records
-    // they wrote, under the kernel bound in the memory stage.
+    // they wrote, under the kernel bound in the memory stage, in one collection with
+    // the other capture cases of its shard.
     for id in capture {
         let name = format!("capture-{id}");
         let timing = format!("{out}/{name}-timing");
         let qualify = |stage: &[&str], output: &str| {
-            let mut command = xtask(&[
-                "capture",
-                "qualify",
+            let mut command = owned(&CAPTURE_QUALIFY);
+            command.extend(owned(&[
                 "--candidate",
                 &format!("{release}/capture-worker"),
                 "--reference",
@@ -873,7 +882,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 &format!("{out}/capture-inputs"),
                 "--out",
                 output,
-            ]);
+            ]));
             command.extend(owned(stage));
             command.extend(owned(&["--only", id]));
             with_full(command)
@@ -889,6 +898,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         for step in &mut steps {
             step.environment.push(("TRIERGON_PYTHON", "python3"));
         }
+        steps[1].batch = Some(CAPTURE_MEMORY);
         items.push(Item {
             name,
             weight: CAPTURE_WEIGHTS
@@ -1640,15 +1650,38 @@ fn run(
         .filter(|(_, step)| step.stage == stage)
         .collect();
     let mut failed = 0;
-    // Parity before timing, memory before grades, item by item.
+    // Parity before timing, memory before grades, item by item; a batch where its
+    // first step stands.
     for placement in [Placement::Free, Placement::Timed, Placement::Memory] {
-        for (item, step) in steps.iter().filter(|(_, s)| s.placement == placement) {
-            let cpus = match placement {
-                Placement::Timed => Some("1"),
-                Placement::Memory => Some(memory.as_str()),
-                Placement::Free | Placement::Grade => None,
+        let cpus = match placement {
+            Placement::Timed => Some("1"),
+            Placement::Memory => Some(memory.as_str()),
+            Placement::Free | Placement::Grade => None,
+        };
+        let placed: Vec<(&Item, &Step)> = steps
+            .iter()
+            .filter(|(_, s)| s.placement == placement)
+            .copied()
+            .collect();
+        let mut batches_run: Vec<&str> = Vec::new();
+        for &(item, step) in &placed {
+            let batch: Vec<(&Item, &Step)> = match step.batch {
+                Some(name) if batches_run.contains(&name) => continue,
+                Some(name) => {
+                    batches_run.push(name);
+                    placed
+                        .iter()
+                        .filter(|(_, s)| s.batch == Some(name))
+                        .copied()
+                        .collect()
+                }
+                None => Vec::new(),
             };
-            let mut command = command(root, &exe, step, cpus);
+            if batch.len() > 1 {
+                failed += run_batch(root, &exe, &output, &log, &batch, cpus)?;
+                continue;
+            }
+            let mut command = command(root, &exe, &step.command, &step.environment, cpus);
             if run_step(&output, &log, item, step, cpus, &mut command)? != 0 {
                 failed += 1;
             }
@@ -1672,7 +1705,8 @@ fn run(
                 .map(|(item, step)| {
                     let (output, log, grader) = (&output, &log, &grader);
                     scope.spawn(move || {
-                        let mut command = command(root, grader, step, None);
+                        let mut command =
+                            command(root, grader, &step.command, &step.environment, None);
                         run_step(output, log, item, step, None, &mut command)
                     })
                 })
@@ -1716,9 +1750,14 @@ fn release_xtask(root: &Path, output: &Path) -> R<PathBuf> {
     Ok(root.join("target/release/xtask"))
 }
 
-fn command(root: &Path, exe: &Path, step: &Step, cpus: Option<&str>) -> Command {
-    let program: Vec<String> = step
-        .command
+fn command(
+    root: &Path,
+    exe: &Path,
+    program: &[String],
+    environment: &[(&'static str, &'static str)],
+    cpus: Option<&str>,
+) -> Command {
+    let program: Vec<String> = program
         .iter()
         .enumerate()
         .map(|(i, part)| {
@@ -1741,7 +1780,7 @@ fn command(root: &Path, exe: &Path, step: &Step, cpus: Option<&str>) -> Command 
     command
         .current_dir(root)
         .env("CARGO_INCREMENTAL", "0")
-        .envs(step.environment.iter().copied())
+        .envs(environment.iter().copied())
         .stdin(Stdio::null());
     command
 }
@@ -1756,12 +1795,84 @@ fn run_step(
     cpus: Option<&str>,
     command: &mut Command,
 ) -> R<i32> {
+    let ran = execute(output, log, &step.name, command)?;
+    record_step(output, log, item, step, cpus, &ran, ran.code)
+}
+
+/// Runs the memory steps of one batch as one command, with its output in
+/// `DIR/logs/BATCH.log`, and records each step with the status of the gate result
+/// in its `--out`, or 1 if it wrote none; returns how many failed.
+fn run_batch(
+    root: &Path,
+    exe: &Path,
+    output: &Path,
+    log: &Path,
+    steps: &[(&Item, &Step)],
+    cpus: Option<&str>,
+) -> R<usize> {
+    let (_, first) = steps[0];
+    let name = first.batch.expect("a batch");
+    let mut program = owned(&CAPTURE_QUALIFY);
+    for (i, (_, step)) in steps.iter().enumerate() {
+        let arguments = step
+            .command
+            .strip_prefix(&program[..CAPTURE_QUALIFY.len()])
+            .ok_or_else(|| format!("{}: a batch runs only capture qualify", step.name))?
+            .to_vec();
+        if step.environment != first.environment {
+            return Err(format!(
+                "{}: the batch {name} differs in environment",
+                step.name
+            ));
+        }
+        if i > 0 {
+            program.push(crate::capture::AND.into());
+        }
+        program.extend(arguments);
+    }
+    // A step's verdict is the result it writes in this run, never an earlier one.
+    let results: Vec<Option<PathBuf>> = steps
+        .iter()
+        .map(|(_, step)| {
+            let result =
+                flag_value(step, "--out").map(|out| out.join(crate::harness::reuse::RESULT));
+            if let Some(result) = &result {
+                let _ = fs::remove_file(result);
+            }
+            result
+        })
+        .collect();
+    let mut command = command(root, exe, &program, &first.environment, cpus);
+    let ran = execute(output, log, name, &mut command)?;
+    let mut failed = 0;
+    for ((item, step), result) in steps.iter().zip(results) {
+        let status = result
+            .and_then(|result| crate::checks::read_json(&result).ok())
+            .and_then(|result| result.get("status").and_then(Value::as_f64))
+            .map_or(1, |status| status as i32);
+        if record_step(output, log, item, step, cpus, &ran, status)? != 0 {
+            failed += 1;
+        }
+    }
+    Ok(failed)
+}
+
+/// What [`execute`] ran: its exit code, when it started, how long it took, and
+/// the log its output went to (`DIR/logs/NAME.log`).
+struct Ran {
+    code: i32,
+    started: String,
+    seconds: f64,
+    name: String,
+}
+
+/// Runs `command` with its output in `DIR/logs/NAME.log`, noted in the run log.
+fn execute(output: &Path, log: &Path, name: &str, command: &mut Command) -> R<Ran> {
     let logs = output.join("logs");
     fs::create_dir_all(&logs).map_err(|e| format!("{}: {e}", logs.display()))?;
-    let file =
-        fs::File::create(logs.join(format!("{}.log", step.name))).map_err(|e| e.to_string())?;
+    let file = fs::File::create(logs.join(format!("{name}.log"))).map_err(|e| e.to_string())?;
     let errors = file.try_clone().map_err(|e| e.to_string())?;
-    append(log, &step.name)?;
+    append(log, name)?;
     let started = crate::python::utc_now();
     let clock = Instant::now();
     let code = command
@@ -1769,7 +1880,25 @@ fn run_step(
         .stderr(errors)
         .status()
         .map_or(127, |s| s.code().unwrap_or(1));
-    let seconds = clock.elapsed().as_secs_f64();
+    Ok(Ran {
+        code,
+        started,
+        seconds: clock.elapsed().as_secs_f64(),
+        name: name.to_owned(),
+    })
+}
+
+/// Records `step`, which `ran` with exit `code` (alone, or in a batch whose
+/// name the record keeps), in `DIR/steps/STEP.json` and the run log.
+fn record_step(
+    output: &Path,
+    log: &Path,
+    item: &Item,
+    step: &Step,
+    cpus: Option<&str>,
+    ran: &Ran,
+    code: i32,
+) -> R<i32> {
     // A measurement that exits 0 with cases it did not measure fails here, so no
     // feature measures nothing in silence.
     let unmeasured = if code == 0 {
@@ -1784,17 +1913,18 @@ fn run_step(
     append(log, &format!("{} EXIT={code}", step.name))?;
     // The verdict lines of a grade or a codec collection, which tell listed open
     // cases from other failures.
-    let mut outcome: Vec<String> = fs::read_to_string(logs.join(format!("{}.log", step.name)))
-        .unwrap_or_default()
-        .lines()
-        .filter(|line| {
-            line.contains(" cases pass")
-                || line.contains(" open failures, as listed")
-                || line.contains(": failing: ")
-                || line.contains("diagnostic on this target")
-        })
-        .map(str::to_owned)
-        .collect();
+    let mut outcome: Vec<String> =
+        fs::read_to_string(output.join("logs").join(format!("{}.log", ran.name)))
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| {
+                line.contains(" cases pass")
+                    || line.contains(" open failures, as listed")
+                    || line.contains(": failing: ")
+                    || line.contains("diagnostic on this target")
+            })
+            .map(str::to_owned)
+            .collect();
     if !unmeasured.is_empty() {
         outcome.push(format!(
             "{} of its cases not measured: {}",
@@ -1806,22 +1936,26 @@ fn run_step(
     if let Some(cpus) = cpus {
         shown.splice(0..0, owned(&["taskset", "-c", cpus]));
     }
+    let mut fields = vec![
+        ("step", Value::str(&step.name)),
+        ("item", Value::str(&item.name)),
+        ("stage", Value::str(step.stage.name())),
+        ("command", Value::strings(shown)),
+        (
+            "environment",
+            Value::object(step.environment.iter().map(|(k, v)| (*k, Value::str(*v)))),
+        ),
+        ("started", Value::str(&ran.started)),
+        ("seconds", Value::float((ran.seconds * 10.0).round() / 10.0)),
+        ("status", Value::int(i64::from(code))),
+        ("outcome", Value::strings(outcome)),
+    ];
+    if ran.name != step.name {
+        fields.push(("batch", Value::str(&ran.name)));
+    }
     crate::corpus::write_json(
         &output.join("steps").join(format!("{}.json", step.name)),
-        &Value::object([
-            ("step", Value::str(&step.name)),
-            ("item", Value::str(&item.name)),
-            ("stage", Value::str(step.stage.name())),
-            ("command", Value::strings(shown)),
-            (
-                "environment",
-                Value::object(step.environment.iter().map(|(k, v)| (*k, Value::str(*v)))),
-            ),
-            ("started", Value::str(started)),
-            ("seconds", Value::float((seconds * 10.0).round() / 10.0)),
-            ("status", Value::int(i64::from(code))),
-            ("outcome", Value::strings(outcome)),
-        ]),
+        &Value::object(fields),
     )?;
     Ok(code)
 }
@@ -1838,9 +1972,14 @@ fn self_checking(step: &Step) -> bool {
 
 /// The directory a step writes its report and gate result to (`--output DIR`).
 fn step_output(step: &Step) -> Option<PathBuf> {
+    flag_value(step, "--output")
+}
+
+/// The path that follows `flag` in the step's command.
+fn flag_value(step: &Step, flag: &str) -> Option<PathBuf> {
     step.command
         .windows(2)
-        .find(|pair| pair[0] == "--output")
+        .find(|pair| pair[0] == flag)
         .map(|pair| PathBuf::from(&pair[1]))
 }
 
@@ -2119,10 +2258,7 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
             };
             started(a).cmp(&started(b))
         });
-        let seconds: f64 = records
-            .iter()
-            .filter_map(|r| r.get("seconds").and_then(Value::as_f64))
-            .sum();
+        let seconds = step_seconds(&records);
         for stage in ["timing", "memory"] {
             let path = directory.join(format!("identity-{stage}.json"));
             match sha256::file_hex(&path) {
@@ -2321,6 +2457,24 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
         ]),
     )?;
     Ok(i32::from(!failed.is_empty() || !problems.is_empty()))
+}
+
+/// The seconds a shard's steps took: the steps of a batch ran as one command, so
+/// its time counts once.
+fn step_seconds(records: &[Value]) -> f64 {
+    let mut batches: Vec<&str> = Vec::new();
+    records
+        .iter()
+        .filter(|record| match record.get("batch").and_then(Value::as_str) {
+            Some(batch) if batches.contains(&batch) => false,
+            Some(batch) => {
+                batches.push(batch);
+                true
+            }
+            None => true,
+        })
+        .filter_map(|record| record.get("seconds").and_then(Value::as_f64))
+        .sum()
 }
 
 // A part's collection and grade commands must all be on its assigned shard,
@@ -2547,6 +2701,131 @@ mod tests {
                 (Placement::Timed, Placement::Memory)
             );
         }
+    }
+
+    /// A shard's capture memory steps share one batch, so they run as one
+    /// collection; nothing else is batched, and the batch can join their commands.
+    #[test]
+    fn capture_memory_steps_alone_share_a_batch() {
+        let plan = plan();
+        let steps: Vec<&Step> = plan.iter().flat_map(|item| &item.steps).collect();
+        let batched: Vec<&&Step> = steps.iter().filter(|s| s.batch.is_some()).collect();
+        assert_eq!(batched.len(), 15);
+        for step in batched {
+            assert!(step.name.starts_with("memory-capture-"), "{}", step.name);
+            assert_eq!(step.batch, Some(CAPTURE_MEMORY));
+            assert_eq!(step.placement, Placement::Memory);
+            assert!(step.command.starts_with(&owned(&CAPTURE_QUALIFY)));
+            assert!(!step.command.iter().any(|arg| arg == crate::capture::AND));
+            assert_eq!(
+                step.environment,
+                [
+                    ("TRIERGON_RSS_KERNEL_BOUND", "1"),
+                    ("TRIERGON_PYTHON", "python3")
+                ]
+            );
+        }
+    }
+
+    /// A batch runs as one command and records each step with the gate result in
+    /// its `--out`: a step that wrote none, or a failing one, fails alone.
+    #[cfg(unix)]
+    #[test]
+    fn a_batch_runs_once_and_records_each_step_by_its_result() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = crate::walk::scratch("gate-batch");
+        // Writes a gate result in each --out but the one named `silent`, failing in
+        // the one named `fails`, and prints its arguments.
+        let program = dir.join("qualify.sh");
+        fs::write(
+            &program,
+            r#"#!/bin/sh
+echo "$@"
+while [ $# -gt 0 ]; do
+  if [ "$1" = --out ]; then
+    case $2 in
+      *silent) ;;
+      *fails) mkdir -p "$2"; echo '{"status": 3}' > "$2/gate-result.json" ;;
+      *) mkdir -p "$2"; echo '{"status": 0}' > "$2/gate-result.json" ;;
+    esac
+  fi
+  shift
+done
+"#,
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let output = dir.join("run");
+        // An earlier run's result is not this run's.
+        fs::create_dir_all(output.join("silent")).unwrap();
+        fs::write(output.join("silent/gate-result.json"), r#"{"status": 0}"#).unwrap();
+        let items: Vec<Item> = ["passes", "fails", "silent"]
+            .iter()
+            .map(|case| {
+                let mut command = owned(&CAPTURE_QUALIFY);
+                command.extend(owned(&["--only", case, "--out"]));
+                command.push(output.join(case).display().to_string());
+                let mut step = step(
+                    format!("memory-{case}"),
+                    Stage::Memory,
+                    Placement::Memory,
+                    command,
+                );
+                step.environment.push(("TRIERGON_PYTHON", "python3"));
+                step.batch = Some("batch");
+                Item {
+                    name: (*case).into(),
+                    weight: 1,
+                    steps: vec![step],
+                    preflight: Vec::new(),
+                }
+            })
+            .collect();
+        let steps: Vec<(&Item, &Step)> = items.iter().map(|i| (i, &i.steps[0])).collect();
+        let log = output.join("run.log");
+        let failed = run_batch(&dir, &program, &output, &log, &steps, None).unwrap();
+        assert_eq!(failed, 2);
+        let joined = fs::read_to_string(output.join("logs/batch.log")).unwrap();
+        assert_eq!(joined.matches("capture qualify").count(), 1, "{joined}");
+        assert_eq!(joined.matches(" --and ").count(), 2, "{joined}");
+        let record = |case: &str| {
+            crate::checks::read_json(&output.join(format!("steps/memory-{case}.json"))).unwrap()
+        };
+        for (case, status) in [("passes", 0.0), ("fails", 3.0), ("silent", 1.0)] {
+            let record = record(case);
+            assert_eq!(record.get("status").and_then(Value::as_f64), Some(status));
+            assert_eq!(record.get("batch").and_then(Value::as_str), Some("batch"));
+            assert_eq!(record.get("item").and_then(Value::as_str), Some(case));
+            let command = record.get("command").and_then(Value::as_array).unwrap();
+            assert!(command.contains(&Value::str(case)));
+            assert!(!command.contains(&Value::str(crate::capture::AND)));
+        }
+        let ran = fs::read_to_string(&log).unwrap();
+        assert!(ran.contains("memory-fails EXIT=3"), "{ran}");
+        assert!(ran.contains("memory-silent EXIT=1"), "{ran}");
+        // The shard's step time counts the batch once.
+        let records: Vec<Value> = ["passes", "fails", "silent"].map(record).into();
+        let once = records[0].get("seconds").and_then(Value::as_f64).unwrap();
+        assert!((step_seconds(&records) - once).abs() < 1e-9);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_batch_counts_its_time_once() {
+        let record = |seconds: f64, batch: Option<&str>| {
+            let mut fields = vec![("seconds", Value::float(seconds))];
+            if let Some(batch) = batch {
+                fields.push(("batch", Value::str(batch)));
+            }
+            Value::object(fields)
+        };
+        let records = [
+            record(2.0, None),
+            record(60.0, Some("memory-capture")),
+            record(60.0, Some("memory-capture")),
+            record(3.0, None),
+        ];
+        assert!((step_seconds(&records) - 65.0).abs() < 1e-9);
     }
 
     #[test]
