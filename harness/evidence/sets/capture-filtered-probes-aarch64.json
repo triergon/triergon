@@ -1,0 +1,12 @@
+{
+ "name": "capture-filtered-probes-aarch64",
+ "path": "capture-filtered-probes-aarch64",
+ "retention": "retained",
+ "reason": "Filtered conversion at 84 width, height and orientation combinations and four full-resolution inputs on Linux AArch64. Includes the pinned reference identity and the luma rounding control.",
+ "key": "evidence/capture-filtered-probes/809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55.tar.zst",
+ "sha256": "809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55",
+ "bytes": 28549514,
+ "source_revisions": [
+  "e12863c88f5050781e20254fc8efd8cee12fac9b"
+ ]
+}
