@@ -6,7 +6,7 @@ use crate::{
     ts_payload::PesInput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
 use triergon_mpegts::{
     AssemblyStep,
@@ -40,20 +40,13 @@ struct PendingPes {
     spans: PayloadCursor,
     // A joined tail replaces the current logical span only after its complete
     // allocation, copy and freeze succeed. Ordinary spans borrow the cursor.
-    current: Option<Bytes>,
+    joined: Option<Bytes>,
     offset: usize,
     remaining: usize,
     coalescing_attempted: bool,
 }
 
 impl PendingPes {
-    fn current(&self) -> Option<BytesView<'_>> {
-        self.current
-            .as_ref()
-            .map(|bytes| bytes.view(0..bytes.len()).expect("complete joined tail"))
-            .or_else(|| self.spans.current_bytes())
-    }
-
     fn try_coalesce(
         &mut self,
         pool: &Budget,
@@ -65,9 +58,10 @@ impl PendingPes {
         if self.coalescing_attempted || self.offset != PREFIX_BYTES || self.remaining == 0 {
             return Ok(false);
         }
-        let Some(current_len) = self.current().map(BytesView::len) else {
+        let Some(current) = self.spans.current_bytes() else {
             return Ok(false);
         };
+        let current_len = current.len();
         if frame_length - PREFIX_BYTES <= current_len - self.offset {
             return Ok(false);
         }
@@ -90,15 +84,16 @@ impl PendingPes {
         }
         self.coalescing_attempted = true;
         let mut remaining = self.remaining;
-        for span in self.spans.remaining_spans() {
+        let mut tail = self.spans.remaining_spans();
+        while let Some(bytes) = tail.next_bytes() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             work.take(1);
-            if !span.bytes.belongs_to(pool) {
+            if !bytes.belongs_to(pool) {
                 return Ok(false);
             }
-            let Some(next) = remaining.checked_sub(span.as_ref().len()) else {
+            let Some(next) = remaining.checked_sub(bytes.len()) else {
                 return Ok(false);
             };
             remaining = next;
@@ -114,17 +109,17 @@ impl PendingPes {
         if joined.try_reserve_exact(total).is_err() || joined.capacity() > maximum {
             return Ok(false);
         }
-        let current = self.current().expect("admitted coalescing span");
-        work.take(current.len() as u64);
+        work.take(current_len as u64);
         if joined.try_extend_from_slice(current.as_ref()).is_err() {
             return Ok(false);
         }
-        for span in self.spans.remaining_spans() {
+        let mut tail = self.spans.remaining_spans();
+        while let Some(bytes) = tail.next_bytes() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            work.take(span.as_ref().len() as u64);
-            if joined.try_extend_from_slice(span.as_ref()).is_err() {
+            work.take(bytes.len() as u64);
+            if joined.try_extend_from_slice(bytes.as_ref()).is_err() {
                 return Ok(false);
             }
         }
@@ -140,7 +135,7 @@ impl PendingPes {
             Ok(())
         })?;
         self.spans.retire_current();
-        self.current = Some(joined);
+        self.joined = Some(joined);
         self.remaining = 0;
         Ok(true)
     }
@@ -280,7 +275,7 @@ impl HlsAac {
         let remaining = packet.payload_len;
         self.pending = mailbox.take().map(|packet| PendingPes {
             spans: packet.into_payload().into_cursor(),
-            current: None,
+            joined: None,
             offset: 0,
             remaining,
             coalescing_attempted: false,
@@ -357,7 +352,10 @@ impl HlsAac {
             {
                 continue;
             }
-            if input.current().is_none() {
+            let span = if let Some(joined) = &input.joined {
+                joined.view(0..joined.len()).expect("complete joined tail")
+            } else {
+                let needs_validation = !input.spans.has_current();
                 let Some(bytes) = input.spans.next_bytes() else {
                     if input.remaining != 0 {
                         return Err(Error::Invalid("HLS AAC PES payload extent"));
@@ -365,24 +363,24 @@ impl HlsAac {
                     self.pending = None;
                     continue;
                 };
-                if !bytes.belongs_to(&self.pool) {
-                    return Err(Error::ForeignPool);
+                if needs_validation {
+                    if !bytes.belongs_to(&self.pool) {
+                        return Err(Error::ForeignPool);
+                    }
+                    // Validate a span's full extent before reading any of it.
+                    input.remaining = input
+                        .remaining
+                        .checked_sub(bytes.len())
+                        .ok_or(Error::Invalid("HLS AAC PES payload extent"))?;
                 }
-                // Validate a span's full extent before reading any of it.
-                input.remaining = input
-                    .remaining
-                    .checked_sub(bytes.len())
-                    .ok_or(Error::Invalid("HLS AAC PES payload extent"))?;
-            }
-            let span = input
-                .current()
-                .ok_or(Error::Invalid("HLS AAC missing PES span"))?;
+                bytes
+            };
             let bytes = &span.as_ref()[input.offset..];
             if bytes.is_empty() {
                 if !work.try_charge(1) {
                     return Ok(AssemblyStep::Yield);
                 }
-                input.current = None;
+                input.joined = None;
                 input.spans.retire_current();
                 input.offset = 0;
                 continue;
@@ -852,7 +850,7 @@ mod tests {
         assert_eq!(pending.offset, PREFIX_BYTES);
         assert_eq!(pending.remaining, 0);
         assert_eq!(pending.spans.remaining(), 0);
-        assert_eq!(pending.current.as_ref().unwrap().as_ref(), wire);
+        assert_eq!(pending.joined.as_ref().unwrap().as_ref(), wire);
         assert!(reader.frame.is_empty());
         let pressure = fixture.pool.reserve(fixture.pool.available()).unwrap();
         let mut work = WorkBudget::new(frame.len() as u64 - PREFIX_BYTES as u64 + 2);
@@ -882,7 +880,12 @@ mod tests {
                 AssemblyStep::Yield
             ));
             let pending = reader.pending.as_mut().unwrap();
-            let original = pending.current().unwrap().backing_bytes().storage_address();
+            let original = pending
+                .spans
+                .current_bytes()
+                .unwrap()
+                .backing_bytes()
+                .storage_address();
             let tail: Vec<_> = pending
                 .spans
                 .remaining_spans()
@@ -921,8 +924,14 @@ mod tests {
             );
             assert_eq!(work.spent(), if available == 0 { 6 } else { 727 });
             assert_eq!(fixture.pool.used(), used);
+            assert!(pending.joined.is_none());
             assert_eq!(
-                pending.current().unwrap().backing_bytes().storage_address(),
+                pending
+                    .spans
+                    .current_bytes()
+                    .unwrap()
+                    .backing_bytes()
+                    .storage_address(),
                 original
             );
             assert_eq!(pending.offset, PREFIX_BYTES);
