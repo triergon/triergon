@@ -1671,7 +1671,7 @@ fn subtitle_recovery_lace(
         0xa1,
         &cat([
             &[0x82],
-            &(block_ticks / tick_ms).to_be_bytes(),
+            &((1000 + block_ticks) / tick_ms).to_be_bytes(),
             &[4, 1],
             silence,
             silence,
@@ -1684,22 +1684,23 @@ fn subtitle_recovery_lace(
     let first = e(
         CLUSTER,
         &cat([
-            &u(0xe7, 1000 / tick_ms),
+            &u(0xe7, 0),
             &block(1, 0, &picture),
-            &block(3, 900, b"Subtitle across a seek"),
+            &block(3, 1900, b"Subtitle across a seek"),
             &e(0xa0, &group),
         ]),
     );
     let second_audio_packet = second_audio.map_or_else(Vec::new, |_| block(4, 110, silence));
+    let audio_start = if tick_ms == 1 { 30 } else { 40 };
     let second = e(
         CLUSTER,
         &cat([
             &u(0xe7, 2000 / tick_ms),
             &block(1, 0, &picture),
-            &block(2, 30, silence),
-            &block(2, 50, silence),
-            &block(2, 70, silence),
-            &block(2, 90, silence),
+            &block(2, audio_start, silence),
+            &block(2, audio_start + 20, silence),
+            &block(2, audio_start + 40, silence),
+            &block(2, audio_start + 60, silence),
             &second_audio_packet,
         ]),
     );
@@ -1712,16 +1713,19 @@ fn subtitle_recovery_lace(
             ]),
         )
     };
-    let info = if tick_ms == 1 {
-        Vec::new()
-    } else {
-        e(INFO, &u(0x2ad7b1, tick_ms * 1_000_000))
-    };
+    let info = e(
+        INFO,
+        &cat([
+            &u(0x2ad7b1, tick_ms * 1_000_000),
+            &e(0x4d80, b"Triergon"),
+            &e(0x5741, b"Triergon"),
+        ]),
+    );
     let first_offset = (info.len() + tracks.len()) as u64;
     let cues = e(
         0x1c53bb6b,
         &cat([
-            &cue(1000 / tick_ms, first_offset),
+            &cue(0, first_offset),
             &cue(2000 / tick_ms, first_offset + first.len() as u64),
         ]),
     );

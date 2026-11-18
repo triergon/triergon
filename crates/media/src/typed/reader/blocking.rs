@@ -43,6 +43,29 @@ pub fn at_block_start<R: Read>(
     )
 }
 
+/// Whether the seek trace includes initial padding after reopening at the start.
+#[cfg(feature = "reference-trace")]
+pub fn seek_initial_trim<R: Read>(
+    reader: &BlockingReader<R>,
+    track: usize,
+    landing: &crate::matroska::SeekReceipt,
+) -> Result<bool> {
+    if !landing.replays_from_start {
+        return Ok(false);
+    }
+    let tracks = reader.tracks();
+    let video = tracks
+        .get(track)
+        .ok_or(Error::Unsupported("seek requires video track"))?;
+    let time = i128::from(landing.actual_ns) + i128::from(video.codec_delay_ns);
+    let scale = reader.timestamp_scale_ns();
+    let mut delay = 0;
+    for audio in tracks.iter().filter(|track| track.kind == 2) {
+        delay = delay.max(RecoveryAudio::BlockStart.delay_ns(audio, scale)?);
+    }
+    Ok(delay != 0 && time < i128::from(delay))
+}
+
 impl<R: Read> BlockingReader<R> {
     pub fn open(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;

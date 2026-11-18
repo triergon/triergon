@@ -41,7 +41,7 @@ pub(crate) enum RecoveryAudio {
 }
 
 impl RecoveryAudio {
-    fn delay_ns(self, track: &crate::matroska::Track, scale_ns: u64) -> Result<u64> {
+    pub(crate) fn delay_ns(self, track: &crate::matroska::Track, scale_ns: u64) -> Result<u64> {
         if self == Self::Overlap || track.codec_delay_ns == 0 {
             return Ok(track.codec_delay_ns);
         }

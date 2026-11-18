@@ -15,6 +15,7 @@ use triergon_harness_protocol::{
     hex, quoted,
 };
 use triergon_matroska::compat::seek::at_block_start;
+use triergon_matroska::reference_trace::seek_initial_trim;
 use triergon_matroska::timing::ExactTime;
 use triergon_matroska::{Limits, compat::clock::packet_timing, typed::BlockingReader as Demuxer};
 
@@ -73,7 +74,13 @@ fn trims(
     first: bool,
 ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
     let mut start = if first && track.kind == 2 {
-        sample_count(track.codec_delay_ns, track.sample_rate)?
+        // Opus pre-skip is expressed in 48 kHz samples (RFC 7845 §5.1).
+        let rate = if track.codec == "A_OPUS" {
+            48_000.0
+        } else {
+            track.sample_rate
+        };
+        sample_count(track.codec_delay_ns, rate)?
     } else {
         0
     };
@@ -325,7 +332,8 @@ fn run(
     for _ in 0..iterations {
         let mut d = open_owned(std::mem::take(data), Limits::default())?;
         let initial_trim = if let Some(target) = seek {
-            at_block_start(&mut d, 0, target, &cancel)?.replays_from_start
+            let landing = at_block_start(&mut d, 0, target, &cancel)?;
+            seek_initial_trim(&d, 0, &landing)?
         } else {
             true
         };
@@ -591,7 +599,8 @@ fn seek_trace(data: Vec<u8>, words: &[String]) -> Outcome {
         while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
     }
     let landing = at_block_start(&mut demux, 0, target, &AtomicBool::new(false))?;
-    trace(demux, landing.replays_from_start, false, 0)
+    let initial_trim = seek_initial_trim(&demux, 0, &landing)?;
+    trace(demux, initial_trim, false, 0)
 }
 
 /// `inflate FILE [OUTPUT_BYTES [EXPANSION_RATIO [WORK]]]`.

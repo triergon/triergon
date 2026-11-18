@@ -192,8 +192,9 @@ frames so a decoder can apply the block-wide trim using their sample counts.
 `compat::block_additions` builds readers that admit WebM VP9's implicit
 ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
 projects block additions to the packet side data and HDR10+ events FFmpeg attaches
-to packets. Comparison-only projections (`Colour::trace_fields`) are compiled only
-with the non-default `reference-trace` feature.
+to packets. The `reference-trace` feature exposes comparison projections.
+`Colour::trace_fields` returns the colour fields and `seek_initial_trim` reports
+when the block-start seek comparison reapplies initial audio padding.
 
 **Segment metadata.** Each `metadata::SharedDocument` owns one source buffer
 plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,
