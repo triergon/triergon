@@ -1,0 +1,103 @@
+{
+ "name": "gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2",
+ "path": "gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/6bbb2cb7887d08585a86440dcb4722506a7e1cb6-aarch64-20261118-104943/shard-2/2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b.tar.zst",
+ "sha256": "2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b",
+ "bytes": 24698923,
+ "results": [
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "1214a36a6d7838a922e497d60803f275d414846b8cb1a31a3dd90119e5a18de2",
+   "status": 0,
+   "report_sha256": "84f64731a65633b4aa0e6856ad5b94c2fb8d87eb00a6ae694119066931a0092c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "2b789ec0c781e0b15ea5f38e426ce0c8de108c06d77783effce8a27ddec5dc26",
+   "status": 0,
+   "report_sha256": "22a2982b2ad6c67e5c87f3a7d0dc7c5475dfcb0cf2222030f05886f657a10f4a",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "6679d27f097b68c039220c8a463f5d0c0e71e76bb21f6d4403e67a14b8c05b43",
+   "status": 0,
+   "report_sha256": "985a3e723f0816c4471a6ae159ffec1fa1fb94bb9412aabf4213a30106853c76",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "fb2368cf850f7fc627ad9266bbd554b8f036774b5f935081c1ba8a1d8b3b0a65",
+   "status": 0,
+   "report_sha256": "897d496acd452f268b0216f82f19dee8928b09cf879e8ee198f6dd41d778924d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "88ce5cc78e16add634c4e6bccaa04ecdce7c7cb17f5fca7d42c3190b8da1505a",
+   "status": 0,
+   "report_sha256": "df62fa038c18ffca88136cfe76c1e7985eec296a8a40685998f4df6c2266d45d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "328ce043c761cef33e6e25ce32f7ea16a8a69d067d7b4b3651f815b42cd4e403",
+   "status": 0,
+   "report_sha256": "5135cdd8a49ddec6780f4fc87b79b17c6b46e737b3c28c54eeef19a28c5bb942",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0f23647448180edc58e580be95c501e64f017f03985f10f75a1aec4b0cac7050",
+   "status": 0,
+   "report_sha256": "03ba6f49be6add0f1ab6183d5e884cb04d67abd082cb48a02ff5ccbc086ca91b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ef1601d7ac93585b238f8bd74a3bbbbe65877a3d9683cbc14808fdb7239cab6d",
+   "status": 0,
+   "report_sha256": "1fc725472cf0ca9288d8e0cbda7a460f77b718f567c3271616784b4158d660cc",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "7609a378c4ade98779cdfff47667302db0341936f8f2f9b809888dd37e74fe0f",
+   "status": 0,
+   "report_sha256": "7c933bf2f787d0c43e6610d74155458302693cd2346f5985d7a292ffc5cc0589"
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "5e778e26b381a33c4777bb35b1d9ff7210121725ac5363df77ffc3ef14591195",
+   "status": 0,
+   "report_sha256": "2e2ca8f670d59661440db1b8da78d1528ca3d18a0fc0594af51a2396963bc008"
+  },
+  {
+   "path": "graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "b8a09d2d4c21cf0ed9e421304f0a72deb5c58923715fb2fd2da1996e36389306",
+   "status": 0,
+   "report_sha256": "4dfc54b6847d1c3f21e517ff3872f8649981c1ce7f8d554dc5552ab7a2a13e9f"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "c2d0a3bc10af48fa0a75e54896b6ee19ee901536e3b30642b831558fc9956817",
+   "status": 0,
+   "report_sha256": "d03ae214ffaed5c662ce88ce24a129d6e8f71356c896e56730c6c1108b8372ae"
+  }
+ ]
+}
