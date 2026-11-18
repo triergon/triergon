@@ -1,0 +1,67 @@
+{
+ "name": "gate-run-armv7-001d40b6-20261118-112458-shard-2",
+ "path": "gate-run-armv7-001d40b6-20261118-112458-shard-2",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-armv7-20261118-112458/shard-2/dd24de3c318835d031849a24a25ff2ad4bde1a9baf0cfe92f1ba2856ed1dfe77.tar.zst",
+ "sha256": "dd24de3c318835d031849a24a25ff2ad4bde1a9baf0cfe92f1ba2856ed1dfe77",
+ "bytes": 417928674,
+ "results": [
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "d248b5f6e27aaa78db7c7e0008f554badadae67ed64018bc1e20bbeda1f6eb83",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "df0b06013232c9869c5681cb6cf7ebe960f347708f9ab19cd7c4f07cc7a9b868",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "a0b09b0443f6715ccca5419a35ef056815e28971d0b3593dc381e6b381be3d00",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "dba4533e757c30411b70f9f636f1753349ed98155aa30ff9ec5922b1afc194c9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "ce5d7d61e2041872ce074c167385cc41c8cd0d365fbb5c421fa25d0b3f883e4c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b79e11cb7f8e0e2a6623d9d8eb7db5241b3d7080236c4c0459521145655bd9e5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "265b1a5ad8d4916017111c98a490672de993b7340cc551554ba98d9b320a373b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "02448e1f69eb3e6d36dc31b0628829b89df02bc4645af714bb5b5afcdce0de7d",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
