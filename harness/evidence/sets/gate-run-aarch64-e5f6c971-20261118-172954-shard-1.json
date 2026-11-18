@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-e5f6c971-20261118-172954-shard-1",
+ "path": "gate-run-aarch64-e5f6c971-20261118-172954-shard-1",
+ "retention": "retained",
+ "reason": "Capture conversion, codec and mux with paired timing and kernel-bound memory on Linux AArch64.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-aarch64-20261118-172954/shard-1/b18f0b5e79d061fe03ac9e71ecd1cf18a29f7857d6f3a7041fa5c44e8d14c341.tar.zst",
+ "sha256": "b18f0b5e79d061fe03ac9e71ecd1cf18a29f7857d6f3a7041fa5c44e8d14c341",
+ "bytes": 358414463,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "17080dc988bf2751e9eb3f31ee7bb685c3b8aba3ddf8f6297119a20f6f8ef098",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "cae3cf9690c223ab04ddf87ec8922f399988ab1c7cc505eda65e1d5f98ffd359",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}

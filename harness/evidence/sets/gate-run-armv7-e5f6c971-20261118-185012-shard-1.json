@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-e5f6c971-20261118-185012-shard-1",
+ "path": "gate-run-armv7-e5f6c971-20261118-185012-shard-1",
+ "retention": "retained",
+ "reason": "Capture conversion, codec and mux with paired timing and kernel-bound memory on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-armv7-20261118-185012/shard-1/4b1430fe845035aa34d433c8ba28a4a85676f50e3077a87aee00b2f4ccfe0572.tar.zst",
+ "sha256": "4b1430fe845035aa34d433c8ba28a4a85676f50e3077a87aee00b2f4ccfe0572",
+ "bytes": 360932673,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "1fc9c924ace6954a85475269a99a59960cb78c747cd877bc27484f56df63b471",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2350208df720170f8e2bd03eee4594b12ae4a7980d8d4e63182c8f3e84ee795e",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}
