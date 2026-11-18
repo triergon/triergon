@@ -232,12 +232,6 @@ mod filtered {
     pub(super) const Y_R: i32 = 8414;
     pub(super) const Y_G: i32 = 16519;
     pub(super) const Y_B: i32 = 3208;
-    const CB_R: i32 = -4865;
-    const CB_G: i32 = -9528;
-    const CB_B: i32 = 14392;
-    const CR_R: i32 = 14392;
-    const CR_G: i32 = -12061;
-    const CR_B: i32 = -2332;
     // The extra 1 << 8 reproduces the reference luma rounding at RGB boundary values.
     const Y_OFFSET: i32 = (16 << 15) + (1 << 14) + (1 << 8);
 
@@ -286,23 +280,45 @@ mod filtered {
         let (y, cb, cr) = (&mut y[..2 * m], &mut cb[..m], &mut cr[..m]);
         for i in 0..m {
             let (r0, g0, b0) = (
-                rgba[8 * i] as i32,
-                rgba[8 * i + 1] as i32,
-                rgba[8 * i + 2] as i32,
+                u16::from(rgba[8 * i]),
+                u16::from(rgba[8 * i + 1]),
+                u16::from(rgba[8 * i + 2]),
             );
             let (r1, g1, b1) = (
-                rgba[8 * i + 4] as i32,
-                rgba[8 * i + 5] as i32,
-                rgba[8 * i + 6] as i32,
+                u16::from(rgba[8 * i + 4]),
+                u16::from(rgba[8 * i + 5]),
+                u16::from(rgba[8 * i + 6]),
             );
-            y[2 * i] = ((Y_R * r0 + Y_G * g0 + Y_B * b0 + Y_OFFSET) >> 15) as u8;
-            y[2 * i + 1] = ((Y_R * r1 + Y_G * g1 + Y_B * b1 + Y_OFFSET) >> 15) as u8;
-            let (r, g, b) = (r0 + r1, g0 + g1, b0 + b1);
-            // The sum of two pixels has sixteen fractional bits. Round it
-            // once here so the vertical filter receives six fractional bits.
-            cb[i] = ((CB_R * r + CB_G * g + CB_B * b + 512) >> 10) as i16;
-            cr[i] = ((CR_R * r + CR_G * g + CR_B * b + 512) >> 10) as i16;
+            y[2 * i] = luma(r0, g0, b0);
+            y[2 * i + 1] = luma(r1, g1, b1);
+            (cb[i], cr[i]) = chroma((r0 + r1) as i16, (g0 + g1) as i16, (b0 + b1) as i16);
         }
+    }
+
+    #[inline]
+    fn luma(r: u16, g: u16, b: u16) -> u8 {
+        // Split each coefficient at seven bits. Shifting the residual before
+        // the final shift preserves the original floor, with a 16-bit sum.
+        const R: i16 = (Y_R - 66 * 128) as i16;
+        const G: i16 = (Y_G - 129 * 128) as i16;
+        const B: i16 = (Y_B - 25 * 128) as i16;
+        let coarse = 66 * r + 129 * g + 25 * b + (Y_OFFSET >> 7) as u16;
+        let residual = R * r as i16 + G * g as i16 + B * b as i16;
+        (coarse.wrapping_add_signed(residual >> 7) >> 8) as u8
+    }
+
+    #[inline]
+    fn chroma(r: i16, g: i16, b: i16) -> (i16, i16) {
+        // Split the Cb (-4865, -9528, 14392) and Cr (14392, -12061, -2332)
+        // coefficients at eight bits. The shared colour differences keep
+        // both terms within 16 bits for pair sums of 0 through 510.
+        let red = r - g;
+        let blue = b - g;
+        let red_scaled = 56 * red;
+        let blue_scaled = 56 * blue;
+        let cb = (blue_scaled - 19 * red + 2 + ((blue_scaled - r) >> 8)) >> 2;
+        let cr = (red_scaled - 9 * blue + 2 + ((red_scaled - 28 * blue - g) >> 8)) >> 2;
+        (cb, cr)
     }
 
     fn decimate(ring: &[Vec<i16>; 4], rows: [usize; 4], out: &mut [u8]) {
