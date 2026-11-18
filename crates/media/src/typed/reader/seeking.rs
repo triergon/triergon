@@ -304,7 +304,9 @@ impl Reader {
                     .as_ref()
                     .is_none_or(|(old, _)| *old > target || pts > *old)
             } else {
+                // A zero-clamped preroll retry takes precedence over a later keyframe.
                 scan.policy.allow_first_after_target
+                    && (!scan.policy.allow_first_after_negative_preroll || scan.retried)
                     && scan
                         .best
                         .as_ref()

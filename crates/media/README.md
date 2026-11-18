@@ -189,9 +189,9 @@ incomplete/zero primaries); values that cannot fit return `Overflow`.
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
 each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's packet
 clock. `compat::seek::at_block_start` selects complete audio blocks by their start
-in the comparison clock during subtitle seek recovery. It can land on the
-first verified keyframe for a nonnegative request that precedes it, by Cue
-validation or a bounded scan. The ordinary playback seek uses packet overlap
+in the comparison clock during subtitle seek recovery. A bounded search can
+land on the first verified keyframe for a nonnegative request that precedes
+it. The ordinary playback seek uses packet overlap
 and retains untimed laces so their timestamps can be derived
 from the audio. An overlapping lace with leading discard padding keeps all its
 frames so a decoder can apply the block-wide trim using their sample counts.

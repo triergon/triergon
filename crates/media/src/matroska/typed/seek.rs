@@ -226,9 +226,7 @@ impl SeekPlanJob {
                             && self.requested >= 0;
                         let cue = self.best.or_else(|| {
                             self.first.filter(|cue| {
-                                self.preroll
-                                    && (i128::from(cue.ticks) <= self.requested_ticks
-                                        || allow_first_after_target)
+                                self.preroll && i128::from(cue.ticks) <= self.requested_ticks
                             })
                         });
                         self.best = cue;

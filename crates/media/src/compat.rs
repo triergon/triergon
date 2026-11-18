@@ -31,7 +31,7 @@ pub mod clock {
 /// there is no extra scan. All frames in a lace follow its Block's timestamp
 /// in that clock.
 /// A nonnegative request before the first keyframe can land on that keyframe
-/// after Cue validation or a bounded scan.
+/// after a bounded search finds no earlier landing.
 ///
 /// Reference: Matroska playback seek observations at FFmpeg revision `d32b387f`.
 pub mod seek {
