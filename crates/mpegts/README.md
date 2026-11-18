@@ -491,8 +491,11 @@ Mixing polling representations returns a typed error before changing state or
 spending work. `CompactPayload::from_spans` always adopts ordinary spans and
 never interprets public metadata as a run marker.
 `PayloadCursor::current_bytes` and `next_bytes` expose just the borrowed byte
-range with the same admission and retirement rules. Full carrier facts remain
-available through `current` and `next_span`.
+range with the same admission and retirement rules. `PayloadCursor::has_current`
+reports whether the cursor has an active range. Full carrier facts remain available
+through `current` and `next_span`. A borrowed span iterator can
+advance through the same ranges with `DemuxSpanViews::next_bytes`, which returns
+only the borrowed bytes.
 Sequential playback can share up to four tight input windows of at most 4 KiB
 each. A full set, oversized backing storage or low budget headroom uses
 carrier-sized storage. Fallback uses the original transport event.
