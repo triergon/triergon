@@ -1,0 +1,28 @@
+{
+ "name": "aac-access-units-414b4cb5-aarch64",
+ "path": "aac-access-units-414b4cb5-aarch64",
+ "retention": "retained",
+ "reason": "Configured AAC access-unit parity, paired runtime and kernel-bound memory at 414b4cb5.",
+ "key": "evidence/aac-access-units/414b4cb5-aarch64/06c6e637c6730956ba9de5f5bdbcfc25ba84010c829b04b4b0acbec5eca94724.tar.zst",
+ "sha256": "06c6e637c6730956ba9de5f5bdbcfc25ba84010c829b04b4b0acbec5eca94724",
+ "bytes": 109076700,
+ "results": [
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "a0ef792f40a87869b94e6d10487b244c31a5fd718aae1f509d9bcd0f08e8d242",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "time/gate-result.json",
+   "command": "codecs time",
+   "key": "ed2e3cd6f960e4bb5d98775f38e8e4e3a599b46cd73d4ae5befdb2adac643a2e",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

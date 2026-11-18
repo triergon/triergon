@@ -1,0 +1,28 @@
+{
+ "name": "aac-access-units-414b4cb5-armv7",
+ "path": "aac-access-units-414b4cb5-armv7",
+ "retention": "retained",
+ "reason": "Configured AAC access-unit parity, paired runtime and kernel-bound memory at 414b4cb5.",
+ "key": "evidence/aac-access-units/414b4cb5-armv7/f9a66d2f6e0c4aad6f7f80078e8be84b78e617908045ff04414f28a2fb67202d.tar.zst",
+ "sha256": "f9a66d2f6e0c4aad6f7f80078e8be84b78e617908045ff04414f28a2fb67202d",
+ "bytes": 108779991,
+ "results": [
+  {
+   "path": "memory/gate-result.json",
+   "command": "codecs memory",
+   "key": "cd5840a2c6acfd17de8a68e182c1cc6d7f730bfa3da18bd81b3f54813a825c6e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "time/gate-result.json",
+   "command": "codecs time",
+   "key": "8145cf6f4644c18a8912625c9b770c9474cc1f9471c02e540b0ee619c14a66e7",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

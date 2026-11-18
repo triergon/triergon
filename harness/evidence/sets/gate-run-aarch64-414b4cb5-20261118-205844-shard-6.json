@@ -1,0 +1,58 @@
+{
+ "name": "gate-run-aarch64-414b4cb5-20261118-205844-shard-6",
+ "path": "gate-run-aarch64-414b4cb5-20261118-205844-shard-6",
+ "retention": "retained",
+ "reason": "Linked codec, reader and subtitle gate at 414b4cb5 on Linux AArch64.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-aarch64-20261118-205844/shard-6/01d9d7ffbbfde217797787b24e2c54b1f912b63a3acf4fb0b9eeebc73ae59d25.tar.zst",
+ "sha256": "01d9d7ffbbfde217797787b24e2c54b1f912b63a3acf4fb0b9eeebc73ae59d25",
+ "bytes": 2947421,
+ "results": [
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "0541803398a58c8fd7824a977259cd629f15134243a248369b23d73647c6dff7",
+   "status": 0,
+   "report_sha256": "6bd06e9867d48c697c34e9707405781a6111ccf981f125df42c55f5713cc84f5",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "54507b31a82f3bac03502886902253ceff4980708cf62f9920c495d20ed0719a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "0bbb9e011cb7bd37d5d534c4b7e2db46105a8bf4aad37f7d1d2aceb5cfd7d16a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6c69005bb426317991452a51c1f5528b657b4a0ec5f8f0a9681742d5b7a9f1e3",
+   "status": 0,
+   "report_sha256": "ea8cb489e8876e4ca3c476203707d207135d5f3009138a807abc1dbd2e24892b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "0c45c527fc4e2ea83cde0e4336db98eeafed278fd8065997ccc61700f8ff5fdc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "ea9cc80b7b72dd8f5234ad32d5bdd3aaab540e646473719bcceb9ebb53fc4858",
+   "status": 1,
+   "report_sha256": "46bd5488540e973ba46f7cb981c466800c372e97925526bb57d102b91e9f4cc3"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}
