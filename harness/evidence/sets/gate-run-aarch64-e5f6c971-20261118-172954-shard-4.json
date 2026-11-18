@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-aarch64-e5f6c971-20261118-172954-shard-4",
+ "path": "gate-run-aarch64-e5f6c971-20261118-172954-shard-4",
+ "retention": "retained",
+ "reason": "Linux AArch64 capture at e5f6c971, run 20261118-172954, shard 4 of 5. A lost SSH connection left shards 2 and 3 without archives.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-aarch64-20261118-172954/shard-4/b07cfbdd79151a8359cd9b5d3e10a141ede87559972b2bb85c5b80433a92bec0.tar.zst",
+ "sha256": "b07cfbdd79151a8359cd9b5d3e10a141ede87559972b2bb85c5b80433a92bec0",
+ "bytes": 420250764,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "115b59e22b7b2b983b8b259ea1ea1ac4efbe599e59103f1d90307f2e794310f9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "110c6ce0352d374d201a0f621ebd659d09214ae1b98bdef4fe0563898117b13e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "f161be2c4de49023ddb8c290863e8469074cf23301969055c1fb3f777b75f83e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "901f7bd12a731e749bf61560a637c375e8d363c61b5d82a3eabdd9828267f439",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "fbfdd54f4d5def00aa07fcdf750b29c12279489c39669a7ed5fac4b5d26794cc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "767b68b775e454fda1ae305001ef54acbf836427bbaf9f1a6112cc56a64387c6",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}

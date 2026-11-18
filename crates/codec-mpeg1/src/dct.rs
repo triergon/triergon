@@ -97,16 +97,23 @@ const INVERSE: [[i32; 8]; 8] = {
     basis
 };
 
-/// Forward DCT of an 8×8 block of samples or residuals (raster order). Both
-/// passes run down columns, so every column runs in its own vector lane: the
-/// row pass on the transposed block, which is then transposed back.
+/// Forward DCT of an 8×8 block of samples or residuals in raster order.
 pub(crate) fn fdct(block: &mut [i32; 64]) {
-    transpose(block);
-    columns_in_place(block, BITS - PASS, fdct_1d);
-    transpose(block);
+    // On 32-bit ARM the transposed row pass vectorises across columns.
+    #[cfg(target_arch = "arm")]
+    {
+        transpose(block);
+        columns_in_place(block, BITS - PASS, fdct_1d);
+        transpose(block);
+    }
+    #[cfg(not(target_arch = "arm"))]
+    for row in block.as_chunks_mut::<8>().0 {
+        *row = fdct_1d(*row, BITS - PASS);
+    }
     columns_in_place(block, BITS + PASS, fdct_1d);
 }
 
+#[cfg(target_arch = "arm")]
 #[inline(always)]
 fn transpose(block: &mut [i32; 64]) {
     for r in 0..8 {
@@ -153,6 +160,15 @@ pub(crate) fn idct(block: &mut [i32; 64], support: u64) {
         for (sum, &weight) in row.iter_mut().zip(&INVERSE[at % 8]) {
             *sum += x * weight;
         }
+    }
+    if support >> 8 == 0 {
+        // With only the zero vertical frequency, every output row is equal.
+        let row = rows[0].map(|v| {
+            let first = (v + (1 << (BITS - PASS - 1))) >> (BITS - PASS);
+            (first * C4 + (1 << (BITS + PASS - 1))) >> (BITS + PASS)
+        });
+        block.as_chunks_mut::<8>().0.fill(row);
+        return;
     }
     let mut occupied = [0; 8];
     let mut count = 0;

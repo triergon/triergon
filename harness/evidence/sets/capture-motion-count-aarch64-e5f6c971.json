@@ -1,0 +1,13 @@
+{
+ "name": "capture-motion-count-aarch64-e5f6c971",
+ "path": "capture-motion-count-aarch64-e5f6c971",
+ "retention": "retained",
+ "reason": "Instruction and cycle counts for the 960\u00d7540 motion workload with the measured Linux AArch64 capture workers.",
+ "key": "evidence/capture-diagnostic/aarch64/e5f6c971e14b8ef43ac71edc802168926b7b0091/8fc8c16fc49d2b47e806af0b0b1a12b21cd7486eaf2d4708d93618247d6a6c77.tar.zst",
+ "sha256": "8fc8c16fc49d2b47e806af0b0b1a12b21cd7486eaf2d4708d93618247d6a6c77",
+ "bytes": 5448,
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091",
+  "a34b98d0f3a83f23a6472e7b32f4a650a62740b2"
+ ]
+}

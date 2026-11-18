@@ -52,6 +52,14 @@ fn fail(what: &str) -> ExitCode {
     ExitCode::from(2)
 }
 
+fn open_session(cfg: &SessionConfig) -> triergon_capture::Result<Session> {
+    if cfg!(all(target_arch = "aarch64", target_os = "linux")) {
+        Session::open_filtered(cfg)
+    } else {
+        Session::open(cfg)
+    }
+}
+
 fn session(
     cfg: &SessionConfig,
     orientation: Orientation,
@@ -60,7 +68,7 @@ fn session(
     sink: &mut impl Sink,
 ) -> Result<f64, String> {
     let frame_bytes = cfg.width as usize * cfg.height as usize * 4;
-    let mut s = Session::open(cfg).map_err(|e| e.to_string())?;
+    let mut s = open_session(cfg).map_err(|e| e.to_string())?;
     for i in 0..count {
         s.encode(
             &frames[i * frame_bytes..(i + 1) * frame_bytes],
@@ -104,7 +112,7 @@ fn main() -> ExitCode {
                 return fail("input");
             };
             let cfg = SessionConfig::with_rate_rule(w, h, 2_500_000);
-            let Ok(mut s) = Session::open(&cfg) else {
+            let Ok(mut s) = open_session(&cfg) else {
                 return fail("open");
             };
             let mut out = Vec::new();
@@ -131,7 +139,7 @@ fn main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let Ok(mut s) = Session::open(&SessionConfig::with_rate_rule(w, h, bitrate)) else {
+            let Ok(mut s) = open_session(&SessionConfig::with_rate_rule(w, h, bitrate)) else {
                 return fail("open");
             };
             let mut out = Vec::new();

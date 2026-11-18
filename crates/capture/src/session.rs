@@ -71,6 +71,18 @@ const FRAME_TICKS: i64 = 3000;
 
 impl Session {
     pub fn open(cfg: &SessionConfig) -> Result<Session> {
+        Self::open_with_converter(cfg, Converter::new)
+    }
+
+    /// Use the centre-sited chroma filter at every input width.
+    pub fn open_filtered(cfg: &SessionConfig) -> Result<Session> {
+        Self::open_with_converter(cfg, Converter::filtered)
+    }
+
+    fn open_with_converter(
+        cfg: &SessionConfig,
+        converter: fn(Geometry) -> Converter,
+    ) -> Result<Session> {
         let geometry = Geometry::new(cfg.width, cfg.height)?;
         let encoder = Encoder::new(EncoderConfig {
             geometry,
@@ -80,7 +92,7 @@ impl Session {
             gop: cfg.gop,
         })?;
         Ok(Session {
-            converter: Converter::new(geometry),
+            converter: converter(geometry),
             input: Picture::new(geometry),
             encoder,
             muxer: Muxer::new(&cfg.mux)?,

@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-aarch64-001d40b6-20261118-112457-shard-1",
+ "path": "gate-run-aarch64-001d40b6-20261118-112457-shard-1",
+ "retention": "retained",
+ "reason": "Capture filtered conversion at 001d40b6 on Linux AArch64, c6g.4xlarge. Shard 1 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-aarch64-20261118-112457/shard-1/81ffc0a2829fad7e5229dc2c0c3e4cfe7de7977e266404938d38de763751fa2e.tar.zst",
+ "sha256": "81ffc0a2829fad7e5229dc2c0c3e4cfe7de7977e266404938d38de763751fa2e",
+ "bytes": 358414786,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "270f4428c4f6fb58f64e838ad59fe3859ef1062e538e04b23e8e9d9f8a9a9cbb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "17260c107f97272588e35e44118a469cb3f834e3eff49924cc5567199fa02374",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
