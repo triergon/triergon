@@ -635,87 +635,228 @@ fn finish_case(
     Ok(line)
 }
 
-/// Collect the memory of every case in one collection, side by side, each slot
-/// measuring its own copies of the gate build's workers, and finish each case.
+/// A run's cases before their memory: measured in this run, or read from the
+/// records of its timing run.
+struct Prepared {
+    refusals: Vec<String>,
+    open: Vec<String>,
+    cases: Vec<MeasuredCase>,
+}
+
+impl Prepared {
+    /// A listed open case whose conversion now passes fails the run once every
+    /// case is measured, so the list cannot go stale.
+    fn still_open(&self) -> Result<(), String> {
+        let now_passing: Vec<&str> = self
+            .cases
+            .iter()
+            .filter(|case| {
+                self.open.contains(&case.id)
+                    && case
+                        .correctness()
+                        .get("conversion")
+                        .is_some_and(Value::truthy)
+            })
+            .map(|case| case.id.as_str())
+            .collect();
+        if now_passing.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "listed open cases now pass; remove them from open_cases: {}",
+                now_passing.join(", ")
+            ))
+        }
+    }
+}
+
+/// What one run's memory collection reads: its workers, pairs, and each case's
+/// input and worker arguments.
+struct MemorySetup<'a> {
+    workers: memory::WorkerPaths<'a>,
+    pairs: Pairs,
+    seed: u64,
+    /// Removed once the collection ends.
+    _copies: Option<InputCopies>,
+    inputs: Vec<PathBuf>,
+    arguments: Vec<Vec<String>>,
+}
+
+/// Collect the memory of every case of `runs` in one collection, side by side on
+/// the CPUs this process may use, each slot measuring its own copies of the gate
+/// build's workers, and finish each case: each run's summary lines.
 fn memory_stage(
     root: &Path,
-    a: &Options,
-    refusals: &[String],
-    open: &[String],
-    measured_cases: Vec<MeasuredCase>,
-) -> Result<Vec<Value>, String> {
-    let workers = memory::WorkerPaths {
-        candidate: Path::new(&a.candidate),
-        reference: Path::new(&a.reference),
-        registered: refusals.is_empty(),
-    };
-    let pairs = Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop);
+    runs: Vec<(&Options, Prepared)>,
+) -> Result<Vec<Result<Vec<Value>, String>>, String> {
     // Cases of one generated input would share its file and so run one after
     // another; side by side, each measures its own copy, of the same bytes.
     let side_by_side = gate_build::allowed_cpu_list().is_none_or(|cpus| cpus.len() > 1);
-    let copies = side_by_side.then(|| {
-        InputCopies(
-            a.inputs
-                .join(format!(".memory-copies-{}", std::process::id())),
-        )
-    });
-    let mut inputs = Vec::new();
-    for measured in &measured_cases {
-        inputs.push(match (&copies, measured.correctness().get("outputs")) {
-            (Some(copies), Some(_)) => measured.copy_input(&copies.0)?,
-            _ => measured.input.clone(),
+    let mut setups = Vec::new();
+    for (run, (a, prepared)) in runs.iter().enumerate() {
+        let copies = side_by_side.then(|| {
+            InputCopies(
+                a.inputs
+                    .join(format!(".memory-copies-{}-{run}", std::process::id())),
+            )
+        });
+        let mut inputs = Vec::new();
+        for measured in &prepared.cases {
+            inputs.push(match (&copies, measured.correctness().get("outputs")) {
+                (Some(copies), Some(_)) => measured.copy_input(&copies.0)?,
+                _ => measured.input.clone(),
+            });
+        }
+        let arguments = prepared
+            .cases
+            .iter()
+            .zip(&inputs)
+            .map(|(measured, input)| measured.memory_arguments(input))
+            .collect();
+        setups.push(MemorySetup {
+            workers: memory::WorkerPaths {
+                candidate: Path::new(&a.candidate),
+                reference: Path::new(&a.reference),
+                registered: prepared.refusals.is_empty(),
+            },
+            pairs: Pairs::gate(a.memory_pairs, memory::CEILING).early_stop(a.early_stop),
+            seed: a.seed + MEMORY_SEED,
+            _copies: copies,
+            inputs,
+            arguments,
         });
     }
-    let arguments: Vec<Vec<String>> = measured_cases
-        .iter()
-        .zip(&inputs)
-        .map(|(measured, input)| measured.memory_arguments(input))
-        .collect();
     let mut jobs = Vec::new();
     let mut collected = Vec::new();
-    for (index, ((measured, args), path)) in measured_cases
+    for (run, ((_, prepared), setup)) in runs.iter().zip(&setups).enumerate() {
+        let MemorySetup {
+            workers,
+            pairs,
+            seed,
+            ..
+        } = *setup;
+        for (case, ((measured, args), path)) in prepared
+            .cases
+            .iter()
+            .zip(&setup.arguments)
+            .zip(&setup.inputs)
+            .enumerate()
+        {
+            let Some(outputs) = measured.correctness().get("outputs") else {
+                continue;
+            };
+            jobs.push(memory::Job::new(&workers, [path.clone()], move |slot| {
+                memory::collect_command(
+                    slot,
+                    root,
+                    workers,
+                    path,
+                    pairs,
+                    seed,
+                    args,
+                    outputs,
+                    SESSION_TIMEOUT,
+                )
+            }));
+            collected.push((run, case));
+        }
+    }
+    let mut memories: Vec<Vec<Option<Result<Value, String>>>> = runs
         .iter()
-        .zip(&arguments)
-        .zip(&inputs)
-        .enumerate()
-    {
-        let Some(outputs) = measured.correctness().get("outputs") else {
-            continue;
-        };
-        jobs.push(memory::Job::new(&workers, [path.clone()], move |slot| {
-            memory::collect_command(
-                slot,
-                root,
-                workers,
-                path,
-                pairs,
-                a.seed + MEMORY_SEED,
-                args,
-                outputs,
-                SESSION_TIMEOUT,
-            )
-        }));
-        collected.push(index);
+        .map(|(_, prepared)| prepared.cases.iter().map(|_| None).collect())
+        .collect();
+    for ((run, case), memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
+        memories[run][case] = Some(memory);
     }
-    let mut memories: Vec<Option<Value>> = vec![None; measured_cases.len()];
-    for (index, memory) in collected.into_iter().zip(memory::collect_all(jobs)?) {
-        memories[index] = Some(memory?);
-    }
-    drop(copies);
-    measured_cases
+    drop(setups);
+    Ok(runs
         .into_iter()
         .zip(memories)
-        .map(|(measured, memory)| {
-            let memory = memory.unwrap_or_else(|| {
-                Value::object([("status", Value::str("missing-correctness-output"))])
-            });
-            let open_on_target = open.contains(&measured.id);
-            finish_case(a, measured, memory, open_on_target)
+        .map(|((a, prepared), memories)| {
+            let open = prepared.open;
+            prepared
+                .cases
+                .into_iter()
+                .zip(memories)
+                .map(|(measured, memory)| {
+                    let memory = memory.transpose()?.unwrap_or_else(|| {
+                        Value::object([("status", Value::str("missing-correctness-output"))])
+                    });
+                    let open_on_target = open.contains(&measured.id);
+                    finish_case(a, measured, memory, open_on_target)
+                })
+                .collect()
         })
+        .collect())
+}
+
+/// Several `--stage memory` runs in one process: every case of every run in one
+/// collection, as one run of all their cases collects them, while each run reads
+/// its own timing run and writes its own summary. Each run's result, in order.
+pub fn run_memory(root: &Path, runs: &[&Options]) -> Vec<Result<(), String>> {
+    let mut results: Vec<Option<Result<(), String>>> = runs.iter().map(|_| None).collect();
+    let (mut ready, mut measuring) = (Vec::new(), Vec::new());
+    for (index, a) in runs.iter().enumerate() {
+        match prepare(root, a) {
+            Ok(prepared) => {
+                measuring.push((index, prepared.still_open()));
+                ready.push((*a, prepared));
+            }
+            Err(error) => results[index] = Some(Err(error)),
+        }
+    }
+    match memory_stage(root, ready) {
+        Ok(summaries) => {
+            for ((index, still_open), summary) in measuring.into_iter().zip(summaries) {
+                results[index] =
+                    Some(summary.and_then(|summary| finish(runs[index], summary, still_open)));
+            }
+        }
+        Err(error) => {
+            for (index, _) in measuring {
+                results[index] = Some(Err(error.clone()));
+            }
+        }
+    }
+    results
+        .into_iter()
+        .map(|result| result.expect("every run has a result"))
         .collect()
 }
 
 pub fn run(root: &Path, a: &Options) -> Result<(), String> {
+    let prepared = prepare(root, a)?;
+    let still_open = prepared.still_open();
+    if matches!(a.stage, Stage::Timing) {
+        return still_open;
+    }
+    let summary = memory_stage(root, vec![(a, prepared)])?
+        .pop()
+        .expect("one run")?;
+    finish(a, summary, still_open)
+}
+
+/// Write a run's summary; it fails on a bound a case fails or with `still_open`.
+fn finish(a: &Options, summary: Vec<Value>, still_open: Result<(), String>) -> Result<(), String> {
+    let failing = failing_bounds(&summary);
+    write(
+        &a.out.join("summary.json"),
+        json::to_python(&Value::Array(summary), Some(1)),
+    )?;
+    for line in &failing {
+        println!("{line}");
+    }
+    still_open?;
+    if failing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("{} capture bounds fail", failing.len()))
+    }
+}
+
+/// Write the run's identity, then measure its cases' correctness and timing, or,
+/// at `--stage memory`, read what its timing run recorded of them.
+fn prepare(root: &Path, a: &Options) -> Result<Prepared, String> {
     for dir in [&a.out, &a.inputs] {
         fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
@@ -804,47 +945,11 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             measured
         }
     };
-    // A listed open case whose conversion now passes fails the run once every
-    // case is measured, so the list cannot go stale.
-    let now_passing: Vec<String> = measured_cases
-        .iter()
-        .filter(|case| {
-            open.contains(&case.id)
-                && case
-                    .correctness()
-                    .get("conversion")
-                    .is_some_and(Value::truthy)
-        })
-        .map(|case| case.id.clone())
-        .collect();
-    let still_open = || {
-        if now_passing.is_empty() {
-            Ok(())
-        } else {
-            Err(format!(
-                "listed open cases now pass; remove them from open_cases: {}",
-                now_passing.join(", ")
-            ))
-        }
-    };
-    if matches!(a.stage, Stage::Timing) {
-        return still_open();
-    }
-    let summary = memory_stage(root, a, &refusals, &open, measured_cases)?;
-    let failing = failing_bounds(&summary);
-    write(
-        &a.out.join("summary.json"),
-        json::to_python(&Value::Array(summary), Some(1)),
-    )?;
-    for line in &failing {
-        println!("{line}");
-    }
-    still_open()?;
-    if failing.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("{} capture bounds fail", failing.len()))
-    }
+    Ok(Prepared {
+        refusals,
+        open,
+        cases: measured_cases,
+    })
 }
 
 /// The fields of a timing run's identity that a memory run must share. A timing

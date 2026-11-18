@@ -231,6 +231,24 @@ fn reused_or_run(
     restore: bool,
     run: impl FnOnce() -> R<i32>,
 ) -> R<i32> {
+    if let Some(status) = take_cited(root, output, key, full, restore)? {
+        return Ok(status);
+    }
+    let status = run()?;
+    record(output, key, status, None)?;
+    Ok(status)
+}
+
+/// Take the cited result for `key` unless `full`, recording it in `output`, and
+/// return its status; `None` when the step is to be measured, as [`step`] does
+/// for a step that runs elsewhere.
+pub fn reused(root: &Path, output: &Path, key: &Key, full: bool) -> R<Option<i32>> {
+    take_cited(root, output, key, full, false)
+}
+
+/// [`reused`], and with `restore` the cited step's directory restored too; a step
+/// whose set cannot be restored is measured.
+fn take_cited(root: &Path, output: &Path, key: &Key, full: bool, restore: bool) -> R<Option<i32>> {
     if !full && let Some(cited) = cited(root, key)? {
         let status = cited
             .get("status")
@@ -249,16 +267,14 @@ fn reused_or_run(
                     "reused {path} from evidence set {set} (status {status}); --full measures it again"
                 );
                 record(output, key, status, Some(cited))?;
-                return Ok(status);
+                return Ok(Some(status));
             }
             Err(error) => {
                 println!("cannot restore {path} from evidence set {set}: {error}; measuring it");
             }
         }
     }
-    let status = run()?;
-    record(output, key, status, None)?;
-    Ok(status)
+    Ok(None)
 }
 
 /// Whether a result an index entry lists is one a gate run restores when it

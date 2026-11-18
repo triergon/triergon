@@ -847,7 +847,13 @@ On one host, a shard's run is:
 3. It [proves](../harness/rss-bound/README.md) the kernel bound, rebuilds the workers
    with the proof, checks them with `cargo xtask gate preflight --kernel`, and collects
    memory on the remaining CPUs (`taskset -c 1-15` on a 16-CPU host, `cargo xtask gate
-   run --stage memory`).
+   run --stage memory`). The shard's capture memory steps run as one `capture qualify`,
+   their runs joined by `--and`, so every case is one job of a single collection, side
+   by side as in a run of all cases (see [Memory in parallel](#memory-in-parallel)).
+   Each run still reads its own timing records, writes its own output and gate result
+   and is reused on its own; each step's record takes the status of its gate result and
+   names the batch (`memory-capture`) and its time (`batch_seconds`); the batch's log
+   is `logs/memory-capture.log`, and a step's outcome lines are those naming its case.
 4. It grades with the module loaded. Grades measure nothing, so several run at once,
    from a release build of xtask.
 
@@ -992,7 +998,16 @@ in parallel on all fifteen (evidence sets `gate-parallel-memory-capture-codecs-a
 and `gate-parallel-memory-capture-codecs-armv7`), gives those five cases the same peak
 heap sample for sample on both targets, keeps every resident median inside the serial
 spread, and grades them the same; the fifteen took 10 minutes on AArch64 and 11 on ARMv7,
-where the five took 31 serially. The codec workloads, collected in parallel at the same
+where the five took 31 serially. The gate collects a shard's capture memory steps the
+same way: the 15 capture items at `c82b4452`, each target on one host (evidence sets
+`gate-run-aarch64-c82b4452-20261118-143205-shard-1` and
+`gate-run-armv7-c82b4452-20261118-143302-shard-1`), against their serial steps at
+`f7b1d8eb` on the same worker bytes (`gate-run-aarch64-f7b1d8eb-20261118-104434-shard-1`
+to `-5` and `gate-run-armv7-f7b1d8eb-20261118-104533-shard-1` to `-5`), give every case
+the same 20 pairs, both workers' peak heap identical sample for sample, each total
+resident median inside the serial collection's range, moved by at most one page on
+AArch64 and 13.5 on ARMv7, and the same heap and total RSS verdicts; the memory pass took
+10.1 minutes on AArch64 and 11.6 on ARMv7, where the serial steps took 88.6 and 83.2. The codec workloads, collected in parallel at the same
 revision, grade every workload as the serial collection of the same worker bytes at
 `8154812e` does, with the reference's heap identical sample for sample. The candidate's
 heap is identical in 21 of 30 workloads on AArch64 and 25 of 30 on ARMv7, and 8 or 16
