@@ -404,9 +404,10 @@ and grades it. The Matroska Cues comparison uses the same six probe times for
 every input, both on a fresh reader and after EOF. The compatibility seek must
 match the full reference trace. The playback seek must keep every packet of
 that reference trace in order. Additional audio or subtitle preroll must occur
-before that track's first reference seek packet and match the sequential
-reference's packet fields in source order, with initial trim cleared. An
-untimestamped continuation must follow timestamped preroll for that track.
+before the seek target and before that track's first reference seek packet in
+the sequential trace. Its packet fields must match the sequential reference in
+source order, with initial trim cleared. An untimestamped continuation must
+follow timestamped preroll for that track.
 A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `matroska-audio-clocks` do with `playback-matroska-worker`
 and the `video` reference and `hls-segments` with `playback-worker` and the `formats` reference, the six bitmap, caption and teletext `subtitle-*` features with

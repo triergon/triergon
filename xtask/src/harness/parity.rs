@@ -454,6 +454,19 @@ pub fn colour_parity(
     Ok(result)
 }
 
+fn same_preroll_packet(packet: &Value, source: &Value) -> bool {
+    let (Value::Object(fields), Value::Object(source_fields)) = (packet, source) else {
+        return false;
+    };
+    fields.len() == source_fields.len()
+        && fields.iter().all(|(key, observed)| {
+            source.get(key).is_some_and(|expected| {
+                // Start padding is applied once at the beginning of the source.
+                key == "trim_start_samples" || super::diff::equal(observed, expected)
+            })
+        })
+}
+
 // Normal playback can recover earlier audio and subtitles for decoding. Use the
 // reference read from the start to check each added packet's source and order.
 fn playback_preroll_matches(
@@ -474,28 +487,45 @@ fn playback_preroll_matches(
     {
         return Err("playback seek tracks differ");
     }
-    let mut wanted = seek
+    let wanted = seek
         .get("packets")
         .and_then(Value::as_array)
-        .ok_or("missing reference seek packets")?
-        .iter()
-        .peekable();
-    let mut earlier = source
+        .ok_or("missing reference seek packets")?;
+    let source = source
         .get("packets")
         .and_then(Value::as_array)
-        .ok_or("missing sequential reference packets")?
-        .iter();
+        .ok_or("missing sequential reference packets")?;
     let packets = actual
         .get("packets")
         .and_then(Value::as_array)
         .ok_or("missing playback seek packets")?;
+    let track_index = |packet: &Value| {
+        integer(packet.get("track"))
+            .and_then(|number| usize::try_from(number).ok())
+            .filter(|&track| track < tracks.len())
+            .ok_or("invalid playback seek track")
+    };
+    let mut first_wanted = vec![None; tracks.len()];
+    for packet in wanted {
+        first_wanted[track_index(packet)?].get_or_insert(packet);
+    }
+    // The first required packet for a track ends its preroll range in the
+    // sequential trace, even when that packet also has a clock before the seek.
+    let mut first_position = vec![None; tracks.len()];
+    for (position, packet) in source.iter().enumerate() {
+        let track = track_index(packet)?;
+        if first_position[track].is_none()
+            && first_wanted[track].is_some_and(|expected| same_preroll_packet(expected, packet))
+        {
+            first_position[track] = Some(position);
+        }
+    }
+    let mut wanted = wanted.iter().peekable();
+    let mut earlier = source.iter().enumerate();
     let mut emitted = vec![false; tracks.len()];
     let mut preroll = vec![false; tracks.len()];
     for packet in packets {
-        let track = integer(packet.get("track"))
-            .and_then(|number| usize::try_from(number).ok())
-            .filter(|&track| track < tracks.len())
-            .ok_or("invalid playback seek track")?;
+        let track = track_index(packet)?;
         if wanted
             .peek()
             .is_some_and(|expected| super::diff::equal(packet, expected))
@@ -514,23 +544,15 @@ fn playback_preroll_matches(
             }
             _ => return Err("extra playback packet lacks a preroll clock before the target"),
         }
-        let Value::Object(fields) = packet else {
-            return Err("invalid playback packet");
+        let end = match first_wanted[track] {
+            Some(_) => first_position[track].ok_or("reference seek packet missing from source")?,
+            None => source.len(),
         };
         if integer(packet.get("trim_start_samples")) != Some(0)
-            || !earlier.by_ref().any(|original| {
-                let Value::Object(original_fields) = original else {
-                    return false;
-                };
-                fields.len() == original_fields.len()
-                    && fields.iter().all(|(key, observed)| {
-                        // Start padding is applied once at the beginning of the source.
-                        key == "trim_start_samples"
-                            || original
-                                .get(key)
-                                .is_some_and(|expected| super::diff::equal(observed, expected))
-                    })
-            })
+            || !earlier
+                .by_ref()
+                .take_while(|(position, _)| *position < end)
+                .any(|(_, original)| same_preroll_packet(packet, original))
         {
             return Err("extra playback preroll differs from the sequential reference");
         }
@@ -585,6 +607,7 @@ fn playback_seek_keeps_the_full_reference_sequence() {
     assert!(playback_preroll_matches(&valid, &seek, &source, 18).is_err());
     for packets in [
         vec![untimed.clone(), video.clone(), audio.clone()],
+        vec![audio.clone(), video.clone(), audio.clone()],
         vec![video.clone(), earlier.clone()],
         vec![earlier.clone(), audio.clone(), video.clone()],
         vec![video.clone(), audio.clone(), earlier.clone()],

@@ -46,11 +46,16 @@ impl RecoveryAudio {
         if self == Self::Overlap || track.codec_delay_ns == 0 {
             return Ok(track.codec_delay_ns);
         }
+        let rate = track.sample_rate;
+        if !rate.is_finite() || rate <= 0.0 {
+            return Err(Error::Invalid("seek codec-delay sample rate"));
+        }
         // The packet comparison uses the integral audio sample rate and
         // counts initial padding in samples before rescaling to Segment ticks.
-        let rate = track.sample_rate as i32;
-        if rate <= 0 {
-            return Err(Error::Invalid("seek codec-delay sample rate"));
+        let rate = rate as i32;
+        if rate == 0 {
+            // A positive sub-Hz rate has no integral comparison clock.
+            return Ok(0);
         }
         let rate = rate as u64;
         // Opus pre-skip counts samples at 48 kHz (RFC 7845 §5.1).

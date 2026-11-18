@@ -1282,6 +1282,59 @@ fn immutable_fixture(raw: &[u8], limits: Limits) -> (Reader, Feed<'_>) {
 }
 
 #[test]
+fn pull_seek_before_first_keyframe_requires_playback_policy() {
+    let clusters = [(20, 0, b"n"), (100, 0x80, b"a"), (200, 0x80, b"b")]
+        .map(|(time, flags, payload)| cluster(time, simple(1, 1, 0, flags, payload)));
+    let fixture = file(&entry(1, 1, &u(0x56bb, 80_000_000)), &[], &clusters);
+
+    for indexed in [false, true] {
+        let pool = Budget::new(4 * 1024 * 1024).unwrap();
+        let (mut reader, mut feed) = if indexed {
+            immutable_fixture(&fixture.raw, Limits::default())
+        } else {
+            (
+                new_reader(&pool, &fixture.raw, Limits::default()),
+                Feed::new(&fixture.raw, 7),
+            )
+        };
+        open(&mut reader, &mut feed).unwrap();
+        if indexed {
+            drain(&mut reader, &mut feed, 8192).unwrap();
+        }
+
+        // These exercise negative preroll, a positive target before the
+        // first keyframe, and a prior keyframe with a later one available.
+        for target in [0, 90_000_000, 230_000_000] {
+            reader.seek_for_playback(0, target).unwrap();
+            let (landing, _) = seek(&mut reader, &mut feed, 1).unwrap();
+            assert_eq!(landing.actual, 100_000_000);
+            assert_eq!(landing.discard_until, target);
+            assert_eq!(landing.preroll, 80_000_000);
+            assert_eq!(landing.indexed, indexed);
+            assert_eq!(landing.scanned == 0, indexed);
+            let packets = drain(&mut reader, &mut feed, 128).unwrap();
+            let replay: Vec<_> = packets
+                .iter()
+                .map(|p| (p.pts, p.key, p.payload.as_slice()))
+                .collect();
+            assert_eq!(
+                replay,
+                [
+                    (Some(100_000_000), true, b"a".as_slice()),
+                    (Some(200_000_000), true, b"b".as_slice()),
+                ]
+            );
+        }
+
+        reader.seek_previous(0, 90_000_000).unwrap();
+        assert!(matches!(
+            seek(&mut reader, &mut feed, 1),
+            Err(Error::Unsupported("no previous random-access block"))
+        ));
+    }
+}
+
+#[test]
 fn immutable_playback_seek_reuses_complete_index_and_earliest_equal_timestamp() {
     let clusters = [(0, b"a"), (100, b"b"), (100, b"c"), (200, b"d")]
         .map(|(time, payload)| cluster(time, simple(1, 1, 0, 0x80, payload)));
