@@ -1038,7 +1038,16 @@ that the index keeps lists a
 result with the same key, the command takes that result instead of measuring: it
 prints the set, writes a `gate-result.json` that names it as `reused` with the set's
 source revisions, and exits with the recorded status. `--full` measures (or, for
-`grade`, grades) anyway. Grading two reused collections takes the cited grade; a
+`grade`, grades) anyway. A `capture qualify --stage timing` it reuses also restores the
+records of that step from the kept set, because its memory stage reads them and measures
+each case at the input this run generates, with the hash its timing recorded. The memory
+stage then requires of a reused timing run only what its key binds: the same workers,
+observer and cases and the same host class, so that run's host name, kernel build and
+the source files the key does not bind (a README, say) may differ; a timing run of the
+same gate run must match them all. A gate host downloads the set through an address
+`tools/gate-aws.sh` gives it (`.research/evidence-addresses`, from `cargo xtask evidence
+restorable`), and the restore is written to disk before the next step starts; a step
+whose set cannot be fetched within the transfer limits is measured. Grading two reused collections takes the cited grade; a
 reused collection beside a measured one cannot be graded, so measure both with
 `--full`.
 

@@ -13,7 +13,9 @@
 //! the set is kept, which happens when a result of it is cited. A later run of
 //! the same command with the same key prints the cited set, records a
 //! `gate-result.json` that names it as reused, and exits with its status;
-//! `--full` measures instead.
+//! `--full` measures instead. A step whose outputs a later step reads (a capture
+//! timing stage, whose records its memory stage reads) also restores them from
+//! the cited set ([`restoring_step`]).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -204,25 +206,98 @@ pub fn step(
     full: bool,
     run: impl FnOnce() -> R<i32>,
 ) -> R<i32> {
+    reused_or_run(root, output, key, full, false, run)
+}
+
+/// [`step`] for a step whose outputs a later step reads: taking the cited result
+/// also restores the cited step's directory from its kept set into `output`, so
+/// the step leaves what a measurement leaves. A step whose set cannot be fetched
+/// or restored is measured.
+pub fn restoring_step(
+    root: &Path,
+    output: &Path,
+    key: &Key,
+    full: bool,
+    run: impl FnOnce() -> R<i32>,
+) -> R<i32> {
+    reused_or_run(root, output, key, full, true, run)
+}
+
+fn reused_or_run(
+    root: &Path,
+    output: &Path,
+    key: &Key,
+    full: bool,
+    restore: bool,
+    run: impl FnOnce() -> R<i32>,
+) -> R<i32> {
     if !full && let Some(cited) = cited(root, key)? {
         let status = cited
             .get("status")
             .and_then(Value::as_f64)
             .ok_or("cited result without a status")? as i32;
-        println!(
-            "reused {} from evidence set {} (status {status}); --full measures it again",
-            cited
-                .get("path")
-                .and_then(Value::as_str)
-                .unwrap_or_default(),
-            cited.get("set").and_then(Value::as_str).unwrap_or_default(),
-        );
-        record(output, key, status, Some(cited))?;
-        return Ok(status);
+        let field = |name| cited.get(name).and_then(Value::as_str).unwrap_or_default();
+        let (path, set) = (field("path"), field("set"));
+        let restored = if restore {
+            restore_outputs(root, set, path, output)
+        } else {
+            Ok(())
+        };
+        match restored {
+            Ok(()) => {
+                println!(
+                    "reused {path} from evidence set {set} (status {status}); --full measures it again"
+                );
+                record(output, key, status, Some(cited))?;
+                return Ok(status);
+            }
+            Err(error) => {
+                println!("cannot restore {path} from evidence set {set}: {error}; measuring it");
+            }
+        }
     }
     let status = run()?;
     record(output, key, status, None)?;
     Ok(status)
+}
+
+/// Whether a result an index entry lists is one a gate run restores when it
+/// reuses it ([`restoring_step`]): a capture timing stage, in the directory the
+/// gate names `capture-ID-timing`, whose records its memory stage reads.
+pub fn restored(result: &Value) -> bool {
+    result.get("command").and_then(Value::as_str) == Some("capture qualify")
+        && result
+            .get("path")
+            .and_then(Value::as_str)
+            .and_then(|path| Path::new(path).parent()?.file_name()?.to_str())
+            .is_some_and(|directory| directory.ends_with("-timing"))
+}
+
+/// Restore the directory of the result at `path` in kept set `set` into `output`:
+/// unpacked beside it first, then moved in, so a failed restore leaves nothing.
+fn restore_outputs(root: &Path, set: &str, path: &str, output: &Path) -> R<()> {
+    let directory = Path::new(path)
+        .parent()
+        .map(|d| d.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut staging = output.as_os_str().to_owned();
+    staging.push(format!(".restoring-{}", std::process::id()));
+    let staging = PathBuf::from(staging);
+    let _ = fs::remove_dir_all(&staging);
+    let restored = crate::evidence::restore(root, set, &directory, &staging).and_then(|_| {
+        fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
+        for entry in fs::read_dir(&staging).map_err(|e| format!("{}: {e}", staging.display()))? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let to = output.join(entry.file_name());
+            if to.is_dir() {
+                fs::remove_dir_all(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+            }
+            fs::rename(entry.path(), &to).map_err(|e| format!("{}: {e}", to.display()))?;
+        }
+        Ok(())
+    });
+    let _ = fs::remove_dir_all(&staging);
+    restored
 }
 
 /// Record the result of a gate command in `output`. A measured result binds the
@@ -561,6 +636,70 @@ mod tests {
             7
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_reused_step_whose_set_cannot_be_restored_is_measured() {
+        let root = crate::walk::scratch("gate-unrestorable");
+        let key = Key {
+            sha256: "u".repeat(64),
+            components: Value::object([("command", Value::str("capture qualify"))]),
+        };
+        let set = Value::object([
+            ("name", Value::str("gone")),
+            ("retention", Value::str("retained")),
+            // A pack this host cannot unpack, so nothing reaches the archive.
+            ("key", Value::str("evidence/gone/pack.zip")),
+            ("sha256", Value::str("0".repeat(64))),
+            (
+                "results",
+                Value::Array(vec![Value::object([
+                    ("path", Value::str("capture-c01-timing/gate-result.json")),
+                    ("command", Value::str("capture qualify")),
+                    ("key", Value::str(&key.sha256)),
+                    ("status", Value::int(0)),
+                ])]),
+            ),
+        ]);
+        let index = root.join(crate::evidence::SETS).join("gone.json");
+        fs::create_dir_all(index.parent().unwrap()).unwrap();
+        crate::corpus::write_json(&index, &set).unwrap();
+        let output = root.join("timing");
+        let measured = std::cell::Cell::new(false);
+        let status = restoring_step(&root, &output, &key, false, || {
+            measured.set(true);
+            Ok(1)
+        });
+        assert_eq!(status.unwrap(), 1);
+        assert!(measured.get());
+        assert!(!was_reused(&output));
+        assert!(fs::read_dir(&root).unwrap().all(|entry| {
+            !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("restoring")
+        }));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn only_capture_timing_results_are_restored() {
+        let result = |command: &str, path: &str| {
+            Value::object([("command", Value::str(command)), ("path", Value::str(path))])
+        };
+        assert!(restored(&result(
+            "capture qualify",
+            "capture-c01-ui-static-960-timing/gate-result.json"
+        )));
+        assert!(!restored(&result(
+            "capture qualify",
+            "capture-c01-ui-static-960/gate-result.json"
+        )));
+        assert!(!restored(&result(
+            "report --benchmark",
+            "benchmark-timing/gate-result.json"
+        )));
     }
 
     #[test]

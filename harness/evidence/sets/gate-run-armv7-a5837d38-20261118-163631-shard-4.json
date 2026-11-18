@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-armv7-a5837d38-20261118-163631-shard-4",
+ "path": "gate-run-armv7-a5837d38-20261118-163631-shard-4",
+ "retention": "retained",
+ "reason": "Partial gate run at a5837d38, the 15 capture items, shard 4 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, 32-bit ARMv7 user space: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "key": "evidence/gate-runs/a5837d38781b61ba3517e57a99db61c3a0968346-armv7-20261118-163631/shard-4/0242aff5dfb9a6d2428a6b7f75221b1bab007a767d516a314960cf2fe38486a7.tar.zst",
+ "sha256": "0242aff5dfb9a6d2428a6b7f75221b1bab007a767d516a314960cf2fe38486a7",
+ "bytes": 423456895,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "a61c2d8a3ad9bf6e043c8fe970962ad0026f3c924b224e5436d4374566cb7317",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b38abdab0e0a91f9f33874cb960331a4e6999b84863756d3c7af571158480e7a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "7f33987d619744d6ce4a796f22e27e9b9c9b6b775adba56bc0cbfe63c71c6216",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "47d436d51ed5514bc08a250aee42018ebe328672fcf4a7844d78a8e8bf9e20d2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "4bc0c8cfc58f5b3cae924976a29398ae6e75ee78668d676af059ce6baeb1917d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "95a8d37a3fe3bf5d5ba920ebd64f89b11971b4d88473643c798e7a330e147158",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
