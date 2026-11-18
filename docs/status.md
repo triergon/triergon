@@ -941,6 +941,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Capture, 32-bit ARMv7, shard 3 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`2c66fce85fc42c2a6f88dd7e231bebfb9c7e2509acbb1cdc3dc31afe745dc75b`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-3.json) |
 | Capture, 32-bit ARMv7, shard 4 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`4737cad0d6a1be8d69b32793b66aca4e495036680d23008c48e4105c2fd672a9`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-4.json) |
 | Capture, 32-bit ARMv7, shard 5 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`a23829f76d2e21b63dda17d13856fd9c4965aae78d875ea6608d6d24b6f01604`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-5.json) |
+| Capture instruction and cycle counts, Linux AArch64 | `e5f6c971e14b8ef43ac71edc802168926b7b0091`, `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`8fc8c16fc49d2b47e806af0b0b1a12b21cd7486eaf2d4708d93618247d6a6c77`](../harness/evidence/sets/capture-motion-count-aarch64-e5f6c971.json) |
 | Filtered capture conversion probes, Linux AArch64 | `e12863c88f5050781e20254fc8efd8cee12fac9b` | [`809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55`](../harness/evidence/sets/capture-filtered-probes-aarch64.json) |
 | Capture conversion probes, 32-bit ARMv7 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`e3dfbf4a9da1d68be300175dff29845dd8ccbb36b3f09d458eb8b9c7f9ebf7a3`](../harness/evidence/sets/capture-native-widths-armv7.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 1 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`1d1edc8d28e39be46f7fd81ce3341ba288ed476569d1fd467bf0af1026cc67d8`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-1.json) |
@@ -1729,6 +1730,10 @@ All 15 ARMv7 cases use the block converter at widths of 480 or 960. The
 of the same block path, consistent with run-to-run variation.
 
 At `e5f6c971`, the 15 capture cases on each c6g.4xlarge target pass conversion, encoding, mux, runtime, peak heap and kernel-bound total RSS. The packed coefficients preserve every compared output fold.
+
+For `c04-motion-960` on Linux AArch64, `cargo xtask count` reports 0.78% fewer
+user-mode instructions and 1.20% fewer user-mode cycles at `e5f6c971` than at
+`a34b98d0`. The input and both worker hashes match their gate measurements.
 
 Capture's worst bound here was 1.1669 at `a73350ca` and 1.1865 at `576f088f`. Profiled in user-mode cycles against
 FFmpeg on the gate host, the encoder's motion search reduced each 16-lane sum of absolute
