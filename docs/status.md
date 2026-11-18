@@ -95,8 +95,9 @@ then failed on parity alone, so the memory bounds above 1.0 of packet framing an
 four `long-movie` PGS cases were in the graded reports' acceptance, not in the step results.
 A grade now fails on a case whose bound fails ([bounds](quality.md#reference-and-corpus)): graded
 again, the PGS grades fail on both targets, and packet framing's total RSS fails as listed
-in its contract's `open_bounds`. The PGS rows have since been measured again at `99f1027b`,
-and with the capture, Matroska / WebM and other subtitle rows at `f8e1c4d9` (below). AAC
+in its contract's `open_bounds`. The PGS rows have since been measured again at `99f1027b`
+and with the Matroska / WebM and other subtitle rows at `f8e1c4d9` (below).
+The capture rows are measured at `2e2e9b4f`. AAC
 in MOV, which the gate does not run, was measured at the same revision on one more
 c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 `gate-run-TARGET-a73350ca-*-shard-1` to `-8` hold the shards' outputs, build identities,
@@ -152,8 +153,8 @@ case is lower on both heap and total RSS. Sets
 `gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
 plans, step records and logs.
 
-The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
-tests, come from one partial gate run per target of the 33 items those workers serve: the
+The Matroska / WebM and subtitle rows, earlier capture comparisons and ARMv7 workspace
+tests at `f8e1c4d9` come from one partial gate run per target of 33 items: the
 15 capture cases, the six Matroska feature groups and the external HDR vector, every
 subtitle feature, the workspace tests in both profiles with the worker tests, each on five
 c6g.4xlarge hosts (Graviton2) from the gate images, kernel `7.0.0-1014-aws`, under the link
@@ -1363,9 +1364,9 @@ run at `f71495ea` used 20 pairs for `hevc-type17` and `hevc-update` and
 
 Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
 bound of 1.2241. MP4 range is gated on
-Linux AArch64 only. The closest below it is MP4 forward 1.0811. At `f8e1c4d9`
-capture's worst bound is 1.0676 (`c13-motion-960-6m`), Matroska's 0.9708 and
-DVD's 0.9752.
+Linux AArch64 only. The closest below it is MP4 forward 1.0811. Capture's worst
+bound at `2e2e9b4f` is 1.0393. At `f8e1c4d9` Matroska's worst bound is 0.9708
+and DVD's is 0.9752.
 Each feature's evidence set lists every case's bound.
 
 The AAC decoder takes 4.8 to 30.3% fewer user-mode instructions on this target at
@@ -1573,8 +1574,9 @@ hold at most four, and cleared the coarse search's row of differences with a lib
 half-sample rows are formed whole, the inverse DCT sums the basis rows of only the
 coefficients a block holds, with the same rounding points, and the coarse row is a
 fixed-size array. `c14-motion-960-rate255` went from 1.175 to 1.069 of FFmpeg's user-mode
-cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged;
-at `f8e1c4d9` they are the two cases above 1.05 (1.0676 and 1.0626). The rest of the gap
+cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged.
+At `2e2e9b4f` the worst ARMv7 runtime bound across all 15 cases is 1.0393.
+The remaining gap
 is spread over the encoder's DCT, quantisation and search, which FFmpeg's ARMv7 build runs
 in ARMv6 and NEON routines (by their symbols in its profile).
 

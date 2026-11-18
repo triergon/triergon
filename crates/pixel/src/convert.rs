@@ -238,6 +238,7 @@ mod filtered {
     const CR_R: i32 = 14392;
     const CR_G: i32 = -12061;
     const CR_B: i32 = -2332;
+    // The extra 1 << 8 reproduces the reference luma rounding at RGB boundary values.
     const Y_OFFSET: i32 = (16 << 15) + (1 << 14) + (1 << 8);
 
     pub(super) fn convert<'a>(

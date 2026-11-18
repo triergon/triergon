@@ -32,7 +32,8 @@ component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session` also g
 `Session::open` selects the chroma conversion by width on every platform. To
 match the reference conversion in the capture suite, use `Session::open` on
 32-bit ARMv7 and `Session::open_filtered` on AArch64 Linux. The filtered
-constructor uses the centre-sited chroma filter at every width.
+constructor uses the centre-sited chroma filter at every width. Its reference
+comparison is on Linux AArch64.
 
 ## Supported
 

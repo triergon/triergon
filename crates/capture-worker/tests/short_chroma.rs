@@ -25,7 +25,7 @@ fn short_filtered_frames_against_reference() {
                 let dir = root.join(&geometry);
                 fs::create_dir(&dir).unwrap();
                 let input = dir.join("input.rgba");
-                let mut rgba = Vec::new();
+                let mut rgba = [0_u8, 85, 170, 255].repeat(width * height);
                 for pulse in 0..height {
                     for row in 0..height {
                         let pixel: [u8; 4] = if row == pulse {
@@ -43,7 +43,7 @@ fn short_filtered_frames_against_reference() {
                     rgba.push(random.to_le_bytes()[0]);
                 }
                 fs::write(&input, rgba).unwrap();
-                let frames = height + 32;
+                let frames = height + 33;
                 let args = [width, height, flip, frames].map(|value| value.to_string());
                 let mut planes = Vec::new();
                 for (role, worker) in [("reference", &*reference), ("candidate", candidate)] {
@@ -58,6 +58,7 @@ fn short_filtered_frames_against_reference() {
                     assert!(result.success(), "{role} on {geometry}: {result}");
                     let data = fs::read(output).unwrap();
                     assert_eq!(data.len(), width * height * 3 / 2 * frames);
+                    assert_eq!(data[0], 76, "{role} luma rounding on {geometry}");
                     planes.push(data);
                 }
                 let max_error = planes[0]
