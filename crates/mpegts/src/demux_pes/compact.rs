@@ -226,6 +226,11 @@ impl PayloadCursor {
     pub fn remaining(&self) -> usize {
         self.remaining
     }
+    /// Whether a logical range has been admitted and is still active.
+    #[inline]
+    pub fn has_current(&self) -> bool {
+        self.active
+    }
     /// Borrow the active range until it is explicitly retired.
     pub fn current(&self) -> Option<DemuxSpanView<'_>> {
         self.active.then(|| {
