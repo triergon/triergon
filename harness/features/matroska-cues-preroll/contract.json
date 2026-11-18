@@ -23,7 +23,8 @@
     "cues-missing"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "minimum_pairs": 30,
   "confidence": 0.95,

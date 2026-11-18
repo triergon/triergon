@@ -44,7 +44,7 @@ kernel module unloaded and TRIERGON_RSS_KERNEL_BOUND unset or 0.";
 pub const FEATURE: &str = "harness/features/isobmff-seek";
 pub const FIXTURES: &str = "harness/fixtures/isobmff-seek";
 const OPEN_INDEX_FIXTURES: &str = "harness/fixtures/isobmff-open-index";
-const CONTRACT_SHA: &str = "c8c9b697310804ce3f10afcd647633ecd7c58ec30469eb38e5afd2f22bc1bd46";
+const CONTRACT_SHA: &str = "15289cd313b5fa37b8534383dcb1239cbe56116cb4d71233c9edeb08a1f6119f";
 const CORPUS_SHA: &str = "058257219f1ca3c27d0a09d8a0951776227e84ccfd704f7eca4c93dfa988d0d5";
 /// Cases: seeks, range plans and refusals, and the distinct inputs they read.
 const SEEKS: usize = 378;

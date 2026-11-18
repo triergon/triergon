@@ -201,6 +201,9 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
     out.resize(start + 2 * samples, 0);
     let frames = &mut out[start..];
     if matrix.is_identity_stereo() {
+        // 32-bit ARM converts from the bits, which vectorises there (see `to_s16_bits`).
+        #[cfg(target_arch = "arm")]
+        let to_s16 = to_s16_bits;
         for ((frame, &l), &r) in frames
             .chunks_exact_mut(2)
             .zip(&planes[0][..samples])
@@ -294,6 +297,39 @@ pub fn to_s16(sample: f32) -> i16 {
     let toward_zero = x as i32;
     let floor = toward_zero.saturating_sub(i32::from(toward_zero as f32 > x));
     floor.clamp(i16::MIN.into(), i16::MAX.into()) as i16
+}
+
+/// [`to_s16`] with integer operations only, which LLVM vectorises on 32-bit ARM, where
+/// it emits no vector float code.
+///
+/// A magnitude is `significand * 2^(exponent - 150)`, so its multiple of 2^15 is the
+/// significand shifted right by `135 - exponent`; an arithmetic shift of the signed
+/// significand rounds toward negative infinity. A magnitude of 1.0 or more leaves at
+/// least 2^15 and saturates in the narrowing. The sign bit is shifted out rather than
+/// masked: LLVM turns a mask of it into a float absolute value, and the loop then no
+/// longer vectorises.
+#[inline]
+#[cfg_attr(
+    not(target_arch = "arm"),
+    allow(dead_code, reason = "used on 32-bit ARM, tested on every target")
+)]
+fn to_s16_bits(sample: f32) -> i16 {
+    let bits = sample.to_bits();
+    // The magnitude's bits, doubled.
+    let doubled = bits << 1;
+    let exponent = doubled >> 24;
+    // The implicit leading bit, except for zero and subnormal values.
+    let significand = (bits & 0x7f_ffff) | (exponent.min(1) << 23);
+    let sign = (bits as i32) >> 31;
+    let signed = (significand as i32 ^ sign) - sign;
+    let floor = signed >> 135_u32.saturating_sub(exponent).min(31);
+    // NaN: a doubled magnitude above infinity's.
+    let value = if doubled > f32::INFINITY.to_bits() << 1 {
+        0
+    } else {
+        floor
+    };
+    value.clamp(i16::MIN.into(), i16::MAX.into()) as i16
 }
 
 #[cfg(test)]
@@ -620,10 +656,21 @@ mod tests {
             f32::INFINITY,
             f32::NEG_INFINITY,
             f32::NAN,
+            -f32::NAN,
+            f32::from_bits(1),
+            -f32::from_bits(1),
+            1.0 - f32::EPSILON / 2.0,
+            -1.0 + f32::EPSILON / 2.0,
+            1.0 / 32768.0,
+            -1.0 / 32768.0,
+            -3.0 / 32768.0,
+            -3.25 / 32768.0,
         ];
         let sweep = (0..=u32::MAX).step_by(997).map(f32::from_bits);
         for x in specials.into_iter().chain(sweep) {
-            assert_eq!(to_s16(x), floored(x), "{x:e}");
+            let want = floored(x);
+            assert_eq!(to_s16(x), want, "{x:e}");
+            assert_eq!(to_s16_bits(x), want, "{x:e} from bits");
         }
     }
 

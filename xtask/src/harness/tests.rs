@@ -704,6 +704,20 @@ fn non_finite_or_incomplete_measurements_never_satisfy_a_gate() {
 }
 
 #[test]
+fn a_run_on_one_required_target_accepts_its_slice_but_not_the_whole_gate() {
+    let (mut contract, rows, identity) = matched_gate_fixture();
+    for (targets, expected) in [
+        (r#"["host"]"#, (true, true)),
+        (r#"["host", "other"]"#, (false, true)),
+        (r#"["other"]"#, (false, false)),
+        ("[]", (false, false)),
+    ] {
+        put(&mut contract, &[], "required_targets", v(targets));
+        assert_eq!(verdict(&contract, &rows, &identity), expected, "{targets}");
+    }
+}
+
+#[test]
 fn complete_matched_evidence_can_pass_and_summary_tampering_fails() {
     let (mut contract, mut rows, mut identity) = matched_gate_fixture();
     assert_eq!(verdict(&contract, &rows, &identity), (true, true));
