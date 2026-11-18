@@ -1213,6 +1213,14 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
             include_bytes!("fixtures/mkv-feed/hevc-truncated-vps.mkv").as_slice(),
             MatroskaDiscoveryCutoff::SourceEnd,
         ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-truncated-pps.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-truncated-sps.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
     ] {
         let (engine, source, _) = matroska_source(
             fixture,

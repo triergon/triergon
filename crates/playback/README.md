@@ -131,8 +131,8 @@ in order.
 
 **Matroska HEVC discovery.** An access unit can repeat the VPS, SPS and PPS
 from CodecPrivate before its first slice. Startup accepts exact repeats of
-the single parameter-set chain after checking the bounded single-layer VPS
-prefix.
+the single parameter-set chain after checking the single-layer VPS and SPS
+through their timing fields and the base PPS through its extension flags.
 
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization

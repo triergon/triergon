@@ -86,7 +86,14 @@ VPS, SPS and PPS from CodecPrivate. SHA-256
 its two-byte NAL header and one payload byte in CodecPrivate and both key
 packets. An EBML Void and filler NALs keep the original byte offsets.
 SHA-256 `f8d1d0d4fb3b6f9a9d1182b9136e6f5e7e40ad8da7a25bc3dc54d39f2779b6e3`.
-Both fixtures are dual-licensed MIT or Apache-2.0.
+
+`hevc-truncated-sps.mkv` keeps the NAL header and first 23 payload bytes of
+the SPS in CodecPrivate and both key packets. SHA-256
+`71e2aff99f5af5e3b72738d2e4db792f8abc9152a9e62aa25870da9c6afffe5b`.
+`hevc-truncated-pps.mkv` applies the same edit to the PPS with one payload
+byte. SHA-256 `78ffcd772e5a5616cc83ba91fa1057c913e78f1e248e40479356339c408402bf`.
+Both use EBML Voids for the removed bytes. These four fixtures are
+dual-licensed MIT or Apache-2.0.
 
 `hevc-indexed-seek.mkv` contains 64 synthetic 96×64 pictures at 24 fps
 with a closed eight-picture GOP, two B pictures, 280 ms cluster limit

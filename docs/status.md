@@ -153,7 +153,7 @@ case is lower on both heap and total RSS. Sets
 plans, step records and logs.
 
 The playback tests separately cover HEVC startup with exact parameter-set
-repeats and a matching truncated VPS that prevents startup.
+repeats and matching truncations of each parameter set that prevent startup.
 
 The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
 tests, come from one partial gate run per target of the 33 items those workers serve: the

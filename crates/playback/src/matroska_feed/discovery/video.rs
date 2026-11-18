@@ -31,28 +31,10 @@ struct Chain {
 }
 
 impl Chain {
-    fn repeats_parameter_set(&self, packet: &Packet, nal: &[u8]) -> bool {
-        let Some(&header) = nal.first() else {
-            return false;
-        };
-        let kind = (header >> 1) & 0x3f;
-        if self.codec != Codec::Hevc || !(32..=34).contains(&kind) {
-            return false;
-        }
-        let offset = usize::from(self.hevc_parameter_sets[usize::from(kind - 32)]);
-        if offset == 0 {
-            return false;
-        }
-        let Some(record) = packet.configuration.initialization(packet.packet.track) else {
-            return false;
-        };
-        record
-            .data
-            .get(offset..)
-            .and_then(|nal| nal.split_first_chunk::<2>())
-            .is_some_and(|(length, payload)| {
-                usize::from(u16::from_be_bytes(*length)) == nal.len() && payload.starts_with(nal)
-            })
+    fn hevc_parameter_set<'a>(&self, record: &'a [u8], index: usize) -> Option<&'a [u8]> {
+        let offset = usize::from(*self.hevc_parameter_sets.get(index)?);
+        let (length, payload) = record.get(offset..)?.split_first_chunk::<2>()?;
+        payload.get(..usize::from(u16::from_be_bytes(*length)))
     }
 }
 
@@ -61,6 +43,7 @@ struct Sample {
     cursor: usize,
     nals: u8,
     picture: bool,
+    hevc_repeats_checked: bool,
 }
 
 #[allow(clippy::large_enum_variant, reason = "one bounded setup at a time")]
@@ -264,16 +247,12 @@ impl Setup {
 fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
     let chain = hevc::startup_chain(view.nals().map(|nal| nal.source_bytes()))?;
     let mut hevc_parameter_sets = [0; 3];
-    // The startup chain can associate the SPS using just the VPS ID. Require
-    // the bounded single-layer VPS prefix before accepting in-band repeats.
-    if hevc::vps_timing(chain.vps).is_ok() {
-        for nal in view.nals() {
-            let kind = nal.header().nal_unit_type();
-            if (32..=34).contains(&kind) {
-                let offset = nal.source_range().start - nal.length_field_bytes().len();
-                hevc_parameter_sets[usize::from(kind - 32)] =
-                    u16::try_from(offset).map_err(|_| Error::Overflow)?;
-            }
+    for nal in view.nals() {
+        let kind = nal.header().nal_unit_type();
+        if (32..=34).contains(&kind) {
+            let offset = nal.source_range().start - nal.length_field_bytes().len();
+            hevc_parameter_sets[usize::from(kind - 32)] =
+                u16::try_from(offset).map_err(|_| Error::Overflow)?;
         }
     }
     Ok(Chain {
@@ -287,6 +266,31 @@ fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
 }
 
 impl Sample {
+    fn repeats_parameter_set(&mut self, chain: &Chain, packet: &Packet, nal: &[u8]) -> bool {
+        let Some(&header) = nal.first() else {
+            return false;
+        };
+        let kind = (header >> 1) & 0x3f;
+        if chain.codec != Codec::Hevc || !(32..=34).contains(&kind) {
+            return false;
+        }
+        let Some(record) = packet.configuration.initialization(packet.packet.track) else {
+            return false;
+        };
+        if chain.hevc_parameter_set(record.data, usize::from(kind - 32)) != Some(nal) {
+            return false;
+        }
+        if !self.hevc_repeats_checked {
+            let payloads =
+                std::array::from_fn(|index| chain.hevc_parameter_set(record.data, index)?.get(2..));
+            let [Some(vps), Some(sps), Some(pps)] = payloads else {
+                return false;
+            };
+            self.hevc_repeats_checked = hevc::check_repeat_prefixes(vps, sps, pps).is_ok();
+        }
+        self.hevc_repeats_checked
+    }
+
     fn poll(
         &mut self,
         packet: &Packet,
@@ -307,7 +311,7 @@ impl Sample {
                 return Ok(None);
             }
             let (nal, consumed) = split_nal(&raw[self.cursor..], chain.length)?;
-            if (self.picture || !chain.repeats_parameter_set(packet, nal))
+            if (self.picture || !self.repeats_parameter_set(&chain, packet, nal))
                 && let Some((first, random_access, pps)) =
                     picture_nal(chain.codec, nal, chain.reorders)?
             {
