@@ -270,6 +270,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   there while timing and memory keep `timeout_seconds`. The font, shaping and ASS
   contracts set 120: on 32-bit ARMv7 FreeType folds the NotoSansCJK collection's
   outlines at 16384 in up to 29.78 s, and 120 is four times that, rounded up.
+  `required_targets` names the targets every case must pass on. Every feature the
+  gate runs names both Linux AArch64 and 32-bit ARMv7. A report on one of them
+  can accept that target's slice; accepting the whole module gate also needs the
+  other target's evidence, which one run does not hold.
   A contract with `"pinned_per_target": true` pins each case per target triple:
   `pins.json` maps each case to a fold for each of the contract's
   `required_targets`, except the targets `unpinned_targets` lists for a case

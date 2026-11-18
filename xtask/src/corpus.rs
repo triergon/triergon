@@ -1376,7 +1376,10 @@ fn delivery_contract(id: &str, operation: &str, contract: &[&str], profiles: Vec
         ("required_profiles", Value::Array(profiles)),
         (
             "required_targets",
-            Value::strings(["aarch64-unknown-linux-gnu"]),
+            Value::strings([
+                "aarch64-unknown-linux-gnu",
+                "thumbv7neon-unknown-linux-gnueabihf",
+            ]),
         ),
         ("minimum_pairs", Value::int(30)),
         ("confidence", Value::float(0.95)),
