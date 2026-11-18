@@ -888,6 +888,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Capture, 32-bit ARMv7, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`99bd020530ba5e10518ad3924b9d4544cb936b4c457db3c7578075c9b02eb445`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-3.json) |
 | Capture, 32-bit ARMv7, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-4.json) |
 | Capture, 32-bit ARMv7, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`948a0bb2163eedf3b29a575da0deaed39993a7ce161c08fd1d2c459214dfb7cd`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-5.json) |
+| Filtered capture conversion probes, Linux AArch64 | `e12863c88f5050781e20254fc8efd8cee12fac9b` | [`809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55`](../harness/evidence/sets/capture-filtered-probes-aarch64.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 1 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`1d1edc8d28e39be46f7fd81ce3341ba288ed476569d1fd467bf0af1026cc67d8`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-1.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 2 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`6a2448ea7b893cfa1f37fae38890d30139ab64ca251bc76ca1056ce4248ab35f`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-2.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 3 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`d03906a29e384369a704de659412a4ce65e8039a3b2bc280acfa66c07b58681c`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-3.json) |
@@ -1641,10 +1642,12 @@ kernel-bound memory. The gate planned 30 pairs per case. On each target, 14 timi
 cases and all 15 memory cases met the early stop at 20 pairs. Both targets pass
 conversion, encoder, mux, runtime, heap and total RSS on all 15 cases.
 
-The filtered conversion also matches on Linux AArch64 at 84 short-frame width,
-height and orientation combinations and at 480×270 and 960×540 in both
-orientations. At RGB (0, 85, 170) the reference produces luma 76. Removing
-the extra `1 << 8` rounding term produces 75 in the converter.
+On the Linux AArch64 gate image, the filtered conversion also matches the
+pinned reference at 84 short-frame width, height and orientation combinations
+and at 480×270 and 960×540 in both orientations. The extra `1 << 8` rounding
+term was recovered by fitting the converter to the reference's emitted luma
+bytes. At RGB (0, 85, 170) the reference produces luma 76. Without that term
+the converter produces 75.
 [`capture-filtered-probes-aarch64`](../harness/evidence/sets/capture-filtered-probes-aarch64.json)
 holds these checks at `e12863c8`.
 

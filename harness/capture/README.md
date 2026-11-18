@@ -43,16 +43,24 @@ total resident peak RSS. It also reports resident growth as a diagnostic.
 
 The conversion probe checks every luma and chroma sample at the seven even
 widths below 16, in both row orientations, at heights 2, 4 and 6. Each size and
-orientation uses a red impulse in each source row and 32 pseudo-random pictures.
+orientation uses a solid picture at the luma rounding boundary, a red impulse
+in each source row and 32 pseudo-random pictures.
 The AArch64 probe also checks widths 18, 22, 34, 66, 258, 958 and 4094 using
-`Converter::filtered`. Both probes require exact sample equality. The AArch64 resolution probe also checks one 480×270 and one
-960×540 picture in both row orientations. Its parameter recovery test uses
-two-row frames to recover the chroma coefficients and six-row frames to
-recover the first vertical filter row. Build the capture reference for the
-target as above and give the tests a fresh output directory.
+`Converter::filtered`.
+
+`capture_resolutions_against_reference` compares one 480×270 and one 960×540
+picture in both row orientations. On AArch64 it uses `Session::open_filtered`.
+On ARMv7 it uses the block path through `Session::open`. Both probes require
+exact sample equality against the pinned reference for that target. The AArch64
+parameter recovery test uses two-row frames to recover the chroma coefficients
+and six-row frames to recover the first vertical filter row. Build the capture
+reference for the target as above and give the tests a fresh output directory.
 
 ```sh
 CAPTURE_REFERENCE="$PWD/target/harness/ffmpeg-capture-worker" \
 CAPTURE_PROBE_DIR="$PWD/.research/short-capture" \
 CARGO_INCREMENTAL=0 cargo test --release -p capture-worker --test short_chroma -- --ignored
 ```
+
+In the ARMv7 gate user space, add `--target thumbv7neon-unknown-linux-gnueabihf`
+before `--` to run both comparison tests with the gate's Thumb-2 build.
