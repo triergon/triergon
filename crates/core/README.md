@@ -101,7 +101,9 @@ is written: one claim charges the capacity and the header `freeze` adds, so fill
 within that capacity and freezing it charge nothing more.
 `BudgetVecIntoIter<T>::as_slice()` borrows the remaining elements in traversal
 order without advancing or allocating. The iterator keeps its capacity charged
-until it drops, including after its last element is consumed.
+until it drops, including after its last element is consumed;
+`into_budget_vec()` returns the elements not yet visited as a vector that keeps
+that allocation and charge, so a used-up vector can be reused without allocating.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
 packets or views cannot be converted back into it. `used()` and `peak()` report
 requested capacity, not RSS or allocator overhead.

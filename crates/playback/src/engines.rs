@@ -1709,6 +1709,21 @@ impl TsEngine {
         std::mem::take(&mut self.suppressed_events)
     }
 
+    /// Hands a consumed PES's lists back to the observer of `pid` for its next PES.
+    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+        let Some(index) = self.native_tracks.index(pid) else {
+            return;
+        };
+        if let Some(observer) = self.native_tracks.as_mut_slice()[index].observer.as_mut() {
+            if let Some(spans) = lists.spans {
+                observer.reuse_payload_spans(spans);
+            }
+            if let Some(header) = lists.header {
+                observer.reuse_header_ranges(header);
+            }
+        }
+    }
+
     fn discover_tracks(&self, map: &ProgramMap) -> Result<TsNativeTracks> {
         let mut selections = map.streams.as_slice().iter().filter_map(|stream| {
             let carriage = match stream.stream_type {

@@ -6,7 +6,7 @@ use crate::{
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
-    ts_payload::PesInput,
+    ts_payload::{PesInput, SpentLists},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{InputCursor, InputRequest, Time, WorkBudget};
@@ -224,6 +224,8 @@ pub struct TsProgressiveReader<S: Source> {
     audio: Option<HlsAac>,
     saw_video: bool,
     audio_times: Option<(Time, NextAudioTime)>,
+    #[cfg(test)]
+    reuse_lists: bool,
 }
 
 impl<S: Source> TsProgressiveReader<S> {
@@ -249,6 +251,8 @@ impl<S: Source> TsProgressiveReader<S> {
             audio: None,
             saw_video: false,
             audio_times: None,
+            #[cfg(test)]
+            reuse_lists: true,
         })
     }
 
@@ -345,6 +349,8 @@ impl<S: Source> TsProgressiveReader<S> {
                     }
                     AvcTsStep::Yield => {}
                     AvcTsStep::NeedInput if self.phase == Phase::Video => {
+                        let lists = video.take_spent();
+                        self.reuse_pes_lists(|tracks| tracks.video, lists);
                         self.phase = Phase::Read;
                     }
                     AvcTsStep::End if self.phase == Phase::DrainVideo => {
@@ -370,6 +376,8 @@ impl<S: Source> TsProgressiveReader<S> {
                     }
                     AssemblyStep::Yield => {}
                     AssemblyStep::NeedPayload if self.phase == Phase::Audio => {
+                        let lists = audio.take_spent();
+                        self.reuse_pes_lists(|tracks| tracks.audio, lists);
                         self.phase = Phase::Read;
                     }
                     AssemblyStep::Finished if self.phase == Phase::DrainAudio => {
@@ -511,6 +519,20 @@ impl<S: Source> TsProgressiveReader<S> {
             _ => {}
         }
         Ok(())
+    }
+
+    /// The observer of a track allocates nothing for its next PES when it gets
+    /// back the lists of the one a reader has just consumed.
+    fn reuse_pes_lists(&mut self, track: impl Fn(&Tracks) -> TrackKey, lists: SpentLists) {
+        #[cfg(test)]
+        if !self.reuse_lists {
+            return;
+        }
+        if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref())
+            && let TrackKey::Ts { pid, .. } = track(tracks)
+        {
+            transport.engine.reuse_pes_lists(pid, lists);
+        }
     }
 
     fn required_pid(&self, pid: u16) -> bool {
@@ -974,6 +996,64 @@ mod tests {
                     assert_eq!(
                         read(false, quantum, window, private_audio),
                         read(true, quantum, window, private_audio),
+                        "work {quantum}, window {window}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn reused_pes_lists_keep_every_output_and_work_boundary() {
+        fn read(wire: &[u8], reuse: bool, quantum: u64, window: usize) -> Vec<(String, u64)> {
+            let pool = Budget::new(8 << 20).unwrap();
+            let id = SourceId(37);
+            let caps = SourceCapabilities {
+                length: Some(wire.len() as u64),
+                random_access: false,
+            };
+            let source =
+                crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, wire).unwrap(), window)
+                    .unwrap();
+            let input = InputCursor::new(&pool, id, caps, window).unwrap();
+            let mut reader =
+                TsProgressiveReader::new(input, source, TsProgressiveLimits::default()).unwrap();
+            reader.reuse_lists = reuse;
+            let cancel = AtomicBool::new(false);
+            let mut trace = Vec::new();
+            loop {
+                let mut work = WorkBudget::new(quantum);
+                let step = reader.advance(&mut work, &cancel).unwrap();
+                let tag = match &step {
+                    TsProgressiveStep::Unit(TsProgressiveUnit::Video(video)) => format!(
+                        "video {:?} {} {:?}",
+                        video.clock,
+                        video.idr,
+                        video.feed_spans().flatten().collect::<Vec<_>>()
+                    ),
+                    TsProgressiveStep::Unit(TsProgressiveUnit::Audio {
+                        frame,
+                        presentation,
+                    }) => format!("audio {presentation:?} {:?}", frame.bytes.as_ref()),
+                    other => format!("{other:?}"),
+                };
+                trace.push((tag, work.spent()));
+                if matches!(step, TsProgressiveStep::End) {
+                    drop(reader);
+                    assert_eq!(pool.used(), Budget::control_storage_bytes());
+                    return trace;
+                }
+            }
+        }
+        for wire in [
+            include_bytes!("../tests/fixtures/hls/baseline-stereo.ts").as_slice(),
+            include_bytes!("../tests/fixtures/hls/bframes-multislice.ts").as_slice(),
+        ] {
+            for quantum in [1, 31, 4096] {
+                for window in [188, 4096] {
+                    assert_eq!(
+                        read(wire, true, quantum, window),
+                        read(wire, false, quantum, window),
                         "work {quantum}, window {window}"
                     );
                 }

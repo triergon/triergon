@@ -3,7 +3,7 @@
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_pes::{clock_describes, lane_track, pes_time},
-    ts_payload::PesInput,
+    ts_payload::{PesInput, SpentLists},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
@@ -160,6 +160,7 @@ pub struct HlsAac {
     frame: BudgetVec<u8>,
     eof: bool,
     failure: Option<Error>,
+    spent: SpentLists,
 }
 
 impl HlsAac {
@@ -191,6 +192,7 @@ impl HlsAac {
             frame: BudgetVec::new(pool),
             eof: false,
             failure: None,
+            spent: SpentLists::default(),
         })
     }
 
@@ -273,14 +275,24 @@ impl HlsAac {
         }
         self.clock_epoch = Some(clock_epoch);
         let remaining = packet.payload_len;
-        self.pending = mailbox.take().map(|packet| PendingPes {
-            spans: packet.into_payload().into_cursor(),
-            joined: None,
-            offset: 0,
-            remaining,
-            coalescing_attempted: false,
-        });
+        if let Some(packet) = mailbox.take() {
+            let (payload, mut header) = packet.into_parts();
+            header.clear();
+            self.spent.header = Some(header);
+            self.pending = Some(PendingPes {
+                spans: payload.into_cursor(),
+                joined: None,
+                offset: 0,
+                remaining,
+                coalescing_attempted: false,
+            });
+        }
         Ok(true)
+    }
+
+    /// The lists of the last consumed PES, for its observer to reuse.
+    pub(crate) fn take_spent(&mut self) -> SpentLists {
+        std::mem::take(&mut self.spent)
     }
 
     /// Signal logical EOF, after the last PES was accepted. Poll to drain it.
@@ -360,7 +372,10 @@ impl HlsAac {
                     if input.remaining != 0 {
                         return Err(Error::Invalid("HLS AAC PES payload extent"));
                     }
-                    self.pending = None;
+                    self.spent.spans = self
+                        .pending
+                        .take()
+                        .map(|pending| pending.spans.into_spans());
                     continue;
                 };
                 if needs_validation {

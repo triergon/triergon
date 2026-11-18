@@ -496,6 +496,12 @@ reports whether the cursor has an active range. Full carrier facts remain availa
 through `current` and `next_span`. A borrowed span iterator can
 advance through the same ranges with `DemuxSpanViews::next_bytes`, which returns
 only the borrowed bytes.
+A consumer that has used a packet up can hand its lists back:
+`PayloadCursor::into_spans` empties the span list, and
+`DemuxObserver::reuse_payload_spans` and `reuse_header_ranges` give the span and
+header-range lists to the observer that emitted them, whose next PES then fills
+them without allocating. Admission, payload runs and growth work follow the
+capacity a new list would have; only the allocation is kept.
 Sequential playback can share up to four tight input windows of at most 4 KiB
 each. A full set, oversized backing storage or low budget headroom uses
 carrier-sized storage. Fallback uses the original transport event.

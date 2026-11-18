@@ -1,6 +1,6 @@
 //! Immutable shared spans and charged mutable construction/arena storage.
 use crate::{Budget, Error, Reservation, Result};
-use std::{ops::Range, sync::Arc};
+use std::{collections::VecDeque, ops::Range, sync::Arc};
 
 #[derive(Debug)]
 struct Storage {
@@ -650,26 +650,39 @@ impl<T> std::ops::DerefMut for BudgetVec<T> {
 /// the iterator releases it, including when only part of the vector is visited.
 #[derive(Debug)]
 pub struct BudgetVecIntoIter<T> {
-    iter: std::vec::IntoIter<T>,
-    _charge: Reservation,
+    // Elements leave from the front only, so the remaining ones stay contiguous.
+    items: VecDeque<T>,
+    charge: Reservation,
 }
 
 impl<T> BudgetVecIntoIter<T> {
     /// Borrow the remaining elements in traversal order without advancing.
     pub fn as_slice(&self) -> &[T] {
-        self.iter.as_slice()
+        let (remaining, wrapped) = self.items.as_slices();
+        debug_assert!(wrapped.is_empty());
+        remaining
+    }
+    /// The elements not yet visited, in traversal order, as a vector that keeps
+    /// this allocation and its charge: a consumer that has used a vector up can
+    /// hand it back for the next one to fill without allocating.
+    pub fn into_budget_vec(self) -> BudgetVec<T> {
+        BudgetVec {
+            data: Vec::from(self.items),
+            charge: self.charge,
+        }
     }
 }
 
 impl<T> Iterator for BudgetVecIntoIter<T> {
     type Item = T;
 
+    #[inline]
     fn next(&mut self) -> Option<T> {
-        self.iter.next()
+        self.items.pop_front()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
+        (self.items.len(), Some(self.items.len()))
     }
 }
 
@@ -681,8 +694,8 @@ impl<T> IntoIterator for BudgetVec<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         BudgetVecIntoIter {
-            iter: self.data.into_iter(),
-            _charge: self.charge,
+            items: VecDeque::from(self.data),
+            charge: self.charge,
         }
     }
 }
@@ -780,6 +793,39 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 mod tests {
     use super::{BudgetVec, Bytes, BytesView, nonzero_prefix_len};
     use crate::Budget;
+
+    #[test]
+    fn a_traversed_vector_comes_back_with_its_allocation_and_charge() {
+        let pool = Budget::new(4096).unwrap();
+        let mut vector = BudgetVec::new(&pool);
+        vector.try_reserve_exact(8).unwrap();
+        for value in 0..6_u32 {
+            vector.try_push(value).unwrap();
+        }
+        let storage = vector.as_slice().as_ptr();
+        let used = pool.used();
+        let mut items = vector.into_iter();
+        assert_eq!(items.by_ref().take(2).collect::<Vec<_>>(), [0, 1]);
+        assert_eq!(items.as_slice(), [2, 3, 4, 5]);
+        let remaining = items.into_budget_vec();
+        assert_eq!(remaining.as_slice(), [2, 3, 4, 5]);
+        assert_eq!(remaining.capacity(), 8);
+        assert_eq!(remaining.as_slice().as_ptr(), storage);
+        assert_eq!(pool.used(), used);
+
+        let mut items = remaining.into_iter();
+        assert_eq!(items.by_ref().count(), 4);
+        let mut emptied = items.into_budget_vec();
+        assert!(emptied.is_empty());
+        assert_eq!(emptied.capacity(), 8);
+        for value in 10..18 {
+            emptied.try_push(value).unwrap();
+        }
+        assert_eq!(emptied.as_slice().as_ptr(), storage);
+        assert_eq!(pool.used(), used);
+        drop(emptied);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 
     #[test]
     fn reserving_grows_geometrically_and_exactly_at_the_limit() {

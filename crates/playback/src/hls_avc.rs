@@ -7,7 +7,7 @@ pub(crate) mod syntax;
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_pes::{clock_describes, lane_track},
-    ts_payload::PesInput,
+    ts_payload::{PesInput, SpentLists},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
@@ -263,6 +263,7 @@ pub struct AvcTsReader {
     allow_startup_sei: bool,
     ended: bool,
     failure: Option<Error>,
+    spent: SpentLists,
 }
 
 impl AvcTsReader {
@@ -306,6 +307,7 @@ impl AvcTsReader {
             allow_startup_sei: false,
             ended: false,
             failure: None,
+            spent: SpentLists::default(),
         })
     }
 
@@ -391,11 +393,16 @@ impl AvcTsReader {
         }
         self.source_clock_epoch = Some(origin);
         let remaining = packet.payload_len;
-        self.pending_pes = mailbox.take().map(|packet| PendingPes {
-            remaining,
-            spans: packet.into_payload().into_cursor(),
-            may_reserve: true,
-        });
+        if let Some(packet) = mailbox.take() {
+            let (payload, mut header) = packet.into_parts();
+            header.clear();
+            self.spent.header = Some(header);
+            self.pending_pes = Some(PendingPes {
+                remaining,
+                spans: payload.into_cursor(),
+                may_reserve: true,
+            });
+        }
         Ok(true)
     }
 
@@ -407,6 +414,11 @@ impl AvcTsReader {
         self.pes_anchor = Some(index);
         self.pes_serial = serial;
         Ok(())
+    }
+
+    /// The lists of the last consumed PES, for its observer to reuse.
+    pub(crate) fn take_spent(&mut self) -> SpentLists {
+        std::mem::take(&mut self.spent)
     }
 
     /// Seal only after definitive segment EOF. Already provided bytes drain.
@@ -502,7 +514,10 @@ impl AvcTsReader {
                     if pending.remaining != 0 {
                         return Err(Error::Invalid("AVC TS PES payload extent"));
                     }
-                    self.pending_pes = None;
+                    self.spent.spans = self
+                        .pending_pes
+                        .take()
+                        .map(|pending| pending.spans.into_spans());
                 }
             }
             if let Some(chunk) = &mut self.input {
