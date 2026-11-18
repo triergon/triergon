@@ -297,9 +297,22 @@ impl Reader {
             && first
             && fields.track == request.track
             && fields.keyframe
-            && pts <= scan.policy.target_ns
-            && scan.best.as_ref().is_none_or(|(old, _)| pts > *old)
         {
+            let target = scan.policy.target_ns;
+            let improves = if pts <= target {
+                scan.best
+                    .as_ref()
+                    .is_none_or(|(old, _)| *old > target || pts > *old)
+            } else {
+                scan.policy.allow_first_after_target
+                    && scan
+                        .best
+                        .as_ref()
+                        .is_none_or(|(old, _)| *old > target && pts < *old)
+            };
+            if !improves {
+                return Ok(());
+            }
             let location = locate()?;
             scan.best_configuration = if scan.prefix_from_initial {
                 let boundary = scan
@@ -470,6 +483,7 @@ impl Reader {
                 start: first.offset(),
                 stop: Some(completion.location.cluster_offset()),
                 target_ns: lower_ns,
+                allow_first_after_target: false,
                 allow_first_after_negative_preroll: false,
                 replay_whole_cluster: true,
             },

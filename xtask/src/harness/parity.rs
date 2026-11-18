@@ -459,17 +459,34 @@ pub fn seek_parity(
     sequential_required: bool,
     comparison: Option<&Comparison<'_>>,
     content: bool,
+    probe_targets: Option<&Value>,
 ) -> Result<Value, String> {
-    let mut result = parity(run, sequential_required, comparison, content, "")?;
-    let mut rows = Vec::new();
-    for target in [
-        0i64,
+    const DEFAULT_TARGETS: [i64; 6] = [
+        0,
         250_000_000,
         2_500_000_000,
         7_500_000_000,
         15_500_000_000,
         25_000_000_000,
-    ] {
+    ];
+    let targets = match probe_targets {
+        Some(Value::Array(values)) if !values.is_empty() => values
+            .iter()
+            .map(|value| match value {
+                Value::Number(number) => number.as_i128().and_then(|ns| i64::try_from(ns).ok()),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or("seek probe targets must be integral nanoseconds")?,
+        Some(_) => return Err("seek probe targets must be a nonempty list".into()),
+        None => DEFAULT_TARGETS.to_vec(),
+    };
+    if targets.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err("seek probe targets must be strictly increasing".into());
+    }
+    let mut result = parity(run, sequential_required, comparison, content, "")?;
+    let mut rows = Vec::new();
+    for target in targets {
         for after_eof in [false, true] {
             let mut extra = vec![arg(target)];
             if after_eof {

@@ -13,6 +13,7 @@ pub(crate) struct ScanPlan {
     pub start: u64,
     pub stop: Option<u64>,
     pub target_ns: i64,
+    pub allow_first_after_target: bool,
     pub allow_first_after_negative_preroll: bool,
     pub replay_whole_cluster: bool,
 }
@@ -220,9 +221,14 @@ impl SeekPlanJob {
                 }
                 Phase::Index => {
                     if self.at == cues.len() {
+                        let allow_first_after_target = self.preroll
+                            && self.recovery_audio == RecoveryAudio::BlockStart
+                            && self.requested >= 0;
                         let cue = self.best.or_else(|| {
                             self.first.filter(|cue| {
-                                self.preroll && i128::from(cue.ticks) <= self.requested_ticks
+                                self.preroll
+                                    && (i128::from(cue.ticks) <= self.requested_ticks
+                                        || allow_first_after_target)
                             })
                         });
                         self.best = cue;
@@ -231,6 +237,7 @@ impl SeekPlanJob {
                                 start: self.first_cluster,
                                 stop: None,
                                 target_ns: self.target,
+                                allow_first_after_target,
                                 allow_first_after_negative_preroll: self.preroll && self.target < 0,
                                 replay_whole_cluster: self.preroll,
                             }));
@@ -273,6 +280,7 @@ impl SeekPlanJob {
                             start: cue.cluster,
                             stop: None,
                             target_ns: self.target,
+                            allow_first_after_target: false,
                             allow_first_after_negative_preroll: false,
                             replay_whole_cluster: true,
                         });
@@ -291,6 +299,7 @@ impl SeekPlanJob {
                                 start: cue.cluster,
                                 stop: self.stop,
                                 target_ns: self.target,
+                                allow_first_after_target: false,
                                 allow_first_after_negative_preroll: false,
                                 replay_whole_cluster: false,
                             }),

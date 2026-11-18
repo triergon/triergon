@@ -160,6 +160,18 @@
       "sha256": "9e3e4b61d43c3fc6769db8c89f5e2dd7ea95e2b7874a47433f18ea235f1d4825",
       "rights": "authored-synthetic",
       "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-before-first-keyframe",
+      "profile": "cues-opus-before-first-keyframe",
+      "file": "cues-opus-before-first-keyframe.mkv",
+      "sha256": "b8ca5374d1690737f3dd5edc12f39e31d9fc2c2a34dc4c865379857d296c4058",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 250000000,
+      "seek_probe_targets_ns": [
+        0,
+        250000000
+      ]
     }
   ]
 }

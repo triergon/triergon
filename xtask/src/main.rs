@@ -762,7 +762,7 @@ fn compare(root: &Path, args: &[String]) -> Task {
     use harness::parity::{catalogue_parity, colour_parity, parity, seek_parity};
     let result = match values.get("--operation").map_or("plain", String::as_str) {
         "plain" => parity(&run, sequential, None, content, "")?,
-        "seek" => seek_parity(&run, sequential, None, content)?,
+        "seek" => seek_parity(&run, sequential, None, content, None)?,
         "colour" => colour_parity(&run, sequential, None, content)?,
         "catalogue" => catalogue_parity(&run, sequential, None, content)?,
         other => return Err(format!("unknown operation {other}")),

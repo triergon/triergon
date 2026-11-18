@@ -338,6 +338,46 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
 }
 
 #[test]
+fn compatibility_seek_can_land_on_the_first_keyframe() {
+    let tracks = element(0x1654ae6b, &track(1, 1, &[]));
+    let cluster = cluster(1000, simple(1, 0, 0x80, b"first"));
+    let cue = element(
+        0xbb,
+        &[
+            uint(0xb3, 1000),
+            element(
+                0xb7,
+                &[uint(0xf7, 1), uint(0xf1, tracks.len() as u64)].concat(),
+            ),
+        ]
+        .concat(),
+    );
+    let cues = element(0x1c53bb6b, &cue);
+    let input = mkv(&[tracks, cluster, cues].concat());
+    let cancel = AtomicBool::new(false);
+    for target in [0, 250_000_000] {
+        let mut reader =
+            BlockingReader::open_seekable(Cursor::new(&input), Limits::default()).unwrap();
+        for after_eof in [false, true] {
+            let landed =
+                triergon_matroska::compat::seek::at_block_start(&mut reader, 0, target, &cancel)
+                    .unwrap();
+            assert_eq!(landed.actual_ns, 1_000_000_000);
+            assert_eq!(landed.discard_until_ns, target);
+            assert_eq!(landed.used_index, after_eof);
+            assert!(landed.replays_from_start);
+            let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+            assert_eq!(packet.packet.data.as_ref(), b"first");
+            assert!(reader.next_typed_packet(&cancel).unwrap().is_none());
+        }
+        assert!(matches!(
+            reader.seek_previous(0, target, &cancel),
+            Err(Error::Unsupported("no previous random-access block"))
+        ));
+    }
+}
+
+#[test]
 fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
     const A: &[u8] = b"first";
     const B: &[u8] = b"next!";

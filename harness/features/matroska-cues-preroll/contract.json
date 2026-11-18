@@ -11,6 +11,7 @@
     "whole audio block selection at the subtitle-recovery cutoff, with zero, omitted and positive lace durations",
     "subtitle-recovery cutoff across audio tracks with distinct initial padding and sample rates",
     "subtitle replay when initial padding rounds to zero or one Segment tick",
+    "fresh and after-EOF seeks at zero and 250 ms before a nonzero first indexed keyframe",
     "fresh, repeated and after-EOF seeks",
     "unknown Cluster lengths",
     "seek cancellation, I/O failures and malformed indexes"
@@ -35,7 +36,8 @@
     "cues-opus-two-tracks-fractional-padding",
     "cues-opus-two-tracks-input-rate",
     "cues-opus-padding-rounds-to-zero",
-    "cues-opus-padding-rounds-to-one-tick"
+    "cues-opus-padding-rounds-to-one-tick",
+    "cues-opus-before-first-keyframe"
   ],
   "required_targets": [
     "aarch64-unknown-linux-gnu",

@@ -1601,6 +1601,7 @@ fn subtitle_recovery_lace(
     duration: Option<u64>,
     second_audio: Option<(u64, u32)>,
     tick_ms: i16,
+    first_video_ms: i16,
 ) -> Result<Vec<u8>, String> {
     let picture = source.video_packet(true)?;
     let avcc = source.track_field(|_| true, "private")?;
@@ -1674,7 +1675,7 @@ fn subtitle_recovery_lace(
         0xa1,
         &cat([
             &[0x82],
-            &((1000 + block_ticks) / tick_ms).to_be_bytes(),
+            &((1000 - first_video_ms + block_ticks) / tick_ms).to_be_bytes(),
             &[4, 1],
             silence,
             silence,
@@ -1687,9 +1688,9 @@ fn subtitle_recovery_lace(
     let first = e(
         CLUSTER,
         &cat([
-            &u(0xe7, 0),
+            &u(0xe7, first_video_ms as u64 / tick_ms),
             &block(1, 0, &picture),
-            &block(3, 1900, b"Subtitle across a seek"),
+            &block(3, 1900 - first_video_ms, b"Subtitle across a seek"),
             &e(0xa0, &group),
         ]),
     );
@@ -1728,7 +1729,7 @@ fn subtitle_recovery_lace(
     let cues = e(
         0x1c53bb6b,
         &cat([
-            &cue(0, first_offset),
+            &cue(first_video_ms as u64 / tick_ms, first_offset),
             &cue(2000 / tick_ms, first_offset + first.len() as u64),
         ]),
     );
@@ -1844,7 +1845,7 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
     ]);
     for (detail, block_ticks, duration, second_audio, tick_ms) in recovery_cases {
         let name = format!("cues-opus-{detail}");
-        let data = subtitle_recovery_lace(source, block_ticks, duration, second_audio, tick_ms)?;
+        let data = subtitle_recovery_lace(source, block_ticks, duration, second_audio, tick_ms, 0)?;
         let file = format!("{name}.mkv");
         write(&output.join(&file), &data)?;
         rows.push(authored(
@@ -1854,6 +1855,22 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
             vec![("seek_target_ns", Value::int(2_080_000_000i64))],
         ));
     }
+    let name = "cues-opus-before-first-keyframe";
+    let file = format!("{name}.mkv");
+    let data = subtitle_recovery_lace(source, 1000, None, None, 20, 1000)?;
+    write(&output.join(&file), &data)?;
+    rows.push(authored(
+        name,
+        &file,
+        &data,
+        vec![
+            ("seek_target_ns", Value::int(250_000_000)),
+            (
+                "seek_probe_targets_ns",
+                Value::Array(vec![Value::int(0), Value::int(250_000_000)]),
+            ),
+        ],
+    ));
     let contract = delivery_contract(
         "matroska-cues-preroll",
         "container-seek-preroll-v1",
@@ -1866,6 +1883,7 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
             "whole audio block selection at the subtitle-recovery cutoff, with zero, omitted and positive lace durations",
             "subtitle-recovery cutoff across audio tracks with distinct initial padding and sample rates",
             "subtitle replay when initial padding rounds to zero or one Segment tick",
+            "fresh and after-EOF seeks at zero and 250 ms before a nonzero first indexed keyframe",
             "fresh, repeated and after-EOF seeks",
             "unknown Cluster lengths",
             "seek cancellation, I/O failures and malformed indexes",
