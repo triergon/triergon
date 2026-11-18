@@ -223,9 +223,10 @@ mod block {
 }
 
 /// The filtered conversion quantizes the limited-range BT.601 components to
-/// six fractional bits before vertical filtering. The capture worker's
+/// six fractional bits before vertical filtering. The chroma coefficients
+/// were recovered from the reference's observed output. The capture worker's
 /// short_filtered_frames_against_reference test checks the coefficients,
-/// rounding and edge taps against the reference output.
+/// rounding and edge taps against that output.
 mod filtered {
     use crate::Picture;
 
@@ -266,6 +267,8 @@ mod filtered {
             let decimate_plane = |ring: &[Vec<i16>; 4], plane: &mut [u8]| match (g.height, k) {
                 (2, _) => decimate_short::<1, 0, 0, 6>(ring, 1, plane),
                 (4, _) => decimate_short::<1, 1, 0, 7>(ring, 2 * k, plane),
+                // The short-frame probe gives weights 3/7, 3/7 and 1/7.
+                // Their 12-bit fixed-point coefficients sum to 4096.
                 (6, 0) => decimate_short::<1755, 1756, 585, 18>(ring, 0, plane),
                 _ => decimate(ring, rows, plane),
             };

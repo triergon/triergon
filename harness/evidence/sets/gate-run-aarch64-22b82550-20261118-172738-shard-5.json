@@ -1,0 +1,39 @@
+{
+ "name": "gate-run-aarch64-22b82550-20261118-172738-shard-5",
+ "path": "gate-run-aarch64-22b82550-20261118-172738-shard-5",
+ "retention": "retained",
+ "reason": "Partial gate run at 22b82550, the 15 capture items, shard 5 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: every capture timing step reused from the a5837d38 run, its records restored from that run's kept sets, and every memory step measured, kernel-bound on CPUs 1-15; the shard outputs, build identities, plan, step records and logs; for the fix that restores a reused capture timing step's records",
+ "key": "evidence/gate-runs/22b82550c0969b95fca246a6769bd8fe360a5f54-aarch64-20261118-172738/shard-5/c29dac40ce89ea12329b7b42f3e4def3cf2803592ed09152b2a5198479333138.tar.zst",
+ "sha256": "c29dac40ce89ea12329b7b42f3e4def3cf2803592ed09152b2a5198479333138",
+ "bytes": 423535386,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "f59309857e2624af93b48e3cddd652a4924c7d29454e032f8829258570b0393d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "1cd82a27739106876fbc0d2ddb7b1fe453aac8f8303e5c55bb4a3b672f03fc9b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "da6323a06d4353d5f2ee1e57681e1c52f6ecf0e9d5154312d7b7493d53b9fbc3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "4c5e6c4fe302451a68078a54b08ac05e2d08b9ea77f9db5f4c4f2372b2c55b63",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

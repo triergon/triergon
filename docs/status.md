@@ -133,15 +133,24 @@ for byte unchanged, as it does the ASS, font, packet framing, rasterising and sh
 workers. On Linux AArch64 the grades of `ass-render-host`, `subtitle-dvd-host` and
 `subtitle-text-host` fail, each only on its contract's listed open cases; no grade fails
 on ARMv7. The capture memory steps fail on both targets without measuring:
-`capture qualify --stage memory` reads the records of its timing step, and a reused timing
-step writes none. No runtime or memory bound crosses its limit; per feature,
+`capture qualify --stage memory` reads the records of its timing step, which a reused
+timing step did not restore then. No runtime or memory bound crosses its limit; per feature,
 the median change of the case medians against `1c64b775` lies within −1.6% and +1.9%
 (+8.1% for the five `subtitle-dvd-host` cases, whose operations take microseconds), as do
 the features whose workers are unchanged, and the changed workers' user-mode instruction
 counts on the link-order training operations are within 0.05% of `2a6a07a7`'s. Sets
 `gate-run-aarch64-2b196e9c-20261117-192110-shard-1` to `-8` and
 `gate-run-armv7-2b196e9c-20261117-192033-shard-1` to `-8` hold the shards' outputs, and
-`link-order-code-size` the instruction counts and the per-feature comparisons.
+`link-order-code-size` the instruction counts and the per-feature comparisons. A reused
+timing step now restores those records from its kept set: one partial run per target of the
+15 capture items on five hosts, at `22b82550` on Linux AArch64 and `01ba2375` on ARMv7,
+reused every timing step from the `a5837d38` run (sets
+`gate-run-aarch64-a5837d38-20261118-163537-shard-1` to `-5` and
+`gate-run-armv7-a5837d38-20261118-163631-shard-1` to `-5`, which measured all 30 steps per
+target) and measured every memory step from the restored records, 30 of 30 steps passing on
+both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and ≤0.9766 on ARMv7;
+sets `gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
+`gate-run-armv7-01ba2375-20261118-191656-shard-1` to `-5`).
 
 The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
 legacy AAC-LC, MP4 forward and range, TS program, MPEG-TS progressive playback and raw
@@ -911,16 +920,6 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-3.json) |
 | Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-4.json) |
 | Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-5.json) |
-| Earlier: Capture, Linux AArch64, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`772388b70251eaa0c414a7622bc37655ad44d39e065d3b8bd417509a40d26916`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-1.json) |
-| Earlier: Capture, Linux AArch64, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`9a53253d8bddfb2e120ef45a8f0e9cdf4488941062037dbbf0ea5c9e14cad788`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-2.json) |
-| Earlier: Capture, Linux AArch64, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`fb3f91c9bd2daef5498050896b5db44cd2bef4b1ef6f7523511733ae373c1569`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-3.json) |
-| Earlier: Capture, Linux AArch64, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`2b9eaa727aba54dbd29e76351752c8aa6789b5a5ebb83fb97572df71d424dc82`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-4.json) |
-| Earlier: Capture, Linux AArch64, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`bf21e970325fe74074080317ae1163fc5de6d2b8b370018f8638bff84f6a99b4`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-5.json) |
-| Earlier: Capture, 32-bit ARMv7, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`3b5fe396a7f6e7eb0b9e002687c6ad65db53b4777e99b2992e529d89c3b380ca`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-1.json) |
-| Earlier: Capture, 32-bit ARMv7, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`e22ce28a5d8d55be2e9dd7ed9aec318df6ec46175aee6747a7acb20e02fc65e5`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-2.json) |
-| Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`99bd020530ba5e10518ad3924b9d4544cb936b4c457db3c7578075c9b02eb445`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-3.json) |
-| Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-4.json) |
-| Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`948a0bb2163eedf3b29a575da0deaed39993a7ce161c08fd1d2c459214dfb7cd`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-5.json) |
 | Earlier: Capture, Linux AArch64, shard 1 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`cd74c2d3d4f8e58f1c350a3ab44d3a87a7708e5ef1de8a59635cf1d5497cbb51`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-1.json) |
 | Earlier: Capture, Linux AArch64, shard 2 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`61767625008844862c7385058026ee1f40d4500af41fc58beea3f4183a840f64`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-2.json) |
 | Earlier: Capture, Linux AArch64, shard 3 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`c2e203a7191af12aada5069fa9690f52d09fc57b76a3a05f3e7d6e2726d680a0`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-3.json) |
@@ -1688,14 +1687,9 @@ and `Sbr::process` with the QMF synthesis takes 47%.
 Capture conversion must stay within one of FFmpeg's on every sample. At capture widths
 of at least 16 that are multiples of 4, FFmpeg's ARMv7 build averages each 2×2 block's
 RGB before computing chroma. The AArch64 build filters chroma vertically. At
-`2e2e9b4f` the default width-dependent `Session::open` matches the ARMv7 build and
+`a34b98d0` the default width-dependent `Session::open` matches the ARMv7 build and
 `Session::open_filtered` matches the AArch64 build byte for byte on all 15 cases.
 [Capture session constructors](../crates/capture/README.md)
-
-Both capture runs at `2e2e9b4f` used c6g.4xlarge, with timing on CPU 1 and
-kernel-bound memory. The gate planned 30 pairs per case. On each target, 14 timing
-cases and all 15 memory cases met the early stop at 20 pairs. Both targets pass
-conversion, encoder, mux, runtime, heap and total RSS on all 15 cases.
 
 On the Linux AArch64 gate image, the filtered conversion also matches the
 pinned reference at 84 short-frame width, height and orientation combinations
@@ -1717,7 +1711,7 @@ Compared with `f8e1c4d9`, the filtered conversion changes the capture output
 folds on all 15 Linux AArch64 cases. All 15 ARMv7 output folds and all
 reference folds on both targets match their earlier values.
 
-At `a34b98d0`, the 15 capture cases pass conversion, encoding, mux, runtime,
+At `a34b98d0`, the 15 capture cases passed conversion, encoding, mux, runtime,
 peak heap and kernel-bound total RSS on each c6g.4xlarge target. The worst
 runtime bounds are 1.0519 on Linux AArch64 and 1.0536 on 32-bit ARMv7.
 
@@ -1725,7 +1719,7 @@ Earlier, at `001d40b6`, all 15 cases per target passed parity, runtime, peak
 heap and kernel-bound total RSS. The runtime upper bounds were at most 1.05.
 
 At `e5f6c971`, all 15 cases per c6g.4xlarge target pass conversion, encoding,
-mux, the 1.10 runtime gate, peak heap and kernel-bound total RSS. The input
+mux, runtime, peak heap and kernel-bound total RSS. The input
 hashes and output folds match `a34b98d0`. The ARMv7 workloads are 480 or 960
 pixels wide and use the block converter.
 

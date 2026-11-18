@@ -1,0 +1,221 @@
+{
+ "name": "gate-run-aarch64-c82b4452-20261118-143205-shard-1",
+ "path": "gate-run-aarch64-c82b4452-20261118-143205-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at c82b4452, the 15 capture items on one c6g.4xlarge host (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1, then the shard's 15 capture memory steps run as one batch, every case a job of one kernel-bound collection on CPUs 1-15; the shard outputs, build identities, plan, step records and logs; for collecting a shard's capture memory steps in one collection, compared case by case with the serial f7b1d8eb run",
+ "key": "evidence/gate-runs/c82b4452f7709076501dd1396ab877724ff0d875-aarch64-20261118-143205/shard-1/4f0e1f00901db125d3175367ae8bd2906240e0804302a60706ec658a81b9cd74.tar.zst",
+ "sha256": "4f0e1f00901db125d3175367ae8bd2906240e0804302a60706ec658a81b9cd74",
+ "bytes": 1514493139,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "245882cb09829fd829a93276e6a2bba8bb003e4eb1d1592f0192a80b94dbde6d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "f41c3ff4fb9681658962b52c08211c758c476b0e061eb07804569499613332d2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "384562f45d056a087eb3d9c9b59bb144c241057a404ca0a20e98c1f43879376b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "dcc58eed7ef19683b0e2a2aa29946a251eaccf9c9a5c4ff40eb267fbea77d040",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "c25d7b5b5e5dd27f07a89b28c760bd01c6fdaf13bae7051ef04cad1197787a25",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c296d9e8bc3d266b79f0f905b73dfac22ae87c78082eb9cda5b7f298adbdcb42",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "fc4604856f26e1b3424dd7789c09d04030251f960e8db5f8e7a26c5bcef2c2b6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "19c92e69cceb86616668849b94a38719d2b5750280b4c2d6cb3b7243209289d2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "99e70b7d77c64bf4f82d911dd64e2637c28e677e49aa8b7e52e53c5952c7983b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "f57133393a84b809f225c622db1ee4a506f4e3859bf9d180e0a515ca28e16b40",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "e32a016c2c3fdcc56ee672582af5f24eadc5813c3cc88bfaf9b06d5aa9578f9f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "211225339d235ca3c0b70024bc9133f2b1baea0d87d96548bb81009f5c07a851",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "1b4e26a2b0360c4ea8a3ac3740933e9c28d7fb9fc09ae5c1a0275c168c97b561",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "75b0da2e7f9f40b1313be9e6b8608e3773949346b18bab25b5c29c7cba0e7917",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "b6041b42e419016ccf4f3aec0fb5a893400ad8893964f0b6ec9471d77aa71f2c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "e9ca47d79ad9e0c9dc3a23f197c74b3b37af5e754b04d916cea176c3dede277b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5cf7e16cf60cdf5a1130a65a26d5d640b833c06be8628cc931e4bb28ee14a7ee",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "1e0c325321109e232c5c3e1070b5b3e63733005e5ed88cc1be1e2c2274418e2f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "1e8c2b4bc824f2307094b8a79a1deb5a9d2546de680bbdf8f6c6d7bc467f137f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "1f1354941525be0a9d0f6fd827072155fcd1561bf33e385d6bf94fe2a2305585",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "6c3c89d91c4bb9d6fff8069c6cbcdb0e9a22f8dcd55f4ba0446014f04edf9175",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "a093ee0cd6c16bb71d8e5fb040002aff2b76ec93ccade47bdd57a09712013f4f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c259d49afe26ebe42e4310f5e826e22b4aeedd19ac8570e355c1ece7276bb12f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "6de16bc7a2af56d0c1b700b3e9330927616e14fa94af661d3fb98bb4fcb77afb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "798a258709782b56ab80a0a998745ffa98e8e3e39ef8e05afd6b56e339eb8b28",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6796034a27856f2599d1d16bb419f8e509f10fab4fa7f88df3a26b4d60ff5667",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "3cd1524b5017820ece455a41bcebdcd835885e7d92885c341b8ae7f825c30fe3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "4c0588879686e8321f2c374d8999fa9c4d9ecc9d1b25572910ea01f0b284046c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "b242d7abb5a559c8493efdfd1477f6ce7a3f3726e30d7759c5506492c54eeb51",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "20b4a63bc3090bd5c4ea0f57cf3df4d8d1c928e71de3f5564c6284fb0297103e",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
