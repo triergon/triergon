@@ -1,0 +1,67 @@
+{
+ "name": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-5",
+ "path": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-5",
+ "retention": "retained",
+ "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 5 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured, archived by hand as collect() does; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "key": "evidence/gate-runs/f7b1d8eb17554e4710c4f475d615bbf83206453c-aarch64-20261118-104434/shard-5/b7b6f9e8a341baac696c97749a6c9a654c036652ce2fca5a26354c3ec0e65182.tar.zst",
+ "sha256": "b7b6f9e8a341baac696c97749a6c9a654c036652ce2fca5a26354c3ec0e65182",
+ "bytes": 423476174,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "fdc04b032f9510fdf01b320b5a6e123bfd52787affca8fb6a7507b54606de3c6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "591ecc6f08d09d643aedcb688f8518be7f7686503c9f6fc825a58085b6fa77b5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "35aa8acf40d907fe545a5083b109261883cd31659261145ef57b9ef303d14085",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "931950f6d654ce0814b9eef290fb78c6d2a5309940f028bcaac8ee24e047ff8c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "9e56a926972c66ac04caf1548e400e40a1532a8df4a58211275b64413121a5ed",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b88c2b52be540b1602d3b0675959c8b9ad02cbcdf84aee2a56ad031373990daf",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b176ea304ce2fb65ec459d6fef2a68aa117d5fc1f4848d3347a3da49a183a9c5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "24cf17cdad19cbd8eeba501d7210b56754443feca9771362ba1793d20abd3556",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
