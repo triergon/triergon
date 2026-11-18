@@ -697,10 +697,16 @@ pub(crate) fn acceptance_iter(
     let mut unique_targets = targets.clone();
     unique_targets.sort_unstable();
     unique_targets.dedup();
-    if unique_targets != [target] {
+    // A run on one required target can accept its slice; the whole module gate
+    // also needs every other required target's evidence, which one run lacks.
+    let required_here = unique_targets.contains(&target);
+    if !required_here {
         reasons.push("required cross-target evidence missing".into());
     }
     let slice_reasons = reasons.clone();
+    if required_here && unique_targets.len() > 1 {
+        reasons.push("required cross-target evidence missing".into());
+    }
     if coverage.is_empty() || coverage.iter().any(|c| s(c, "status") != Some("pass")) {
         reasons.push("FATE mapping/asset/expected-output coverage pending".into());
     }

@@ -1,0 +1,9 @@
+{
+ "name": "codec-worker-placement-armv7",
+ "path": "codec-worker-placement-armv7",
+ "retention": "retained",
+ "reason": "Counts behind the ARMv7 audio rows at 9d70b166, one c6g.4xlarge host (Graviton2) from the 32-bit ARMv7 gate image: perf stat user-mode instructions and cycles (5 runs, CPU 1) of the gate build of codec-worker at main 2a6a07a7 and at 9d70b166 on every non-AAC audio codec and file workload, with output digests; perf records with symbol reports of both on vorbis-q3-5.1; the script, the workers' SHA-256 and a bundle of the measured source; cited by docs/status.md for the multichannel audio rows, whose cycles moved with the placement of the unchanged IMDCT at equal instruction counts.",
+ "key": "evidence/codec-worker-placement-armv7/89791000c33713eefab8eb83eb23779150c677b41cba2c728e053fe43b11467c.tar.gz",
+ "sha256": "89791000c33713eefab8eb83eb23779150c677b41cba2c728e053fe43b11467c",
+ "bytes": 2888947
+}

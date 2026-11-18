@@ -4,7 +4,8 @@
 checks ten literal per-engine outcomes across five functional inputs. It validates
 all outcomes before collecting timing or memory samples.
 
-Add `--benchmark` or `--memory` for paired collection on native AArch64 Linux.
+Add `--benchmark` or `--memory` for paired collection on native Linux, on AArch64 or
+32-bit ARMv7: the contract requires both.
 Each of the three comparable inputs must pass the
 [runtime and memory gates](../../../docs/quality.md#gates). Timing uses 50 complete
 sessions per sample and at least 30 pairs. Timing and memory reports must match

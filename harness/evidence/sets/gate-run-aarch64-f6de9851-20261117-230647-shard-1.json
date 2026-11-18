@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-f6de9851-20261117-230647-shard-1",
+ "path": "gate-run-aarch64-f6de9851-20261117-230647-shard-1",
+ "retention": "retained",
+ "reason": "Packet framing at f6de9851 on AArch64 Linux, c6g.4xlarge. The archive holds all 135 AVC and HEVC cases, 30 paired timing samples and 30 kernel-bound memory pairs per case, reports, and build identities.",
+ "key": "evidence/gate-runs/f6de9851d99ff3ebe621c95fabf7c89cb617a329-aarch64-20261117-230647/shard-1/5bc206763e41494030e26cd61cfac84d66a0fad4416ac5d5f7feeb81b8d25009.tar.zst",
+ "sha256": "5bc206763e41494030e26cd61cfac84d66a0fad4416ac5d5f7feeb81b8d25009",
+ "bytes": 19787148,
+ "results": [
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "c13d121b506aa6881bb0d35df81c7cf4f2591624a4b77f7b8e99395850bdc8ba",
+   "status": 0,
+   "report_sha256": "6205768343dca3912c4706fd5ede441698ec1e79d9f627f47988e53c563cfde2",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c448059a0c7a68a0234cff4f1ed9b1541b5056654331b3b1086ea8e5679678ba",
+   "status": 0,
+   "report_sha256": "c03cba2c36d741b2ee3633867e3c87ba84a2b7e6c92667d00631229c3cd6f122",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "94493110dc4517ac791863e5863282aa33e19c17de4e1f50ad195e8caf8ad4e7",
+   "status": 0,
+   "report_sha256": "285935aa824e9c41cb2d342b9bfda6b3018edcbe8613d41790f50b3e0074bb26"
+  }
+ ]
+}
