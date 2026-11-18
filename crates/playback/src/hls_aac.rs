@@ -90,15 +90,16 @@ impl PendingPes {
         }
         self.coalescing_attempted = true;
         let mut remaining = self.remaining;
-        for span in self.spans.remaining_spans() {
+        let mut tail = self.spans.remaining_spans();
+        while let Some(bytes) = tail.next_bytes() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             work.take(1);
-            if !span.bytes.belongs_to(pool) {
+            if !bytes.belongs_to(pool) {
                 return Ok(false);
             }
-            let Some(next) = remaining.checked_sub(span.as_ref().len()) else {
+            let Some(next) = remaining.checked_sub(bytes.len()) else {
                 return Ok(false);
             };
             remaining = next;
@@ -119,12 +120,13 @@ impl PendingPes {
         if joined.try_extend_from_slice(current.as_ref()).is_err() {
             return Ok(false);
         }
-        for span in self.spans.remaining_spans() {
+        let mut tail = self.spans.remaining_spans();
+        while let Some(bytes) = tail.next_bytes() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            work.take(span.as_ref().len() as u64);
-            if joined.try_extend_from_slice(span.as_ref()).is_err() {
+            work.take(bytes.len() as u64);
+            if joined.try_extend_from_slice(bytes.as_ref()).is_err() {
                 return Ok(false);
             }
         }

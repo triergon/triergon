@@ -3,6 +3,7 @@
 use super::{DemuxSpan, SourceContext};
 use crate::SourceRange;
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS_PAYLOAD_START, TS188_BYTES};
+use std::ops::Range;
 use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, BytesView};
 
 /// One logical payload span. The byte range borrows its packet or cursor;
@@ -48,8 +49,7 @@ fn byte_view(span: &DemuxSpan, index: usize, run: bool) -> BytesView<'_> {
     })
 }
 
-fn view(span: &DemuxSpan, index: usize, grouped: bool) -> DemuxSpanView<'_> {
-    let run = record_count(span, grouped) != 1;
+fn view(span: &DemuxSpan, index: usize, run: bool) -> DemuxSpanView<'_> {
     let bytes = byte_view(span, index, run);
     if !run {
         return DemuxSpanView {
@@ -161,29 +161,46 @@ impl CompactPayload {
 #[derive(Debug)]
 pub struct DemuxSpanViews<'a> {
     records: std::slice::Iter<'a, DemuxSpan>,
-    current: Option<(&'a DemuxSpan, usize)>,
+    current: Option<(&'a DemuxSpan, Range<usize>)>,
     first_index: usize,
     remaining: usize,
     grouped: bool,
 }
-impl<'a> Iterator for DemuxSpanViews<'a> {
-    type Item = DemuxSpanView<'a>;
-    fn next(&mut self) -> Option<Self::Item> {
+impl<'a> DemuxSpanViews<'a> {
+    #[inline]
+    fn next_entry(&mut self) -> Option<(&'a DemuxSpan, usize, bool)> {
         if self.remaining == 0 {
             return None;
         }
         loop {
-            if let Some((span, index)) = &mut self.current
-                && *index < record_count(span, self.grouped)
+            if let Some((span, indices)) = &mut self.current
+                && let Some(index) = indices.next()
             {
-                let output = view(span, *index, self.grouped);
-                *index += 1;
                 self.remaining -= 1;
-                return Some(output);
+                return Some((span, index, indices.end != 1));
             }
-            self.current = Some((self.records.next()?, std::mem::take(&mut self.first_index)));
+            let span = self.records.next()?;
+            let count = record_count(span, self.grouped);
+            self.current = Some((span, std::mem::take(&mut self.first_index)..count));
         }
     }
+
+    /// Advance to the next payload bytes without constructing its source facts.
+    /// This advances the same logical span as `Iterator::next`.
+    #[inline]
+    pub fn next_bytes(&mut self) -> Option<BytesView<'a>> {
+        let (span, index, run) = self.next_entry()?;
+        Some(byte_view(span, index, run))
+    }
+}
+
+impl<'a> Iterator for DemuxSpanViews<'a> {
+    type Item = DemuxSpanView<'a>;
+    fn next(&mut self) -> Option<Self::Item> {
+        let (span, index, run) = self.next_entry()?;
+        Some(view(span, index, run))
+    }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
     }
@@ -215,7 +232,7 @@ impl PayloadCursor {
             view(
                 self.current.as_ref().expect("active payload range"),
                 self.index,
-                self.grouped,
+                self.current_count != 1,
             )
         })
     }
@@ -298,7 +315,7 @@ impl PayloadCursor {
             records: self.records.as_slice().iter(),
             current: self.current.as_ref().and_then(|span| {
                 let index = self.index + usize::from(self.active) + self.tail_retired;
-                (index < self.current_count).then_some((span, index))
+                (index < self.current_count).then_some((span, index..self.current_count))
             }),
             first_index: self.head_retired,
             remaining: self.remaining,
@@ -387,6 +404,30 @@ mod tests {
             at += count;
         }
         CompactPayload::new(records, total, true).into_cursor()
+    }
+
+    #[test]
+    fn byte_and_source_views_share_the_remaining_span_order() {
+        let pool = Budget::new(8192).unwrap();
+        let mut cursor = grouped_cursor(&pool, &[3, 1, 2]);
+        assert_eq!(cursor.next_span().unwrap().context.source_event_ordinal, 0);
+        let expected = cursor.remaining_spans().collect::<Vec<_>>();
+        let mut spans = cursor.remaining_spans();
+        assert_eq!(spans.len(), 5);
+        for (index, view) in expected.iter().enumerate() {
+            assert_eq!(view.context.source_event_ordinal, 2 * (index as u64 + 1));
+            let bytes = if index % 2 == 0 {
+                spans.next_bytes().unwrap()
+            } else {
+                spans.next().unwrap().bytes
+            };
+            assert_eq!(bytes.len(), view.bytes.len());
+            assert_eq!(bytes.as_ref().as_ptr(), view.as_ref().as_ptr());
+            assert_eq!(spans.len(), 4 - index);
+        }
+        assert!(spans.next().is_none());
+        assert!(spans.next_bytes().is_none());
+        assert_eq!(cursor.current().unwrap().context.source_event_ordinal, 0);
     }
 
     #[test]
