@@ -255,6 +255,15 @@ identities, plan, step records and logs; the earlier runs at `d79071d4` and `987
 stay in `gate-run-aarch64-d79071d4-20261116-204903-shard-1` and
 `gate-run-armv7-9870b694-20261116-202556-shard-1`.
 
+Every gated feature's contract requires both Linux AArch64 and ARMv7 since `47aa0451`
+([quality](quality.md#reference-and-corpus)). One partial gate run at that revision on three
+c6g.4xlarge hosts ran the 26 items those contracts belong to on ARMv7, measured the same
+way: 72 steps, none failed. Every case of each of those features passes; the only failures
+are the listed open cases of `raster-sweep` (`outlines-71`, `outlines-83`) and
+`ass-parse-host`. The rows above keep the revisions they were measured at. Sets
+`gate-run-armv7-47aa0451-20261118-040605-shard-1` to `-shard-3` hold the outputs, build
+identities, plans, step records and logs.
+
 The rows at `79e0ae13` come from one full sharded gate run per target
 ([running the gates](quality.md#running-the-gates)), each on ten c6g.4xlarge hosts
 (Graviton2) with kernel `7.0.0-1014-aws` and every worker and reference linked under the
@@ -849,6 +858,9 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Code size against the trained orders: sizes, resident probes, instruction counts and per-case comparisons, both targets | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`39ea31fe8e47d1250d407aea7d2c2163bec09d29ee1449373f5e4144078f2834`](../harness/evidence/sets/link-order-code-size.json) |
 | Packet framing, Linux AArch64 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`457b9b996902aa4b5b51bc40497ffc6d02404b890f2dd3d370f1654af49fc796`](../harness/evidence/sets/gate-run-aarch64-384de6c9-20261117-193302-shard-1.json) |
 | Packet framing, ARMv7 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170`](../harness/evidence/sets/gate-run-armv7-384de6c9-20261117-193351-shard-1.json) |
+| Gated features on both targets, ARMv7 run, shard 1 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`ea6fc3b79c890f2907ecf887c894c1411b719747e2b90a4a8a5c426f665b87b4`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-1.json) |
+| Gated features on both targets, ARMv7 run, shard 2 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`5c4fb2235ce492670904c24637d445f2905ffbb623ead2e73ffec57eb1a66e5b`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-2.json) |
+| Gated features on both targets, ARMv7 run, shard 3 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`8d21689ebde93edd870a10821c623c511dbadbf725e0e778529d4105f2b3dc55`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-3.json) |
 | Earlier: Packet framing, Linux AArch64 | `d79071d48bc45ca5f66a922849daa15ad5a02d1c` | [`f34c5dcfd258842207b7579e0035f40e099910851ebf5814e966e1db0038a211`](../harness/evidence/sets/gate-run-aarch64-d79071d4-20261116-204903-shard-1.json) |
 | Earlier: Packet framing, ARMv7 | `9870b6940b733dffcc5b63826fb785dbcfcd0027` | [`d04220edf917c952af02eaa5289777d9a6053dc4f22a9d1ff975a4158150342f`](../harness/evidence/sets/gate-run-armv7-9870b694-20261116-202556-shard-1.json) |
 | Earlier: Subtitles, PGS, Linux AArch64 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1`](../harness/evidence/sets/gate-run-aarch64-99f1027b-20261116-050209-shard-1.json) |
@@ -1236,8 +1248,9 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 ## Platforms
 
-Qualification runs on native AArch64 Linux and, where the next section says so, on
-32-bit ARMv7 Linux. x86_64 has no performance runs yet.
+Qualification runs on native AArch64 Linux and on 32-bit ARMv7 Linux: every feature the
+gate runs requires both, and the next section says what is measured on ARMv7. x86_64 has
+no performance runs yet.
 
 ### 32-bit ARMv7
 
