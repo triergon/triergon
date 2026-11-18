@@ -1198,6 +1198,57 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 }
 
 #[test]
+fn hevc_discovery_checks_repeated_parameter_sets() {
+    use triergon_playback::matroska_feed::{
+        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits,
+        MatroskaDiscoveryStep,
+    };
+
+    for (fixture, expected) in [
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::StreamsReady,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-truncated-vps.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-truncated-pps.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-truncated-sps.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
+    ] {
+        let (engine, source, _) = matroska_source(
+            fixture,
+            7,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        );
+        let cancel = AtomicBool::new(false);
+        let mut discovery = MatroskaCompactDiscovery::for_av_feed(
+            engine,
+            source,
+            Selection::All,
+            PlayerPolicy::default(),
+            MatroskaDiscoveryLimits::default(),
+        )
+        .unwrap();
+        let cutoff = (0..10_000)
+            .find_map(
+                |_| match discovery.poll(&mut WorkBudget::new(32), &cancel).unwrap() {
+                    MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
+                    MatroskaDiscoveryStep::Progress(_) => None,
+                },
+            )
+            .expect("HEVC discovery stalled");
+        assert_eq!(cutoff, expected);
+    }
+}
+
+#[test]
 fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
     use triergon_playback::matroska_feed::{
         MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryStep,

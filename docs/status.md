@@ -152,6 +152,15 @@ case is lower on both heap and total RSS. Sets
 `gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
 plans, step records and logs.
 
+The playback tests cover HEVC startup with exact parameter-set repeats and
+matching truncations of each parameter set that prevent startup. At `6bbb2cb7`,
+all 289 cases in the nine playback gate groups passed parity, runtime and
+kernel-bound heap and total RSS on both targets. Linux AArch64's largest runtime
+bound is 1.0528 for progressive `reordered-48000`, with worst heap 0.8877 and
+total RSS 0.8499. The 32-bit ARMv7 bounds are 0.9999, 0.7849 and 0.9670,
+respectively. The four playback archives in the measured revisions table hold
+the corresponding build identities and per-case evidence.
+
 The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
 tests, come from one partial gate run per target of the 33 items those workers serve: the
 15 capture cases, the six Matroska feature groups and the external HDR vector, every
@@ -853,6 +862,10 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Ordered workers without their trained orders after the code-size change, Linux AArch64 | `d18904f950fee2d00da37901cf9d36b6cf9d46a6` | [`8d2cfccfd6f0cffe114bc7b9990264ec592a247ea432937a4ad1d919349afdcc`](../harness/evidence/sets/gate-run-aarch64-d18904f9-20261117-192309-shard-1.json) |
 | Ordered workers without their trained orders after the code-size change, ARMv7 | `d18904f950fee2d00da37901cf9d36b6cf9d46a6` | [`f1d1cc8dabc6cfec0d885ba7e779b2501f9620fda5f43783a58698fd69e6faf6`](../harness/evidence/sets/gate-run-armv7-d18904f9-20261117-192245-shard-1.json) |
 | Code size against the trained orders: sizes, resident probes, instruction counts and per-case comparisons, both targets | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`39ea31fe8e47d1250d407aea7d2c2163bec09d29ee1449373f5e4144078f2834`](../harness/evidence/sets/link-order-code-size.json) |
+| Playback with HEVC parameter-set repeats, Linux AArch64, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`a69853ba25e9b5efcdf0b2623ce4b1e4a391f0915c3b7eda3fac3ceff01d19d7`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-1.json) |
+| Playback with HEVC parameter-set repeats, Linux AArch64, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2.json) |
+| Playback with HEVC parameter-set repeats, ARMv7, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`caa758a1e3348d4fccfdca6414ac504a39e8457a5fce1774402dce5bc645889e`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-1.json) |
+| Playback with HEVC parameter-set repeats, ARMv7, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`43ee65711daba9295f1f963771cd120531eace54aba94b9032e08fb06232b470`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-2.json) |
 | Packet framing, Linux AArch64 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`5bc206763e41494030e26cd61cfac84d66a0fad4416ac5d5f7feeb81b8d25009`](../harness/evidence/sets/gate-run-aarch64-f6de9851-20261117-230647-shard-1.json) |
 | Packet framing, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`2c3625a5b709f4402496798fe95ddec86d59216fddf2a5e78acb12512ffac28b`](../harness/evidence/sets/gate-run-armv7-f6de9851-20261117-230647-shard-1.json) |
 | Earlier: Packet framing, Linux AArch64 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`457b9b996902aa4b5b51bc40497ffc6d02404b890f2dd3d370f1654af49fc796`](../harness/evidence/sets/gate-run-aarch64-384de6c9-20261117-193302-shard-1.json) |
