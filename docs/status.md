@@ -379,8 +379,8 @@ Codec and decode-session runtime at
 `576f088f` was measured on c6g.4xlarge on both targets. Timing ran on CPU 1
 with the RSS module unloaded. Peak memory ran under the kernel RSS proof. Each
 case planned 30 pairs per stage and used the [early-stop rule](quality.md#early-stop).
-The AArch64 noise case's timing and memory are at `6d7a0f3c`, which gives
-the memory observer the same session timeout as timing.
+In that earlier comparison, the AArch64 noise case used timing and memory at
+`6d7a0f3c`, which gave the memory observer the same session timeout as timing.
 The audio codecs in files row used the gate build at
 `ccff5b5734c113c1d88160b84825157508c701c0` on a c8g.2xlarge, unpinned, against the `decode` profile:
 30 timing pairs per workload of `harness/codecs/file-workloads.json`, each demuxing,
@@ -901,16 +901,16 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Earlier: Packet framing, ARMv7 | `9870b6940b733dffcc5b63826fb785dbcfcd0027` | [`d04220edf917c952af02eaa5289777d9a6053dc4f22a9d1ff975a4158150342f`](../harness/evidence/sets/gate-run-armv7-9870b694-20261116-202556-shard-1.json) |
 | Earlier: Subtitles, PGS, Linux AArch64 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1`](../harness/evidence/sets/gate-run-aarch64-99f1027b-20261116-050209-shard-1.json) |
 | Earlier: Subtitles, PGS, ARMv7 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4c93b0902098f445ae645b18cc1df079177e3ae6bd45876e1f643f18b163b2de`](../harness/evidence/sets/gate-run-armv7-99f1027b-20261116-050516-shard-1.json) |
-| Capture, Linux AArch64, shard 1 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`81ffc0a2829fad7e5229dc2c0c3e4cfe7de7977e266404938d38de763751fa2e`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-1.json) |
-| Capture, Linux AArch64, shard 2 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ed4a56d3052d08d73896bee340a247daa259d69cad45046a6738e210c1cb31bf`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-2.json) |
-| Capture, Linux AArch64, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7cdacefe8e434bdd6bb6340fa027203a46911ee287be5a65843249db6305ae8b`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-3.json) |
-| Capture, Linux AArch64, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`27f8ab1c910345a8103e276e47e27869ed3a7f8e07b0854773a5de8df65437ab`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-4.json) |
-| Capture, Linux AArch64, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf7c8f0b8e56f77bac684513514e66391630cf48a2915acc021e75f5c5942f79`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-5.json) |
-| Capture, 32-bit ARMv7, shard 1 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`b7e435a22e6a982992975bbbedeed794583983e688d68efb084760fee204b9a6`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-1.json) |
-| Capture, 32-bit ARMv7, shard 2 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`dd24de3c318835d031849a24a25ff2ad4bde1a9baf0cfe92f1ba2856ed1dfe77`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-2.json) |
-| Capture, 32-bit ARMv7, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-3.json) |
-| Capture, 32-bit ARMv7, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-4.json) |
-| Capture, 32-bit ARMv7, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-5.json) |
+| Earlier: Capture, Linux AArch64, shard 1 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`81ffc0a2829fad7e5229dc2c0c3e4cfe7de7977e266404938d38de763751fa2e`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-1.json) |
+| Earlier: Capture, Linux AArch64, shard 2 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ed4a56d3052d08d73896bee340a247daa259d69cad45046a6738e210c1cb31bf`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-2.json) |
+| Earlier: Capture, Linux AArch64, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7cdacefe8e434bdd6bb6340fa027203a46911ee287be5a65843249db6305ae8b`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-3.json) |
+| Earlier: Capture, Linux AArch64, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`27f8ab1c910345a8103e276e47e27869ed3a7f8e07b0854773a5de8df65437ab`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-4.json) |
+| Earlier: Capture, Linux AArch64, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf7c8f0b8e56f77bac684513514e66391630cf48a2915acc021e75f5c5942f79`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-5.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 1 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`b7e435a22e6a982992975bbbedeed794583983e688d68efb084760fee204b9a6`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-1.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 2 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`dd24de3c318835d031849a24a25ff2ad4bde1a9baf0cfe92f1ba2856ed1dfe77`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-2.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-3.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-4.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-5.json) |
 | Earlier: Capture, Linux AArch64, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`772388b70251eaa0c414a7622bc37655ad44d39e065d3b8bd417509a40d26916`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-1.json) |
 | Earlier: Capture, Linux AArch64, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`9a53253d8bddfb2e120ef45a8f0e9cdf4488941062037dbbf0ea5c9e14cad788`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-2.json) |
 | Earlier: Capture, Linux AArch64, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`fb3f91c9bd2daef5498050896b5db44cd2bef4b1ef6f7523511733ae373c1569`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-3.json) |
@@ -1466,8 +1466,8 @@ run at `f71495ea` used 20 pairs for `hevc-type17` and `hevc-update` and
 Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
 bound of 1.2241. MP4 range is gated on
 Linux AArch64 only. The closest below it is MP4 forward 1.0811. Capture's worst
-bound at `001d40b6` is 1.0476. At `f8e1c4d9` Matroska's worst bound is 0.9708
-and DVD's is 0.9752.
+bound on ARMv7 at `e5f6c971` is 1.0427. At `f8e1c4d9` Matroska's worst bound
+is 0.9708 and DVD's is 0.9752.
 Each feature's evidence set lists every case's bound.
 
 The AAC decoder takes 4.8 to 30.3% fewer user-mode instructions on this target at
@@ -1721,19 +1721,27 @@ At `a34b98d0`, the 15 capture cases pass conversion, encoding, mux, runtime,
 peak heap and kernel-bound total RSS on each c6g.4xlarge target. The worst
 runtime bounds are 1.0519 on Linux AArch64 and 1.0536 on 32-bit ARMv7.
 
-At `001d40b6`, the filtered colour arithmetic keeps the same capture output
-folds on both targets. Each of the 15 cases passes parity, runtime, peak heap
-and kernel-bound total RSS. All runtime upper bounds are at most 1.05. The
-AArch64 `c04-motion-960` bound is 1.0385, down from 1.0618 at `2e2e9b4f`.
-All 15 ARMv7 cases use the block converter at widths of 480 or 960. The
-`c13-motion-960-6m` bound moved from 1.0357 to 1.0476 between the two runs
-of the same block path, consistent with run-to-run variation.
+Earlier, at `001d40b6`, all 15 cases per target passed parity, runtime, peak
+heap and kernel-bound total RSS. The runtime upper bounds were at most 1.05.
 
-At `e5f6c971`, the 15 capture cases on each c6g.4xlarge target pass conversion, encoding, mux, runtime, peak heap and kernel-bound total RSS. The packed coefficients preserve every compared output fold.
+At `e5f6c971`, all 15 cases per c6g.4xlarge target pass conversion, encoding,
+mux, the 1.10 runtime gate, peak heap and kernel-bound total RSS. The input
+hashes and output folds match `a34b98d0`. The ARMv7 workloads are 480 or 960
+pixels wide and use the block converter.
 
-For `c04-motion-960` on Linux AArch64, `cargo xtask count` reports 0.78% fewer
-user-mode instructions and 1.20% fewer user-mode cycles at `e5f6c971` than at
-`a34b98d0`. The input and both worker hashes match their gate measurements.
+The Linux AArch64 evidence combines shards 1, 4 and 5 of run
+`20261118-172954` with both shards of run `20261118-185150`. A lost SSH
+connection left the original shards 2 and 3 without archives. The second
+run measured their seven cases at the same revision. Run `20261118-185012`
+covered all 15 ARMv7 cases.
+
+The sole bound above 1.05 is AArch64 `c04-motion-960` at 1.0595 after the
+validated 20-pair early stop. Its bound was 1.0519 with 30 pairs at `a34b98d0`
+and 1.0385 at `001d40b6`. Both recent revisions use filtered chroma.
+On one AArch64 host, `cargo xtask count` reports 0.78% fewer user-mode
+instructions and 1.20% fewer user-mode cycles at `e5f6c971` than at `a34b98d0`.
+The input and worker hashes match their gate measurements. The cause of the
+difference between the gate runs remains unresolved.
 
 Capture's worst bound here was 1.1669 at `a73350ca` and 1.1865 at `576f088f`. Profiled in user-mode cycles against
 FFmpeg on the gate host, the encoder's motion search reduced each 16-lane sum of absolute
@@ -1745,7 +1753,8 @@ half-sample rows are formed whole, the inverse DCT sums the basis rows of only t
 coefficients a block holds, with the same rounding points, and the coarse row is a
 fixed-size array. `c14-motion-960-rate255` went from 1.175 to 1.069 of FFmpeg's user-mode
 cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged.
-At `001d40b6` the worst ARMv7 runtime bound across all 15 cases is 1.0476.
+At `e5f6c971`, the worst ARMv7 runtime bound is 1.0427
+(`c14-motion-960-rate255`).
 The remaining gap is spread over the encoder's DCT, quantisation and search,
 which FFmpeg's ARMv7 build runs in ARMv6 and NEON routines (by their symbols
 in its profile).

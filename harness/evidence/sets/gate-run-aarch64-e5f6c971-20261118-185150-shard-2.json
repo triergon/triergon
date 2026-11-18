@@ -2,7 +2,7 @@
  "name": "gate-run-aarch64-e5f6c971-20261118-185150-shard-2",
  "path": "gate-run-aarch64-e5f6c971-20261118-185150-shard-2",
  "retention": "retained",
- "reason": "Capture conversion, codec and mux with paired timing and kernel-bound memory on Linux AArch64.",
+ "reason": "Linux AArch64 capture at e5f6c971, run 20261118-185150, shard 2 of 2. Measures the three cases from shard 3 of run 20261118-172954 after a lost SSH connection left it without an archive.",
  "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-aarch64-20261118-185150/shard-2/23b33f6e92d06e85655799c968e14e28fe8f5865eea6383e06fcbc60ccebe5a3.tar.zst",
  "sha256": "23b33f6e92d06e85655799c968e14e28fe8f5865eea6383e06fcbc60ccebe5a3",
  "bytes": 316542388,

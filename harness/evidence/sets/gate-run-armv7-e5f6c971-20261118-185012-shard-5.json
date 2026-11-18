@@ -2,7 +2,7 @@
  "name": "gate-run-armv7-e5f6c971-20261118-185012-shard-5",
  "path": "gate-run-armv7-e5f6c971-20261118-185012-shard-5",
  "retention": "retained",
- "reason": "Capture conversion, codec and mux with paired timing and kernel-bound memory on 32-bit ARMv7.",
+ "reason": "32-bit ARMv7 capture at e5f6c971, run 20261118-185012, shard 5 of 5. Parity, paired runtime and kernel-bound memory from the complete 15-case run.",
  "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-armv7-20261118-185012/shard-5/a23829f76d2e21b63dda17d13856fd9c4965aae78d875ea6608d6d24b6f01604.tar.zst",
  "sha256": "a23829f76d2e21b63dda17d13856fd9c4965aae78d875ea6608d6d24b6f01604",
  "bytes": 425911091,
