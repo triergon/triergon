@@ -590,23 +590,11 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
             "{name}: `files` must list {{path, sha256}} objects"
         ));
     }
-    let (download, compression) = download(root, set)?;
     let target = into.map_or_else(
         || root.join(".research/evidence").join(name),
         Path::to_path_buf,
     );
-    // A set packed from repository files lists each file; an archived run copied
-    // in whole is verified by its archive hash alone.
-    let mut tar = TarReader::new(Unpack {
-        name,
-        listed: set.get("files").and_then(Value::as_array),
-        set_path: s(set, "path").unwrap_or_default(),
-        target: &target,
-        unpacked: 0,
-        current: None,
-    });
-    compression.unpack(&download, &mut tar)?;
-    let unpacked = tar.finish()?.unpacked;
+    let unpacked = unpack(root, name, set, "", &target)?;
     if listed_len(set).is_some_and(|len| len != unpacked) {
         return Err(format!("{name}: archive and index list different files"));
     }
@@ -670,12 +658,21 @@ fn address(root: &Path, name: &str) -> Result<Option<String>, String> {
 
 fn curl(url: &str, to: &Path) -> Result<(), String> {
     let status = Command::new("curl")
+        // A stalled transfer fails, so a restoring step measures instead of waiting.
         .args([
             "--fail",
             "--silent",
             "--show-error",
             "--retry",
             "3",
+            "--connect-timeout",
+            "30",
+            "--speed-limit",
+            "1048576",
+            "--speed-time",
+            "60",
+            "--max-time",
+            "3600",
             "--output",
         ])
         .arg(to)
@@ -690,14 +687,9 @@ fn curl(url: &str, to: &Path) -> Result<(), String> {
     }
 }
 
-/// The commands whose results a gate run restores when it reuses them, because a
-/// later step reads their outputs: a capture memory stage reads the records of
-/// its timing stage.
-const RESTORED: [&str; 1] = ["capture qualify"];
-
 /// `cargo xtask evidence restorable`: the name and key of every kept set listing
-/// a result a gate run may restore, for `tools/gate-aws.sh` to give its hosts an
-/// address of each ([`ADDRESSES`]).
+/// a result a gate run restores when it reuses it ([`crate::harness::reuse::restored`]),
+/// for `tools/gate-aws.sh` to give its hosts an address of each ([`ADDRESSES`]).
 pub fn restorable(root: &Path) -> Result<Vec<(String, String)>, String> {
     Ok(sets(root)?
         .iter()
@@ -707,82 +699,64 @@ pub fn restorable(root: &Path) -> Result<Vec<(String, String)>, String> {
                 .and_then(Value::as_array)
                 .unwrap_or_default()
                 .iter()
-                .any(|result| RESTORED.iter().any(|c| s(result, "command") == Some(c)))
+                .any(crate::harness::reuse::restored)
         })
         .filter_map(|set| Some((s(set, "name")?.to_owned(), s(set, "key")?.to_owned())))
         .collect())
 }
 
 /// Restore `directory` of kept set `name` into `into`: every file of the set under
-/// that directory (all of them for an empty one), at its path below it. Returns
-/// how many files it restored; a directory the set lacks is an error.
+/// that directory (all of them for an empty one), at its path below it, written
+/// back to disk before it returns, so no writeback follows into a timed step.
+/// Returns how many files it restored; a directory the set lacks is an error.
 pub fn restore(root: &Path, name: &str, directory: &str, into: &Path) -> Result<usize, String> {
-    struct Subtree<'a> {
-        name: &'a str,
-        prefix: String,
-        into: &'a Path,
-        restored: usize,
-        current: Option<(BufWriter<File>, PathBuf)>,
-    }
-    impl TarFiles for Subtree<'_> {
-        fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
-            let path = path.trim_start_matches("./");
-            let Some(relative) = path.strip_prefix(&self.prefix) else {
-                return Ok(());
-            };
-            if relative.is_empty()
-                || Path::new(relative)
-                    .components()
-                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
-            {
-                return Err(format!("{}: {path} escapes the set", self.name));
-            }
-            let out = self.into.join(relative);
-            fs::create_dir_all(out.parent().expect("file has a parent"))
-                .map_err(|e| format!("{}: {e}", out.display()))?;
-            let file = File::create(&out).map_err(|e| format!("{}: {e}", out.display()))?;
-            self.current = Some((BufWriter::new(file), out));
-            Ok(())
-        }
-        fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
-            match &mut self.current {
-                Some((file, out)) => file
-                    .write_all(chunk)
-                    .map_err(|e| format!("{}: {e}", out.display())),
-                None => Ok(()),
-            }
-        }
-        fn end(&mut self) -> Result<(), String> {
-            if let Some((mut file, out)) = self.current.take() {
-                file.flush()
-                    .map_err(|e| format!("{}: {e}", out.display()))?;
-                self.restored += 1;
-            }
-            Ok(())
-        }
-    }
     let set = set(root, name)?;
     if s(&set, "retention") != Some(Retention::Kept.label()) {
         return Err(format!("{name}: not a kept set"));
     }
-    let (download, compression) = download(root, &set)?;
+    let restored = unpack(root, name, &set, directory, into)?;
+    let synced = Command::new("sync")
+        .status()
+        .map_err(|e| format!("sync: {e}"))?;
+    if !synced.success() {
+        return Err(format!("sync: {synced}"));
+    }
+    match restored {
+        0 => Err(format!("{name}: no files under {directory}/")),
+        restored => Ok(restored),
+    }
+}
+
+/// Download `set` and write its files under `directory` (all of them for an empty
+/// one) into `target`, each at its path below the directory, checking every file
+/// the index lists; returns how many it wrote.
+fn unpack(
+    root: &Path,
+    name: &str,
+    set: &Value,
+    directory: &str,
+    target: &Path,
+) -> Result<usize, String> {
+    let (download, compression) = download(root, set)?;
     let directory = directory.trim_start_matches("./").trim_end_matches('/');
-    let mut tar = TarReader::new(Subtree {
+    // A set packed from repository files lists each file; an archived run copied
+    // in whole is verified by its archive hash alone.
+    let mut tar = TarReader::new(Unpack {
         name,
+        listed: set.get("files").and_then(Value::as_array),
+        set_path: s(set, "path").unwrap_or_default(),
         prefix: if directory.is_empty() {
             String::new()
         } else {
             format!("{directory}/")
         },
-        into,
-        restored: 0,
+        target,
+        seen: 0,
+        unpacked: 0,
         current: None,
     });
     compression.unpack(&download, &mut tar)?;
-    match tar.finish()?.restored {
-        0 => Err(format!("{name}: no files under {directory}/")),
-        restored => Ok(restored),
-    }
+    Ok(tar.finish()?.unpacked)
 }
 
 fn listed_len(set: &Value) -> Option<usize> {
@@ -791,13 +765,17 @@ fn listed_len(set: &Value) -> Option<usize> {
         .map(<[Value]>::len)
 }
 
-/// Writes each file of a fetched set under `target` as it streams out of the
-/// archive, checking it against the index's list when the set has one.
+/// Writes each file of a set under `prefix` into `target` as it streams out of
+/// the archive, checking it against the index's list when the set has one.
 struct Unpack<'a> {
     name: &'a str,
     listed: Option<&'a [Value]>,
     set_path: &'a str,
+    /// The directory whose files are written, with its trailing `/`; empty for all.
+    prefix: String,
     target: &'a Path,
+    /// The files the archive has held so far, written or not: the index's position.
+    seen: usize,
     unpacked: usize,
     current: Option<(BufWriter<File>, sha256::Sha256, PathBuf)>,
 }
@@ -807,7 +785,7 @@ impl Unpack<'_> {
         self.listed
             .map(|listed| {
                 listed
-                    .get(self.unpacked)
+                    .get(self.seen)
                     .ok_or_else(|| format!("{}: archive and index list different files", self.name))
             })
             .transpose()
@@ -815,23 +793,28 @@ impl Unpack<'_> {
 }
 
 impl TarFiles for Unpack<'_> {
-    fn begin(&mut self, relative: &str, _size: u64) -> Result<(), String> {
+    fn begin(&mut self, path: &str, _size: u64) -> Result<(), String> {
         let name = self.name;
+        let path = path.trim_start_matches("./");
         if let Some(file) = self.indexed()? {
-            let path = s(file, "path").unwrap_or_default();
-            let indexed = path
+            let listed = s(file, "path").unwrap_or_default();
+            let indexed = listed
                 .strip_prefix(self.set_path)
                 .and_then(|p| p.strip_prefix('/'))
-                .unwrap_or(path);
-            if relative != indexed {
-                return Err(format!("{name}: {relative} differs from the index"));
+                .unwrap_or(listed);
+            if path != indexed {
+                return Err(format!("{name}: {path} differs from the index"));
             }
         }
-        if Path::new(relative)
-            .components()
-            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        let Some(relative) = path.strip_prefix(&self.prefix) else {
+            return Ok(());
+        };
+        if relative.is_empty()
+            || Path::new(relative)
+                .components()
+                .any(|c| !matches!(c, std::path::Component::Normal(_)))
         {
-            return Err(format!("{name}: {relative} escapes the set"));
+            return Err(format!("{name}: {path} escapes the set"));
         }
         let out = self.target.join(relative);
         fs::create_dir_all(out.parent().expect("file has a parent"))
@@ -842,26 +825,30 @@ impl TarFiles for Unpack<'_> {
     }
 
     fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
-        let (file, hash, out) = self.current.as_mut().expect("a file is open");
+        let Some((file, hash, out)) = self.current.as_mut() else {
+            return Ok(());
+        };
         hash.update(chunk);
         file.write_all(chunk)
             .map_err(|e| format!("{}: {e}", out.display()))
     }
 
     fn end(&mut self) -> Result<(), String> {
-        let (mut file, hash, out) = self.current.take().expect("a file is open");
-        file.flush()
-            .map_err(|e| format!("{}: {e}", out.display()))?;
-        if let Some(indexed) = self.indexed()?
-            && Some(hash.finish_hex().as_str()) != s(indexed, "sha256")
-        {
-            return Err(format!(
-                "{}: {} differs from the index",
-                self.name,
-                out.strip_prefix(self.target).unwrap_or(&out).display()
-            ));
+        if let Some((mut file, hash, out)) = self.current.take() {
+            file.flush()
+                .map_err(|e| format!("{}: {e}", out.display()))?;
+            if let Some(indexed) = self.indexed()?
+                && Some(hash.finish_hex().as_str()) != s(indexed, "sha256")
+            {
+                return Err(format!(
+                    "{}: {} differs from the index",
+                    self.name,
+                    out.strip_prefix(self.target).unwrap_or(&out).display()
+                ));
+            }
+            self.unpacked += 1;
         }
-        self.unpacked += 1;
+        self.seen += 1;
         Ok(())
     }
 }
@@ -1064,6 +1051,78 @@ mod tests {
                 .is_err()
         );
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A gate shard's pack is `tar -cf - .` of its run directory through zstd, so
+    /// its names start with `./`; a reused step restores its own directory alone.
+    #[test]
+    fn a_kept_shard_pack_restores_one_step_directory() {
+        let root = crate::walk::scratch("evidence-restore");
+        let run = root.join("run");
+        for (file, text) in [
+            ("capture-c01-timing/identity.json", "{}"),
+            ("capture-c01-timing/c01/timing.json", "{\"case\": 1}"),
+            ("capture-c01/result.json", "{}"),
+            ("capture-inputs/noise.rgba", "pixels"),
+        ] {
+            fs::create_dir_all(run.join(file).parent().unwrap()).unwrap();
+            fs::write(run.join(file), text).unwrap();
+        }
+        let tar = root.join("shard.tar");
+        let packed = Command::new("tar")
+            .env("COPYFILE_DISABLE", "1")
+            .arg("-cf")
+            .arg(&tar)
+            .arg("-C")
+            .arg(&run)
+            .arg(".")
+            .status()
+            .expect("tar is installed");
+        assert!(packed.success());
+        let compressed = Command::new("zstd")
+            .arg("--quiet")
+            .arg(&tar)
+            .arg("-o")
+            .arg(root.join("shard.tar.zst"))
+            .status()
+            .expect("zstd is installed");
+        assert!(compressed.success());
+        let sha = sha256::file_hex(&root.join("shard.tar.zst")).unwrap();
+        let cache = root.join(".research/evidence-cache");
+        fs::create_dir_all(&cache).unwrap();
+        fs::rename(
+            root.join("shard.tar.zst"),
+            cache.join(format!("{sha}.tar.zst")),
+        )
+        .unwrap();
+        let index = |retention: &str| {
+            let set = Value::object([
+                ("name", Value::str("shard")),
+                ("path", Value::str("shard")),
+                ("retention", Value::str(retention)),
+                ("key", Value::str(format!("evidence/shard/{sha}.tar.zst"))),
+                ("sha256", Value::str(&sha)),
+            ]);
+            let file = root.join(SETS).join("shard.json");
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            crate::corpus::write_json(&file, &set).unwrap();
+        };
+        index("retained");
+        let into = root.join("restored");
+        assert_eq!(
+            restore(&root, "shard", "capture-c01-timing", &into).unwrap(),
+            2
+        );
+        assert_eq!(
+            fs::read_to_string(into.join("c01/timing.json")).unwrap(),
+            "{\"case\": 1}"
+        );
+        assert!(into.join("identity.json").is_file());
+        assert!(!into.join("result.json").exists() && !into.join("noise.rgba").exists());
+        assert!(restore(&root, "shard", "capture-c02-timing", &root.join("none")).is_err());
+        index("90 days");
+        assert!(restore(&root, "shard", "capture-c01-timing", &root.join("again")).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
