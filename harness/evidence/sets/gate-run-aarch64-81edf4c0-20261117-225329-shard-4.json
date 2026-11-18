@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-aarch64-81edf4c0-20261117-225329-shard-4",
+ "path": "gate-run-aarch64-81edf4c0-20261117-225329-shard-4",
+ "retention": "retained",
+ "reason": "Partial gate run at 81edf4c0 (main 3ffe8826 merged into the change: integer s16 conversion of the stereo pass-through on 32-bit ARM, SBR predictors once per source band, std::simd SBR covariances and PS hybrid filters) on four c6g.4xlarge hosts, AArch64, shard 4 of the items that link the AAC decoder or the stereo downmix (codecs, codecs-audio, codec-workloads, codec-file-workloads and their memory cases, isobmff-reader, ogg-readers, tests, tests-release), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable, with set codec-derived-streams unpacked: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results; steps benchmark-codec-file-workloads, codec-bin, codecs-grade, codecs-manifest, memory-codec-file-workloads-3, memory-codec-workloads-4); cited by docs/status.md.",
+ "key": "evidence/gate-runs/81edf4c0dac9563f099a50327cab0b19f5eed01f-aarch64-20261117-225329/shard-4/aa9e246d9f238c9c6965666d9f177541c1c690e91222337c606ddf5ca2c3a8a9.tar.zst",
+ "sha256": "aa9e246d9f238c9c6965666d9f177541c1c690e91222337c606ddf5ca2c3a8a9",
+ "bytes": 1654033,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "4f020a6108c4b88885235fbbaeed6236670debf31bd82c0a6fd630f0b95a657d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "05b70771092aead88e71ed8d0a3271f5d7b610a572045f78f498358e759323f4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "0736f63497240bffde998584485a67bc5857303e6f229faac0f84448d5b721ae",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

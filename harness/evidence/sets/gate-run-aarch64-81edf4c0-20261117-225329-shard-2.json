@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-aarch64-81edf4c0-20261117-225329-shard-2",
+ "path": "gate-run-aarch64-81edf4c0-20261117-225329-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at 81edf4c0 (main 3ffe8826 merged into the change: integer s16 conversion of the stereo pass-through on 32-bit ARM, SBR predictors once per source band, std::simd SBR covariances and PS hybrid filters) on four c6g.4xlarge hosts, AArch64, shard 2 of the items that link the AAC decoder or the stereo downmix (codecs, codecs-audio, codec-workloads, codec-file-workloads and their memory cases, isobmff-reader, ogg-readers, tests, tests-release), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable, with set codec-derived-streams unpacked: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results; steps isobmff-reader-compare, memory-codec-workloads-2, memory-codec-workloads-3, memory-codec-workloads-5); cited by docs/status.md.",
+ "key": "evidence/gate-runs/81edf4c0dac9563f099a50327cab0b19f5eed01f-aarch64-20261117-225329/shard-2/87216601111cfbeac37ff68068bc0b07ea094973b6a518ce55b274b417ba4fc9.tar.zst",
+ "sha256": "87216601111cfbeac37ff68068bc0b07ea094973b6a518ce55b274b417ba4fc9",
+ "bytes": 1253241,
+ "results": [
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "0fd6e5a9e40ec6f9838ea4e95187297ff34cf927bfbf55cffb9d6a852ba0dcfd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "4599c7e186ce2d1da1435209ffbd0bac7750d1dcba589987191b34ce6293d2ba",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "38299160a5bee128e792a884adb7e01a4c65c1806b14a11da432770bde3740a7",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -59,7 +59,7 @@ caller's reserved PCM planes and reuses them on the next access unit.
 
 | Feature | Default | Effect |
 |---|---|---|
-| `simd` | off | `std::simd` forms of the SBR QMF analysis and synthesis windowing and shuffles. Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
+| `simd` | off | `std::simd` forms of the SBR QMF analysis and synthesis windowing and shuffles, of the covariance sums of HF generation (four source bands at a time) and of the Parametric Stereo hybrid filters (four slots at a time). Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
 
 Without `simd` the crate builds on stable and uses the scalar code. Each vector lane
 performs the scalar code's operations in the same order, so output is identical where the
