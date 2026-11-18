@@ -1,13 +1,13 @@
 {
-  "name": "capture-motion-count-aarch64-d7de211d",
-  "path": "capture-motion-count-aarch64-d7de211d",
-  "retention": "retained",
-  "reason": "Instruction and cycle counts for the 960×540 motion case with identical capture output on Linux AArch64.",
-  "key": "evidence/capture-diagnostic/aarch64/d7de211d6653cf26b796a2a87ec0c83b9e2c632a/800ad4b5d34ed302b58850131f281233912f4f6369b362366c2c4b812a5f469c.tar.zst",
-  "sha256": "800ad4b5d34ed302b58850131f281233912f4f6369b362366c2c4b812a5f469c",
-  "bytes": 64746,
-  "source_revisions": [
-    "eea761b31a23bed706540ec5b3e2c3f740e8d9a3",
-    "d7de211d6653cf26b796a2a87ec0c83b9e2c632a"
-  ]
+ "name": "capture-motion-count-aarch64-d7de211d",
+ "path": "capture-motion-count-aarch64-d7de211d",
+ "retention": "retained",
+ "reason": "Instruction and cycle counts for the 960\u00d7540 motion case with identical capture output on Linux AArch64.",
+ "key": "evidence/capture-diagnostic/aarch64/d7de211d6653cf26b796a2a87ec0c83b9e2c632a/800ad4b5d34ed302b58850131f281233912f4f6369b362366c2c4b812a5f469c.tar.zst",
+ "sha256": "800ad4b5d34ed302b58850131f281233912f4f6369b362366c2c4b812a5f469c",
+ "bytes": 64746,
+ "source_revisions": [
+  "eea761b31a23bed706540ec5b3e2c3f740e8d9a3",
+  "d7de211d6653cf26b796a2a87ec0c83b9e2c632a"
+ ]
 }
