@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
     AvcConfigLimits, AvcConfigParser, AvcConfigSource, BuildStep, Codec, HvcConfigLimits,
-    HvcConfigParser, HvcConfigSource, LengthSize,
+    HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
 };
 use triergon_matroska::{matroska::Track, typed::Packet};
 
@@ -27,6 +27,15 @@ struct Chain {
     pps: u8,
     minimum_pictures: u8,
     reorders: bool,
+    hevc_parameter_sets: [u16; 3],
+}
+
+impl Chain {
+    fn hevc_parameter_set<'a>(&self, record: &'a [u8], index: usize) -> Option<&'a [u8]> {
+        let offset = usize::from(*self.hevc_parameter_sets.get(index)?);
+        let (length, payload) = record.get(offset..)?.split_first_chunk::<2>()?;
+        payload.get(..usize::from(u16::from_be_bytes(*length)))
+    }
 }
 
 #[derive(Default)]
@@ -34,6 +43,7 @@ struct Sample {
     cursor: usize,
     nals: u8,
     picture: bool,
+    hevc_repeats_checked: bool,
 }
 
 #[allow(clippy::large_enum_variant, reason = "one bounded setup at a time")]
@@ -116,13 +126,7 @@ impl VideoProbe {
             self.sample = Sample::default();
             return Ok(Some(false));
         };
-        let ready = match self.sample.poll(
-            packet.packet.data.as_ref(),
-            chain,
-            pictures == 0,
-            work,
-            cancel,
-        ) {
+        let ready = match self.sample.poll(packet, chain, pictures == 0, work, cancel) {
             Ok(None) => return Ok(None),
             Ok(Some(true)) => {
                 self.tracks[index] = TrackProbe::Watching {
@@ -225,19 +229,14 @@ impl Setup {
                         pps,
                         minimum_pictures,
                         reorders: reorder != 0,
+                        hevc_parameter_sets: [0; 3],
                     }))
                 }
                 BuildStep::Yield => Ok(BuildStep::Yield),
                 BuildStep::Complete => Ok(BuildStep::Complete),
             },
             Self::Hevc(parser) => match parser.step(work, cancel)? {
-                BuildStep::Ready(view) => {
-                    let chain = hevc_chain(
-                        view.length_size(),
-                        view.nals().map(|nal| nal.source_bytes()),
-                    )?;
-                    Ok(BuildStep::Ready(chain))
-                }
+                BuildStep::Ready(view) => Ok(BuildStep::Ready(hevc_chain(&view)?)),
                 BuildStep::Yield => Ok(BuildStep::Yield),
                 BuildStep::Complete => Ok(BuildStep::Complete),
             },
@@ -245,26 +244,62 @@ impl Setup {
     }
 }
 
-fn hevc_chain<'a>(length: LengthSize, nals: impl Iterator<Item = &'a [u8]>) -> Result<Chain> {
-    let chain = hevc::startup_chain(nals)?;
+fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
+    let chain = hevc::startup_chain(view.nals().map(|nal| nal.source_bytes()))?;
+    let mut hevc_parameter_sets = [0; 3];
+    for nal in view.nals() {
+        let kind = nal.header().nal_unit_type();
+        if (32..=34).contains(&kind) {
+            let offset = nal.source_range().start - nal.length_field_bytes().len();
+            hevc_parameter_sets[usize::from(kind - 32)] =
+                u16::try_from(offset).map_err(|_| Error::Overflow)?;
+        }
+    }
     Ok(Chain {
         codec: Codec::Hevc,
-        length,
+        length: view.length_size(),
         pps: chain.pps_id,
         minimum_pictures: chain.reorder + 1,
         reorders: chain.reorder != 0,
+        hevc_parameter_sets,
     })
 }
 
 impl Sample {
+    fn repeats_parameter_set(&mut self, chain: &Chain, packet: &Packet, nal: &[u8]) -> bool {
+        let Some(&header) = nal.first() else {
+            return false;
+        };
+        let kind = (header >> 1) & 0x3f;
+        if chain.codec != Codec::Hevc || !(32..=34).contains(&kind) {
+            return false;
+        }
+        let Some(record) = packet.configuration.initialization(packet.packet.track) else {
+            return false;
+        };
+        if chain.hevc_parameter_set(record.data, usize::from(kind - 32)) != Some(nal) {
+            return false;
+        }
+        if !self.hevc_repeats_checked {
+            let payloads =
+                std::array::from_fn(|index| chain.hevc_parameter_set(record.data, index)?.get(2..));
+            let [Some(vps), Some(sps), Some(pps)] = payloads else {
+                return false;
+            };
+            self.hevc_repeats_checked = hevc::check_repeat_prefixes(vps, sps, pps).is_ok();
+        }
+        self.hevc_repeats_checked
+    }
+
     fn poll(
         &mut self,
-        raw: &[u8],
+        packet: &Packet,
         chain: Chain,
         first_packet: bool,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<bool>> {
+        let raw = packet.packet.data.as_ref();
         while self.cursor != raw.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -276,8 +311,9 @@ impl Sample {
                 return Ok(None);
             }
             let (nal, consumed) = split_nal(&raw[self.cursor..], chain.length)?;
-            if let Some((first, random_access, pps)) =
-                picture_nal(chain.codec, nal, chain.reorders)?
+            if (self.picture || !self.repeats_parameter_set(&chain, packet, nal))
+                && let Some((first, random_access, pps)) =
+                    picture_nal(chain.codec, nal, chain.reorders)?
             {
                 if pps != chain.pps || first == self.picture || (first_packet && !random_access) {
                     return Ok(Some(false));

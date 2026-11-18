@@ -55,9 +55,9 @@ worker's operations read only the raw-video and timed-text movies of its compari
 | MPEG-TS | PSI, continuity, PES assembly and ordered TS188/M2TS192 entities with control-only and bounded fault completion, with format-owned track classification | 97/97 PES compatibility-view comparisons across all 272 requests | 0.7217 (97/97 pass) | heap ≤0.0653, total RSS ≤0.8651 (97/97 lower) | strict source clocks, full FATE mapping |
 | MPEG-TS access units | `ContainerReader` and `AnyReader` for TS188 and M2TS192, with AVC, HEVC, ADTS AAC-LC, LATM in LOAS, signalled AC-3 and E-AC-3, DVB subtitle segments and ordered entities; `Reader` can frame selected PIDs while retaining all source events | 169/169 transport compatibility folds for all tracks in the chosen program, including LATM PES and opaque observations, with all 272 original request associations; explicit PID selection has separate reader tests | 0.9075 (169/169 pass) | heap ≤0.1067, total RSS ≤0.8812 (169/169 lower) | additional carriages, seeking and full FATE mapping |
 | MPEG-TS program playback | Selected TS188 program and M2TS192 PID with packet payloads and clock projection | 35/35 packet folds | 0.7710 (35/35 pass) at `419a8493` | heap ≤0.0877, total RSS ≤0.7924 (35/35 lower) at `419a8493` | additional program and carriage profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0616 (3/3 pass) at `419a8493` | heap ≤0.0151, total RSS ≤0.6350 (3/3 lower) at `419a8493` | broader transport and codec profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.0398 (3/3 pass) at `fd22d790` | heap ≤0.0151, total RSS ≤0.6354 (3/3 lower) at `fd22d790` | broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 0.7854 (71/71 pass) at `419a8493` | heap ≤0.0207, total RSS ≤0.7325 (71/71 lower) at `419a8493` | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.0110 (135/135 pass for AVC/HEVC) at `384de6c9` | heap ≤0.3300 (135/135 lower), total RSS fails at 1.0267 (134/135 lower; `avc-bad-update`) at `384de6c9` | AArch64 total RSS, ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 135/135 AVC/HEVC reference comparisons. DTS core is byte-exact on 37,125 projections and 1,172 FATE packets without a timing runner. | 1.0176 (135/135 pass for AVC/HEVC) at `f6de9851` | heap ≤0.3300, total RSS ≤0.9877 (135/135 lower) at `f6de9851` | ARMv7 total RSS, full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SubRip and WebVTT documents as FFmpeg's `srt` and `webvtt` demuxers read them, ASS packets as its `ass` decoder decodes them, with `sub_charenc` charsets, and mov_text and tx3g to ASS | 367/367 cases (`subtitle-text`: 82 captured mov_text cases, 13 authored mov_text sessions for the override tags written where a style record or the highlight starts or ends, the samples of the 79 tx3g tests, 80 charset cases, 17 ASS packets, 96 SubRip and WebVTT documents) on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7); `subtitle-text-host` pins per target the 23 SubRip and WebVTT documents whose time fields leave the 32-bit range: 23/23 pass on ARMv7, 0/23 on AArch64 (open) | 1.0290 (367/367 pass; worst `charset-windows-1251-text`) at `f8e1c4d9` | heap ≤0.3360, total RSS ≤0.9311 (367/367 lower) at `f8e1c4d9` | on AArch64, `subtitle-text-host`'s 23 cases, a deliberate divergence: FFmpeg for AArch64 reads a SubRip time field beyond the 32-bit range as its value, held to the 64-bit signed range, modulo 2^32, and a WebVTT field whose digits exceed 2^32 − 1 as those digits, held to 2^64 − 1, modulo 2^32, where on 32-bit ARM both saturate; the reader follows 32-bit ARM, so these cases are not timed or measured on AArch64; FATE coverage |
 | Subtitles, PGS | Presentation, palette and object segments to subtitle rectangles, with FFmpeg's recovery from damaged and incomplete segments | 319/319 cases (`subtitle-pgs`: TS, SUP and Matroska), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7912 (319/319 pass) at `f8e1c4d9` | heap ≤0.9654, total RSS ≤0.9682 (319/319 lower) at `f8e1c4d9` | FATE coverage |
 | Subtitles, PGS capsules | Recorded PGS packet sessions through `compat::pgs::ReceiverDecoder`, with raw PTS, DTS and time base, the forced-only option and hard resets that reopen the decoder | 229/229 cases (`subtitle-pgs-capsules`: capsules of up to 64 complete PGS packets against FFmpeg's `pgssub` decoder), on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7) | 0.7247 (229/229 pass) at `f8e1c4d9` | heap ≤0.5788, total RSS ≤0.7381 (229/229 lower) at `f8e1c4d9` | — |
@@ -141,12 +141,15 @@ counts on the link-order training operations are within 0.05% of `2a6a07a7`'s. S
 `gate-run-aarch64-2b196e9c-20261117-192110-shard-1` to `-8` and
 `gate-run-armv7-2b196e9c-20261117-192033-shard-1` to `-8` hold the shards' outputs, and
 `link-order-code-size` the instruction counts and the per-feature comparisons. A reused
-timing step now restores those records from its kept set: at `176afab0`, one partial run per
-target of the 15 capture items, on one host each, reused every timing step from the
-`f7b1d8eb` run and measured every memory step from the restored records, 30 of 30 steps
-passing on both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and
-≤0.9766 on ARMv7; sets `gate-run-aarch64-176afab0-20261118-134108-shard-1` and
-`gate-run-armv7-176afab0-20261118-134158-shard-1`).
+timing step now restores those records from its kept set: one partial run per target of the
+15 capture items on five hosts, at `22b82550` on Linux AArch64 and `01ba2375` on ARMv7,
+reused every timing step from the `a5837d38` run (sets
+`gate-run-aarch64-a5837d38-20261118-163537-shard-1` to `-5` and
+`gate-run-armv7-a5837d38-20261118-163631-shard-1` to `-5`, which measured all 30 steps per
+target) and measured every memory step from the restored records, 30 of 30 steps passing on
+both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and ≤0.9766 on ARMv7;
+sets `gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
+`gate-run-armv7-01ba2375-20261118-191656-shard-1` to `-5`).
 
 The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
 legacy AAC-LC, MP4 forward and range, TS program, MPEG-TS progressive playback and raw
@@ -157,6 +160,24 @@ case is lower on both heap and total RSS. Sets
 `gate-run-aarch64-419a8493-20261117-190817-shard-1` and
 `gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
 plans, step records and logs.
+
+The playback tests cover HEVC startup with exact parameter-set repeats and
+matching truncations of each parameter set that prevent startup. At `6bbb2cb7`,
+all 289 cases in the nine playback gate groups passed parity, runtime and
+kernel-bound heap and total RSS on both targets. Linux AArch64's largest runtime
+bound is 1.0528 for progressive `reordered-48000`, with worst heap 0.8877 and
+total RSS 0.8499. The 32-bit ARMv7 bounds are 0.9999, 0.7849 and 0.9670,
+respectively. The four playback archives in the measured revisions table hold
+the corresponding build identities and per-case evidence.
+
+At `fd22d790`, reusing the admitted AAC payload view keeps the complete
+progressive traces and work counts byte-identical. The nine playback groups
+and the two MPEG-TS groups passed parity, runtime, peak heap and kernel-bound
+total RSS on 555 cases per target on c6g.4xlarge. The largest bounds on Linux AArch64
+were 1.0398 for runtime, 0.8877 for heap and 0.8801 for RSS.
+The 32-bit ARMv7 bounds were 1.0101, 0.7849 and 0.9790, respectively.
+Every runtime upper bound is at most 1.05. The four AAC payload view archives
+list the corresponding build identities and per-case results.
 
 The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
 tests, come from one partial gate run per target of the 33 items those workers serve: the
@@ -245,21 +266,27 @@ records and logs. AAC in MOV, which the gate does not run, was measured at the s
 revision on one more c6g.4xlarge per target as the gate measures a codec workload list
 (sets `aac-access-units-4213d042-TARGET`).
 
-The packet framing rows come from one partial gate run of the `framing` item per target at
-`384de6c9`, measured the same way. Every step passes 135 of 135 cases, and only the total
-RSS bounds listed in the contract's `open_bounds` fail. No case's runtime bound is above
-1.05 on either target: the worst is `hevc-irap_repeat`, 1.0110 on Linux AArch64 and
-0.9146 on ARMv7, and the median of the case medians is 0.8936 on Linux AArch64 and 0.7306
-on ARMv7 (0.9463 and 0.7904 in the ceiling runs at `1c64b775`, where 13 Linux AArch64
-cases were above 1.05, worst `hevc-inband_both` at 1.0763). The packet and configuration
-outputs are charged once with their shared owner and copied in one pass, which on Linux
-AArch64 shortened the first operation of each timed process, where the HEVC cases lost
-to the reference on instruction fetch. Sets
-`gate-run-aarch64-384de6c9-20261117-193302-shard-1` and
-`gate-run-armv7-384de6c9-20261117-193351-shard-1` hold each target's outputs, build
-identities, plan, step records and logs; the earlier runs at `d79071d4` and `9870b694`
-stay in `gate-run-aarch64-d79071d4-20261116-204903-shard-1` and
-`gate-run-armv7-9870b694-20261116-202556-shard-1`.
+The packet framing rows come from a gate run of the `framing` item on each target at
+`f6de9851`. Each run measured all 135 cases on c6g.4xlarge, with 30 timing pairs of
+50 operations on CPU 1 and 30 kernel-bound memory pairs per case. All cases match the
+reference and pass the runtime and heap bounds. The worst runtime bounds are 1.0176
+on AArch64 for `avc-multi_idr` and 0.9643 on ARMv7 for `hevc-irap_repeat`. Across
+cases, the median of the ratios of median times is 0.9004 on AArch64 and 0.7486 on ARMv7.
+All AArch64 total RSS bounds are lower, including `avc-bad-update` at 0.9844.
+All 135 ARMv7 total RSS bounds remain above 1.0, with `avc-header-only-idr` highest at
+1.0836. Sets
+`gate-run-aarch64-f6de9851-20261117-230647-shard-1` and
+`gate-run-armv7-f6de9851-20261117-230647-shard-1` hold the reports, build identities,
+plans and logs.
+
+ARMv7 debugger snapshots of the same two executables cover `avc-header-only-idr`,
+`avc-high-flags` and `hevc-config-unknown_empty`, with 32 runs per executable and case.
+Rust's stack-guard lookup adds a median of 31.5 to 32 resident pages, of which 30.5 to
+31 are libc executable pages. Each shared libc load-address bucket (modulo 64 KiB)
+compares the candidate's median residency before input open with the median of the
+reference's per-run maxima over three stops (before input open, operation start and
+operation end). The median excess across shared buckets is 16.25, 14.5 and 13.5 pages,
+respectively. The packet-framing gate uses the kernel-bound peaks recorded above.
 
 Every gated feature's contract requires both Linux AArch64 and ARMv7 since `47aa0451`
 ([quality](quality.md#reference-and-corpus)). One partial gate run at that revision on three
@@ -389,7 +416,7 @@ the kept sets `packet-framing-be0eff89-aarch64` and `packet-framing-f4f1c7ad-arm
 contain those per-case results. At `384de6c9` the AArch64 worker links in its order
 retrained from the same training operations.
 
-On AArch64, `avc-bad-update` is the only total RSS miss. Its median
+At `be0eff89`, `avc-bad-update` was the only AArch64 total RSS miss. Its median
 resident pages are 443 at entry and 459 at peak in Triergon, and 450 at
 entry and 451 at peak in FFmpeg. In three mapping snapshots per worker
 and marker, the candidate's resident executable text grows from 152 to
@@ -862,8 +889,19 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Ordered workers without their trained orders after the code-size change, Linux AArch64 | `d18904f950fee2d00da37901cf9d36b6cf9d46a6` | [`8d2cfccfd6f0cffe114bc7b9990264ec592a247ea432937a4ad1d919349afdcc`](../harness/evidence/sets/gate-run-aarch64-d18904f9-20261117-192309-shard-1.json) |
 | Ordered workers without their trained orders after the code-size change, ARMv7 | `d18904f950fee2d00da37901cf9d36b6cf9d46a6` | [`f1d1cc8dabc6cfec0d885ba7e779b2501f9620fda5f43783a58698fd69e6faf6`](../harness/evidence/sets/gate-run-armv7-d18904f9-20261117-192245-shard-1.json) |
 | Code size against the trained orders: sizes, resident probes, instruction counts and per-case comparisons, both targets | `2b196e9c94f6341af49ef5acd46b08ace399e551` | [`39ea31fe8e47d1250d407aea7d2c2163bec09d29ee1449373f5e4144078f2834`](../harness/evidence/sets/link-order-code-size.json) |
-| Packet framing, Linux AArch64 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`457b9b996902aa4b5b51bc40497ffc6d02404b890f2dd3d370f1654af49fc796`](../harness/evidence/sets/gate-run-aarch64-384de6c9-20261117-193302-shard-1.json) |
-| Packet framing, ARMv7 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170`](../harness/evidence/sets/gate-run-armv7-384de6c9-20261117-193351-shard-1.json) |
+| AAC payload views, Linux AArch64, shard 1 of 2 | `fd22d7906da027afb91fb8c486814a90d3da1c38` | [`e92ac9ba2e23db5a7f719cf3401c6eb0f16006c5ca5acfd43f2d9b43d8b1236b`](../harness/evidence/sets/gate-run-aarch64-fd22d790-20261118-154842-shard-1.json) |
+| AAC payload views, Linux AArch64, shard 2 of 2 | `fd22d7906da027afb91fb8c486814a90d3da1c38` | [`cda3273b5f0fa481ef3506d3240c0cb836e38a7618728145ddd747e5a6169609`](../harness/evidence/sets/gate-run-aarch64-fd22d790-20261118-154842-shard-2.json) |
+| AAC payload views, ARMv7, shard 1 of 2 | `fd22d7906da027afb91fb8c486814a90d3da1c38` | [`7c5bf2e1e8f629da90ba6b1ab17e0e10683e4099971c554a55dfe8ef0a407b2c`](../harness/evidence/sets/gate-run-armv7-fd22d790-20261118-155439-shard-1.json) |
+| AAC payload views, ARMv7, shard 2 of 2 | `fd22d7906da027afb91fb8c486814a90d3da1c38` | [`1b0f99bb79e4a7a6c60a30080482f6c1b96f25e250b08cedbcbd8fcc7edc0b9b`](../harness/evidence/sets/gate-run-armv7-fd22d790-20261118-155439-shard-2.json) |
+| Playback with HEVC parameter-set repeats, Linux AArch64, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`a69853ba25e9b5efcdf0b2623ce4b1e4a391f0915c3b7eda3fac3ceff01d19d7`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-1.json) |
+| Playback with HEVC parameter-set repeats, Linux AArch64, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`2ab05fbb4a99c88d03cec697104d3360ee92dd45f398fcb8949a2c3e17125d4b`](../harness/evidence/sets/gate-run-aarch64-6bbb2cb7-20261118-104943-shard-2.json) |
+| Playback with HEVC parameter-set repeats, ARMv7, shard 1 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`caa758a1e3348d4fccfdca6414ac504a39e8457a5fce1774402dce5bc645889e`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-1.json) |
+| Playback with HEVC parameter-set repeats, ARMv7, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`43ee65711daba9295f1f963771cd120531eace54aba94b9032e08fb06232b470`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-2.json) |
+| Packet framing, Linux AArch64 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`5bc206763e41494030e26cd61cfac84d66a0fad4416ac5d5f7feeb81b8d25009`](../harness/evidence/sets/gate-run-aarch64-f6de9851-20261117-230647-shard-1.json) |
+| Packet framing, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`2c3625a5b709f4402496798fe95ddec86d59216fddf2a5e78acb12512ffac28b`](../harness/evidence/sets/gate-run-armv7-f6de9851-20261117-230647-shard-1.json) |
+| Packet framing startup mappings, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`9941dac4835e3107d1fb9a60804ca7cd3bf552635cd8b2f91b106442e87fec1f`](../harness/evidence/sets/framing-armv7-startup-residency-f6de9851.json) |
+| Earlier: Packet framing, Linux AArch64 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`457b9b996902aa4b5b51bc40497ffc6d02404b890f2dd3d370f1654af49fc796`](../harness/evidence/sets/gate-run-aarch64-384de6c9-20261117-193302-shard-1.json) |
+| Earlier: Packet framing, ARMv7 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170`](../harness/evidence/sets/gate-run-armv7-384de6c9-20261117-193351-shard-1.json) |
 | Gated features on both targets, ARMv7 run, shard 1 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`ea6fc3b79c890f2907ecf887c894c1411b719747e2b90a4a8a5c426f665b87b4`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-1.json) |
 | Gated features on both targets, ARMv7 run, shard 2 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`5c4fb2235ce492670904c24637d445f2905ffbb623ead2e73ffec57eb1a66e5b`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-2.json) |
 | Gated features on both targets, ARMv7 run, shard 3 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`8d21689ebde93edd870a10821c623c511dbadbf725e0e778529d4105f2b3dc55`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-3.json) |
@@ -1291,7 +1329,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | ISO BMFF / MP4 | 1,020/1,020 open and index comparisons (972 matching outputs, 48 matching refusals); the neutral reader's 648 comparison cases, as on AArch64 | 0.9747 (956/956 timed operations pass) | heap ≤0.2467, total RSS ≤0.8605 (956/956 lower) |
 | ISO BMFF seek and range plans | 476/476 (378 seeks, 94 range plans, 4 refusals) | 1.0222 (472/472 pass) | heap ≤0.8541, total RSS ≤0.8704 (472/472 lower) |
 | AAC in MOV | the configured decoder comparison: 34 clips, 3,544 access units | 1.0062 (34/34 pass) at `4213d042` | heap ≤0.6756, total RSS ≤0.5326 (34/34 lower) at `4213d042` |
-| Packet framing | 135/135 AVC/HEVC reference comparisons | 0.9146 (135/135 pass) at `384de6c9` | heap ≤0.2633 (135/135 lower), total RSS fails at 1.0838 (0/135 lower) at `384de6c9` |
+| Packet framing | 135/135 AVC/HEVC reference comparisons | 0.9643 (135/135 pass) at `f6de9851` | heap ≤0.2633 (135/135 lower), total RSS fails at 1.0836 (0/135 lower) at `f6de9851` |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness lanes as gate item `codecs-audio` at `81edf4c0`, as on AArch64: AAC 38/39 and one open case (`aac-sce-in-stereo`, FFmpeg's unwritten FR plane), AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 20/20 pass at `81edf4c0`: the six video workloads 0.6035 to 1.0447 (`h264-high-1080p` 1.0447), the fourteen audio workloads 0.7665 to 1.0182 (worst `aac-he-5.1`; `aac-hev2-stereo` 1.0163, `aac-he-stereo` 1.0032) | heap ≤0.9421, total RSS ≤0.8384 (20/20 lower) at `81edf4c0` |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | 0.9904 (10/10 pass; worst `vorbis-q3-5.1`) at `81edf4c0` | heap ≤0.8994, total RSS ≤0.7710 (10/10 lower) at `81edf4c0` |
 | Capture | 15/15 at `f8e1c4d9`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.0676 (15/15 pass; worst `c13-motion-960-6m`, median of the cases 0.8734) at `f8e1c4d9` | heap ≤0.6086, total RSS ≤0.9764 (15/15 lower) at `f8e1c4d9` |
@@ -1301,7 +1339,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Playback: MP4 forward | 46/46 packet folds (`mp4-forward`) | 0.9100 (51/51 pass; worst `progressive-ten-sequential-batches`, below) at `419a8493` | heap ≤0.5920, total RSS ≤0.9828 (51/51 lower) at `419a8493` |
 | Playback: MP4 range | 51/51 open and backward-seek comparisons (`mp4-range`) | 1.0007 (64/64 pass) at `419a8493` | heap ≤0.7849, total RSS ≤0.9294 (64/64 lower) at `419a8493` |
 | Playback: TS program | 35/35 packet folds (`ts-program`) | 0.7678 (35/35 pass) at `419a8493` | heap ≤0.1177, total RSS ≤0.8344 (35/35 lower) at `419a8493` |
-| MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7827 (3/3 pass) at `419a8493` | heap ≤0.0150, total RSS ≤0.7346 (3/3 lower) at `419a8493` |
+| MPEG-TS progressive playback | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 0.7751 (3/3 pass) at `fd22d790` | heap ≤0.0150, total RSS ≤0.6987 (3/3 lower) at `fd22d790` |
 | Playback: raw Annex B | 7/7 packet folds (`raw-annex-b`) | 0.7528 (7/7 pass) at `419a8493` | heap ≤0.1265, total RSS ≤0.7961 (7/7 lower) at `419a8493` |
 | Rasterising | `raster-glyphs` 12/12, `raster-outlines` 2/2 and `raster-bitmaps` 2/2 pass; `raster-sweep` 301/303 (below); the crate's tests pass | not measured | not measured |
 | ASS parsing | `ass-parse-scripts` 48/48, `ass-parse-chunks` 4/4 and `ass-parse-events` 21/21 pass; `ass-parse-host` 13/15 (2 open); the crate's tests pass | not measured | not measured |

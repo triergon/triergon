@@ -1,0 +1,11 @@
+{
+ "name": "framing-armv7-startup-residency-f6de9851",
+ "retention": "retained",
+ "reason": "ARMv7 resident mapping snapshots at framing worker startup and around the packet operation, using the two workers of the f6de9851 comparison.",
+ "key": "evidence/framing-resident-native-mappings/armv7/f6de9851d99ff3ebe621c95fabf7c89cb617a329/9941dac4835e3107d1fb9a60804ca7cd3bf552635cd8b2f91b106442e87fec1f.tar.zst",
+ "sha256": "9941dac4835e3107d1fb9a60804ca7cd3bf552635cd8b2f91b106442e87fec1f",
+ "bytes": 438603,
+ "source_revisions": {
+  "candidate": "f6de9851d99ff3ebe621c95fabf7c89cb617a329"
+ }
+}
