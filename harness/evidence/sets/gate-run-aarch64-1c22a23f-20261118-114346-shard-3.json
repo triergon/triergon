@@ -1,0 +1,57 @@
+{
+ "name": "gate-run-aarch64-1c22a23f-20261118-114346-shard-3",
+ "path": "gate-run-aarch64-1c22a23f-20261118-114346-shard-3",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/1c22a23fc638a64420465733e0616ca4ddce6079-aarch64-20261118-114346/shard-3/032527c9acbd2212f4d9a139131072d371b110aa9f17e789b8d192d1388602d9.tar.zst",
+ "sha256": "032527c9acbd2212f4d9a139131072d371b110aa9f17e789b8d192d1388602d9",
+ "bytes": 9188010,
+ "results": [
+  {
+   "path": "memory/matroska-startup-seek/gate-result.json",
+   "command": "report --memory",
+   "key": "b1e7a9f3786dab878d40dd5c4deb1a60b0620db254b927e0a5bf30f4b4be4fe1",
+   "status": 0,
+   "report_sha256": "aa8a0a1e8bccafc11270e62505707294bf1e07add97e1f53296786bf20ae7a30",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-header-removal/gate-result.json",
+   "command": "report --memory",
+   "key": "95567198f2a5e968bee9f9be510d02154c39bf70fbfca461073c4f4031a0170a",
+   "status": 0,
+   "report_sha256": "b7df18f1fdb3f7a711b542471793f04622507cedde6303b6ad224cfa92497f2e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-startup-seek/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6790465808857ea86d94cab7a098bdda997f27d9c62ad64e353010ed3c6d816a",
+   "status": 0,
+   "report_sha256": "f511e2042cda24ceb16bd2508d7d65bf82c77e5ff2e35af725e44724623fdfb2",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-header-removal/gate-result.json",
+   "command": "report --benchmark",
+   "key": "124363b5b69b39bfe2c2b73729fb0cc6b6a93691bf5a61f7f9eb641c1641a0f6",
+   "status": 0,
+   "report_sha256": "c8cb5b126453fa6d76fb973b76407ad67a737ed0221856b37ea034ce3f3d5d03",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "0fd1191d12818c985db7fe56f9b9513db85eec51d7fc330996118e86cd82e243",
+   "status": 0,
+   "report_sha256": "36fcbd76330e037a715b00e89393e4b82dc5b6429dc752ae562e8a9245672c9e"
+  },
+  {
+   "path": "graded/matroska-header-removal/gate-result.json",
+   "command": "grade",
+   "key": "3adf5acc9e6a6f6905ee0f745765e20db7c3e03ad1cd413dd98572dcba4d9847",
+   "status": 0,
+   "report_sha256": "37ac29d678b85aa6a7cefea31532922b1fd2581ee59b9f6fd52ba667504b908e"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-aarch64-1c22a23f-20261118-114346-shard-1",
+ "path": "gate-run-aarch64-1c22a23f-20261118-114346-shard-1",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/1c22a23fc638a64420465733e0616ca4ddce6079-aarch64-20261118-114346/shard-1/14f432453b52abc9e75a522d33638acbf15c67a4c887170c81b1ade224e7f198.tar.zst",
+ "sha256": "14f432453b52abc9e75a522d33638acbf15c67a4c887170c81b1ade224e7f198",
+ "bytes": 8028971,
+ "results": [
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "1e8023db8fabd54c7d3b2d82be898aeee645c989e0ed7abc605231c056de6c97",
+   "status": 0,
+   "report_sha256": "888d49013da2d6643f73294545bc7fd8e4e73c54594d530c6fc2c13fd03a9944",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "3e42fc8b8f41778366fc6ae605d617a1e5c1471f9619b5de1a7c7753788cd185",
+   "status": 0,
+   "report_sha256": "6c9dbf9f25f8f9f80a45687b5db882a5e97d383f3adda4c1b49a3facab9afce6",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "6eedc45265ac6d8273f5d9f59b18e9c6e56cf43fc06f8a30bb7b1dcbdc713974",
+   "status": 0,
+   "report_sha256": "b914c3f91c3308b3e2a63335f48a55e14a8d7cfb50ac1602d5d213c76e23689b"
+  }
+ ]
+}

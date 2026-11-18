@@ -1,0 +1,103 @@
+{
+ "name": "gate-run-armv7-1c22a23f-20261118-114422-shard-4",
+ "path": "gate-run-armv7-1c22a23f-20261118-114422-shard-4",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/1c22a23fc638a64420465733e0616ca4ddce6079-armv7-20261118-114422/shard-4/8b124a2c07e36574e10697a01ee48ec84bb6a209e662c7483120dd26cebc608e.tar.zst",
+ "sha256": "8b124a2c07e36574e10697a01ee48ec84bb6a209e662c7483120dd26cebc608e",
+ "bytes": 10298372,
+ "results": [
+  {
+   "path": "memory/external-vector/gate-result.json",
+   "command": "external-vector --memory",
+   "key": "96e321cfa3a1107d887ff0853b0065537c83d675f3ac758de73ebb6c4c11ac64",
+   "status": 0,
+   "report_sha256": "1c00afdfd9e58a750b8aef14b1ed1517c60eb407520271f6329d313c5bb07cac",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "3059f9624c53c7e7ca079b293ebbc47b0aded4e8511039d0bbc58aad4aad76ea",
+   "status": 0,
+   "report_sha256": "01d4f80602666b4596efaa64f5b23914647412823a791230dbf82dd9a6e3055d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "8e74cfd6fbb39c49eee60451a9944f3d71d350c32bf197617b28ad075d30707d",
+   "status": 0,
+   "report_sha256": "92007830e02f5bde2ad3b4b6c4366732ecaf223ba318cbde686155a393675b77",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "19dee253a47fecf294ff93dc738fffc1032354cb31cdd2a2f3b9fa962eb3198c",
+   "status": 0,
+   "report_sha256": "4fb8102e42823f775cf517337f2c441f82ea2ae5e5d0b172f23dd7b69380cb7c",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/external-vector/gate-result.json",
+   "command": "external-vector --benchmark",
+   "key": "a9b152da1b6fb9feb883cfb571fdab72d2cca86b96b0457a6c07cc7d52fb1fcb",
+   "status": 0,
+   "report_sha256": "90c1fd96d89e732e9c516a0ba25057f019235579916fd3e0a95716f47faef447",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "11b49f2805bf157148ed8f912e6f952b9c6a2f0fa56ec48a4b54cdfb42c09517",
+   "status": 0,
+   "report_sha256": "c1bc13cee917d7388aeacf20bb26b71ed5ccbfc96ce1dd874390f451addc75f5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "30ba99ce7810bc6612cfcabee46f15d1c271e082d89e35c0c76b18be0aa2dd62",
+   "status": 0,
+   "report_sha256": "968a74b898e8c3a98793ab8bd9a32cd6c64d52f9d83bc59a05f1cc5b21e4fbf6",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9850d57c22963471ffd626a37f7a2f4ea1f84c21f74906ecb8786c07ec3d5064",
+   "status": 0,
+   "report_sha256": "a51aaeac62e88ecba32bc17a6d1230034ca03f866d3e9861ca41208f4c348ae7",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/external-vector/gate-result.json",
+   "command": "grade",
+   "key": "96d1e7ffea441b76554a3f1e66b2087c5471e2cf09254a512b55a1c699efc63b",
+   "status": 0,
+   "report_sha256": "484def87fd39ce4c4c790bc1d1c69b09578a115408c4fc061245c1be17f68b27"
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "1d9962adcb8ea4a02a1095f5205c2e4dfa10330244df17b30eebfdf8bd6c5710",
+   "status": 0,
+   "report_sha256": "32434c11c845565f14d7f2e70f29c284da9ab98e8943fc1f7cc3b934189a43d9"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "a26f23003db8637e2612884ed6ad790c366790c793d2d964f64ab93cc4ec38f7",
+   "status": 0,
+   "report_sha256": "4901a5bbe72cceadd1da8555f8ce1347c8421c9263ecdcd1fe13db87f05b9144"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "145e4bc9368fc37edba6228267ec87132d01aa9c27900ff01d6f4c5525c5fcaa",
+   "status": 0,
+   "report_sha256": "2376e880055ed48f2a7bef4f538bab36d956fe60b4c73bb3cd9b01827f2f8963"
+  }
+ ]
+}
