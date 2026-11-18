@@ -76,6 +76,11 @@ sequence with libx265 and one B picture. The original DefaultDuration
 element is replaced with a same-size EBML Void so packet offsets are
 preserved.
 
+`hevc-repeated-parameter-sets.mkv` contains six 64×48 pictures at 24 fps
+from `testsrc2`, encoded with libx265. It uses a four-picture GOP without B
+pictures, `repeat-headers=1` and `info=0`. The first access unit repeats the
+VPS, SPS and PPS from CodecPrivate.
+
 `hevc-indexed-seek.mkv` contains 64 synthetic 96×64 pictures at 24 fps
 with a closed eight-picture GOP, two B pictures, 280 ms cluster limit
 and Cues at the front. A seek to 700 ms resolves to the 667 ms keyframe
