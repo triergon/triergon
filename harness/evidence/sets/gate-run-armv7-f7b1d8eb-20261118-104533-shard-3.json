@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-armv7-f7b1d8eb-20261118-104533-shard-3",
+ "path": "gate-run-armv7-f7b1d8eb-20261118-104533-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 3 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, 32-bit ARMv7 user space: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured, archived by hand as collect() does; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "key": "evidence/gate-runs/f7b1d8eb17554e4710c4f475d615bbf83206453c-armv7-20261118-104533/shard-3/90f5e4a5e93c8bf67fdda555f70dbb7d2b05c97a686a576c2eb146730ad41547.tar.zst",
+ "sha256": "90f5e4a5e93c8bf67fdda555f70dbb7d2b05c97a686a576c2eb146730ad41547",
+ "bytes": 317461200,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "9e5a1f57fb21dd870322ce0a74a7bc29b8382efa17443944049379672c3406df",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "f8f7c600334a25c5e5163647d28c22e339576b1d8605eb914f3faf6f25e92bbc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "16954ce6932a19e0482c5a266f26f4ddc06ea6db33ee5a59a909e5dd6dbecc91",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "545dab814adc4ac4f221208d20bd89868c0f562eed65e4745adb0b39b023dcc9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "038725f5d02e380026df78591615a9eec889f0a25c5fb59636d8284a61e50034",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "5f02aa13a4c3af68d88d49e2e241e3dcedd961184afa3b44a3c6bf26dbddefd7",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
