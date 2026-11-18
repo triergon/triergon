@@ -1912,7 +1912,10 @@ fn record_step(
     }
     append(log, &format!("{} EXIT={code}", step.name))?;
     // The verdict lines of a grade or a codec collection, which tell listed open
-    // cases from other failures.
+    // cases from other failures; of a batch's shared log, only those naming one of
+    // the step's own cases.
+    let batched = ran.name != step.name;
+    let cases = only_cases(step);
     let mut outcome: Vec<String> =
         fs::read_to_string(output.join("logs").join(format!("{}.log", ran.name)))
             .unwrap_or_default()
@@ -1923,6 +1926,7 @@ fn record_step(
                     || line.contains(": failing: ")
                     || line.contains("diagnostic on this target")
             })
+            .filter(|line| !batched || cases.iter().any(|case| line.contains(case.as_str())))
             .map(str::to_owned)
             .collect();
     if !unmeasured.is_empty() {
@@ -1946,13 +1950,18 @@ fn record_step(
             Value::object(step.environment.iter().map(|(k, v)| (*k, Value::str(*v)))),
         ),
         ("started", Value::str(&ran.started)),
-        ("seconds", Value::float((ran.seconds * 10.0).round() / 10.0)),
+    ];
+    // A batched step's time is its batch's, which it shares with the others.
+    let seconds = Value::float((ran.seconds * 10.0).round() / 10.0);
+    if batched {
+        fields.extend([("batch", Value::str(&ran.name)), ("batch_seconds", seconds)]);
+    } else {
+        fields.push(("seconds", seconds));
+    }
+    fields.extend([
         ("status", Value::int(i64::from(code))),
         ("outcome", Value::strings(outcome)),
-    ];
-    if ran.name != step.name {
-        fields.push(("batch", Value::str(&ran.name)));
-    }
+    ]);
     crate::corpus::write_json(
         &output.join("steps").join(format!("{}.json", step.name)),
         &Value::object(fields),
@@ -1973,6 +1982,17 @@ fn self_checking(step: &Step) -> bool {
 /// The directory a step writes its report and gate result to (`--output DIR`).
 fn step_output(step: &Step) -> Option<PathBuf> {
     flag_value(step, "--output")
+}
+
+/// The case ids that follow `--only` in the step's command.
+fn only_cases(step: &Step) -> Vec<String> {
+    step.command
+        .iter()
+        .skip_while(|arg| *arg != "--only")
+        .skip(1)
+        .take_while(|arg| !arg.starts_with("--"))
+        .cloned()
+        .collect()
 }
 
 /// The path that follows `flag` in the step's command.
@@ -2394,10 +2414,7 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .get("step")
                 .and_then(Value::as_str)
                 .unwrap_or_default(),
-            record
-                .get("seconds")
-                .and_then(Value::as_f64)
-                .unwrap_or_default(),
+            record_seconds(record).unwrap_or_default(),
             record.get("status").and_then(Value::as_f64).unwrap_or(-1.0)
         );
         for line in record
@@ -2459,6 +2476,13 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
     Ok(i32::from(!failed.is_empty() || !problems.is_empty()))
 }
 
+/// A step record's time: its own, or its batch's.
+fn record_seconds(record: &Value) -> Option<f64> {
+    ["seconds", "batch_seconds"]
+        .iter()
+        .find_map(|key| record.get(key).and_then(Value::as_f64))
+}
+
 /// The seconds a shard's steps took: the steps of a batch ran as one command, so
 /// its time counts once.
 fn step_seconds(records: &[Value]) -> f64 {
@@ -2473,7 +2497,7 @@ fn step_seconds(records: &[Value]) -> f64 {
             }
             None => true,
         })
-        .filter_map(|record| record.get("seconds").and_then(Value::as_f64))
+        .filter_map(record_seconds)
         .sum()
 }
 
@@ -2735,13 +2759,14 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = crate::walk::scratch("gate-batch");
         // Writes a gate result in each --out but the one named `silent`, failing in
-        // the one named `fails`, and prints its arguments.
+        // the one named `fails`, and prints its arguments and a verdict line per case.
         let program = dir.join("qualify.sh");
         fs::write(
             &program,
             r#"#!/bin/sh
 echo "$@"
 while [ $# -gt 0 ]; do
+  if [ "$1" = --only ]; then echo "$2: 1 of 1 cases pass"; fi
   if [ "$1" = --out ]; then
     case $2 in
       *silent) ;;
@@ -2796,6 +2821,12 @@ done
             assert_eq!(record.get("status").and_then(Value::as_f64), Some(status));
             assert_eq!(record.get("batch").and_then(Value::as_str), Some("batch"));
             assert_eq!(record.get("item").and_then(Value::as_str), Some(case));
+            assert_eq!(record.get("seconds"), None);
+            // Of the shared log, only its own case's verdict.
+            assert_eq!(
+                record.get("outcome"),
+                Some(&Value::strings([format!("{case}: 1 of 1 cases pass")]))
+            );
             let command = record.get("command").and_then(Value::as_array).unwrap();
             assert!(command.contains(&Value::str(case)));
             assert!(!command.contains(&Value::str(crate::capture::AND)));
@@ -2805,7 +2836,10 @@ done
         assert!(ran.contains("memory-silent EXIT=1"), "{ran}");
         // The shard's step time counts the batch once.
         let records: Vec<Value> = ["passes", "fails", "silent"].map(record).into();
-        let once = records[0].get("seconds").and_then(Value::as_f64).unwrap();
+        let once = records[0]
+            .get("batch_seconds")
+            .and_then(Value::as_f64)
+            .unwrap();
         assert!((step_seconds(&records) - once).abs() < 1e-9);
         fs::remove_dir_all(dir).unwrap();
     }
@@ -2813,11 +2847,13 @@ done
     #[test]
     fn a_batch_counts_its_time_once() {
         let record = |seconds: f64, batch: Option<&str>| {
-            let mut fields = vec![("seconds", Value::float(seconds))];
-            if let Some(batch) = batch {
-                fields.push(("batch", Value::str(batch)));
-            }
-            Value::object(fields)
+            Value::object(match batch {
+                Some(batch) => vec![
+                    ("batch", Value::str(batch)),
+                    ("batch_seconds", Value::float(seconds)),
+                ],
+                None => vec![("seconds", Value::float(seconds))],
+            })
         };
         let records = [
             record(2.0, None),

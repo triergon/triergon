@@ -120,12 +120,17 @@ fn qualify_together(root: &Path, runs: &[(qualify::Options, bool)]) -> i32 {
     };
     let mut measured = Vec::new();
     for (options, full) in runs {
-        let reused = qualify::gate_key(root, options)
-            .and_then(|key| Ok(reuse::reused(root, &options.out, &key, *full, false)?.ok_or(key)));
-        match reused {
-            Ok(Ok(0)) => {}
-            Ok(Ok(status)) => fail(options, &format!("reused with status {status}")),
-            Ok(Err(key)) => measured.push((options, key)),
+        let key = match qualify::gate_key(root, options) {
+            Ok(key) => key,
+            Err(error) => {
+                fail(options, &error);
+                continue;
+            }
+        };
+        match reuse::reused(root, &options.out, &key, *full) {
+            Ok(None) => measured.push((options, key)),
+            Ok(Some(0)) => {}
+            Ok(Some(status)) => fail(options, &format!("reused with status {status}")),
             Err(error) => fail(options, &error),
         }
     }

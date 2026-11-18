@@ -852,7 +852,8 @@ On one host, a shard's run is:
    by side as in a run of all cases (see [Memory in parallel](#memory-in-parallel)).
    Each run still reads its own timing records, writes its own output and gate result
    and is reused on its own; each step's record takes the status of its gate result and
-   names the batch (`memory-capture`), whose log is `logs/memory-capture.log`.
+   names the batch (`memory-capture`) and its time (`batch_seconds`); the batch's log
+   is `logs/memory-capture.log`, and a step's outcome lines are those naming its case.
 4. It grades with the module loaded. Grades measure nothing, so several run at once,
    from a release build of xtask.
 
