@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-aarch64-c30b9c80-20261118-221041-shard-4",
+ "path": "gate-run-aarch64-c30b9c80-20261118-221041-shard-4",
+ "retention": "retained",
+ "reason": "Capture parity, runtime and kernel-bound memory at c30b9c80 on Linux AArch64.",
+ "key": "evidence/gate-runs/c30b9c80f4828eb1409e1a59bce0fe6d49668ffa-aarch64-20261118-221041/shard-4/066d38148faf6c24080b3bd98875fbde4b3a911adb9519148829700bd06ece7f.tar.zst",
+ "sha256": "066d38148faf6c24080b3bd98875fbde4b3a911adb9519148829700bd06ece7f",
+ "bytes": 420245381,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "81d5aa65af4c32eda1dd68bab99a9ad99c01a09b1cec357cfdea34c3e0d9f336",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "ad26576732f093272465eb8e7f265871d20176a6ec11e401811164ba25a491cb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "8b4f795cee8f4a4bfd039921d7a813d602ce2873fab3ccec170564ddbe33ad46",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "903f1a81b0ccf237a19885f5931154d9b64672b23f529375790cf55844dfb337",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "86158bc0682b6f2e9decc1b5883497d470e0a455ce11f5d182a3d1b13770117f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "910ad35517eef1873d4e7ca080d10a64db0af948fd80878effb2c597db0c044f",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "c30b9c80f4828eb1409e1a59bce0fe6d49668ffa"
+ ]
+}

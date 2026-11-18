@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-aarch64-c30b9c80-20261118-221041-shard-1",
+ "path": "gate-run-aarch64-c30b9c80-20261118-221041-shard-1",
+ "retention": "retained",
+ "reason": "Capture parity, runtime and kernel-bound memory at c30b9c80 on Linux AArch64.",
+ "key": "evidence/gate-runs/c30b9c80f4828eb1409e1a59bce0fe6d49668ffa-aarch64-20261118-221041/shard-1/4ed88bf63e5046861f80c95eaee0eb76643a9a8c12be42ac4c11d935cb09b448.tar.zst",
+ "sha256": "4ed88bf63e5046861f80c95eaee0eb76643a9a8c12be42ac4c11d935cb09b448",
+ "bytes": 358419934,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "9eb42b1ea8d19292dac49414a5d460afa2fdad07db585f98ac187a73cbbe0e98",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "d3d21466ad55e9549f32072c0150cf08a740ff8dbb70b7e392be6ddb4a8fa6ba",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "c30b9c80f4828eb1409e1a59bce0fe6d49668ffa"
+ ]
+}
