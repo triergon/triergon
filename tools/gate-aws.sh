@@ -53,6 +53,10 @@ RUN_INPUTS=()
 
 : "${AWS_PROFILE:?}" "${AWS_REGION:?}" "${TRIERGON_SUBNET:?}" "${TRIERGON_SSH_CIDR:?}"
 : "${TRIERGON_EVIDENCE_ARCHIVE:?}"
+case $TRIERGON_EVIDENCE_ARCHIVE in
+s3://[!/]*) ;;
+*) echo "TRIERGON_EVIDENCE_ARCHIVE must name a bucket (s3://BUCKET[/PREFIX]): $TRIERGON_EVIDENCE_ARCHIVE" >&2; exit 2 ;;
+esac
 case $TRIERGON_SSH_CIDR in
 */32) ;;
 *) echo "TRIERGON_SSH_CIDR must be one address (/32): $TRIERGON_SSH_CIDR" >&2; exit 2 ;;
