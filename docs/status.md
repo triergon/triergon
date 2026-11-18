@@ -146,9 +146,9 @@ timing step now restores those records from its kept set: one partial run per ta
 reused every timing step from the `a5837d38` run (sets
 `gate-run-aarch64-a5837d38-20261118-163537-shard-1` to `-5` and
 `gate-run-armv7-a5837d38-20261118-163631-shard-1` to `-5`, which measured all 30 steps per
-target) and measured every memory step from the restored records, 30 of 30 steps passing on both targets (heap ≤0.5904 and total RSS
-≤0.9704 on AArch64, ≤0.6086 and ≤0.9766 on ARMv7; sets
-`gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
+target) and measured every memory step from the restored records, 30 of 30 steps passing on
+both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and ≤0.9766 on ARMv7;
+sets `gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
 `gate-run-armv7-01ba2375-20261118-191656-shard-1` to `-5`).
 
 The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
