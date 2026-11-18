@@ -1863,13 +1863,7 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
         name,
         &file,
         &data,
-        vec![
-            ("seek_target_ns", Value::int(250_000_000)),
-            (
-                "seek_probe_targets_ns",
-                Value::Array(vec![Value::int(0), Value::int(250_000_000)]),
-            ),
-        ],
+        vec![("seek_target_ns", Value::int(250_000_000))],
     ));
     let contract = delivery_contract(
         "matroska-cues-preroll",
@@ -1884,6 +1878,8 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
             "subtitle-recovery cutoff across audio tracks with distinct initial padding and sample rates",
             "subtitle replay when initial padding rounds to zero or one Segment tick",
             "fresh and after-EOF seeks at zero and 250 ms before a nonzero first indexed keyframe",
+            "all six seek probe times on every input",
+            "playback retains the reference packet sequence and may prepend checked source audio or subtitle preroll",
             "fresh, repeated and after-EOF seeks",
             "unknown Cluster lengths",
             "seek cancellation, I/O failures and malformed indexes",

@@ -338,7 +338,7 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
 }
 
 #[test]
-fn compatibility_seek_can_land_on_the_first_keyframe() {
+fn playback_and_compatibility_seeks_can_land_on_the_first_keyframe() {
     let tracks = element(0x1654ae6b, &track(1, 1, &[]));
     let cluster = cluster(1000, simple(1, 0, 0x80, b"first"));
     let cue = element(
@@ -355,24 +355,29 @@ fn compatibility_seek_can_land_on_the_first_keyframe() {
     let cues = element(0x1c53bb6b, &cue);
     let input = mkv(&[tracks, cluster, cues].concat());
     let cancel = AtomicBool::new(false);
-    for target in [0, 250_000_000] {
-        let mut reader =
-            BlockingReader::open_seekable(Cursor::new(&input), Limits::default()).unwrap();
-        for _ in 0..2 {
-            let landed =
-                triergon_matroska::compat::seek::at_block_start(&mut reader, 0, target, &cancel)
-                    .unwrap();
-            assert_eq!(landed.actual_ns, 1_000_000_000);
-            assert_eq!(landed.discard_until_ns, target);
-            assert!(landed.replays_from_start);
-            let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
-            assert_eq!(packet.packet.data.as_ref(), b"first");
-            assert!(reader.next_typed_packet(&cancel).unwrap().is_none());
+    for block_start in [false, true] {
+        for target in [0, 250_000_000] {
+            let mut reader =
+                BlockingReader::open_seekable(Cursor::new(&input), Limits::default()).unwrap();
+            for _ in 0..2 {
+                let landed = if block_start {
+                    triergon_matroska::compat::seek::at_block_start(&mut reader, 0, target, &cancel)
+                } else {
+                    reader.seek_for_playback(0, target, &cancel)
+                }
+                .unwrap();
+                assert_eq!(landed.actual_ns, 1_000_000_000);
+                assert_eq!(landed.discard_until_ns, target);
+                assert!(landed.replays_from_start);
+                let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+                assert_eq!(packet.packet.data.as_ref(), b"first");
+                assert!(reader.next_typed_packet(&cancel).unwrap().is_none());
+            }
+            assert!(matches!(
+                reader.seek_previous(0, target, &cancel),
+                Err(Error::Unsupported("no previous random-access block"))
+            ));
         }
-        assert!(matches!(
-            reader.seek_previous(0, target, &cancel),
-            Err(Error::Unsupported("no previous random-access block"))
-        ));
     }
 }
 

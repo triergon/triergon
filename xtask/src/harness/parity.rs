@@ -454,14 +454,153 @@ pub fn colour_parity(
     Ok(result)
 }
 
+// Normal playback can recover earlier audio and subtitles for decoding. Use the
+// reference read from the start to check each added packet's source and order.
+fn playback_preroll_matches(
+    actual: &Value,
+    seek: &Value,
+    source: &Value,
+    target_ns: i64,
+) -> Result<(), &'static str> {
+    let integer = |field: Option<&Value>| match field {
+        Some(Value::Number(number)) => number.as_i128(),
+        _ => None,
+    };
+    let track_info = seek.get("tracks").ok_or("missing seek tracks")?;
+    let tracks = track_info.as_array().ok_or("invalid seek tracks")?;
+    if !actual
+        .get("tracks")
+        .is_some_and(|actual| super::diff::equal(actual, track_info))
+    {
+        return Err("playback seek tracks differ");
+    }
+    let mut wanted = seek
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing reference seek packets")?
+        .iter()
+        .peekable();
+    let mut earlier = source
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing sequential reference packets")?
+        .iter();
+    let packets = actual
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing playback seek packets")?;
+    let mut emitted = vec![false; tracks.len()];
+    let mut preroll = vec![false; tracks.len()];
+    for packet in packets {
+        let track = integer(packet.get("track"))
+            .and_then(|number| usize::try_from(number).ok())
+            .filter(|&track| track < tracks.len())
+            .ok_or("invalid playback seek track")?;
+        if wanted
+            .peek()
+            .is_some_and(|expected| super::diff::equal(packet, expected))
+        {
+            emitted[track] = true;
+            wanted.next();
+            continue;
+        }
+        if emitted[track] || !matches!(integer(tracks[track].get("kind")), Some(2 | 17)) {
+            return Err("playback seeks must keep the complete reference packet sequence");
+        }
+        match packet.get("pts_ns") {
+            Some(Value::Null) if preroll[track] => {}
+            pts if integer(pts).is_some_and(|pts| pts < i128::from(target_ns)) => {
+                preroll[track] = true;
+            }
+            _ => return Err("extra playback packet lacks a preroll clock before the target"),
+        }
+        let Value::Object(fields) = packet else {
+            return Err("invalid playback packet");
+        };
+        if integer(packet.get("trim_start_samples")) != Some(0)
+            || !earlier.by_ref().any(|original| {
+                let Value::Object(original_fields) = original else {
+                    return false;
+                };
+                fields.len() == original_fields.len()
+                    && fields.iter().all(|(key, observed)| {
+                        // Start padding is applied once at the beginning of the source.
+                        key == "trim_start_samples"
+                            || original
+                                .get(key)
+                                .is_some_and(|expected| super::diff::equal(observed, expected))
+                    })
+            })
+        {
+            return Err("extra playback preroll differs from the sequential reference");
+        }
+    }
+    if wanted.next().is_some() {
+        return Err("playback seek lost a reference packet");
+    }
+    Ok(())
+}
+
+#[test]
+fn playback_seek_keeps_the_full_reference_sequence() {
+    let packet = |track, pts, start_trim, payload| {
+        Value::object([
+            ("track", Value::int(track)),
+            ("pts_ns", pts),
+            ("trim_start_samples", Value::int(start_trim)),
+            ("payload", Value::str(payload)),
+        ])
+    };
+    let trace = |packets| {
+        Value::object([
+            (
+                "tracks",
+                Value::Array(
+                    [1, 2, 17]
+                        .map(|kind| Value::object([("kind", Value::int(kind))]))
+                        .to_vec(),
+                ),
+            ),
+            ("packets", Value::Array(packets)),
+        ])
+    };
+    let video = packet(0, Value::int(20), 0, "video");
+    let audio = packet(1, Value::int(21), 0, "audio");
+    let seek = trace(vec![video.clone(), audio.clone()]);
+    let earlier = packet(1, Value::int(18), 0, "preroll");
+    let untimed = packet(1, Value::Null, 0, "same lace");
+    let source = trace(vec![
+        packet(1, Value::int(18), 312, "preroll"),
+        untimed.clone(),
+        video.clone(),
+        audio.clone(),
+    ]);
+    let valid = trace(vec![
+        earlier.clone(),
+        untimed.clone(),
+        video.clone(),
+        audio.clone(),
+    ]);
+    assert_eq!(playback_preroll_matches(&valid, &seek, &source, 22), Ok(()));
+    assert!(playback_preroll_matches(&valid, &seek, &source, 18).is_err());
+    for packets in [
+        vec![untimed.clone(), video.clone(), audio.clone()],
+        vec![video.clone(), earlier.clone()],
+        vec![earlier.clone(), audio.clone(), video.clone()],
+        vec![video.clone(), audio.clone(), earlier.clone()],
+        vec![packet(1, Value::int(18), 0, "other bytes"), video, audio],
+    ] {
+        assert!(playback_preroll_matches(&trace(packets), &seek, &source, 22).is_err());
+    }
+}
+
 pub fn seek_parity(
     run: &Run<'_>,
     sequential_required: bool,
     comparison: Option<&Comparison<'_>>,
     content: bool,
-    probe_targets: Option<&Value>,
 ) -> Result<Value, String> {
-    const DEFAULT_TARGETS: [i64; 6] = [
+    const TARGETS_NS: [i64; 6] = [
         0,
         250_000_000,
         2_500_000_000,
@@ -469,24 +608,10 @@ pub fn seek_parity(
         15_500_000_000,
         25_000_000_000,
     ];
-    let targets = match probe_targets {
-        Some(Value::Array(values)) if !values.is_empty() => values
-            .iter()
-            .map(|value| match value {
-                Value::Number(number) => number.as_i128().and_then(|ns| i64::try_from(ns).ok()),
-                _ => None,
-            })
-            .collect::<Option<Vec<_>>>()
-            .ok_or("seek probe targets must be integral nanoseconds")?,
-        Some(_) => return Err("seek probe targets must be a nonempty list".into()),
-        None => DEFAULT_TARGETS.to_vec(),
-    };
-    if targets.windows(2).any(|pair| pair[0] >= pair[1]) {
-        return Err("seek probe targets must be strictly increasing".into());
-    }
     let mut result = parity(run, sequential_required, comparison, content, "")?;
+    let source = crate::checks::read_json(&run.raw.join("reference.json"))?;
     let mut rows = Vec::new();
-    for target in targets {
+    for target in TARGETS_NS {
         for after_eof in [false, true] {
             let mut extra = vec![arg(target)];
             if after_eof {
@@ -494,8 +619,14 @@ pub fn seek_parity(
             }
             let left = run.candidate("seek-trace", &extra);
             let right = run.exec(run.reference, "seek-trace", &extra);
+            let playback = run.candidate("playback-seek-trace", &extra);
+            let playback_check = if ok(&playback) && ok(&right) && ok(&source) {
+                playback_preroll_matches(data(&playback), data(&right), data(&source), target)
+            } else {
+                Err("playback or reference seek worker failed")
+            };
             let delta = differences(data(&left), data(&right));
-            let pass = ok(&left) && ok(&right) && delta.is_empty();
+            let pass = ok(&left) && ok(&right) && delta.is_empty() && playback_check.is_ok();
             rows.push(Value::object([
                 ("target_ns", Value::int(target)),
                 (
@@ -504,8 +635,14 @@ pub fn seek_parity(
                 ),
                 ("status", status_of(pass)),
                 ("differences", Value::Array(delta)),
+                ("playback_status", status_of(playback_check.is_ok())),
+                (
+                    "playback_error",
+                    playback_check.err().map_or(Value::Null, Value::str),
+                ),
                 ("candidate", left),
                 ("reference", right),
+                ("playback_candidate", playback),
             ]));
         }
     }
@@ -515,7 +652,9 @@ pub fn seek_parity(
         .map(|row| match row {
             Value::Object(m) => Value::Object(
                 m.iter()
-                    .filter(|(k, _)| k != "candidate" && k != "reference")
+                    .filter(|(k, _)| {
+                        !matches!(k.as_str(), "candidate" | "reference" | "playback_candidate")
+                    })
                     .cloned()
                     .collect(),
             ),

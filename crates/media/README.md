@@ -161,6 +161,8 @@ symbols and checksum chunks.
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
 replays the landing Cluster, including interleaved audio before the keyframe.
+A bounded scan can land on the first verified keyframe for a nonnegative
+request that precedes it.
 When the reader recovers earlier subtitles, it filters the replay prefix up
 to the destination keyframe. It keeps complete untimed audio laces and audio
 with a known end past the cutoff, even when the packet starts before it.

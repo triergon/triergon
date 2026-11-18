@@ -468,7 +468,8 @@ fn entry() -> Outcome {
             println!("{{\"input_bytes\":{}}}", data.len());
             Ok(())
         }
-        "seek-trace" => seek_trace(data, words),
+        "seek-trace" => seek_trace(data, words, false),
+        "playback-seek-trace" => seek_trace(data, words, true),
         "inflate" => inflate(&data, words),
         "seek" => seek(data, words),
         "seek-bench" => bench(data, words, true, View::PLAIN),
@@ -590,15 +591,20 @@ fn memory(mut data: Vec<u8>, words: &[String], seek: Option<bool>, view: View) -
     Ok(())
 }
 
-/// `seek-trace FILE NS [after-eof]`.
+/// `seek-trace FILE NS [after-eof]` or `playback-seek-trace FILE NS [after-eof]`.
 #[inline(never)]
-fn seek_trace(data: Vec<u8>, words: &[String]) -> Outcome {
+fn seek_trace(data: Vec<u8>, words: &[String], playback: bool) -> Outcome {
     let target = seek_target(words, 0)?;
     let mut demux = open_owned(data, Limits::default())?;
+    let cancel = AtomicBool::new(false);
     if words.get(1).is_some_and(|value| value == "after-eof") {
-        while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
+        while demux.next_packet(&cancel)?.is_some() {}
     }
-    let landing = at_block_start(&mut demux, 0, target, &AtomicBool::new(false))?;
+    let landing = if playback {
+        demux.seek_for_playback(0, target, &cancel)?
+    } else {
+        at_block_start(&mut demux, 0, target, &cancel)?
+    };
     let initial_trim = seek_initial_trim(&demux, 0, &landing)?;
     trace(demux, initial_trim, false, 0)
 }

@@ -167,11 +167,7 @@
       "file": "cues-opus-before-first-keyframe.mkv",
       "sha256": "b8ca5374d1690737f3dd5edc12f39e31d9fc2c2a34dc4c865379857d296c4058",
       "rights": "authored-synthetic",
-      "seek_target_ns": 250000000,
-      "seek_probe_targets_ns": [
-        0,
-        250000000
-      ]
+      "seek_target_ns": 250000000
     }
   ]
 }

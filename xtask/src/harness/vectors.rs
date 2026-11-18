@@ -655,13 +655,7 @@ fn matroska_traces(
             } else if case.get("seek_target_ns").is_none_or(|v| *v == Value::Null) {
                 parity::parity(&run, true, comparison.as_ref(), content, "")?
             } else {
-                parity::seek_parity(
-                    &run,
-                    true,
-                    comparison.as_ref(),
-                    content,
-                    case.get("seek_probe_targets_ns"),
-                )?
+                parity::seek_parity(&run, true, comparison.as_ref(), content)?
             };
             verdicts.push((
                 format!("{id}/{}", s(case, "id").unwrap_or_default()),

@@ -50,7 +50,7 @@ impl RecoveryAudio {
         // counts initial padding in samples before rescaling to Segment ticks.
         let rate = track.sample_rate as i32;
         if rate <= 0 {
-            return Ok(0);
+            return Err(Error::Invalid("seek codec-delay sample rate"));
         }
         let rate = rate as u64;
         // Opus pre-skip counts samples at 48 kHz (RFC 7845 §5.1).
@@ -221,9 +221,7 @@ impl SeekPlanJob {
                 }
                 Phase::Index => {
                     if self.at == cues.len() {
-                        let allow_first_after_target = self.preroll
-                            && self.recovery_audio == RecoveryAudio::BlockStart
-                            && self.requested >= 0;
+                        let allow_first_after_target = self.preroll && self.requested >= 0;
                         let cue = self.best.or_else(|| {
                             self.first.filter(|cue| {
                                 self.preroll && i128::from(cue.ticks) <= self.requested_ticks
