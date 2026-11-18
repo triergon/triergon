@@ -1628,6 +1628,17 @@ kernel-bound memory. The gate planned 30 pairs per case. On each target, 14 timi
 cases and all 15 memory cases met the early stop at 20 pairs. Both targets pass
 conversion, encoder, mux, runtime, heap and total RSS on all 15 cases.
 
+The filtered conversion also matches on Linux AArch64 at 84 short-frame width,
+height and orientation combinations and at 480×270 and 960×540 in both
+orientations. At RGB (0, 85, 170) the reference produces luma 76. Removing
+the extra `1 << 8` rounding term produces 75 in the converter.
+[`capture-filtered-probes-aarch64`](../harness/evidence/sets/capture-filtered-probes-aarch64.json)
+holds these checks at `e12863c8`.
+
+Compared with `f8e1c4d9`, the filtered conversion changes the capture output
+folds on all 15 Linux AArch64 cases. All 15 ARMv7 output folds and all
+reference folds on both targets match their earlier values.
+
 Capture's worst bound here was 1.1669 at `a73350ca` and 1.1865 at `576f088f`. Profiled in user-mode cycles against
 FFmpeg on the gate host, the encoder's motion search reduced each 16-lane sum of absolute
 differences with 16 lane extracts and spills where it was inlined, built half-sample rows
