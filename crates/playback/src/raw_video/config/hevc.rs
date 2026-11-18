@@ -315,8 +315,67 @@ fn skip_profile_tier_level(bits: &mut Rbsp<'_>, sublayers: u8) -> Result<()> {
 }
 
 pub(crate) fn pps(payload: &[u8]) -> Result<(u8, u8)> {
-    let mut bits = Rbsp::new(payload);
+    pps_ids(&mut Rbsp::new(payload))
+}
+
+fn pps_ids(bits: &mut Rbsp<'_>) -> Result<(u8, u8)> {
     Ok((bits.id(63)?, bits.id(15)?))
+}
+
+pub(crate) fn check_repeat_prefixes(vps: &[u8], sps: &[u8], pps: &[u8]) -> Result<()> {
+    vps_timing(vps)?;
+    sps_timing(sps)?;
+    check_pps_prefix(pps)
+}
+
+/// H.265 §7.3.2.3.1 through the base PPS syntax and extension flags.
+fn check_pps_prefix(payload: &[u8]) -> Result<()> {
+    let mut bits = Rbsp::new(payload);
+    pps_ids(&mut bits)?;
+    bits.skip(7)?; // Slice-header and CABAC flags.
+    bits.bounded(14)?; // Default L0 references minus one.
+    bits.bounded(14)?; // Default L1 references minus one.
+    bits.ue()?; // Initial QP delta codeword.
+    bits.skip(2)?; // Constrained intra prediction and transform skip.
+    if bits.flag()? {
+        bits.ue()?; // CU QP delta depth.
+    }
+    bits.ue()?; // Cb QP offset codeword.
+    bits.ue()?; // Cr QP offset codeword.
+    bits.skip(4)?; // Slice chroma offsets, weighted prediction and transquant bypass.
+    let tiles = bits.flag()?;
+    bits.skip(1)?; // Entropy coding sync.
+    if tiles {
+        let columns = bits.bounded(19)?;
+        let rows = bits.bounded(21)?;
+        if !bits.flag()? {
+            for _ in 0..columns + rows {
+                bits.ue()?;
+            }
+        }
+        bits.skip(1)?; // Loop filter across tiles.
+    }
+    bits.skip(1)?; // Loop filter across slices.
+    if bits.flag()? {
+        bits.skip(1)?; // Deblocking override.
+        if !bits.flag()? {
+            bits.ue()?; // Beta offset codeword.
+            bits.ue()?; // Tc offset codeword.
+        }
+    }
+    if bits.flag()? {
+        skip_scaling_lists(&mut bits)?;
+    }
+    bits.skip(1)?; // Reference-list modification.
+    bits.ue()?; // Parallel merge level.
+    bits.skip(1)?; // Slice-header extension enabled.
+    if bits.flag()? {
+        bits.skip(8)?; // Extension flags.
+    }
+    if bits.0.stop_bit_consumed() {
+        return Err(Error::Truncated);
+    }
+    Ok(())
 }
 
 pub(super) fn slice_pps(payload: &[u8], nal_type: u8) -> Result<u8> {
