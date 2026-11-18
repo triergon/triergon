@@ -277,6 +277,18 @@ fn take_cited(root: &Path, output: &Path, key: &Key, full: bool, restore: bool) 
     Ok(None)
 }
 
+/// Whether a result an index entry lists is one a gate run restores when it
+/// reuses it ([`restoring_step`]): a capture timing stage, in the directory the
+/// gate names `capture-ID-timing`, whose records its memory stage reads.
+pub fn restored(result: &Value) -> bool {
+    result.get("command").and_then(Value::as_str) == Some("capture qualify")
+        && result
+            .get("path")
+            .and_then(Value::as_str)
+            .and_then(|path| Path::new(path).parent()?.file_name()?.to_str())
+            .is_some_and(|directory| directory.ends_with("-timing"))
+}
+
 /// Restore the directory of the result at `path` in kept set `set` into `output`:
 /// unpacked beside it first, then moved in, so a failed restore leaves nothing.
 fn restore_outputs(root: &Path, set: &str, path: &str, output: &Path) -> R<()> {
@@ -640,6 +652,70 @@ mod tests {
             7
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_reused_step_whose_set_cannot_be_restored_is_measured() {
+        let root = crate::walk::scratch("gate-unrestorable");
+        let key = Key {
+            sha256: "u".repeat(64),
+            components: Value::object([("command", Value::str("capture qualify"))]),
+        };
+        let set = Value::object([
+            ("name", Value::str("gone")),
+            ("retention", Value::str("retained")),
+            // A pack this host cannot unpack, so nothing reaches the archive.
+            ("key", Value::str("evidence/gone/pack.zip")),
+            ("sha256", Value::str("0".repeat(64))),
+            (
+                "results",
+                Value::Array(vec![Value::object([
+                    ("path", Value::str("capture-c01-timing/gate-result.json")),
+                    ("command", Value::str("capture qualify")),
+                    ("key", Value::str(&key.sha256)),
+                    ("status", Value::int(0)),
+                ])]),
+            ),
+        ]);
+        let index = root.join(crate::evidence::SETS).join("gone.json");
+        fs::create_dir_all(index.parent().unwrap()).unwrap();
+        crate::corpus::write_json(&index, &set).unwrap();
+        let output = root.join("timing");
+        let measured = std::cell::Cell::new(false);
+        let status = restoring_step(&root, &output, &key, false, || {
+            measured.set(true);
+            Ok(1)
+        });
+        assert_eq!(status.unwrap(), 1);
+        assert!(measured.get());
+        assert!(!was_reused(&output));
+        assert!(fs::read_dir(&root).unwrap().all(|entry| {
+            !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("restoring")
+        }));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn only_capture_timing_results_are_restored() {
+        let result = |command: &str, path: &str| {
+            Value::object([("command", Value::str(command)), ("path", Value::str(path))])
+        };
+        assert!(restored(&result(
+            "capture qualify",
+            "capture-c01-ui-static-960-timing/gate-result.json"
+        )));
+        assert!(!restored(&result(
+            "capture qualify",
+            "capture-c01-ui-static-960/gate-result.json"
+        )));
+        assert!(!restored(&result(
+            "report --benchmark",
+            "benchmark-timing/gate-result.json"
+        )));
     }
 
     #[test]

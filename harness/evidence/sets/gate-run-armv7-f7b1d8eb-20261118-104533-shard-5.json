@@ -2,7 +2,7 @@
  "name": "gate-run-armv7-f7b1d8eb-20261118-104533-shard-5",
  "path": "gate-run-armv7-f7b1d8eb-20261118-104533-shard-5",
  "retention": "retained",
- "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 5 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, 32-bit ARMv7 user space: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured, archived by hand as collect() does; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 5 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, 32-bit ARMv7 user space: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
  "key": "evidence/gate-runs/f7b1d8eb17554e4710c4f475d615bbf83206453c-armv7-20261118-104533/shard-5/d18ab4295c65edf6ce9c8920f3a7598c85d2b12b78fb724d4eec44ead2990862.tar.zst",
  "sha256": "d18ab4295c65edf6ce9c8920f3a7598c85d2b12b78fb724d4eec44ead2990862",
  "bytes": 425912533,

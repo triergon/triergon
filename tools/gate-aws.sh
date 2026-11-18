@@ -107,10 +107,11 @@ tags() { echo "ResourceType=$1,Tags=[{Key=Project,Value=triergon},{Key=Name,Valu
 presign() { aws s3 presign "$ARCHIVE/$1" --expires-in 86400; }
 archived() { aws s3 ls "$ARCHIVE/$1" >/dev/null 2>&1 < /dev/null; }
 
-# Presign each kept set in STATE/restorable, which a reused gate step may restore
-# its outputs from, into STATE/evidence-addresses. An address lasts only as long as
-# the credentials that signed it, an hour or less from SSO, so a run signs them
-# again every poll and each poll hands a host the current file (hand_addresses).
+# Presign each kept set in STATE/restorable, which a reused capture timing step
+# may restore its records from, into STATE/evidence-addresses. An address lasts
+# only as long as the credentials that signed it, an hour or less from SSO, so a
+# run signs them again every poll and each poll hands a host the current file
+# (hand_addresses).
 sign_addresses() {
     local set key url
     while read -r set key; do
@@ -122,7 +123,7 @@ sign_addresses() {
 # Give host I the current addresses, at ADDRESSES in its repository.
 hand_addresses() {
     [ -n "$ADDRESSES" ] && [ -f "$STATE/evidence-addresses" ] || return 0
-    on "$1" "mkdir -p ${ADDRESSES%/*} && taskset -c 0 cat > $ADDRESSES.new && mv $ADDRESSES.new $ADDRESSES" \
+    on "$1" "taskset -c 0 sh -c 'mkdir -p ${ADDRESSES%/*} && cat > $ADDRESSES.new && mv $ADDRESSES.new $ADDRESSES'" \
         < "$STATE/evidence-addresses"
 }
 

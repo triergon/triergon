@@ -132,15 +132,21 @@ for byte unchanged, as it does the ASS, font, packet framing, rasterising and sh
 workers. On Linux AArch64 the grades of `ass-render-host`, `subtitle-dvd-host` and
 `subtitle-text-host` fail, each only on its contract's listed open cases; no grade fails
 on ARMv7. The capture memory steps fail on both targets without measuring:
-`capture qualify --stage memory` reads the records of its timing step, and a reused timing
-step writes none. No runtime or memory bound crosses its limit; per feature,
+`capture qualify --stage memory` reads the records of its timing step, which a reused
+timing step did not restore then. No runtime or memory bound crosses its limit; per feature,
 the median change of the case medians against `1c64b775` lies within −1.6% and +1.9%
 (+8.1% for the five `subtitle-dvd-host` cases, whose operations take microseconds), as do
 the features whose workers are unchanged, and the changed workers' user-mode instruction
 counts on the link-order training operations are within 0.05% of `2a6a07a7`'s. Sets
 `gate-run-aarch64-2b196e9c-20261117-192110-shard-1` to `-8` and
 `gate-run-armv7-2b196e9c-20261117-192033-shard-1` to `-8` hold the shards' outputs, and
-`link-order-code-size` the instruction counts and the per-feature comparisons.
+`link-order-code-size` the instruction counts and the per-feature comparisons. A reused
+timing step now restores those records from its kept set: at `176afab0`, one partial run per
+target of the 15 capture items, on one host each, reused every timing step from the
+`f7b1d8eb` run and measured every memory step from the restored records, 30 of 30 steps
+passing on both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and
+≤0.9766 on ARMv7; sets `gate-run-aarch64-176afab0-20261118-134108-shard-1` and
+`gate-run-armv7-176afab0-20261118-134158-shard-1`).
 
 The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
 legacy AAC-LC, MP4 forward and range, TS program, MPEG-TS progressive playback and raw
