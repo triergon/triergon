@@ -13,7 +13,9 @@
 //! the set is kept, which happens when a result of it is cited. A later run of
 //! the same command with the same key prints the cited set, records a
 //! `gate-result.json` that names it as reused, and exits with its status;
-//! `--full` measures instead.
+//! `--full` measures instead. A step whose outputs a later step reads (a capture
+//! timing stage, whose records its memory stage reads) also restores them from
+//! the cited set ([`restoring_step`]).
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -204,25 +206,86 @@ pub fn step(
     full: bool,
     run: impl FnOnce() -> R<i32>,
 ) -> R<i32> {
+    reused_or_run(root, output, key, full, false, run)
+}
+
+/// [`step`] for a step whose outputs a later step reads: taking the cited result
+/// also restores the cited step's directory from its kept set into `output`, so
+/// the step leaves what a measurement leaves. A step whose set cannot be fetched
+/// or restored is measured.
+pub fn restoring_step(
+    root: &Path,
+    output: &Path,
+    key: &Key,
+    full: bool,
+    run: impl FnOnce() -> R<i32>,
+) -> R<i32> {
+    reused_or_run(root, output, key, full, true, run)
+}
+
+fn reused_or_run(
+    root: &Path,
+    output: &Path,
+    key: &Key,
+    full: bool,
+    restore: bool,
+    run: impl FnOnce() -> R<i32>,
+) -> R<i32> {
     if !full && let Some(cited) = cited(root, key)? {
         let status = cited
             .get("status")
             .and_then(Value::as_f64)
             .ok_or("cited result without a status")? as i32;
-        println!(
-            "reused {} from evidence set {} (status {status}); --full measures it again",
-            cited
-                .get("path")
-                .and_then(Value::as_str)
-                .unwrap_or_default(),
-            cited.get("set").and_then(Value::as_str).unwrap_or_default(),
-        );
-        record(output, key, status, Some(cited))?;
-        return Ok(status);
+        let field = |name| cited.get(name).and_then(Value::as_str).unwrap_or_default();
+        let (path, set) = (field("path"), field("set"));
+        let restored = if restore {
+            restore_outputs(root, set, path, output)
+        } else {
+            Ok(())
+        };
+        match restored {
+            Ok(()) => {
+                println!(
+                    "reused {path} from evidence set {set} (status {status}); --full measures it again"
+                );
+                record(output, key, status, Some(cited))?;
+                return Ok(status);
+            }
+            Err(error) => {
+                println!("cannot restore {path} from evidence set {set}: {error}; measuring it");
+            }
+        }
     }
     let status = run()?;
     record(output, key, status, None)?;
     Ok(status)
+}
+
+/// Restore the directory of the result at `path` in kept set `set` into `output`:
+/// unpacked beside it first, then moved in, so a failed restore leaves nothing.
+fn restore_outputs(root: &Path, set: &str, path: &str, output: &Path) -> R<()> {
+    let directory = Path::new(path)
+        .parent()
+        .map(|d| d.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut staging = output.as_os_str().to_owned();
+    staging.push(format!(".restoring-{}", std::process::id()));
+    let staging = PathBuf::from(staging);
+    let _ = fs::remove_dir_all(&staging);
+    let restored = crate::evidence::restore(root, set, &directory, &staging).and_then(|_| {
+        fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
+        for entry in fs::read_dir(&staging).map_err(|e| format!("{}: {e}", staging.display()))? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let to = output.join(entry.file_name());
+            if to.is_dir() {
+                fs::remove_dir_all(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+            }
+            fs::rename(entry.path(), &to).map_err(|e| format!("{}: {e}", to.display()))?;
+        }
+        Ok(())
+    });
+    let _ = fs::remove_dir_all(&staging);
+    restored
 }
 
 /// Record the result of a gate command in `output`. A measured result binds the

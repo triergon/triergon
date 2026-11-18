@@ -127,9 +127,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 stage,
             };
             let key = qualify::gate_key(root, &options)?;
-            return reuse::step(root, &options.out, &key, a.get("full").is_some(), || {
-                qualify::run(root, &options).map(|()| 0)
-            });
+            let full = a.get("full").is_some();
+            let run = || qualify::run(root, &options).map(|()| 0);
+            // A memory stage reads the records of its timing stage, so a reused
+            // timing stage restores them.
+            return if matches!(options.stage, qualify::Stage::Timing) {
+                reuse::restoring_step(root, &options.out, &key, full, run)
+            } else {
+                reuse::step(root, &options.out, &key, full, run)
+            };
         }
         "summarize" => match rest {
             [run] => summary::run(Path::new(run))?,

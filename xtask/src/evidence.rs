@@ -590,26 +590,7 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
             "{name}: `files` must list {{path, sha256}} objects"
         ));
     }
-    let (key, expected) = (
-        s(set, "key").ok_or("set without key")?,
-        s(set, "sha256").ok_or("set without sha256")?,
-    );
-    let extension =
-        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
-    let archive = archive_location()?;
-    let cache = root.join(".research/evidence-cache");
-    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
-    let download = cache.join(format!("{expected}{}", extension.suffix()));
-    if !download.is_file() {
-        let partial = cache.join(format!("{expected}.part"));
-        aws_cp(&format!("{archive}/{key}"), &partial.display().to_string())?;
-        fs::rename(&partial, &download).map_err(|e| e.to_string())?;
-    }
-    if sha256::file_hex(&download).map_err(|e| format!("{}: {e}", download.display()))? != expected
-    {
-        let _ = fs::remove_file(&download);
-        return Err(format!("{key}: SHA-256 differs from the index"));
-    }
+    let (download, compression) = download(root, set)?;
     let target = into.map_or_else(
         || root.join(".research/evidence").join(name),
         Path::to_path_buf,
@@ -624,7 +605,7 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         unpacked: 0,
         current: None,
     });
-    extension.unpack(&download, &mut tar)?;
+    compression.unpack(&download, &mut tar)?;
     let unpacked = tar.finish()?.unpacked;
     if listed_len(set).is_some_and(|len| len != unpacked) {
         return Err(format!("{name}: archive and index list different files"));
@@ -633,6 +614,175 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         "{name}: {unpacked} files verified into {}",
         target.display()
     ))
+}
+
+/// Where a host without archive credentials downloads kept sets from: lines of a
+/// set's name and a presigned address of its pack, which `tools/gate-aws.sh`
+/// writes for the sets a gate run may restore ([`restorable`]).
+pub const ADDRESSES: &str = ".research/evidence-addresses";
+
+/// The pack of `set` in `.research/evidence-cache`, downloaded through its address
+/// in [`ADDRESSES`] or else from the archive with the `aws` CLI, and checked
+/// against the SHA-256 the index records.
+fn download(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> {
+    let (key, expected) = (
+        s(set, "key").ok_or("set without key")?,
+        s(set, "sha256").ok_or("set without sha256")?,
+    );
+    let compression =
+        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
+    let cache = root.join(".research/evidence-cache");
+    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let download = cache.join(format!("{expected}{}", compression.suffix()));
+    if !download.is_file() {
+        let partial = cache.join(format!("{expected}.{}.part", std::process::id()));
+        let name = s(set, "name").unwrap_or_default();
+        match address(root, name)? {
+            Some(url) => curl(&url, &partial)?,
+            None => aws_cp(
+                &format!("{}/{key}", archive_location()?),
+                &partial.display().to_string(),
+            )?,
+        }
+        fs::rename(&partial, &download).map_err(|e| e.to_string())?;
+    }
+    if sha256::file_hex(&download).map_err(|e| format!("{}: {e}", download.display()))? != expected
+    {
+        let _ = fs::remove_file(&download);
+        return Err(format!("{key}: SHA-256 differs from the index"));
+    }
+    Ok((download, compression))
+}
+
+/// The address [`ADDRESSES`] gives set `name`, if the file lists it.
+fn address(root: &Path, name: &str) -> Result<Option<String>, String> {
+    let path = root.join(ADDRESSES);
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    Ok(text.lines().find_map(|line| {
+        let (set, url) = line.split_once(' ')?;
+        (set == name).then(|| url.trim().to_owned())
+    }))
+}
+
+fn curl(url: &str, to: &Path) -> Result<(), String> {
+    let status = Command::new("curl")
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--retry",
+            "3",
+            "--output",
+        ])
+        .arg(to)
+        .arg(url)
+        .status()
+        .map_err(|e| format!("curl: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        let _ = fs::remove_file(to);
+        Err(format!("downloading {}: curl {status}", to.display()))
+    }
+}
+
+/// The commands whose results a gate run restores when it reuses them, because a
+/// later step reads their outputs: a capture memory stage reads the records of
+/// its timing stage.
+const RESTORED: [&str; 1] = ["capture qualify"];
+
+/// `cargo xtask evidence restorable`: the name and key of every kept set listing
+/// a result a gate run may restore, for `tools/gate-aws.sh` to give its hosts an
+/// address of each ([`ADDRESSES`]).
+pub fn restorable(root: &Path) -> Result<Vec<(String, String)>, String> {
+    Ok(sets(root)?
+        .iter()
+        .filter(|set| s(set, "retention") == Some(Retention::Kept.label()))
+        .filter(|set| {
+            set.get("results")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .iter()
+                .any(|result| RESTORED.iter().any(|c| s(result, "command") == Some(c)))
+        })
+        .filter_map(|set| Some((s(set, "name")?.to_owned(), s(set, "key")?.to_owned())))
+        .collect())
+}
+
+/// Restore `directory` of kept set `name` into `into`: every file of the set under
+/// that directory (all of them for an empty one), at its path below it. Returns
+/// how many files it restored; a directory the set lacks is an error.
+pub fn restore(root: &Path, name: &str, directory: &str, into: &Path) -> Result<usize, String> {
+    struct Subtree<'a> {
+        name: &'a str,
+        prefix: String,
+        into: &'a Path,
+        restored: usize,
+        current: Option<(BufWriter<File>, PathBuf)>,
+    }
+    impl TarFiles for Subtree<'_> {
+        fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
+            let path = path.trim_start_matches("./");
+            let Some(relative) = path.strip_prefix(&self.prefix) else {
+                return Ok(());
+            };
+            if relative.is_empty()
+                || Path::new(relative)
+                    .components()
+                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
+            {
+                return Err(format!("{}: {path} escapes the set", self.name));
+            }
+            let out = self.into.join(relative);
+            fs::create_dir_all(out.parent().expect("file has a parent"))
+                .map_err(|e| format!("{}: {e}", out.display()))?;
+            let file = File::create(&out).map_err(|e| format!("{}: {e}", out.display()))?;
+            self.current = Some((BufWriter::new(file), out));
+            Ok(())
+        }
+        fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
+            match &mut self.current {
+                Some((file, out)) => file
+                    .write_all(chunk)
+                    .map_err(|e| format!("{}: {e}", out.display())),
+                None => Ok(()),
+            }
+        }
+        fn end(&mut self) -> Result<(), String> {
+            if let Some((mut file, out)) = self.current.take() {
+                file.flush()
+                    .map_err(|e| format!("{}: {e}", out.display()))?;
+                self.restored += 1;
+            }
+            Ok(())
+        }
+    }
+    let set = set(root, name)?;
+    if s(&set, "retention") != Some(Retention::Kept.label()) {
+        return Err(format!("{name}: not a kept set"));
+    }
+    let (download, compression) = download(root, &set)?;
+    let directory = directory.trim_start_matches("./").trim_end_matches('/');
+    let mut tar = TarReader::new(Subtree {
+        name,
+        prefix: if directory.is_empty() {
+            String::new()
+        } else {
+            format!("{directory}/")
+        },
+        into,
+        restored: 0,
+        current: None,
+    });
+    compression.unpack(&download, &mut tar)?;
+    match tar.finish()?.restored {
+        0 => Err(format!("{name}: no files under {directory}/")),
+        restored => Ok(restored),
+    }
 }
 
 fn listed_len(set: &Value) -> Option<usize> {

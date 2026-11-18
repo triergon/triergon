@@ -26,7 +26,9 @@
 #       for its module source and the image's kernel. --items runs those items of
 #       the plan alone; each --input, a media inputs archive in the evidence
 #       archive (.tar.gz, repository-relative paths), is unpacked at each host's
-#       repository root before it gets ready, for inputs the image lacks
+#       repository root before it gets ready, for inputs the image lacks. Each
+#       host gets an address of every kept set a reused step may restore its
+#       outputs from (.research/evidence-addresses)
 #
 # Environment: AWS_PROFILE and AWS_REGION; TRIERGON_SUBNET, the subnet hosts
 # start in; TRIERGON_SSH_CIDR, the one address (/32) SSH is open to, which must be
@@ -381,6 +383,8 @@ shard() {
             { say "host $i: could not unpack $input"; return 1; }
         say "host $i: unpacked $input"
     done
+    on "$i" "mkdir -p $(repository_path "$target")/.research && cat > $(repository_path "$target")/.research/evidence-addresses" \
+        < "$STATE/evidence-addresses" || { say "host $i: could not copy the evidence addresses"; return 1; }
     detached "$i" "READY" ready "$i/$count"
     detached "$i" "DONE" run "$i/$count" ".research/gate/$revision" "$full"
     touch "$out/shard-$i/finished"
@@ -516,6 +520,13 @@ run() {
     POLL=300
     RUN_OBJECT="qualification/gate-runs/$revision-$target-$stamp"
     RUN_NAME="gate-run-$target-${revision:0:8}-$stamp"
+    # A step that reuses a result whose outputs a later step reads (a capture
+    # timing stage's records) restores them from its kept set, which the hosts
+    # download through these addresses (`cargo xtask evidence restorable`).
+    local set key
+    (cd "$checkout" && CARGO_INCREMENTAL=0 cargo xtask evidence restorable) |
+        while read -r set key; do echo "$set $(presign "$key" < /dev/null)"; done > "$STATE/evidence-addresses"
+    say "addresses of $(wc -l < "$STATE/evidence-addresses" | tr -d ' ') kept sets the hosts may restore from"
     mkdir -p "$out"
     rm -f "$out/ended" "$out/summary-host" "$out"/terminated-* "$out"/shard-*/finished "$out"/shard-*/verified
     rmdir "$out/.release" 2>/dev/null || true

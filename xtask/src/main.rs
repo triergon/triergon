@@ -93,6 +93,8 @@ commands:
   evidence pack DIR OUT       deterministic .tar.gz or .tar.zst of DIR; prints its SHA-256
   evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
                               (harness/evidence/sets/SET.json; TRIERGON_EVIDENCE_ARCHIVE)
+  evidence restorable         the name and key of each kept set holding results a gate run
+                              restores when it reuses them
   playback-golds DIR [--check]
                  convert the FFprobe captures of evidence set playback-terminal-matrix-ffprobe,
                  unpacked in DIR, into the playback terminal-media records; --check compares
@@ -390,9 +392,16 @@ fn evidence(root: &Path, args: &[String]) -> Task {
             println!("{}", evidence::promote(root, set)?);
             Ok(())
         }
+        [command] if command == "restorable" => {
+            for (set, key) in evidence::restorable(root)? {
+                println!("{set} {key}");
+            }
+            Ok(())
+        }
         _ => Err(
             "usage: evidence pack DIR OUT | evidence upload SET ARCHIVE \
-                  | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR]"
+                  | evidence entry SET ARCHIVE [--key KEY] | evidence promote SET | evidence fetch SET [DIR] \
+                  | evidence restorable"
                 .into(),
         ),
     }
