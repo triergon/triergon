@@ -73,10 +73,10 @@ fn short_filtered_frames_against_reference() {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 #[test]
-#[ignore = "requires the pinned AArch64 capture reference worker"]
-fn filtered_capture_resolutions_against_reference() {
+#[ignore = "requires the pinned capture reference worker for this target"]
+fn capture_resolutions_against_reference() {
     use triergon_capture::pixel::Orientation;
     use triergon_capture::{Session, SessionConfig};
 
@@ -107,7 +107,12 @@ fn filtered_capture_resolutions_against_reference() {
                 .unwrap();
             assert!(status.success(), "{w}x{h}, flip {flip}: {status}");
 
-            let mut candidate = Session::open_filtered(&cfg).unwrap();
+            let mut candidate = if cfg!(target_arch = "aarch64") {
+                Session::open_filtered(&cfg)
+            } else {
+                Session::open(&cfg)
+            }
+            .unwrap();
             candidate
                 .encode(&rgba, orientation, &mut Vec::new())
                 .unwrap();

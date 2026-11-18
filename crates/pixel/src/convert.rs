@@ -232,7 +232,9 @@ mod filtered {
     pub(super) const Y_R: i32 = 8414;
     pub(super) const Y_G: i32 = 16519;
     pub(super) const Y_B: i32 = 3208;
-    // The extra 1 << 8 reproduces the reference luma rounding at RGB boundary values.
+    // The extra 1 << 8 was recovered by fitting the fixed-point formula to the
+    // reference's observed luma bytes in the short_filtered_frames_against_reference probe.
+    // RGB (0, 85, 170) gives 76 in the probe and 75 with only the half-unit bias.
     const Y_OFFSET: i32 = (16 << 15) + (1 << 14) + (1 << 8);
 
     pub(super) fn convert<'a>(
@@ -446,6 +448,20 @@ mod tests {
         let mut picture = Picture::new(geometry);
         rgba_to_yuv420(&rgba, Orientation::TopDown, &mut picture).unwrap();
         (picture.y[0], picture.cb[0], picture.cr[0])
+    }
+
+    #[test]
+    fn filtered_luma_matches_the_observed_rounding_boundary() {
+        let [r, g, b, a] = [0, 85, 170, 255];
+        let geometry = Geometry::new(16, 8).unwrap();
+        let rgba = [r, g, b, a].repeat(16 * 8);
+        let mut picture = Picture::new(geometry);
+        Converter::filtered(geometry)
+            .convert(&rgba, Orientation::TopDown, &mut picture)
+            .unwrap();
+
+        assert_eq!(solid(16, (r, g, b, a)).0, 75);
+        assert_eq!((solid(14, (r, g, b, a)).0, picture.y[0]), (76, 76));
     }
 
     #[test]
