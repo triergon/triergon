@@ -261,6 +261,15 @@ All 135 ARMv7 total RSS bounds remain above 1.0, with `avc-header-only-idr` high
 `gate-run-armv7-f6de9851-20261117-230647-shard-1` hold the reports, build identities,
 plans and logs.
 
+ARMv7 debugger snapshots of the same two executables cover `avc-header-only-idr`,
+`avc-high-flags` and `hevc-config-unknown_empty`, with 32 runs per executable and case.
+Rust's stack-guard lookup adds a median of 31.5 to 32 resident pages, of which 30.5 to
+31 are libc executable pages. Each shared libc load-address bucket (modulo 64 KiB)
+compares the candidate's median residency before input open with the median of the
+reference's per-run maxima over three stops (before input open, operation start and
+operation end). The median excess across shared buckets is 16.25, 14.5 and 13.5 pages,
+respectively. The packet-framing gate uses the kernel-bound peaks recorded above.
+
 Every gated feature's contract requires both Linux AArch64 and ARMv7 since `47aa0451`
 ([quality](quality.md#reference-and-corpus)). One partial gate run at that revision on three
 c6g.4xlarge hosts ran the 26 items those contracts belong to on ARMv7, measured the same
@@ -868,6 +877,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Playback with HEVC parameter-set repeats, ARMv7, shard 2 of 2 | `6bbb2cb7887d08585a86440dcb4722506a7e1cb6` | [`43ee65711daba9295f1f963771cd120531eace54aba94b9032e08fb06232b470`](../harness/evidence/sets/gate-run-armv7-6bbb2cb7-20261118-105014-shard-2.json) |
 | Packet framing, Linux AArch64 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`5bc206763e41494030e26cd61cfac84d66a0fad4416ac5d5f7feeb81b8d25009`](../harness/evidence/sets/gate-run-aarch64-f6de9851-20261117-230647-shard-1.json) |
 | Packet framing, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`2c3625a5b709f4402496798fe95ddec86d59216fddf2a5e78acb12512ffac28b`](../harness/evidence/sets/gate-run-armv7-f6de9851-20261117-230647-shard-1.json) |
+| Packet framing startup mappings, ARMv7 | `f6de9851d99ff3ebe621c95fabf7c89cb617a329` | [`9941dac4835e3107d1fb9a60804ca7cd3bf552635cd8b2f91b106442e87fec1f`](../harness/evidence/sets/framing-armv7-startup-residency-f6de9851.json) |
 | Earlier: Packet framing, Linux AArch64 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`457b9b996902aa4b5b51bc40497ffc6d02404b890f2dd3d370f1654af49fc796`](../harness/evidence/sets/gate-run-aarch64-384de6c9-20261117-193302-shard-1.json) |
 | Earlier: Packet framing, ARMv7 | `384de6c9347bee64e797bc3cdc49a5801ddd3f66` | [`f804fddba7d18b70b21ace6c59465beb00f443d1514c2706caf19b8746fb1170`](../harness/evidence/sets/gate-run-armv7-384de6c9-20261117-193351-shard-1.json) |
 | Gated features on both targets, ARMv7 run, shard 1 of 3 | `47aa0451e0c9511a7f75c6213a7f33d3401fc2b7` | [`ea6fc3b79c890f2907ecf887c894c1411b719747e2b90a4a8a5c426f665b87b4`](../harness/evidence/sets/gate-run-armv7-47aa0451-20261118-040605-shard-1.json) |
