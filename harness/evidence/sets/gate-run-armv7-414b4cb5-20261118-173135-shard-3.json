@@ -1,0 +1,60 @@
+{
+ "name": "gate-run-armv7-414b4cb5-20261118-173135-shard-3",
+ "path": "gate-run-armv7-414b4cb5-20261118-173135-shard-3",
+ "retention": "retained",
+ "reason": "Matroska and linked playback cases on the Linux gate targets, with paired timing and kernel-bound memory.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-armv7-20261118-173135/shard-3/475e6933b20d5c9d35203f790d5b13437825d9f30b61b9f27091f138be79a138.tar.zst",
+ "sha256": "475e6933b20d5c9d35203f790d5b13437825d9f30b61b9f27091f138be79a138",
+ "bytes": 10403272,
+ "results": [
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "b0b6e2269adbb577d2b08f588717f9a92a122978139941d2bc207665d800bb00",
+   "status": 0,
+   "report_sha256": "d4e184fd63875d32da282a0ed77385221b1bdeec8ad5443cd91b1817361214a9",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-header-removal/gate-result.json",
+   "command": "report --memory",
+   "key": "a875cf073dbad4c21a0459be38e37cd2c1b4c059973749f452e9444a530e091a",
+   "status": 0,
+   "report_sha256": "b5bc326fffb2f3ab7484a7372f2e931d8103c6c5709b4a5201056f7fb10a78d1",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "faa672046555ddf969747b72738bbc3504dc0ab442e4d793a6458a95dfff3b46",
+   "status": 0,
+   "report_sha256": "c288240046a13307cade934789e412467e7288de2a522c8daf06c7dc3da19e22",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-header-removal/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2e938aaf44e5889047a12903899587f7bf55520038f87d4cbb9b03201bdd9660",
+   "status": 0,
+   "report_sha256": "9285605e3b65556e6f0e312ade8acb1a37e3ab7b7290ffba5c4250ceecc4dc6a",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "87cb19514728e3f7468503f559db2598d936fe8ca84dad5db913c35df0ea5c06",
+   "status": 0,
+   "report_sha256": "c158e3a57aa55675af305ff6135a7b5f5da2f899629e8fed32fbf816dfd2e395"
+  },
+  {
+   "path": "graded/matroska-header-removal/gate-result.json",
+   "command": "grade",
+   "key": "07f6382a81eed17e0cbdeff6974d498ebbb3d2489d0998fab9d7a9b58cec33eb",
+   "status": 0,
+   "report_sha256": "afd6638825913a05dd86b781d46091f521b5842a34613fda33eb4ce2d97ffedd"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-armv7-be14c7e6-20261118-174904-shard-1",
+ "path": "gate-run-armv7-be14c7e6-20261118-174904-shard-1",
+ "retention": "retained",
+ "reason": "Cues and preroll with full compatibility and normal playback probes on the Linux gate targets.",
+ "key": "evidence/gate-runs/be14c7e6ce5c08c46d13d42f7f23e4b30289cef2-armv7-20261118-174904/shard-1/93cdf4d1f8c7cc71c051abac41477985a1a526f4c175f2e8f396a7cd50ec0acf.tar.zst",
+ "sha256": "93cdf4d1f8c7cc71c051abac41477985a1a526f4c175f2e8f396a7cd50ec0acf",
+ "bytes": 4353044,
+ "results": [
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "e5d7d98942a0a45ba3261ec26fc8b9666ededc3b84829a12b2f8587c56b478b3",
+   "status": 0,
+   "report_sha256": "c4eb0d06911606d989b1030e85ab5d8771a50e766f0bf65c3da4dc477fab46ce",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7159f39d58f48fdee22debd2d995d372cc0b836aba56ac1e2b0d62efcb53449f",
+   "status": 0,
+   "report_sha256": "34c5f3cd3f8e6e8467f4c20989b8317bb022931e3fc72508a5ff785122f9e000",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "e5bb382bdebf662a2e4c6c1ffc3170e38a7270eb39d3ddafbe8d46542e6306b9",
+   "status": 0,
+   "report_sha256": "b910f7ff7b0124be6a7850b6f8c380a8ec18b59633dba8d83e4b7e3e1f859a2e"
+  }
+ ],
+ "source_revisions": [
+  "be14c7e6ce5c08c46d13d42f7f23e4b30289cef2"
+ ]
+}

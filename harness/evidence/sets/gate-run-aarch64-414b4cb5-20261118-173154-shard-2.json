@@ -1,0 +1,37 @@
+{
+ "name": "gate-run-aarch64-414b4cb5-20261118-173154-shard-2",
+ "path": "gate-run-aarch64-414b4cb5-20261118-173154-shard-2",
+ "retention": "retained",
+ "reason": "Matroska and linked playback cases on the Linux gate targets, with paired timing and kernel-bound memory.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-aarch64-20261118-173154/shard-2/bb76c6fbef97a181da4d13d84576b7d38ef986b19d91359ab9151207c9198a5e.tar.zst",
+ "sha256": "bb76c6fbef97a181da4d13d84576b7d38ef986b19d91359ab9151207c9198a5e",
+ "bytes": 7787095,
+ "results": [
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "a33ed70ee1cba5347c9fd12e0ddaf0382aed5731dad0a0710786fa9b58a9c556",
+   "status": 0,
+   "report_sha256": "1868d4a57e34085437f472a545873a37400bfaa412efd45c48ce876ce3d9328a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0033b37e7f9d6ab9db9e430b9209713f69375b6673fb1138955698cb1a85045d",
+   "status": 0,
+   "report_sha256": "324eb8b1cf09fc7c7cbaf3619a8c51fc455a2fbcb0bb5a8518b79f6e74961006",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "48c8c06f41c62d244ce99d98f487cb60e0ae4bf671b47c060d4719e9b7936ac6",
+   "status": 0,
+   "report_sha256": "90c74f2f28db85740ecca39d084ffeb9754dd0b239cb72d857d3d46d31fcb5c6"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}
