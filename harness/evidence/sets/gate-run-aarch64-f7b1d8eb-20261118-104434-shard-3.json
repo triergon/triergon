@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-3",
+ "path": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-3",
+ "retention": "retained",
+ "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 3 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "key": "evidence/gate-runs/f7b1d8eb17554e4710c4f475d615bbf83206453c-aarch64-20261118-104434/shard-3/8e867cddeb37a20b7a804e7de0c4258c6598307660cd615301600e572a0fb873.tar.zst",
+ "sha256": "8e867cddeb37a20b7a804e7de0c4258c6598307660cd615301600e572a0fb873",
+ "bytes": 317506619,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "97f648d7ce45b30c6d5646c2c71ff52f75d1198e75fa984a856cd0e79dc90f2b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "9c33db492a563ec1b366b1208b7ee29b092a8ad706a0721d830ddd07e0c98afb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "db46d57abaa7f495ff6dd280738e2c23340a54136326e6605d29aab1916493be",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "f24df68132875b3b66d1a1c2a7640d61c561c209f1fafd3ccb69bb12f7447381",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "270b9d6802b1aa7f3737e36a3ad780248d5666d841ca282cf884538858da1b96",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "18b1ca91e88721380a23fdd8f6968fae5db7b9be7dcb7aee5900968210881b2c",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-4",
+ "path": "gate-run-aarch64-f7b1d8eb-20261118-104434-shard-4",
+ "retention": "retained",
+ "reason": "Partial gate run at f7b1d8eb, the 15 capture items, shard 4 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "key": "evidence/gate-runs/f7b1d8eb17554e4710c4f475d615bbf83206453c-aarch64-20261118-104434/shard-4/51c7411ccb6d72d98e98ddb4609f490b4ccc1bb3d85db9e60167f0fad7292f7f.tar.zst",
+ "sha256": "51c7411ccb6d72d98e98ddb4609f490b4ccc1bb3d85db9e60167f0fad7292f7f",
+ "bytes": 421795763,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6e860114957379a7a130efcacd6046eb081f1cd5e1da4d0032a275da8056bbbc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "d74ce9f21d055e872988109fa19f5fde422cff76e9d678581bc6467c18993efd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "c4919e2cc0b487bee0b1e33ebbefcfdfb0efff5942d52c6ad3d3861ab11dddde",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "03d017a595a18f5cf6be0df2e8090073ac4f3a443d4a9c459e0d124dce91a770",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "37af262d6dbe752db29a771fdc4bf2dee8ccabd93893853e837479ca97bf28c2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "ac21eebcfbfe8904b5c206dc5bef75b8f1f2009bb38b8cc13cc5b7802c02bc5f",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

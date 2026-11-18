@@ -1,0 +1,67 @@
+{
+ "name": "gate-run-aarch64-a5837d38-20261118-163537-shard-2",
+ "path": "gate-run-aarch64-a5837d38-20261118-163537-shard-2",
+ "retention": "retained",
+ "reason": "Partial gate run at a5837d38, the 15 capture items, shard 2 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: each case's timing on CPU 1 and kernel-bound memory on CPUs 1-15, every result measured; the shard outputs, build identities, plan, step records and logs; the capture timing results a later run reuses to show its memory stage measuring from restored records",
+ "key": "evidence/gate-runs/a5837d38781b61ba3517e57a99db61c3a0968346-aarch64-20261118-163537/shard-2/ed65811a3c31624d9ac04e99f3191a5494a9f16c405712987e6371eb18376f0c.tar.zst",
+ "sha256": "ed65811a3c31624d9ac04e99f3191a5494a9f16c405712987e6371eb18376f0c",
+ "bytes": 416130653,
+ "results": [
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "490c505a9e3f0d0e1fcda6dddace30cf92a4b7049f8c741842e78229201b405d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "7653d0152a30f221b76133fe61b48ad8710cf818b59498310dbf57d5816f8df2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "0f3bf4c57eab18872d010e094509a7bfe20351a6c12c8f65390d4e6d5da0c783",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "d1e49d9811503ef4153de01360dc09be415f7a1e3e1fa8f814915738751ded77",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "071c183879bc3ad33a12d61d9b62546fbec3cea988d3fed0634cc89abd880c88",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "cec74bce91d3aea29357f1e6a8c2e6c1ac3e72cf9d41ae1f0fbffb0a33c52a1e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "84ce43ae10d107aec515b685e2d9b1d2c77ce61acd1039613fbe120bf04ede85",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "9b2290480c0d3c78477d6abd8d0e3d962d9bf8becb77945bd9fe4f7d6cfee0c1",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
