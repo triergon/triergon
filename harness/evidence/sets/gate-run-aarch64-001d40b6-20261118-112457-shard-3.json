@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-aarch64-001d40b6-20261118-112457-shard-3",
+ "path": "gate-run-aarch64-001d40b6-20261118-112457-shard-3",
+ "retention": "retained",
+ "reason": "Capture filtered conversion at 001d40b6 on Linux AArch64, c6g.4xlarge. Shard 3 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-aarch64-20261118-112457/shard-3/7cdacefe8e434bdd6bb6340fa027203a46911ee287be5a65843249db6305ae8b.tar.zst",
+ "sha256": "7cdacefe8e434bdd6bb6340fa027203a46911ee287be5a65843249db6305ae8b",
+ "bytes": 316444833,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b57f81dff7a16ed34a17284208e4a15dd203acc89b07ef1931a91a603a4d684c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "1b0ee6dd1fde052596895894bca0e1abf5ac5e4676a30dd9e5cca69cb7aa1e2e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "ed7d83ba5693f4c5ff743e4b3eb7e84da5916b9f7750f1cd8bc24b0d0d6dc5e5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "4fe589f1e7308155e304732506b76fa049334d7a93ae7cd921a4daea0299ad33",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "d2d52419f9acf4344c821856bf2b73aaafd5663f2f960c00f7fa5075f489bf13",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c722595fbe11c0ae7dd0ee3c1e22bad37e1d5b39e7502b0b5ccfe677d9e07f0d",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

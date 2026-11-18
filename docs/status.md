@@ -74,7 +74,7 @@ worker's operations read only the raw-video and timed-text movies of its compari
 | Rasterising | libass's outline and bitmap stages: conversion from font outlines, rotation by 90°, affine and perspective transforms, border stroking, the 16×16 tile rasteriser, the glyph transform and its quantisation against a run with borders and opaque boxes, the karaoke leftmost x, `\blur` and `\be`, composition of fill, border and shadow, the additive and multiplying blends, shadow shifts and rectangle clipping with the karaoke split; storage charged to a budget, work to a `WorkBudget`, bitmaps bounded by libass's own size limit | Identical to libass's plain C bitmap engine (what libass runs on 32-bit ARMv7, pinned on every host), with glyphs loaded by `triergon-font` as libass loads them with hinting off. Gating: `raster-glyphs` 12/12 pass (576 operations over 8 glyphs of a file of each outline format and an authored font at 13.33 and 256 pixels) and `raster-outlines` 2/2 pass (1,019 operations on 200 random outlines), both with transforms of moderate reach, and `raster-bitmaps` 2/2 pass (560 operations on 80 random bitmap sets, a tenth of their blurs and `\be` passes beyond libass's clamps, among them radii it still blurs); on demand, `raster-sweep` 303/303 pass (72,445 operations: every corpus file at three heights with 30 glyphs each, 4,500 random outlines, 3,000 bitmap sets, with transforms as far as libass draws them). Platforms: macOS AArch64, Linux x86_64 and Linux AArch64 all four pass (12/12, 2/2, 2/2, 303/303); [32-bit ARMv7](#32-bit-armv7) passes the three gating features (12/12, 2/2, 2/2) and `raster-sweep` 301/303: on `outlines-71` and `outlines-83` libass silently draws nothing when its composite allocation fails; the crate returns `Allocation` (open cases on ARMv7, compared and passing elsewhere). `raster-simd`, the required cases against the host's SIMD engine, records where it departs: NEON on macOS and Linux AArch64 14/16 pass (4 of the 80 blur cases depart, all with `\be` passes); AVX2 on Linux x86_64 0/16 (AVX2: every bitmap differs in row padding; visible-pixel comparison needs its own fold) | not measured | not measured | the overlap and allocation logic of vector clips at image-list level, which belongs to the renderer; libass's large-tile build and its SIMD engines (NEON blurs `\be` over whole 16-byte rows into the padding; AVX2 pads rows to 32 bytes); runtime and memory; `outlines-71` and `outlines-83` on ARMv7, open there: libass silently draws nothing when its composite allocation fails, the crate returns `Allocation`; a visible-pixel fold for `raster-simd` |
 | ASS parsing | Whole ASS and SSA scripts and Matroska packet streams as libass reads them: headers, styles, events, style overrides, embedded fonts; codec private, packets with ReadOrder deduplication, flushing and pruning; typed override tags with libass's argument rules; every glyph's state at a time (animation, movement, fades, clips, karaoke tags, transition effects); karaoke syllables from laid-out positions; the drawing language into `triergon-raster` outlines; storage charged to a budget, work to a `WorkBudget` | Identical to libass on 54 authored fixtures, on macOS AArch64 and, with each target's own libass build, on aarch64-unknown-linux-gnu and thumbv7neon-unknown-linux-gnueabihf: `ass-parse-scripts` 48/48 pass (every track, style and event field, 87 styles, 222 events, embedded fonts, one script without a track), `ass-parse-chunks` 4/4 pass (10 track states, ReadOrder deduplication by bitmap and by scan, flushes, prunes, fonts in a codec private and in more data), `ass-parse-events` 21/21 pass (695 event walks, 6,976 glyph states and karaoke results, 48 drawing and clip outlines, 3 of them rejected as libass rejects them). `ass-parse-host` holds the 15 operations whose libass result differs by target, each pinned per target: on thumbv7neon-unknown-linux-gnueabihf 13/15 pass with 2 open, on aarch64-unknown-linux-gnu 11/15 pass with 4 open; elsewhere all 15 are reported. The reference flags every conversion from `double` to `int` out of range or for NaN (drawing coordinates, `\pbo`, an animated `\clip` or `\iclip`, `\fade`'s alpha, a `Banner` or `Scroll` delay) and a drawing coordinate on `INT_MIN`, and a flagged case fails any other feature. 2,728 mutated fixtures (`fuzz --contract`, 30 rounds of each feature, with the reference for all but `ass-parse-host`) gave identical work in both workers | not measured | not measured | `long`-width behaviour follows each target's libass, and out-of-range drawing coordinates are rejected as libass does on 32-bit ARM with GCC; every other out-of-range conversion from `double` to `int` saturates as there. Open as deliberate divergences: a coordinate landing exactly on `INT_MIN`, which libass built with GCC accepts and the crate rejects (`drawings-int-min-x` and `drawings-int-min-y`, on both targets), and `drawings-infinite` and `drawings-int-min` on aarch64-unknown-linux-gnu, whose coordinates libass converts with a 64-bit `long` there; the font description a glyph asks for (`GlyphState::font`) and karaoke run starts from style runs, shaping and wrapping are compared through the renderer (`ass-render`), not here; selective style overrides, track features, `ass_step_sub`; runtime and memory |
 | ASS rendering | `Renderer`: the events shown at a time to positioned alpha images as libass's `ass_render_frame` draws them with hinting off and complex shaping: font selection and fallback over attached, embedded and default fonts, shaping and bidi, wrapping, alignment, positioning, scrolling, collisions kept across frames, change detection, glyph and border bitmaps, blur and shadows, clips, karaoke and the image list; storage charged to a budget, and all the work of a frame (evaluation, font selection, shaping, outlines, layout, drawing and collisions) to one per-frame bound, `Settings::work` | Identical to libass on Linux AArch64 and [32-bit ARMv7](#32-bit-armv7), each with its own libass build, and on macOS AArch64 before the cases of `@` fonts, unregistered languages, glyphs without points, the charmap retry, two `@` font styles and vector clips without a contour or beyond libass's reach (macOS was not run with them), configured as a player embeds it (attached fonts, a default family and font file, no system font provider, no hinting, storage smaller than the frame): `ass-render` 100/100 pass over 47 authored scripts and 3 Matroska packet streams (ReadOrder deduplication, flushes, prunes, an embedded font) at 1920×1080 over 1280×720 storage and 1280×720 over anamorphic 720×576 storage, at each fixture's frame times; every image's kind, position, size, colour and alpha bytes, and every frame's change value as `ass_detect_change` reports it (802 frames, including underline and strike-out lines on TrueType, CFF and CFF2 faces with synthetic styles, borders and `@` fonts, frames after a flush and after pruning every event, opaque boxes around different glyphs that draw nothing, vector clips whose drawing has no contour, which empty their event's images, and one whose drawing libass cannot place, which it does not apply, frames whose caches overflow and are cut, C1 controls drawn through a fallback face's Macintosh charmap that the face keeps for later lookups, a style font size of 0, whose glyphs FreeType loads unscaled, `@` fonts drawn rotated and shaped with their vertical advances, a `Language` header HarfBuzz does not register, fallback mark positioning that measures a glyph without points, and a fallback face whose characters libass finds by trying its format 2 and 8 subtables, the Unicode charmap FreeType builds from its glyph names and its CFF encoding in FreeType's order, and two styles of one `@` font that select the same face, whose rotation decisions libass keeps apart); the box behind a `BorderStyle` 4 event, whose type libass leaves uninitialised, is told by its own buffer, also after a collision shift cuts rows off its top, and compared as a type of its own; colliding events whose boxes lie 2^31 or more rows apart, each within `int`'s range (`collision-far-margins.ass`), placed as glibc's merge sort orders them under libass's overflowing comparison, with the far event clipped away, whose 26.6 position leaves `int`'s range and which libass for AArch64 alone draws inside the frame; with libass's cache limits at 1000 glyphs and 24 MiB; `ass-render-host` pins per target the rendering whose libass result C leaves to the target (`border-x-overflow.ass`, a box width that doubles a huge border in wrapping `int`, and `collision-far-tops.ass`, colliding events whose boxes end up 2^31 or more rows apart, sorted as glibc's merge sort sorts them with libass's overflowing comparison): 4/4 pass on ARMv7 | 1.0256 (100/100 pass) at `eaff16ba` | heap ≤0.9485, total RSS ≤0.9972 (100/100 lower) at `eaff16ba` | on AArch64, `ass-render-host`'s 4 cases, a deliberate divergence: libass built with GCC for aarch64-unknown-linux-gnu gives an event box value outside the signed 32-bit range (its top, height, left or width) its low 32 bits, where libass on 32-bit ARM saturates it, and the renderer follows 32-bit ARM, so they are not timed or measured there; settings other than frame and storage size are unverified; libass's simple shaping and hinting modes, selective overrides and track features; of 5,182 generated scripts and 540 fixture mutations rendered frame by frame against libass for ARMv7, 48 scripts and no mutation differ, each for a stated cause: the renderer stops at the default `Settings::work` bound (17), which on ARMv7 is about 9 s of rendering for one frame (a median 33 ns per unit); with the bound lifted, 34 of those frames take 7 to 21 s each there and 110 run out of the 32-bit address space, so the bound refuses only frames no player could show in time; it runs out of the 32-bit address space (19 allocations refused, 8 at the worker's budget) where libass for ARMv7 peaks at 2.6 to 4.1 GB; and in 4, and in earlier frames of 2 of the above, libass for ARMv7 alone departs from libass for AArch64 at 3.7 to 4.0 GB of its 4 GB address space, and the renderer matches libass for AArch64 (`random-2258` from frame 46). Against libass for AArch64, 113 scripts and 1 mutation differ: 79, the mutation among them, that are identical on ARMv7 and differ there through libass's 64-bit `long` narrowing and its low 32 bits of event box values outside the signed 32-bit range, both deliberate divergences; 34 at the work bound, where libass peaks at 3.5 to 23 GB; and `random-1428`, where libass is killed for memory and the renderer refuses at its budget |
-| Capture | RGBA to YUV 4:2:0 as FFmpeg's ARMv7 build converts it, MPEG-1 video with budgeted storage, MPEG-TS mux | at `f8e1c4d9`: mux and encoder pass 15/15 against FFmpeg 9.0.2; conversion fails on all 15, open on this target; the short filtered conversion agrees within one sample on 84 probes at `cfcb1c97` on AArch64 and 42 at `a62c8eab` on ARMv7 | 1.0724 at `f8e1c4d9` on c6g.4xlarge (15/15 pass; worst `c04-motion-960`, median of the cases 0.8009) | heap ≤0.5904, total RSS ≤0.9704 (15/15 lower, kernel-bound) at `f8e1c4d9` | on `aarch64-unknown-linux-gnu`, the 15 cases' conversion: FFmpeg for AArch64 filters chroma vertically where its ARMv7 build averages each 2×2 block ([pixel](../crates/pixel/README.md#conformance)); the converter follows 32-bit ARM; on every target, widths of 2 modulo 4 from 18 up, where FFmpeg's ARMv7 build faults and the converter takes the filtered path |
+| Capture | RGBA to YUV 4:2:0, MPEG-1 video with budgeted storage, MPEG-TS mux | 15/15 conversion, encoder and mux comparisons at `e5f6c971`. Conversion is byte-identical to FFmpeg 9.0.2 using `Session::open_filtered` on AArch64 and `Session::open` on ARMv7. | 1.0595 (15/15 pass, worst `c04-motion-960`, median of the cases 0.8550) at `e5f6c971` | heap ≤0.5904, total RSS ≤0.9704 (15/15 lower, kernel-bound) at `e5f6c971` | FFmpeg's ARMv7 build faults at widths of 2 modulo 4 from 18 up. The converter uses the filtered path at those widths. |
 
 ## Measured revisions
 
@@ -95,8 +95,9 @@ then failed on parity alone, so the memory bounds above 1.0 of packet framing an
 four `long-movie` PGS cases were in the graded reports' acceptance, not in the step results.
 A grade now fails on a case whose bound fails ([bounds](quality.md#reference-and-corpus)): graded
 again, the PGS grades fail on both targets, and packet framing's total RSS fails as listed
-in its contract's `open_bounds`. The PGS rows have since been measured again at `99f1027b`,
-and with the capture, Matroska / WebM and other subtitle rows at `f8e1c4d9` (below). AAC
+in its contract's `open_bounds`. The PGS rows have since been measured again at `99f1027b`
+and with the Matroska / WebM and other subtitle rows at `f8e1c4d9` (below).
+The capture rows are measured at `e5f6c971`. AAC
 in MOV, which the gate does not run, was measured at the same revision on one more
 c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 `gate-run-TARGET-a73350ca-*-shard-1` to `-8` hold the shards' outputs, build identities,
@@ -179,8 +180,8 @@ The 32-bit ARMv7 bounds were 1.0101, 0.7849 and 0.9790, respectively.
 Every runtime upper bound is at most 1.05. The four AAC payload view archives
 list the corresponding build identities and per-case results.
 
-The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
-tests, come from one partial gate run per target of the 33 items those workers serve: the
+The Matroska / WebM and subtitle rows, earlier capture comparisons and ARMv7 workspace
+tests at `f8e1c4d9` come from one partial gate run per target of 33 items: the
 15 capture cases, the six Matroska feature groups and the external HDR vector, every
 subtitle feature, the workspace tests in both profiles with the worker tests, each on five
 c6g.4xlarge hosts (Graviton2) from the gate images, kernel `7.0.0-1014-aws`, under the link
@@ -387,8 +388,8 @@ Codec and decode-session runtime at
 `576f088f` was measured on c6g.4xlarge on both targets. Timing ran on CPU 1
 with the RSS module unloaded. Peak memory ran under the kernel RSS proof. Each
 case planned 30 pairs per stage and used the [early-stop rule](quality.md#early-stop).
-The AArch64 noise case's timing and memory are at `6d7a0f3c`, which gives
-the memory observer the same session timeout as timing.
+In that earlier comparison, the AArch64 noise case used timing and memory at
+`6d7a0f3c`, which gave the memory observer the same session timeout as timing.
 The audio codecs in files row used the gate build at
 `ccff5b5734c113c1d88160b84825157508c701c0` on a c8g.2xlarge, unpinned, against the `decode` profile:
 30 timing pairs per workload of `harness/codecs/file-workloads.json`, each demuxing,
@@ -909,6 +910,39 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Earlier: Packet framing, ARMv7 | `9870b6940b733dffcc5b63826fb785dbcfcd0027` | [`d04220edf917c952af02eaa5289777d9a6053dc4f22a9d1ff975a4158150342f`](../harness/evidence/sets/gate-run-armv7-9870b694-20261116-202556-shard-1.json) |
 | Earlier: Subtitles, PGS, Linux AArch64 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4cd8df9c5d0652aabf435dcb8100e4984966fcca365080e1f46c84fd973f5bd1`](../harness/evidence/sets/gate-run-aarch64-99f1027b-20261116-050209-shard-1.json) |
 | Earlier: Subtitles, PGS, ARMv7 | `99f1027b1e6a4bddb0b1a99b84cc79756116d8cb` | [`4c93b0902098f445ae645b18cc1df079177e3ae6bd45876e1f643f18b163b2de`](../harness/evidence/sets/gate-run-armv7-99f1027b-20261116-050516-shard-1.json) |
+| Earlier: Capture, Linux AArch64, shard 1 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`81ffc0a2829fad7e5229dc2c0c3e4cfe7de7977e266404938d38de763751fa2e`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-1.json) |
+| Earlier: Capture, Linux AArch64, shard 2 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ed4a56d3052d08d73896bee340a247daa259d69cad45046a6738e210c1cb31bf`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-2.json) |
+| Earlier: Capture, Linux AArch64, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7cdacefe8e434bdd6bb6340fa027203a46911ee287be5a65843249db6305ae8b`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-3.json) |
+| Earlier: Capture, Linux AArch64, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`27f8ab1c910345a8103e276e47e27869ed3a7f8e07b0854773a5de8df65437ab`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-4.json) |
+| Earlier: Capture, Linux AArch64, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf7c8f0b8e56f77bac684513514e66391630cf48a2915acc021e75f5c5942f79`](../harness/evidence/sets/gate-run-aarch64-001d40b6-20261118-112457-shard-5.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 1 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`b7e435a22e6a982992975bbbedeed794583983e688d68efb084760fee204b9a6`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-1.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 2 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`dd24de3c318835d031849a24a25ff2ad4bde1a9baf0cfe92f1ba2856ed1dfe77`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-2.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-3.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-4.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-5.json) |
+| Earlier: Capture, Linux AArch64, shard 1 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`cd74c2d3d4f8e58f1c350a3ab44d3a87a7708e5ef1de8a59635cf1d5497cbb51`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-1.json) |
+| Earlier: Capture, Linux AArch64, shard 2 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`61767625008844862c7385058026ee1f40d4500af41fc58beea3f4183a840f64`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-2.json) |
+| Earlier: Capture, Linux AArch64, shard 3 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`c2e203a7191af12aada5069fa9690f52d09fc57b76a3a05f3e7d6e2726d680a0`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-3.json) |
+| Earlier: Capture, Linux AArch64, shard 4 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`177e26dae0d079f070971200dcb25d831b114227e09892406314c4c965c5cd27`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-4.json) |
+| Earlier: Capture, Linux AArch64, shard 5 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`85647dfcc795cc479b7d069dffb2a53751d17c92cf6d4f91bff22cea9572ffbe`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-5.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 1 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`46da8c298f4cb8fc0db538616e958f1e1ff41aa6827622a3574e6852b76b345d`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-1.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 2 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`446db811a403c6b0292c5206b0e4f27bf818348848fd2cb79c151eaf0c48b5e2`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-2.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`7e845eb83a4ecf2509164becda8a2a923cb650f8b2951cc937cc323f2faf1f88`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-3.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`4f8490d45c0fdcb3771c7be473b18c41dee1795ae5c8db4d3642c3de2bdf39cf`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-4.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`69cafbfa7ff7f62248c2ef8ad1386fcd3c4c629e419716a28d6e3885d5e72474`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-5.json) |
+| Capture, Linux AArch64, shard 1 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`b18f0b5e79d061fe03ac9e71ecd1cf18a29f7857d6f3a7041fa5c44e8d14c341`](../harness/evidence/sets/gate-run-aarch64-e5f6c971-20261118-172954-shard-1.json) |
+| Capture, Linux AArch64, shard 4 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`b07cfbdd79151a8359cd9b5d3e10a141ede87559972b2bb85c5b80433a92bec0`](../harness/evidence/sets/gate-run-aarch64-e5f6c971-20261118-172954-shard-4.json) |
+| Capture, Linux AArch64, shard 5 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`1f1e5b86572b312841749df4e6759f22028574095b74123eb8d241c9357a7519`](../harness/evidence/sets/gate-run-aarch64-e5f6c971-20261118-172954-shard-5.json) |
+| Capture, Linux AArch64, shard 1 of 2 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`cf1c358e58f949990bff912cf3e9ab8e418db02fc37e90db86750290a9d57520`](../harness/evidence/sets/gate-run-aarch64-e5f6c971-20261118-185150-shard-1.json) |
+| Capture, Linux AArch64, shard 2 of 2 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`23b33f6e92d06e85655799c968e14e28fe8f5865eea6383e06fcbc60ccebe5a3`](../harness/evidence/sets/gate-run-aarch64-e5f6c971-20261118-185150-shard-2.json) |
+| Capture, 32-bit ARMv7, shard 1 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`4b1430fe845035aa34d433c8ba28a4a85676f50e3077a87aee00b2f4ccfe0572`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-1.json) |
+| Capture, 32-bit ARMv7, shard 2 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`4046625b77739a7cbeabb3f739894da3f7938a7f0e348662bb2197a4e40659c6`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-2.json) |
+| Capture, 32-bit ARMv7, shard 3 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`2c66fce85fc42c2a6f88dd7e231bebfb9c7e2509acbb1cdc3dc31afe745dc75b`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-3.json) |
+| Capture, 32-bit ARMv7, shard 4 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`4737cad0d6a1be8d69b32793b66aca4e495036680d23008c48e4105c2fd672a9`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-4.json) |
+| Capture, 32-bit ARMv7, shard 5 of 5 | `e5f6c971e14b8ef43ac71edc802168926b7b0091` | [`a23829f76d2e21b63dda17d13856fd9c4965aae78d875ea6608d6d24b6f01604`](../harness/evidence/sets/gate-run-armv7-e5f6c971-20261118-185012-shard-5.json) |
+| Capture instruction and cycle counts, Linux AArch64 | `e5f6c971e14b8ef43ac71edc802168926b7b0091`, `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`8fc8c16fc49d2b47e806af0b0b1a12b21cd7486eaf2d4708d93618247d6a6c77`](../harness/evidence/sets/capture-motion-count-aarch64-e5f6c971.json) |
+| Filtered capture conversion probes, Linux AArch64 | `e12863c88f5050781e20254fc8efd8cee12fac9b` | [`809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55`](../harness/evidence/sets/capture-filtered-probes-aarch64.json) |
+| Capture conversion probes, 32-bit ARMv7 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`e3dfbf4a9da1d68be300175dff29845dd8ccbb36b3f09d458eb8b9c7f9ebf7a3`](../harness/evidence/sets/capture-native-widths-armv7.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 1 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`1d1edc8d28e39be46f7fd81ce3341ba288ed476569d1fd467bf0af1026cc67d8`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-1.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 2 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`6a2448ea7b893cfa1f37fae38890d30139ab64ca251bc76ca1056ce4248ab35f`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-2.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 3 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`d03906a29e384369a704de659412a4ce65e8039a3b2bc280acfa66c07b58681c`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-3.json) |
@@ -1332,7 +1366,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Packet framing | 135/135 AVC/HEVC reference comparisons | 0.9643 (135/135 pass) at `f6de9851` | heap ≤0.2633 (135/135 lower), total RSS fails at 1.0836 (0/135 lower) at `f6de9851` |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the audio correctness lanes as gate item `codecs-audio` at `81edf4c0`, as on AArch64: AAC 38/39 and one open case (`aac-sce-in-stereo`, FFmpeg's unwritten FR plane), AC-3 6/6, E-AC-3 6/6, DTS core 22/22, and `xll_51_24_48_none` out of set (no core substream); the six video timing workloads decode to FFmpeg's digests | 20/20 pass at `81edf4c0`: the six video workloads 0.6035 to 1.0447 (`h264-high-1080p` 1.0447), the fourteen audio workloads 0.7665 to 1.0182 (worst `aac-he-5.1`; `aac-hev2-stereo` 1.0163, `aac-he-stereo` 1.0032) | heap ≤0.9421, total RSS ≤0.8384 (20/20 lower) at `81edf4c0` |
 | Audio codecs in files | the 10 workloads of `file-workloads.json`, each worker's work checked equal before it is measured | 0.9904 (10/10 pass; worst `vorbis-q3-5.1`) at `81edf4c0` | heap ≤0.8994, total RSS ≤0.7710 (10/10 lower) at `81edf4c0` |
-| Capture | 15/15 at `f8e1c4d9`: conversion byte-identical to FFmpeg's on all 15, mux and encoder pass (below) | 1.0676 (15/15 pass; worst `c13-motion-960-6m`, median of the cases 0.8734) at `f8e1c4d9` | heap ≤0.6086, total RSS ≤0.9764 (15/15 lower) at `f8e1c4d9` |
+| Capture | 15/15 at `e5f6c971`. Conversion is byte-identical to FFmpeg's on all 15, and mux and encoder pass. | 1.0427 (15/15 pass, worst `c14-motion-960-rate255`, median of the cases 0.8533) at `e5f6c971` | heap ≤0.6086, total RSS ≤0.9766 (15/15 lower, kernel-bound) at `e5f6c971` |
 | Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.7757 (10/10 pass) at `419a8493` | heap ≤0.7323, total RSS ≤0.9497 (10/10 lower), on `playback-matroska-worker`, at `419a8493` |
 | MPEG-TS | 97/97 compat-view operations (`mpegts-pes`) | 0.8543 (97/97 pass) | heap ≤0.0902, total RSS ≤0.8453 (97/97 lower) |
 | MPEG-TS access units | 169/169 transport compatibility folds (`mpegts-access-units`) | 1.0084 (169/169 pass) | heap ≤0.1626, total RSS ≤0.8928 (169/169 lower) |
@@ -1430,9 +1464,9 @@ run at `f71495ea` used 20 pairs for `hevc-type17` and `hevc-update` and
 
 Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
 bound of 1.2241. MP4 range is gated on
-Linux AArch64 only. The closest below it is MP4 forward 1.0811. At `f8e1c4d9`
-capture's worst bound is 1.0676 (`c13-motion-960-6m`), Matroska's 0.9708 and
-DVD's 0.9752.
+Linux AArch64 only. The closest below it is MP4 forward 1.0811. Capture's worst
+bound on ARMv7 at `e5f6c971` is 1.0427. At `f8e1c4d9` Matroska's worst bound
+is 0.9708 and DVD's is 0.9752.
 Each feature's evidence set lists every case's bound.
 
 The AAC decoder takes 4.8 to 30.3% fewer user-mode instructions on this target at
@@ -1650,14 +1684,58 @@ against 16.65 s at `b89e5844`, with the same digest. There `floorf` and `Downmix
 took 4,620 M and 2,175 M of 32.65 G cycles; `Downmix::mix` now takes 692 M of 26.57 G,
 and `Sbr::process` with the QMF synthesis takes 47%.
 
-Capture conversion must stay within ±1 of FFmpeg's on every sample. FFmpeg's ARMv7 and
-AArch64 builds convert RGBA differently at the capture widths: for a width of at least 16
-that is a multiple of 4, the ARMv7 build averages each 2×2 block's RGB before computing its
-chroma, where the AArch64 build filters vertically
-([pixel](../crates/pixel/README.md#conformance)). The converter follows the ARMv7 build on
-every target. At `dcf51398` its output is byte-identical to FFmpeg's ARMv7 output on all 15
-cases, and the same on AArch64; FFmpeg's AArch64 output is up to 36 from it, so the 15 cases
-are listed as open on `aarch64-unknown-linux-gnu`.
+Capture conversion must stay within one of FFmpeg's on every sample. At capture widths
+of at least 16 that are multiples of 4, FFmpeg's ARMv7 build averages each 2×2 block's
+RGB before computing chroma. The AArch64 build filters chroma vertically. At
+`a34b98d0` the default width-dependent `Session::open` matches the ARMv7 build and
+`Session::open_filtered` matches the AArch64 build byte for byte on all 15 cases.
+[Capture session constructors](../crates/capture/README.md)
+
+On the Linux AArch64 gate image, the filtered conversion also matches the
+pinned reference at 84 short-frame width, height and orientation combinations
+and at 480×270 and 960×540 in both orientations. The extra `1 << 8` rounding
+term was recovered by fitting the converter to the reference's emitted luma
+bytes. At RGB (0, 85, 170) the reference produces luma 76. Without that term
+the converter produces 75.
+[`capture-filtered-probes-aarch64`](../harness/evidence/sets/capture-filtered-probes-aarch64.json)
+holds these checks at `e12863c8`.
+
+On the 32-bit ARMv7 gate image, `Session::open` matches the pinned conversion
+sample for sample at 42 combinations of widths 2 through 14, heights 2, 4 and 6,
+and both orientations. The same check passes at 480×270 and 960×540 in both
+orientations, where it exercises the block path.
+[`capture-native-widths-armv7`](../harness/evidence/sets/capture-native-widths-armv7.json)
+holds these checks at `a34b98d0`.
+
+Compared with `f8e1c4d9`, the filtered conversion changes the capture output
+folds on all 15 Linux AArch64 cases. All 15 ARMv7 output folds and all
+reference folds on both targets match their earlier values.
+
+At `a34b98d0`, the 15 capture cases passed conversion, encoding, mux, runtime,
+peak heap and kernel-bound total RSS on each c6g.4xlarge target. The worst
+runtime bounds are 1.0519 on Linux AArch64 and 1.0536 on 32-bit ARMv7.
+
+Earlier, at `001d40b6`, all 15 cases per target passed parity, runtime, peak
+heap and kernel-bound total RSS. The runtime upper bounds were at most 1.05.
+
+At `e5f6c971`, all 15 cases per c6g.4xlarge target pass conversion, encoding,
+mux, runtime, peak heap and kernel-bound total RSS. The input
+hashes and output folds match `a34b98d0`. The ARMv7 workloads are 480 or 960
+pixels wide and use the block converter.
+
+The Linux AArch64 evidence combines shards 1, 4 and 5 of run
+`20261118-172954` with both shards of run `20261118-185150`. A lost SSH
+connection left the original shards 2 and 3 without archives. The second
+run measured their seven cases at the same revision. Run `20261118-185012`
+covered all 15 ARMv7 cases.
+
+The sole bound above 1.05 is AArch64 `c04-motion-960` at 1.0595 after the
+validated 20-pair early stop. Its bound was 1.0519 with 30 pairs at `a34b98d0`
+and 1.0385 at `001d40b6`. Both recent revisions use filtered chroma.
+On one AArch64 host, `cargo xtask count` reports 0.78% fewer user-mode
+instructions and 1.20% fewer user-mode cycles at `e5f6c971` than at `a34b98d0`.
+The input and worker hashes match their gate measurements. The cause of the
+difference between the gate runs remains unresolved.
 
 Capture's worst bound here was 1.1669 at `a73350ca` and 1.1865 at `576f088f`. Profiled in user-mode cycles against
 FFmpeg on the gate host, the encoder's motion search reduced each 16-lane sum of absolute
@@ -1668,10 +1746,12 @@ hold at most four, and cleared the coarse search's row of differences with a lib
 half-sample rows are formed whole, the inverse DCT sums the basis rows of only the
 coefficients a block holds, with the same rounding points, and the coarse row is a
 fixed-size array. `c14-motion-960-rate255` went from 1.175 to 1.069 of FFmpeg's user-mode
-cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged;
-at `f8e1c4d9` they are the two cases above 1.05 (1.0676 and 1.0626). The rest of the gap
-is spread over the encoder's DCT, quantisation and search, which FFmpeg's ARMv7 build runs
-in ARMv6 and NEON routines (by their symbols in its profile).
+cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged.
+At `e5f6c971`, the worst ARMv7 runtime bound is 1.0427
+(`c14-motion-960-rate255`).
+The remaining gap is spread over the encoder's DCT, quantisation and search,
+which FFmpeg's ARMv7 build runs in ARMv6 and NEON routines (by their symbols
+in its profile).
 
 At `a73350ca` 16 `subtitle-dvd` cases were above 1.05 here (`vob-split` worst, 1.0869),
 while the feature's median of case medians was 0.1918: they are the DVD program streams

@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-a34b98d0-20261118-172123-shard-3",
+ "path": "gate-run-armv7-a34b98d0-20261118-172123-shard-3",
+ "retention": "retained",
+ "reason": "Capture conversion, codec and mux with paired timing and kernel-bound memory.",
+ "key": "evidence/gate-runs/a34b98d0f3a83f23a6472e7b32f4a650a62740b2-armv7-20261118-172123/shard-3/7e845eb83a4ecf2509164becda8a2a923cb650f8b2951cc937cc323f2faf1f88.tar.zst",
+ "sha256": "7e845eb83a4ecf2509164becda8a2a923cb650f8b2951cc937cc323f2faf1f88",
+ "bytes": 318095092,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "c5ebad94f99e2234e70c4fa7c6e9437f6668e5a94d66ba4d3b49cb40658b9960",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "4dd4de12e27c984f85cce0cefcf479d4f1ebc823e5c106fce5dead598983f4d4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "466fc99e95e922d4eb98aac1f1219e01a31bc1c1810f298609c6bc3accd41df3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "f71f2a17cd258dedc3b9b71f72a9169420de5c070a7bdca4c00232cc529b34e3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "3a5bc22b32bc9282cd320c13f7b842b8eb21b89da2bf07b038bd3a3d52084071",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "40309df1e6649c303c665929d3205481053f2332795321a05110aa7b1df1040d",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "a34b98d0f3a83f23a6472e7b32f4a650a62740b2"
+ ]
+}

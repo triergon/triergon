@@ -8,17 +8,14 @@
 //!   covers, every channel averaged with rounding (`(sum + 2) >> 2`), then
 //!   `Cb = (−19 R − 37 G + 56 B + 16448) >> 7` and
 //!   `Cr = (56 R − 47 G − 9 B + 16448) >> 7`.
-//! - **Filtered path**, every other width: chroma is the mean of each horizontal
-//!   pixel pair, decimated vertically with centre-sited taps 1/8, 3/8, 3/8, 1/8
-//!   over rows 2k−1 … 2k+2 with the edge rows replicated, from 16-bit
-//!   fixed-point coefficients in one rounding step. Below a width of 16 this is
-//!   the ARMv7 result too; at widths of 2 modulo 4 from 18 up the ARMv7 build
-//!   gives no result (it faults), and this path decimates chroma as FFmpeg's
-//!   AArch64 build does, within 1 of that build's output.
+//! - **Filtered path**, every other width: chroma is averaged over each pair
+//!   of pixels before applying the centre-sited vertical taps 1/8, 3/8, 3/8,
+//!   1/8. Two-, four- and six-row frames have their own edge taps. Widths
+//!   below 16 share this result on both targets. At widths of 2 modulo 4
+//!   from 18 up, the 32-bit reference faults and conversion uses the filter.
 //!
-//! At heights of 2, 4 and 6 the filtered path uses the boundary rules checked
-//! by the capture worker's `short_filtered_frames_against_reference` test.
-//! FFmpeg built for AArch64 takes the filtered path at every width.
+//! Converter::filtered uses the filtered conversion at every width, as the
+//! AArch64 reference does.
 
 use crate::{Error, Geometry, Picture, Result};
 
@@ -39,6 +36,7 @@ pub(crate) const fn block_path(geometry: Geometry) -> bool {
 #[derive(Debug)]
 pub struct Converter {
     scratch: Scratch,
+    filtered_only: bool,
 }
 
 #[derive(Debug)]
@@ -48,15 +46,15 @@ enum Scratch {
     /// Four source rows of pair-summed chroma terms.
     Filtered {
         half: usize,
-        cb: [Vec<i32>; 4],
-        cr: [Vec<i32>; 4],
+        cb: [Vec<i16>; 4],
+        cr: [Vec<i16>; 4],
     },
 }
 
 impl Scratch {
-    fn new(geometry: Geometry) -> Scratch {
+    fn new(geometry: Geometry, use_blocks: bool) -> Scratch {
         let width = geometry.width;
-        if block_path(geometry) {
+        if use_blocks {
             Scratch::Block {
                 width,
                 sums: std::array::from_fn(|_| vec![0; width]),
@@ -71,10 +69,10 @@ impl Scratch {
         }
     }
 
-    fn fits(&self, geometry: Geometry) -> bool {
+    fn fits(&self, geometry: Geometry, use_blocks: bool) -> bool {
         match self {
-            Scratch::Block { width, .. } => block_path(geometry) && *width == geometry.width,
-            Scratch::Filtered { half, .. } => !block_path(geometry) && *half == geometry.width / 2,
+            Scratch::Block { width, .. } => use_blocks && *width == geometry.width,
+            Scratch::Filtered { half, .. } => !use_blocks && *half == geometry.width / 2,
         }
     }
 }
@@ -82,7 +80,16 @@ impl Scratch {
 impl Converter {
     pub fn new(geometry: Geometry) -> Converter {
         Converter {
-            scratch: Scratch::new(geometry),
+            scratch: Scratch::new(geometry, block_path(geometry)),
+            filtered_only: false,
+        }
+    }
+
+    /// Use pair averaging and centre-sited vertical filtering at every width.
+    pub fn filtered(geometry: Geometry) -> Converter {
+        Converter {
+            scratch: Scratch::new(geometry, false),
+            filtered_only: true,
         }
     }
 
@@ -101,8 +108,9 @@ impl Converter {
                 actual: rgba.len(),
             });
         }
-        if !self.scratch.fits(g) {
-            self.scratch = Scratch::new(g);
+        let use_blocks = !self.filtered_only && block_path(g);
+        if !self.scratch.fits(g, use_blocks) {
+            self.scratch = Scratch::new(g, use_blocks);
         }
         let row_bytes = g.width * 4;
         let source_row = |r: usize| {
@@ -214,32 +222,26 @@ mod block {
     }
 }
 
-/// The filtered path: 16-bit fixed-point coefficients carrying the 219/255
-/// (luma) and 224/255 (chroma) range factors; each chroma row sums to zero, so
-/// neutral grey maps to exactly 128. `tests::coefficients_follow_bt601`
-/// derives them.
+/// The filtered conversion quantizes the limited-range BT.601 components to
+/// six fractional bits before vertical filtering. The chroma coefficients
+/// were recovered from the reference's observed output. The capture worker's
+/// short_filtered_frames_against_reference test checks the coefficients,
+/// rounding and edge taps against that output.
 mod filtered {
     use crate::Picture;
 
-    pub(super) const Y_R: i32 = 16829;
-    pub(super) const Y_G: i32 = 33039;
-    pub(super) const Y_B: i32 = 6416;
-    pub(super) const CB_R: i32 = -9714;
-    pub(super) const CB_G: i32 = -19071;
-    pub(super) const CB_B: i32 = 28785;
-    pub(super) const CR_R: i32 = 28785;
-    pub(super) const CR_G: i32 = -24104;
-    pub(super) const CR_B: i32 = -4681;
-
-    const Y_OFFSET: i32 = (16 << 16) + (1 << 15);
-    /// Chroma sums carry 2 (pair) × 8 (vertical taps) × 2^16.
-    const C_SHIFT: u32 = 20;
-    const C_OFFSET: i32 = (128 << C_SHIFT) + (1 << (C_SHIFT - 1));
+    pub(super) const Y_R: i32 = 8414;
+    pub(super) const Y_G: i32 = 16519;
+    pub(super) const Y_B: i32 = 3208;
+    // The extra 1 << 8 was recovered by fitting the fixed-point formula to the
+    // reference's observed luma bytes in the short_filtered_frames_against_reference probe.
+    // RGB (0, 85, 170) gives 76 in the probe and 75 with only the half-unit bias.
+    const Y_OFFSET: i32 = (16 << 15) + (1 << 14) + (1 << 8);
 
     pub(super) fn convert<'a>(
         source_row: impl Fn(usize) -> &'a [u8],
-        cb_rows: &mut [Vec<i32>; 4],
-        cr_rows: &mut [Vec<i32>; 4],
+        cb_rows: &mut [Vec<i16>; 4],
+        cr_rows: &mut [Vec<i16>; 4],
         out: &mut Picture,
     ) {
         let g = out.geometry;
@@ -262,10 +264,12 @@ mod filtered {
             }
             let rows = [(2 * k).saturating_sub(1), 2 * k, 2 * k + 1, last];
             let start = k * chroma_stride;
-            let decimate_plane = |ring: &[Vec<i32>; 4], plane: &mut [u8]| match (g.height, k) {
-                (2, _) => decimate_short::<1, 0, 0>(ring, 1, plane),
-                (4, _) => decimate_short::<1, 1, 0>(ring, 2 * k, plane),
-                (6, 0) => decimate_short::<3, 3, 1>(ring, 0, plane),
+            let decimate_plane = |ring: &[Vec<i16>; 4], plane: &mut [u8]| match (g.height, k) {
+                (2, _) => decimate_short::<1, 0, 0, 6>(ring, 1, plane),
+                (4, _) => decimate_short::<1, 1, 0, 7>(ring, 2 * k, plane),
+                // The short-frame probe gives weights 3/7, 3/7 and 1/7.
+                // Their 12-bit fixed-point coefficients sum to 4096.
+                (6, 0) => decimate_short::<1755, 1756, 585, 18>(ring, 0, plane),
                 _ => decimate(ring, rows, plane),
             };
             decimate_plane(cb_rows, &mut out.cb[start..start + half]);
@@ -275,88 +279,163 @@ mod filtered {
 
     /// Luma of a row and the pair-summed chroma terms, one pass over pixel pairs
     /// (indexed byte loads become de-interleaving vector loads).
-    fn luma_and_pairs(rgba: &[u8], y: &mut [u8], cb: &mut [i32], cr: &mut [i32]) {
+    fn luma_and_pairs(rgba: &[u8], y: &mut [u8], cb: &mut [i16], cr: &mut [i16]) {
         let m = (y.len() / 2).min(cb.len()).min(cr.len());
         let rgba = &rgba[..8 * m];
         let (y, cb, cr) = (&mut y[..2 * m], &mut cb[..m], &mut cr[..m]);
         for i in 0..m {
             let (r0, g0, b0) = (
-                rgba[8 * i] as i32,
-                rgba[8 * i + 1] as i32,
-                rgba[8 * i + 2] as i32,
+                u16::from(rgba[8 * i]),
+                u16::from(rgba[8 * i + 1]),
+                u16::from(rgba[8 * i + 2]),
             );
             let (r1, g1, b1) = (
-                rgba[8 * i + 4] as i32,
-                rgba[8 * i + 5] as i32,
-                rgba[8 * i + 6] as i32,
+                u16::from(rgba[8 * i + 4]),
+                u16::from(rgba[8 * i + 5]),
+                u16::from(rgba[8 * i + 6]),
             );
-            y[2 * i] = ((Y_R * r0 + Y_G * g0 + Y_B * b0 + Y_OFFSET) >> 16) as u8;
-            y[2 * i + 1] = ((Y_R * r1 + Y_G * g1 + Y_B * b1 + Y_OFFSET) >> 16) as u8;
-            let (r, g, b) = (r0 + r1, g0 + g1, b0 + b1);
-            cb[i] = CB_R * r + CB_G * g + CB_B * b;
-            cr[i] = CR_R * r + CR_G * g + CR_B * b;
+            y[2 * i] = luma(r0, g0, b0);
+            y[2 * i + 1] = luma(r1, g1, b1);
+            (cb[i], cr[i]) = chroma((r0 + r1) as i16, (g0 + g1) as i16, (b0 + b1) as i16);
         }
     }
 
-    fn decimate(ring: &[Vec<i32>; 4], rows: [usize; 4], out: &mut [u8]) {
-        let (a, b, c, d) = (
-            &ring[rows[0] & 3],
-            &ring[rows[1] & 3],
-            &ring[rows[2] & 3],
-            &ring[rows[3] & 3],
-        );
+    // Split at seven bits, rounding the coarse coefficients to keep the
+    // residual small.
+    const Y_COARSE: [i32; 3] = [(Y_R + 64) >> 7, (Y_G + 64) >> 7, (Y_B + 64) >> 7];
+    const Y_RESIDUAL: [i32; 3] = [
+        Y_R - 128 * Y_COARSE[0],
+        Y_G - 128 * Y_COARSE[1],
+        Y_B - 128 * Y_COARSE[2],
+    ];
+
+    const _: () = {
+        let channel_max = u8::MAX as i32;
+        let offset = Y_OFFSET >> 7;
+        assert!(Y_OFFSET % 128 == 0 && offset >= 0);
+        assert!(Y_COARSE[0] >= 0 && Y_COARSE[1] >= 0 && Y_COARSE[2] >= 0);
+        let coarse_max = (Y_COARSE[0] + Y_COARSE[1] + Y_COARSE[2]) * channel_max + offset;
+        assert!(coarse_max <= u16::MAX as i32);
+
+        assert!(Y_RESIDUAL[0] <= 0 && Y_RESIDUAL[1] >= 0 && Y_RESIDUAL[2] >= 0);
+        let residual_min = Y_RESIDUAL[0] * channel_max;
+        let residual_max = (Y_RESIDUAL[1] + Y_RESIDUAL[2]) * channel_max;
+        assert!(residual_min >= i16::MIN as i32 && residual_max <= i16::MAX as i32);
+
+        // The original positive coefficients give the corrected sum's
+        // extrema at black and white, before the final shift.
+        assert!(Y_R >= 0 && Y_G >= 0 && Y_B >= 0);
+        let corrected_max = ((Y_R + Y_G + Y_B) * channel_max + Y_OFFSET) >> 7;
+        assert!(corrected_max <= u16::MAX as i32);
+    };
+
+    #[inline]
+    fn luma(r: u16, g: u16, b: u16) -> u8 {
+        let coarse = Y_COARSE[0] as u16 * r
+            + Y_COARSE[1] as u16 * g
+            + Y_COARSE[2] as u16 * b
+            + (Y_OFFSET >> 7) as u16;
+        let residual = Y_RESIDUAL[0] as i16 * r as i16
+            + Y_RESIDUAL[1] as i16 * g as i16
+            + Y_RESIDUAL[2] as i16 * b as i16;
+        // Shifting the residual first preserves the floor. The signed
+        // correction leaves the sum within u16.
+        let sum = (i32::from(coarse) + i32::from(residual >> 7)) as u16;
+        (sum >> 8) as u8
+    }
+
+    const CB_R: i32 = -4865;
+    const CB_G: i32 = -9528;
+    const CB_B: i32 = 14392;
+    const CR_R: i32 = 14392;
+    const CR_G: i32 = -12061;
+    const CR_B: i32 = -2332;
+
+    const C_SCALE: i32 = CB_B / 256;
+    const CB_RED: i32 = -CB_R / 256;
+    const CR_BLUE: i32 = -CR_B / 256;
+    const CR_BLUE_RESIDUAL: i32 = -CR_B % 256;
+    const C_ROUND: i16 = 512 >> 8;
+
+    const _: () = {
+        // Divide the coefficients at eight bits. Expanding the colour
+        // differences recovers all six original coefficients.
+        let shared = C_SCALE * 257;
+        assert!(CB_B == shared && CR_R == shared);
+        assert!(CB_R == -256 * CB_RED - 1);
+        assert!(CB_G == 256 * CB_RED - shared);
+        assert!(CR_B == -256 * CR_BLUE - CR_BLUE_RESIDUAL);
+        assert!(CR_G == 256 * CR_BLUE + CR_BLUE_RESIDUAL - shared - 1);
+
+        // The shared green component bounds each difference of scaled
+        // differences by the dominant product. The extra -r or -g extends
+        // only the negative end of the residual range.
+        assert!(0 <= CB_RED && CB_RED <= C_SCALE);
+        assert!(0 <= CR_BLUE && CR_BLUE <= C_SCALE);
+        assert!(0 <= CR_BLUE_RESIDUAL && CR_BLUE_RESIDUAL <= C_SCALE);
+        let pair_max = 2 * u8::MAX as i32;
+        let scaled_max = C_SCALE * pair_max;
+        let residual_min = -scaled_max - pair_max;
+        assert!(residual_min >= i16::MIN as i32 && scaled_max <= i16::MAX as i32);
+
+        let sum_min = -scaled_max + C_ROUND as i32 + (residual_min >> 8);
+        let sum_max = scaled_max + C_ROUND as i32 + (scaled_max >> 8);
+        assert!(sum_min >= i16::MIN as i32 && sum_max <= i16::MAX as i32);
+    };
+
+    #[inline]
+    fn chroma(r: i16, g: i16, b: i16) -> (i16, i16) {
+        let red = r - g;
+        let blue = b - g;
+        let red_scaled = C_SCALE as i16 * red;
+        let blue_scaled = C_SCALE as i16 * blue;
+        let cb = (blue_scaled - CB_RED as i16 * red + C_ROUND + ((blue_scaled - r) >> 8)) >> 2;
+        let cr = (red_scaled - CR_BLUE as i16 * blue
+            + C_ROUND
+            + ((red_scaled - CR_BLUE_RESIDUAL as i16 * blue - g) >> 8))
+            >> 2;
+        (cb, cr)
+    }
+
+    fn decimate(ring: &[Vec<i16>; 4], rows: [usize; 4], out: &mut [u8]) {
+        let [a, b, c, d] = rows.map(|row| ring[row & 3].as_slice());
         for ((((out, &a), &b), &c), &d) in out.iter_mut().zip(a).zip(b).zip(c).zip(d) {
-            let sum = a + 3 * (b + c) + d;
-            *out = ((sum + C_OFFSET) >> C_SHIFT).clamp(0, 255) as u8;
+            let sum = i32::from(a) + 3 * (i32::from(b) + i32::from(c)) + i32::from(d);
+            *out = quantize::<9>(sum);
         }
     }
 
-    fn decimate_short<const A: i32, const B: i32, const C: i32>(
-        ring: &[Vec<i32>; 4],
+    fn decimate_short<const A: i32, const B: i32, const C: i32, const SHIFT: u32>(
+        ring: &[Vec<i16>; 4],
         first: usize,
         out: &mut [u8],
     ) {
         let [a, b, c] = std::array::from_fn(|i| &ring[(first + i) & 3]);
-        // Each row represents the sum of two pixels in 16-bit fixed point.
-        let scale = (A + B + C) << 17;
-        let offset = 128 * scale + scale / 2;
         for (((out, &a), &b), &c) in out.iter_mut().zip(a).zip(b).zip(c) {
-            let sum = A * a + B * b + C * c;
-            *out = ((sum + offset) / scale).clamp(0, 255) as u8;
+            let sum = A * i32::from(a) + B * i32::from(b) + C * i32::from(c);
+            *out = quantize::<SHIFT>(sum);
         }
+    }
+
+    fn quantize<const SHIFT: u32>(value: i32) -> u8 {
+        let offset = (128 << SHIFT) + (1 << (SHIFT - 1));
+        ((value + offset) >> SHIFT).clamp(0, 255) as u8
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::filtered::{CB_B, CB_G, CB_R, CR_B, CR_G, CR_R, Y_B, Y_G, Y_R};
+    use super::filtered::{Y_B, Y_G, Y_R};
     use super::*;
 
     #[test]
-    fn coefficients_follow_bt601() {
+    fn luma_coefficients_follow_bt601() {
         let (kr, kb) = (0.299f64, 0.114f64);
         let kg = 1.0 - kr - kb;
-        let ys = 219.0 / 255.0 * 65536.0;
-        let cs = 224.0 / 255.0 * 65536.0;
-        let ideal = [
-            (Y_R, kr * ys),
-            (Y_G, kg * ys),
-            (Y_B, kb * ys),
-            (CB_R, -kr / (2.0 * (1.0 - kb)) * cs),
-            (CB_G, -kg / (2.0 * (1.0 - kb)) * cs),
-            (CB_B, 0.5 * cs),
-            (CR_R, 0.5 * cs),
-            (CR_G, -kg / (2.0 * (1.0 - kr)) * cs),
-            (CR_B, -kb / (2.0 * (1.0 - kr)) * cs),
-        ];
-        for (actual, wanted) in ideal {
-            assert!(
-                (actual as f64 - wanted).abs() <= 1.0,
-                "{actual} vs {wanted}"
-            );
+        let scale = 219.0 / 255.0 * 32768.0;
+        for (actual, coefficient) in [(Y_R, kr), (Y_G, kg), (Y_B, kb)] {
+            assert_eq!(actual, (scale * coefficient).round() as i32);
         }
-        assert_eq!(CB_R + CB_G + CB_B, 0);
-        assert_eq!(CR_R + CR_G + CR_B, 0);
     }
 
     #[test]
@@ -372,6 +451,20 @@ mod tests {
         let mut picture = Picture::new(geometry);
         rgba_to_yuv420(&rgba, Orientation::TopDown, &mut picture).unwrap();
         (picture.y[0], picture.cb[0], picture.cr[0])
+    }
+
+    #[test]
+    fn filtered_luma_matches_the_observed_rounding_boundary() {
+        let [r, g, b, a] = [0, 85, 170, 255];
+        let geometry = Geometry::new(16, 8).unwrap();
+        let rgba = [r, g, b, a].repeat(16 * 8);
+        let mut picture = Picture::new(geometry);
+        Converter::filtered(geometry)
+            .convert(&rgba, Orientation::TopDown, &mut picture)
+            .unwrap();
+
+        assert_eq!(solid(16, (r, g, b, a)).0, 75);
+        assert_eq!((solid(14, (r, g, b, a)).0, picture.y[0]), (76, 76));
     }
 
     #[test]

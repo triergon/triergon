@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-e5f6c971-20261118-185012-shard-3",
+ "path": "gate-run-armv7-e5f6c971-20261118-185012-shard-3",
+ "retention": "retained",
+ "reason": "32-bit ARMv7 capture at e5f6c971, run 20261118-185012, shard 3 of 5. Parity, paired runtime and kernel-bound memory from the complete 15-case run.",
+ "key": "evidence/gate-runs/e5f6c971e14b8ef43ac71edc802168926b7b0091-armv7-20261118-185012/shard-3/2c66fce85fc42c2a6f88dd7e231bebfb9c7e2509acbb1cdc3dc31afe745dc75b.tar.zst",
+ "sha256": "2c66fce85fc42c2a6f88dd7e231bebfb9c7e2509acbb1cdc3dc31afe745dc75b",
+ "bytes": 317591569,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "ce2bc63cbaa45093a9d940568c6ee214d76acc3d2886da2a24fd4cfb556b2747",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "cf451dfa0605693144f552615cd860f7c873124aeac575c8d275aac725403661",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "586e9e25411efbe8473058479eab515c7b8b1dd7231cb7dd43ee6c998310ae85",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "52e0a726e2f0e1464ef1c6e36375f6b60fc8ce2f1a87406f2503d33759d406ac",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "d90cb09c3fd3d7d6c25d2a7e26446176f1f9eecd9f830f1c91872bb1d5846b11",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "37769b826a75b7c7d1860c544bddccf48786662fd823523905c9c1eb94433715",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "e5f6c971e14b8ef43ac71edc802168926b7b0091"
+ ]
+}
