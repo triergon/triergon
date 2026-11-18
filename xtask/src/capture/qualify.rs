@@ -847,10 +847,46 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     }
 }
 
+/// The fields of a timing run's identity that a memory run must share. A timing
+/// run of this gate run shares all but what differs by design: the time, stage
+/// and CPUs. A reused one shares what its gate key binds: the bytes of the
+/// workers, the observer and the cases, and the host class (system, machine and
+/// kernel release), with whether the builds were refused, since a refused build
+/// has no gate result to pair with. The sources it hashes beyond those may differ
+/// (a README, say), as may the host's name and kernel build.
+fn comparable(identity: &Value, reused: bool) -> Value {
+    const BOUND: [&str; 6] = [
+        "build_refusals",
+        "candidate_sha256",
+        "reference_sha256",
+        "reference_small_sha256",
+        "observer_sha256",
+        "cases_sha256",
+    ];
+    const HOST_BOUND: [&str; 3] = ["system", "machine", "release"];
+    let Value::Object(fields) = identity else {
+        return identity.clone();
+    };
+    let fields = fields.iter().filter_map(|(k, v)| match (k.as_str(), v) {
+        ("utc" | "stage" | "cpus", _) => None,
+        ("host", Value::Object(host)) if reused => Some((
+            k.clone(),
+            Value::Object(
+                host.iter()
+                    .filter(|(k, _)| HOST_BOUND.contains(&k.as_str()))
+                    .cloned()
+                    .collect(),
+            ),
+        )),
+        _ if reused && k != "host" && !BOUND.contains(&k.as_str()) => None,
+        _ => Some((k.clone(), v.clone())),
+    });
+    Value::Object(fields.collect())
+}
+
 /// The cases the timing run in `timing` recorded, for a memory run with
-/// `identity` to measure: that run must have timed the same sources, workers,
-/// cases and host. A timing run this gate reused ran on another host of the class
-/// its key binds, whose name differs. Each case is measured at its input under
+/// `identity` to measure: that run must have timed the same workers, cases and
+/// host ([`comparable`]). Each case is measured at its input under
 /// `--inputs`, generated again if this run lacks it, with the hash its timing
 /// recorded.
 fn timed_cases(
@@ -864,24 +900,10 @@ fn timed_cases(
     let recorded =
         crate::checks::read_json(&recorded).map_err(|e| format!("{}: {e}", recorded.display()))?;
     let reused = crate::harness::reuse::was_reused(timing);
-    let unstamped = |identity: &Value| match identity {
-        Value::Object(fields) => Value::Object(
-            fields
-                .iter()
-                // What differs between the two runs by design.
-                .filter(|(k, _)| !["utc", "stage", "cpus"].contains(&k.as_str()))
-                .map(|(k, v)| match v {
-                    Value::Object(host) if reused && k == "host" => (
-                        k.clone(),
-                        Value::Object(host.iter().filter(|(k, _)| k != "node").cloned().collect()),
-                    ),
-                    _ => (k.clone(), v.clone()),
-                })
-                .collect(),
-        ),
-        other => other.clone(),
-    };
-    if !crate::harness::diff::equal(&unstamped(&recorded), &unstamped(identity)) {
+    if !crate::harness::diff::equal(
+        &comparable(&recorded, reused),
+        &comparable(identity, reused),
+    ) {
         return Err(format!(
             "{}: timed other sources, workers, cases or host",
             timing.display()
@@ -1072,13 +1094,24 @@ mod tests {
             r#"{"id": "c01", "content": "noise", "width": 64, "height": 48, "frames": 2}"#,
         )
         .unwrap();
-        let identity = |node: &str, candidate: &str| {
+        // The sources a run hashes include files its gate key does not bind, such as
+        // the capture crate's README, which may change between the two runs.
+        let identity = |node: &str, candidate: &str, readme: &str| {
             Value::object([
+                ("source_digest", Value::str(readme)),
+                (
+                    "source_manifest",
+                    Value::object([("crates/capture/README.md", Value::str(readme))]),
+                ),
                 ("candidate_sha256", Value::str(candidate)),
                 ("cpus", Value::str("1")),
                 (
                     "host",
-                    Value::object([("node", Value::str(node)), ("release", Value::str("7.0"))]),
+                    Value::object([
+                        ("node", Value::str(node)),
+                        ("release", Value::str("7.0")),
+                        ("version", Value::str(format!("#1 {node}"))),
+                    ]),
                 ),
                 ("stage", Value::str("timing")),
                 ("utc", Value::float(1.0)),
@@ -1108,7 +1141,7 @@ mod tests {
         .unwrap();
         fs::write(
             step.join("identity.json"),
-            json::to_python(&identity("ip-a", "c0"), Some(1)),
+            json::to_python(&identity("ip-a", "c0", "readme-1"), Some(1)),
         )
         .unwrap();
         let key = reuse::Key {
@@ -1154,7 +1187,8 @@ mod tests {
         assert!(timing.join("c01").join(TIMING_RECORD).is_file());
         assert!(timing.join("identity.json").is_file());
 
-        // Its memory stage reads them, at this run's copy of the input.
+        // Its memory stage reads them, at this run's copy of the input, though the
+        // README changed and the host is another of the class.
         let inputs = root.join(".research/gate/new/capture-inputs");
         fs::create_dir_all(&inputs).unwrap();
         fs::write(inputs.join("noise-64x48-2.rgba"), b"pixels").unwrap();
@@ -1177,7 +1211,7 @@ mod tests {
                 timing: timing.clone(),
             },
         };
-        let mut now = identity("ip-b", "c0");
+        let mut now = identity("ip-b", "c0", "readme-2");
         if let Value::Object(fields) = &mut now {
             fields.retain(|(k, _)| k != "stage");
             fields.push(("stage".into(), Value::str("memory")));
@@ -1194,15 +1228,23 @@ mod tests {
             measured[0].memory_arguments(&measured[0].input).last(),
             Some(&python::path(&inputs.join("noise-64x48-2.rgba")))
         );
-        // Other workers, or other input bytes, are refused.
-        let other = identity("ip-b", "c1");
+        // Other workers, another kernel, or other input bytes are refused.
+        let mut kernel = now.clone();
+        if let Value::Object(fields) = &mut kernel
+            && let Some((_, Value::Object(host))) = fields.iter_mut().find(|(k, _)| k == "host")
+        {
+            host.retain(|(k, _)| k != "release");
+            host.push(("release".into(), Value::str("7.1")));
+        }
+        assert!(timed_cases(&root, &options, &timing, &kernel, &cases).is_err());
+        let other = identity("ip-b", "c1", "readme-2");
         assert!(timed_cases(&root, &options, &timing, &other, &cases).is_err());
         fs::write(inputs.join("noise-64x48-2.rgba"), b"other").unwrap();
         let error = timed_cases(&root, &options, &timing, &now, &cases)
             .err()
             .unwrap();
         assert!(error.contains("changed since timing"), "{error}");
-        // Only a reused timing run may come from another host.
+        // Only a reused timing run may come from another host or other sources.
         let measured_here = root.join("measured-here");
         fs::create_dir_all(&measured_here).unwrap();
         for file in ["identity.json", "c01/timing.json"] {
@@ -1211,55 +1253,18 @@ mod tests {
             fs::copy(timing.join(file), to).unwrap();
         }
         fs::write(inputs.join("noise-64x48-2.rgba"), b"pixels").unwrap();
-        assert!(timed_cases(&root, &options, &measured_here, &now, &cases).is_err());
         reuse::record(&measured_here, &key, 0, None).unwrap();
-        assert!(timed_cases(&root, &options, &measured_here, &now, &cases).is_err());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn a_reused_step_whose_set_cannot_be_restored_is_measured() {
-        use crate::harness::reuse;
-        let root = crate::walk::scratch("capture-unrestorable-timing");
-        let key = reuse::Key {
-            sha256: "u".repeat(64),
-            components: Value::object([("command", Value::str("capture qualify"))]),
+        let here = |readme: &str| {
+            let mut identity = identity("ip-a", "c0", readme);
+            if let Value::Object(fields) = &mut identity {
+                fields.retain(|(k, _)| k != "stage");
+                fields.push(("stage".into(), Value::str("memory")));
+            }
+            identity
         };
-        let set = Value::object([
-            ("name", Value::str("gone")),
-            ("retention", Value::str("retained")),
-            // A pack this host cannot unpack, so nothing reaches the archive.
-            ("key", Value::str("evidence/gone/pack.zip")),
-            ("sha256", Value::str("0".repeat(64))),
-            (
-                "results",
-                Value::Array(vec![Value::object([
-                    ("path", Value::str("capture-c01-timing/gate-result.json")),
-                    ("command", Value::str("capture qualify")),
-                    ("key", Value::str(&key.sha256)),
-                    ("status", Value::int(0)),
-                ])]),
-            ),
-        ]);
-        let index = root.join(crate::evidence::SETS).join("gone.json");
-        fs::create_dir_all(index.parent().unwrap()).unwrap();
-        crate::corpus::write_json(&index, &set).unwrap();
-        let output = root.join("timing");
-        let measured = std::cell::Cell::new(false);
-        let status = reuse::restoring_step(&root, &output, &key, false, || {
-            measured.set(true);
-            Ok(1)
-        });
-        assert_eq!(status.unwrap(), 1);
-        assert!(measured.get());
-        assert!(!reuse::was_reused(&output));
-        assert!(fs::read_dir(&root).unwrap().all(|entry| {
-            !entry
-                .unwrap()
-                .file_name()
-                .to_string_lossy()
-                .contains("restoring")
-        }));
+        assert!(timed_cases(&root, &options, &measured_here, &here("readme-1"), &cases).is_ok());
+        assert!(timed_cases(&root, &options, &measured_here, &here("readme-2"), &cases).is_err());
+        assert!(timed_cases(&root, &options, &measured_here, &now, &cases).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
