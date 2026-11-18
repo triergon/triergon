@@ -243,7 +243,8 @@
     "pgs-original140--window-crop-forced-real-pixels"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "iterations": 2000,
   "minimum_pairs": 30,

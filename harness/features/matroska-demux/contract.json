@@ -37,13 +37,13 @@
     "discard-padding"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
-  ],
-  "deferred_targets": [
-    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"
   ],
-  "target_scope": "qualification runs on native Linux ARM64; runtime and memory gates follow harness/policy.json",
+  "deferred_targets": [
+    "x86_64-unknown-linux-gnu"
+  ],
+  "target_scope": "qualification runs on native Linux AArch64 and in 32-bit ARMv7 user space; runtime and memory gates follow harness/policy.json",
   "minimum_pairs": 30,
   "confidence": 0.95,
   "absolute_limits": {

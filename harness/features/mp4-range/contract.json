@@ -99,7 +99,8 @@
     "fate-shorter-track-seek"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "iterations": 50,
   "minimum_pairs": 30,
