@@ -1198,36 +1198,46 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 }
 
 #[test]
-fn hevc_discovery_accepts_repeated_parameter_sets() {
+fn hevc_discovery_checks_repeated_parameter_sets() {
     use triergon_playback::matroska_feed::{
         MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits,
         MatroskaDiscoveryStep,
     };
 
-    let fixture = include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv");
-    let (engine, source, _) = matroska_source(
-        fixture,
-        7,
-        triergon_matroska::typed::PayloadOwnership::OwnedExact,
-    );
-    let cancel = AtomicBool::new(false);
-    let mut discovery = MatroskaCompactDiscovery::for_av_feed(
-        engine,
-        source,
-        Selection::All,
-        PlayerPolicy::default(),
-        MatroskaDiscoveryLimits::default(),
-    )
-    .unwrap();
-    let cutoff = (0..10_000)
-        .find_map(
-            |_| match discovery.poll(&mut WorkBudget::new(32), &cancel).unwrap() {
-                MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
-                MatroskaDiscoveryStep::Progress(_) => None,
-            },
+    for (fixture, expected) in [
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::StreamsReady,
+        ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-truncated-vps.mkv").as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
+    ] {
+        let (engine, source, _) = matroska_source(
+            fixture,
+            7,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        );
+        let cancel = AtomicBool::new(false);
+        let mut discovery = MatroskaCompactDiscovery::for_av_feed(
+            engine,
+            source,
+            Selection::All,
+            PlayerPolicy::default(),
+            MatroskaDiscoveryLimits::default(),
         )
-        .expect("HEVC discovery stalled");
-    assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
+        .unwrap();
+        let cutoff = (0..10_000)
+            .find_map(
+                |_| match discovery.poll(&mut WorkBudget::new(32), &cancel).unwrap() {
+                    MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
+                    MatroskaDiscoveryStep::Progress(_) => None,
+                },
+            )
+            .expect("HEVC discovery stalled");
+        assert_eq!(cutoff, expected);
+    }
 }
 
 #[test]

@@ -40,6 +40,9 @@ impl Chain {
             return false;
         }
         let offset = usize::from(self.hevc_parameter_sets[usize::from(kind - 32)]);
+        if offset == 0 {
+            return false;
+        }
         let Some(record) = packet.configuration.initialization(packet.packet.track) else {
             return false;
         };
@@ -261,12 +264,16 @@ impl Setup {
 fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
     let chain = hevc::startup_chain(view.nals().map(|nal| nal.source_bytes()))?;
     let mut hevc_parameter_sets = [0; 3];
-    for nal in view.nals() {
-        let kind = nal.header().nal_unit_type();
-        if (32..=34).contains(&kind) {
-            let offset = nal.source_range().start - nal.length_field_bytes().len();
-            hevc_parameter_sets[usize::from(kind - 32)] =
-                u16::try_from(offset).map_err(|_| Error::Overflow)?;
+    // The startup chain can associate the SPS using just the VPS ID. Require
+    // the bounded single-layer VPS prefix before accepting in-band repeats.
+    if hevc::vps_timing(chain.vps).is_ok() {
+        for nal in view.nals() {
+            let kind = nal.header().nal_unit_type();
+            if (32..=34).contains(&kind) {
+                let offset = nal.source_range().start - nal.length_field_bytes().len();
+                hevc_parameter_sets[usize::from(kind - 32)] =
+                    u16::try_from(offset).map_err(|_| Error::Overflow)?;
+            }
         }
     }
     Ok(Chain {

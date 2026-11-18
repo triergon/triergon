@@ -152,8 +152,8 @@ case is lower on both heap and total RSS. Sets
 `gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
 plans, step records and logs.
 
-The playback tests separately cover HEVC startup when the first access unit
-repeats the VPS, SPS and PPS from CodecPrivate byte for byte.
+The playback tests separately cover HEVC startup with exact parameter-set
+repeats and a matching truncated VPS that prevents startup.
 
 The capture, Matroska / WebM and subtitle rows at `f8e1c4d9`, and the ARMv7 workspace
 tests, come from one partial gate run per target of the 33 items those workers serve: the

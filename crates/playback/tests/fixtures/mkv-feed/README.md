@@ -79,7 +79,14 @@ preserved.
 `hevc-repeated-parameter-sets.mkv` contains six 64×48 pictures at 24 fps
 from `testsrc2`, encoded with libx265. It uses a four-picture GOP without B
 pictures, `repeat-headers=1` and `info=0`. The first access unit repeats the
-VPS, SPS and PPS from CodecPrivate.
+VPS, SPS and PPS from CodecPrivate. SHA-256
+`90023f5ee80c66d387c1dbe21935f2804f85a4ee81bb89d1c3797f7ed3882888`.
+
+`hevc-truncated-vps.mkv` derives from that fixture by shortening the VPS to
+its two-byte NAL header and one payload byte in CodecPrivate and both key
+packets. An EBML Void and filler NALs keep the original byte offsets.
+SHA-256 `f8d1d0d4fb3b6f9a9d1182b9136e6f5e7e40ad8da7a25bc3dc54d39f2779b6e3`.
+Both fixtures are dual-licensed MIT or Apache-2.0.
 
 `hevc-indexed-seek.mkv` contains 64 synthetic 96×64 pictures at 24 fps
 with a closed eight-picture GOP, two B pictures, 280 ms cluster limit
