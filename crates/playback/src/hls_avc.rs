@@ -757,16 +757,7 @@ impl AvcTsReader {
         }
         let clock = unit.clock;
         let raster = sps.value;
-        let mut next = BudgetVec::new(&self.pool);
-        next.try_extend_from_slice(&self.bytes.as_slice()[end..])?;
-        let builder = std::mem::replace(&mut self.bytes, next);
-        let source = match builder.freeze() {
-            Ok(bytes) => bytes.into_slice(0..end)?,
-            Err(error) => {
-                self.bytes = error.buffer;
-                return Err(error.error);
-            }
-        };
+        let source = self.publish(end)?;
         self.unit = None;
         Ok(AvcTsAccessUnit {
             source,
@@ -776,6 +767,31 @@ impl AvcTsReader {
             raster,
             idr: picture.idr,
         })
+    }
+
+    /// The builder's first `end` bytes as shared storage, leaving the bytes
+    /// after them at the builder's start. The access unit gets an allocation
+    /// of exactly its size and the builder keeps its own, so later units of a
+    /// similar size are assembled without growing it. Where the pool cannot
+    /// hold the copy, the builder's allocation becomes the unit's instead.
+    fn publish(&mut self, end: usize) -> Result<Bytes> {
+        let builder = self.bytes.as_slice();
+        if let Ok(unit) = Bytes::copy_from_slice(&self.pool, &builder[..end]) {
+            let len = builder.len();
+            self.bytes.as_mut_slice().copy_within(end..len, 0);
+            self.bytes.truncate(len - end);
+            return Ok(unit);
+        }
+        let mut next = BudgetVec::new(&self.pool);
+        next.try_extend_from_slice(&builder[end..])?;
+        let builder = std::mem::replace(&mut self.bytes, next);
+        match builder.freeze() {
+            Ok(bytes) => bytes.into_slice(0..end),
+            Err(error) => {
+                self.bytes = error.buffer;
+                Err(error.error)
+            }
+        }
     }
 }
 
