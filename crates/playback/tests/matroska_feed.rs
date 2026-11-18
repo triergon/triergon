@@ -1200,7 +1200,8 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 #[test]
 fn hevc_discovery_accepts_repeated_parameter_sets() {
     use triergon_playback::matroska_feed::{
-        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryStep,
+        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits,
+        MatroskaDiscoveryStep,
     };
 
     let fixture = include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv");
@@ -1215,7 +1216,7 @@ fn hevc_discovery_accepts_repeated_parameter_sets() {
         source,
         Selection::All,
         PlayerPolicy::default(),
-        Default::default(),
+        MatroskaDiscoveryLimits::default(),
     )
     .unwrap();
     let cutoff = (0..10_000)
