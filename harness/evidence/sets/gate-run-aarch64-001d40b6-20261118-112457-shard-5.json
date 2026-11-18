@@ -2,7 +2,7 @@
  "name": "gate-run-aarch64-001d40b6-20261118-112457-shard-5",
  "path": "gate-run-aarch64-001d40b6-20261118-112457-shard-5",
  "retention": "retained",
- "reason": "",
+ "reason": "Capture filtered conversion at 001d40b6 on Linux AArch64, c6g.4xlarge. Shard 5 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
  "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-aarch64-20261118-112457/shard-5/cf7c8f0b8e56f77bac684513514e66391630cf48a2915acc021e75f5c5942f79.tar.zst",
  "sha256": "cf7c8f0b8e56f77bac684513514e66391630cf48a2915acc021e75f5c5942f79",
  "bytes": 421394980,

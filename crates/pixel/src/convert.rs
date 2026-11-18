@@ -295,29 +295,100 @@ mod filtered {
         }
     }
 
+    // Split at seven bits, rounding the coarse coefficients to keep the
+    // residual small.
+    const Y_COARSE: [i32; 3] = [(Y_R + 64) >> 7, (Y_G + 64) >> 7, (Y_B + 64) >> 7];
+    const Y_RESIDUAL: [i32; 3] = [
+        Y_R - 128 * Y_COARSE[0],
+        Y_G - 128 * Y_COARSE[1],
+        Y_B - 128 * Y_COARSE[2],
+    ];
+
+    const _: () = {
+        let channel_max = u8::MAX as i32;
+        let offset = Y_OFFSET >> 7;
+        assert!(Y_OFFSET % 128 == 0 && offset >= 0);
+        assert!(Y_COARSE[0] >= 0 && Y_COARSE[1] >= 0 && Y_COARSE[2] >= 0);
+        let coarse_max = (Y_COARSE[0] + Y_COARSE[1] + Y_COARSE[2]) * channel_max + offset;
+        assert!(coarse_max <= u16::MAX as i32);
+
+        assert!(Y_RESIDUAL[0] <= 0 && Y_RESIDUAL[1] >= 0 && Y_RESIDUAL[2] >= 0);
+        let residual_min = Y_RESIDUAL[0] * channel_max;
+        let residual_max = (Y_RESIDUAL[1] + Y_RESIDUAL[2]) * channel_max;
+        assert!(residual_min >= i16::MIN as i32 && residual_max <= i16::MAX as i32);
+
+        // The original positive coefficients give the corrected sum's
+        // extrema at black and white, before the final shift.
+        assert!(Y_R >= 0 && Y_G >= 0 && Y_B >= 0);
+        let corrected_max = ((Y_R + Y_G + Y_B) * channel_max + Y_OFFSET) >> 7;
+        assert!(corrected_max <= u16::MAX as i32);
+    };
+
     #[inline]
     fn luma(r: u16, g: u16, b: u16) -> u8 {
-        // Split each coefficient at seven bits. Shifting the residual before
-        // the final shift preserves the original floor, with a 16-bit sum.
-        const R: i16 = (Y_R - 66 * 128) as i16;
-        const G: i16 = (Y_G - 129 * 128) as i16;
-        const B: i16 = (Y_B - 25 * 128) as i16;
-        let coarse = 66 * r + 129 * g + 25 * b + (Y_OFFSET >> 7) as u16;
-        let residual = R * r as i16 + G * g as i16 + B * b as i16;
-        (coarse.wrapping_add_signed(residual >> 7) >> 8) as u8
+        let coarse = Y_COARSE[0] as u16 * r
+            + Y_COARSE[1] as u16 * g
+            + Y_COARSE[2] as u16 * b
+            + (Y_OFFSET >> 7) as u16;
+        let residual = Y_RESIDUAL[0] as i16 * r as i16
+            + Y_RESIDUAL[1] as i16 * g as i16
+            + Y_RESIDUAL[2] as i16 * b as i16;
+        // Shifting the residual first preserves the floor. The signed
+        // correction leaves the sum within u16.
+        let sum = (i32::from(coarse) + i32::from(residual >> 7)) as u16;
+        (sum >> 8) as u8
     }
+
+    const CB_R: i32 = -4865;
+    const CB_G: i32 = -9528;
+    const CB_B: i32 = 14392;
+    const CR_R: i32 = 14392;
+    const CR_G: i32 = -12061;
+    const CR_B: i32 = -2332;
+
+    const C_SCALE: i32 = CB_B / 256;
+    const CB_RED: i32 = -CB_R / 256;
+    const CR_BLUE: i32 = -CR_B / 256;
+    const CR_BLUE_RESIDUAL: i32 = -CR_B % 256;
+    const C_ROUND: i16 = 512 >> 8;
+
+    const _: () = {
+        // Divide the coefficients at eight bits. Expanding the colour
+        // differences recovers all six original coefficients.
+        let shared = C_SCALE * 257;
+        assert!(CB_B == shared && CR_R == shared);
+        assert!(CB_R == -256 * CB_RED - 1);
+        assert!(CB_G == 256 * CB_RED - shared);
+        assert!(CR_B == -256 * CR_BLUE - CR_BLUE_RESIDUAL);
+        assert!(CR_G == 256 * CR_BLUE + CR_BLUE_RESIDUAL - shared - 1);
+
+        // The shared green component bounds each difference of scaled
+        // differences by the dominant product. The extra -r or -g extends
+        // only the negative end of the residual range.
+        assert!(0 <= CB_RED && CB_RED <= C_SCALE);
+        assert!(0 <= CR_BLUE && CR_BLUE <= C_SCALE);
+        assert!(0 <= CR_BLUE_RESIDUAL && CR_BLUE_RESIDUAL <= C_SCALE);
+        let pair_max = 2 * u8::MAX as i32;
+        let scaled_max = C_SCALE * pair_max;
+        let residual_min = -scaled_max - pair_max;
+        assert!(residual_min >= i16::MIN as i32 && scaled_max <= i16::MAX as i32);
+
+        let sum_min = -scaled_max + C_ROUND as i32 + (residual_min >> 8);
+        let sum_max = scaled_max + C_ROUND as i32 + (scaled_max >> 8);
+        assert!(sum_min >= i16::MIN as i32 && sum_max <= i16::MAX as i32);
+    };
 
     #[inline]
     fn chroma(r: i16, g: i16, b: i16) -> (i16, i16) {
-        // Split the Cb (-4865, -9528, 14392) and Cr (14392, -12061, -2332)
-        // coefficients at eight bits. The shared colour differences keep
-        // both terms within 16 bits for pair sums of 0 through 510.
         let red = r - g;
         let blue = b - g;
-        let red_scaled = 56 * red;
-        let blue_scaled = 56 * blue;
-        let cb = (blue_scaled - 19 * red + 2 + ((blue_scaled - r) >> 8)) >> 2;
-        let cr = (red_scaled - 9 * blue + 2 + ((red_scaled - 28 * blue - g) >> 8)) >> 2;
+        let red_scaled = C_SCALE as i16 * red;
+        let blue_scaled = C_SCALE as i16 * blue;
+        let cb = (blue_scaled - CB_RED as i16 * red + C_ROUND + ((blue_scaled - r) >> 8)) >> 2;
+        let cr = (red_scaled - CR_BLUE as i16 * blue
+            + C_ROUND
+            + ((red_scaled - CR_BLUE_RESIDUAL as i16 * blue - g) >> 8))
+            >> 2;
         (cb, cr)
     }
 

@@ -888,16 +888,16 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Capture, 32-bit ARMv7, shard 3 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-3.json) |
 | Capture, 32-bit ARMv7, shard 4 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-4.json) |
 | Capture, 32-bit ARMv7, shard 5 of 5 | `001d40b60d0347fcfa74a90adf09b314fe42a13c` | [`ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20`](../harness/evidence/sets/gate-run-armv7-001d40b6-20261118-112458-shard-5.json) |
-| Capture, Linux AArch64, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`772388b70251eaa0c414a7622bc37655ad44d39e065d3b8bd417509a40d26916`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-1.json) |
-| Capture, Linux AArch64, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`9a53253d8bddfb2e120ef45a8f0e9cdf4488941062037dbbf0ea5c9e14cad788`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-2.json) |
-| Capture, Linux AArch64, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`fb3f91c9bd2daef5498050896b5db44cd2bef4b1ef6f7523511733ae373c1569`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-3.json) |
-| Capture, Linux AArch64, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`2b9eaa727aba54dbd29e76351752c8aa6789b5a5ebb83fb97572df71d424dc82`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-4.json) |
-| Capture, Linux AArch64, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`bf21e970325fe74074080317ae1163fc5de6d2b8b370018f8638bff84f6a99b4`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-5.json) |
-| Capture, 32-bit ARMv7, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`3b5fe396a7f6e7eb0b9e002687c6ad65db53b4777e99b2992e529d89c3b380ca`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-1.json) |
-| Capture, 32-bit ARMv7, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`e22ce28a5d8d55be2e9dd7ed9aec318df6ec46175aee6747a7acb20e02fc65e5`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-2.json) |
-| Capture, 32-bit ARMv7, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`99bd020530ba5e10518ad3924b9d4544cb936b4c457db3c7578075c9b02eb445`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-3.json) |
-| Capture, 32-bit ARMv7, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-4.json) |
-| Capture, 32-bit ARMv7, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`948a0bb2163eedf3b29a575da0deaed39993a7ce161c08fd1d2c459214dfb7cd`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-5.json) |
+| Earlier: Capture, Linux AArch64, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`772388b70251eaa0c414a7622bc37655ad44d39e065d3b8bd417509a40d26916`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-1.json) |
+| Earlier: Capture, Linux AArch64, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`9a53253d8bddfb2e120ef45a8f0e9cdf4488941062037dbbf0ea5c9e14cad788`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-2.json) |
+| Earlier: Capture, Linux AArch64, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`fb3f91c9bd2daef5498050896b5db44cd2bef4b1ef6f7523511733ae373c1569`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-3.json) |
+| Earlier: Capture, Linux AArch64, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`2b9eaa727aba54dbd29e76351752c8aa6789b5a5ebb83fb97572df71d424dc82`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-4.json) |
+| Earlier: Capture, Linux AArch64, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`bf21e970325fe74074080317ae1163fc5de6d2b8b370018f8638bff84f6a99b4`](../harness/evidence/sets/gate-run-aarch64-2e2e9b4f-20261117-232244-shard-5.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 1 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`3b5fe396a7f6e7eb0b9e002687c6ad65db53b4777e99b2992e529d89c3b380ca`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-1.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 2 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`e22ce28a5d8d55be2e9dd7ed9aec318df6ec46175aee6747a7acb20e02fc65e5`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-2.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`99bd020530ba5e10518ad3924b9d4544cb936b4c457db3c7578075c9b02eb445`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-3.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-4.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`948a0bb2163eedf3b29a575da0deaed39993a7ce161c08fd1d2c459214dfb7cd`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-5.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 1 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`1d1edc8d28e39be46f7fd81ce3341ba288ed476569d1fd467bf0af1026cc67d8`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-1.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 2 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`6a2448ea7b893cfa1f37fae38890d30139ab64ca251bc76ca1056ce4248ab35f`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-2.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 3 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`d03906a29e384369a704de659412a4ce65e8039a3b2bc280acfa66c07b58681c`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-3.json) |
@@ -1420,7 +1420,7 @@ run at `f71495ea` used 20 pairs for `hevc-type17` and `hevc-update` and
 Five of MP4 range's 51 cases also exceed the ceiling on ARMv7, with a worst
 bound of 1.2241. MP4 range is gated on
 Linux AArch64 only. The closest below it is MP4 forward 1.0811. Capture's worst
-bound at `2e2e9b4f` is 1.0393. At `f8e1c4d9` Matroska's worst bound is 0.9708
+bound at `001d40b6` is 1.0476. At `f8e1c4d9` Matroska's worst bound is 0.9708
 and DVD's is 0.9752.
 Each feature's evidence set lists every case's bound.
 
@@ -1666,6 +1666,9 @@ At `001d40b6`, the filtered colour arithmetic keeps the same capture output
 folds on both targets. Each of the 15 cases passes parity, runtime, peak heap
 and kernel-bound total RSS. All runtime upper bounds are at most 1.05. The
 AArch64 `c04-motion-960` bound is 1.0385, down from 1.0618 at `2e2e9b4f`.
+All 15 ARMv7 cases use the block converter at widths of 480 or 960. The
+`c13-motion-960-6m` bound moved from 1.0357 to 1.0476 between the two runs
+of the same block path, consistent with run-to-run variation.
 
 Capture's worst bound here was 1.1669 at `a73350ca` and 1.1865 at `576f088f`. Profiled in user-mode cycles against
 FFmpeg on the gate host, the encoder's motion search reduced each 16-lane sum of absolute
@@ -1677,10 +1680,10 @@ half-sample rows are formed whole, the inverse DCT sums the basis rows of only t
 coefficients a block holds, with the same rounding points, and the coarse row is a
 fixed-size array. `c14-motion-960-rate255` went from 1.175 to 1.069 of FFmpeg's user-mode
 cycles and `c13-motion-960-6m` from 1.178 to 1.065, with all 15 stream digests unchanged.
-At `2e2e9b4f` the worst ARMv7 runtime bound across all 15 cases is 1.0393.
-The remaining gap
-is spread over the encoder's DCT, quantisation and search, which FFmpeg's ARMv7 build runs
-in ARMv6 and NEON routines (by their symbols in its profile).
+At `001d40b6` the worst ARMv7 runtime bound across all 15 cases is 1.0476.
+The remaining gap is spread over the encoder's DCT, quantisation and search,
+which FFmpeg's ARMv7 build runs in ARMv6 and NEON routines (by their symbols
+in its profile).
 
 At `a73350ca` 16 `subtitle-dvd` cases were above 1.05 here (`vob-split` worst, 1.0869),
 while the feature's median of case medians was 0.1918: they are the DVD program streams

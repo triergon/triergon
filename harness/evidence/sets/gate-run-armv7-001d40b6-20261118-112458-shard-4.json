@@ -2,7 +2,7 @@
  "name": "gate-run-armv7-001d40b6-20261118-112458-shard-4",
  "path": "gate-run-armv7-001d40b6-20261118-112458-shard-4",
  "retention": "retained",
- "reason": "",
+ "reason": "Capture block conversion at 001d40b6 on 32-bit ARMv7 Linux, c6g.4xlarge. Shard 4 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
  "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-armv7-20261118-112458/shard-4/7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e.tar.zst",
  "sha256": "7d954ad14d914cbcc407b060f2e9ab7cb4bb6c6d6d427c36d1a6fc8dd705ab7e",
  "bytes": 423478434,
