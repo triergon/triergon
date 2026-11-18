@@ -1730,7 +1730,7 @@ mod tests {
             ("matroska-demux", 12),
             ("matroska-header-removal", 4),
             ("matroska-zlib", 10),
-            ("matroska-cues-preroll", 20),
+            ("matroska-cues-preroll", 21),
             ("matroska-colour", 33),
             ("matroska-segment-metadata", 48),
             ("matroska-startup-seek", 44),
@@ -1838,7 +1838,7 @@ mod tests {
                 + array(&contract, "required_additional_vectors")
                     .unwrap()
                     .len(),
-            128
+            129
         );
     }
 
