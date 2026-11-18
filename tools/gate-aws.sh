@@ -222,7 +222,7 @@ workstation() { curl -fsS --max-time 10 https://checkip.amazonaws.com 2>/dev/nul
 # as a /32: the hosts must be reachable from here, and from nowhere else.
 require_address() {
     local address
-    address=$(workstation)
+    address=$(workstation) || address=
     echo "workstation address ${address:-unknown}, TRIERGON_SSH_CIDR $TRIERGON_SSH_CIDR"
     if [ -z "$address" ] || [ "$address/32" != "$TRIERGON_SSH_CIDR" ]; then
         echo "TRIERGON_SSH_CIDR must be this workstation's address as a /32: launching nothing" >&2
@@ -260,7 +260,7 @@ detached() {
             case $state in *running*) ;; *) say "host $i stopped"; on "$i" "tail -n 20 ~/gate-host.log ~/gate-host.out"; return 1;; esac
         else
             local address verdict=yes
-            address=$(workstation)
+            address=$(workstation) || address=
             [ -z "$address" ] || verdict=$(admitted "$address")
             if [ "$verdict" = unknown ]; then
                 say "host $i: unreachable, and $SG cannot be read: the AWS credentials \
