@@ -921,6 +921,16 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`99bd020530ba5e10518ad3924b9d4544cb936b4c457db3c7578075c9b02eb445`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-3.json) |
 | Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`78335df6299bb7b7687c7f01ee7aead8d785a4f3d0a0125dc08b0f67674da1bb`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-4.json) |
 | Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `2e2e9b4faf0364b276b51abfdb6716f828ab96fb` | [`948a0bb2163eedf3b29a575da0deaed39993a7ce161c08fd1d2c459214dfb7cd`](../harness/evidence/sets/gate-run-armv7-2e2e9b4f-20261117-232244-shard-5.json) |
+| Earlier: Capture, Linux AArch64, shard 1 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`cd74c2d3d4f8e58f1c350a3ab44d3a87a7708e5ef1de8a59635cf1d5497cbb51`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-1.json) |
+| Earlier: Capture, Linux AArch64, shard 2 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`61767625008844862c7385058026ee1f40d4500af41fc58beea3f4183a840f64`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-2.json) |
+| Earlier: Capture, Linux AArch64, shard 3 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`c2e203a7191af12aada5069fa9690f52d09fc57b76a3a05f3e7d6e2726d680a0`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-3.json) |
+| Earlier: Capture, Linux AArch64, shard 4 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`177e26dae0d079f070971200dcb25d831b114227e09892406314c4c965c5cd27`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-4.json) |
+| Earlier: Capture, Linux AArch64, shard 5 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`85647dfcc795cc479b7d069dffb2a53751d17c92cf6d4f91bff22cea9572ffbe`](../harness/evidence/sets/gate-run-aarch64-a34b98d0-20261118-172006-shard-5.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 1 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`46da8c298f4cb8fc0db538616e958f1e1ff41aa6827622a3574e6852b76b345d`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-1.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 2 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`446db811a403c6b0292c5206b0e4f27bf818348848fd2cb79c151eaf0c48b5e2`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-2.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 3 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`7e845eb83a4ecf2509164becda8a2a923cb650f8b2951cc937cc323f2faf1f88`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-3.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 4 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`4f8490d45c0fdcb3771c7be473b18c41dee1795ae5c8db4d3642c3de2bdf39cf`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-4.json) |
+| Earlier: Capture, 32-bit ARMv7, shard 5 of 5 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`69cafbfa7ff7f62248c2ef8ad1386fcd3c4c629e419716a28d6e3885d5e72474`](../harness/evidence/sets/gate-run-armv7-a34b98d0-20261118-172123-shard-5.json) |
 | Filtered capture conversion probes, Linux AArch64 | `e12863c88f5050781e20254fc8efd8cee12fac9b` | [`809f94049ee31d7b0f0ca4a619abd5842828798982ce8e406216dd742dc15c55`](../harness/evidence/sets/capture-filtered-probes-aarch64.json) |
 | Capture conversion probes, 32-bit ARMv7 | `a34b98d0f3a83f23a6472e7b32f4a650a62740b2` | [`e3dfbf4a9da1d68be300175dff29845dd8ccbb36b3f09d458eb8b9c7f9ebf7a3`](../harness/evidence/sets/capture-native-widths-armv7.json) |
 | Capture, Matroska and subtitle gate run, Linux AArch64, shard 1 of 5 | `f8e1c4d9136d5a43661d8f069ca0908e07cb2acc` | [`1d1edc8d28e39be46f7fd81ce3341ba288ed476569d1fd467bf0af1026cc67d8`](../harness/evidence/sets/gate-run-aarch64-f8e1c4d9-20261116-083951-shard-1.json) |
@@ -1695,6 +1705,10 @@ holds these checks at `a34b98d0`.
 Compared with `f8e1c4d9`, the filtered conversion changes the capture output
 folds on all 15 Linux AArch64 cases. All 15 ARMv7 output folds and all
 reference folds on both targets match their earlier values.
+
+At `a34b98d0`, the 15 capture cases pass conversion, encoding, mux, runtime,
+peak heap and kernel-bound total RSS on each c6g.4xlarge target. The worst
+runtime bounds are 1.0519 on Linux AArch64 and 1.0536 on 32-bit ARMv7.
 
 At `001d40b6`, the filtered colour arithmetic keeps the same capture output
 folds on both targets. Each of the 15 cases passes parity, runtime, peak heap

@@ -1,0 +1,70 @@
+{
+ "name": "gate-run-aarch64-a34b98d0-20261118-172006-shard-5",
+ "path": "gate-run-aarch64-a34b98d0-20261118-172006-shard-5",
+ "retention": "retained",
+ "reason": "Capture conversion, codec and mux with paired timing and kernel-bound memory.",
+ "key": "evidence/gate-runs/a34b98d0f3a83f23a6472e7b32f4a650a62740b2-aarch64-20261118-172006/shard-5/85647dfcc795cc479b7d069dffb2a53751d17c92cf6d4f91bff22cea9572ffbe.tar.zst",
+ "sha256": "85647dfcc795cc479b7d069dffb2a53751d17c92cf6d4f91bff22cea9572ffbe",
+ "bytes": 421318687,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "6fe4732b4a2795a0913c83fd0b53cb9706500e4464bf1df2338d9ca4663201ff",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "1c584b39c3bbe4bc11514c709725a0da0204a4bda712d12d18516d38977a03d3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "4a34ee6f0463440361b512548e25385919fa7fccee49d4b4725460380456de35",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "6065c27242fc9959fa95c5274b0cf15f368fef637203a688a182f918e2851e31",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "1554268ff014519179a308073d4245d0219afb37ec414a50fc614b075ae58408",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2692c883eef2b354a72c6c39762e4ebe4328cd06d4ae2626ea205a25bfb621da",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "936e7b15be632fd634f9e91bb09d6e7af0746587ad2ad5b6cc0ee8e3c941b3b1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e593004e9b6d14760bc0de6352a51945f65b9adaf366cd3d427b1f07adabbb00",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "a34b98d0f3a83f23a6472e7b32f4a650a62740b2"
+ ]
+}
