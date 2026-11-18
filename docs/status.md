@@ -141,12 +141,13 @@ counts on the link-order training operations are within 0.05% of `2a6a07a7`'s. S
 `gate-run-aarch64-2b196e9c-20261117-192110-shard-1` to `-8` and
 `gate-run-armv7-2b196e9c-20261117-192033-shard-1` to `-8` hold the shards' outputs, and
 `link-order-code-size` the instruction counts and the per-feature comparisons. A reused
-timing step now restores those records from its kept set: at `176afab0`, one partial run per
-target of the 15 capture items, on one host each, reused every timing step from the
-`f7b1d8eb` run and measured every memory step from the restored records, 30 of 30 steps
-passing on both targets (heap ≤0.5904 and total RSS ≤0.9704 on AArch64, ≤0.6086 and
-≤0.9766 on ARMv7; sets `gate-run-aarch64-176afab0-20261118-134108-shard-1` and
-`gate-run-armv7-176afab0-20261118-134158-shard-1`).
+timing step now restores those records from its kept set: one partial run per target of the
+15 capture items on five hosts, at `22b82550` on Linux AArch64 and `01ba2375` on ARMv7,
+reused every timing step from the `a5837d38` run and measured every memory step from the
+restored records, 30 of 30 steps passing on both targets (heap ≤0.5904 and total RSS
+≤0.9704 on AArch64, ≤0.6086 and ≤0.9766 on ARMv7; sets
+`gate-run-aarch64-22b82550-20261118-172738-shard-1` to `-5` and
+`gate-run-armv7-01ba2375-20261118-191656-shard-1` to `-5`).
 
 The playback rows at `419a8493` (HLS segments, Matroska startup and seek, audio clocks and
 legacy AAC-LC, MP4 forward and range, TS program, MPEG-TS progressive playback and raw

@@ -1,0 +1,18 @@
+{
+ "name": "gate-run-aarch64-22b82550-20261118-172738-shard-1",
+ "path": "gate-run-aarch64-22b82550-20261118-172738-shard-1",
+ "retention": "retained",
+ "reason": "Partial gate run at 22b82550, the 15 capture items, shard 1 of 5, c6g.4xlarge hosts (Graviton2) from the gate images, Linux AArch64: every capture timing step reused from the a5837d38 run, its records restored from that run's kept sets, and every memory step measured, kernel-bound on CPUs 1-15; the shard outputs, build identities, plan, step records and logs; for the fix that restores a reused capture timing step's records",
+ "key": "evidence/gate-runs/22b82550c0969b95fca246a6769bd8fe360a5f54-aarch64-20261118-172738/shard-1/238dbe5a5af92a541125c77eab979762acacf2d3717358a9c077bfe04e13a275.tar.zst",
+ "sha256": "238dbe5a5af92a541125c77eab979762acacf2d3717358a9c077bfe04e13a275",
+ "bytes": 359221608,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "3ac78594aa44a21f1771abf0963335c18c8b0139cd44065250ba2d71e1042457",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
