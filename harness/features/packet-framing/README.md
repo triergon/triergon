@@ -37,4 +37,4 @@ framing crate's `reference-trace` feature for comparison-only error codes.
 and source hashes. The two AVC input files and `corpus.json` pin the ten
 additional scripts and their observed folds. The historical measurements used
 compiler overrides. Qualification requires the pinned stable build and all 135
-cases on native AArch64 Linux.
+cases on native Linux AArch64 and on 32-bit ARMv7.

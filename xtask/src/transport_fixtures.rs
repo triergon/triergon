@@ -1134,7 +1134,10 @@ fn contract(cases: &[Case]) -> R<Value> {
         ),
         (
             "required_targets",
-            Value::strings(["aarch64-unknown-linux-gnu"]),
+            Value::strings([
+                "aarch64-unknown-linux-gnu",
+                "thumbv7neon-unknown-linux-gnueabihf",
+            ]),
         ),
         ("iterations", Value::int(50)),
         ("minimum_pairs", Value::int(30)),

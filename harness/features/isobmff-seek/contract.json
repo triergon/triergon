@@ -16,7 +16,8 @@
     "Expected work preserves the reference input SHA-256 and work-contract digest. Reference proof fields are checked separately from the candidate work projection."
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
   ],
   "counts": {
     "cases": 476,
