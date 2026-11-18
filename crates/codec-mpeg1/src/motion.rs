@@ -130,9 +130,8 @@ pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride:
 /// SAD of a group of four rows. Accumulate across each column before reducing
 /// the 16 columns, with at most 16,320 in the 16-bit total.
 #[inline(always)]
-fn sad4(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
-    let [[a0, b0], [a1, b1], [a2, b2], [a3, b3]] =
-        std::array::from_fn(|r| [row16(cur, r * cur_stride), row16(reference, r * ref_stride)]);
+fn sad4([a0, a1, a2, a3]: &[[u8; 16]; 4], reference: &[u8], stride: usize) -> u32 {
+    let [b0, b1, b2, b3] = std::array::from_fn(|r| row16(reference, r * stride));
     let total = (0..16)
         .map(|i| {
             u16::from(a0[i].abs_diff(b0[i]))
@@ -148,21 +147,10 @@ fn sad4(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u
 /// exact when below `limit` and otherwise the sum of the rows up to the first
 /// group of four at which it reached `limit`.
 #[inline(never)]
-pub(crate) fn sad16_within(
-    cur: &[u8],
-    cur_stride: usize,
-    reference: &[u8],
-    ref_stride: usize,
-    limit: u32,
-) -> u32 {
+fn sad16_within(cur: &[[u8; 16]; 16], reference: &[u8], stride: usize, limit: u32) -> u32 {
     let mut total = 0u32;
-    for rows in [0, 4, 8, 12] {
-        total += sad4(
-            &cur[rows * cur_stride..],
-            cur_stride,
-            &reference[rows * ref_stride..],
-            ref_stride,
-        );
+    for (group, row) in cur.as_chunks::<4>().0.iter().zip([0, 4, 8, 12]) {
+        total += sad4(group, &reference[row * stride..], stride);
         if total >= limit {
             return total;
         }
@@ -173,8 +161,8 @@ pub(crate) fn sad16_within(
 /// SAD of a 16×16 block against the half-sample interpolation of
 /// `reference` (top-left full sample given) without materialising it.
 #[inline]
-pub(crate) fn sad16_half(
-    cur: &[u8],
+fn sad16_half(
+    cur: &[[u8; 16]; 16],
     reference: &[u8],
     stride: usize,
     half_x: bool,
@@ -182,16 +170,20 @@ pub(crate) fn sad16_half(
 ) -> u32 {
     /// One interpolation, decided once for the whole block.
     #[inline(never)]
-    fn sad<const HX: bool, const HY: bool>(cur: &[u8], reference: &[u8], stride: usize) -> u32 {
+    fn sad<const HX: bool, const HY: bool>(
+        cur: &[[u8; 16]; 16],
+        reference: &[u8],
+        stride: usize,
+    ) -> u32 {
         let mut acc = [0u16; 16];
-        for k in 0..16 {
+        for (k, row) in cur.iter().enumerate() {
             let prediction = half_row::<HX, HY>(reference, k * stride, stride);
-            accumulate(&mut acc, row16(cur, k * stride), &prediction);
+            accumulate(&mut acc, row, &prediction);
         }
         lane_sum(&acc)
     }
     match (half_x, half_y) {
-        (false, false) => sad16(cur, stride, reference, stride),
+        (false, false) => sad::<false, false>(cur, reference, stride),
         (true, false) => sad::<true, false>(cur, reference, stride),
         (false, true) => sad::<false, true>(cur, reference, stride),
         (true, true) => sad::<true, true>(cur, reference, stride),
@@ -402,11 +394,11 @@ impl Search<'_> {
     }
 
     #[inline]
-    fn half_sad(&self, mv: Mv) -> u32 {
+    fn half_sad(&self, cur: &[[u8; 16]; 16], mv: Mv) -> u32 {
         let sx = (self.x as i32 + (mv.x >> 1)) as usize;
         let sy = (self.y as i32 + (mv.y >> 1)) as usize;
         sad16_half(
-            &self.cur[self.y * self.stride + self.x..],
+            cur,
             &self.reference[sy * self.stride + sx..],
             self.stride,
             mv.x & 1 != 0,
@@ -432,6 +424,9 @@ impl Search<'_> {
         if best_sad == 0 {
             return (best, 0);
         }
+        // Every remaining candidate compares against these same source rows.
+        let start = self.y * self.stride + self.x;
+        let cur = std::array::from_fn(|row| *row16(self.cur, start + row * self.stride));
         // Evaluates a full-sample candidate and returns its cost (exact when
         // it beats the best, otherwise only a lower bound; u32::MAX when not
         // evaluated).
@@ -454,10 +449,8 @@ impl Search<'_> {
             }
             let base = (self.y as i32 + c.y / 2) as usize * self.stride
                 + (self.x as i32 + c.x / 2) as usize;
-            let cur = &self.cur[self.y * self.stride + self.x..];
             let sad = sad16_within(
-                cur,
-                self.stride,
+                &cur,
                 &self.reference[base..],
                 self.stride,
                 *best_cost - bits,
@@ -571,7 +564,7 @@ impl Search<'_> {
                 y: center.y + dy,
             };
             if self.bounds.contains(c) {
-                let sad = self.half_sad(c);
+                let sad = self.half_sad(&cur, c);
                 let cost = sad + self.cost_bits(c);
                 axis[k] = cost;
                 if cost < best_cost {
@@ -586,7 +579,7 @@ impl Search<'_> {
             y: center.y + dy,
         };
         if self.bounds.contains(c) {
-            let sad = self.half_sad(c);
+            let sad = self.half_sad(&cur, c);
             if sad + self.cost_bits(c) < best_cost {
                 (best, best_sad) = (c, sad);
             }
@@ -692,6 +685,31 @@ mod tests {
         assert_eq!(out[0], 16); // (10+21+1)/2
         predict::<1>(&plane, 3, 0, 0, 1, 1, &mut out);
         assert_eq!(out[0], 18); // (10+11+21+30+2)/4, stride 3
+    }
+
+    #[test]
+    fn packed_sad_returns_the_same_four_row_cutoffs() {
+        let stride = 32;
+        let plane: Vec<u8> = (0..17 * stride).map(|i| (i * 73 + i / 9) as u8).collect();
+        let reference = &plane[3..];
+        let cur = std::array::from_fn(|r| *row16(&plane, r * stride + 11));
+        let mut prefixes = [0u32; 4];
+        let mut total = 0;
+        for (r, row) in cur.iter().enumerate() {
+            for (a, b) in row.iter().zip(row16(reference, r * stride)) {
+                total += u32::from(a.abs_diff(*b));
+            }
+            if r % 4 == 3 {
+                prefixes[r / 4] = total;
+            }
+        }
+        for limit in [0, prefixes[0], prefixes[0] + 1, prefixes[2] + 1, total + 1] {
+            let expected = prefixes
+                .into_iter()
+                .find(|sum| *sum >= limit)
+                .unwrap_or(total);
+            assert_eq!(sad16_within(&cur, reference, stride, limit), expected);
+        }
     }
 
     #[test]
