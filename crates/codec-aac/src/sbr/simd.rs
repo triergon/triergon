@@ -1,11 +1,13 @@
-//! `std::simd` forms of the SBR QMF banks' windowing and shuffles, used with the `simd`
-//! feature (nightly).
+//! `std::simd` forms of the SBR QMF banks' windowing and shuffles, of the covariances HF
+//! generation predicts from, and of the Parametric Stereo hybrid filters, used with the
+//! `simd` feature (nightly).
 //!
 //! Every lane performs the scalar code's operations in the scalar code's order, so the
 //! results equal the scalar code's wherever the vector unit follows IEEE 754 (AArch64).
 //! ARMv7 NEON flushes subnormal operands and results to zero, so there the results can
 //! differ from the scalar code's for subnormal values.
 
+use super::{Covariance, XL_LEN};
 use crate::fft::Cpx;
 use std::simd::{f32x4, simd_swizzle};
 
@@ -122,6 +124,85 @@ pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut 
     }
 }
 
+/// The covariances of [`super::covariance`] for four bands, lane j from band `x[j]`. Each
+/// lane adds the scalar code's terms in its order. The bands are transposed two slots at a
+/// time, so that every vector holds one slot's real or imaginary parts of the four bands.
+pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
+    let mut re = [V::splat(0.0); XL_LEN];
+    let mut im = [V::splat(0.0); XL_LEN];
+    for n in (0..XL_LEN).step_by(2) {
+        let [a, b, c, d] = x.map(|x| ld2(x, n));
+        let (ab_lo, cd_lo) = (
+            simd_swizzle!(a, b, [0, 4, 1, 5]),
+            simd_swizzle!(c, d, [0, 4, 1, 5]),
+        );
+        let (ab_hi, cd_hi) = (
+            simd_swizzle!(a, b, [2, 6, 3, 7]),
+            simd_swizzle!(c, d, [2, 6, 3, 7]),
+        );
+        re[n] = simd_swizzle!(ab_lo, cd_lo, [0, 1, 4, 5]);
+        im[n] = simd_swizzle!(ab_lo, cd_lo, [2, 3, 6, 7]);
+        re[n + 1] = simd_swizzle!(ab_hi, cd_hi, [0, 1, 4, 5]);
+        im[n + 1] = simd_swizzle!(ab_hi, cd_hi, [2, 3, 6, 7]);
+    }
+    let zero = V::splat(0.0);
+    let (mut r01re, mut r01im, mut r02re, mut r02im) = (zero, zero, zero, zero);
+    let (mut r11, mut r12re, mut r12im, mut r22) = (zero, zero, zero, zero);
+    for n in 0..XL_LEN - 2 {
+        let (ar, ai) = (re[n + 2], im[n + 2]);
+        let (br, bi) = (re[n + 1], im[n + 1]);
+        let (cr, ci) = (re[n], im[n]);
+        r01re += ar * br + ai * bi;
+        r01im += ai * br - ar * bi;
+        r02re += ar * cr + ai * ci;
+        r02im += ai * cr - ar * ci;
+        r11 += br * br + bi * bi;
+        r12re += br * cr + bi * ci;
+        r12im += bi * cr - br * ci;
+        r22 += cr * cr + ci * ci;
+    }
+    std::array::from_fn(|j| Covariance {
+        r01: Cpx::new(r01re[j], r01im[j]),
+        r02: Cpx::new(r02re[j], r02im[j]),
+        r11: r11[j],
+        r12: Cpx::new(r12re[j], r12im[j]),
+        r22: r22[j],
+    })
+}
+
+/// One Parametric Stereo hybrid filter over a frame: `out[t] = sum_d f[d] e[t + 12 - d]`,
+/// t < 32, each sum from zero in tap order, with the real taps alone when `real` (a
+/// mirror pair). Four slots a vector, real and imaginary parts apart.
+pub(super) fn hybrid_filter(f: &[Cpx; 13], e: &[Cpx; 44], real: bool, out: &mut [Cpx; 32]) {
+    let mut re = [0f32; 44];
+    let mut im = [0f32; 44];
+    for ((r, i), v) in re.iter_mut().zip(im.iter_mut()).zip(e) {
+        *r = v.re;
+        *i = v.im;
+    }
+    for (b, out) in out.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+        let t = 4 * b;
+        let (mut acc_re, mut acc_im) = (V::splat(0.0), V::splat(0.0));
+        for (d, c) in f.iter().enumerate() {
+            let (vr, vi) = (ld(&re, t + 12 - d), ld(&im, t + 12 - d));
+            let (cr, ci) = (V::splat(c.re), V::splat(c.im));
+            if real {
+                acc_re += cr * vr;
+                acc_im += cr * vi;
+            } else {
+                acc_re += cr * vr - ci * vi;
+                acc_im += cr * vi + ci * vr;
+            }
+        }
+        for (o, (r, i)) in out
+            .iter_mut()
+            .zip(acc_re.to_array().into_iter().zip(acc_im.to_array()))
+        {
+            *o = Cpx::new(r, i);
+        }
+    }
+}
+
 #[cfg(test)]
 // the scalar forms are written index-style, as the default code's loops are
 #[allow(clippy::needless_range_loop)]
@@ -205,5 +286,58 @@ mod tests {
             })
             .collect();
         assert_eq!(bits(&out), bits(&scalar));
+    }
+
+    fn cpx(seed: u32, n: usize) -> Vec<Cpx> {
+        let re = values(seed, n);
+        let im = values(seed + 1000, n);
+        re.into_iter()
+            .zip(im)
+            .map(|(re, im)| Cpx::new(re, im))
+            .collect()
+    }
+
+    fn cpx_bits(v: &[Cpx]) -> Vec<(u32, u32)> {
+        v.iter().map(|c| (c.re.to_bits(), c.im.to_bits())).collect()
+    }
+
+    #[test]
+    fn covariance_kernel_equals_the_scalar_arithmetic() {
+        let bands: Vec<[Cpx; XL_LEN]> = (0..4)
+            .map(|j| cpx(20 + j, XL_LEN).try_into().unwrap())
+            .collect();
+        let sums = covariance4(std::array::from_fn(|j| &bands[j]));
+        for (band, sums) in bands.iter().zip(sums) {
+            let scalar = super::super::covariance(band);
+            let parts = |c: &Covariance| cpx_bits(&[c.r01, c.r02, c.r12, Cpx::new(c.r11, c.r22)]);
+            assert_eq!(parts(&sums), parts(&scalar));
+        }
+    }
+
+    #[test]
+    fn hybrid_filter_equals_the_scalar_arithmetic() {
+        let f: [Cpx; 13] = cpx(30, 13).try_into().unwrap();
+        let e: [Cpx; 44] = cpx(31, 44).try_into().unwrap();
+        for real in [false, true] {
+            let mut out = [Cpx::default(); 32];
+            hybrid_filter(&f, &e, real, &mut out);
+            let scalar: Vec<Cpx> = (0..32)
+                .map(|t| {
+                    let mut acc = Cpx::default();
+                    for (c, v) in f.iter().zip(e[t..t + 13].iter().rev()) {
+                        if real {
+                            acc.re += c.re * v.re;
+                            acc.im += c.re * v.im;
+                        } else {
+                            let p = c.mul(*v);
+                            acc.re += p.re;
+                            acc.im += p.im;
+                        }
+                    }
+                    acc
+                })
+                .collect();
+            assert_eq!(cpx_bits(&out), cpx_bits(&scalar), "real taps {real}");
+        }
     }
 }

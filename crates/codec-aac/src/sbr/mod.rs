@@ -1068,11 +1068,20 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
     let bw = chirp(c, ft.n_q);
     let s0 = 2 * c.t_env[0] + T_HFADJ;
     let s1 = 2 * c.t_env[c.num_env] + T_HFADJ;
+    // the prediction coefficients of every source band, once each: patches can share
+    // source bands
+    let first = ft.patch_start.iter().copied().min().unwrap_or(0);
+    let end = (ft.patch_start.iter().zip(ft.patch_num.iter()))
+        .map(|(&start, &num)| start + num)
+        .max()
+        .unwrap_or(0);
+    let mut alpha = [(Cpx::default(), Cpx::default()); 64];
+    predictors(&c.xl[first..end], &mut alpha[first..end]);
     let mut k = ft.kx;
     for (p, &num) in ft.patch_num.iter().enumerate() {
         for x in 0..num {
             let src = ft.patch_start[p] + x;
-            let (a0, a1) = lpc(&c.xl[src]);
+            let (a0, a1) = alpha[src];
             let mut g = 0;
             while g + 1 < ft.noise.len() - 1 && k >= ft.noise[g + 1] {
                 g += 1;
@@ -1102,9 +1111,41 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
     }
 }
 
-/// Covariance-method second order prediction coefficients (4.6.18.6.2).
-fn lpc(x: &[Cpx; XL_LEN]) -> (Cpx, Cpx) {
-    // phi(i, j) = sum_{n=0}^{37} x[n + 2 - i] conj(x[n + 2 - j])
+/// The prediction coefficients ([`predictor`]) of each band of `xl`, into `alpha`.
+fn predictors(xl: &[[Cpx; XL_LEN]], alpha: &mut [(Cpx, Cpx)]) {
+    #[cfg(feature = "simd")]
+    {
+        for (rows, alpha) in xl.chunks(4).zip(alpha.chunks_mut(4)) {
+            // a short last group repeats its last band in the spare lanes
+            let lanes: [&[Cpx; XL_LEN]; 4] = std::array::from_fn(|j| &rows[j.min(rows.len() - 1)]);
+            for (a, sums) in alpha.iter_mut().zip(simd::covariance4(lanes)) {
+                *a = predictor(&sums);
+            }
+        }
+    }
+    #[cfg(not(feature = "simd"))]
+    for (x, a) in xl.iter().zip(alpha) {
+        *a = predictor(&covariance(x));
+    }
+}
+
+/// The covariances phi(i, j) = sum_{n=0}^{37} x\[n + 2 - i\] conj(x\[n + 2 - j\]) of one
+/// band that the predictor needs (4.6.18.6.2).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Covariance {
+    r01: Cpx,
+    r02: Cpx,
+    r11: f32,
+    r12: Cpx,
+    r22: f32,
+}
+
+/// The covariances of one band, each summed in time order from zero.
+#[cfg_attr(
+    feature = "simd",
+    allow(dead_code, reason = "the scalar form, tested against the kernel")
+)]
+fn covariance(x: &[Cpx; XL_LEN]) -> Covariance {
     let mut r01 = Cpx::default();
     let mut r02 = Cpx::default();
     let mut r11 = 0f32;
@@ -1124,6 +1165,24 @@ fn lpc(x: &[Cpx; XL_LEN]) -> (Cpx, Cpx) {
         r12.im += b.im * cc.re - b.re * cc.im;
         r22 += cc.re * cc.re + cc.im * cc.im;
     }
+    Covariance {
+        r01,
+        r02,
+        r11,
+        r12,
+        r22,
+    }
+}
+
+/// Covariance-method second order prediction coefficients (4.6.18.6.2).
+fn predictor(sums: &Covariance) -> (Cpx, Cpx) {
+    let Covariance {
+        r01,
+        r02,
+        r11,
+        r12,
+        r22,
+    } = *sums;
     let det = r22 * r11 - (r12.re * r12.re + r12.im * r12.im) / (1.0 + 1e-6);
     let mut a1 = Cpx::default();
     if det != 0.0 {

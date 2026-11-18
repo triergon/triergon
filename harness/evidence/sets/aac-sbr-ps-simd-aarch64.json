@@ -1,0 +1,9 @@
+{
+ "name": "aac-sbr-ps-simd-aarch64",
+ "path": "aac-sbr-ps-simd-aarch64",
+ "retention": "retained",
+ "reason": "Stage account and counts of the AAC decoder's std::simd covariance and hybrid-filter kernels and the integer s16 conversion, one c6g.4xlarge host (Graviton2) from the Linux AArch64 gate image: perf stat user-mode instructions and cycles of the gate build of codec-aac-worker (pinned nightly, aac-simd) at main 2a6a07a7 and at each commit of the change (bbfa860f, cd4d899c, 881f7f26, 9d70b166), each against main and the commit before, with output digests, on the five AAC codec workloads; perf records with symbol reports of main, 9d70b166 and the reference, and of stage-symbol builds of both on aac-he-stereo and aac-hev2-stereo; one quick timing round (30 pairs) of 9d70b166 against the reference; the codec-aac and session unit tests, stable and nightly with simd; the 39 aac-lane vectors of the correctness manifest decoded by the AAC decode example (nightly, simd) at main and at 9d70b166, byte for byte; scripts, binaries' and inputs' SHA-256, toolchains, host details and a bundle of the measured source; cited by docs/status.md for the HE-AAC timings.",
+ "key": "evidence/aac-sbr-ps-simd-aarch64/6bc6f725fea8a4eba6b4a297d0a30de838ade7bc4aece09f3f31267480b7c254.tar.gz",
+ "sha256": "6bc6f725fea8a4eba6b4a297d0a30de838ade7bc4aece09f3f31267480b7c254",
+ "bytes": 6436353
+}

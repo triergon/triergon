@@ -1,0 +1,32 @@
+{
+ "name": "gate-run-armv7-81edf4c0-20261117-225155-shard-4",
+ "path": "gate-run-armv7-81edf4c0-20261117-225155-shard-4",
+ "retention": "retained",
+ "reason": "Partial gate run at 81edf4c0 (main 3ffe8826 merged into the change: integer s16 conversion of the stereo pass-through on 32-bit ARM, SBR predictors once per source band, std::simd SBR covariances and PS hybrid filters) on four c6g.4xlarge hosts, ARMv7, shard 4 of the items that link the AAC decoder or the stereo downmix (codecs, codecs-audio, codec-workloads, codec-file-workloads and their memory cases, isobmff-reader, ogg-readers, tests, tests-release), codec-aac-worker built by the pinned nightly with codec-aac's simd feature and every other worker, codec-worker included, by stable, with set codec-derived-streams unpacked: the shard's outputs as tools/gate-aws.sh archives them (step records, logs, build identities, gate results; steps benchmark-codec-file-workloads, codec-bin, codecs-grade, codecs-manifest, memory-codec-file-workloads-3, memory-codec-workloads-4); cited by docs/status.md.",
+ "key": "evidence/gate-runs/81edf4c0dac9563f099a50327cab0b19f5eed01f-armv7-20261117-225155/shard-4/bcd4616b3ebe6de203e2dbb3d7587f97fd62c9dae9eae570a7f8b2d120f2c42e.tar.zst",
+ "sha256": "bcd4616b3ebe6de203e2dbb3d7587f97fd62c9dae9eae570a7f8b2d120f2c42e",
+ "bytes": 1594319,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "ea46d5bcf319af7589f6557acd1a91124e4f5b6ecfc4102dc5b53ecb46ea5f0f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "255aff4ed3c8b31afb128d8f44601f5a4d97ea0070e4dcbe588b0c0fb52bdf3d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "76b2ed6cda7aef6efbc1111570ce0b92468202dda3a9ffa915bacde6d13704e5",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
