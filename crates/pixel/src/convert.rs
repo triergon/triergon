@@ -233,12 +233,6 @@ mod filtered {
     pub(super) const Y_R: i32 = 8414;
     pub(super) const Y_G: i32 = 16519;
     pub(super) const Y_B: i32 = 3208;
-    const CB_R: i32 = -4865;
-    const CB_G: i32 = -9528;
-    const CB_B: i32 = 14392;
-    const CR_R: i32 = 14392;
-    const CR_G: i32 = -12061;
-    const CR_B: i32 = -2332;
     // The extra 1 << 8 was recovered by fitting the fixed-point formula to the
     // reference's observed luma bytes in the short_filtered_frames_against_reference probe.
     // RGB (0, 85, 170) gives 76 in the probe and 75 with only the half-unit bias.
@@ -291,23 +285,116 @@ mod filtered {
         let (y, cb, cr) = (&mut y[..2 * m], &mut cb[..m], &mut cr[..m]);
         for i in 0..m {
             let (r0, g0, b0) = (
-                rgba[8 * i] as i32,
-                rgba[8 * i + 1] as i32,
-                rgba[8 * i + 2] as i32,
+                u16::from(rgba[8 * i]),
+                u16::from(rgba[8 * i + 1]),
+                u16::from(rgba[8 * i + 2]),
             );
             let (r1, g1, b1) = (
-                rgba[8 * i + 4] as i32,
-                rgba[8 * i + 5] as i32,
-                rgba[8 * i + 6] as i32,
+                u16::from(rgba[8 * i + 4]),
+                u16::from(rgba[8 * i + 5]),
+                u16::from(rgba[8 * i + 6]),
             );
-            y[2 * i] = ((Y_R * r0 + Y_G * g0 + Y_B * b0 + Y_OFFSET) >> 15) as u8;
-            y[2 * i + 1] = ((Y_R * r1 + Y_G * g1 + Y_B * b1 + Y_OFFSET) >> 15) as u8;
-            let (r, g, b) = (r0 + r1, g0 + g1, b0 + b1);
-            // The sum of two pixels has sixteen fractional bits. Round it
-            // once here so the vertical filter receives six fractional bits.
-            cb[i] = ((CB_R * r + CB_G * g + CB_B * b + 512) >> 10) as i16;
-            cr[i] = ((CR_R * r + CR_G * g + CR_B * b + 512) >> 10) as i16;
+            y[2 * i] = luma(r0, g0, b0);
+            y[2 * i + 1] = luma(r1, g1, b1);
+            (cb[i], cr[i]) = chroma((r0 + r1) as i16, (g0 + g1) as i16, (b0 + b1) as i16);
         }
+    }
+
+    // Split at seven bits, rounding the coarse coefficients to keep the
+    // residual small.
+    const Y_COARSE: [i32; 3] = [(Y_R + 64) >> 7, (Y_G + 64) >> 7, (Y_B + 64) >> 7];
+    const Y_RESIDUAL: [i32; 3] = [
+        Y_R - 128 * Y_COARSE[0],
+        Y_G - 128 * Y_COARSE[1],
+        Y_B - 128 * Y_COARSE[2],
+    ];
+
+    const _: () = {
+        let channel_max = u8::MAX as i32;
+        let offset = Y_OFFSET >> 7;
+        assert!(Y_OFFSET % 128 == 0 && offset >= 0);
+        assert!(Y_COARSE[0] >= 0 && Y_COARSE[1] >= 0 && Y_COARSE[2] >= 0);
+        let coarse_max = (Y_COARSE[0] + Y_COARSE[1] + Y_COARSE[2]) * channel_max + offset;
+        assert!(coarse_max <= u16::MAX as i32);
+
+        assert!(Y_RESIDUAL[0] <= 0 && Y_RESIDUAL[1] >= 0 && Y_RESIDUAL[2] >= 0);
+        let residual_min = Y_RESIDUAL[0] * channel_max;
+        let residual_max = (Y_RESIDUAL[1] + Y_RESIDUAL[2]) * channel_max;
+        assert!(residual_min >= i16::MIN as i32 && residual_max <= i16::MAX as i32);
+
+        // The original positive coefficients give the corrected sum's
+        // extrema at black and white, before the final shift.
+        assert!(Y_R >= 0 && Y_G >= 0 && Y_B >= 0);
+        let corrected_max = ((Y_R + Y_G + Y_B) * channel_max + Y_OFFSET) >> 7;
+        assert!(corrected_max <= u16::MAX as i32);
+    };
+
+    #[inline]
+    fn luma(r: u16, g: u16, b: u16) -> u8 {
+        let coarse = Y_COARSE[0] as u16 * r
+            + Y_COARSE[1] as u16 * g
+            + Y_COARSE[2] as u16 * b
+            + (Y_OFFSET >> 7) as u16;
+        let residual = Y_RESIDUAL[0] as i16 * r as i16
+            + Y_RESIDUAL[1] as i16 * g as i16
+            + Y_RESIDUAL[2] as i16 * b as i16;
+        // Shifting the residual first preserves the floor. The signed
+        // correction leaves the sum within u16.
+        let sum = (i32::from(coarse) + i32::from(residual >> 7)) as u16;
+        (sum >> 8) as u8
+    }
+
+    const CB_R: i32 = -4865;
+    const CB_G: i32 = -9528;
+    const CB_B: i32 = 14392;
+    const CR_R: i32 = 14392;
+    const CR_G: i32 = -12061;
+    const CR_B: i32 = -2332;
+
+    const C_SCALE: i32 = CB_B / 256;
+    const CB_RED: i32 = -CB_R / 256;
+    const CR_BLUE: i32 = -CR_B / 256;
+    const CR_BLUE_RESIDUAL: i32 = -CR_B % 256;
+    const C_ROUND: i16 = 512 >> 8;
+
+    const _: () = {
+        // Divide the coefficients at eight bits. Expanding the colour
+        // differences recovers all six original coefficients.
+        let shared = C_SCALE * 257;
+        assert!(CB_B == shared && CR_R == shared);
+        assert!(CB_R == -256 * CB_RED - 1);
+        assert!(CB_G == 256 * CB_RED - shared);
+        assert!(CR_B == -256 * CR_BLUE - CR_BLUE_RESIDUAL);
+        assert!(CR_G == 256 * CR_BLUE + CR_BLUE_RESIDUAL - shared - 1);
+
+        // The shared green component bounds each difference of scaled
+        // differences by the dominant product. The extra -r or -g extends
+        // only the negative end of the residual range.
+        assert!(0 <= CB_RED && CB_RED <= C_SCALE);
+        assert!(0 <= CR_BLUE && CR_BLUE <= C_SCALE);
+        assert!(0 <= CR_BLUE_RESIDUAL && CR_BLUE_RESIDUAL <= C_SCALE);
+        let pair_max = 2 * u8::MAX as i32;
+        let scaled_max = C_SCALE * pair_max;
+        let residual_min = -scaled_max - pair_max;
+        assert!(residual_min >= i16::MIN as i32 && scaled_max <= i16::MAX as i32);
+
+        let sum_min = -scaled_max + C_ROUND as i32 + (residual_min >> 8);
+        let sum_max = scaled_max + C_ROUND as i32 + (scaled_max >> 8);
+        assert!(sum_min >= i16::MIN as i32 && sum_max <= i16::MAX as i32);
+    };
+
+    #[inline]
+    fn chroma(r: i16, g: i16, b: i16) -> (i16, i16) {
+        let red = r - g;
+        let blue = b - g;
+        let red_scaled = C_SCALE as i16 * red;
+        let blue_scaled = C_SCALE as i16 * blue;
+        let cb = (blue_scaled - CB_RED as i16 * red + C_ROUND + ((blue_scaled - r) >> 8)) >> 2;
+        let cr = (red_scaled - CR_BLUE as i16 * blue
+            + C_ROUND
+            + ((red_scaled - CR_BLUE_RESIDUAL as i16 * blue - g) >> 8))
+            >> 2;
+        (cb, cr)
     }
 
     fn decimate(ring: &[Vec<i16>; 4], rows: [usize; 4], out: &mut [u8]) {

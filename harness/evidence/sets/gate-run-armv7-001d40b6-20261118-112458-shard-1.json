@@ -1,0 +1,25 @@
+{
+ "name": "gate-run-armv7-001d40b6-20261118-112458-shard-1",
+ "path": "gate-run-armv7-001d40b6-20261118-112458-shard-1",
+ "retention": "retained",
+ "reason": "Capture block conversion at 001d40b6 on 32-bit ARMv7 Linux, c6g.4xlarge. Shard 1 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-armv7-20261118-112458/shard-1/b7e435a22e6a982992975bbbedeed794583983e688d68efb084760fee204b9a6.tar.zst",
+ "sha256": "b7e435a22e6a982992975bbbedeed794583983e688d68efb084760fee204b9a6",
+ "bytes": 360947689,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "56ec21ceb28d57b1a4dc03bb1464e6f180a67e5a02708c9a8ed6972328614c95",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "d0b8181ddef4050eeb8f40a5e70be45d427fe3b826795a40b26c12b11faa38f1",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "name": "gate-run-armv7-001d40b6-20261118-112458-shard-5",
+ "path": "gate-run-armv7-001d40b6-20261118-112458-shard-5",
+ "retention": "retained",
+ "reason": "Capture block conversion at 001d40b6 on 32-bit ARMv7 Linux, c6g.4xlarge. Shard 5 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-armv7-20261118-112458/shard-5/ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20.tar.zst",
+ "sha256": "ac3ba1dbde7174dbc9409ad510a23c273c8d3632a6d655d775bdf91debd6bb20",
+ "bytes": 425895396,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "8bd81468f1453206ab673e1a5f611b825077b621b89db6fd4ae7d3d15dd73fb6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "93a2bb885e7396cbefe650aab0122959ff9fb901af68d7722f0f8bb1b114ea10",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "aac32c91adb25cf4a46a7f7636d671798a82789a9780457f1875ed344a3481be",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "90bfa57ff31b551e7515c7a29e93d65197853b7255bc9eece586b9fa9dbfc3df",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "5c06c97bd360c2bec572967aebcba0a9c2f7254369496ce7a2228b84dabf27ed",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "0fd1a4adc587a3954c632e3f46599698b16e32408943ae9d87c3e010173bddd3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b2201518e1438914429f63d6ffc4b12323435f9aa6431b7dfc2c2fabb8143777",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "146a3161b356ac92da8c7b6ff137f5e95b55ab8473602e3479d1400baf90ea84",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+{
+ "name": "gate-run-armv7-001d40b6-20261118-112458-shard-3",
+ "path": "gate-run-armv7-001d40b6-20261118-112458-shard-3",
+ "retention": "retained",
+ "reason": "Capture block conversion at 001d40b6 on 32-bit ARMv7 Linux, c6g.4xlarge. Shard 3 of 5 holds conversion, encoding and mux comparisons, paired runtime, kernel-bound memory and worker build identities.",
+ "key": "evidence/gate-runs/001d40b60d0347fcfa74a90adf09b314fe42a13c-armv7-20261118-112458/shard-3/cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac.tar.zst",
+ "sha256": "cf20a1ad5895d44aefa373ecf42ebe4d8681a06dcaf3bd86b49e02d87aab72ac",
+ "bytes": 317465566,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "556cb4324d30f778640becca29c0696c8c10095a86113df958162709be3f0ba5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "0ee5441aa7c9fce882b6d71bdd7f09c12caa1f01a3a607a0e42e0d8a6ec577db",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e798e3890f333e4276b30d13be4fec4aacc3cb8279c62dfe6fc80e853f347558",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "cf21f6263f1cd08e9abbf1ca17112181f705ae67bdff45d9552d47be8171aa78",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "078a76b1505f1359ec77ab5ff5f09ffe9aa4f07aced1847a9b7d323e9162653c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "11bc88a3035c59c392f119bb22db35cd61f1036330c95545ab838c04828ac13f",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
