@@ -320,9 +320,7 @@ impl PayloadCursor {
     ///
     /// [`DemuxObserver::reuse_payload_spans`]: super::DemuxObserver::reuse_payload_spans
     pub fn into_spans(self) -> BudgetVec<DemuxSpan> {
-        let mut spans = self.records.into_budget_vec();
-        spans.clear();
-        spans
+        self.records.reclaim()
     }
     /// Borrow only ranges not yet admitted or successfully retired.
     pub fn remaining_spans(&self) -> DemuxSpanViews<'_> {

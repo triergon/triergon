@@ -213,10 +213,11 @@ impl Bytes {
         }
         Ok(BytesWriter(self.storage))
     }
-    /// A uniquely owned allocation back as an empty vector that keeps its
-    /// capacity and is charged for exactly that capacity; the shared-owner
-    /// header's charge returns to the pool. Whatever range this view covers,
-    /// its bytes are discarded. A shared allocation is returned intact.
+    /// Reclaims the allocation, as [`BudgetVecIntoIter::reclaim`] does for a
+    /// traversed vector: discards the bytes, whatever range this view covers,
+    /// and returns an empty vector that keeps the capacity and is charged for
+    /// exactly it; the shared-owner header's charge returns to the pool. Fails,
+    /// returning this view intact, while another handle shares the allocation.
     pub fn try_reclaim(self) -> std::result::Result<BudgetVec<u8>, Self> {
         let Storage {
             mut data,
@@ -678,12 +679,16 @@ impl<T> BudgetVecIntoIter<T> {
         debug_assert!(wrapped.is_empty());
         remaining
     }
-    /// The elements not yet visited, in traversal order, as a vector that keeps
-    /// this allocation and its charge: a consumer that has used a vector up can
-    /// hand it back for the next one to fill without allocating.
-    pub fn into_budget_vec(self) -> BudgetVec<T> {
+    /// Reclaims the allocation: drops the elements not yet visited and returns
+    /// an empty vector that keeps this capacity and is charged for exactly it,
+    /// so a consumer that has used a vector up can hand it back for the next
+    /// one to fill without allocating. [`Bytes::try_reclaim`] is the same
+    /// operation for frozen bytes.
+    pub fn reclaim(self) -> BudgetVec<T> {
+        let mut data = Vec::from(self.items);
+        data.clear();
         BudgetVec {
-            data: Vec::from(self.items),
+            data,
             charge: self.charge,
         }
     }
@@ -835,7 +840,7 @@ mod tests {
     }
 
     #[test]
-    fn a_traversed_vector_comes_back_with_its_allocation_and_charge() {
+    fn a_partly_traversed_vector_is_reclaimed_empty_with_its_allocation_and_charge() {
         let pool = Budget::new(4096).unwrap();
         let mut vector = BudgetVec::new(&pool);
         vector.try_reserve_exact(8).unwrap();
@@ -847,15 +852,7 @@ mod tests {
         let mut items = vector.into_iter();
         assert_eq!(items.by_ref().take(2).collect::<Vec<_>>(), [0, 1]);
         assert_eq!(items.as_slice(), [2, 3, 4, 5]);
-        let remaining = items.into_budget_vec();
-        assert_eq!(remaining.as_slice(), [2, 3, 4, 5]);
-        assert_eq!(remaining.capacity(), 8);
-        assert_eq!(remaining.as_slice().as_ptr(), storage);
-        assert_eq!(pool.used(), used);
-
-        let mut items = remaining.into_iter();
-        assert_eq!(items.by_ref().count(), 4);
-        let mut emptied = items.into_budget_vec();
+        let mut emptied = items.reclaim();
         assert!(emptied.is_empty());
         assert_eq!(emptied.capacity(), 8);
         for value in 10..18 {
