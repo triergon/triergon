@@ -16,14 +16,6 @@ use crate::{
 pub fn packet_timing(timing: BlockTiming) -> Result<PacketTiming> {
     timing.validate()?;
     let scale = i128::from(timing.scale_ns);
-    let delay = if timing.codec_delay_ns == 0 {
-        0
-    } else {
-        match timing.codec_delay_ns.checked_add(timing.scale_ns / 2) {
-            Some(value) => i128::from(value / timing.scale_ns),
-            None => (i128::from(timing.codec_delay_ns) + scale / 2) / scale,
-        }
-    };
     let total_ticks = match timing.duration_ticks.filter(|d| *d != 0) {
         Some(d) => i128::from(d),
         None => match timing.default_duration_ns {
@@ -50,11 +42,13 @@ pub fn packet_timing(timing: BlockTiming) -> Result<PacketTiming> {
     {
         None
     } else {
-        let ticks = timing
-            .timestamp_ticks
-            .checked_sub(delay)
-            .and_then(|n| n.checked_add(start))
-            .ok_or(Error::Overflow)?;
+        let ticks = block_start_ticks(
+            timing.timestamp_ticks,
+            timing.codec_delay_ns,
+            timing.scale_ns,
+        )?
+        .checked_add(start)
+        .ok_or(Error::Overflow)?;
         Some(ExactTime::new(
             ticks.checked_mul(scale).ok_or(Error::Overflow)?,
             1,
@@ -71,6 +65,18 @@ pub fn packet_timing(timing: BlockTiming) -> Result<PacketTiming> {
             )?)
         },
     })
+}
+
+#[inline]
+pub(crate) fn block_start_ticks(ticks: i128, delay_ns: u64, scale_ns: u64) -> Result<i128> {
+    if delay_ns == 0 {
+        return Ok(ticks);
+    }
+    let delay_ticks = match delay_ns.checked_add(scale_ns / 2) {
+        Some(value) => i128::from(value / scale_ns),
+        None => (i128::from(delay_ns) + i128::from(scale_ns / 2)) / i128::from(scale_ns),
+    };
+    ticks.checked_sub(delay_ticks).ok_or(Error::Overflow)
 }
 
 /// The common timestamp numerator fits a machine divide. Keep the wide path

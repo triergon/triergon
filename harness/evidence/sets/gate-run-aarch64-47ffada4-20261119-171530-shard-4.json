@@ -1,0 +1,113 @@
+{
+ "name": "gate-run-aarch64-47ffada4-20261119-171530-shard-4",
+ "path": "gate-run-aarch64-47ffada4-20261119-171530-shard-4",
+ "retention": "retained",
+ "reason": "Linked worker gates with the Matroska, CELT and PGS changes together.",
+ "key": "evidence/gate-runs/47ffada46db5406b434e37ff4e5ab01a031365a9-aarch64-20261119-171530/shard-4/dd8ac35f34cf6906f5fc1cbb79f771eb8060190e3c078fd5a03f815636f4ef66.tar.zst",
+ "sha256": "dd8ac35f34cf6906f5fc1cbb79f771eb8060190e3c078fd5a03f815636f4ef66",
+ "bytes": 91514795,
+ "results": [
+  {
+   "path": "memory/subtitle-cc/gate-result.json",
+   "command": "report --memory",
+   "key": "6a41433ff6f88e60b6e3eb48abae69cf88f3bfddf0243110de0e3a308839011b",
+   "status": 0,
+   "report_sha256": "54ce03d5cee285ffbaa2acec5b64528cd91e3f78602a20d2b3829a30b0659f53",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "ac14b9693f2b49527b7a87c4d1e81bdd3f86753e2ed0d0f9601b1633a3212f3a",
+   "status": 0,
+   "report_sha256": "78a4732606460d24b8a4b7ff7383f03547bd5881bccb65941412aae57e9c131c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "66a935d86d03090890ca05d27aeab888935a07470e9d4eb0bb6e755cbc110042",
+   "status": 0,
+   "report_sha256": "59dfa525e0223cdf5418df7841d817de4662c6ff58440dfcfb2eaced5229396a",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvd/gate-result.json",
+   "command": "report --memory",
+   "key": "954d0a077a97a5433bcb85f32fc670506eadc4751240e03eb10e0c129cc51220",
+   "status": 0,
+   "report_sha256": "9381529ebf278dfdd1c304dcee7b11ce786be2511698b3e79b1b90ffc710122e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-cc/gate-result.json",
+   "command": "report --benchmark",
+   "key": "fa401277ab10ee6c8ad56eafd3d4f12a4dc7a47d200921b3411f4e6ddf6f0fa8",
+   "status": 0,
+   "report_sha256": "c24e74a979db08186360ea84b823de5822cd9b482acb28b390a830f2640edd58",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e472d8851b7ba91980b6592d8b768e55e78b5ccb5c71f031421bc965bade2271",
+   "status": 0,
+   "report_sha256": "f3893c0ee4167fd52dd0932ae2db63b8a033b491fe42b0c1dd3eb2db6e69119d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2cd556343c5e7e1e36fece5da8c67482741a3f562ceca3b0bba126128e926ccb",
+   "status": 0,
+   "report_sha256": "548b469122921fc8848b1731b33f4d262f70ef9bc86074b886135d04513a8a5e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "5d959f799add18887c125e255d3195b0ad5e00105f553e742c3736897307474c",
+   "status": 0,
+   "report_sha256": "9cc4338565a3f0f7e6f2cce493004eb7e3364b1ed7bb733f0fe22f4b47b67c9a",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-cc/gate-result.json",
+   "command": "grade",
+   "key": "2070d889be8ab252deac25949df7e1844f3c6a5c99278331a4cffc3619bf7ae4",
+   "status": 0,
+   "report_sha256": "1c1c60d43643d5705734dd947f81e41a0dea68ce900f6bec2db1ae97a60c5414"
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "839b37d54a9ad4a4d673d7075b6ca24a87ef468e36120f9d505545cc15d389d3",
+   "status": 1,
+   "report_sha256": "7e147e9cdbc1881522b0a4bd0ffe7517784e4b77c354b798a2b4f352c9f9b109"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "c9300565ef3a429bc006b5b78b75dd0a6ff3a3d5bec2d885faa0e8cccfebfd1b",
+   "status": 0,
+   "report_sha256": "3d64431ba2ab9f561e36fe9e4400e90f154ebb379dbf6257b7c953df61b90673"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "43247af5b9b108d1485cb451e8113ff2146006c2fe6cef4b08756f238e17e122",
+   "status": 1,
+   "report_sha256": "ebf88ec10e68618d50039dac25985a94339f46966d2dacee9a92a83f3f9ca1e2"
+  },
+  {
+   "path": "graded/subtitle-dvd/gate-result.json",
+   "command": "grade",
+   "key": "6bc375e661a656aa9a38a7b87b2be26d825edfe3fcb72e611ca1bfece0c0694f",
+   "status": 0,
+   "report_sha256": "3892d318573c27f4015962f1ea1217a5a04de62a4229a72e16b43aa269d59e86"
+  }
+ ],
+ "source_revisions": [
+  "47ffada46db5406b434e37ff4e5ab01a031365a9"
+ ]
+}

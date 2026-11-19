@@ -1,0 +1,122 @@
+{
+ "name": "gate-run-aarch64-bc488ac0-20261119-010800-shard-2",
+ "path": "gate-run-aarch64-bc488ac0-20261119-010800-shard-2",
+ "retention": "retained",
+ "reason": "Matroska and linked playback workers on qualified native hosts",
+ "key": "evidence/gate-runs/bc488ac098e95b4ab2ea81c0b07c7ffe8424ccff-aarch64-20261119-010800/shard-2/f7731a5249af3ffcc92ef9df429996f9df3e514cad7dd57e882f9dc27ef56229.tar.zst",
+ "sha256": "f7731a5249af3ffcc92ef9df429996f9df3e514cad7dd57e882f9dc27ef56229",
+ "bytes": 25463591,
+ "results": [
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "12377e61acd259bff27555c07700ea8a6a982f38699968165dd1c4c352b581ec",
+   "status": 0,
+   "report_sha256": "04135f0b6729565bb3e67d70730069b09c2830b49aabec72213b1c4b000738c1",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "f0cb7ac61477020a8b92f590b056f6259bed1dd4df60a39a9c2204c2e6756ede",
+   "status": 0,
+   "report_sha256": "3610686f6934d56c62c808aa9e77f225c759b220abeb5e0b64d144b3a8864795",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-segment-metadata/gate-result.json",
+   "command": "report --memory",
+   "key": "71c2e7c79a610ae1e3bc4f0e4eae6a919749aaee29f9e5cf3c14ccef5bcd40d9",
+   "status": 0,
+   "report_sha256": "9f53752f87cbb9aa8170dc45dec9a581e47c21f7eabde58b2d6af1f3ecb24eb7",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "a8a8bc410edbcc6a85569539ff1ad3b472d1bb2d7dd923783fe160b27798135e",
+   "status": 0,
+   "report_sha256": "8eca1b6e634eb8e69506217ddd5055eb38522bb589a79b2c12b03daef34e3162",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "5ea4e04ad861bf67ef48585d9014606a5d977be828ad6bd840e727f267b63398",
+   "status": 0,
+   "report_sha256": "167b79eaa8391b383984c0d9bb28eebbd359104e2bfeff740b9d8f3212d11af5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e3f737f66c384307d12ee17de3db6e1affad1479fe4f2c7ac1f5ab3b765e9d78",
+   "status": 0,
+   "report_sha256": "dcfc97fb6e8539e17baf14b7a39f876130ec85ef9c42d07be00d1fa0429ba721",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "84b6fac7981558e12e86bb05effc9e9835003cc6f98ba05170385595976df07f",
+   "status": 0,
+   "report_sha256": "b4f8137a78a759c13667a148de3f6f8e95a37668d357a1a3ee30b7f1156b7022",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-segment-metadata/gate-result.json",
+   "command": "report --benchmark",
+   "key": "1a0ea5b7c4e4f1476ffe9ef49d0c517ea8ad31dc24d257a076cd0b1db97426b2",
+   "status": 0,
+   "report_sha256": "a34dd6d9f2362f3637744fc60bc6db339733863c1d529a0268cb20de577f28ee",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "eb126b558bd541da5d479cd1e7f6fc282043a7e4dca187a99dc38bba7ef37011",
+   "status": 0,
+   "report_sha256": "222489a57aa663a85721704cd91535785f4f8ccff5caa1ca0df5506e5250a894",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f1d7f218eab3e02634dc762e1d692875d7c0b78bddce393a6b74c9b8f6f3fabb",
+   "status": 0,
+   "report_sha256": "4448dc762dbd4a333bbee5cacc223d8c66cc9a13afe852b25968b4e596be1ae1",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "d7c57d74b805c810d85abdba850c344132f04fbc1f2a1f1e7b51a5fdfc07dc08",
+   "status": 0,
+   "report_sha256": "35e25f84b5a2f4b364cfb33aa36655d4f1a91b1f767fb5fe314ddc53142ca6de"
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "6c2b9390ada90c61aadd7e5336fa12331980cda19d72a04b030dcbca403e4fd8",
+   "status": 0,
+   "report_sha256": "fbdb191edcb759ec787b33c5ad85012a169665692664fc559f2fe9a72d3387f1"
+  },
+  {
+   "path": "graded/matroska-segment-metadata/gate-result.json",
+   "command": "grade",
+   "key": "360140ac339508678c6d584c479011449fd4834636b0cc5be43b6c70cc87162a",
+   "status": 0,
+   "report_sha256": "d1cb1f58e3c53199e9fdd9e25f7fd086a168b40f92ec558aa6cfa1f66bfaf27c"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "b03c1eda7efb710cb4fecc94ba95dee87a8a8131f571a58a50baa44b9bf680d2",
+   "status": 0,
+   "report_sha256": "156627bc9fb10719fccf959a37b24432d365c0c316bf7128fe39af5e357ed9d8"
+  }
+ ],
+ "source_revisions": [
+  "bc488ac098e95b4ab2ea81c0b07c7ffe8424ccff"
+ ]
+}

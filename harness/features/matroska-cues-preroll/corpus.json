@@ -64,6 +64,110 @@
       "sha256": "7f8bb1773ab0db5442851b7b435b90085aae0a34543cdc1f83e2157f4a87dccb",
       "rights": "authored-synthetic",
       "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-opus-zero-before-cutoff",
+      "profile": "cues-opus-zero-before-cutoff",
+      "file": "cues-opus-zero-before-cutoff.mkv",
+      "sha256": "482039dd4131772843fb3740e57e19c105635d677b4c14b0b5bafcc457c6e3f9",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-zero-at-cutoff",
+      "profile": "cues-opus-zero-at-cutoff",
+      "file": "cues-opus-zero-at-cutoff.mkv",
+      "sha256": "2d3039fe263c7d7805a01687bc041fe094e7fd75b3cbe966eefdfd8b7e32aa79",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-omitted-before-cutoff",
+      "profile": "cues-opus-omitted-before-cutoff",
+      "file": "cues-opus-omitted-before-cutoff.mkv",
+      "sha256": "56b3ba4686ab0d338cb7e400fa8a8407ea0598108f27c2052db201441f27cfad",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-omitted-at-cutoff",
+      "profile": "cues-opus-omitted-at-cutoff",
+      "file": "cues-opus-omitted-at-cutoff.mkv",
+      "sha256": "9eb28468208f9a2e82bf4550818c8d1d9bf2ad0a28c7e2c95d9db0ccc82deb36",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-timed-before-cutoff",
+      "profile": "cues-opus-timed-before-cutoff",
+      "file": "cues-opus-timed-before-cutoff.mkv",
+      "sha256": "959d01e0662cff0bc1687889fdc6494074b8839f5c88ef2003fc56f7c1d47987",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-timed-at-cutoff",
+      "profile": "cues-opus-timed-at-cutoff",
+      "file": "cues-opus-timed-at-cutoff.mkv",
+      "sha256": "8b45ba293d9ce9f4e3553cdf55786a0d665808e92cb083f16fbd5688fe3abff7",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-before-cutoff",
+      "profile": "cues-opus-two-tracks-before-cutoff",
+      "file": "cues-opus-two-tracks-before-cutoff.mkv",
+      "sha256": "71efb69773411e57a0890fc27162ed755c66eff717af6aa5c82b2d078a687f5a",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-at-cutoff",
+      "profile": "cues-opus-two-tracks-at-cutoff",
+      "file": "cues-opus-two-tracks-at-cutoff.mkv",
+      "sha256": "b3fab0642407578d5cfbf64b7de93240435bd9e09066aeb24f975484b0f6d278",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-fractional-padding",
+      "profile": "cues-opus-two-tracks-fractional-padding",
+      "file": "cues-opus-two-tracks-fractional-padding.mkv",
+      "sha256": "c1e67cb848ea4a733dcbccbbcaddf6a1e8adabdc5ff7ec0ea394acd0e5a0a6ef",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-two-tracks-input-rate",
+      "profile": "cues-opus-two-tracks-input-rate",
+      "file": "cues-opus-two-tracks-input-rate.mkv",
+      "sha256": "3daa286ff7dc75aecefdec82e821dddc0f28ced73276af560e397ec958c75d55",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-padding-rounds-to-zero",
+      "profile": "cues-opus-padding-rounds-to-zero",
+      "file": "cues-opus-padding-rounds-to-zero.mkv",
+      "sha256": "6b66c382afd5bfa347126f9e6e91a3ca7b7ed9f23cf6cf7fa1e93307d52682e4",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-padding-rounds-to-one-tick",
+      "profile": "cues-opus-padding-rounds-to-one-tick",
+      "file": "cues-opus-padding-rounds-to-one-tick.mkv",
+      "sha256": "9e3e4b61d43c3fc6769db8c89f5e2dd7ea95e2b7874a47433f18ea235f1d4825",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 2080000000
+    },
+    {
+      "id": "cues-opus-before-first-keyframe",
+      "profile": "cues-opus-before-first-keyframe",
+      "file": "cues-opus-before-first-keyframe.mkv",
+      "sha256": "b8ca5374d1690737f3dd5edc12f39e31d9fc2c2a34dc4c865379857d296c4058",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 250000000
     }
   ]
 }

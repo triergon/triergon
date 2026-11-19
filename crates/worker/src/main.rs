@@ -14,6 +14,8 @@ use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex, quoted,
 };
+use triergon_matroska::compat::seek::at_block_start;
+use triergon_matroska::reference_trace::seek_initial_trim;
 use triergon_matroska::timing::ExactTime;
 use triergon_matroska::{Limits, compat::clock::packet_timing, typed::BlockingReader as Demuxer};
 
@@ -72,7 +74,13 @@ fn trims(
     first: bool,
 ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
     let mut start = if first && track.kind == 2 {
-        sample_count(track.codec_delay_ns, track.sample_rate)?
+        // Opus pre-skip is expressed in 48 kHz samples (RFC 7845 §5.1).
+        let rate = if track.codec == "A_OPUS" {
+            48_000.0
+        } else {
+            track.sample_rate
+        };
+        sample_count(track.codec_delay_ns, rate)?
     } else {
         0
     };
@@ -324,7 +332,8 @@ fn run(
     for _ in 0..iterations {
         let mut d = open_owned(std::mem::take(data), Limits::default())?;
         let initial_trim = if let Some(target) = seek {
-            d.seek_for_playback(0, target, &cancel)?.replays_from_start
+            let landing = at_block_start(&mut d, 0, target, &cancel)?;
+            seek_initial_trim(&d, 0, &landing)?
         } else {
             true
         };
@@ -459,7 +468,8 @@ fn entry() -> Outcome {
             println!("{{\"input_bytes\":{}}}", data.len());
             Ok(())
         }
-        "seek-trace" => seek_trace(data, words),
+        "seek-trace" => seek_trace(data, words, false),
+        "playback-seek-trace" => seek_trace(data, words, true),
         "inflate" => inflate(&data, words),
         "seek" => seek(data, words),
         "seek-bench" => bench(data, words, true, View::PLAIN),
@@ -581,16 +591,22 @@ fn memory(mut data: Vec<u8>, words: &[String], seek: Option<bool>, view: View) -
     Ok(())
 }
 
-/// `seek-trace FILE NS [after-eof]`.
+/// `seek-trace FILE NS [after-eof]` or `playback-seek-trace FILE NS [after-eof]`.
 #[inline(never)]
-fn seek_trace(data: Vec<u8>, words: &[String]) -> Outcome {
+fn seek_trace(data: Vec<u8>, words: &[String], playback: bool) -> Outcome {
     let target = seek_target(words, 0)?;
     let mut demux = open_owned(data, Limits::default())?;
+    let cancel = AtomicBool::new(false);
     if words.get(1).is_some_and(|value| value == "after-eof") {
-        while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
+        while demux.next_packet(&cancel)?.is_some() {}
     }
-    let receipt = demux.seek_for_playback(0, target, &AtomicBool::new(false))?;
-    trace(demux, receipt.replays_from_start, false, 0)
+    let landing = if playback {
+        demux.seek_for_playback(0, target, &cancel)?
+    } else {
+        at_block_start(&mut demux, 0, target, &cancel)?
+    };
+    let initial_trim = seek_initial_trim(&demux, 0, &landing)?;
+    trace(demux, initial_trim, false, 0)
 }
 
 /// `inflate FILE [OUTPUT_BYTES [EXPANSION_RATIO [WORK]]]`.

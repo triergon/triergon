@@ -5,6 +5,7 @@ use super::{configuration::Configuration, syntax::check};
 use crate::matroska::typed::syntax::Required;
 use crate::{Error, Result, cues::Cue, incremental::ParseStep};
 use std::sync::atomic::AtomicBool;
+use triergon_core::container::{CodecId, TrackInfo};
 use triergon_core::{Rounding, Time, TimeBase, WorkBudget};
 
 #[derive(Clone, Copy, Debug)]
@@ -12,6 +13,7 @@ pub(crate) struct ScanPlan {
     pub start: u64,
     pub stop: Option<u64>,
     pub target_ns: i64,
+    pub allow_first_after_target: bool,
     pub allow_first_after_negative_preroll: bool,
     pub replay_whole_cluster: bool,
 }
@@ -32,6 +34,49 @@ pub(crate) struct SeekPlan {
     pub subtitle_recovery_delay_ns: u64,
     pub landing: LandingPlan,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RecoveryAudio {
+    Overlap,
+    BlockStart,
+}
+
+impl RecoveryAudio {
+    pub(crate) fn delay_ns(self, track: &crate::matroska::Track, scale_ns: u64) -> Result<u64> {
+        if self == Self::Overlap || track.codec_delay_ns == 0 {
+            return Ok(track.codec_delay_ns);
+        }
+        let rate = track.sample_rate;
+        if !rate.is_finite() || rate <= 0.0 {
+            return Err(Error::Invalid("seek codec-delay sample rate"));
+        }
+        // The packet comparison uses the integral audio sample rate and
+        // counts initial padding in samples before rescaling to Segment ticks.
+        let rate = rate as i32;
+        if rate == 0 {
+            // A positive sub-Hz rate has no integral comparison clock.
+            return Ok(0);
+        }
+        let rate = rate as u64;
+        // Opus pre-skip counts samples at 48 kHz (RFC 7845 §5.1).
+        let padding_rate = if track.codec() == CodecId::Opus {
+            48_000
+        } else {
+            rate
+        };
+        let samples = Time::new(i128::from(track.codec_delay_ns), 1_000_000_000)?
+            .to_ticks(TimeBase::new(1, padding_rate)?, Rounding::NearestAway)?;
+        let ticks = Time::new(samples, u128::from(rate))?.to_ticks(
+            TimeBase::new(scale_ns, 1_000_000_000)?,
+            Rounding::NearestAway,
+        )?;
+        u64::try_from(ticks)
+            .ok()
+            .and_then(|ticks| ticks.checked_mul(scale_ns))
+            .ok_or(Error::Overflow)
+    }
+}
+
 #[derive(Debug)]
 enum Phase {
     Preroll,
@@ -46,6 +91,7 @@ pub(crate) struct SeekPlanJob {
     track: usize,
     requested: i64,
     preroll: bool,
+    recovery_audio: RecoveryAudio,
     scale: u64,
     first_cluster: u64,
     phase: Phase,
@@ -77,6 +123,7 @@ impl SeekPlanJob {
         preroll: bool,
         scale: u64,
         first_cluster: u64,
+        recovery_audio: RecoveryAudio,
     ) -> Result<Self> {
         if configuration
             .tracks()
@@ -93,6 +140,7 @@ impl SeekPlanJob {
             track,
             requested,
             preroll,
+            recovery_audio,
             scale,
             first_cluster,
             phase: Phase::Preroll,
@@ -148,7 +196,9 @@ impl SeekPlanJob {
                         self.roll = self.roll.max(track.seek_preroll_ns);
                         self.subtitle_tracks |= track.kind == 17;
                         if track.kind == 2 && track.sample_rate != 0.0 {
-                            self.audio_delay_ns = self.audio_delay_ns.max(track.codec_delay_ns);
+                            self.audio_delay_ns = self
+                                .audio_delay_ns
+                                .max(self.recovery_audio.delay_ns(track, self.scale)?);
                         }
                         self.at += 1;
                     } else {
@@ -176,6 +226,7 @@ impl SeekPlanJob {
                 }
                 Phase::Index => {
                     if self.at == cues.len() {
+                        let allow_first_after_target = self.preroll && self.requested >= 0;
                         let cue = self.best.or_else(|| {
                             self.first.filter(|cue| {
                                 self.preroll && i128::from(cue.ticks) <= self.requested_ticks
@@ -187,6 +238,7 @@ impl SeekPlanJob {
                                 start: self.first_cluster,
                                 stop: None,
                                 target_ns: self.target,
+                                allow_first_after_target,
                                 allow_first_after_negative_preroll: self.preroll && self.target < 0,
                                 replay_whole_cluster: self.preroll,
                             }));
@@ -229,6 +281,7 @@ impl SeekPlanJob {
                             start: cue.cluster,
                             stop: None,
                             target_ns: self.target,
+                            allow_first_after_target: false,
                             allow_first_after_negative_preroll: false,
                             replay_whole_cluster: true,
                         });
@@ -247,6 +300,7 @@ impl SeekPlanJob {
                                 start: cue.cluster,
                                 stop: self.stop,
                                 target_ns: self.target,
+                                allow_first_after_target: false,
                                 allow_first_after_negative_preroll: false,
                                 replay_whole_cluster: false,
                             }),

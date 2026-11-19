@@ -1,7 +1,8 @@
 //! Runtime contracts for the typed reader.
 #[path = "support/ebml.rs"]
 mod ebml;
-use ebml::{element, mkv, track, uint};
+use ebml::{cluster, element, mkv, simple, track, uint};
+use std::io::Cursor;
 use std::sync::atomic::AtomicBool;
 use triergon_core::Step;
 use triergon_core::{
@@ -9,7 +10,7 @@ use triergon_core::{
 };
 use triergon_matroska::{
     Error, Limits,
-    typed::{Event, Reader},
+    typed::{BlockingReader, Event, Reader},
 };
 
 const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
@@ -334,6 +335,237 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
     assert!(!packets.is_empty());
     assert_eq!(packets[0].packet.track, 1);
     assert_eq!(packets[0].packet.data.as_ref(), b"A");
+}
+
+#[test]
+fn playback_and_compatibility_seeks_can_land_on_the_first_keyframe() {
+    let tracks = element(0x1654ae6b, &track(1, 1, &[]));
+    let cluster = cluster(1000, simple(1, 0, 0x80, b"first"));
+    let cue = element(
+        0xbb,
+        &[
+            uint(0xb3, 1000),
+            element(
+                0xb7,
+                &[uint(0xf7, 1), uint(0xf1, tracks.len() as u64)].concat(),
+            ),
+        ]
+        .concat(),
+    );
+    let cues = element(0x1c53bb6b, &cue);
+    let input = mkv(&[tracks, cluster, cues].concat());
+    let cancel = AtomicBool::new(false);
+    for block_start in [false, true] {
+        for target in [0, 250_000_000] {
+            let mut reader =
+                BlockingReader::open_seekable(Cursor::new(&input), Limits::default()).unwrap();
+            for _ in 0..2 {
+                let landed = if block_start {
+                    triergon_matroska::compat::seek::at_block_start(&mut reader, 0, target, &cancel)
+                } else {
+                    reader.seek_for_playback(0, target, &cancel)
+                }
+                .unwrap();
+                assert_eq!(landed.actual_ns, 1_000_000_000);
+                assert_eq!(landed.discard_until_ns, target);
+                assert!(landed.replays_from_start);
+                let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+                assert_eq!(packet.packet.data.as_ref(), b"first");
+                assert!(reader.next_typed_packet(&cancel).unwrap().is_none());
+            }
+            assert!(matches!(
+                reader.seek_previous(0, target, &cancel),
+                Err(Error::Unsupported("no previous random-access block"))
+            ));
+        }
+    }
+}
+
+#[test]
+fn compatibility_seek_prefers_an_earlier_uncued_keyframe() {
+    let tracks = element(0x1654ae6b, &track(1, 1, &[]));
+    let first = cluster(1000, simple(1, 0, 0x80, b"uncued"));
+    let later = cluster(10_000, simple(1, 0, 0x80, b"cued"));
+    let cue = element(
+        0xbb,
+        &[
+            uint(0xb3, 10_000),
+            element(
+                0xb7,
+                &[
+                    uint(0xf7, 1),
+                    uint(0xf1, (tracks.len() + first.len()) as u64),
+                ]
+                .concat(),
+            ),
+        ]
+        .concat(),
+    );
+    let cues = element(0x1c53bb6b, &cue);
+    let input = mkv(&[tracks, first, later, cues].concat());
+    let cancel = AtomicBool::new(false);
+    let mut reader = BlockingReader::open_seekable(Cursor::new(input), Limits::default()).unwrap();
+    while reader.next_typed_packet(&cancel).unwrap().is_some() {}
+    let landing =
+        triergon_matroska::compat::seek::at_block_start(&mut reader, 0, 2_000_000_000, &cancel)
+            .unwrap();
+    assert_eq!(landing.actual_ns, 1_000_000_000);
+}
+
+#[test]
+fn compatibility_seek_keeps_the_zero_clamped_preroll_landing() {
+    let tracks = element(
+        0x1654ae6b,
+        &[track(1, 1, &[]), track(2, 2, &uint(0x56bb, 80_000_000))].concat(),
+    );
+    let initial = cluster(
+        0,
+        [
+            simple(1, -40, 0x80, b"before zero"),
+            simple(1, 0, 0x80, b"at zero"),
+        ]
+        .concat(),
+    );
+    let input = mkv(&[tracks, initial].concat());
+    let cancel = AtomicBool::new(false);
+    let mut reader = BlockingReader::open_seekable(Cursor::new(input), Limits::default()).unwrap();
+    let landing =
+        triergon_matroska::compat::seek::at_block_start(&mut reader, 0, 0, &cancel).unwrap();
+    assert_eq!(landing.actual_ns, 0);
+}
+
+#[test]
+fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
+    const A: &[u8] = b"first";
+    const B: &[u8] = b"next!";
+    let second = cluster(2000, simple(1, 0, 0x80, b"target"));
+    let cancel = AtomicBool::new(false);
+    for (duration, default_duration, padding, first_frame) in [
+        (Some(0), None, 0_i64, 0),
+        (None, None, 0, 0),
+        (Some(0), Some(10_000_000), 0, 1),
+        (Some(0), Some(10_000_000), -15_000_000, 0),
+        (Some(10), None, 0, 2),
+        (Some(20), None, 0, 1),
+        (Some(40), None, 0, 0),
+        (Some(10), None, -5_000_000, 2),
+        (Some(20), None, -15_000_000, 0),
+        (None, Some(10_000_000), -15_000_000, 0),
+        (Some(20), None, 15_000_000, 1),
+    ] {
+        let audio = element(
+            0xae,
+            &[
+                uint(0xd7, 2),
+                uint(0x73c5, 2),
+                uint(0x83, 2),
+                element(0x86, b"A_OPUS"),
+                element(0xe1, &element(0xb5, &48_000_f64.to_be_bytes())),
+                uint(0x56aa, 6_500_000),
+                uint(0x56bb, 80_000_000),
+                default_duration
+                    .map(|ns| uint(0x23e383, ns))
+                    .unwrap_or_default(),
+            ]
+            .concat(),
+        );
+        let tracks = element(
+            0x1654ae6b,
+            &[track(1, 1, &[]), audio, track(3, 17, &[])].concat(),
+        );
+        let mut block_group = element(0xa1, &[&[0x82, 0x03, 0xde, 4, 1][..], A, B].concat());
+        if let Some(duration) = duration {
+            block_group.extend(uint(0x9b, duration));
+        }
+        if padding != 0 {
+            block_group.extend(element(0x75a2, &padding.to_be_bytes()));
+        }
+        let first = cluster(
+            1000,
+            [
+                simple(1, 0, 0x80, b"earlier"),
+                simple(3, 900, 0x80, b"subtitle"),
+                element(0xa0, &block_group),
+            ]
+            .concat(),
+        );
+        let cue = element(
+            0xbb,
+            &[
+                uint(0xb3, 2000),
+                element(
+                    0xb7,
+                    &[
+                        uint(0xf7, 1),
+                        uint(0xf1, (tracks.len() + first.len()) as u64),
+                    ]
+                    .concat(),
+                ),
+            ]
+            .concat(),
+        );
+        let cues = element(0x1c53bb6b, &cue);
+        let raw = mkv(&[tracks.as_slice(), &first, &second, &cues].concat());
+        let mut reader =
+            BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
+        let mut audio_packets = Vec::new();
+        for at_block_start in [false, true, false] {
+            let landed = if at_block_start {
+                triergon_matroska::compat::seek::at_block_start(
+                    &mut reader,
+                    0,
+                    2_080_000_000,
+                    &cancel,
+                )
+                .unwrap()
+            } else {
+                reader.seek_for_playback(0, 2_080_000_000, &cancel).unwrap()
+            };
+            assert_eq!(landed.actual_ns, 2_000_000_000);
+            assert_eq!(landed.preroll_ns, 80_000_000);
+            assert!(!landed.replays_from_start, "{landed:?}");
+            let mut other_packets = Vec::new();
+            while let Some(packet) = reader.next_typed_packet(&cancel).unwrap() {
+                let packet = packet.packet;
+                if packet.track == 1 {
+                    assert_eq!(packet.discard_padding_ns, padding);
+                    audio_packets.push((
+                        packet.timing.frame,
+                        packet.timing.duration_ticks,
+                        packet.pts_ns,
+                        packet.data.as_ref().to_vec(),
+                    ));
+                } else {
+                    other_packets.push(packet.data.as_ref().to_vec());
+                }
+            }
+            assert_eq!(other_packets, [b"subtitle".to_vec(), b"target".to_vec()]);
+            let start = 1_983_500_000;
+            let expected = [
+                (0, duration, Some(start), A.to_vec()),
+                (
+                    1,
+                    duration,
+                    duration
+                        .map(|ticks| ticks * 500_000)
+                        .or(default_duration)
+                        .map(|ns| start + ns as i64),
+                    B.to_vec(),
+                ),
+            ];
+            let first_frame = if at_block_start {
+                expected.len()
+            } else {
+                first_frame
+            };
+            assert_eq!(
+                audio_packets,
+                expected[first_frame..],
+                "duration {duration:?}, default {default_duration:?}, padding {padding}, block-start seek {at_block_start}"
+            );
+            audio_packets.clear();
+        }
+    }
 }
 
 #[test]

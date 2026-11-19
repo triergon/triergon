@@ -1,0 +1,51 @@
+{
+ "name": "gate-run-armv7-414b4cb5-20261118-205950-shard-2",
+ "path": "gate-run-armv7-414b4cb5-20261118-205950-shard-2",
+ "retention": "retained",
+ "reason": "Linked codec, reader and subtitle gate at 414b4cb5 on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-armv7-20261118-205950/shard-2/027b2941ad14cc7fd7bcb12e4eb7bb928d54c7c7563606d97c88a58f723f3ee0.tar.zst",
+ "sha256": "027b2941ad14cc7fd7bcb12e4eb7bb928d54c7c7563606d97c88a58f723f3ee0",
+ "bytes": 36395130,
+ "results": [
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "39044c9be289d695acd7702b14464dd4a01ce5cd3e720b35c90e850eda2145cb",
+   "status": 0,
+   "report_sha256": "651c9980d42d63b16ddd169b5d459201053fbfd3f22f0f53e46c30723172d407",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-5/gate-result.json",
+   "command": "codecs memory",
+   "key": "b22c0bf751dda344bd192a505e40f1149b4d0a9473c3ed0b68edc20b40706dd4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a598e5fd94edc09adae3d748512f40ea5e2a20f7fa1115e300d89d5b1de0e050",
+   "status": 0,
+   "report_sha256": "b239654758c8cd49fb8edcd33903ec670864305a12d9bbf613eee547ec49c878",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "6a9e3923ec22b5668129436ee017ea3a02fe5c2790cb830fac944e92dea29edc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "b4172e1071e2c6621425f20e10f68cc16d80bb594d2e05f5ac3561ba359b08cb",
+   "status": 0,
+   "report_sha256": "f5e4d146f58c9a057613cf389f5e31735766bb3bded20b86a1a0be80142e566e"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

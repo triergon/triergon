@@ -1,0 +1,106 @@
+{
+ "name": "gate-run-aarch64-5bacc138-20261119-095551-shard-4",
+ "path": "gate-run-aarch64-5bacc138-20261119-095551-shard-4",
+ "retention": "retained",
+ "reason": "Native Matroska, playback and linked worker qualification.",
+ "key": "evidence/gate-runs/5bacc1387b475e35a7babb98664cba227db69fe4-aarch64-20261119-095551/shard-4/f305431f00fd3a98851fc4d1d62b9933fb40cd538170c8fa186e7beb932d2323.tar.zst",
+ "sha256": "f305431f00fd3a98851fc4d1d62b9933fb40cd538170c8fa186e7beb932d2323",
+ "bytes": 69735366,
+ "results": [
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "6af44fa94556fd9ecf8468acb109f363ecf27ebefb8c22adda70db3e7d089ae8",
+   "status": 0,
+   "report_sha256": "79d6d8c3ea6c16f9e506a1e6f578be073fa223319a5c719c192facccbb91124d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "ab7e08b61ffeb0ca65710e880b3db550b53688ae5e05dfe3dc2f06438daf2729",
+   "status": 0,
+   "report_sha256": "784f405db7e4413da8813c4583f9480aaf236e9f7d57cb866f18d1260a5db7fc",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvd/gate-result.json",
+   "command": "report --memory",
+   "key": "d31055ab0b86771743d228cedc1f33fb65c5529672340e167ad0ddc937238ba3",
+   "status": 0,
+   "report_sha256": "4e32fa6f7d25c628cca57c79cdc3fa4ffb39eb3233f42c8b5eabf9b496e71cd3",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "51ed9fce64402194963f6545e5da68aff004d5e9693fa139b46c8a05b41e73d2",
+   "status": 0,
+   "report_sha256": "7e1a4c23df881632038d837db6e9f1ac1ef02d673a1bd29d7d55518c600cc5d8",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "cede1400ef472b2bf5c6af98061cded74c2880b70f40622b3524ae78c7788cbe",
+   "status": 0,
+   "report_sha256": "85e8c0394cda3c2f9bd230f83094ae41994afe47648de9c09e30ec599271a5e7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e163721f3af5a56690ad53b938b0c7e37a1bc77c207c7c345a034e61b6f7e4dc",
+   "status": 0,
+   "report_sha256": "433843e09c8b144a6a70460200532c62bd66391655336c434fc6c055988d16ef",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "372c73bf269e9ecbca255f01c0ffe3f818d48c2e0c02d7090e36cd62ffdbaaff",
+   "status": 0,
+   "report_sha256": "84d727a64dd51b339fac1b2cd6bc4b87d0b47ed328804348d79ae636db85b0c5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9ba96dde175673ef64a04ed2f6c4d55d96942b1d87e3143f62611299baed55bc",
+   "status": 0,
+   "report_sha256": "3b11ea1202cddc716453e8b19395d848fe7ed12adcdfad50954eba58ac7ab8a2",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "3a3b21d659b483fbf46867a7546bccb0d35b4c1b22e8f9c66c40bcbc68c835f2",
+   "status": 0,
+   "report_sha256": "e9e1c718afd37fad19c2a83c8166378c9c0582578602731bc55e8159a9775ac4"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "d110c050499c331c595060d30a8e4799ac33417a8aa5bc069a082f18cbd4460b",
+   "status": 0,
+   "report_sha256": "8a133afd4e051eaa3af26488a1f7645919d0f1de876fb0c2e12d28abdf162776"
+  },
+  {
+   "path": "graded/subtitle-dvd/gate-result.json",
+   "command": "grade",
+   "key": "05f232d2dde1e4ebe581a8dd54b27cfe30b51d11c3227d50b3ce47cf3802e768",
+   "status": 0,
+   "report_sha256": "22a68bf826080ffd3ad4d31e224604dbd7a984c8efa432d36007984840e21ddf"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "95dc29f3405575f3a29207263499fb73e4adf429d7b73c14d5f3ce6061463517",
+   "status": 0,
+   "report_sha256": "03c878302731e6919b078179096de0f9294e4deed6f76e3ca02eaf6c36080af9"
+  }
+ ],
+ "source_revisions": [
+  "5bacc1387b475e35a7babb98664cba227db69fe4"
+ ]
+}

@@ -162,7 +162,7 @@ impl SimplePacketJob {
     #[cfg(test)]
     pub(crate) fn step_compact(
         &mut self,
-        prefix: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<SimpleProgress> {
@@ -171,7 +171,7 @@ impl SimplePacketJob {
     pub(crate) fn step_compact_borrowing(
         &mut self,
         borrowed: Option<&Configuration>,
-        prefix: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<SimpleProgress> {
@@ -199,7 +199,7 @@ impl SimplePacketJob {
     fn advance(
         &mut self,
         borrowed: Option<&Configuration>,
-        prefix: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<SimpleProgress> {
@@ -298,10 +298,10 @@ impl SimplePacketJob {
             if !work.try_charge(1) {
                 return Ok(SimpleProgress::Yield);
             }
-            if let Some(lower) = prefix {
+            if let Some(cutoff) = prefix {
                 let packet = self.staged.as_ref().required("missing staged packet")?;
                 let kind = self.configuration(borrowed)?.tracks()[packet.track].kind;
-                if !keep_recovery_packet(kind, packet.pts_ns, lower) {
+                if !keep_recovery_packet(kind, packet, cutoff)? {
                     self.staged = None;
                     self.phase = SimplePhase::Done;
                     check(cancel)?;
@@ -323,7 +323,7 @@ impl SimplePacketJob {
     #[cfg(test)]
     pub(crate) fn step_ready(
         &mut self,
-        prefix: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<()>> {

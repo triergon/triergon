@@ -868,6 +868,50 @@ fn async_cue_validation_cannot_turn_bad_last_crc_or_wrong_source_position_into_l
 }
 
 #[test]
+fn block_start_seek_accepts_positive_sub_hz_audio_rate() {
+    use crate::ebml_kit::{cluster, simple};
+    use crate::typed::BlockingReader;
+    use std::io::Cursor;
+
+    let audio = track(
+        2,
+        2,
+        &[
+            element(0xe1, &element(0xb5, &0.5_f64.to_be_bytes())),
+            uint(0x56aa, 1_000_000),
+        ]
+        .concat(),
+    );
+    let tracks = element(0x1654ae6b, &[track(1, 1, &[]), audio].concat());
+    let raw = mkv(&[tracks, cluster(1, simple(1, 0, 0x80, b"keyframe"))].concat());
+    let mut reader =
+        BlockingReader::open_seekable(Cursor::new(raw), crate::Limits::default()).unwrap();
+    let mut audio = reader.tracks()[1].clone();
+    let recovery = seek::RecoveryAudio::BlockStart;
+    assert_eq!(recovery.delay_ns(&audio, 1_000_000).unwrap(), 0);
+    assert_eq!(
+        seek::RecoveryAudio::Overlap
+            .delay_ns(&audio, 1_000_000)
+            .unwrap(),
+        1_000_000
+    );
+
+    let cancel = AtomicBool::new(false);
+    let landing = crate::compat::seek::at_block_start(&mut reader, 0, 1_000_000, &cancel).unwrap();
+    assert_eq!(landing.actual_ns, 1_000_000);
+    let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+    assert_eq!(packet.packet.data.as_ref(), b"keyframe");
+
+    for raw_rate in [0.0, -0.5, f64::NAN, f64::INFINITY] {
+        audio.sample_rate = raw_rate;
+        assert!(matches!(
+            recovery.delay_ns(&audio, 1_000_000),
+            Err(Error::Invalid("seek codec-delay sample rate"))
+        ));
+    }
+}
+
+#[test]
 fn seek_plan_uses_all_track_preroll_negative_floor_and_keeps_extreme_unselected_ticks() {
     use crate::cues::Cue;
     let pool = Budget::new(64 * 1024).unwrap();
@@ -900,7 +944,16 @@ fn seek_plan_uses_all_track_preroll_negative_floor_and_keeps_extreme_unselected_
         codec_state: 0,
     };
     let cues = [cue(0, 1, 100), cue(u64::MAX, 1, 200), cue(u64::MAX, 2, 300)];
-    let mut plan = seek::SeekPlanJob::new(config.unwrap(), 0, 0, true, 3, 100).unwrap();
+    let mut plan = seek::SeekPlanJob::new(
+        config.unwrap(),
+        0,
+        0,
+        true,
+        3,
+        100,
+        seek::RecoveryAudio::Overlap,
+    )
+    .unwrap();
     let mut result = None;
     for _ in 0..1000 {
         match plan
@@ -1068,6 +1121,50 @@ fn blocking_feeder_retries_freeze_without_reading_again_and_observes_known_eof()
             .unwrap(),
         triergon_core::Step::End(_)
     ));
+}
+
+#[test]
+fn blocking_reposition_observes_cancellation_during_seek() {
+    use std::io::{Read, Seek, SeekFrom};
+    use std::sync::atomic::Ordering;
+
+    struct CancelOnSeek<'a>(&'a AtomicBool);
+    impl Read for CancelOnSeek<'_> {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            panic!("reposition does not read");
+        }
+    }
+    impl Seek for CancelOnSeek<'_> {
+        fn seek(&mut self, from: SeekFrom) -> std::io::Result<u64> {
+            assert_eq!(from, SeekFrom::Start(6));
+            self.0.store(true, Ordering::Relaxed);
+            Ok(6)
+        }
+    }
+
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(4096).unwrap();
+    let mut input = InputCursor::new(
+        &pool,
+        SourceId(32),
+        SourceCapabilities {
+            length: Some(8),
+            random_access: true,
+        },
+        4,
+    )
+    .unwrap();
+    let request = input.request_range(6).unwrap();
+    let mut feeder = blocking::InputFeeder::new(CancelOnSeek(&cancel), 4).unwrap();
+    assert!(matches!(
+        feeder.synchronize_seekable_position(&mut input, &request, &cancel),
+        Err(Error::Cancelled)
+    ));
+    cancel.store(false, Ordering::Relaxed);
+    feeder
+        .synchronize_seekable_position(&mut input, &request, &cancel)
+        .unwrap();
+    assert!(!cancel.load(Ordering::Relaxed));
 }
 
 #[test]
@@ -1392,6 +1489,7 @@ fn playback_preroll_plan_validates_video_but_replays_the_earlier_interleaved_aud
         true,
         1_000_000,
         anchor.offset(),
+        seek::RecoveryAudio::Overlap,
     )
     .unwrap();
     let mut result = None;

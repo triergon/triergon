@@ -5,8 +5,8 @@ use crate::matroska::typed::{
     cues::CuesJob,
     epoch::{EpochReference, EpochRestoreJob, EpochTarget},
     header::{EbmlJob, SeekHeadJob},
-    packet::{PacketBatchJob, SimplePacketJob, SimpleProgress},
-    seek::SeekPlanJob,
+    packet::{PacketBatchJob, RecoveryCutoff, SimplePacketJob, SimpleProgress},
+    seek::{RecoveryAudio, SeekPlanJob},
     seek_validate::CueValidationJob,
     tracks::TracksJob,
 };
@@ -52,7 +52,7 @@ fn packet_replay_prefix(
     prefix: &mut Option<ReplayPrefix>,
     location: Option<&ReplayLocation>,
     envelope: &ElementReader,
-) -> Result<Option<i64>> {
+) -> Result<Option<RecoveryCutoff>> {
     if let Some(value) = *prefix {
         if value.source != envelope.request().source || value.generation != envelope.generation() {
             return Err(Error::Invalid("recovery replay source identity changed"));
@@ -62,7 +62,7 @@ fn packet_replay_prefix(
             *prefix = None;
             Ok(None)
         } else {
-            Ok(Some(value.lower_ns))
+            Ok(Some(value.cutoff))
         }
     } else {
         Ok(None)
@@ -155,6 +155,7 @@ pub struct Reader {
     opening: Option<Opening>,
     resolver: Option<Resolver>,
     pending_seek: Option<SeekRequest>,
+    recovery_audio: RecoveryAudio,
     seek_mode: SeekMode,
     plan: Option<SeekPlanJob>,
     seek_plan: Option<crate::matroska::typed::seek::SeekPlan>,
@@ -227,6 +228,7 @@ impl Reader {
             opening: None,
             resolver: None,
             pending_seek: None,
+            recovery_audio: RecoveryAudio::Overlap,
             seek_mode: SeekMode::None,
             plan: None,
             seek_plan: None,
@@ -402,6 +404,7 @@ impl Reader {
         self.opening = None;
         self.resolver = None;
         self.pending_seek = None;
+        self.recovery_audio = RecoveryAudio::Overlap;
         self.seek_mode = SeekMode::None;
         self.plan = None;
         self.seek_plan = None;

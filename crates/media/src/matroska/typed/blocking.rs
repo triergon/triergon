@@ -3,7 +3,7 @@
 //! pending, so output pressure cannot repeat I/O or drop an unread partial chunk.
 //! The public blocking reader drives the retained typed jobs through this supply
 //! adapter; it does not select an alternate parsing path.
-use crate::matroska::typed::syntax::Required;
+use crate::matroska::typed::syntax::{Required, check};
 use crate::{Error, Result};
 use std::{
     io::{self, Read, Seek, SeekFrom},
@@ -491,7 +491,10 @@ impl<R: Read + Seek> InputFeeder<R> {
         }
         if self.position != request.offset {
             match self.reader.seek(SeekFrom::Start(request.offset)) {
-                Ok(position) if position == request.offset => self.position = position,
+                Ok(position) if position == request.offset => {
+                    self.position = position;
+                    check(cancel)?;
+                }
                 Ok(_) => {
                     input.fail(
                         request.source,

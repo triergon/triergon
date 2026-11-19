@@ -10,3 +10,5 @@
 //!
 //! Reference: the `matroska` demuxer at FFmpeg git revision `d32b387f` on the 9.0
 //! branch.
+
+pub use crate::typed::reader::blocking::seek_initial_trim;

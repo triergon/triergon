@@ -1,0 +1,74 @@
+{
+ "name": "gate-run-armv7-414b4cb5-20261118-205950-shard-3",
+ "path": "gate-run-armv7-414b4cb5-20261118-205950-shard-3",
+ "retention": "retained",
+ "reason": "Linked codec, reader and subtitle gate at 414b4cb5 on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-armv7-20261118-205950/shard-3/3e49b75fd2fdc84bfc445d31ccb86138ba9f431102382090c238dc401477579f.tar.zst",
+ "sha256": "3e49b75fd2fdc84bfc445d31ccb86138ba9f431102382090c238dc401477579f",
+ "bytes": 14057485,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "26128ff091d8a7e5bc5ce5f308590c9a0bb7b90f29aea3a64986f0f9377ebe9f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "2dfd4994cb4145a464c30582fab7414182de70d816cb57f1576347591ae805ce",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "181282c49571cd403d0afa8e51dde60568082d4e82934e794f123476268385fb",
+   "status": 0,
+   "report_sha256": "53cf6f57e118d05b1e7249cf7d08dc3d5a66dc6f56a31813738b5e5d02b8f047",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "1dff5a042148a987dc5b594f3ac09c10ea6874499fc4cd39187264d496d784b0",
+   "status": 0,
+   "report_sha256": "4dc5c351d2da6bb8ba8de2f766e21334f4c62133a5ab39dddc117ba79f742e11",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "fc6827c6dd6a403cf2c15281a0aa4baa12ee588b7d8bec1a133d24bed79018aa",
+   "status": 0,
+   "report_sha256": "4903878c9685b91933b4b9137953282a618d5304944631b94bfa42ba10adc299",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a137dfa2e288744ee483b3f0a84a4e0365fefcd43c905232b39cc4031320f582",
+   "status": 0,
+   "report_sha256": "e43f1a3ab951ddd0a328c2620c9d4c3360abaf87d2dee04118b4fe3a92701356",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "169cbb28a0c21f87bb0bb5a2c1b576c6ab144e16177456b42d5cdf68ff9b9605",
+   "status": 0,
+   "report_sha256": "91aeab1009fcda84a0d2cc86b4f2ca7ecf793447d619ce7b04be9210c2af3577"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "1916e97b6eed65cc0cca0c63885cbbeb4fa95a95a10bdb38249eb317cd9aed7c",
+   "status": 0,
+   "report_sha256": "d920e9eccece62c5ec2a190dddd4a05c3f198d77e6a3c0c080572fafbbd18175"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

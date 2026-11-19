@@ -147,13 +147,21 @@ impl ImmutableSeekIndex {
                 .checked_sub(1)
                 .map(|at| entries[at])
         };
-        previous(policy.target_ns).or_else(|| {
-            if policy.allow_first_after_negative_preroll {
-                previous(0)
-            } else {
-                None
-            }
-        })
+        previous(policy.target_ns)
+            .or_else(|| {
+                if policy.allow_first_after_negative_preroll {
+                    previous(0)
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                if policy.allow_first_after_target {
+                    entries.first().copied()
+                } else {
+                    None
+                }
+            })
     }
 }
 

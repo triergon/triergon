@@ -1,0 +1,60 @@
+{
+ "name": "gate-run-aarch64-414b4cb5-20261118-205844-shard-4",
+ "path": "gate-run-aarch64-414b4cb5-20261118-205844-shard-4",
+ "retention": "retained",
+ "reason": "Linked codec, reader and subtitle gate at 414b4cb5 on Linux AArch64.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-aarch64-20261118-205844/shard-4/10a1080b9751543451dce9b12a4af79109d5f59a3d45751afef371711c0ce13f.tar.zst",
+ "sha256": "10a1080b9751543451dce9b12a4af79109d5f59a3d45751afef371711c0ce13f",
+ "bytes": 62097957,
+ "results": [
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "82c08f09973783277eb9e9861cde1551dffeaa47a2cf1f23b244b461e5487795",
+   "status": 0,
+   "report_sha256": "882a5bac1909fd5b19ae818938fc0696ff5e3c5f0537631ae3dec9794915c9b0",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvd/gate-result.json",
+   "command": "report --memory",
+   "key": "a1d6a80995a603f439b2c75c8a82ec9b3694c0d16b75ba433889e761b73dddab",
+   "status": 0,
+   "report_sha256": "af3445609dafd38a38f82c90c5ec8a446af8d20178c61a91efd07c54ccf97ca2",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "53738d2b927ba0b8adbe86a9f8fd0ffce896a49fffa298d9aac0ea12921696cf",
+   "status": 0,
+   "report_sha256": "26329ac1ba0bd0b9092ba1d98ca682f9226291f43556bb268cc1c5b923e7fec5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "cb985c6984e900a6b67cd26622d81a9327c675a8fcd337626a36f0c4c48ed9da",
+   "status": 0,
+   "report_sha256": "c359cb92df986aaa031caa4ae2977782966e9b1645f6bc542d7315a3adc21cb4",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "08e434ba4dced1b9e6d59ffd136738b9487860330803ca091177f1d7144dee94",
+   "status": 0,
+   "report_sha256": "604d362754c4e6d96e1185e490851fab9a3993176e45d3df0282b03cf5c06725"
+  },
+  {
+   "path": "graded/subtitle-dvd/gate-result.json",
+   "command": "grade",
+   "key": "9c5e224665bf2180519460970d41111f994b24b2eed65b693564c510bea3128e",
+   "status": 0,
+   "report_sha256": "2a02478ae42c4849b430ae262d468471fb0f1588e5ee3e1ad40d56103d42f21f"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

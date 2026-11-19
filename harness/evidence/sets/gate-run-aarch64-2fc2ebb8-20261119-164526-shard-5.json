@@ -1,0 +1,81 @@
+{
+ "name": "gate-run-aarch64-2fc2ebb8-20261119-164526-shard-5",
+ "path": "gate-run-aarch64-2fc2ebb8-20261119-164526-shard-5",
+ "retention": "retained",
+ "reason": "Matroska seek, playback and linked worker gates with the CELT decoding changes.",
+ "key": "evidence/gate-runs/2fc2ebb8b30ba97544c9a07a4111fecaa0695c13-aarch64-20261119-164526/shard-5/b74d4b5a14743cc10ad850488c019387f23c763c2e3c1f66a23681c56ee1bc8d.tar.zst",
+ "sha256": "b74d4b5a14743cc10ad850488c019387f23c763c2e3c1f66a23681c56ee1bc8d",
+ "bytes": 9561245,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "7ae1fee029f7a352e5a24a364a6f94c4c7b1156beaba000bbadcc21add859c86",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "081be70a16ca78f393a6f7e154591dbb4bb38bd27062fe3a0576c2bd88d6b6fb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "68ff1db515e742b68b81f273f95645fabb8beaff4e4fb7070a23c9a262789ade",
+   "status": 0,
+   "report_sha256": "a6a23038a25e209c4d3492af0f88ff216326cedc1cb5f2e76282d621e89ac290",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "79b690938652ba82c0a6e46cfc1b96afeb51a9bacc219362170a9c74af18587c",
+   "status": 0,
+   "report_sha256": "7a9825f01b683978d40cace67f91ff908e0de644b3f47c09877fd452ffe56dd4",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b7356a34b26bb75e3717f23ff6692e6abd1e8897ac8e31f63ed59b38b41b276b",
+   "status": 0,
+   "report_sha256": "e2b400fc01767a2602181fd20f1a1ba4def77c2315e069bdbc507cc24bff6cc7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ce8ff2e514ee60d8c79562df4a910168debf04eabef2eb187f08f13611e40c64",
+   "status": 0,
+   "report_sha256": "a8c8ed9a151d4229b0a947b7aaa73781bd18129a5de3a923b36dac78f1966387",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "524ca6b602e74bb79e4ebf494f6ecc363d9712c2b43f0936b89f9697e8c377db",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "6251ef1529c6c4579d6c087da5a288f3a249f3561f57ba475e638c2b6c978c5e",
+   "status": 0,
+   "report_sha256": "a17cfb856ce9858e7c52f0a4aae7e6df8043714dbdc2aee21b6fb0c90f064b61"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "6ed2a567149148b11d2030aee0c53653fe9bb737ea443ab827c23db4312a8ce8",
+   "status": 0,
+   "report_sha256": "4fb19c4060db338fd612bc4b882c43af118c98b925b42817954689974467350a"
+  }
+ ],
+ "source_revisions": [
+  "2fc2ebb8b30ba97544c9a07a4111fecaa0695c13"
+ ]
+}

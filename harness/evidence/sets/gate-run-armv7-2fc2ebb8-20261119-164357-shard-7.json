@@ -1,0 +1,113 @@
+{
+ "name": "gate-run-armv7-2fc2ebb8-20261119-164357-shard-7",
+ "path": "gate-run-armv7-2fc2ebb8-20261119-164357-shard-7",
+ "retention": "retained",
+ "reason": "Matroska seek, playback and linked worker gates with the CELT decoding changes.",
+ "key": "evidence/gate-runs/2fc2ebb8b30ba97544c9a07a4111fecaa0695c13-armv7-20261119-164357/shard-7/914074689464e88c8e28c74f45969860a108e06e7c3ecd0688cef7600f973d7f.tar.zst",
+ "sha256": "914074689464e88c8e28c74f45969860a108e06e7c3ecd0688cef7600f973d7f",
+ "bytes": 40118131,
+ "results": [
+  {
+   "path": "memory/codec-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "01112222c078bfc975e649ffa3b3576af4f1ad74d5d3c885d079cf56992c850c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "a33d234a99889ad8d215ba74476eaac17ef1fd05ff1318536ec898eb8643e9c4",
+   "status": 0,
+   "report_sha256": "0c5860176c9b00663d5899c5069d1ff7ce092a25249652cceffbd0f4e415c32b",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-colour/gate-result.json",
+   "command": "report --memory",
+   "key": "08d9fc654cf07e542d94bb1bed6a241a25116af3397837661e0a2753607d5e24",
+   "status": 0,
+   "report_sha256": "962597e2fcca1acfe0a788c3b4b2dbee73953361f929ee80ebe5b439828c9ed0",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "f32b60598e3a8f2d5719828e4c9386821b4a9305b6ecdabcbff429ba318a52c9",
+   "status": 0,
+   "report_sha256": "68fac164b1e8865dfcb902720f8ecf31a9d514781e1d277ec28150dc8772c4e5",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "45f5ebf07907327007a1d74af55a10122b0c5cbbc5699445dbc154df4f3fbd64",
+   "status": 0,
+   "report_sha256": "cc1dd221f8e7d735106265ee77d5071501c2657818d371b149b06a80529e26c9",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4aab8673152fe2d413d485766e92847ed29a11689808c7e7579e017c3bd9c03b",
+   "status": 0,
+   "report_sha256": "55669ebc74d1c32ada4664e73196a2c953f686469ae57024ecba9cd49aa5e4ff",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-colour/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6bbab86e7fc2049682d98e7f023c601989e59a9ee742b564fb37120204b7c721",
+   "status": 0,
+   "report_sha256": "bf89ec8b1dbc9788da0b35f84df9c8ca01f18e2359961a89c6e592918f846f69",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "bf87876e1edb651022f6093b691d32ff2fa1857f775a32dc734fd1f9e4f51c1d",
+   "status": 0,
+   "report_sha256": "52227ddfc0340c590c1e39e71b441b6a3de4b51f6580a7444c9b6b37a79d380d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "524fc1bf3d7732af7115e22b53f572c13f65942456ed4b2a83040461d4b6e344",
+   "status": 0,
+   "report_sha256": "4e9484e8758a03411fb811d93ff3738950431213787d84023f3d5d85045e31d1",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "989413ccc76c60c5b5a3b359a3fd137b85e4bdeb6f037cb10aaf1dac6e1f53d4",
+   "status": 0,
+   "report_sha256": "c3240ec1e3addc189c21f7ac25b24b494aad8606b0a6121269f8332a44a50102"
+  },
+  {
+   "path": "graded/matroska-colour/gate-result.json",
+   "command": "grade",
+   "key": "b6fc1360f9b9fe186ebd6126800a90d43f391cba90bc5e97ef272fd1c634b094",
+   "status": 0,
+   "report_sha256": "55a24068be3b25119744cf227e74a690a853451465d42aaa69ac38b466ee8feb"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "5e1f0b081cffc8c97f163edda28c8e2128786cb1e6b1881ccca6b4d0e8215d8d",
+   "status": 0,
+   "report_sha256": "8a8e415590361a7e35a4932f9534b10aa95b1c8288e68233fa0628f2a466ad11"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "9470e2d944e67e98d4407aa8080ff34664e3d6f1e337cf6ec431fbcb16814169",
+   "status": 0,
+   "report_sha256": "413acf5b36c2e91acfd91cd126597372082010dcb2b7f8175ed8038d03de3e2d"
+  }
+ ],
+ "source_revisions": [
+  "2fc2ebb8b30ba97544c9a07a4111fecaa0695c13"
+ ]
+}

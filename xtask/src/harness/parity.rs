@@ -454,22 +454,213 @@ pub fn colour_parity(
     Ok(result)
 }
 
+fn same_preroll_packet(packet: &Value, source: &Value) -> bool {
+    let (Value::Object(fields), Value::Object(source_fields)) = (packet, source) else {
+        return false;
+    };
+    fields.len() == source_fields.len()
+        && fields.iter().all(|(key, observed)| {
+            source.get(key).is_some_and(|expected| {
+                // Start padding is applied once at the beginning of the source.
+                key == "trim_start_samples" || super::validation::same(observed, expected)
+            })
+        })
+}
+
+// Normal playback can recover earlier audio and subtitles for decoding. Use the
+// reference read from the start to check each added packet's source and order.
+fn playback_preroll_matches(
+    actual: &Value,
+    seek: &Value,
+    source: &Value,
+    target_ns: i64,
+) -> Result<(), &'static str> {
+    let integer = |field: Option<&Value>| match field {
+        Some(Value::Number(number)) => number.as_i128(),
+        _ => None,
+    };
+    let track_info = seek.get("tracks").ok_or("missing seek tracks")?;
+    let tracks = track_info.as_array().ok_or("invalid seek tracks")?;
+    if !actual
+        .get("tracks")
+        .is_some_and(|actual| super::validation::same(actual, track_info))
+    {
+        return Err("playback seek tracks differ");
+    }
+    let wanted = seek
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing reference seek packets")?;
+    let source = source
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing sequential reference packets")?;
+    let packets = actual
+        .get("packets")
+        .and_then(Value::as_array)
+        .ok_or("missing playback seek packets")?;
+    let track_index = |packet: &Value| {
+        integer(packet.get("track"))
+            .and_then(|number| usize::try_from(number).ok())
+            .filter(|&track| track < tracks.len())
+            .ok_or("invalid playback seek track")
+    };
+    let mut first_wanted = vec![None; tracks.len()];
+    for packet in wanted {
+        first_wanted[track_index(packet)?].get_or_insert(packet);
+    }
+    // The first required packet for a track ends its preroll range in the
+    // sequential trace, even when that packet also has a clock before the seek.
+    let mut first_position = vec![None; tracks.len()];
+    for (position, packet) in source.iter().enumerate() {
+        let track = track_index(packet)?;
+        if first_position[track].is_none()
+            && first_wanted[track].is_some_and(|expected| same_preroll_packet(expected, packet))
+        {
+            first_position[track] = Some(position);
+        }
+    }
+    let mut wanted = wanted.iter().peekable();
+    let mut earlier = source.iter().enumerate();
+    let mut emitted = vec![false; tracks.len()];
+    let mut preroll_clock = vec![None; tracks.len()];
+    for packet in packets {
+        let track = track_index(packet)?;
+        if wanted
+            .peek()
+            .is_some_and(|expected| super::validation::same(packet, expected))
+        {
+            emitted[track] = true;
+            wanted.next();
+            continue;
+        }
+        if emitted[track] || !matches!(integer(tracks[track].get("kind")), Some(2 | 17)) {
+            return Err("playback seeks must keep the complete reference packet sequence");
+        }
+        let timed = match packet.get("pts_ns") {
+            Some(Value::Null) => false,
+            pts if integer(pts).is_some_and(|pts| pts < i128::from(target_ns)) => true,
+            _ => return Err("extra playback packet lacks a preroll clock before the target"),
+        };
+        let end = match first_wanted[track] {
+            Some(_) => first_position[track].ok_or("reference seek packet missing from source")?,
+            None => source.len(),
+        };
+        if integer(packet.get("trim_start_samples")) != Some(0) {
+            return Err("extra playback preroll reapplies initial trim");
+        }
+        let (position, _) = earlier
+            .by_ref()
+            .take_while(|(position, _)| *position < end)
+            .find(|(_, original)| same_preroll_packet(packet, original))
+            .ok_or("extra playback preroll differs from the sequential reference")?;
+        if timed {
+            preroll_clock[track] = Some(position);
+        } else {
+            let anchor = preroll_clock[track].ok_or("untimestamped preroll has no source clock")?;
+            if source[anchor + 1..position].iter().any(|original| {
+                track_index(original) == Ok(track) && integer(original.get("pts_ns")).is_some()
+            }) {
+                return Err("untimestamped preroll skipped its source clock");
+            }
+        }
+    }
+    if wanted.next().is_some() {
+        return Err("playback seek lost a reference packet");
+    }
+    Ok(())
+}
+
+#[test]
+fn playback_seek_keeps_the_full_reference_sequence() {
+    let packet = |track, pts, start_trim, payload| {
+        Value::object([
+            ("track", Value::int(track)),
+            ("pts_ns", pts),
+            ("key", Value::Bool(true)),
+            ("trim_start_samples", Value::int(start_trim)),
+            ("payload", Value::str(payload)),
+        ])
+    };
+    let trace = |packets| {
+        Value::object([
+            (
+                "tracks",
+                Value::Array(
+                    [1, 2, 17]
+                        .map(|kind| Value::object([("kind", Value::int(kind))]))
+                        .to_vec(),
+                ),
+            ),
+            ("packets", Value::Array(packets)),
+        ])
+    };
+    let video = packet(0, Value::int(20), 0, "video");
+    let audio = packet(1, Value::int(21), 0, "audio");
+    let seek = trace(vec![video.clone(), audio.clone()]);
+    let mut integer_key = audio.clone();
+    super::validation::put(&mut integer_key, "key", Value::int(1)).unwrap();
+    let earlier = packet(1, Value::int(18), 0, "preroll");
+    let untimed = packet(1, Value::Null, 0, "same lace");
+    let source = trace(vec![
+        packet(1, Value::int(18), 312, "preroll"),
+        untimed.clone(),
+        video.clone(),
+        audio.clone(),
+    ]);
+    let valid = trace(vec![
+        earlier.clone(),
+        untimed.clone(),
+        video.clone(),
+        audio.clone(),
+    ]);
+    assert_eq!(playback_preroll_matches(&valid, &seek, &source, 22), Ok(()));
+    assert!(playback_preroll_matches(&valid, &seek, &source, 18).is_err());
+    for packets in [
+        vec![untimed.clone(), video.clone(), audio.clone()],
+        vec![audio.clone(), video.clone(), audio.clone()],
+        vec![video.clone(), earlier.clone()],
+        vec![earlier.clone(), audio.clone(), video.clone()],
+        vec![video.clone(), audio.clone(), earlier.clone()],
+        vec![video.clone(), integer_key],
+        vec![packet(1, Value::int(18), 0, "other bytes"), video, audio],
+    ] {
+        assert!(playback_preroll_matches(&trace(packets), &seek, &source, 22).is_err());
+    }
+
+    let first = packet(1, Value::int(18), 0, "earlier audio");
+    let later = packet(1, Value::int(27), 0, "later audio");
+    let later_tail = packet(1, Value::Null, 0, "later lace");
+    let required = packet(1, Value::int(30), 0, "reference audio");
+    let source = trace(vec![
+        first.clone(),
+        later,
+        later_tail.clone(),
+        required.clone(),
+    ]);
+    let seek = trace(vec![required.clone()]);
+    let invalid = trace(vec![first, later_tail, required]);
+    assert!(playback_preroll_matches(&invalid, &seek, &source, 22).is_err());
+}
+
 pub fn seek_parity(
     run: &Run<'_>,
     sequential_required: bool,
     comparison: Option<&Comparison<'_>>,
     content: bool,
 ) -> Result<Value, String> {
-    let mut result = parity(run, sequential_required, comparison, content, "")?;
-    let mut rows = Vec::new();
-    for target in [
-        0i64,
+    const TARGETS_NS: [i64; 6] = [
+        0,
         250_000_000,
         2_500_000_000,
         7_500_000_000,
         15_500_000_000,
         25_000_000_000,
-    ] {
+    ];
+    let mut result = parity(run, sequential_required, comparison, content, "")?;
+    let source = crate::checks::read_json(&run.raw.join("reference.json"))?;
+    let mut rows = Vec::new();
+    for target in TARGETS_NS {
         for after_eof in [false, true] {
             let mut extra = vec![arg(target)];
             if after_eof {
@@ -477,8 +668,14 @@ pub fn seek_parity(
             }
             let left = run.candidate("seek-trace", &extra);
             let right = run.exec(run.reference, "seek-trace", &extra);
+            let playback = run.candidate("playback-seek-trace", &extra);
+            let playback_check = if ok(&playback) && ok(&right) && ok(&source) {
+                playback_preroll_matches(data(&playback), data(&right), data(&source), target)
+            } else {
+                Err("playback or reference seek worker failed")
+            };
             let delta = differences(data(&left), data(&right));
-            let pass = ok(&left) && ok(&right) && delta.is_empty();
+            let pass = ok(&left) && ok(&right) && delta.is_empty() && playback_check.is_ok();
             rows.push(Value::object([
                 ("target_ns", Value::int(target)),
                 (
@@ -487,8 +684,14 @@ pub fn seek_parity(
                 ),
                 ("status", status_of(pass)),
                 ("differences", Value::Array(delta)),
+                ("playback_status", status_of(playback_check.is_ok())),
+                (
+                    "playback_error",
+                    playback_check.err().map_or(Value::Null, Value::str),
+                ),
                 ("candidate", left),
                 ("reference", right),
+                ("playback_candidate", playback),
             ]));
         }
     }
@@ -498,7 +701,9 @@ pub fn seek_parity(
         .map(|row| match row {
             Value::Object(m) => Value::Object(
                 m.iter()
-                    .filter(|(k, _)| k != "candidate" && k != "reference")
+                    .filter(|(k, _)| {
+                        !matches!(k.as_str(), "candidate" | "reference" | "playback_candidate")
+                    })
                     .cloned()
                     .collect(),
             ),

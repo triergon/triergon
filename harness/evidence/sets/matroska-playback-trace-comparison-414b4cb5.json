@@ -1,0 +1,13 @@
+{
+ "name": "matroska-playback-trace-comparison-414b4cb5",
+ "path": "matroska-playback-trace-comparison-414b4cb5",
+ "retention": "retained",
+ "reason": "Byte-identical outputs on the 397 Matroska and linked playback cases outside the Cues group, with five additional TS188 controls on Linux AArch64.",
+ "key": "evidence/matroska-trace-comparison/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d/aarch64/639e932bc47c07c96592f3e184c22c9beb0fb8a3acc151b949d6bcdcbf2c8401.tar.zst",
+ "sha256": "639e932bc47c07c96592f3e184c22c9beb0fb8a3acc151b949d6bcdcbf2c8401",
+ "bytes": 2729874,
+ "source_revisions": [
+  "9e8700bfd7656494e93085e9a2315f7da2f86598",
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}

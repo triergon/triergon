@@ -160,9 +160,17 @@ symbols and checksum chunks.
 **Seeking.** Requests name a track index (must be video) and a presentation time in
 nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
 target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
-replays the whole landing Cluster so interleaved audio before the keyframe is kept;
-when subtitle tracks exist it also recovers earlier subtitle packets that are
-still in range. A cue is checked against the real Cluster, track, timestamp and
+replays the landing Cluster, including interleaved audio before the keyframe.
+A bounded scan can land on the first verified keyframe for a nonnegative
+request that precedes it.
+When the reader recovers earlier subtitles, it filters the replay prefix up
+to the destination keyframe. It keeps complete untimed audio laces and audio
+with a known end past the cutoff, even when the packet starts before it.
+For overlap, a zero BlockDuration falls back to the track's DefaultDuration.
+Returned packets retain the declared block timing. Recovery can fail with
+`missing timed audio duration` if a timed packet has no duration, or
+`Error::Overflow` if its timing exceeds the supported range.
+A cue is checked against the real Cluster, track, timestamp and
 keyframe; a forged index fails instead of landing elsewhere. The gap after the
 last cue is scanned for uncued keyframes. The `SeekReceipt` reports `actual_ns`,
 `used_index`, `scanned_bytes`, `preroll_ns`, `discard_until_ns` (decode, but do
@@ -182,11 +190,20 @@ incomplete/zero primaries); values that cannot fit return `Overflow`.
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
 each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's packet
-clock. `compat::block_additions` builds readers that admit WebM VP9's implicit
+clock. `compat::seek::at_block_start` selects complete audio blocks by their start
+in the comparison clock during subtitle seek recovery. That integer clock gives
+zero recovery delay to an audio track with a positive rate below 1 Hz. A bounded search can
+land on the first verified keyframe for a nonnegative request that precedes
+it. The ordinary playback seek uses packet overlap
+and retains untimed laces so their timestamps can be derived
+from the audio. An overlapping lace with leading discard padding keeps all its
+frames so a decoder can apply the block-wide trim using their sample counts.
+`compat::block_additions` builds readers that admit WebM VP9's implicit
 ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
 projects block additions to the packet side data and HDR10+ events FFmpeg attaches
-to packets. Comparison-only projections (`Colour::trace_fields`) are compiled only
-with the non-default `reference-trace` feature.
+to packets. The `reference-trace` feature exposes comparison projections.
+`Colour::trace_fields` returns the colour fields and `seek_initial_trim` reports
+when the block-start seek comparison reapplies initial audio padding.
 
 **Segment metadata.** Each `metadata::SharedDocument` owns one source buffer
 plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,

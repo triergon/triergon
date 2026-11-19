@@ -1,0 +1,67 @@
+{
+ "name": "gate-run-armv7-47ffada4-20261119-171532-shard-1",
+ "path": "gate-run-armv7-47ffada4-20261119-171532-shard-1",
+ "retention": "retained",
+ "reason": "Linked worker gates with the Matroska, CELT and PGS changes together.",
+ "key": "evidence/gate-runs/47ffada46db5406b434e37ff4e5ab01a031365a9-armv7-20261119-171532/shard-1/ee3ac21004334fa58b6910a413ee1450732e6ba60b924effd463782122fd6b0c.tar.zst",
+ "sha256": "ee3ac21004334fa58b6910a413ee1450732e6ba60b924effd463782122fd6b0c",
+ "bytes": 44347160,
+ "results": [
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "fddebdb9a212aa3043709b30dec64c50d5755e9fb3649c9bfb774d33ab7cfcda",
+   "status": 0,
+   "report_sha256": "21ce5bf9f44849a9922e7ec7ce80fc06f8d8621258e019bbae839af2122bfd79",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "9ac6eed177efc7b504ca8b2ce99e88c8603998852dced37ea5b4385a952c80fa",
+   "status": 0,
+   "report_sha256": "216bb8e13c32ea8716bd29183145f0d0e9636d5a7b63cf562bb8da1637a5e4fc",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f0ce63e27ccaf6c91eca0173e90103dd6dd49088c4f152e977df20a90f8f4f7b",
+   "status": 0,
+   "report_sha256": "ddaeb0034f6fb3bf184bc4ed2f798d6cb374b140bef6722d713782d4008536ac",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4afc55192cc5debafd35a65bb83ff539844f60c975ee84e6b1e4152410ddad39",
+   "status": 0,
+   "report_sha256": "e494dd6b2790f65a9bf0d3a71db231efbc10402ce55516dd70939e6f525c5091",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "39c7cd35f3fdbbb67cac3df937101f3f0c121779185b314e36017e122875c8cf",
+   "status": 0,
+   "report_sha256": "12d9c69bf5ce960ff5778062c6460b0bcf41280fb010e566e44757a45a6e0e93"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "1d24ab6e61d6fa59c667bddd96abc932d4e1e0bf20201005820d56c7f173ec0a",
+   "status": 0,
+   "report_sha256": "57484a786c6683a15f852e24e5eef077a782322d9f0cb7b37344c51e07f3eefb"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "c3371ccdbb29233dd6bd26715f68c434eaac14c30393d022f8a906917468cfea",
+   "status": 0,
+   "report_sha256": "92a5c1b377f8fe09d3cc25a9cf0b3626164253c84f649df08b79884c45e779c0"
+  }
+ ],
+ "source_revisions": [
+  "47ffada46db5406b434e37ff4e5ab01a031365a9"
+ ]
+}

@@ -25,7 +25,7 @@ pub(super) enum SeekMode {
 pub(super) struct SubtitleRecovery {
     actual_ns: i64,
     destination_block: u64,
-    lower_ns: i64,
+    cutoff: RecoveryCutoff,
     used_index: bool,
     source: SourceId,
     generation: u64,
@@ -36,7 +36,7 @@ pub(super) struct SubtitleRecovery {
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ReplayPrefix {
     pub until_block: u64,
-    pub lower_ns: i64,
+    pub cutoff: RecoveryCutoff,
     pub source: SourceId,
     pub generation: u64,
 }
@@ -297,9 +297,24 @@ impl Reader {
             && first
             && fields.track == request.track
             && fields.keyframe
-            && pts <= scan.policy.target_ns
-            && scan.best.as_ref().is_none_or(|(old, _)| pts > *old)
         {
+            let target = scan.policy.target_ns;
+            let improves = if pts <= target {
+                scan.best
+                    .as_ref()
+                    .is_none_or(|(old, _)| *old > target || pts > *old)
+            } else {
+                // A zero-clamped preroll retry takes precedence over a later keyframe.
+                scan.policy.allow_first_after_target
+                    && (!scan.policy.allow_first_after_negative_preroll || scan.retried)
+                    && scan
+                        .best
+                        .as_ref()
+                        .is_none_or(|(old, _)| *old > target && pts < *old)
+            };
+            if !improves {
+                return Ok(());
+            }
             let location = locate()?;
             scan.best_configuration = if scan.prefix_from_initial {
                 let boundary = scan
@@ -316,20 +331,30 @@ impl Reader {
         Ok(())
     }
     pub fn seek_previous(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
-        self.begin_seek(SeekRequest {
-            track,
-            requested_ns,
-            playback_preroll: false,
-        })
+        self.begin_seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: false,
+            },
+            RecoveryAudio::Overlap,
+        )
     }
     pub fn seek_for_playback(&mut self, track: usize, requested_ns: i64) -> Result<InputRequest> {
-        self.begin_seek(SeekRequest {
-            track,
-            requested_ns,
-            playback_preroll: true,
-        })
+        self.begin_seek(
+            SeekRequest {
+                track,
+                requested_ns,
+                playback_preroll: true,
+            },
+            RecoveryAudio::Overlap,
+        )
     }
-    fn begin_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
+    pub(super) fn begin_seek(
+        &mut self,
+        request: SeekRequest,
+        audio: RecoveryAudio,
+    ) -> Result<InputRequest> {
         let result = (|| {
             if self
                 .tracks()
@@ -354,6 +379,7 @@ impl Reader {
             self.last_location = None;
             self.opening = None;
             self.pending_seek = Some(request);
+            self.recovery_audio = audio;
             self.plan = None;
             self.seek_plan = None;
             self.scan = None;
@@ -393,6 +419,7 @@ impl Reader {
             request.playback_preroll,
             self.scale,
             first,
+            self.recovery_audio,
         )?);
         self.seek_mode = SeekMode::Plan;
         Ok(())
@@ -417,11 +444,20 @@ impl Reader {
             // negative CodecDelay and the original initial-trim distinction.
             return Ok(false);
         }
-        let lower_ns = i64::try_from(
-            i128::from(completion.actual_ns)
-                - i128::from(completion.plan.subtitle_recovery_delay_ns),
-        )
-        .map_err(|_| Error::Overflow)?;
+        let delay_ns = completion.plan.subtitle_recovery_delay_ns;
+        let lower_ns = i64::try_from(i128::from(completion.actual_ns) - i128::from(delay_ns))
+            .map_err(|_| Error::Overflow)?;
+        let block_start_ticks = if self.recovery_audio == RecoveryAudio::BlockStart {
+            let request = self.pending_seek.required("missing seek request")?;
+            let video_delay_ns = self.tracks()[request.track].codec_delay_ns;
+            let ticks = (i128::from(completion.actual_ns) + i128::from(video_delay_ns))
+                / i128::from(self.scale);
+            let start = crate::packet_clock::block_start_ticks(ticks, video_delay_ns, self.scale)?;
+            let cutoff = start - i128::from(delay_ns / self.scale);
+            Some(i64::try_from(cutoff).map_err(|_| Error::Overflow)?)
+        } else {
+            None
+        };
         let used = completion
             .scanned
             .checked_add(self.seek_metadata_bytes)
@@ -433,7 +469,10 @@ impl Reader {
         self.subtitle_recovery = Some(SubtitleRecovery {
             actual_ns: completion.actual_ns,
             destination_block: completion.location.block_offset(),
-            lower_ns,
+            cutoff: RecoveryCutoff {
+                lower_ns,
+                block_start_ticks,
+            },
             used_index: completion.used_index,
             source: self.envelope.request().source,
             generation: self.generation(),
@@ -446,6 +485,7 @@ impl Reader {
                 start: first.offset(),
                 stop: Some(completion.location.cluster_offset()),
                 target_ns: lower_ns,
+                allow_first_after_target: false,
                 allow_first_after_negative_preroll: false,
                 replay_whole_cluster: true,
             },
@@ -481,7 +521,7 @@ impl Reader {
             used_index = recovery.used_index;
             self.replay_prefix = Some(ReplayPrefix {
                 until_block: recovery.destination_block,
-                lower_ns: recovery.lower_ns,
+                cutoff: recovery.cutoff,
                 source: recovery.source,
                 generation: recovery.generation,
             });

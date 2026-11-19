@@ -158,8 +158,111 @@ fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
     }
     Ok(())
 }
-fn keep_recovery_packet(kind: u64, pts: Option<i64>, lower: i64) -> bool {
-    kind == 17 || pts.is_none_or(|pts| pts >= lower)
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RecoveryCutoff {
+    pub(crate) lower_ns: i64,
+    pub(crate) block_start_ticks: Option<i64>,
+}
+
+fn keep_recovery_packet(kind: u64, packet: &Packet, cutoff: RecoveryCutoff) -> Result<bool> {
+    let lower = cutoff.lower_ns;
+    if kind == 2
+        && let Some(cutoff_ticks) = cutoff.block_start_ticks
+    {
+        let timing = packet.timing;
+        return Ok(crate::packet_clock::block_start_ticks(
+            timing.timestamp_ticks,
+            timing.codec_delay_ns,
+            timing.scale_ns,
+        )? >= i128::from(cutoff_ticks));
+    }
+    let Some(pts) = packet.pts_ns else {
+        return Ok(true);
+    };
+    if kind != 2 {
+        return Ok(kind == 17 || pts >= lower);
+    }
+    let mut timing = packet.timing;
+    let zero_block_duration = timing.duration_ticks == Some(0);
+    if zero_block_duration {
+        timing.duration_ticks = None;
+    }
+    let Some(duration) = timing
+        .duration_ticks
+        .or(timing.default_duration_ns)
+        .filter(|&value| value != 0)
+    else {
+        // The Block timestamp locates only the first frame in a lace
+        // (RFC 9559 §10.3.5). Keep untimed laces and their anchor together.
+        return Ok(pts >= lower || timing.frames > 1);
+    };
+    if packet.discard_padding_ns < 0 && timing.frames > 1 {
+        // Leading DiscardPadding covers the whole Block (RFC 9559 §5.1.3.5.7).
+        // Keep the earlier frames of an overlapping lace so the decoder has
+        // their sample counts when applying the trim.
+        let start = timing.source_base_ns()?;
+        let multiplier = if timing.duration_ticks.is_some() {
+            timing.scale_ns
+        } else {
+            u64::from(timing.frames)
+        };
+        let end = i128::from(duration)
+            .checked_mul(i128::from(multiplier))
+            .and_then(|duration| start.checked_add(duration))
+            .ok_or(Error::Overflow)?;
+        return Ok(end > i128::from(lower));
+    }
+    if zero_block_duration {
+        return recovery_overlaps(timing, lower);
+    }
+    let duration = packet
+        .duration_ns
+        .required("missing timed audio duration")?;
+    let rounded_delta = i128::from(pts) + i128::from(duration) - i128::from(lower);
+    // Rounding the start and duration can move their sum by up to 1 ns.
+    if !(0..=1).contains(&rounded_delta) {
+        return Ok(rounded_delta > 0);
+    }
+    recovery_overlaps(timing, lower)
+}
+
+fn recovery_overlaps(timing: BlockTiming, lower: i64) -> Result<bool> {
+    let source = timing.source()?;
+    let pts = source.pts.required("missing timed audio start")?;
+    let duration = source.duration.required("missing timed audio duration")?;
+    let end = Time::new(pts.numerator(), u128::from(pts.denominator()))?.checked_add(Time::new(
+        duration.numerator(),
+        u128::from(duration.denominator()),
+    )?)?;
+    Ok(end > Time::new(i128::from(lower), 1)?)
+}
+
+#[cfg(test)]
+#[test]
+fn recovery_uses_the_exact_end_of_a_fractional_audio_lace() {
+    let timing = BlockTiming {
+        timestamp_ticks: 0,
+        scale_ns: 1,
+        codec_delay_ns: 0,
+        default_duration_ns: None,
+        duration_ticks: Some(40_000_001),
+        frame: 1,
+        frames: 2,
+    };
+    let packet = super::super::PacketFields::new(0, timing, true, 0)
+        .unwrap()
+        .finish(PacketData {
+            storage: SharedBytes::default(),
+            range: 0..0,
+        });
+    assert_eq!(packet.pts_ns, Some(20_000_001));
+    assert_eq!(packet.duration_ns, Some(20_000_001));
+    let cutoff = |lower_ns| RecoveryCutoff {
+        lower_ns,
+        block_start_ticks: None,
+    };
+    assert!(!keep_recovery_packet(2, &packet, cutoff(40_000_001)).unwrap());
+    assert!(keep_recovery_packet(2, &packet, cutoff(40_000_000)).unwrap());
 }
 
 #[derive(Clone, Debug)]
@@ -432,7 +535,7 @@ impl PacketBatchJob {
     /// TypedPacket through the batch parser's Result/ParseStep return slot.
     pub(crate) fn step_ready(
         &mut self,
-        prefix_ns: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<()>> {
@@ -441,7 +544,7 @@ impl PacketBatchJob {
                 "packet batch requires replacement after error",
             ));
         }
-        let result = self.advance(prefix_ns, work, cancel);
+        let result = self.advance(prefix, work, cancel);
         match result {
             Err(Error::Backpressure {
                 requested,
@@ -459,7 +562,7 @@ impl PacketBatchJob {
     }
     fn advance(
         &mut self,
-        prefix_ns: Option<i64>,
+        prefix: Option<RecoveryCutoff>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<()>> {
@@ -761,7 +864,7 @@ impl PacketBatchJob {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
-                    if let Some(lower) = prefix_ns {
+                    if let Some(cutoff) = prefix {
                         let packet = self.staged.peek(self.publish)?;
                         let kind = self.live_configuration()?.tracks()[packet.track].kind;
                         // Consumer recovery selection at the real replay input
@@ -769,7 +872,7 @@ impl PacketBatchJob {
                         // all subtitle packets in this prefix, including known
                         // ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
-                        let keep = keep_recovery_packet(kind, packet.pts_ns, lower);
+                        let keep = keep_recovery_packet(kind, packet, cutoff)?;
                         if !keep {
                             drop(self.staged.take(self.publish)?);
                             self.publish += 1;

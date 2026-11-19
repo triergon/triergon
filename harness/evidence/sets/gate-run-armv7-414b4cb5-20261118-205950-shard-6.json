@@ -1,0 +1,58 @@
+{
+ "name": "gate-run-armv7-414b4cb5-20261118-205950-shard-6",
+ "path": "gate-run-armv7-414b4cb5-20261118-205950-shard-6",
+ "retention": "retained",
+ "reason": "Linked codec, reader and subtitle gate at 414b4cb5 on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/414b4cb5753ff0fae70fcc8194cf27e87cba1f9d-armv7-20261118-205950/shard-6/f8535266a3706e538e12ea8fd14960ba3c3718c1f3e3209912ded2c1f8114145.tar.zst",
+ "sha256": "f8535266a3706e538e12ea8fd14960ba3c3718c1f3e3209912ded2c1f8114145",
+ "bytes": 3332623,
+ "results": [
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "129e6c5b72178bcf49a9b203363e6c406c4ef4cbd46b751bd506245185a336dd",
+   "status": 0,
+   "report_sha256": "f2c97f1435b242eb6cf8adea3d303b2769e2700caebaaad37fbd32823ef9f114",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "73eb451a11c972661b06c1dbec56106cd8a05e9db8991ccd8cb29eb377160b21",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "d2f1e0cecb015a9199a6703d35fed87f1d5d086e9f8822afb2b320be7980b062",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "b692d4bf3228a6e0f93848275f7c5b412530d1cb78305e9b570b8d2ae8d6eb22",
+   "status": 0,
+   "report_sha256": "68099085efd7694735bddb05d8fb0212767c2b2c88b039b41c85f32ff6089972",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "8e4d3fa8103bee71a6a425ba9f51a2b354ff1250e0ac9f26ab5648aadcba2f28",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "50171d2a6f24081626ac441a02e48f614fa3d4a5cc8d02bd6551fa6167d46c89",
+   "status": 0,
+   "report_sha256": "6fbca82c32cb771ce28029e0d8eda5b017ed6c9b19ad2a0844f26f242c03b3c9"
+  }
+ ],
+ "source_revisions": [
+  "414b4cb5753ff0fae70fcc8194cf27e87cba1f9d"
+ ]
+}
