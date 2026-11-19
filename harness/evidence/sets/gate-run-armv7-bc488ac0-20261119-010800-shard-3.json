@@ -1,0 +1,129 @@
+{
+ "name": "gate-run-armv7-bc488ac0-20261119-010800-shard-3",
+ "path": "gate-run-armv7-bc488ac0-20261119-010800-shard-3",
+ "retention": "retained",
+ "reason": "Matroska and linked playback workers on qualified native hosts",
+ "key": "evidence/gate-runs/bc488ac098e95b4ab2ea81c0b07c7ffe8424ccff-armv7-20261119-010800/shard-3/b36dcc6c48c5679554475a0cf9fee1f004c9f91a535a35aaec356fdc0945543a.tar.zst",
+ "sha256": "b36dcc6c48c5679554475a0cf9fee1f004c9f91a535a35aaec356fdc0945543a",
+ "bytes": 25256378,
+ "results": [
+  {
+   "path": "memory/ts-program/gate-result.json",
+   "command": "report --memory",
+   "key": "291acb6d835132d542c9beb11d1d24257ea2087947cbc9421f6b0ef30ea36a23",
+   "status": 0,
+   "report_sha256": "0e7dbcfb0b638b7d1f15ce724ebafa670e30b16728a3ed8989c8920db206086e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "076247c593042d0e9fb6b25fe4fc7b0b175c5b3542793f13d5eadc7151f9ff24",
+   "status": 0,
+   "report_sha256": "5f3ecd0b6a6620ba6b32e6176906b833ff36445941a98cbaaf9ba98aa730339c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-demux/gate-result.json",
+   "command": "report --memory",
+   "key": "7772424eff284df387d47d1517b7939a19361a31e3197b4e97b5a405c6d63ccd",
+   "status": 0,
+   "report_sha256": "9988902a211b77b71b8d425599c934322c2c032da40e848990138cbdf9529e79",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-zlib/gate-result.json",
+   "command": "report --memory",
+   "key": "731c93f022ddb5d2136cfb72a0445f23e9e3d5656c7851e3e10389d54dbaf1da",
+   "status": 0,
+   "report_sha256": "efbe674934cb9e75edfcbd8c7f4d8b76f7f1fc864dd8ace8d2c029a52bf75ad4",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-colour/gate-result.json",
+   "command": "report --memory",
+   "key": "098fabe925a127c27a1b521be67a8e8091a8d5482f1f4cb1d4ff2e95969a3680",
+   "status": 0,
+   "report_sha256": "ff5c267acfa5dfb60049f02b7a0e3ec625f84c91fd37f65cc41278c5af88b670",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ts-program/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f464fcb317eb440403a10cf0e456e9021c730e652e111eb52f9f0019c850ab1f",
+   "status": 0,
+   "report_sha256": "2eed64b01e02e560a844e41913bb0749ddee24dffcff82f8566174f610a46052",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "99593e89083788bad7f741c0b21672ece85ba46f5a8f0961ea7a652905c6a13b",
+   "status": 0,
+   "report_sha256": "564da886443198e72390e8f6dc1dfaba1701f4dcb0bbd0627aaf9bc209e1ac93",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-demux/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f3a618ac2f80052acb5064583e8a93a691b42962141f99369504645369d101d9",
+   "status": 0,
+   "report_sha256": "490347cf3fe5c082ee43cf58920de953df444d3c1de50091b7affdde9ca661f7",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-zlib/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4ab988ad6798c265525c7c05d597cd913e2eff24292b9d463901f75756f5e10d",
+   "status": 0,
+   "report_sha256": "6e2703f9e670a8792d15ae4df30bc879c46e814a0e01c69eb913a65a3d1777dc",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-colour/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0af8c4dcb02975ec2f8d8174f2a37b9982bcb919923e7faff591e1bbb85c92db",
+   "status": 0,
+   "report_sha256": "2ca86c9fa7f6447ba0b336d3200192d8886ddd50c773228725c7cf7729155239",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "bd8813d337e28098d0d9ae56bc2537fdb62ba2a8d2524fedbe8f16934131375b",
+   "status": 0,
+   "report_sha256": "7edcd261733826d001f74fa8f1999bbb408d07bb2489477f131a5ed839aefaba"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "b7ed0718c85ec1347c378bb7e8f385ca99476f66e33c60925b87324c914a3a97",
+   "status": 0,
+   "report_sha256": "f0115ddd2043497fc2adb3f4fe0a10fba85c343cfce0bc3ac0f53ff9015f4633"
+  },
+  {
+   "path": "graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "02891a8091aa35b4d1478b5dff9332aaf8cb97a539c74d2f627202f3116fed5f",
+   "status": 0,
+   "report_sha256": "3ec6bc85314afef39d21bb27686b2edbb39369ca60a1086e302fd7bd35b6b316"
+  },
+  {
+   "path": "graded/matroska-zlib/gate-result.json",
+   "command": "grade",
+   "key": "2e3153c9ad94409faaf442079c2ef61cd66b9819ab942ccba6268d72e2b9dbaf",
+   "status": 0,
+   "report_sha256": "5572c60e743571900d8b65f57ffa1aa6644738a96b4f57674f7e1de37a230743"
+  },
+  {
+   "path": "graded/matroska-colour/gate-result.json",
+   "command": "grade",
+   "key": "f83c5a8327b7e0bfd3b15cec22bd8783d8465e64b0d09cd17be5527c992eae8e",
+   "status": 0,
+   "report_sha256": "f2eeac06ef656309d8067490562ddbf1eac0eee49bd2238b015e5ad3e52bccae"
+  }
+ ],
+ "source_revisions": [
+  "bc488ac098e95b4ab2ea81c0b07c7ffe8424ccff"
+ ]
+}
