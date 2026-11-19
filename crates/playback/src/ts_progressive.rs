@@ -422,7 +422,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 }
             }
             TsPayloadStep::Packet { packet, clock } => match packet {
-                NativePacket::Owned(packet) => self.on_packet(packet, &clock)?,
+                NativePacket::Owned(packet) => self.on_owned_packet(packet, &clock)?,
                 NativePacket::Compact(packet) => self.on_packet(packet, &clock)?,
             },
             TsPayloadStep::Refusal { track, error, .. }
@@ -436,6 +436,16 @@ impl<S: Source> TsProgressiveReader<S> {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Owned payloads come only from an engine built without compact payloads.
+    #[cold]
+    fn on_owned_packet(
+        &mut self,
+        packet: triergon_mpegts::compat::pes::DemuxPacket,
+        clock: &triergon_mpegts::compat::pes::DemuxTimeView,
+    ) -> Result<()> {
+        self.on_packet(packet, clock)
     }
 
     fn on_packet<P: PesInput>(
@@ -475,6 +485,8 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(())
     }
 
+    /// Tables, clock and fault events, which arrive rarely beside the payload.
+    #[cold]
     fn on_transport(&mut self, event: TraceEvent) -> Result<()> {
         match event {
             TraceEvent::Pat(table) => {

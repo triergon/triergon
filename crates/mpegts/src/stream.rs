@@ -2016,6 +2016,9 @@ impl TransportStream {
         }
     }
 
+    // A stream runs one of the two variants, so neither is inlined into the
+    // other's caller: the one that runs stays contiguous.
+    #[inline(never)]
     fn poll_feed_inner<const DIRECT: bool, const RUNS: bool>(
         &mut self,
         input: &mut InputCursor,

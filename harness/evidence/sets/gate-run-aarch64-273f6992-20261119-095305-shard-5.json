@@ -1,0 +1,92 @@
+{
+ "name": "gate-run-aarch64-273f6992-20261119-095305-shard-5",
+ "path": "gate-run-aarch64-273f6992-20261119-095305-shard-5",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/273f6992b83532651d66f95ac58810e9baa8be9f-aarch64-20261119-095305/shard-5/f557842fa476c39ac46c298289e60dfb3944a2991649b6b8765feb180e794e2a.tar.zst",
+ "sha256": "f557842fa476c39ac46c298289e60dfb3944a2991649b6b8765feb180e794e2a",
+ "bytes": 410761964,
+ "results": [
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "e6f031c35a84fa30ffe2147ace82db90f628eee9419ace64e08f8f4894f751aa",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "a430b1bc46c9aff7dd43f555f31baedeef4593b9b26aa6ba67d2ef21909f8d5f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "0f9a150e125fecb697db1cfdff33edac57544ae070a81c3065a905c946d64f41",
+   "status": 0,
+   "report_sha256": "7a2190c3c3a71da1bedaf0bcae4fceaf459d1d6c63872424983e9f53b9059fe1",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "1d580e94e2f65b2691d4565c11fca0cb849d9db807444fa7a7268bf254c70255",
+   "status": 0,
+   "report_sha256": "6f632420ed1d6bbd9b2fb9e3a5e2017ed67182f8fec1fa456555c59b885cc12f",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e7a2ab3b0e22cf172ceb60c93ceb45a57337baa443f1f1e758fefd08becb413e",
+   "status": 0,
+   "report_sha256": "b8112befd2f7c36122b2e855f651c8b5b6a247c77b44a6030fb0754293d2027e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a999279e7d75a5050a7b49118fdf5607910bfe37144e43e1798edcfba87fe254",
+   "status": 0,
+   "report_sha256": "d040e14099050b76d41e11ee34366ecf8f1e1162c57a7d2d0aefd6147a6fb7b8",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "c6f10d428dd1b5249c325a2f60e58dc51b3cb867c8eb8392a8a1d1f38191ba50",
+   "status": 0,
+   "report_sha256": "d4468c9573a1602eba970f96f6ba760a9fae5327485e0a4fbf4fe781feb27402"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "59766820e050fdc56179fb115e20463653b3d69e1b6eaf4bf3b428915556dff8",
+   "status": 0,
+   "report_sha256": "bfed728e4bbbd497bd69099f844485790f523bcc0c16a5296fc2a53cfe2cc7f3"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "098fecf4ee286e995c97d72d532f6a1cf3a542bff97228f7a01b90ee36c8f09f",
+   "status": 0,
+   "report_sha256": "237b54557cd509dd088ddef66ba2d4aaf75202fa3ba8873b681a3ab03fc89eea"
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "5b220ce95172cdfe87417c7530ecdd589c06f8f7a7bf911b9f3cef0b0d8f9d19",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "88b6b9497e15895a1cc486190c6fcfe5fc1319c8f160efa2ccbeb70d05a2df8b",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

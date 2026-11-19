@@ -454,7 +454,7 @@ playback_worker::hls::run::{closure#1}
 <triergon_playback::engines::TsEngine>::native_segment
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::with_queue
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::read_output
-<triergon_mpegts::stream::TransportStream>::poll_feed_with_payload_runs::<<triergon_playback::engines::TsEngine>::poll_feed_stream::{closure#0}>
+<triergon_mpegts::stream::TransportStream>::poll_feed_inner::<false, false, &mut <triergon_playback::engines::TsEngine>::poll_feed_stream::{closure#0}>
 <triergon_mpegts::framer::TransportFramer>::release_unused_windows
 <triergon_playback::io::SourceOwner<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::poll
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::provide
@@ -496,6 +496,8 @@ triergon_playback::hls_avc::syntax::pps
 <triergon_core::bytes::BudgetVec<triergon_playback::hls_avc::ParameterSet<u8>>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_playback::hls_avc::ParameterSet<u8>>>::reallocate
 <triergon_mpegts::demux_pes::compact::PayloadCursor>::into_spans
+<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::reuse_pes_lists::<<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::step::{closure#0}>
+<triergon_playback::engines::TsEngine>::reuse_pes_lists
 triergon_playback::hls_avc::syntax::slice_picture
 <triergon_playback::hls_avc::AvcTsReader>::emit
 core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_segment::Unit<triergon_playback::hls_avc::AvcTsAccessUnit, triergon_playback::hls_aac::HlsAacFrame>>>
@@ -518,6 +520,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_aac::PendingP
 <triergon_playback::hls_aac::HlsAac>::publish
 <triergon_core::bytes::BudgetVec<triergon_playback::hls_aac::HlsAacFrame>>::reallocate
 <triergon_core::bytes::BudgetVec<triergon_playback::hls_aac::HlsAacFrame>>::try_push
+<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::reuse_pes_lists::<<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::step::{closure#1}>
 core::ptr::drop_glue::<triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::shutdown
 core::ptr::drop_glue::<triergon_playback::hls_avc::AvcTsReader>
@@ -549,6 +552,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_segment::lane
 <triergon_core::bytes::BudgetVec<triergon_framing::reader::NalUnit>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_framing::reader::NalUnit>>::reallocate
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVecIntoIter<triergon_mpegts::demux_pes::DemuxSpan>>
+<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_segment::lanes::VideoAssembler, triergon_playback::hls_segment::lanes::AudioAssembler>>::reuse_pes_lists::<<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_segment::lanes::VideoAssembler, triergon_playback::hls_segment::lanes::AudioAssembler>>::step::{closure#0}>
 triergon_playback::hls_hevc::picture_entry
 <triergon_playback::raw_video::config::RawVideoConfigTracker>::observe
 <triergon_core::bytes::BudgetVec<triergon_playback::raw_video::config::Update>>::grow_for_push
@@ -574,6 +578,7 @@ triergon_framing::ac3::probe_with_layout
 <triergon_framing::ac3::PrefixBits>::small
 <triergon_framing::ac3::PrefixBits>::compression
 <triergon_framing::ac3::Ac3FrameHeader>::sample_span
+<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_segment::lanes::VideoAssembler, triergon_playback::hls_segment::lanes::AudioAssembler>>::reuse_pes_lists::<<triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_segment::lanes::VideoAssembler, triergon_playback::hls_segment::lanes::AudioAssembler>>::step::{closure#1}>
 <triergon_core::input::InputCursor>::finish
 core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_hevc::Active>>
 core::ptr::drop_glue::<triergon_framing::raw_annex_b::RawAnnexBReader>
@@ -838,9 +843,11 @@ core::ptr::drop_glue::<alloc::vec::Vec<core::option::Option<playback_worker::mat
 playback_worker::progressive::run
 playback_worker::progressive::run::{closure#0}
 playback_worker::progressive::operation
+<triergon_mpegts::stream::TransportStream>::poll_feed_inner::<true, true, &mut <triergon_playback::engines::TsEngine>::poll_feed_stream::{closure#0}>
 <triergon_playback::ts_progressive::Transport<playback_worker::progressive::Forward>>::provide
 <std::fs::File as alloc::io::read::Read>::read
 <triergon_mpegts::framer::TransportFramer>::share_progressive_window
+<triergon_playback::ts_progressive::TsProgressiveReader<playback_worker::progressive::Forward>>::on_transport
 <triergon_playback::hls_avc::AvcTsReader>::new_progressive
 <triergon_playback::hls_aac::HlsAac>::new
 <triergon_mpegts::stream::FeedPayloadRun>::append_ready
@@ -849,7 +856,6 @@ playback_worker::progressive::operation
 <triergon_mpegts::demux_pes::DemuxObserver>::append_payload_run::<<triergon_mpegts::stream::FeedPayloadRun>::append_ready::{closure#1}>
 <triergon_mpegts::demux_pes::DemuxObserver>::prepare_payload_run_growth
 <triergon_playback::engines::TsEngine>::project_pending_packet::<triergon_playback::engines::TsPayloadStep>
-<triergon_playback::engines::TsEngine>::reuse_pes_lists
 <playback_worker::progressive::RetainedStream>::retire
 <playback_worker::progressive::RetainedStream>::fields
 <triergon_playback::hls_avc::AvcTsAccessUnit>::feed_spans
