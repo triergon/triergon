@@ -46,9 +46,8 @@ fn an_audio_session_applies_pre_skip_and_end_trim() {
             session.load(Some(TrackDecoder::new(track).unwrap().into_decoder()));
             loaded = true;
         }
-        let payload = packet.payload().to_vec();
         session
-            .feed_discarding(&payload, None, Discard::of(&packet))
+            .feed_discarding(packet.payload(), None, Discard::of(&packet))
             .unwrap();
     }
     session.end_of_stream();

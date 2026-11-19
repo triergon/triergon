@@ -100,6 +100,7 @@ impl AudioSession {
     pub fn end_of_stream(&mut self) {
         if self.decoder.is_some() {
             self.ended = true;
+            self.queue.release_spare();
         }
     }
     /// Decode every queued unit that is due at `clock_ns` (PTS minus `lead_ns`
@@ -132,6 +133,9 @@ impl AudioSession {
             let result = decoder.decode(&unit.data, &mut self.frame);
             if result.is_ok() {
                 unit.discard.apply(&mut self.frame, &mut self.delay);
+                if !self.ended {
+                    self.queue.recycle(unit.data);
+                }
             }
             consumed += 1;
             match result {

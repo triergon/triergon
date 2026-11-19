@@ -39,7 +39,7 @@ pub enum FeedError {
 
 #[derive(Debug)]
 pub(crate) struct Unit {
-    pub data: Vec<u8>,
+    pub data: Box<[u8]>,
     pub pts: Option<i64>,
     pub discard: Discard,
 }
@@ -48,6 +48,7 @@ pub(crate) struct Unit {
 pub(crate) struct UnitQueue {
     limits: QueueLimits,
     units: VecDeque<Unit>,
+    spare: Option<Box<[u8]>>,
     bytes: usize,
 }
 
@@ -56,6 +57,7 @@ impl UnitQueue {
         Self {
             limits,
             units: VecDeque::new(),
+            spare: None,
             bytes: 0,
         }
     }
@@ -71,21 +73,32 @@ impl UnitQueue {
         if data.is_empty() || data.len() > self.limits.unit_bytes {
             return Err(FeedError::Invalid);
         }
-        if self.units.len() >= self.limits.units || self.bytes + data.len() > self.limits.bytes {
+        if self.units.len() >= self.limits.units || data.len() > self.limits.bytes - self.bytes {
             return Err(FeedError::Backpressure);
         }
+        // Exact-size backing keeps every byte of the queue limit usable. A
+        // mismatched spare is dropped before allocating its replacement.
+        let data = if let Some(mut spare) = self.spare.take().filter(|s| s.len() == data.len()) {
+            spare.copy_from_slice(data);
+            spare
+        } else {
+            Box::from(data)
+        };
         self.bytes += data.len();
-        self.units.push_back(Unit {
-            data: data.to_vec(),
-            pts,
-            discard,
-        });
+        self.units.push_back(Unit { data, pts, discard });
         Ok(())
     }
     pub fn pop(&mut self) -> Option<Unit> {
         let unit = self.units.pop_front()?;
         self.bytes -= unit.data.len();
         Some(unit)
+    }
+    /// Keep the just-consumed unit's storage for the next borrowed feed.
+    pub fn recycle(&mut self, data: Box<[u8]>) {
+        self.spare = Some(data);
+    }
+    pub fn release_spare(&mut self) {
+        self.spare = None;
     }
     #[allow(clippy::option_option)] // `None`: empty queue; `Some(None)`: unit without a timestamp.
     pub fn front_pts(&self) -> Option<Option<i64>> {
@@ -100,6 +113,7 @@ impl UnitQueue {
     }
     pub fn clear(&mut self) {
         self.units.clear();
+        self.release_spare();
         self.bytes = 0;
     }
 }
@@ -131,5 +145,41 @@ mod tests {
         queue.clear();
         assert!(queue.is_empty());
         queue.push(&[4; 8], None).unwrap();
+    }
+
+    #[test]
+    fn same_size_feed_reuses_only_the_consumed_payload_and_preserves_byte_admission() {
+        let mut q = UnitQueue::new(QueueLimits {
+            units: 3,
+            bytes: 12,
+            unit_bytes: 10,
+        });
+        q.push(&[1; 8], Some(1)).unwrap();
+        q.push(&[2; 4], Some(2)).unwrap();
+        let first = q.pop().unwrap();
+        let storage = first.data.as_ptr();
+        q.recycle(first.data);
+        assert_eq!(q.bytes + q.spare.as_ref().unwrap().len(), 12);
+        assert_eq!(q.push(&[3; 9], None), Err(FeedError::Backpressure));
+        assert_eq!(q.spare.as_ref().unwrap().as_ptr(), storage);
+        q.push(&[3; 8], Some(3)).unwrap();
+        assert!(q.spare.is_none());
+        assert_eq!(q.pop().unwrap().pts, Some(2));
+        let reused = q.pop().unwrap();
+        assert_eq!(reused.data.as_ptr(), storage);
+        assert_eq!((&*reused.data, reused.pts), (&[3; 8][..], Some(3)));
+        q.recycle(reused.data);
+
+        // A smaller payload cannot pin the old eight-byte backing and prevent
+        // the next ten-byte unit from being admitted.
+        q.push(&[4; 2], None).unwrap();
+        assert!(q.spare.is_none());
+        q.push(&[5; 10], None).unwrap();
+        assert_eq!(q.units.iter().map(|u| u.data.len()).sum::<usize>(), 12);
+        let small = q.pop().unwrap();
+        q.recycle(small.data);
+        q.clear();
+        assert!(q.spare.is_none());
+        assert_eq!(q.bytes, 0);
     }
 }

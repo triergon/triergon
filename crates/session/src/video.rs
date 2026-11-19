@@ -103,6 +103,7 @@ impl VideoSession {
     pub fn end_of_stream(&mut self) {
         if self.decoder.is_some() && !self.ended {
             self.ended = true;
+            self.queue.release_spare();
         }
     }
     /// Bounded work: decode until one picture waits ahead of the clock or the
@@ -153,6 +154,8 @@ impl VideoSession {
                     if let Err(error) = decoder.send(&unit.data, unit.pts) {
                         self.failure = Some(error.0);
                         self.queue.clear();
+                    } else if !self.ended {
+                        self.queue.recycle(unit.data);
                     }
                 }
                 None if self.ended && !self.drained => {
