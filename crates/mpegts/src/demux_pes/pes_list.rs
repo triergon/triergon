@@ -10,6 +10,9 @@ use triergon_core::{Budget, BudgetVec, Error, PushError, Result};
 pub(super) struct PesList<T> {
     items: BudgetVec<T>,
     planned: usize,
+    /// The planned capacity of the list last handed out: what a new list
+    /// grew to for that PES.
+    handed_out: usize,
 }
 
 /// Room for a payload run: in the list's own allocation, or in a replacement
@@ -25,6 +28,7 @@ impl<T> PesList<T> {
         Self {
             items: BudgetVec::new(budget),
             planned: 0,
+            handed_out: 0,
         }
     }
     pub(super) fn len(&self) -> usize {
@@ -112,16 +116,19 @@ impl<T> PesList<T> {
     /// The filled list, leaving a new, empty one in its place.
     pub(super) fn take(&mut self) -> BudgetVec<T> {
         let empty = BudgetVec::new(self.items.budget());
-        self.planned = 0;
+        self.handed_out = std::mem::take(&mut self.planned);
         std::mem::replace(&mut self.items, empty)
     }
     /// Adopts `list`'s allocation for the next fill when this list holds
-    /// nothing and `list` is larger and charged to the same pool. The planned
-    /// capacity is unchanged; `list`'s elements are dropped either way.
+    /// nothing and `list` is larger, charged to the same pool and of a size
+    /// comparable to what a new list grew to for the last PES. The planned
+    /// capacity is unchanged;
+    /// `list`'s elements are dropped either way.
     pub(super) fn reuse(&mut self, mut list: BudgetVec<T>) {
         list.clear();
         if self.items.is_empty()
             && list.capacity() > self.items.capacity()
+            && list.fits_reuse_for(self.handed_out)
             && list.budget().same_pool(self.items.budget())
         {
             self.items = list;
@@ -134,10 +141,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_reused_list_plans_growth_as_a_new_one_without_allocating() {
+    fn a_reused_list_of_comparable_size_plans_growth_as_a_new_one_without_allocating() {
         let pool = Budget::new(64 * 1024).unwrap();
         let mut fresh = PesList::new(&pool);
         let mut reused = PesList::new(&pool);
+        // The last PES planned 32 entries: a list of more than twice that is
+        // dropped, one within it adopted.
+        reused.try_reserve_exact(32).unwrap();
+        drop(reused.take());
+        let mut larger = BudgetVec::new(&pool);
+        larger.try_reserve_exact(65).unwrap();
+        reused.reuse(larger);
+        assert_eq!(reused.allocated(), 0);
         let mut previous = BudgetVec::new(&pool);
         previous.try_reserve_exact(32).unwrap();
         previous.try_push(7_u64).unwrap();

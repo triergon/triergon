@@ -462,6 +462,13 @@ impl<T> BudgetVec<T> {
     pub fn capacity(&self) -> usize {
         self.data.capacity()
     }
+    /// Whether this allocation is of a size comparable to an item of `len`
+    /// elements, to hold a reclaimed allocation for: at most twice that, the
+    /// slack amortised doubling already leaves a growing vector. A larger one
+    /// would keep memory the item does not need.
+    pub fn fits_reuse_for(&self, len: usize) -> bool {
+        self.capacity() <= len.saturating_mul(2)
+    }
     pub fn as_slice(&self) -> &[T] {
         &self.data
     }

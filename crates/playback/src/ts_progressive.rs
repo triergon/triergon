@@ -1022,13 +1022,14 @@ mod tests {
     #[test]
     fn reused_storage_keeps_every_output_and_work_boundary() {
         // Like the progressive worker, hold two units per track and hand the
-        // oldest back when a third arrives.
+        // oldest back when a third arrives. Reused storage is at most twice
+        // the item it serves, so the peak may rise by at most one unit.
         fn read(
             wire: &[u8],
             reuse: bool,
             quantum: u64,
             window: usize,
-        ) -> (Vec<(String, u64)>, usize) {
+        ) -> (Vec<(String, u64)>, usize, usize) {
             let pool = Budget::new(8 << 20).unwrap();
             let id = SourceId(37);
             let caps = SourceCapabilities {
@@ -1046,6 +1047,7 @@ mod tests {
             let mut trace = Vec::new();
             let mut held: [VecDeque<TsProgressiveUnit>; 2] = Default::default();
             let mut peak = 0;
+            let mut largest = 0;
             loop {
                 let mut work = WorkBudget::new(quantum);
                 let step = reader.advance(&mut work, &cancel).unwrap();
@@ -1066,6 +1068,9 @@ mod tests {
                 peak = peak.max(pool.used());
                 match step {
                     TsProgressiveStep::Unit(unit) => {
+                        if let TsProgressiveUnit::Video(video) = &unit {
+                            largest = largest.max(video.source_bytes().len());
+                        }
                         let track =
                             &mut held[usize::from(matches!(unit, TsProgressiveUnit::Audio { .. }))];
                         track.push_back(unit);
@@ -1078,7 +1083,7 @@ mod tests {
                     TsProgressiveStep::End => {
                         drop((reader, held));
                         assert_eq!(pool.used(), Budget::control_storage_bytes());
-                        return (trace, peak);
+                        return (trace, peak, largest);
                     }
                     _ => {}
                 }
@@ -1090,12 +1095,13 @@ mod tests {
         ] {
             for quantum in [1, 31, 4096] {
                 for window in [188, 4096] {
-                    let (reused, reused_peak) = read(wire, true, quantum, window);
-                    let (fresh, fresh_peak) = read(wire, false, quantum, window);
+                    let (reused, reused_peak, largest) = read(wire, true, quantum, window);
+                    let (fresh, fresh_peak, _) = read(wire, false, quantum, window);
                     assert_eq!(reused, fresh, "work {quantum}, window {window}");
                     assert!(
-                        reused_peak <= fresh_peak,
-                        "peak {reused_peak} above {fresh_peak}: work {quantum}, window {window}"
+                        reused_peak <= fresh_peak + largest,
+                        "peak {reused_peak} above {fresh_peak} and a {largest}-byte unit: \
+                         work {quantum}, window {window}"
                     );
                 }
             }

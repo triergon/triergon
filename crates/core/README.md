@@ -107,7 +107,9 @@ an allocation back for reuse: `BudgetVecIntoIter::reclaim()` and
 `BudgetVec` that keeps the capacity and is charged for exactly it, so a consumer
 can return a used-up vector or frozen buffer to its producer to fill again
 without allocating. `try_reclaim` fails, returning the bytes intact, while
-another handle shares the allocation.
+another handle shares the allocation. `BudgetVec::fits_reuse_for(len)` states
+the size rule for keeping such an allocation: at most twice the item it serves,
+the slack amortised doubling already allows.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
 packets or views cannot be converted back into it. `used()` and `peak()` report
 requested capacity, not RSS or allocator overhead.

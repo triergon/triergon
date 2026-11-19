@@ -257,6 +257,8 @@ pub struct AvcTsReader {
     nal_data_end: usize,
     unit: Option<Unit>,
     unit_serial: u64,
+    /// Length of the most recently published unit.
+    published_len: usize,
     bytes: BudgetVec<u8>,
     sps: BudgetVec<ParameterSet<AvcRaster>>,
     pps: BudgetVec<ParameterSet<u8>>,
@@ -301,6 +303,7 @@ impl AvcTsReader {
             nal_data_end: 0,
             unit: None,
             unit_serial: 0,
+            published_len: 0,
             bytes: BudgetVec::new(pool),
             sps: BudgetVec::new(pool),
             pps: BudgetVec::new(pool),
@@ -421,13 +424,13 @@ impl AvcTsReader {
         std::mem::take(&mut self.spent)
     }
 
-    /// Takes back a unit the caller has finished with. When no other handle
-    /// shares its storage, that storage is larger than the assembly buffer and
-    /// the buffer holds no more than a start code's lookahead, as it does
-    /// right after a unit is published, the storage becomes the assembly
-    /// buffer. Later units of a similar size are then assembled without
-    /// allocating. Otherwise the unit is dropped. Outputs and work are the
-    /// same either way.
+    /// Takes back a unit the caller has finished with. Its storage becomes the
+    /// assembly buffer when no other handle shares it, it is larger than the
+    /// buffer but at most twice the last published unit
+    /// ([`BudgetVec::fits_reuse_for`]), and the buffer holds no more than a
+    /// start code's lookahead, as it does right after a unit is published.
+    /// Later units of a similar size are then assembled without allocating.
+    /// Otherwise the unit is dropped. Outputs and work are the same either way.
     pub fn reuse_unit(&mut self, unit: AvcTsAccessUnit) {
         let AvcTsAccessUnit { source, .. } = unit;
         if self.bytes.len() > LOOKAHEAD || !source.belongs_to(&self.pool) {
@@ -437,6 +440,7 @@ impl AvcTsReader {
             return;
         };
         if storage.capacity() > self.bytes.capacity()
+            && storage.fits_reuse_for(self.published_len)
             && storage.try_extend_from_slice(self.bytes.as_slice()).is_ok()
         {
             self.bytes = storage;
@@ -805,6 +809,7 @@ impl AvcTsReader {
             }
         };
         self.unit = None;
+        self.published_len = end;
         Ok(AvcTsAccessUnit {
             source,
             sps: sps_feed,

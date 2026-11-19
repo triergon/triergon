@@ -256,7 +256,10 @@ lookahead into the next buffer. A player that is done with a unit may hand it
 back with `TsProgressiveReader::reuse_unit` instead of dropping it. Hand back
 each unit when it would otherwise be dropped, and keep advancing as usual.
 When no other handle shares a video unit's storage and the reader has just
-published, that storage becomes the buffer for the next unit. Handing units
+published, that storage becomes the buffer for the next unit, provided its
+capacity is at most twice the last published unit: the slack amortised growth
+already allows, so reuse never holds much more memory than the units need.
+The transport observer keeps a PES's span and header lists under the same rule. Handing units
 back is optional: dropping them gives the same units, clocks and work counts.
 A unit that is still shared, or that arrives once assembly has moved on, is
 simply dropped. Each advance can process several internal steps
