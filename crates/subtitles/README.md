@@ -146,6 +146,10 @@ there is no detection from content, language or file name.
 | Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
 | FFmpeg/glibc labels | `compat::charset::receiver_charset` and `receiver_charset_with_glibc_euc_kr` map ASS charset labels to the repertoire the reference build accepts |
 
+The three EUC-KR profiles share one two-byte lookup table. All accept ASCII.
+Both receiver profiles additionally map bytes 0x80–0x9F to the C1 controls.
+Only `ReceiverEucKrGlibc239` maps A2 E8 to U+327E.
+
 Mapping tables, sources and licences are listed in
 [MULTIBYTE-CONTRACT.md](src/text/MULTIBYTE-CONTRACT.md). Undefined or unmapped
 bytes are errors; nothing is replaced with U+FFFD.

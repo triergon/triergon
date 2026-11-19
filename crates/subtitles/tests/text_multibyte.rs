@@ -249,6 +249,50 @@ fn all_short_inputs(index: usize) {
     }
 }
 
+/// Single-byte results from the source repertoire, including an unfinished lead at EOF.
+fn euc_kr_single(byte: u8, single_max: u8) -> Result<String, Error> {
+    match byte {
+        b if b <= single_max => Ok(char::from(b).to_string()),
+        0xa1..=0xfe => Err(Error::Truncated),
+        _ => Err(Error::Invalid("unmapped multibyte byte")),
+    }
+}
+
+#[test]
+fn every_euc_kr_profile_reports_exact_scalars_and_refusals() {
+    for (profile, single_max) in [
+        (M::EucKr, 0x7f),
+        (M::ReceiverEucKrC1, 0x9f),
+        (M::ReceiverEucKrGlibc239, 0x9f),
+    ] {
+        let mut pairs = mapping(M::EucKr, include_str!("multibyte-mapping-data/CP949.TXT"));
+        if profile == M::ReceiverEucKrGlibc239 {
+            assert!(pairs.insert(0xa2e8, '\u{327e}').is_none());
+        }
+        for first in 0..=u8::MAX {
+            let prefix = euc_kr_single(first, single_max);
+            assert_eq!(
+                low_level(&[first], profile),
+                prefix,
+                "{profile:?} {first:02x}"
+            );
+            for second in 0..=u8::MAX {
+                let raw = [first, second];
+                let expected = match &prefix {
+                    Ok(a) => euc_kr_single(second, single_max).map(|b| format!("{a}{b}")),
+                    Err(Error::Truncated) if (0xa1..=0xfe).contains(&second) => pairs
+                        .get(&u16::from_be_bytes(raw))
+                        .map(char::to_string)
+                        .ok_or(Error::Invalid("unmapped multibyte pair")),
+                    Err(Error::Truncated) => Err(Error::Invalid("invalid multibyte trail")),
+                    Err(error) => Err(*error),
+                };
+                assert_eq!(low_level(&raw, profile), expected, "{profile:?} {raw:02x?}");
+            }
+        }
+    }
+}
+
 macro_rules! table_tests {
     ($whole:ident,$short:ident,$index:expr) => {
         #[test]
