@@ -2040,8 +2040,6 @@ fn unmeasured_cases(step: &Step) -> Vec<String> {
             vec!["a reused result whose cases no gate run checked; --full measures it".into()]
         };
     }
-    // ISO BMFF writes statuses and hashes separately from its raw observations.
-    // The grade step checks those observations one case at a time.
     let filename = if step
         .command
         .get(1)
@@ -2051,45 +2049,92 @@ fn unmeasured_cases(step: &Step) -> Vec<String> {
     } else {
         "report.json"
     };
-    let path = output.join(filename);
-    match crate::checks::read_json(&path) {
-        Ok(report) => unmeasured_in(&report, key, measured),
-        Err(error) => vec![format!("no report: {error}")],
-    }
+    let check = || {
+        let contents =
+            fs::read_to_string(output.join(filename)).map_err(|e| format!("no report: {e}"))?;
+        let report =
+            crate::json::parse_observations(&contents).map_err(|e| format!("{filename}: {e}"))?;
+        unmeasured_in(step, &report, key, measured)
+    };
+    check().unwrap_or_else(|error| vec![error])
 }
 
-/// The ids of `report`'s cases whose `key` collection has a status other than
-/// `measured`, and the report when it says its collection is incomplete. A case
-/// whose collection is null or absent is not this report's to measure: an ISO BMFF
-/// part leaves the cases of the other parts null.
-fn unmeasured_in(report: &Value, key: &str, measured: &str) -> Vec<String> {
-    let incomplete = report
-        .get("collection_status")
-        .and_then(Value::as_str)
-        .is_some_and(|status| status != "complete");
-    let cases = report
-        .get("cases")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter(|case| {
-            case.get(key)
-                .filter(|collection| matches!(collection, Value::Object(_)))
-                .is_some_and(|collection| {
-                    collection.get("status").and_then(Value::as_str) != Some(measured)
-                })
-        })
-        .map(|case| {
-            case.get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("case")
-                .to_owned()
-        });
-    let mut unmeasured: Vec<String> = cases.collect();
-    if incomplete {
-        unmeasured.insert(0, "the report's collection is incomplete".into());
+/// Only ISO BMFF assigns a subset of a corpus's measurements. Resolve it from
+/// the scheduled command, including the aliases of each physical index operation.
+fn collection_selection(
+    step: &Step,
+    command: &str,
+    report: &Value,
+    rows: usize,
+) -> R<Option<Vec<usize>>> {
+    let feature = match command {
+        "isobmff-bench" => "isobmff-open-index",
+        "isobmff-seek" => "isobmff-seek",
+        _ => return Ok(None),
+    };
+    let part = flag_value(step, "--part")
+        .map(|p| parse_part(&p.to_string_lossy()))
+        .transpose()?;
+    let root = crate::root();
+    let selected = if command == "isobmff-seek" {
+        crate::isobmff_seek::measurement_selection(&root, part)?
+    } else {
+        crate::isobmff_bench::full_part_selection(&root, part.unwrap_or((0, 1)))?
+    };
+    let indices = Value::Array(selected.iter().map(|&i| Value::int(i as i128)).collect());
+    if report.get("contract_id").and_then(Value::as_str) != Some(feature)
+        || report.get("part") != Some(&crate::isobmff_bench::part_value(part))
+        || report.get("selection") != Some(&indices)
+        || selected.last().is_none_or(|&i| i >= rows)
+    {
+        return Err("ISO BMFF collection differs from the scheduled measurement selection".into());
     }
-    unmeasured
+    Ok(Some(selected))
+}
+
+/// Called after a successful runner exit. The corpus runner has already checked
+/// target-specific open and unpinned parity against its contract. Those rows can
+/// lack measurements. Any recorded measurement must have the requested status.
+fn unmeasured_in(step: &Step, report: &Value, key: &str, measured: &str) -> R<Vec<String>> {
+    let rows = crate::harness::grade::report_rows(report)?;
+    let command = step
+        .command
+        .get(1)
+        .map(String::as_str)
+        .ok_or("missing measured command")?;
+    let external = command == "external-vector";
+    if external != report.get("case").is_some() {
+        return Err(format!("wrong report shape for {command}"));
+    }
+    let selection = collection_selection(step, command, report, rows.len())?;
+    let mut missing = Vec::new();
+    for (index, row) in rows.iter().enumerate() {
+        let id = row
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| format!("missing case id at index {index}"))?;
+        let parity = row
+            .get("parity")
+            .and_then(|p| p.get("status"))
+            .and_then(Value::as_str);
+        let parity_only = if let Some(selection) = &selection {
+            selection.binary_search(&index).is_err() && parity == Some("pass")
+        } else {
+            !external && matches!(parity, Some("unpinned" | "mismatch"))
+        };
+        let collected = match row.get(key) {
+            None | Some(Value::Null) => parity_only,
+            Some(value) => {
+                parity == Some("pass")
+                    && value.get("status").and_then(Value::as_str) == Some(measured)
+            }
+        };
+        if !collected {
+            missing.push(id.to_owned());
+        }
+    }
+    Ok(missing)
 }
 
 fn git(root: &Path, args: &[&str]) -> R<String> {
@@ -3055,61 +3100,212 @@ done
         assert!(problems[0].starts_with(&format!("{listed}: pinned as")));
     }
 
-    #[test]
-    fn a_measurement_with_an_unmeasured_case_names_it() {
-        let report = crate::json::parse(
-            r#"{"cases": [
-                {"id": "a", "timing": {"status": "measured"}, "memory": {"status": "qualified"}},
-                {"id": "b", "timing": {"status": "warmup-failed"}, "memory": {"status": "invalid-memory-work"}},
-                {"id": "c", "timing": null}
-            ]}"#,
-        )
-        .unwrap();
-        assert_eq!(unmeasured_in(&report, "timing", "measured"), vec!["b"]);
-        assert_eq!(unmeasured_in(&report, "memory", "qualified"), vec!["b"]);
-        let all =
-            crate::json::parse(r#"{"cases": [{"id": "a", "timing": {"status": "measured"}}]}"#)
-                .unwrap();
-        assert!(unmeasured_in(&all, "timing", "measured").is_empty());
-        let partial = crate::json::parse(
-            r#"{"collection_status": "partial", "cases": [{"id": "a", "timing": {"status": "measured"}}]}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            unmeasured_in(&partial, "timing", "measured"),
-            vec!["the report's collection is incomplete"]
-        );
-        // A step with nothing to read fails; a self-checking command checks itself.
-        let mut timed = step(
-            "benchmark-x",
+    fn timed_step(args: &[&str]) -> Step {
+        step(
+            "benchmark-test",
             Stage::Timing,
             Placement::Timed,
-            xtask(&["report"]),
-        );
-        assert_eq!(unmeasured_cases(&timed), vec!["the step names no --output"]);
-        timed.command = xtask(&["report", "--output", "/nonexistent-gate-output"]);
-        assert!(unmeasured_cases(&timed)[0].starts_with("no report: "));
-        timed.command = xtask(&["codecs", "time", "--out", "/nonexistent-gate-output"]);
-        assert!(unmeasured_cases(&timed).is_empty());
+            xtask(args),
+        )
+    }
+
+    fn parsed(raw: &str) -> Value {
+        crate::json::parse_observations(raw).unwrap()
+    }
+
+    fn external_receipt() -> Value {
+        parsed(
+            r#"{"case":{"id":"mkv/hdr10tags-both.mkv","parity":{"status":"pass"},
+            "timing":{"status":"measured"},"memory":{"status":"qualified"}}}"#,
+        )
     }
 
     #[test]
-    fn isobmff_step_checks_the_compact_collection() {
-        let output = crate::walk::scratch("gate-isobmff-completion");
-        fs::create_dir_all(&output).unwrap();
-        fs::write(output.join("report.json"), b"{").unwrap();
-        fs::write(
-            output.join("collection.json"),
-            br#"{"collection_status":"complete","cases":[{"id":"a","timing":{"status":"measured"}}]}"#,
-        )
-        .unwrap();
-        let timed = step(
-            "benchmark-isobmff",
-            Stage::Timing,
-            Placement::Timed,
-            xtask(&["isobmff-bench", "--output", output.to_str().unwrap()]),
+    fn collection_checks_single_external_vectors_and_rejects_missing_measurements() {
+        let step = timed_step(&["external-vector"]);
+        let good = external_receipt();
+        for (key, status) in [("timing", "measured"), ("memory", "qualified")] {
+            let check = |report: &Value| unmeasured_in(&step, report, key, status);
+            assert!(check(&good).unwrap().is_empty());
+            for bad in [
+                None,
+                Some("null"),
+                Some("false"),
+                Some("[]"),
+                Some("{}"),
+                Some(r#"{"status":"rejected"}"#),
+            ] {
+                let mut row = parsed(r#"{"id":"external","parity":{"status":"pass"}}"#);
+                if let Some(raw) = bad {
+                    crate::isobmff_bench::field(&mut row, key, parsed(raw));
+                }
+                assert_eq!(
+                    check(&Value::object([("case", row)])).unwrap(),
+                    ["external"]
+                );
+            }
+            for bad in [
+                "{}",
+                r#"{"cases":[]}"#,
+                r#"{"case":[]}"#,
+                r#"{"case":{},"cases":[]}"#,
+                r#"{"case":{"id":"","timing":{"status":"measured"}}}"#,
+                r#"{"cases":[{}],"collection_status":"complete"}"#,
+                r#"{"case":{},"collection_status":"partial"}"#,
+            ] {
+                assert!(check(&parsed(bad)).is_err(), "{bad}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_measurement_with_an_unmeasured_case_names_it() {
+        let report = parsed(
+            r#"{"collection_status":"complete","cases":[
+            {"id":"a","parity":{"status":"pass"},"timing":{"status":"measured"},"memory":{"status":"qualified"}},
+            {"id":"b","parity":{"status":"pass"},"timing":{"status":"warmup-failed"},"memory":{"status":"invalid-memory-work"}},
+            {"id":"c","parity":{"status":"pass"},"timing":null},
+            {"id":"open","parity":{"status":"mismatch"}},
+            {"id":"unpinned","parity":{"status":"unpinned"},"timing":null},
+            {"id":"bad","parity":{"status":"unpinned"},"timing":false,"memory":{}}
+        ]}"#,
         );
-        assert!(unmeasured_cases(&timed).is_empty());
+        for command in ["report", "framing", "progressive"] {
+            let step = timed_step(&[command]);
+            for (key, status) in [("timing", "measured"), ("memory", "qualified")] {
+                assert_eq!(
+                    unmeasured_in(&step, &report, key, status).unwrap(),
+                    ["b", "c", "bad"]
+                );
+            }
+            // A corpus cannot claim ISO BMFF selection exemptions via its header.
+            let mut wrong = report.clone();
+            crate::isobmff_bench::field(&mut wrong, "contract_id", Value::str("isobmff-seek"));
+            crate::isobmff_bench::field(&mut wrong, "selection", parsed("[0]"));
+            assert_eq!(
+                unmeasured_in(&step, &wrong, "timing", "measured").unwrap(),
+                ["b", "c", "bad"]
+            );
+            for bad in [
+                r#"{"cases":[],"collection_status":"complete"}"#,
+                r#"{"cases":[{}]}"#,
+                r#"{"cases":[{}],"collection_status":"partial"}"#,
+            ] {
+                assert!(unmeasured_in(&step, &parsed(bad), "timing", "measured").is_err());
+            }
+            assert!(unmeasured_in(&step, &external_receipt(), "timing", "measured").is_err());
+        }
+        assert_eq!(
+            unmeasured_cases(&timed_step(&["report"])),
+            ["the step names no --output"]
+        );
+        assert!(
+            unmeasured_cases(&timed_step(&[
+                "report",
+                "--output",
+                "/nonexistent-gate-output"
+            ]))[0]
+                .starts_with("no report: ")
+        );
+        for cmd in ["codecs", "capture"] {
+            assert!(
+                unmeasured_cases(&timed_step(&[cmd, "--out", "/nonexistent-gate-output"]))
+                    .is_empty()
+            );
+        }
+    }
+
+    #[test]
+    fn isobmff_step_checks_the_registered_partial_collection() {
+        use crate::isobmff_bench::{field, full_part_selection};
+        let root = crate::root();
+        let output = crate::walk::scratch("gate-isobmff-completion");
+        let shard = full_part_selection(&root, (1, 3)).unwrap();
+        let seek = crate::isobmff_seek::measurement_selection(&root, None).unwrap();
+        for (cmd, feature, part, selected, filename) in [
+            (
+                "isobmff-bench",
+                "isobmff-open-index",
+                Some("2/3"),
+                shard,
+                "collection.json",
+            ),
+            ("isobmff-seek", "isobmff-seek", None, seek, "report.json"),
+        ] {
+            let mut step = timed_step(&[cmd, "--output", output.to_str().unwrap()]);
+            if let Some(part) = part {
+                step.command.extend(owned(&["--part", part]));
+            }
+            let contract = crate::checks::read_json(
+                &root
+                    .join("harness/features")
+                    .join(feature)
+                    .join("contract.json"),
+            )
+            .unwrap();
+            let profiles = contract
+                .get("required_profiles")
+                .unwrap()
+                .as_array()
+                .unwrap();
+            assert!(selected.len() < profiles.len());
+            let mut rows: Vec<_> = profiles
+                .iter()
+                .enumerate()
+                .map(|(i, id)| {
+                    let mut row = Value::object([
+                        ("id", id.clone()),
+                        ("parity", parsed(r#"{"status":"pass"}"#)),
+                    ]);
+                    if selected.binary_search(&i).is_ok() {
+                        field(&mut row, "timing", parsed(r#"{"status":"measured"}"#));
+                    }
+                    row
+                })
+                .collect();
+            let indices =
+                |set: &[usize]| Value::Array(set.iter().map(|&i| Value::int(i as i128)).collect());
+            let mut report = Value::object([
+                ("cases", Value::Array(rows.clone())),
+                ("collection_status", Value::str("complete")),
+                ("contract_id", Value::str(feature)),
+                ("part", part.map_or(Value::Null, Value::str)),
+                ("selection", indices(&selected)),
+            ]);
+            crate::corpus::write_json(&output.join(filename), &report).unwrap();
+            assert!(unmeasured_cases(&step).is_empty(), "{cmd}");
+            let check = |r: &Value| unmeasured_in(&step, r, "timing", "measured");
+            for (k, v) in [
+                ("part", Value::str("1/3")),
+                ("selection", indices(&selected[1..])),
+                ("selection", parsed("[0,0]")),
+                ("contract_id", Value::str("other")),
+            ] {
+                let mut wrong = report.clone();
+                field(&mut wrong, k, v);
+                assert!(check(&wrong).is_err(), "{cmd} {k}");
+            }
+            let i = selected[0];
+            field(&mut rows[i], "timing", Value::Null);
+            let other = (0..rows.len())
+                .find(|i| selected.binary_search(i).is_err())
+                .unwrap();
+            field(
+                &mut rows[other],
+                "timing",
+                parsed(r#"{"status":"rejected"}"#),
+            );
+            field(&mut report, "cases", Value::Array(rows));
+            let failed = check(&report).unwrap();
+            assert_eq!(failed.len(), 2);
+            for index in [i, other] {
+                assert!(
+                    failed
+                        .iter()
+                        .any(|id| Some(id.as_str()) == profiles[index].as_str())
+                );
+            }
+        }
         fs::remove_dir_all(output).unwrap();
     }
 
@@ -3118,29 +3314,44 @@ done
         use crate::harness::reuse;
         let root = crate::walk::scratch("gate-reused-check");
         let output = root.join("benchmark/f");
-        let timed = step(
-            "benchmark-f",
-            Stage::Timing,
-            Placement::Timed,
-            xtask(&["report", "--output", output.to_str().unwrap()]),
-        );
+        let timed = timed_step(&["external-vector", "--output", output.to_str().unwrap()]);
         let key = reuse::Key {
             sha256: "k".repeat(64),
-            components: Value::object([("command", Value::str("report --benchmark"))]),
+            components: Value::object([("command", Value::str("external-vector --benchmark"))]),
         };
-        // A measured result with an unmeasured case: the gate's verdict goes into it.
+        let mut row = external_receipt().get("case").unwrap().clone();
+        let id = row.get("id").unwrap().as_str().unwrap().to_owned();
+        crate::isobmff_bench::field(&mut row, "timing", parsed(r#"{"status":"warmup-failed"}"#));
+        crate::corpus::write_json(&output.join("report.json"), &Value::object([("case", row)]))
+            .unwrap();
         reuse::record(&output, &key, 0, None).unwrap();
-        crate::corpus::write_json(
-            &output.join("report.json"),
-            &crate::json::parse(
-                r#"{"cases": [{"id": "a", "timing": {"status": "warmup-failed"}}]}"#,
+        assert_eq!(checked_result(&timed), Some(output.clone()));
+        assert_eq!(unmeasured_cases(&timed), [id]);
+        let item = Item {
+            name: "external-vector".into(),
+            steps: vec![],
+            weight: 1,
+            preflight: vec![],
+        };
+        let ran = Ran {
+            name: timed.name.clone(),
+            started: "test".into(),
+            seconds: 0.0,
+            code: 0,
+        };
+        assert_eq!(
+            record_step(
+                &root,
+                &root.join("run.log"),
+                &item,
+                &timed,
+                Some("1"),
+                &ran,
+                0
             )
             .unwrap(),
-        )
-        .unwrap();
-        assert_eq!(checked_result(&timed), Some(output.clone()));
-        assert_eq!(unmeasured_cases(&timed), vec!["a"]);
-        reuse::checked(&output, 1).unwrap();
+            1
+        );
         let result = reuse::read(&output).unwrap();
         assert_eq!(result.get("status"), Some(&Value::int(1)));
         assert_eq!(result.get("cases_checked"), Some(&Value::Bool(true)));

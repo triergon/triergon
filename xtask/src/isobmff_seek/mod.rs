@@ -345,6 +345,11 @@ impl Suite {
     }
 }
 
+/// The registered seek outputs assigned to a gate collection.
+pub(crate) fn measurement_selection(root: &Path, part: Option<(usize, usize)>) -> R<Vec<usize>> {
+    Ok(Suite::load(root)?.timed(part))
+}
+
 /// The suite's harness inputs, bound to the ISO BMFF worker's build.
 pub fn source_inputs(root: &Path) -> R<Vec<String>> {
     let suite = Suite::load(root)?;
