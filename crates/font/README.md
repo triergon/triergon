@@ -159,7 +159,8 @@ than one operand, whose mask bytes then run as charstring, and a mask over more
 than 96 stems fails the glyph, all as in FreeType), local and global subroutines (16 nested
 calls, FreeType's limit; TN 5177 states 10), arithmetic, storage and `random` operators (CFF only, as in
 FreeType), and `seac` accents through StandardEncoding and the charset, the
-accent drawn first. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
+accent drawn first. `standard_encoding_sid` maps a StandardEncoding byte to
+its CFF string ID, including SID 0 for unassigned codes. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
 ExpertSubset, which must cover the glyphs) and a name-keyed face's encoding are
 read when the face is parsed, as FreeType reads them; one it cannot read makes
 the face `Error::Invalid`. Charstrings are evaluated in 16.16 fixed

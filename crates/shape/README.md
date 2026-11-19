@@ -69,7 +69,8 @@ glyph has no extents when its charstring fails: more than ten nested
 subroutine calls, a moveto or flex with the wrong operands, a CFF charstring
 without `endchar` or a subroutine without `return`, more than 513 operands,
 its 200,000th operation, or an accented `endchar` naming a glyph the charset
-lacks. CFF2 `blend` keeps the default values. `Scale` reproduces HarfBuzz's scaling arithmetic,
+lacks. Accented components use `triergon_font::standard_encoding_sid`.
+The shaping reader bounds each CFF INDEX object by its final offset. CFF2 `blend` keeps the default values. `Scale` reproduces HarfBuzz's scaling arithmetic,
 including hinting device tables when a ppem is set.
 
 The bidi API mirrors libass's `ass_shaper_shape` and `ass_shaper_reorder`:
