@@ -1,0 +1,28 @@
+{
+ "name": "gate-run-armv7-c30b9c80-20261118-221127-shard-1",
+ "path": "gate-run-armv7-c30b9c80-20261118-221127-shard-1",
+ "retention": "retained",
+ "reason": "Capture parity, runtime and kernel-bound memory at c30b9c80 on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/c30b9c80f4828eb1409e1a59bce0fe6d49668ffa-armv7-20261118-221127/shard-1/286619af9978dcecfa24f9d3a60de275b90eed9a172b962e682f82cd67fc50de.tar.zst",
+ "sha256": "286619af9978dcecfa24f9d3a60de275b90eed9a172b962e682f82cd67fc50de",
+ "bytes": 360937859,
+ "results": [
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "028b124903fedc22b979d9581ec26ee620e329e01b2eb705134952040500ac9a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "3b106260fe2ef5c07b5b19d6e89c8ff03d8a4a80274f5b98320cd971a9aed8ba",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "c30b9c80f4828eb1409e1a59bce0fe6d49668ffa"
+ ]
+}
