@@ -104,6 +104,9 @@ on ARMv7 and 51 of 53 on Linux AArch64, with the same open subtitle cases.
 The two subtitle workers change and every other candidate and reference hash matches
 `2fc2ebb8`.
 
+The Opus CELT profile includes `5bacc138` with the CELT changes applied. That build's
+codec worker matches the hash of the Linux AArch64 gate build at `2fc2ebb8`.
+
 At `5bacc138`, all 418 Matroska and playback cases pass on each c6g.4xlarge
 target, including 252 compatibility and 252 normal playback seek probes per target.
 The largest runtime upper bounds are 1.0404 on Linux AArch64 and 0.9935 on 32-bit ARMv7.
@@ -1275,7 +1278,7 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 | Linked worker gates with the PGS changes, 32-bit ARMv7, shard 2 of 4 | `47ffada46db5406b434e37ff4e5ab01a031365a9` | [`47a1d2641925a0901435e48bc512143a2a8e525d0b27f0915bedf00d4f55d438`](../harness/evidence/sets/gate-run-armv7-47ffada4-20261119-171532-shard-2.json) |
 | Linked worker gates with the PGS changes, 32-bit ARMv7, shard 3 of 4 | `47ffada46db5406b434e37ff4e5ab01a031365a9` | [`0bbae8d22096cba9b07e5632342590114b5477e9402337cce51cd663eca29dbb`](../harness/evidence/sets/gate-run-armv7-47ffada4-20261119-171532-shard-3.json) |
 | Linked worker gates with the PGS changes, 32-bit ARMv7, shard 4 of 4 | `47ffada46db5406b434e37ff4e5ab01a031365a9` | [`6f380a46f3a2461d4a6a0c17c3b39b6f82745a7e68df1f494a19d05cdb4103be`](../harness/evidence/sets/gate-run-armv7-47ffada4-20261119-171532-shard-4.json) |
-| Opus CELT counts, PCM comparisons and profiles on Linux AArch64 | `2fc2ebb8b30ba97544c9a07a4111fecaa0695c13` | [`1b1e2a6965261ad3310ef4101a0e57a1a913d6bf771c2f533b3005bbf8fcc73e`](../harness/evidence/sets/opus-celt-profile.json) |
+| Opus CELT counts, PCM comparisons and profiles on Linux AArch64 | `31d2994522f116b4404916cb51f82b03a29c158f`, `5bacc1387b475e35a7babb98664cba227db69fe4`, `19ad7c0cb92dcd8f20cf2bb2e459dd785ba3fa2f` | [`1b1e2a6965261ad3310ef4101a0e57a1a913d6bf771c2f533b3005bbf8fcc73e`](../harness/evidence/sets/opus-celt-profile.json) |
 | Matroska, playback and linked workers, Linux AArch64, shard 1 of 6 | `5bacc1387b475e35a7babb98664cba227db69fe4` | [`32a4dc5580031b94a510d9103a5e9475458126e87369dbf922275f2c2f92a4d9`](../harness/evidence/sets/gate-run-aarch64-5bacc138-20261119-095551-shard-1.json) |
 | Matroska, playback and linked workers, Linux AArch64, shard 2 of 6 | `5bacc1387b475e35a7babb98664cba227db69fe4` | [`d30c4a0c1d0b6ed02caf9c1bbacb5a2e63d8c6476911c81ea3a1db60436f5897`](../harness/evidence/sets/gate-run-aarch64-5bacc138-20261119-095551-shard-2.json) |
 | Matroska, playback and linked workers, Linux AArch64, shard 3 of 6 | `5bacc1387b475e35a7babb98664cba227db69fe4` | [`e6053f887a03a8c1703c30fdbedbcfbf1f4207687c269ea93b30b05fca13ec81`](../harness/evidence/sets/gate-run-aarch64-5bacc138-20261119-095551-shard-3.json) |
