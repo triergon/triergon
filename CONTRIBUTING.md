@@ -97,7 +97,10 @@ benchmarks assume it.
 
 Register comparisons in `harness/features/<id>/contract.json`. The contract
 selects the candidate, reference and operation. Set its `gate` to `required`
-to include the comparison in `cargo xtask check`. Worker identities bind the
+to include the comparison in `cargo xtask check`. Set `runner` to
+`cargo xtask report` for a gate item using the standard report command. Its
+`corpus_directory` supplies the input directory when the manifest omits it.
+Worker identities bind the
 registered contracts and their corpus inputs. Generated manifests record and
 verify their pins against the reference named in the contract. A generated
 feature can set `pin_note` to describe those pins. Required comparisons check

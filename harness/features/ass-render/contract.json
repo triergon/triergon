@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "ass-render",
+  "runner": "cargo xtask report",
   "operation": "ass-render",
   "candidate": "ass-worker",
   "worker_operation": "ass-render-",

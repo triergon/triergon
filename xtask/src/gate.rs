@@ -113,56 +113,42 @@ pub struct Item {
     preflight: Vec<String>,
 }
 
-/// The features the gate measures through `report`, with their corpus
-/// directory and planning weight: the minutes their timing, memory and grade took
-/// with early stop on a c6g.4xlarge, the more of 32-bit ARMv7 and Linux AArch64.
-const FEATURES: [(&str, Option<&str>, u32); 27] = [
-    ("mp4-forward", None, 2),
-    ("mp4-range", None, 4),
-    ("mpegts-access-units", None, 6),
-    ("subtitle-pgs-capsules", None, 9),
-    ("ts-program", None, 2),
-    ("matroska-audio-clocks", None, 1),
-    ("matroska-legacy-aac", None, 1),
-    ("raw-annex-b", None, 1),
-    ("mpegts-pes", None, 3),
-    ("hls-segments", Some("harness/fixtures/hls"), 5),
-    (
-        "matroska-startup-seek",
-        Some(".research/startup-seek-fixtures"),
-        3,
-    ),
-    ("matroska-colour", Some(".research/colour-fixtures"), 3),
-    ("matroska-cues-preroll", Some(".research/seek-fixtures"), 1),
-    ("matroska-demux", Some(".research/fixtures"), 1),
-    (
-        "matroska-header-removal",
-        Some(".research/header-fixtures"),
-        1,
-    ),
-    (
-        "matroska-segment-metadata",
-        Some(".research/catalogue-fixtures"),
-        5,
-    ),
-    ("matroska-zlib", Some(".research/zlib-fixtures"), 1),
-    ("ass-render", Some(""), 22),
-    ("ass-render-host", Some(""), 1),
-    ("subtitle-text", Some(""), 16),
-    ("subtitle-text-host", Some(""), 2),
-    ("subtitle-pgs", Some(SUBTITLE_CORPUS), 18),
-    ("subtitle-dvb", Some(SUBTITLE_CORPUS), 13),
-    ("subtitle-dvd", Some(SUBTITLE_CORPUS), 9),
-    ("subtitle-dvd-host", Some(SUBTITLE_CORPUS), 1),
-    ("subtitle-cc", Some(SUBTITLE_CORPUS), 10),
-    ("subtitle-teletext", Some(SUBTITLE_CORPUS), 5),
+/// Relative scheduling costs for report features, in historical plan order.
+/// A newly registered report has a weight of one until it has a measured cost.
+const REPORT_WEIGHTS: &[(&str, u32)] = &[
+    ("mp4-forward", 2),
+    ("mp4-range", 4),
+    ("mpegts-access-units", 6),
+    ("subtitle-pgs-capsules", 9),
+    ("ts-program", 2),
+    ("matroska-audio-clocks", 1),
+    ("matroska-legacy-aac", 1),
+    ("raw-annex-b", 1),
+    ("mpegts-pes", 3),
+    ("hls-segments", 5),
+    ("matroska-startup-seek", 3),
+    ("matroska-colour", 3),
+    ("matroska-cues-preroll", 1),
+    ("matroska-demux", 1),
+    ("matroska-header-removal", 1),
+    ("matroska-segment-metadata", 5),
+    ("matroska-zlib", 1),
+    ("ass-render", 22),
+    ("ass-render-host", 1),
+    ("subtitle-text", 16),
+    ("subtitle-text-host", 2),
+    ("subtitle-pgs", 18),
+    ("subtitle-dvb", 13),
+    ("subtitle-dvd", 9),
+    ("subtitle-dvd-host", 1),
+    ("subtitle-cc", 10),
+    ("subtitle-teletext", 5),
 ];
-const SUBTITLE_CORPUS: &str = ".research/subtitle-corpus";
 
 /// How the gate covers every other registered feature (`harness/features/ID`):
 /// through the command that measures or compares it, or why it is not gated.
 /// `gate plan` and `gate summary` fail on a registered feature that is neither here
-/// nor in [`FEATURES`].
+/// nor registered with the report runner.
 const COVERED: [(&str, Coverage); 26] = [
     (
         "isobmff-open-index",
@@ -207,7 +193,7 @@ const COVERED: [(&str, Coverage); 26] = [
     ),
 ];
 
-/// How a registered feature that [`FEATURES`] does not measure is covered.
+/// How a registered feature with a specialized runner or exclusion is covered.
 #[derive(Clone, Copy, Debug)]
 enum Coverage {
     /// By the gate step that runs this command.
@@ -216,41 +202,68 @@ enum Coverage {
     Excluded(&'static str),
 }
 
-/// Registered features with neither a plan nor a stated exclusion, and listed
-/// features that are not registered.
-fn coverage_problems(root: &Path) -> R<Vec<String>> {
-    let directory = root.join("harness/features");
-    let mut registered: Vec<String> = fs::read_dir(&directory)
-        .map_err(|e| format!("{}: {e}", directory.display()))?
-        .flatten()
-        .filter(|entry| entry.path().join("contract.json").is_file())
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
-        .collect();
-    registered.sort();
-    let listed: Vec<&str> = FEATURES
-        .iter()
-        .map(|(id, _, _)| *id)
-        .chain(COVERED.iter().map(|(id, _)| *id))
-        .collect();
-    let mut problems: Vec<String> = registered
-        .iter()
-        .filter(|id| !listed.contains(&id.as_str()))
-        .map(|id| format!("{id}: registered, but neither planned nor excluded"))
-        .collect();
-    problems.extend(
-        listed
-            .iter()
-            .filter(|id| !registered.iter().any(|r| r == *id))
-            .map(|id| format!("{id}: planned, but not registered")),
-    );
-    for (i, id) in listed.iter().enumerate() {
-        if listed[..i].contains(id) {
-            problems.push(format!("{id}: listed twice"));
-        }
-    }
-    Ok(problems)
+/// Settings the generic report runner reads from one feature contract.
+struct ReportFeature {
+    id: String,
+    corpus: Option<String>,
+    manifest_directory: Option<&'static str>,
+    weight: u32,
 }
-/// Each capture case's planning weight, as [`FEATURES`] gives the features'; a case
+
+/// Use only registered runners. Scheduling an unknown contract as a generic
+/// report could skip the controls a dedicated runner needs.
+fn report_features(root: &Path) -> R<Vec<ReportFeature>> {
+    report_contracts(crate::harness::features::discover(root)?)
+}
+
+fn report_contracts(contracts: Vec<crate::harness::features::Contract>) -> R<Vec<ReportFeature>> {
+    let mut special: BTreeSet<_> = COVERED.iter().map(|(id, _)| *id).collect();
+    let mut reports = Vec::new();
+    for contract in contracts {
+        let specialized = special.remove(contract.id.as_str());
+        if contract.document.get("runner").and_then(Value::as_str) != Some("cargo xtask report") {
+            if specialized {
+                continue;
+            }
+            return Err(format!("{}: no gate runner or exclusion", contract.id));
+        }
+        if specialized {
+            return Err(format!("{}: scheduled twice", contract.id));
+        }
+        let corpus = contract
+            .document
+            .get("corpus_directory")
+            .map(|v| {
+                v.as_str()
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("{}: invalid corpus_directory", contract.id))
+            })
+            .transpose()?;
+        let manifest_directory = crate::generators::for_contract(&contract.document)
+            .filter(|_| contract.generated())
+            .map(|g| g.manifest_directory);
+        let position = REPORT_WEIGHTS.iter().position(|(id, _)| *id == contract.id);
+        let weight = position.map_or(1, |index| REPORT_WEIGHTS[index].1);
+        reports.push((
+            position.unwrap_or(usize::MAX),
+            ReportFeature {
+                id: contract.id,
+                corpus,
+                manifest_directory,
+                weight,
+            },
+        ));
+    }
+    if !special.is_empty() {
+        return Err(format!(
+            "gate runner has no registered feature: {special:?}"
+        ));
+    }
+    reports.sort_by_key(|(order, _)| *order);
+    Ok(reports.into_iter().map(|(_, report)| report).collect())
+}
+/// Each capture case's planning weight, as [`REPORT_WEIGHTS`] gives the features'; a case
 /// not listed weighs [`CAPTURE_WEIGHT`].
 const CAPTURE_WEIGHTS: [(&str, u32); 15] = [
     ("c01-ui-static-960", 10),
@@ -321,14 +334,6 @@ fn step(name: impl Into<String>, stage: Stage, placement: Placement, command: Ve
     }
 }
 
-fn manifest(feature: &str) -> String {
-    if feature.starts_with("ass-") {
-        format!(".research/ass/manifests/{feature}/corpus.json")
-    } else {
-        format!("harness/features/{feature}/corpus.json")
-    }
-}
-
 /// A gate collection: timing on CPU 1, then memory under the kernel bound.
 fn collections(name: &str, timing: Vec<String>, memory: Vec<String>) -> [Step; 2] {
     let mut memory = step(
@@ -376,7 +381,14 @@ fn grade(name: &str, contract: &str, manifest: &str, out: &str, full: bool) -> S
 /// Every item of the gate, writing under `out`, with `full` passed to the
 /// commands that reuse a kept result. `target` is the gate target, `release`
 /// the workers' directory and `capture` the capture case ids.
-fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String]) -> Vec<Item> {
+fn items(
+    reports: &[ReportFeature],
+    out: &str,
+    full: bool,
+    target: &str,
+    release: &str,
+    capture: &[String],
+) -> Vec<Item> {
     let pairs = crate::harness::timing::GATE_PAIRS.to_string();
     let with_full = |mut args: Vec<String>| {
         if full {
@@ -385,8 +397,13 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         args
     };
     let mut items = Vec::new();
-    for (feature, corpus, weight) in FEATURES {
-        let manifest = manifest(feature);
+    for report_feature in reports {
+        let feature = report_feature.id.as_str();
+        let corpus = report_feature.corpus.as_deref();
+        let manifest_directory = report_feature
+            .manifest_directory
+            .unwrap_or("harness/features");
+        let manifest = format!("{manifest_directory}/{feature}/corpus.json");
         let report = |mode: &str| {
             let mut args = xtask(&[
                 "report",
@@ -395,7 +412,7 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
                 "--manifest",
                 &manifest,
             ]);
-            if let Some(corpus) = corpus.filter(|c| !c.is_empty()) {
+            if let Some(corpus) = corpus {
                 args.extend(owned(&["--corpus", corpus]));
             }
             args.extend(owned(&[
@@ -411,17 +428,15 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
             collections(feature, report("benchmark"), report("memory")).into();
         steps.push(grade(feature, feature, &manifest, out, full));
         let mut preflight = owned(&["--feature", feature]);
-        match corpus {
-            None => {}
-            Some("") => {}
-            Some(corpus) => preflight.extend(owned(&["--corpus", &format!("{feature}={corpus}")])),
+        if let Some(corpus) = corpus {
+            preflight.extend(owned(&["--corpus", &format!("{feature}={corpus}")]));
         }
-        if feature.starts_with("ass-") {
+        if report_feature.manifest_directory.is_some() {
             preflight.extend(owned(&["--manifest", &format!("{feature}={manifest}")]));
         }
         items.push(Item {
             name: feature.to_owned(),
-            weight,
+            weight: report_feature.weight,
             steps,
             preflight,
         });
@@ -1108,7 +1123,14 @@ fn shard_items(
     let target = crate::harness::report::gate_target()?;
     let release = crate::harness::gate_build::release_dir()?;
     let all = select(
-        items(out, full, &target, &release, &capture_cases(root)?),
+        items(
+            &report_features(root)?,
+            out,
+            full,
+            &target,
+            &release,
+            &capture_cases(root)?,
+        ),
         selection,
     )?;
     Ok(shards(all, count).swap_remove(index))
@@ -1341,6 +1363,7 @@ fn kept_files(root: &Path) -> R<BTreeMap<String, String>> {
 fn check(root: &Path, count: usize, target: &str, selection: Option<&[String]>) -> R<i32> {
     let all = select(
         items(
+            &report_features(root)?,
             "OUT",
             false,
             target,
@@ -1426,8 +1449,9 @@ fn gate_inputs(root: &Path, prepared: bool) -> R<(BTreeMap<String, String>, usiz
     }
     let capture = capture_cases(root)?;
     let mut unknown = BTreeSet::new();
+    let reports = report_features(root)?;
     for target in TARGETS {
-        for item in items("OUT", false, target, "target/release", &capture) {
+        for item in items(&reports, "OUT", false, target, "target/release", &capture) {
             let inputs = crate::harness::preflight::inputs(root, &item.preflight, &|path| {
                 tree.manifest(path)
             })?;
@@ -1463,6 +1487,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
             let target = options.target.as_deref().unwrap_or("TARGET");
             let all = select(
                 items(
+                    &report_features(root)?,
                     "OUT",
                     false,
                     target,
@@ -1487,11 +1512,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                     Coverage::Excluded(reason) => println!("{id}: not gated, {reason}"),
                 }
             }
-            let problems = coverage_problems(root)?;
-            for problem in &problems {
-                println!("FAIL {problem}");
-            }
-            Ok(i32::from(!problems.is_empty()))
+            Ok(0)
         }
         "check" => check(
             root,
@@ -2251,7 +2272,7 @@ fn only_open_cases(record: &Value) -> bool {
 /// Joins the shards' outputs into one result at `file`; 0 when every planned
 /// step ran once and passed on one source and one set of workers.
 fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
-    let mut problems = coverage_problems(root)?;
+    let mut problems = Vec::new();
     let mut shards = Vec::new();
     let mut records_by_shard = Vec::new();
     let mut identities: Vec<(String, String)> = Vec::new();
@@ -2350,9 +2371,17 @@ fn summary(root: &Path, file: &Path, directories: &[PathBuf]) -> R<i32> {
                 .filter_map(|n| n.as_str().map(str::to_owned))
                 .collect()
         });
+    let reports = report_features(root)?;
     let plan_of = || {
         select(
-            items(SUMMARY_OUTPUT, false, &target, "target/release", &capture),
+            items(
+                &reports,
+                SUMMARY_OUTPUT,
+                false,
+                &target,
+                "target/release",
+                &capture,
+            ),
             selection.as_deref(),
         )
     };
@@ -2570,6 +2599,7 @@ mod tests {
     fn plan() -> Vec<Item> {
         let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
         items(
+            &report_features(&crate::root()).unwrap(),
             "/o",
             false,
             "thumbv7neon-unknown-linux-gnueabihf",
@@ -2627,7 +2657,14 @@ mod tests {
 
     #[test]
     fn aarch64_plan_binds_each_isobmff_grade_to_its_shard_and_collections() {
-        let realized = items("/run", true, ISOBMFF_GRADE_TARGET, "target/release", &[]);
+        let realized = items(
+            &report_features(&crate::root()).unwrap(),
+            "/run",
+            true,
+            ISOBMFF_GRADE_TARGET,
+            "target/release",
+            &[],
+        );
         let mut records = BTreeMap::new();
         for item in realized.iter().filter(|i| i.name.starts_with("isobmff-")) {
             let steps = item.steps.iter().map(|step| {
@@ -2655,6 +2692,7 @@ mod tests {
         }
         let plan = shards(
             items(
+                &report_features(&crate::root()).unwrap(),
                 SUMMARY_OUTPUT,
                 false,
                 ISOBMFF_GRADE_TARGET,
@@ -2976,7 +3014,22 @@ done
     #[test]
     fn every_registered_feature_is_planned_or_excluded() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        assert_eq!(coverage_problems(root).unwrap(), Vec::<String>::new());
+        let mut contracts = crate::harness::features::discover(root).unwrap();
+        let id = "new-report-feature";
+        contracts.push(crate::harness::features::Contract {
+            id: id.into(),
+            path: root.join("harness/features").join(id).join("contract.json"),
+            document: Value::object([("runner", Value::str("cargo xtask report"))]),
+            compare_order: 0,
+        });
+        let reports = report_contracts(contracts).unwrap();
+        let new = reports.iter().find(|report| report.id == id).unwrap();
+        assert_eq!(new.weight, 1);
+        assert!(
+            items(&reports, "OUT", false, TARGETS[0], "target/release", &[])
+                .iter()
+                .any(|item| item.name == id)
+        );
     }
 
     #[test]
@@ -3008,6 +3061,7 @@ done
     fn preflight_of(name: &str) -> Vec<String> {
         let capture: Vec<String> = (1..=15).map(|i| format!("c{i:02}")).collect();
         items(
+            &report_features(&crate::root()).unwrap(),
             "/o",
             false,
             "aarch64-unknown-linux-gnu",
@@ -3186,7 +3240,14 @@ done
         for target in TARGETS {
             let release = format!("target/{target}/release");
             let selected = select(
-                items("/o", false, target, &release, &capture),
+                items(
+                    &report_features(&crate::root()).unwrap(),
+                    "/o",
+                    false,
+                    target,
+                    &release,
+                    &capture,
+                ),
                 Some(&["progressive".to_owned()]),
             );
             assert_eq!(selected.map(|items| items.len()), Ok(1), "{target}");

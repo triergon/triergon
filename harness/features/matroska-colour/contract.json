@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-colour",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/colour-fixtures",
   "operation": "container-colour-demux-v1",
   "contract": [
     "All Matroska Colour integer elements with schema defaults; preserve unknown numeric codes and absent optional values",

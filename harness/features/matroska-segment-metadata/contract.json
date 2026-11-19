@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-segment-metadata",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/catalogue-fixtures",
   "operation": "container-catalogue-demux-v1",
   "contract": [
     "Bounded complete chapter edition/nested atom trees, exact unsigned nanosecond source times, display languages and source extensions",

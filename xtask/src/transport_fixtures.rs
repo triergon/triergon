@@ -1097,6 +1097,7 @@ fn contract(cases: &[Case]) -> R<Value> {
     Ok(Value::object([
         ("schema", Value::int(1)),
         ("id", Value::str("mpegts-access-units")),
+        ("runner", Value::str("cargo xtask report")),
         ("gate", Value::str("required")),
         ("operation", Value::str(OPERATION)),
         ("candidate", Value::str("transport-worker")),

@@ -1367,10 +1367,18 @@ pub fn zlib_case(source: &Source, c: ZlibCase) -> Result<Vec<u8>, String> {
     Ok(single_block_file(&track, &block))
 }
 
-fn delivery_contract(id: &str, operation: &str, contract: &[&str], profiles: Vec<Value>) -> Value {
+fn delivery_contract(
+    id: &str,
+    directory: &str,
+    operation: &str,
+    contract: &[&str],
+    profiles: Vec<Value>,
+) -> Value {
     Value::object([
         ("schema", Value::int(1)),
         ("id", Value::str(id)),
+        ("runner", Value::str("cargo xtask report")),
+        ("corpus_directory", Value::str(directory)),
         ("operation", Value::str(operation)),
         ("contract", Value::strings(contract.iter().copied())),
         ("required_profiles", Value::Array(profiles)),
@@ -1443,6 +1451,7 @@ fn zlib_matrix(paths: &Paths, source: &Source) -> Result<String, String> {
     }
     let contract = delivery_contract(
         "matroska-zlib",
+        ".research/zlib-fixtures",
         "container-demux-v1",
         &[
             "RFC 1950 checksum and wrapper",
@@ -1867,6 +1876,7 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
     ));
     let contract = delivery_contract(
         "matroska-cues-preroll",
+        ".research/seek-fixtures",
         "container-seek-preroll-v1",
         &[
             "bounded Cues/SeekHead lookup",

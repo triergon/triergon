@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "raw-annex-b",
+  "runner": "cargo xtask report",
   "operation": "raw-annex-b-feed",
   "candidate": "playback-worker",
   "worker_operation": "raw-video-",
