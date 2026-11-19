@@ -507,6 +507,9 @@ impl<S: Source> Player<S> {
     pub fn engine(&self) -> Option<&Engine> {
         self.engine.as_ref()
     }
+    pub(crate) fn engine_mut(&mut self) -> Option<&mut Engine> {
+        self.engine.as_mut()
+    }
     pub fn pending_request(&self) -> Option<&InputRequest> {
         self.request.as_ref()
     }

@@ -468,6 +468,13 @@ pub enum Engine {
     Ts(TsEngine),
 }
 impl Engine {
+    /// Hands a consumed PES's lists back to the observer of `pid`, when this
+    /// is a transport stream engine.
+    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+        if let Self::Ts(engine) = self {
+            engine.reuse_pes_lists(pid, lists);
+        }
+    }
     pub fn matroska(
         pool: &Budget,
         id: SourceId,

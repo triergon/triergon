@@ -10,6 +10,7 @@ use crate::{
         parser_only_audio_clocks, resolve_hls_aac_clocks,
     },
     io::SourceOwner,
+    ts_payload::SpentLists,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, InputCursor, InputRequest, WorkBudget};
@@ -509,6 +510,8 @@ where
                     AssemblyStep::Output(unit) => self.pending = Some(Unit::Video(unit)),
                     AssemblyStep::Yield => {}
                     AssemblyStep::NeedPayload if self.phase == Phase::Video => {
+                        let lists = video.take_spent();
+                        self.reuse_pes_lists(|(video, _, _)| Some(video), lists);
                         self.phase = Phase::Read;
                     }
                     AssemblyStep::Finished if self.phase == Phase::EndVideo => {
@@ -524,6 +527,8 @@ where
                         AssemblyStep::Output(unit) => self.pending = Some(Unit::Audio(unit)),
                         AssemblyStep::Yield => {}
                         AssemblyStep::NeedPayload if self.phase == Phase::Audio => {
+                            let lists = audio.take_spent();
+                            self.reuse_pes_lists(|(_, audio, _)| audio, lists);
                             self.phase = Phase::Read;
                         }
                         AssemblyStep::Finished if self.phase == Phase::EndAudio => {
@@ -543,6 +548,21 @@ where
             Ok(HlsSegmentProgress::Ready)
         } else {
             Ok(HlsSegmentProgress::Yield)
+        }
+    }
+
+    /// The observer of a track allocates nothing for its next PES when it gets
+    /// back the lists of the one a reader has just consumed.
+    fn reuse_pes_lists(
+        &mut self,
+        track: impl Fn((TrackKey, Option<TrackKey>, u64)) -> Option<TrackKey>,
+        lists: SpentLists,
+    ) {
+        if let (Some(player), Some(TrackKey::Ts { pid, .. })) =
+            (self.player.as_mut(), self.map.and_then(track))
+            && let Some(engine) = player.engine_mut()
+        {
+            engine.reuse_pes_lists(pid, lists);
         }
     }
 
