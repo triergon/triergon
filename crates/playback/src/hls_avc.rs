@@ -7,7 +7,7 @@ pub(crate) mod syntax;
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_pes::{clock_describes, lane_track},
-    ts_payload::PesInput,
+    ts_payload::{PesInput, SpentLists},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
@@ -257,12 +257,15 @@ pub struct AvcTsReader {
     nal_data_end: usize,
     unit: Option<Unit>,
     unit_serial: u64,
+    /// Length of the most recently published unit.
+    published_len: usize,
     bytes: BudgetVec<u8>,
     sps: BudgetVec<ParameterSet<AvcRaster>>,
     pps: BudgetVec<ParameterSet<u8>>,
     allow_startup_sei: bool,
     ended: bool,
     failure: Option<Error>,
+    spent: SpentLists,
 }
 
 impl AvcTsReader {
@@ -300,12 +303,14 @@ impl AvcTsReader {
             nal_data_end: 0,
             unit: None,
             unit_serial: 0,
+            published_len: 0,
             bytes: BudgetVec::new(pool),
             sps: BudgetVec::new(pool),
             pps: BudgetVec::new(pool),
             allow_startup_sei: false,
             ended: false,
             failure: None,
+            spent: SpentLists::default(),
         })
     }
 
@@ -391,11 +396,16 @@ impl AvcTsReader {
         }
         self.source_clock_epoch = Some(origin);
         let remaining = packet.payload_len;
-        self.pending_pes = mailbox.take().map(|packet| PendingPes {
-            remaining,
-            spans: packet.into_payload().into_cursor(),
-            may_reserve: true,
-        });
+        if let Some(packet) = mailbox.take() {
+            let (payload, mut header) = packet.into_parts();
+            header.clear();
+            self.spent.header = Some(header);
+            self.pending_pes = Some(PendingPes {
+                remaining,
+                spans: payload.into_cursor(),
+                may_reserve: true,
+            });
+        }
         Ok(true)
     }
 
@@ -407,6 +417,34 @@ impl AvcTsReader {
         self.pes_anchor = Some(index);
         self.pes_serial = serial;
         Ok(())
+    }
+
+    /// The lists of the last consumed PES, for its observer to reuse.
+    pub(crate) fn take_spent(&mut self) -> SpentLists {
+        std::mem::take(&mut self.spent)
+    }
+
+    /// Takes back a unit the caller has finished with. Its storage becomes the
+    /// assembly buffer when no other handle shares it, it is larger than the
+    /// buffer but at most twice the last published unit
+    /// ([`BudgetVec::fits_reuse_for`]), and the buffer holds no more than a
+    /// start code's lookahead, as it does right after a unit is published.
+    /// Later units of a similar size are then assembled without allocating.
+    /// Otherwise the unit is dropped. Outputs and work are the same either way.
+    pub fn reuse_unit(&mut self, unit: AvcTsAccessUnit) {
+        let AvcTsAccessUnit { source, .. } = unit;
+        if self.bytes.len() > LOOKAHEAD || !source.belongs_to(&self.pool) {
+            return;
+        }
+        let Ok(mut storage) = source.try_reclaim() else {
+            return;
+        };
+        if storage.capacity() > self.bytes.capacity()
+            && storage.fits_reuse_for(self.published_len)
+            && storage.try_extend_from_slice(self.bytes.as_slice()).is_ok()
+        {
+            self.bytes = storage;
+        }
     }
 
     /// Seal only after definitive segment EOF. Already provided bytes drain.
@@ -502,7 +540,10 @@ impl AvcTsReader {
                     if pending.remaining != 0 {
                         return Err(Error::Invalid("AVC TS PES payload extent"));
                     }
-                    self.pending_pes = None;
+                    self.spent.spans = self
+                        .pending_pes
+                        .take()
+                        .map(|pending| pending.spans.into_spans());
                 }
             }
             if let Some(chunk) = &mut self.input {
@@ -768,6 +809,7 @@ impl AvcTsReader {
             }
         };
         self.unit = None;
+        self.published_len = end;
         Ok(AvcTsAccessUnit {
             source,
             sps: sps_feed,

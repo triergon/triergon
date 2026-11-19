@@ -468,6 +468,13 @@ pub enum Engine {
     Ts(TsEngine),
 }
 impl Engine {
+    /// Hands a consumed PES's lists back to the observer of `pid`, when this
+    /// is a transport stream engine.
+    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+        if let Self::Ts(engine) = self {
+            engine.reuse_pes_lists(pid, lists);
+        }
+    }
     pub fn matroska(
         pool: &Budget,
         id: SourceId,
@@ -1709,6 +1716,21 @@ impl TsEngine {
         std::mem::take(&mut self.suppressed_events)
     }
 
+    /// Hands a consumed PES's lists back to the observer of `pid` for its next PES.
+    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: crate::ts_payload::SpentLists) {
+        let Some(index) = self.native_tracks.index(pid) else {
+            return;
+        };
+        if let Some(observer) = self.native_tracks.as_mut_slice()[index].observer.as_mut() {
+            if let Some(spans) = lists.spans {
+                observer.reuse_payload_spans(spans);
+            }
+            if let Some(header) = lists.header {
+                observer.reuse_header_ranges(header);
+            }
+        }
+    }
+
     fn discover_tracks(&self, map: &ProgramMap) -> Result<TsNativeTracks> {
         let mut selections = map.streams.as_slice().iter().filter_map(|stream| {
             let carriage = match stream.stream_type {
@@ -2015,30 +2037,80 @@ impl TsEngine {
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
+    /// The next native track's configuration or refusal from track `at` on,
+    /// if any is waiting.
+    #[cold]
+    fn next_native_update(&mut self, at: usize) -> Option<TsPayloadStep> {
+        let (index, pid, update) = self
+            .native_tracks
+            .as_mut_slice()
+            .iter_mut()
+            .enumerate()
+            .skip(at)
+            .find_map(|(i, track)| track.update.take().map(|update| (i, track.pid(), update)))?;
+        self.native_update_at = Some(index + 1);
+        Some(match update {
+            TsNativeUpdate::Configuration(configuration) => {
+                TsPayloadStep::Configuration(configuration)
+            }
+            TsNativeUpdate::Refusal(error) => TsPayloadStep::Refusal {
+                track: TrackKey::Ts {
+                    program: self.program,
+                    pid,
+                },
+                error,
+                source_event_ordinal: self.event_ordinal,
+            },
+        })
+    }
+
+    /// Ends the current entity: a segment reports its end, and the source's
+    /// end starts draining the stream and every native track.
+    #[cold]
+    fn end_entity<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
+        if self.draining {
+            return Err(Error::Invalid("TS repeated undrained entity End"));
+        }
+        if self.segmented {
+            if let Some(end) = self.stream.media_entity_end(&mut self.input, w, c)? {
+                self.boundary = Some(end.clone());
+                return T::project(TsPayloadStep::EntityEnd(end));
+            }
+            return T::project(TsPayloadStep::Yield);
+        }
+        if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
+            return Err(Error::Invalid("TS segment ended without an active PMT"));
+        }
+        self.stream.end_of_source()?;
+        self.draining = true;
+        for track in self.native_tracks.as_mut_slice() {
+            if let Some(observer) = track.observer.as_mut() {
+                observer.end_of_source()?;
+            }
+        }
+        self.native_active = Some(0);
+        T::project(TsPayloadStep::Yield)
+    }
+
+    /// Refuses every native track once an M2TS input loses its carrier grid.
+    #[cold]
+    fn refuse_after_lost_grid(&mut self) {
+        self.native_prefix_failed = true;
+        for track in self.native_tracks.as_mut_slice() {
+            track.refuse(Error::Unsupported("native M2TS carrier grid lost"));
+        }
+        self.native_update_at = Some(0);
+    }
+
     fn poll<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
         if let Some(at) = self.native_update_at.take()
-            && let Some((index, pid, update)) = self
+            && self
                 .native_tracks
-                .as_mut_slice()
-                .iter_mut()
-                .enumerate()
-                .skip(at)
-                .find_map(|(i, track)| track.update.take().map(|update| (i, track.pid(), update)))
+                .as_slice()
+                .get(at..)
+                .is_some_and(|tracks| tracks.iter().any(|track| track.update.is_some()))
+            && let Some(event) = self.next_native_update(at)
         {
-            self.native_update_at = Some(index + 1);
-            let event = match update {
-                TsNativeUpdate::Configuration(configuration) => {
-                    TsPayloadStep::Configuration(configuration)
-                }
-                TsNativeUpdate::Refusal(error) => TsPayloadStep::Refusal {
-                    track: TrackKey::Ts {
-                        program: self.program,
-                        pid,
-                    },
-                    error,
-                    source_event_ordinal: self.event_ordinal,
-                },
-            };
             return T::project(event);
         }
         if self.native_pending.is_some() {
@@ -2134,43 +2206,14 @@ impl TsEngine {
                     Step::Ready(e) => self.pending = Some(e),
                     Step::NeedInput(r) => return T::project(TsPayloadStep::NeedInput(r)),
                     Step::Yield => return T::project(TsPayloadStep::Yield),
-                    Step::End(_) => {
-                        if self.draining {
-                            return Err(Error::Invalid("TS repeated undrained entity End"));
-                        }
-                        if self.segmented {
-                            if let Some(end) =
-                                self.stream.media_entity_end(&mut self.input, w, c)?
-                            {
-                                self.boundary = Some(end.clone());
-                                return T::project(TsPayloadStep::EntityEnd(end));
-                            }
-                            return T::project(TsPayloadStep::Yield);
-                        }
-                        if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
-                            return Err(Error::Invalid("TS segment ended without an active PMT"));
-                        }
-                        self.stream.end_of_source()?;
-                        self.draining = true;
-                        for track in self.native_tracks.as_mut_slice() {
-                            if let Some(observer) = track.observer.as_mut() {
-                                observer.end_of_source()?;
-                            }
-                        }
-                        self.native_active = Some(0);
-                        return T::project(TsPayloadStep::Yield);
-                    }
+                    Step::End(_) => return self.end_entity(w, c),
                 }
             }
             if (feed_only || !matches!(self.pending, Some(TraceEvent::Pes(_)))) && !w.try_charge(1)
             {
                 return T::project(TsPayloadStep::Yield);
             }
-            let event = self
-                .pending
-                .as_ref()
-                .ok_or(Error::Invalid("TS event missing"))?;
-            if let TraceEvent::Diagnostic(fault) = event
+            if let Some(TraceEvent::Diagnostic(fault)) = &self.pending
                 && fault.kind == ts::FaultKind::Transport
                 && matches!(
                     fault.error,
@@ -2182,12 +2225,12 @@ impl TsEngine {
                     .as_ref()
                     .is_some_and(triergon_mpegts::compat::input::InputContext::is_prefix)
             {
-                self.native_prefix_failed = true;
-                for track in self.native_tracks.as_mut_slice() {
-                    track.refuse(Error::Unsupported("native M2TS carrier grid lost"));
-                }
-                self.native_update_at = Some(0);
+                self.refuse_after_lost_grid();
             }
+            let event = self
+                .pending
+                .as_ref()
+                .ok_or(Error::Invalid("TS event missing"))?;
             if let TraceEvent::ProgramMap {
                 map,
                 active: true,

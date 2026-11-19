@@ -314,6 +314,14 @@ impl PayloadCursor {
             self.current_count = 0;
         }
     }
+    /// The span list, emptied, with its allocation and charge, to hand back to
+    /// the observer that emitted it ([`DemuxObserver::reuse_payload_spans`]).
+    /// Ranges not yet retired are released.
+    ///
+    /// [`DemuxObserver::reuse_payload_spans`]: super::DemuxObserver::reuse_payload_spans
+    pub fn into_spans(self) -> BudgetVec<DemuxSpan> {
+        self.records.reclaim()
+    }
     /// Borrow only ranges not yet admitted or successfully retired.
     pub fn remaining_spans(&self) -> DemuxSpanViews<'_> {
         DemuxSpanViews {

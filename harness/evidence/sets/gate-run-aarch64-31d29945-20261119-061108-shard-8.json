@@ -1,0 +1,108 @@
+{
+ "name": "gate-run-aarch64-31d29945-20261119-061108-shard-8",
+ "path": "gate-run-aarch64-31d29945-20261119-061108-shard-8",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/31d2994522f116b4404916cb51f82b03a29c158f-aarch64-20261119-061108/shard-8/d8642ba2fc6834c027179df3f79d3ef06a5419c24cf6381056d28173c2f07c38.tar.zst",
+ "sha256": "d8642ba2fc6834c027179df3f79d3ef06a5419c24cf6381056d28173c2f07c38",
+ "bytes": 336006595,
+ "results": [
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "414ffcb45e90cc7407e8decd9a842a5ad5cee4887e9446ef054c02ff8304dfe5",
+   "status": 0,
+   "report_sha256": "020f397cc70be84f04c9fea91f77449495f46840928ab47670384019d2b59d3c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --memory",
+   "key": "c6eee19d9e57ebac268795222c1356b4830cde5de829956bcf9f766bbd803176",
+   "status": 0,
+   "report_sha256": "6c629d03def5f09e5a91e271712ddb14142fe4ba055c71abea33d3dc24d6155d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "95717b229bee564b38fcb9eb7090899f37b6c1de68bb6f4ef60917ef59bab0a2",
+   "status": 0,
+   "report_sha256": "2cfbf29eae093c01f9882be17b9794b2bc871ce62b640280fe33ed420fc1ae3a",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "669fd2ecb58db8b615d735e7ba274a6a29402d26956a1583440a21cdb6a2370c",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8504ed1a6fd4c0f8f71c1926b9f6822ca9567fa1517c1216df8ee349db69b62c",
+   "status": 0,
+   "report_sha256": "6c23efa725f83debb6e76b7e219a9ec582f492252fae8ae734b796794478282b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --benchmark",
+   "key": "34820e4c26ebb4dc03387549e45c521d4c6f955a768bc8bc0407d113ddae1d5b",
+   "status": 0,
+   "report_sha256": "b59cef4cb5ea1d324ccc20aa6784958a912190581ac624a48ba9bd362f284a01",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7f7e3cafa1b98c2a371ce7b71620d35d51d7995683f9573d8c509de1d62902ef",
+   "status": 0,
+   "report_sha256": "971d8ef44c77ee2f6b72dd6d981e384049b1283ab8032c3dacea76c9489d8db2",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/codec-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "2c133e6f625713050221cf7e72868f6663580033250f816d498243ffa0f45ebd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "00fdee2dd2bd463ef96eaaba7769b2b530cc74a3c28d410e0c6900f530a37945",
+   "status": 0,
+   "report_sha256": "d4ee95556767bee07e47ec01221a7dab0f3f095d163f9d5189e5069ec5a20a26"
+  },
+  {
+   "path": "graded/subtitle-pgs-capsules/gate-result.json",
+   "command": "grade",
+   "key": "8e7e5f6a72a1c9c34ec7281fc4488d947a082008c3369027cb00ba89d6d7ec50",
+   "status": 0,
+   "report_sha256": "e359cbc92585b8208676733e5a5b5a16b174d8fe0b223a5172106b91d3ccde47"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "6eb1139199cdd1597bf5678a9f6fc98e97330819c5bd0c42a184710978bdb40e",
+   "status": 1,
+   "report_sha256": "eded02ead9ba8110d227d68e695c70da181c713777b67647abbcf00ec96a5cbb"
+  },
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "b3df824882784b47e6f8a6a587377721ca8e4d9ddae72a40d1914d39e4ebbea8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "788db82ed9821f06540671753aa9fff3b46af86b3f69cb2a9fdd8cb5cba0d0e3",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

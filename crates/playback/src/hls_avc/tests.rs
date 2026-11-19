@@ -603,3 +603,94 @@ fn nal_body_scan_matches_scalar_search_for_mixed_bytes() {
         }
     }
 }
+
+/// Assembles `unit` and publishes it once the next delimiter's lookahead
+/// arrives, as a progressive reader does, leaving that lookahead in the
+/// builder. Publication costs one work unit.
+fn publish_before_next(reader: &mut AvcTsReader, unit: &[u8]) -> AvcTsAccessUnit {
+    push_span(reader, unit);
+    let mut units = Vec::new();
+    drain(reader, &mut units);
+    assert!(units.is_empty());
+    push_span(reader, &DELIMITER[..LOOKAHEAD]);
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        reader
+            .step(&mut WorkBudget::new(LOOKAHEAD as u64), &cancel)
+            .unwrap(),
+        AvcTsStep::Yield
+    ));
+    let mut publication_work = WorkBudget::new(1);
+    let AvcTsStep::Ready(published) = reader.step(&mut publication_work, &cancel).unwrap() else {
+        panic!("expected the pending access unit");
+    };
+    assert_eq!(publication_work.spent(), 1);
+    assert_eq!(reader.bytes.as_slice(), &DELIMITER[..LOOKAHEAD]);
+    published
+}
+
+#[test]
+fn a_reused_unit_becomes_the_buffer_the_next_one_is_published_from() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let unit = publish_before_next(&mut reader, &first);
+    assert_eq!(unit.source_bytes().as_ref(), first);
+    let storage = unit.source_bytes().as_ref().as_ptr();
+    let capacity = unit.source_bytes().retained_capacity();
+    let used = pool.used();
+    reader.reuse_unit(unit);
+    assert_eq!(reader.bytes.as_slice(), &DELIMITER[..LOOKAHEAD]);
+    assert_eq!(reader.bytes.as_slice().as_ptr(), storage);
+    assert_eq!(reader.bytes.capacity(), capacity);
+    assert!(
+        pool.used() < used,
+        "the unit's storage replaces the builder"
+    );
+
+    let second = [DELIMITER, IDR, &[0x66; 200]].concat();
+    let unit = publish_before_next(&mut reader, &second[LOOKAHEAD..]);
+    assert_eq!(unit.source_bytes().as_ref(), second);
+    assert_eq!(unit.source_bytes().as_ref().as_ptr(), storage);
+}
+
+#[test]
+fn a_unit_held_elsewhere_stays_intact_and_the_builder_is_kept() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let unit = publish_before_next(&mut reader, &first);
+    let held = unit.source_bytes().clone();
+    let builder = reader.bytes.as_slice().as_ptr();
+    let used = pool.used();
+    reader.reuse_unit(unit);
+    assert_eq!(reader.bytes.as_slice().as_ptr(), builder);
+    assert_eq!(pool.used(), used);
+    assert_eq!(held.as_ref(), first);
+}
+
+#[test]
+fn a_reused_buffer_leaves_room_to_record_the_final_unit() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let unit = publish_before_next(&mut reader, &first);
+    reader.reuse_unit(unit);
+    let second = [DELIMITER, IDR, &[0x66; 200]].concat();
+    push_span(&mut reader, &second[LOOKAHEAD..]);
+    let mut units = Vec::new();
+    drain(&mut reader, &mut units);
+    assert!(units.is_empty());
+    reader.finish();
+
+    // Publication adds only the shared-owner header to the buffer's charge.
+    let available = Bytes::owner_overhead_bytes() + size_of::<AvcTsAccessUnit>();
+    let _pressure = pool.reserve(pool.available() - available).unwrap();
+    let AvcTsStep::Ready(unit) = reader
+        .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
+        .unwrap()
+    else {
+        panic!("expected the final access unit");
+    };
+    assert_eq!(unit.source_bytes().as_ref(), second);
+    let _record = pool
+        .reserve(size_of::<AvcTsAccessUnit>())
+        .expect("the segment builder can record the unit while it is held");
+}
