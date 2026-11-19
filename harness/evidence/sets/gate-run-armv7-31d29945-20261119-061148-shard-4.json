@@ -1,0 +1,140 @@
+{
+ "name": "gate-run-armv7-31d29945-20261119-061148-shard-4",
+ "path": "gate-run-armv7-31d29945-20261119-061148-shard-4",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/31d2994522f116b4404916cb51f82b03a29c158f-armv7-20261119-061148/shard-4/a6cae1a8529c6717b3fe1356eb424e96f5703b306815af64bcf1c7889af8de98.tar.zst",
+ "sha256": "a6cae1a8529c6717b3fe1356eb424e96f5703b306815af64bcf1c7889af8de98",
+ "bytes": 80323360,
+ "results": [
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "9e4576ba042e96a96120dd31b963743ad7a72d130a428cc29411e308a3f35608",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "addc336be4531043625a36fe87911c1adc15ce3f486d1b40a450aad176fb4209",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "64dcf43da5578b99ee500388c6c45853ebdafc9ff1d909933704734a866ffcb3",
+   "status": 0,
+   "report_sha256": "9cb814248a5dc8b06fccd7d97336a0578f2f1df4dfa7b2e5375d1f39f71fb3b9",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "26c87d8648e730117acfca0726628a94025a7b6a8cc3b4a456ea5aa42d8f023b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "330d26fac6660f1a31fcde6c2c4a5228349438010538df7b043c2f0dd6591407",
+   "status": 0,
+   "report_sha256": "941d16eac898fa90f5020b815b34599849d657f8c6ca31a034694e5c7da55aa3",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "f1ff702a439a9be846b8b5d7d04378dd98ea2999907d2366be0153f5a420a4d9",
+   "status": 0,
+   "report_sha256": "56736013fe8507ea7ceac02729c5c463f48c671222861fceac042670d25ca697",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "a4551dbb1fd216d14ab42791f97150be5a33a29f2436d300c2ad3fbae494e2a8",
+   "status": 0,
+   "report_sha256": "475ab6b304061ddca0279771e1ef2a5132acb0082d8dba4e32d830caa0372bfa",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "932a6a0c26c155db3efb8105ba64a78636310ab1597bd46ed554c49e505a391d",
+   "status": 0,
+   "report_sha256": "e344478c50b1fb203188eefcf6854de3eb7e998d4a4ffadb315c5f9161897992",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "90b3252e2d6d5b197fd2b758b9af46750bcfa42aec7dfc1e1d22ea4018c917e5",
+   "status": 0,
+   "report_sha256": "4e9131ba3551b94cf29ad634cff531917f98aaaf8189a47b9430fd108c7cf4b9",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "292c43c87d1b4d5b133b94c829c434c692c872dbc644526f291d8fffe95006b5",
+   "status": 0,
+   "report_sha256": "1e3be7626b81a535a13c591eb8eac8ed45431961a1670366d6ebbe742bda861d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "cec22d60663c28a317ff87aa95d65317e82fd8c846c4b4ed59ec3f9a3e714b31",
+   "status": 0,
+   "report_sha256": "65856e9c5db79a23db4be31dd605554e678e6dc946ba49d46180eeee81909d55",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "5c684a8fa0b1e536a6c3c1e22742651ae8eac7da4e406617cc40aa043f0d7d28",
+   "status": 0,
+   "report_sha256": "dae07045110072f630e9442d083e685fb626511b8c5ed950e57b38437e14c9cd",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "3a698303601f347052473ddaf4c19d4ebd13db5b597ee3887c739e9cdad79df2",
+   "status": 0,
+   "report_sha256": "e3b0dcf10ba376a26485baf9d45987661b62a4249103099186417a2bd8a38015",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "7773af64ba1909a5d10866fcd16167439a2cd313a9d34263903079e0eea4b629",
+   "status": 0,
+   "report_sha256": "7ef0f7ff5a60f4d021d435ba926443f13692a95584b5c58357383134c633f370"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "e3c1eeada0c75523f01a10316133a4753a9c19e1b1a5bca0f33ee13bac1b6cf5",
+   "status": 0,
+   "report_sha256": "fd8ded6a54a23b320646067266504cfec39929e3cb9adab237b4418fde46755d"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "f306e55d60b06786084f19a2409e01b27c74c6ff8d136985ce135a82ca8bacb6",
+   "status": 0,
+   "report_sha256": "9b55d43deddd348cf3e93340de283dc236f38b0a43e3634442dd2075d03f9761"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "6ac501c93b56c849482222131536dfd0851a3754e5198842dc56afa7c7ce3dde",
+   "status": 0,
+   "report_sha256": "e896ebe56771195dbd05999e512ca891fda818248c8163eed2c912271a628bea"
+  }
+ ]
+}

@@ -1,0 +1,108 @@
+{
+ "name": "gate-run-aarch64-31d29945-20261119-061108-shard-5",
+ "path": "gate-run-aarch64-31d29945-20261119-061108-shard-5",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/31d2994522f116b4404916cb51f82b03a29c158f-aarch64-20261119-061108/shard-5/f6376e66880cd70d9bb05ef1cbb81fc0972f7a7d611b2fea2031a81fbc742a74.tar.zst",
+ "sha256": "f6376e66880cd70d9bb05ef1cbb81fc0972f7a7d611b2fea2031a81fbc742a74",
+ "bytes": 409800712,
+ "results": [
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "dbd3722d487acacd8819dab36a7c443df6893077cecc023cb797a29e35671547",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "3d46196373b86c58c8ad9c62d9e7eced65120a1516025514c2515128c45b9825",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "5a3271be7f9876d43c43f9623eb170c9fa5e142f6ba1bd2c8905c34196d43775",
+   "status": 0,
+   "report_sha256": "64d57ed3df1c6faaa7e1f4a62235af3f2c948d3a96b892791791321848a690b8",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "050813aef7040610d62733001bd99eaeb8457a27f7de842218278303d3046ef5",
+   "status": 0,
+   "report_sha256": "c30a1eb7f4691162aa63065f7d5546234e91c9be389a88aeed5e603c46eee127",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "c22205f406f7f14e67e5ad49901129d520cdfed956e1bcefc56ad2e1a7ac31f0",
+   "status": 0,
+   "report_sha256": "f3dc7a73b5ef4a0546cd7502ce2568d6a23767d80d6c73af003f599047c28482",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8409f8de25ef74cba98c44643af60cd233230679515448a94851dfb794c400a0",
+   "status": 0,
+   "report_sha256": "2b8c2cb2cee91d210da6d9137f8c659a751af13b7ac15f13b55f05e279f11beb",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8bce3fa4efbe534443e5cfc123e875d4e4ff29f69dd4a65bfea9d74ae91c7def",
+   "status": 0,
+   "report_sha256": "70a0653d94aec0287087b55f88bb93d565966d4612c637e4e6f524751656773d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "095257174e9d1191afdc7aab4e7eaefc9cbe956fccdf7c9985b76896462cd1c6",
+   "status": 0,
+   "report_sha256": "3caac431dd92db44a510ab6f20dc7bef2e2cdbd896425325274c8e106f0e24dd",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "c4e99bf3007da36f462ced80c875b95c1b5a5da88c82e8060f8de6acba21c285",
+   "status": 0,
+   "report_sha256": "a47c3091d86f52be4b1ea33e768654aae0b3d89e87a41d140849971c3635f09a"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "401afe7732d1f26ca512ec85efdc8b66d4d39d8103f22a9d49ef704c13fc528f",
+   "status": 0,
+   "report_sha256": "10a55ab7a87579b78cd279e789d693843dcd4d1a6311e31b52a321a4d04b8af3"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "c86e368a3fd82680e81dcf65529934d40feb6840bc4fd64caa8d708bf124360e",
+   "status": 0,
+   "report_sha256": "f7c2e26bee0467e739da4703bee74de6c31483d4991a86ab0123fc47c4df1dcf"
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "ef569d758ecc580e1a8bc1af68cc2d88aee055eb895fb1ba257f1a30f10c93fa",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "4f8e046e860a8d3526fce00ed45cd6ed3eaefe0b505889c45c00641c78c862db",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

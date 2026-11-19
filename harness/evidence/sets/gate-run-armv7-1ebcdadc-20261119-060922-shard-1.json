@@ -1,0 +1,34 @@
+{
+ "name": "gate-run-armv7-1ebcdadc-20261119-060922-shard-1",
+ "path": "gate-run-armv7-1ebcdadc-20261119-060922-shard-1",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/1ebcdadca39b3d62f9c1686e01688ef01b94e62d-armv7-20261119-060922/shard-1/8ca1c34ed6e80efa190b70dec57c6d88ad8d01d966b41481382fdff385c5e309.tar.zst",
+ "sha256": "8ca1c34ed6e80efa190b70dec57c6d88ad8d01d966b41481382fdff385c5e309",
+ "bytes": 28272343,
+ "results": [
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "1b3b5dba19f8c6220c5bd42c37a189ffd997c4252502541e85fc186188310ad9",
+   "status": 0,
+   "report_sha256": "cd781cb72ccefcc6950d5707744787be8f6743e6ef66d5e6d08ba8221cf91108",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "73b51972870d19f353ef7afa2206c714e2a697486ec485c242a8fe4febd5eb7b",
+   "status": 0,
+   "report_sha256": "ecce974509ff0db58e19053e2500041b2cddef2931d29956676c61e9ffe01ff7",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "c5d1c570db610d4ade346d46a85272f10f866a420e1b39e06877e04a97438130",
+   "status": 0,
+   "report_sha256": "142d25b42b392fccc2ffc13485a973e1c8ebf04aff691c66fb5d734cda3a67c8"
+  }
+ ]
+}

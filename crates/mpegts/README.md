@@ -500,8 +500,10 @@ A consumer that has used a packet up can hand its lists back:
 `PayloadCursor::into_spans` empties the span list, and
 `DemuxObserver::reuse_payload_spans` and `reuse_header_ranges` give the span and
 header-range lists to the observer that emitted them, whose next PES then fills
-them without allocating. Admission, payload runs and growth work follow the
-capacity a new list would have; only the allocation is kept.
+them without allocating. A list is kept only while its capacity is at most twice
+what a new list grew to for the last PES (`BudgetVec::fits_reuse_for`), and only
+when the observer's own list is empty. Admission, payload runs and growth work
+follow the capacity a new list would have; only the allocation is kept.
 Sequential playback can share up to four tight input windows of at most 4 KiB
 each. A full set, oversized backing storage or low budget headroom uses
 carrier-sized storage. Fallback uses the original transport event.
