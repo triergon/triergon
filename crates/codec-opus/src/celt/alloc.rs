@@ -65,24 +65,100 @@ pub(super) fn split_threshold(band: usize, lm: i32) -> i32 {
     i32::from(cache[usize::from(cache[0])]) + 12
 }
 
-/// The pulse index whose cost is closest to `bits` (`bits2pulses`).
-pub(super) fn bits_to_pulses(band: usize, lm: i32, bits: i32) -> usize {
-    let cache = pulse_cache(band, lm);
-    let bits = bits - 1;
-    let (mut lo, mut hi) = (0usize, usize::from(cache[0]));
-    for _ in 0..6 {
+// The last column represents a budget above every stored cost.
+const PULSE_BUDGETS: usize = u8::MAX as usize + 3;
+const PULSE_ROWS: usize = {
+    let mut offset = 0;
+    let mut rows = 0;
+    while offset < CACHE_BITS.len() {
+        offset += 1 + CACHE_BITS[offset] as usize;
+        rows += 1;
+    }
+    rows
+};
+
+struct PulseLookup {
+    rows: [u8; CACHE_INDEX.len()],
+    pulses: [[u8; PULSE_BUDGETS]; PULSE_ROWS],
+}
+
+// Bands and block sizes that share a pulse cache share the same lookup row.
+static PULSE_LOOKUP: PulseLookup = {
+    let mut lookup = PulseLookup {
+        rows: [0; CACHE_INDEX.len()],
+        pulses: [[0; PULSE_BUDGETS]; PULSE_ROWS],
+    };
+    let mut row = 0;
+    let mut offset = 0;
+    while offset < CACHE_BITS.len() {
+        let mut index = 0;
+        while index < CACHE_INDEX.len() {
+            let start = CACHE_INDEX[index];
+            if start == offset as i16 {
+                lookup.rows[index] = row as u8;
+            }
+            index += 1;
+        }
+        let mut budget = 0;
+        while budget < PULSE_BUDGETS {
+            lookup.pulses[row][budget] = closest_pulse(offset, budget as i32);
+            budget += 1;
+        }
+        offset += 1 + CACHE_BITS[offset] as usize;
+        row += 1;
+    }
+    lookup
+};
+
+/// Search the cache as specified for shape decoding, including equal costs.
+const fn closest_pulse(start: usize, budget: i32) -> u8 {
+    let bits = budget - 1;
+    let (mut lo, mut hi) = (0, CACHE_BITS[start] as usize);
+    let mut step = 0;
+    while step < 6 {
         let mid = (lo + hi + 1) >> 1;
-        if i32::from(cache[mid]) >= bits {
+        if CACHE_BITS[start + mid] as i32 >= bits {
             hi = mid;
         } else {
             lo = mid;
         }
+        step += 1;
     }
-    let below = if lo == 0 { -1 } else { i32::from(cache[lo]) };
-    if bits - below <= i32::from(cache[hi]) - bits {
+    let below = if lo == 0 {
+        -1
+    } else {
+        CACHE_BITS[start + lo] as i32
+    };
+    let pulse = if bits - below <= CACHE_BITS[start + hi] as i32 - bits {
         lo
     } else {
         hi
+    };
+    pulse as u8
+}
+
+/// The pulse index whose cost is closest to `bits` (`bits2pulses`).
+#[inline]
+pub(super) fn bits_to_pulses(band: usize, lm: i32, bits: i32) -> usize {
+    let row = usize::from(PULSE_LOOKUP.rows[(lm + 1) as usize * BANDS + band]);
+    let budget = bits.clamp(0, PULSE_BUDGETS as i32 - 1) as usize;
+    usize::from(PULSE_LOOKUP.pulses[row][budget])
+}
+
+#[cfg(test)]
+#[test]
+fn pulse_lookup_matches_the_search_at_every_cost() {
+    for lm in -1..=3 {
+        for band in 0..BANDS {
+            let start = CACHE_INDEX[(lm + 1) as usize * BANDS + band].max(0) as usize;
+            for budget in (-1..=PULSE_BUDGETS as i32).chain([512, 16_383]) {
+                assert_eq!(
+                    bits_to_pulses(band, lm, budget),
+                    usize::from(closest_pulse(start, budget)),
+                    "band {band}, block size {lm}, budget {budget}"
+                );
+            }
+        }
     }
 }
 

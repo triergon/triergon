@@ -62,6 +62,8 @@ the pre-skip or other container trims.
 
 ## Behaviour and limits
 
+- CELT shares a compile-time lookup across bands with the same pulse costs. Pulse
+  decoding accumulates vector energy as it writes each codeword.
 - The header's output gain is applied. Its pre-skip is not: the decoder reports it as
   its start delay (`AudioDecoder::delay`), which a consumer discards together with the
   container's trims (Ogg's granule positions, Matroska's CodecDelay and

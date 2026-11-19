@@ -74,9 +74,9 @@ fn u(n: usize, k: usize) -> u32 {
 /// The vector of codeword `index` of `k` pulses over `y.len()` dimensions: at each
 /// position with `n` dimensions left, indices from U(n, k + 1) on have a negative entry
 /// there, and the entry's magnitude takes the pulses down to the largest `k'` with
-/// U(n, k') <= the index. O(n + k) lookups.
-fn codeword(mut index: u32, mut k: usize, y: &mut [i32]) {
-    y.fill(0);
+/// U(n, k') <= the index. Returns the sum of the squared entries.
+fn codeword(mut index: u32, mut k: usize, y: &mut [i32]) -> i32 {
+    let mut energy = 0;
     let mut n = y.len();
     let mut j = 0;
     while k > 0 {
@@ -86,6 +86,7 @@ fn codeword(mut index: u32, mut k: usize, y: &mut [i32]) {
             let (row, next) = (&U_TABLE[k], &U_TABLE[k + 1]);
             while n > k + 1 && (row[n]..next[n]).contains(&index) {
                 index -= row[n];
+                y[j] = 0;
                 j += 1;
                 n -= 1;
             }
@@ -105,16 +106,19 @@ fn codeword(mut index: u32, mut k: usize, y: &mut [i32]) {
         index -= below;
         let magnitude = (total - k) as i32;
         y[j] = if negative { -magnitude } else { magnitude };
+        energy += magnitude * magnitude;
         j += 1;
         n -= 1;
     }
+    y[j..].fill(0);
+    energy
 }
 
 /// Decode the codeword of `k` pulses over `y.len() >= 2` dimensions.
-fn decode_pulses(rc: &mut RangeDecoder<'_>, y: &mut [i32], k: usize) {
+fn decode_pulses(rc: &mut RangeDecoder<'_>, y: &mut [i32], k: usize) -> i32 {
     let n = y.len();
     let index = rc.uint(u(n, k).wrapping_add(u(n, k + 1)));
-    codeword(index, k, y);
+    codeword(index, k, y)
 }
 
 /// One pass of the spreading rotation over pairs `stride` apart, forwards then backwards.
@@ -191,9 +195,8 @@ pub(super) fn decode_band(
     gain: f32,
 ) -> u32 {
     let y = &mut pulses[..x.len()];
-    decode_pulses(rc, y, k);
     // Exact in integers: at most 128 pulses.
-    let energy = y.iter().map(|&v| v * v).sum::<i32>() as f32;
+    let energy = decode_pulses(rc, y, k) as f32;
     let g = 1.0 / energy.sqrt() * gain;
     for (out, &v) in x.iter_mut().zip(y.iter()) {
         *out = g * v as f32;
@@ -243,9 +246,10 @@ mod tests {
                 );
                 let mut seen = std::collections::HashSet::new();
                 for index in 0..total {
-                    let mut y = vec![0; n];
-                    codeword(index, k, &mut y);
+                    let mut y = vec![i32::MAX; n];
+                    let energy = codeword(index, k, &mut y);
                     assert_eq!(y.iter().map(|v| v.unsigned_abs()).sum::<u32>(), k as u32);
+                    assert_eq!(energy, y.iter().map(|&v| v * v).sum::<i32>());
                     assert!(seen.insert(y), "n {n} k {k} index {index}");
                 }
             }
