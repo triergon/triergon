@@ -136,6 +136,13 @@ fn complete_reference(section: &Value, count: &str, exit: &str, tail: &str) -> b
 }
 
 fn video_allows_refusal(decoder: &Value, output: &Value) -> bool {
+    let pictures = output.get("pictures_ours").and_then(python::int);
+    let code = output.get("ours_rc").and_then(python::int);
+    let no_output = pictures == Some(0) && matches!(code, Some(0 | 1));
+    let exact_output = code == Some(0)
+        && text(output.get("status")) == Some("pass")
+        && pictures == output.get("pictures_ref").and_then(python::int)
+        && pictures == output.get("pictures_equal").and_then(python::int);
     complete_reference(decoder, "frames_ref", "ffmpeg_rc", "ffmpeg_partial_bytes")
         && complete_reference(
             output,
@@ -145,9 +152,7 @@ fn video_allows_refusal(decoder: &Value, output: &Value) -> bool {
         )
         && decoder.get("frames_ours").and_then(python::int) == Some(0)
         && matches!(decoder.get("ours_rc").and_then(python::int), Some(0 | 1))
-        && (output.get("ours_rc").and_then(python::int) == Some(0)
-            || (output.get("ours_rc").and_then(python::int) == Some(1)
-                && output.get("pictures_ours").and_then(python::int) == Some(0)))
+        && (no_output || exact_output)
 }
 
 fn classify(row: &Value, lane: &str) -> String {
@@ -422,7 +427,7 @@ mod tests {
         assert_eq!(
             classify(
                 &row(
-                    r#"{"decoder": {"status": "refused-unsupported", "frames_ref": 1, "frames_ours": 0, "ffmpeg_rc": 0, "ours_rc": 1, "ours_errors": [{"error": "Unsupported 4:2:2 Chroma"}]}, "output": {"status": "fail", "pictures_ref": 1, "reference_rc": 0, "ours_rc": 0}}"#
+                    r#"{"decoder": {"status": "refused-unsupported", "frames_ref": 1, "frames_ours": 0, "ffmpeg_rc": 0, "ours_rc": 1, "ours_errors": [{"error": "Unsupported 4:2:2 Chroma"}]}, "output": {"status": "fail", "pictures_ref": 1, "pictures_ours": 0, "reference_rc": 0, "ours_rc": 0}}"#
                 ),
                 "h264"
             ),
@@ -453,7 +458,7 @@ mod tests {
             let input = row(&format!(
                 r#"{{"decoder":{{"status":"refused-unsupported","frames_ref":{count},
                 "ffmpeg_rc":{code},"frames_ours":0,"ours_rc":1,"ours_errors":[{{"error":"unsupported bit depth"}}]}},
-                "output":{{"status":"fail","pictures_ref":1,"reference_rc":0,"ours_rc":0}}}}"#
+                "output":{{"status":"fail","pictures_ref":1,"pictures_ours":0,"reference_rc":0,"ours_rc":0}}}}"#
             ));
             assert_eq!(classify(&input, "hevc"), expected);
         }

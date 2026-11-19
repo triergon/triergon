@@ -41,13 +41,17 @@ mod child_processes {
     use super::*;
     use crate::process::{OUT, TempDir};
     use std::fs;
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::symlink;
     use std::path::Path;
 
     fn program(dir: &Path, name: &str, script: &str) -> String {
         let path = dir.join(name);
-        fs::write(&path, format!("#!/bin/sh\n{script}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        let launcher = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/codecs/correctness/video/test-worker.sh");
+        fs::write(path.with_extension("body"), script).unwrap();
+        if !path.exists() {
+            symlink(launcher, &path).unwrap();
+        }
         path.to_str().unwrap().to_owned()
     }
 
@@ -80,6 +84,7 @@ mod child_processes {
                 ],
                 6,
                 true,
+                RUN_TIMEOUT,
             )
             .unwrap()
         };
@@ -234,13 +239,20 @@ echo '{"frame":1,"poc":27}' >&2"#;
         let late_exit = "printf abcdef; exit 2";
         let tmp = TempDir::new(None).unwrap();
         let run = tmp.0.join("run.jsonl");
-        for (planar, rgba, accepted) in [
-            (frame, frame, true),
-            (late_exit, frame, false),
-            (frame, late_exit, false),
-            (":", frame, false),
-            (frame, "printf abcdefX", false),
-            (frame, ":", false),
+        for (planar, rgba_ours, rgba_ref, accepted) in [
+            (frame, "exit 1", frame, true),
+            (frame, ":", frame, true),
+            (frame, frame, frame, true),
+            (frame, "printf Xbcdef", frame, false),
+            (frame, "printf abcdefabcdef", frame, false),
+            (frame, frame, "printf abcdefabcdef", false),
+            (frame, "printf X", frame, false),
+            (frame, "printf abcdefX", frame, false),
+            (late_exit, "exit 1", frame, false),
+            (frame, "exit 1", late_exit, false),
+            (":", "exit 1", frame, false),
+            (frame, "exit 1", "printf abcdefX", false),
+            (frame, "exit 1", ":", false),
         ] {
             let decoded = planar_row(refuse, planar);
             assert_eq!(
@@ -253,7 +265,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
                 ("lane", Value::str("hevc")),
                 ("name", Value::str("prefix.bit")),
                 ("decoder", decoded),
-                ("output", rgba_row("exit 1", rgba)),
+                ("output", rgba_row(rgba_ours, rgba_ref)),
             ]);
             fs::write(&run, json::to_python(&row, None)).unwrap();
             let result = crate::codecs::summary::summarize(

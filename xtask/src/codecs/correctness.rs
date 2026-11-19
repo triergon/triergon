@@ -626,8 +626,8 @@ fn output_path(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, S
     let worker = python::path(a.codec_workers.of(decode));
     if video_extensions(lane).is_some() {
         let argv = |w: &str| vec![w.to_owned(), op.clone(), path.to_owned(), OUT.to_owned()];
-        let ours = Frames::spawn(&argv(&worker), CANVAS, true)?;
-        let reference = Frames::spawn(&argv(&a.reference), CANVAS, true)?;
+        let ours = Frames::spawn(&argv(&worker), CANVAS, true, RUN_TIMEOUT)?;
+        let reference = Frames::spawn(&argv(&a.reference), CANVAS, true, RUN_TIMEOUT)?;
         return video::output(ours, reference);
     }
     let (o, r) = (tmp.join("ours.s16"), tmp.join("ref.s16"));

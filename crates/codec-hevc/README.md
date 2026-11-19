@@ -105,4 +105,5 @@ identical output.
   comparison used by `codecs grade`. An exact match requires both processes to exit
   successfully with complete, identical frames. The first mismatch records the frame,
   plane, sample and 64×64 luma region. [Command and report fields](../../harness/codecs/hevc/STATUS.md).
-- The manifest grade also compares the 1920×1080 RGBA output. [Project-wide gates](../../docs/quality.md).
+- The manifest grade also compares the 1920×1080 RGBA output. If the planar decoder
+  refuses a declared feature, any RGBA output must still match in full. [Project-wide gates](../../docs/quality.md).

@@ -44,8 +44,8 @@ fn compare(
         frames_ref += i64::from(b.is_some());
     }
     Ok(Compared {
-        ours: ours.close(RUN_TIMEOUT)?,
-        reference: reference.close(RUN_TIMEOUT)?,
+        ours: ours.close()?,
+        reference: reference.close()?,
         frames_ours,
         frames_ref,
         equal,
@@ -229,8 +229,8 @@ pub(super) fn decoder(
         .filter(|_| w > 0 && h > 0)
         .ok_or_else(|| Stop::Fatal(format!("invalid video dimensions {w}x{h}")))?;
     let reference_argv = reference_command(ffmpeg, path, out_format);
-    let reference = Frames::spawn(&reference_argv, size, false)?;
-    let ours = Frames::spawn(&ours_argv, size, false)?;
+    let reference = Frames::spawn(&reference_argv, size, false, RUN_TIMEOUT)?;
+    let ours = Frames::spawn(&ours_argv, size, false, RUN_TIMEOUT)?;
     let mut first = None;
     let compared = compare(ours, reference, |n, fa, fb| {
         first.get_or_insert_with(|| (n, first_diff(fa, fb, w, h, depth, lane == "hevc")));

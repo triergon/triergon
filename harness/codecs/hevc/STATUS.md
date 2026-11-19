@@ -21,7 +21,8 @@ luma units for chroma samples even when the stream signals a smaller CTB size.
 
 The command exits successfully only when every file matches. A typed unsupported
 feature with no candidate frames is recorded separately. The strict summary accepts
-that refusal when the reference produces complete pictures in both YUV and RGBA.
+that refusal when both reference runs succeed with complete pictures and the RGBA
+candidate emits zero bytes or matches every reference picture exactly.
 If FFmpeg emits a prefix and then exits with an error, the manifest grade records
 the candidate's diagnostic in `ours_errors` and the strict summary fails that vector.
 If ffprobe gives no pixel format, both decoders run and the row records their byte
