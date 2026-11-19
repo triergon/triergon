@@ -83,15 +83,29 @@ pub const OUT: &str = "{out}";
 pub struct Frames {
     child: Child,
     src: Box<dyn Read + Send>,
-    size: usize,
-    err: Option<JoinHandle<Vec<u8>>>,
-    /// The bytes of the last short read.
-    pub tail: Vec<u8>,
+    buffer: Vec<u8>,
+    partial_bytes: Option<usize>,
+    err: Option<JoinHandle<std::io::Result<Vec<u8>>>>,
     argv: Vec<String>,
+}
+
+/// A fully drained frame stream and the process that wrote it.
+pub struct FrameExit {
+    pub code: i64,
+    pub stderr: String,
+    pub partial_bytes: usize,
 }
 
 impl Frames {
     pub fn spawn(argv: &[String], size: usize, side: bool) -> Result<Frames, String> {
+        if size == 0 {
+            return Err("a frame must contain at least one byte".into());
+        }
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(size)
+            .map_err(|e| format!("cannot buffer a {size}-byte frame: {e}"))?;
+        buffer.resize(size, 0);
         let argv: Vec<String> = argv
             .iter()
             .map(|a| {
@@ -121,45 +135,57 @@ impl Frames {
         let mut stderr = child.stderr.take().expect("piped stderr");
         let err = std::thread::spawn(move || {
             let mut buffer = Vec::new();
-            let _ = stderr.read_to_end(&mut buffer);
-            buffer
+            stderr.read_to_end(&mut buffer)?;
+            Ok(buffer)
         });
         Ok(Frames {
             child,
             src,
-            size,
+            buffer,
+            partial_bytes: None,
             err: Some(err),
-            tail: Vec::new(),
             argv,
         })
     }
 
-    /// The next full record; `None` at a short read, whose bytes become `tail`.
-    pub fn next(&mut self) -> Option<Vec<u8>> {
-        let mut buffer = vec![0; self.size];
-        let mut filled = 0;
-        while filled < self.size {
-            match self.src.read(&mut buffer[filled..]) {
-                Ok(0) => break,
-                Ok(n) => filled += n,
-                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(_) => break,
-            }
-        }
-        if filled < self.size {
-            buffer.truncate(filled);
-            self.tail = buffer;
-            None
-        } else {
-            Some(buffer)
-        }
+    /// Count arbitrary stdout bytes when no record size is known. Drain stdout
+    /// concurrently so even a producer that never closes the pipe can time out.
+    pub fn count_stdout(argv: &[String], timeout: Duration) -> Result<(u64, FrameExit), Stop> {
+        let mut stream = Self::spawn(argv, 1, false)?;
+        let mut stdout = std::mem::replace(&mut stream.src, Box::new(std::io::empty()));
+        let bytes = std::thread::spawn(move || std::io::copy(&mut stdout, &mut std::io::sink()));
+        let end = stream.close(timeout)?;
+        let bytes = bytes
+            .join()
+            .map_err(|_| Stop::Fatal("stdout reader panicked".into()))?
+            .map_err(|e| Stop::Fatal(format!("{} output: {e}", argv[0])))?;
+        Ok((bytes, end))
     }
 
-    /// Read what is left into `tail`, wait for the child and return its exit
-    /// code, stderr and the final `tail`.
-    pub fn close(mut self, timeout: Duration) -> Result<(i64, String, Vec<u8>), Stop> {
-        let _ = self.src.read_to_end(&mut self.tail);
-        drop(self.src);
+    /// Borrow the next full record. At EOF keep the short byte count, including on
+    /// subsequent calls while a longer peer is still emitting frames.
+    pub fn next(&mut self) -> Result<Option<&[u8]>, String> {
+        if self.partial_bytes.is_some() {
+            return Ok(None);
+        }
+        let mut filled = 0;
+        while filled < self.buffer.len() {
+            match self.src.read(&mut self.buffer[filled..]) {
+                Ok(0) => {
+                    self.partial_bytes = Some(filled);
+                    return Ok(None);
+                }
+                Ok(n) => filled += n,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(format!("{} output: {e}", self.argv[0])),
+            }
+        }
+        Ok(Some(&self.buffer))
+    }
+
+    /// Finish reading records and report the producer's actual exit and tail.
+    pub fn close(mut self, timeout: Duration) -> Result<FrameExit, Stop> {
+        while self.next()?.is_some() {}
         let started = Instant::now();
         let status = loop {
             match self.child.try_wait() {
@@ -167,7 +193,7 @@ impl Frames {
                 Ok(None) if started.elapsed() >= timeout => {
                     let _ = self.child.kill();
                     let _ = self.child.wait();
-                    return Err(Stop::Timeout(self.argv));
+                    return Err(Stop::Timeout(std::mem::take(&mut self.argv)));
                 }
                 Ok(None) => std::thread::sleep(Duration::from_millis(2)),
                 Err(e) => return Err(Stop::Fatal(e.to_string())),
@@ -176,9 +202,25 @@ impl Frames {
         let stderr = self
             .err
             .take()
-            .map(|t| t.join().unwrap_or_default())
-            .unwrap_or_default();
-        Ok((exit_code(status), python::decode(&stderr), self.tail))
+            .expect("stderr reader")
+            .join()
+            .map_err(|_| Stop::Fatal("stderr reader panicked".into()))?
+            .map_err(|e| Stop::Fatal(format!("{} stderr: {e}", self.argv[0])))?;
+        Ok(FrameExit {
+            code: exit_code(status),
+            stderr: python::decode(&stderr),
+            partial_bytes: self.partial_bytes.expect("read to EOF"),
+        })
+    }
+}
+
+impl Drop for Frames {
+    fn drop(&mut self) {
+        // Reap a producer even when spawning or reading its peer failed.
+        if !matches!(self.child.try_wait(), Ok(Some(_))) {
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
     }
 }
 
@@ -237,15 +279,17 @@ mod tests {
     #[test]
     fn frames_keep_the_last_short_read() {
         let mut frames = Frames::spawn(&sh("printf abcdefg; echo err >&2"), 3, false).unwrap();
-        assert_eq!(frames.next().as_deref(), Some(&b"abc"[..]));
-        assert_eq!(frames.next().as_deref(), Some(&b"def"[..]));
-        assert_eq!(frames.next(), None);
-        assert_eq!(frames.tail, b"g");
-        // A further read past the end replaces the tail, as Python's does.
-        assert_eq!(frames.next(), None);
-        assert_eq!(frames.tail, b"");
-        let (code, stderr, tail) = frames.close(Duration::from_secs(5)).unwrap();
-        assert_eq!((code, stderr.as_str(), tail.len()), (0, "err\n", 0));
+        assert_eq!(frames.next().unwrap(), Some(&b"abc"[..]));
+        assert_eq!(frames.next().unwrap(), Some(&b"def"[..]));
+        for _ in 0..3 {
+            assert_eq!(frames.next().unwrap(), None);
+            assert_eq!(&frames.buffer[..frames.partial_bytes.unwrap()], b"g");
+        }
+        let end = frames.close(Duration::from_secs(5)).unwrap();
+        assert_eq!(
+            (end.code, end.stderr.as_str(), end.partial_bytes),
+            (0, "err\n", 1)
+        );
     }
 
     #[test]
@@ -257,10 +301,19 @@ mod tests {
             OUT.into(),
         ];
         let mut frames = Frames::spawn(&argv, 2, true).unwrap();
-        assert_eq!(frames.next().as_deref(), Some(&b"wx"[..]));
-        assert_eq!(frames.next().as_deref(), Some(&b"yz"[..]));
-        assert_eq!(frames.next(), None);
-        assert_eq!(frames.close(Duration::from_secs(5)).unwrap().0, 0);
+        assert_eq!(frames.next().unwrap(), Some(&b"wx"[..]));
+        assert_eq!(frames.next().unwrap(), Some(&b"yz"[..]));
+        assert_eq!(frames.next().unwrap(), None);
+        assert_eq!(frames.close(Duration::from_secs(5)).unwrap().code, 0);
+    }
+
+    #[test]
+    fn counting_unframed_stdout_keeps_the_worker_timeout() {
+        let argv = sh("printf x; exec sleep 5");
+        assert!(
+            matches!(Frames::count_stdout(&argv, Duration::from_millis(100)),
+                         Err(Stop::Timeout(command)) if command == argv)
+        );
     }
 
     #[test]

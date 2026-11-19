@@ -122,6 +122,34 @@ fn refusal(row: &Value, lane: &str) -> Vec<&'static str> {
         .collect()
 }
 
+/// Both video references must have produced usable pictures. Older reports have
+/// frame counts and exits but omit some of the trailing byte counts.
+fn complete_reference(section: &Value, count: &str, exit: &str, tail: &str) -> bool {
+    section
+        .get(count)
+        .and_then(python::int)
+        .is_some_and(|n| n > 0)
+        && section.get(exit).and_then(python::int) == Some(0)
+        && [tail, "ours_partial_bytes"]
+            .iter()
+            .all(|key| section.get(key).is_none_or(|n| python::equals_int(n, 0)))
+}
+
+fn video_allows_refusal(decoder: &Value, output: &Value) -> bool {
+    complete_reference(decoder, "frames_ref", "ffmpeg_rc", "ffmpeg_partial_bytes")
+        && complete_reference(
+            output,
+            "pictures_ref",
+            "reference_rc",
+            "reference_partial_bytes",
+        )
+        && decoder.get("frames_ours").and_then(python::int) == Some(0)
+        && matches!(decoder.get("ours_rc").and_then(python::int), Some(0 | 1))
+        && (output.get("ours_rc").and_then(python::int) == Some(0)
+            || (output.get("ours_rc").and_then(python::int) == Some(1)
+                && output.get("pictures_ours").and_then(python::int) == Some(0)))
+}
+
 fn classify(row: &Value, lane: &str) -> String {
     let empty = empty();
     let decoder = get(row, "decoder").unwrap_or(&empty);
@@ -158,7 +186,7 @@ fn classify(row: &Value, lane: &str) -> String {
     }
     if is(ds, "refused-unsupported") || is(ds, "fail") {
         let named = refusal(row, lane);
-        if !named.is_empty() {
+        if !named.is_empty() && video_allows_refusal(decoder, output) {
             return format!("out-of-set (typed refusal: {})", named.join(", "));
         }
     }
@@ -394,7 +422,7 @@ mod tests {
         assert_eq!(
             classify(
                 &row(
-                    r#"{"decoder": {"status": "refused-unsupported", "ours_errors": [{"error": "Unsupported 4:2:2 Chroma"}]}, "output": {"status": "fail"}}"#
+                    r#"{"decoder": {"status": "refused-unsupported", "frames_ref": 1, "frames_ours": 0, "ffmpeg_rc": 0, "ours_rc": 1, "ours_errors": [{"error": "Unsupported 4:2:2 Chroma"}]}, "output": {"status": "fail", "pictures_ref": 1, "reference_rc": 0, "ours_rc": 0}}"#
                 ),
                 "h264"
             ),
@@ -413,6 +441,22 @@ mod tests {
             classify(&row(r#"{"status": "input-hash-mismatch"}"#), "aac"),
             "FAIL"
         );
+    }
+
+    #[test]
+    fn older_refusal_rows_require_a_successful_nonempty_planar_reference() {
+        for (count, code, expected) in [
+            (1, 0, "out-of-set (typed refusal: bit depth)"),
+            (0, 0, "FAIL"),
+            (1, 3, "FAIL"),
+        ] {
+            let input = row(&format!(
+                r#"{{"decoder":{{"status":"refused-unsupported","frames_ref":{count},
+                "ffmpeg_rc":{code},"frames_ours":0,"ours_rc":1,"ours_errors":[{{"error":"unsupported bit depth"}}]}},
+                "output":{{"status":"fail","pictures_ref":1,"reference_rc":0,"ours_rc":0}}}}"#
+            ));
+            assert_eq!(classify(&input, "hevc"), expected);
+        }
     }
 
     #[test]
