@@ -23,6 +23,12 @@ const fn base(unicode: u32) -> u32 {
     unicode & !VARIANT_BIT
 }
 
+/// The CFF string ID for an Adobe StandardEncoding character code (TN 5176,
+/// Appendix B). Unassigned codes map to SID 0, `.notdef`.
+pub const fn standard_encoding_sid(code: u8) -> u16 {
+    STANDARD_ENCODING[code as usize]
+}
+
 /// The CFF standard string of `sid`, a glyph name.
 pub(crate) fn standard_string(sid: u16) -> Option<&'static str> {
     STANDARD_STRINGS.get(usize::from(sid)).copied()
