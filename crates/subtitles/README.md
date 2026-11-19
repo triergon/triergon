@@ -219,4 +219,4 @@ subtitle runner (`crates/subtitle-worker`, `harness/features/subtitle-*`). Every
 under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
 in [docs/status.md](../../docs/status.md). Every subtitle feature was measured at
-`f8e1c4d9` on Linux AArch64 and in the ARMv7 user space.
+`f8e1c4d9` on Linux AArch64 and in the ARMv7 user space, and PGS again at `546045db`.

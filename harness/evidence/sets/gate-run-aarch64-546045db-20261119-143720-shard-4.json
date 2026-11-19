@@ -1,0 +1,154 @@
+{
+ "name": "gate-run-aarch64-546045db-20261119-143720-shard-4",
+ "path": "gate-run-aarch64-546045db-20261119-143720-shard-4",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/546045db0473d0e39d70f67ec0e247e21e18e68b-aarch64-20261119-143720/shard-4/ee906c9782755fe6b7f9dec1009cd6bef34eae358ffa3ef6b7cd32070c17cbd8.tar.zst",
+ "sha256": "ee906c9782755fe6b7f9dec1009cd6bef34eae358ffa3ef6b7cd32070c17cbd8",
+ "bytes": 100886774,
+ "results": [
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "90a953a1ac53b321d822163c6946e692adae2abce27ec3dd8b4987720eced2ba",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "e9230ad36c187076f56429970258b5670827c960e30e8c277196180a5aaee2f9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "ac97f6c104ef4f441e148efbe742fe04985935afb5392fe2e9ef1ec45296c615",
+   "status": 0,
+   "report_sha256": "5a4049996e59d80130c2a1450a2d424fb518e54452665b80a5c3ff749e3c53fd",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "58b54136d1e706d8c21ae99f427cebe407f70db875a08383c56a2699576bbe0a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "3f3e916e1d59b762f90f965f16bb0246fbade024980fa96f321cc3292fa50ced",
+   "status": 0,
+   "report_sha256": "61dae03df5982de10e49b65836388780e9242d24bdd166160d81cceedd2f4d2c",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "754593dafb860e9b187aace0d8aae33cd7ec58309aa8760ab295982b7680a41e",
+   "status": 0,
+   "report_sha256": "fcf3c46c517fed557a1143295646a16c8a1f75007db119b31771c4d5a654d616",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "9a8d8872887fbf643eea42a658a3853ea5c9899e8f1241ecf64d1ddd78a8242c",
+   "status": 0,
+   "report_sha256": "6a68f44f6fcbbb61c6356f8d53fd68eed98ad91f6c797ff3c78db74079332086",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "198e38e91c23c249a72e4166ae5225c9f10e7c05a6574127887703bff99a09ed",
+   "status": 0,
+   "report_sha256": "db772f40afed7f6c0df659c7a48329558918b24b473efac32d9bb5c89f036dd2",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "fb36b26aeea0ed5eac762222ba8e800437ae086e1af6fe177dcae71b5d565ae1",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c5b09ce1ccc16feee29b4262c03fb323d13403c9b05e8f3e901c2324ad7e3f99",
+   "status": 0,
+   "report_sha256": "98bd2c6de196aab9115ddc0246f7d9e258aeb634d3fd08898c90a9961b12d134",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "945f553adc26f15bf2d2655acbdf1ae5b43e6d4d3e753feb5bda8c95fcacbba5",
+   "status": 0,
+   "report_sha256": "ca15a18399ae3013648a589ae26cf677f128c64ce318ccda7e0fbbc79f994139",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "fcfd987bd4e17055c644dd9ef66ac6c893feb5d3bffb573c56f05a7d63a5a59e",
+   "status": 0,
+   "report_sha256": "e718c9db7e42342a16fcdec756f70a09480c050f69bd6b52835126ddb6e7e51a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9cf02cc93fafe39b88f9f0d19f538626dccac6c870203252b66132e15c5b549d",
+   "status": 0,
+   "report_sha256": "f70044c79e22616cfcb8ea6eb1c83904d15ecaa252d399c57951980833dc9e70",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ec094495d5e664813b0a8b110b384d415023e55a7b5a6576b1703c8fb3520e40",
+   "status": 0,
+   "report_sha256": "1e1a095d700019c7c8c11ea154755f0f61d685a4739b61baf2473dedd5fd6ade",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "eef4f5eb6f92cfd2ce0353982c8973b72438e8c61c358dfe49c9cb0345da9d47",
+   "status": 1,
+   "report_sha256": "096fb3aea80e7979e1261c7d3c61ea02990267f604c310c1ab337d8aaca9de40"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "0f1389ddb861bd9537c7a71fa761f6a8bb5f420a511b7bd1411be4742ff83718",
+   "status": 0,
+   "report_sha256": "44ebff0477b1595899b6a2b99a7cd36ab96756b4d14fd04711998e65c7edf6d6"
+  },
+  {
+   "path": "graded/isobmff-3/gate-result.json",
+   "command": "grade",
+   "key": "cba0bb8a1214883b6676041a9af65825d94168f2ddf4d08620445aaf15bd9419",
+   "status": 0,
+   "report_sha256": "222c7d77c521a6565ea2ac4c00e237381b8538283a3904e678ae6caea07ba3d7"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "a286fd59461fb25ff173e2f75c9681f4fb203fc79a9c5937730eadab0150fbf3",
+   "status": 0,
+   "report_sha256": "b9e77060fabf8c0dcad2a18bb0ec23837f1c37a22d1bdaddf52e1f231413b8c1"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "fd482e4efc894324359e77f937c4eeef078673940608e3d22ce49f2905ee5248",
+   "status": 0,
+   "report_sha256": "93740786bbd106d4423e9e24d336438ee4c219d5b934962b03230eb29d9c6389"
+  }
+ ]
+}

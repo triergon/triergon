@@ -1,0 +1,136 @@
+{
+ "name": "gate-run-aarch64-546045db-20261119-143720-shard-5",
+ "path": "gate-run-aarch64-546045db-20261119-143720-shard-5",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/546045db0473d0e39d70f67ec0e247e21e18e68b-aarch64-20261119-143720/shard-5/f8bf53732874cd37445a534c6012b0172ef15294ad26ea86b3c80c419118b896.tar.zst",
+ "sha256": "f8bf53732874cd37445a534c6012b0172ef15294ad26ea86b3c80c419118b896",
+ "bytes": 410739259,
+ "results": [
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "9de5d37b6c306846093ec80e6d68b9d13224ad5e55fbe7f7df90fd6a4123c570",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "e6dfba764832935c076cff0e838849c77c874ac3bf07d767d3a2f723c9850dd2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "14948f8fb1c127571189d52cc4b585b80e7747cbd5ae8e63a19d24b12a464ecb",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "5f34298efa5782ac4449f9815ab01a4447a246c104eed8887c179ae618455f9d",
+   "status": 0,
+   "report_sha256": "9748d0b3cc4642dc4cadb8b1ec33f974d2fe10ec54855d6f3e356a8261d3aae8",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "df43e0c4efb3f0fcc9612374b66cb0f44174e998cf6e07755e5030e76ae94342",
+   "status": 0,
+   "report_sha256": "3dc3d2cfd268a87aea02dd8c979929eb234752848be9068f1e5ee39e4c91a838",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "e5a50359006d3a4265edc169a435f349588137a2eb4a0b6745c365b405817d53",
+   "status": 0,
+   "report_sha256": "b6ebfab0839b9ace3f36738ddedea62a6602bd027e78af77403356c2afa97e40",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "3803ea67ede0cdae2e0a731fce6d070769b5c5b8296cb000a7892dbdeb186e5f",
+   "status": 0,
+   "report_sha256": "995e037b81770e84258612e1e60ceadeeb6efa2c293db6d5741872cde8f89324",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2999413e7f75a55526aac13cee644c3f1a16291eaf028e8b367c55f27d83ea46",
+   "status": 0,
+   "report_sha256": "1913adfddff91cd0c33ba1bc00cfffd830a59566e513fcff9f58468bdeb914ba",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8f8d16cc3a73801d9d768c6b8c4db299829eb2f3fa13dfb947653cb4c746b29c",
+   "status": 0,
+   "report_sha256": "851b7a70cb24a31565a69e508d7ad2f4433afa8fdf098ecf4e5de5df8d75a410",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "e9fde79218bf03e408517b96e33c12c13a18e26021ff47f44e344b6d13873e48",
+   "status": 0,
+   "report_sha256": "0a7c614d852394fe11f2b931fa71fc91ebefabfbb1ad0f491affaba7cb4a8762"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "d2f1278cef20d9a4521f2c113558f1f3b046096fe07999971e0df0e130dc97be",
+   "status": 0,
+   "report_sha256": "ba580aa5a644dbc74755ff75c3603b7e6a3b3b9068627a8468bad841113036c7"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "93fbbbdab23e225d04ea4c8128ddc580d6ebfefa07476bd5ee8b2644f02985aa",
+   "status": 0,
+   "report_sha256": "2e6035c15ed9c0e6c5a936aeafa7604f94d0becd45004dd44ca29c84be644c8b"
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "46a288eccad201f12b80d8cb7cca1d11f4751db71e812777e6f2b8b3d2769ded",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "198a6801e33926ee4964c605c4337191e28f59c56862de7e7504c4fa1403cfdf",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "d4184ba4bf711a70f44641544d8101c5d303232ed23053431bea7f1c4b201012",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "df6f298bb42b4851ca6e23d34de7204031ebd9099b85a6867c2bc5c5e1e9ba2f",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "79587d607d2bb017cf6a02e370035ea1af612bf7f98c0bbd2c5e53e5543aff74",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
