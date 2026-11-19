@@ -228,7 +228,7 @@ path spans fewer instruction-cache lines. Traces and work counts stay
 byte-identical. One full gate run per target on c6g.4xlarge passed every step
 except those on the contract's listed open cases. Progressive `reordered-48000`
 has runtime upper bounds of 0.9652 on Linux AArch64 and 0.7306 on 32-bit ARMv7,
-and no case exceeds 1.05 on either target. Heap and kernel-bound total RSS are
+and no case exceeds the runtime ceiling on either target. Heap and kernel-bound total RSS are
 lower than the reference in every case except ARMv7 packet framing, whose total
 RSS stays open at 1.0835. The run's credentials expired as its shards finished,
 so each shard's output tree was packed, archived and indexed afterwards with the
