@@ -1,0 +1,99 @@
+{
+ "name": "gate-run-armv7-ce55904b-20261119-194218-shard-3",
+ "path": "gate-run-armv7-ce55904b-20261119-194218-shard-3",
+ "retention": "retained",
+ "reason": "Native playback gates with matched HEVC repeats and validated VPS timing.",
+ "key": "evidence/gate-runs/ce55904b842a6ddad77e90688a8ec4528438f576-armv7-20261119-194218/shard-3/7b27620324781b51b163b02e6725ac59b350195c8d313fa3322bb50a20db1df7.tar.zst",
+ "sha256": "7b27620324781b51b163b02e6725ac59b350195c8d313fa3322bb50a20db1df7",
+ "bytes": 22393561,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "5016410d7990055853973872fff5452ebf8641dee7f3b5f0f06108b6955aead6",
+   "status": 0,
+   "report_sha256": "7725a8b21f1b8e58a0dda2ed4339312a3a5e693ca436fc4f678a24299d7b6437",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "025717d4512687c09d1e02b3f87220b1f0ec723ee804614cd23d5862911180b6",
+   "status": 0,
+   "report_sha256": "a161b08a1f92a25e38d1399a279583dae44651df2c8f999b7d8fe8a8d955a05e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "b3a42c09e36685c333f247e2c8f265f60da67a98981e83db68c054db999a87f5",
+   "status": 0,
+   "report_sha256": "0eebaabf96f26c55dc16964470fd22a0c5e0ab5f7c0cd8628d0c7d17b419841b",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "341ea92b4c983a20b473cf7d6a2ccf457e5481779c005dd97de0ef419b7b3dd2",
+   "status": 0,
+   "report_sha256": "6b5959d49ec1f1c849f910a97837695ae8c1f1d563f13329052d5503c6faed52",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c7af680206464c549b420baf4cb403d3a4cca98af678ac238192739d691998c2",
+   "status": 0,
+   "report_sha256": "facc941c7c8110c0a50384d537ee1877072a2e797d5eed9ad30011518d772446",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "687330da10452ce9d7fb2932ed49b67e5d00e866858f2104e490d86508315572",
+   "status": 0,
+   "report_sha256": "593e2121536811a9e0492538a44a2bd82033f302919b1f0c1edfa6dc9e50752d",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4144b42f58de6e3e67aba3b8f3352609a2aba0bc618568c65b9c695ee431f95a",
+   "status": 0,
+   "report_sha256": "81d4919d98cd696d3a4934f0e0045d9963bf6a232f27f0814306ea124b75de54",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a619763e0a0d794f2c1de59ae6ea97d6ef285c6d32d48e082e782efa433bbf37",
+   "status": 0,
+   "report_sha256": "5e520e3a925680303d14e3da97a361d654981d70d68d67765d13c8c1f6e995cc",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "8387efae9da7af5546da828783f8a61182409044c0346bc6b6f937c5771d30d1",
+   "status": 0,
+   "report_sha256": "565353d7a3cdbba443c34e169b7a0baf7b8e40bf0fcd4b9c94b9c12c42e18fde"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "bc7c954621dde5ee414763b4f2984ff76e03b7f50e55aaeb0df8c8db21107bb3",
+   "status": 0,
+   "report_sha256": "b5891a5281e1887ae15ba92f4a9721f74d5a5a771fda94053eff23c29329f9f8"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "649767584d5d42c4fd42dd29b75fb3f1d59e6a12f6ae8ef611151a7867ff3c47",
+   "status": 0,
+   "report_sha256": "b4987099c814a7105f74b420f18813b53a960a7e5e7197506b4eaf61707e9d9e"
+  }
+ ],
+ "source_revisions": [
+  "ce55904b842a6ddad77e90688a8ec4528438f576"
+ ]
+}
