@@ -104,16 +104,26 @@ c6g.4xlarge host per target as the gate measures a codec workload list. Sets
 plans, step records and logs, `aac-access-units-a73350ca-TARGET` the AAC in MOV
 measurements, and `closing-run-ratios-a73350ca` every timed case's paired median and 95%
 bounds with, per feature and target, the cases whose median or bound is above 1.0 and whose
-bound is above 1.20, the [ceiling](quality.md#gates) and 1.05, and the median of the case
-medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
+bound is above 1.20, 1.10 and the present [ceiling](quality.md#gates), and the median of the
+case medians. The run predates the `codecs-audio` item, graded at `bbdefa70`.
 
-The runtime [ceiling](quality.md#gates) is set on one more full sharded gate run per target
+The runtime [ceiling](quality.md#gates) is set on the full sharded gate run per target at
+`31d29945` described below with the PES list and unit reuse, the newest full measurement of
+every item, and on AAC in MOV measured at `4213d042` (0.8717 on Linux AArch64, 1.0062 on
+ARMv7). On Linux AArch64 no timed case has a runtime bound above the ceiling; the highest is
+Matroska segment metadata's `chapters-many` at 1.0352. On ARMv7 two `subtitle-pgs` cases are
+above it, `rle-long-rows-sup` at 1.0591 and `state-c0-and-reserved-sup` at 1.0550; a same-day
+run of that item at `1ebcdadc` measured them at 1.0490 and 1.0496 with the same medians. They
+fail the gate until they are brought below the ceiling: they are not listed as open, and any
+other case above the ceiling fails as usual.
+
+The previous ceiling, 1.10, was set on one more full sharded gate run per target
 at `1c64b775`, measured as the `a73350ca` run was, with set `codec-derived-streams` unpacked
 on its hosts, and on AAC in MOV measured at that revision on one more c6g.4xlarge per
 target; no result was reused. Linux AArch64 ran 156 steps and ARMv7 153. On Linux AArch64
 the grades of `ass-render-host`, `subtitle-dvd-host` and `subtitle-text-host` fail, each only
 on its contract's listed open cases; no step fails on ARMv7. Of 4,316 timed cases on Linux
-AArch64 and 4,362 on ARMv7, none has a runtime bound above the ceiling. The highest are
+AArch64 and 4,362 on ARMv7, none has a runtime bound above 1.10. The highest are
 `ass-render`'s `cache-keys-ass-720p` at 1.0817 (median 1.0782) on Linux AArch64 and
 `aac-hev2-stereo` at 1.0755 (median 1.0711) on ARMv7, where `h264-high-1080p` reaches
 1.0426, `hevc-irap_repeat` 1.0133 and AAC in MOV 1.0176. The only memory bounds above 1.0
@@ -123,7 +133,7 @@ on Linux AArch64, all 135 up to 1.0823 on ARMv7. Sets
 `gate-run-armv7-1c64b775-20261116-230958-shard-1` to `-8` hold the shards' outputs, build
 identities, plans, step records and logs, `aac-access-units-1c64b775-TARGET` the AAC in MOV
 measurements, and `closing-run-ratios-1c64b775` every timed case's paired median and 95%
-bounds, the cases with a bound above 1.05, and per feature and target the worst runtime,
+bounds, the cases with a bound above the present [ceiling](quality.md#gates), and per feature and target the worst runtime,
 heap and total RSS bounds. The rows above keep the revisions they name.
 
 At `2b196e9c`, which keeps `Time`'s 256-bit fallbacks out of line, one more full sharded gate
@@ -134,7 +144,8 @@ workers. On Linux AArch64 the grades of `ass-render-host`, `subtitle-dvd-host` a
 `subtitle-text-host` fail, each only on its contract's listed open cases; no grade fails
 on ARMv7. The capture memory steps fail on both targets without measuring:
 `capture qualify --stage memory` reads the records of its timing step, which a reused
-timing step did not restore then. No runtime or memory bound crosses its limit; per feature,
+timing step did not restore then. No runtime bound crosses 1.10, the ceiling then, and no memory
+bound crosses its limit; per feature,
 the median change of the case medians against `1c64b775` lies within −1.6% and +1.9%
 (+8.1% for the five `subtitle-dvd-host` cases, whose operations take microseconds), as do
 the features whose workers are unchanged, and the changed workers' user-mode instruction
@@ -177,7 +188,7 @@ and the two MPEG-TS groups passed parity, runtime, peak heap and kernel-bound
 total RSS on 555 cases per target on c6g.4xlarge. The largest bounds on Linux AArch64
 were 1.0398 for runtime, 0.8877 for heap and 0.8801 for RSS.
 The 32-bit ARMv7 bounds were 1.0101, 0.7849 and 0.9790, respectively.
-Every runtime upper bound is at most 1.05. The four AAC payload view archives
+Every runtime upper bound is within the present [ceiling](quality.md#gates). The four AAC payload view archives
 list the corresponding build identities and per-case results.
 
 At `29cb8c54`, each AVC access unit is published in exact storage while the
@@ -228,7 +239,8 @@ worst bounds within 0.006 of these (capture 1.0618, Matroska 0.9725, DVD 0.9753)
 `gate-run-TARGET-f8e1c4d9-*` hold the shards' outputs, build identities, plans, step
 records and logs, `gate-run-armv7-78596bf0-20261116-070135-shard-1` to `-5` the earlier
 ARMv7 run, and `capture-matroska-subtitle-ratios-f8e1c4d9` every case's paired runtime
-ratio and memory bounds with, per feature, the worst bounds and the cases above 1.05.
+ratio and memory bounds with, per feature, the worst bounds and the cases above the present
+[ceiling](quality.md#gates).
 
 The PGS rows were measured before that at `99f1027b`, from one partial gate run of the `subtitle-pgs` item per
 target, each on one c6g.4xlarge (Graviton2) from the gate image, kernel `7.0.0-1014-aws`,
@@ -1445,7 +1457,7 @@ gated as on AArch64, and no codec workload is open on this target.
 | Shaping | `shape-libass` 209/209 and `shape-text` 209/209 at `69d4d0f8`, `shape-bidi` 24/24, `shape-simple` 6/6, `shape-unicode` 1/1, `shape-extents` 9/9 | not measured | not measured |
 | ASS rendering | `ass-render` 100/100 and `ass-render-host` 4/4 pass; the crate's tests pass | `ass-render` 0.8002 (100/100 pass), `ass-render-host` 0.7315 (4/4 pass) at `eaff16ba` | heap ≤0.9754, total RSS ≤0.9975 (104/104 lower) at `eaff16ba` |
 | Subtitles, text | `subtitle-text` 367/367 and `subtitle-text-host` 23/23 pass | `subtitle-text` 1.0041 (367/367 pass); `subtitle-text-host` 0.0755 (23/23 pass) at `f8e1c4d9` | `subtitle-text` heap ≤0.3358, total RSS ≤0.9982 (367/367 lower); `subtitle-text-host` heap ≤0.0075, total RSS ≤0.9337 (23/23 lower) at `f8e1c4d9` |
-| Subtitles, PGS | 319/319 (`subtitle-pgs`) | 1.0132 (319/319 pass) at `f8e1c4d9` | heap ≤0.9678, total RSS ≤0.9917 (319/319 lower) at `f8e1c4d9` |
+| Subtitles, PGS | 319/319 (`subtitle-pgs`) | 1.0591 (317/319 pass: `rle-long-rows-sup` 1.0591 and `state-c0-and-reserved-sup` 1.0550 are above the ceiling) at `31d29945` | heap ≤0.9678, total RSS ≤0.9917 (319/319 lower) at `f8e1c4d9` |
 | Subtitles, PGS capsules | 229/229 (`subtitle-pgs-capsules`) | 0.6936 (229/229 pass) at `f8e1c4d9` | heap ≤0.5966, total RSS ≤0.7911 (229/229 lower) at `f8e1c4d9` |
 | Subtitles, DVB | 241/241 (`subtitle-dvb`) | 0.8514 (241/241 pass) at `f8e1c4d9` | heap ≤0.7118, total RSS ≤0.8630 (241/241 lower) at `f8e1c4d9` |
 | Subtitles, DVD | 228/228 (`subtitle-dvd`) and 5/5 (`subtitle-dvd-host`, gated on this target) | `subtitle-dvd` 0.9752 (228/228 pass; median of the cases 0.1909); `subtitle-dvd-host` 0.6668 (5/5 pass) at `f8e1c4d9` | `subtitle-dvd` heap ≤0.9657, total RSS ≤0.8882 (228/228 lower); `subtitle-dvd-host` heap ≤0.2037, total RSS ≤0.8105 (5/5 lower) at `f8e1c4d9` |
@@ -1567,7 +1579,8 @@ assembled lane by lane, was slower on both targets and stays scalar.
 
 At `81edf4c0` the three HE-AAC workloads measure 1.0032 (`aac-he-stereo`), 1.0163
 (`aac-hev2-stereo`) and 1.0182 (`aac-he-5.1`), from 1.0647, 1.0751 and 1.0510 at `906d0a36`.
-Each timing stopped after 20 pairs on the ceiling, its upper bound already below 1.05. A
+Each timing stopped after 20 pairs on the ceiling then in force, its upper bound already below
+the present [ceiling](quality.md#gates). A
 stage account at `2a6a07a7` named three items the reference runs as NEON code and the
 decoder ran scalar: the device path's s16 conversion (about 6% of the cycles of both stereo
 workloads, against 0.5% in FFmpeg's NEON conversion), the covariance sums of HF generation
@@ -1780,7 +1793,7 @@ peak heap and kernel-bound total RSS on each c6g.4xlarge target. The worst
 runtime bounds are 1.0519 on Linux AArch64 and 1.0536 on 32-bit ARMv7.
 
 Earlier, at `001d40b6`, all 15 cases per target passed parity, runtime, peak
-heap and kernel-bound total RSS. The runtime upper bounds were at most 1.05.
+heap and kernel-bound total RSS. The runtime upper bounds were within the present [ceiling](quality.md#gates).
 
 At `e5f6c971`, all 15 cases per c6g.4xlarge target pass conversion, encoding,
 mux, runtime, peak heap and kernel-bound total RSS. The input
@@ -1793,7 +1806,7 @@ connection left the original shards 2 and 3 without archives. The second
 run measured their seven cases at the same revision. Run `20261118-185012`
 covered all 15 ARMv7 cases.
 
-In that comparison, the sole bound above 1.05 was AArch64 `c04-motion-960` at 1.0595 after the
+In that comparison, the sole bound above the present [ceiling](quality.md#gates) was AArch64 `c04-motion-960` at 1.0595 after the
 validated 20-pair early stop. Its bound was 1.0519 with 30 pairs at `a34b98d0`
 and 1.0385 at `001d40b6`. Both recent revisions use filtered chroma.
 On one AArch64 host, `cargo xtask count` reports 0.78% fewer user-mode
@@ -1828,7 +1841,7 @@ The remaining gap is spread over the encoder's DCT, quantisation and search,
 which FFmpeg's ARMv7 build runs in ARMv6 and NEON routines (by their symbols
 in its profile).
 
-At `a73350ca` 16 `subtitle-dvd` cases were above 1.05 here (`vob-split` worst, 1.0869),
+At `a73350ca` 16 `subtitle-dvd` cases were above the present [ceiling](quality.md#gates) here (`vob-split` worst, 1.0869),
 while the feature's median of case medians was 0.1918: they are the DVD program streams
 with many full-size subpictures, whose time is the run-length decode; most other cases
 are small. The worker ran FFmpeg's user-mode instruction count on
