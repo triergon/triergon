@@ -71,6 +71,11 @@ assert!(composite.fill.is_some() && composite.border.is_some() && composite.shad
 A bitmap's `position` is its first pixel relative to the origin it is placed
 against: a glyph's fill and border each count from their `PlacedBitmap::origin`,
 and a run's composite from `Composite::origin`, the least origin of its glyphs.
+`Bitmap::copy_region` copies a window to the origin and charges one unit per
+16 pixels of each destination row, rounded up. A full-width window copies the
+aligned rows together. A narrower window copies its pixels and initializes
+only the padding to zero. `Bitmap::stride_within` checks the logical bitmap
+size and gives its aligned stride before allocation.
 
 `Raster::render` draws a glyph in one call. A renderer that keeps the bitmaps it
 draws, as libass's caches do, renders through `Raster::render_with` and a
