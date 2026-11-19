@@ -54,6 +54,9 @@ Implement `Source` for real transports. `ByteSource` serves immutable local
 bytes. Use `io::PlaybackProbe` (or `io::Probe` for containers only) when the
 format is unknown; its `PlaybackInput` holds a `SelectedInput` or a
 `RawVideoSource` that replays the probed prefix and then continues reading.
+Both probes accept the MP4 opening boxes `ftyp`, `styp`, `moov`, `free`,
+`wide` and `mdat`. For transport streams they examine a 389-byte prefix and
+require exactly one of the TS188 and M2TS192 three-sync patterns to match.
 MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 `mp4_plan::Mp4IndexJob` → `Engine::mp4`.
 Indexed MP4 packets share immutable track metadata. A complete sample in a
