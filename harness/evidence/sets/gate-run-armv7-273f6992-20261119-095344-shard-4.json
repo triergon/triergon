@@ -1,0 +1,110 @@
+{
+ "name": "gate-run-armv7-273f6992-20261119-095344-shard-4",
+ "path": "gate-run-armv7-273f6992-20261119-095344-shard-4",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/273f6992b83532651d66f95ac58810e9baa8be9f-armv7-20261119-095344/shard-4/9177f8ae8f8425a4fd46c26c4e16d171ebda57717ea30f15dec0c9741479046b.tar.zst",
+ "sha256": "9177f8ae8f8425a4fd46c26c4e16d171ebda57717ea30f15dec0c9741479046b",
+ "bytes": 80787943,
+ "results": [
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "9886a1ce34bedfc4b61114079503fc7dde3b126e0e0311df71d88b2303c69b5a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/subtitle-dvd-host/gate-result.json",
+   "command": "report --memory",
+   "key": "2a452c3b30b02e43d1520def06ecace06bd249fa09d0bd916af667daf97ad79e",
+   "status": 0,
+   "report_sha256": "0f01b58789569eb3e4ab8fe7e052d5290a32f265ec9e0eb6c650411fd05407c8",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "54f69efdc8bb5cbaa421b2e7369aacd3ebadc349153aeacb3aca821bfaa6d450",
+   "status": 0,
+   "report_sha256": "a776ddd96d9f3f425b1b95fb98d09c930bdb1a7052360cb80ed7ee0c1362504d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mpegts-pes/gate-result.json",
+   "command": "report --memory",
+   "key": "db76e1f1820db5c7799040b50c2d35857dcdbfa16ae47e581c1d35d6d69d5550",
+   "status": 0,
+   "report_sha256": "ce28b1b4258c513b3119a66c9fd5d39d95163734ec72647ce24898c08fac8187",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "4e14510754f25ed2c343c6477555acd53bb510797bc0dbe4eb9df591ed388a8f",
+   "status": 0,
+   "report_sha256": "3090a6b007bbdde770e1665a0bd36331da90a0a3fb286151cc350823310a9b08",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e79665f1463f9ae6b160e3be3ecba68c1f4ca1f17e9f8ab7cbdb66bbbb064be6",
+   "status": 0,
+   "report_sha256": "1b214a0e66b02441213e2196fe11a60402c87e607cee1b88df57a2821055d7fc",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "08c0481a918eadb7eeb44bde41178974ba94f2d3367698b5e04648022135d023",
+   "status": 0,
+   "report_sha256": "3309330a2307a9f552a2697a4f3e8df0062d5d50b47ce27253c3b78b2499a016",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mpegts-pes/gate-result.json",
+   "command": "report --benchmark",
+   "key": "e366497ca6a39868b1cabef514e5bbfa443ed06fdd0e471770875b9efe3857fc",
+   "status": 0,
+   "report_sha256": "e0fafc3f9047aa504be0b9ab4619e964cea8ba6069c191d2ef8f09c3dc75132e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "fd3a913beacd3dd3d1a82805b6a80fb03ec82849e347d4effc45eb37a8a5da5f",
+   "status": 0,
+   "report_sha256": "be160046c4240d5652f0873d64162aaeacf6b20863bac8e759a970d00851cc1a",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd-host/gate-result.json",
+   "command": "grade",
+   "key": "8036a62b069f53640c3868512ac90cf1f27adaf501180155f20482d77909b1ea",
+   "status": 0,
+   "report_sha256": "d52773e9eb37864e5d0cd20fe8dced309bb91d71b2d46fda4206cad3fbb567b8"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "d4aba104c503e229fb9c3d4791ba9d874a1a50ce59eee3cc2f34682b3987946a",
+   "status": 0,
+   "report_sha256": "4f5d7f6b55912ce4211b955e93d9a220a0adf4586968a7179968c6be24ee3cdb"
+  },
+  {
+   "path": "graded/mpegts-pes/gate-result.json",
+   "command": "grade",
+   "key": "e9489de8296dbe51b97c226d1b9e62b605578d1676b7b84ed1e076ccc0b62853",
+   "status": 0,
+   "report_sha256": "0e3ec463aa3d25032236a0e7542031ff5ef70fb251fe89203d2a517380d0761f"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "3fdeab7e312c0f63811b0d8cad727f35d1cc417b756448f1708209295dd4a26c",
+   "status": 0,
+   "report_sha256": "2cc1619a33c31e18a8b7afd57f24454814098c1619d207182104e410562be7ee"
+  }
+ ]
+}

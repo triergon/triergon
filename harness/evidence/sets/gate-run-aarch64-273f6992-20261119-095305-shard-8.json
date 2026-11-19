@@ -1,0 +1,85 @@
+{
+ "name": "gate-run-aarch64-273f6992-20261119-095305-shard-8",
+ "path": "gate-run-aarch64-273f6992-20261119-095305-shard-8",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/273f6992b83532651d66f95ac58810e9baa8be9f-aarch64-20261119-095305/shard-8/731c35848c13aef82f8eed521c720bb8d79c5d74f2b1e79d99a839b7392e5264.tar.zst",
+ "sha256": "731c35848c13aef82f8eed521c720bb8d79c5d74f2b1e79d99a839b7392e5264",
+ "bytes": 335214168,
+ "results": [
+  {
+   "path": "memory/matroska-legacy-aac/gate-result.json",
+   "command": "report --memory",
+   "key": "05ebd7d7e191b1a77f422995c9209022f5c9acb3bb553ac4858a9568f19a6619",
+   "status": 0,
+   "report_sha256": "cbf851d119e1f183698c94b7387ff9240d2b4fac5b6f2dd6eaff613b59662012",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "a6be60cec1c9edf2e97f4150da1f95bd2bac42670490de9b0a3e3c19e257e040",
+   "status": 0,
+   "report_sha256": "caca55f8b9cf360e1410c16f8c1828687c2d9518f6dca7a6f18ef34f1418281a",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "d51529b51d9ca85dde08feb08b75940c3e4c41d7b885d58bc5c2ba3c5ed6068e",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/matroska-legacy-aac/gate-result.json",
+   "command": "report --benchmark",
+   "key": "82b5e494996933ab7f7191f261f6306825927e06ba50a5e78c30c551b81d1050",
+   "status": 0,
+   "report_sha256": "256f6e26ba926e25dee4fcd9784914d3b67d449a30f73bdd5ae86d798cb98b51",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c2fd3ff28b7f9ced05c299a1dc55128c13b296d8d30dcb5dab984dc7a6ba28e6",
+   "status": 0,
+   "report_sha256": "c490140c05081e7a62f9238015905169e817d4a340908e07a4352edd6fef0978",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-legacy-aac/gate-result.json",
+   "command": "grade",
+   "key": "2d2c2e8b122b89dd7060cf298db7a498aed8cf168238974af6ffb05626765f27",
+   "status": 0,
+   "report_sha256": "fabb983774f913e3e1b2dba8e813e5f6e84e4a73dd0b21989a706194558975ff"
+  },
+  {
+   "path": "graded/subtitle-pgs-capsules/gate-result.json",
+   "command": "grade",
+   "key": "e06a77e4a41549ebf96238fe6e7a46efb0e478fb2696e917f52fe73c8bb580a6",
+   "status": 0,
+   "report_sha256": "2e33ff16bd7ffc4201915e1e922cf568d91f667ba45b40845289115e706b9247"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "f1db20f4d5bf4158bee07700a405e6d6fd45c05e109d58c97d871cbfb5a1d6e6",
+   "status": 1,
+   "report_sha256": "242d5e19c82bbd6cee66d5bcaa9f2112394e508bab2b61c73a58d8499563adb2"
+  },
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "911c1e83156e9c2630fca1b14ef1a58ef756946a4dafdb49b8e4d8edede8d345",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "406ee9ce8198e79172249ab25c412b4e3e19999858dd41d34883c0499525c585",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}

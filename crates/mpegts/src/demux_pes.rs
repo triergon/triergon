@@ -579,6 +579,7 @@ impl DemuxObserver {
     fn finite_private(&self) -> bool {
         self.private_audio.is_some() || self.payload_format == PayloadFormat::Dvb
     }
+    #[cold]
     fn finite_private_error(&self, audio: &'static str, dvb: &'static str) -> Error {
         Error::Unsupported(if self.payload_format == PayloadFormat::Dvb {
             dvb
