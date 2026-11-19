@@ -1,11 +1,11 @@
 //! SubRip times and cue numbers, read as the `srt` demuxer reads them.
 //!
 //! A number is leading white space, an optional sign, then decimal digits.
-//! Its value saturates to the 32-bit signed range, so a field beyond it reads
-//! as 2³¹ − 1 or −2³¹, as observed on 32-bit ARMv7. A field has no range of
-//! its own: minutes and
-//! seconds above 59 count as they are, and the fraction is a count of
-//! milliseconds whatever its width (`1,5` is 1.005 seconds).
+//! A timestamp field saturates to the selected signed range, then reads as a
+//! 32-bit signed number. Minutes and seconds above 59 count as they are.
+//! The fraction counts milliseconds whatever its width (`1,5` is 1.005 seconds).
+
+use super::TimestampFieldWidth;
 
 /// A cursor over one line.
 struct Scan<'a> {
@@ -32,39 +32,47 @@ impl Scan<'_> {
     }
 
     /// A number, as its sign and the magnitude of its digits.
-    fn signed(&mut self) -> Option<(bool, i64)> {
+    fn signed(&mut self) -> Option<(bool, u64)> {
         self.space();
         let negative = self.peek() == Some(b'-');
         if matches!(self.peek(), Some(b'-' | b'+')) {
             self.at += 1;
         }
         let start = self.at;
-        let mut magnitude = 0_i64;
+        let mut magnitude = 0_u64;
         while let Some(digit) = self.peek().filter(u8::is_ascii_digit) {
             magnitude = magnitude
                 .saturating_mul(10)
-                .saturating_add(i64::from(digit - b'0'));
+                .saturating_add(u64::from(digit - b'0'));
             self.at += 1;
         }
         (self.at > start).then_some((negative, magnitude))
     }
 
-    /// A number, saturated to the 32-bit signed range.
-    fn integer(&mut self) -> Option<i64> {
+    /// Saturate before narrowing. The signed minimum has a larger magnitude.
+    fn integer(&mut self, width: TimestampFieldWidth) -> Option<i64> {
         let (negative, magnitude) = self.signed()?;
-        let value = if negative { -magnitude } else { magnitude };
-        Some(value.clamp(i32::MIN.into(), i32::MAX.into()))
+        let maximum = match width {
+            TimestampFieldWidth::Bits32 => i32::MAX as u64,
+            TimestampFieldWidth::Bits64 => i64::MAX as u64,
+        };
+        let value = magnitude.min(maximum + u64::from(negative)) as i32;
+        Some(i64::from(if negative {
+            value.wrapping_neg()
+        } else {
+            value
+        }))
     }
 
     /// `H:M:S`, one byte of `separators` and the fraction; in milliseconds.
-    fn clock(&mut self, separators: &[u8]) -> Option<i64> {
-        let hours = self.integer()?;
+    fn clock(&mut self, separators: &[u8], width: TimestampFieldWidth) -> Option<i64> {
+        let hours = self.integer(width)?;
         self.one_of(b":")?;
-        let minutes = self.integer()?;
+        let minutes = self.integer(width)?;
         self.one_of(b":")?;
-        let seconds = self.integer()?;
+        let seconds = self.integer(width)?;
         self.one_of(separators)?;
-        let fraction = self.integer()?;
+        let fraction = self.integer(width)?;
         Some(milliseconds(hours, minutes, seconds, fraction))
     }
 }
@@ -81,13 +89,13 @@ fn milliseconds(hours: i64, minutes: i64, seconds: i64, fraction: i64) -> i64 {
 /// A SubRip timing line's start and end in milliseconds: `H:M:S,F --> H:M:S,F`
 /// with `,` or `.` before the fraction, white space around the arrow
 /// optional and anything after the end.
-pub(super) fn subrip(line: &[u8]) -> Option<(i64, i64)> {
+pub(super) fn subrip(line: &[u8], width: TimestampFieldWidth) -> Option<(i64, i64)> {
     let mut scan = Scan { bytes: line, at: 0 };
-    let start = scan.clock(b",.")?;
+    let start = scan.clock(b",.", width)?;
     scan.space();
     line.get(scan.at..)?.starts_with(b"-->").then_some(())?;
     scan.at += 3;
-    let end = scan.clock(b",.")?;
+    let end = scan.clock(b",.", width)?;
     Some((start, end))
 }
 
