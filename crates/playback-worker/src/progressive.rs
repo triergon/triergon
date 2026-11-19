@@ -106,33 +106,46 @@ impl RetainedStream {
         fields: &[i64],
         out: &mut Option<&mut dyn Write>,
     ) -> Result<()> {
-        mix(&mut self.digest, u64::from(tag as u32));
         if let Some(out) = out.as_deref_mut() {
-            write!(out, "{tag}")?;
-            for &field in fields {
-                mix(&mut self.digest, field as u64);
-                write!(out, " {field}")?;
-            }
-            write!(out, " ")?;
-        } else {
-            for &field in fields {
-                mix(&mut self.digest, field as u64);
-            }
+            return self.trace_fields(out, tag, fields);
         }
+        mix(&mut self.digest, u64::from(tag as u32));
+        for &field in fields {
+            mix(&mut self.digest, field as u64);
+        }
+        Ok(())
+    }
+
+    /// Folds and writes a unit's fields to the trace.
+    #[cold]
+    fn trace_fields(&mut self, out: &mut dyn Write, tag: char, fields: &[i64]) -> Result<()> {
+        mix(&mut self.digest, u64::from(tag as u32));
+        write!(out, "{tag}")?;
+        for &field in fields {
+            mix(&mut self.digest, field as u64);
+            write!(out, " {field}")?;
+        }
+        write!(out, " ")?;
         Ok(())
     }
 
     #[inline]
     fn payload(&mut self, data: &[u8], out: &mut Option<&mut dyn Write>) -> Result<()> {
-        if let Some(out) = out.as_deref_mut() {
-            for &byte in data {
-                mix(&mut self.digest, u64::from(byte));
-                write!(out, "{byte:02x}")?;
-            }
-        } else {
-            fold_bytes(&mut self.digest, data);
+        match out.as_deref_mut() {
+            Some(out) => self.trace_payload(out, data)?,
+            None => fold_bytes(&mut self.digest, data),
         }
         self.bytes += data.len() as u64;
+        Ok(())
+    }
+
+    /// Folds and writes a unit's payload to the trace in hex.
+    #[cold]
+    fn trace_payload(&mut self, out: &mut dyn Write, data: &[u8]) -> Result<()> {
+        for &byte in data {
+            mix(&mut self.digest, u64::from(byte));
+            write!(out, "{byte:02x}")?;
+        }
         Ok(())
     }
 
@@ -208,7 +221,7 @@ impl RetainedStream {
             }
         }
         if let Some(out) = out.as_deref_mut() {
-            writeln!(out)?;
+            end_trace_line(out)?;
         }
         Ok(held.unit)
     }
@@ -249,6 +262,45 @@ impl RetainedStream {
     }
 }
 
+/// Writes which track a unit came out on to the trace.
+#[cold]
+fn trace_output(out: &mut dyn Write, stream: usize) -> Result<()> {
+    writeln!(out, "o {}", ['v', 'a'][stream])?;
+    Ok(())
+}
+
+/// Ends a line of the trace.
+#[cold]
+fn end_trace_line(out: &mut dyn Write) -> Result<()> {
+    writeln!(out)?;
+    Ok(())
+}
+
+/// Describes a playback failure as the operation reports it.
+#[cold]
+fn playback_error(error: triergon_playback::Error) -> String {
+    format!("{error:?}")
+}
+
+/// Prints the facts of both retained streams to stderr, after a traced session.
+#[cold]
+fn report_streams(input: &InputFacts, [video, audio]: &[RetainedStream; 2]) {
+    eprintln!(
+        "STREAM {{\"input_bytes\":{},\"reads\":{},\"max_read\":{},\"first\":[{},{}],\"high\":[{},{}],\"across_read\":[{},{}],\"retired_before_eof\":[{},{}],\"retired\":true}}",
+        input.bytes,
+        input.reads,
+        input.max_read,
+        video.first.unwrap(),
+        audio.first.unwrap(),
+        video.high,
+        audio.high,
+        video.across_read,
+        audio.across_read,
+        video.retired_before_eof,
+        audio.retired_before_eof,
+    );
+}
+
 #[derive(Default)]
 struct Work {
     packets: u64,
@@ -262,7 +314,6 @@ fn operation(
     mut out: Option<&mut dyn Write>,
     require_streaming: bool,
 ) -> Result<Work> {
-    let playback_error = |error: triergon_playback::Error| format!("{error:?}");
     let mut file = File::open(path)?;
     let facts = file.metadata()?;
     let size = facts.len();
@@ -344,7 +395,7 @@ fn operation(
                 }
                 let stream = usize::from(matches!(unit, TsProgressiveUnit::Audio { .. }));
                 if let Some(out) = out.as_deref_mut() {
-                    writeln!(out, "o {}", ['v', 'a'][stream])?;
+                    trace_output(out, stream)?;
                 }
                 if let Some(retired) = streams[stream].enqueue(unit, &input, &mut out)? {
                     reader.reuse_unit(retired);
@@ -381,21 +432,7 @@ fn operation(
         return Err("progressive pool retained charged storage".into());
     }
     if out.is_some() {
-        let [video, audio] = &streams;
-        eprintln!(
-            "STREAM {{\"input_bytes\":{},\"reads\":{},\"max_read\":{},\"first\":[{},{}],\"high\":[{},{}],\"across_read\":[{},{}],\"retired_before_eof\":[{},{}],\"retired\":true}}",
-            input.bytes,
-            input.reads,
-            input.max_read,
-            video.first.unwrap(),
-            audio.first.unwrap(),
-            video.high,
-            audio.high,
-            video.across_read,
-            audio.across_read,
-            video.retired_before_eof,
-            audio.retired_before_eof,
-        );
+        report_streams(&input, &streams);
     }
     Ok(work)
 }
