@@ -113,8 +113,8 @@ pub struct Encoder {
     analysis: BudgetVec<Analysis>,
     row_activity: BudgetVec<f64>,
     previous_mvs: BudgetVec<Mv>,
-    coarse_cur: BudgetVec<u8>,
-    coarse_ref: BudgetVec<u8>,
+    /// Current and reference luma for motion search, one half each.
+    coarse_planes: BudgetVec<u8>,
     /// Luma of the previous source picture, for scene-change detection.
     previous_luma: BudgetVec<u8>,
     /// Chroma (Cb, then Cr) of the previous source picture: with the luma, it
@@ -201,8 +201,7 @@ impl Encoder {
             analysis: BudgetVec::try_filled(budget, Analysis::default(), mbs)?,
             row_activity: BudgetVec::try_filled(budget, 0.0, g.macroblock_height())?,
             previous_mvs: BudgetVec::try_filled(budget, Mv::ZERO, mbs)?,
-            coarse_cur: BudgetVec::new(budget),
-            coarse_ref: BudgetVec::new(budget),
+            coarse_planes: BudgetVec::new(budget),
             previous_luma: BudgetVec::try_filled(
                 budget,
                 0,
@@ -239,7 +238,7 @@ impl Encoder {
         self.reference.view()
     }
 
-    /// Encode `input` (same geometry, padded) into `out` (cleared first).
+    /// Encode `input` (same geometry, padded), replacing `out` on success.
     pub fn encode(&mut self, input: &Picture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
         if input.geometry() != self.cfg.geometry {
             return Err(Error::PictureGeometry {
@@ -264,13 +263,7 @@ impl Encoder {
         let repeated = same_source_luma && input.cb() == previous_cb && input.cr() == previous_cr;
         let mut f_code = 0;
         if !key {
-            let g = self.cfg.geometry;
-            let coarse = g.luma_stride() / 4 * (g.macroblock_height() * 4);
-            if self.coarse_cur.len() != coarse {
-                self.coarse_cur.try_resize(coarse, 0)?;
-                self.coarse_ref.try_resize(coarse, 0)?;
-            }
-            let (f, scene_change) = self.analyse(input, same_source_luma);
+            let (f, scene_change) = self.analyse(input, same_source_luma)?;
             f_code = f;
             key = scene_change;
         }
@@ -436,7 +429,7 @@ impl Encoder {
     /// λ ≈ 0.85·q²; a positive total means the content changed more than
     /// intra coding costs. Comparing sources keeps the decision about the
     /// content rather than about the reconstruction's quantisation.
-    fn analyse(&mut self, input: &Picture, same_source_luma: bool) -> (u32, bool) {
+    fn analyse(&mut self, input: &Picture, same_source_luma: bool) -> Result<(u32, bool)> {
         let g = self.cfg.geometry;
         let stride = g.luma_stride();
         let lambda = self.rc.last_q.clamp(2, 31);
@@ -445,53 +438,65 @@ impl Encoder {
         let mut scene = 0.0f64;
         let mut unchanged = 0;
         let (mut lo, mut hi) = (0i32, 0i32);
-        let rows = g.macroblock_height() * 16;
-        motion::decimate4(input.y(), stride, rows, &mut self.coarse_cur);
-        motion::decimate4(self.reference.y(), stride, rows, &mut self.coarse_ref);
-        let coarse = Coarse {
-            cur: &self.coarse_cur,
-            reference: &self.coarse_ref,
-            width: g.macroblock_width() * 4,
+        let coarse = if same_source_luma {
+            None
+        } else {
+            let rows = g.macroblock_height() * 16;
+            let width = stride / 4;
+            let plane_len = width * (rows / 4);
+            if self.coarse_planes.is_empty() {
+                self.coarse_planes.try_resize(2 * plane_len, 0)?;
+            }
+            let (cur, reference) = self.coarse_planes.split_at_mut(plane_len);
+            motion::decimate4(input.y(), stride, rows, cur);
+            motion::decimate4(self.reference.y(), stride, rows, reference);
+            Some(Coarse {
+                cur,
+                reference,
+                width,
+            })
         };
         for mb_y in 0..g.macroblock_height() {
             let mut row = 0.0;
             for mb_x in 0..g.macroblock_width() {
                 let i = mb_y * g.macroblock_width() + mb_x;
                 let (x, y) = (mb_x * 16, mb_y * 16);
-                let left = if mb_x > 0 {
-                    self.analysis[i - 1].mv
-                } else {
-                    Mv::ZERO
-                };
-                let mut candidates = [left, self.previous_mvs[i], Mv::ZERO, Mv::ZERO, Mv::ZERO];
-                if mb_y > 0 {
-                    candidates[2] = self.analysis[i - g.macroblock_width()].mv;
-                    if mb_x + 1 < g.macroblock_width() {
-                        candidates[3] = self.analysis[i - g.macroblock_width() + 1].mv;
+                let (mv, sad) = if let Some(coarse) = &coarse {
+                    let left = if mb_x > 0 {
+                        self.analysis[i - 1].mv
+                    } else {
+                        Mv::ZERO
+                    };
+                    let mut candidates = [left, self.previous_mvs[i], Mv::ZERO, Mv::ZERO, Mv::ZERO];
+                    if mb_y > 0 {
+                        candidates[2] = self.analysis[i - g.macroblock_width()].mv;
+                        if mb_x + 1 < g.macroblock_width() {
+                            candidates[3] = self.analysis[i - g.macroblock_width() + 1].mv;
+                        }
                     }
-                }
-                if mb_x + 1 < g.macroblock_width() {
-                    candidates[4] = self.previous_mvs[i + 1];
-                }
-                let search = Search {
-                    cur: input.y(),
-                    reference: self.reference.y(),
-                    stride,
-                    x,
-                    y,
-                    bounds: Bounds::new(&g, mb_x, mb_y, SEARCH_RANGE),
-                    pred: left,
-                    lambda,
-                    f_code: 2,
-                };
-                let neighbour = if mb_x > 0 {
-                    self.analysis[i - 1].sad
+                    if mb_x + 1 < g.macroblock_width() {
+                        candidates[4] = self.previous_mvs[i + 1];
+                    }
+                    let search = Search {
+                        cur: input.y(),
+                        reference: self.reference.y(),
+                        stride,
+                        x,
+                        y,
+                        bounds: Bounds::new(&g, mb_x, mb_y, SEARCH_RANGE),
+                        pred: left,
+                        lambda,
+                        f_code: 2,
+                    };
+                    let neighbour = if mb_x > 0 {
+                        self.analysis[i - 1].sad
+                    } else {
+                        u32::MAX
+                    };
+                    search.run(&candidates, coarse, mb_x, mb_y, neighbour)
                 } else {
-                    u32::MAX
-                };
-                // The source did not move: its zero vector is its motion. A
-                // search would only fit the reference's quantisation noise.
-                let (mv, sad) = if same_source_luma {
+                    // Repeated luma predicts at zero motion, even when quantisation
+                    // changed the reconstructed reference.
                     let origin = y * stride + x;
                     let zero = motion::sad16(
                         &input.y()[origin..],
@@ -500,8 +505,6 @@ impl Encoder {
                         stride,
                     );
                     (Mv::ZERO, zero)
-                } else {
-                    search.run(&candidates, &coarse, mb_x, mb_y, neighbour)
                 };
                 // Intra only pays off when prediction is poor; skip the
                 // deviation pass otherwise.
@@ -558,7 +561,7 @@ impl Encoder {
         let f_code = (1..=MAX_F_CODE)
             .find(|&f| lo >= -(16 << (f - 1)) && hi < 16 << (f - 1))
             .unwrap_or(MAX_F_CODE);
-        (f_code, scene > 0.0)
+        Ok((f_code, scene > 0.0))
     }
 
     /// Per-row intra activity of an I picture.
