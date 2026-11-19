@@ -1,0 +1,69 @@
+{
+ "name": "gate-run-armv7-273f6992-20261119-095344-shard-6",
+ "path": "gate-run-armv7-273f6992-20261119-095344-shard-6",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/273f6992b83532651d66f95ac58810e9baa8be9f-armv7-20261119-095344/shard-6/e5cddccb848aeb5690b7d752762e971f6d2ba5cb45cf62db08c5c14e61037caf.tar.zst",
+ "sha256": "e5cddccb848aeb5690b7d752762e971f6d2ba5cb45cf62db08c5c14e61037caf",
+ "bytes": 356113150,
+ "results": [
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "2db34e7856771d14babd2a1ce037d885cf8b5da02e84d912eee04ae7c8c4bfc2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "82d649877173ea2a13a732408fb1698e4e07ae1da580189ad14762e136bbd5ce",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "5218ba3146aebc9c9b5730b09607f588aa8b7a1fb365a8dfd61228ced9f6169c",
+   "status": 0,
+   "report_sha256": "1e389210c4b3f8c7637802a64590339e0162c937248d422e5ef51186d3c38d46",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6c7a8e7d569e3f5e597b8d86a01c482e951021c33d64817f06a0667ea8e3b8ae",
+   "status": 0,
+   "report_sha256": "2eab2809fbff94cc76580900e05ef0a01a28665eec54deb8e3aebd1fee5e5d32",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "bd620ff8914500b34138a9360684319350ea131417f365db3b2dacf802d19c46",
+   "status": 0,
+   "report_sha256": "89fd9ea3d05b3e5c233cb76ff5fe77ff117fce982c3cf3282707587b5cc53c0e"
+  },
+  {
+   "path": "graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "818b6dd43629fcd17cf998e0a0e94c76ff9ba466e45773d4eb173bfd1d4ecede",
+   "status": 0,
+   "report_sha256": "a85d6c7a5b7cd37c69b8033112ae83510347e472834ca2ecd3826afb5ab3c6c3"
+  },
+  {
+   "path": "tests/checked/gate-result.json",
+   "command": "gate test",
+   "key": "4abe6cbdad7a2ea984f7d008b1bc4dbdd8e1de06647e55efa8ed0b2261e31983",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "9abfb0fcde4b3e10b4037973c0935ba21e8b6537c3c04565b3267510f32b159b",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
