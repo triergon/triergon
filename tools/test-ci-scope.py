@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Tests of tools/ci-scope.py: each case commits a change to a scratch repository and
-checks the scope it is given."""
+"""Exercise the CI scope and target cache helpers in isolated Git checkouts."""
 import importlib.util
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -28,7 +28,7 @@ BASE_FILES = {
 }
 
 
-class Scope(unittest.TestCase):
+class GitFixture(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -53,6 +53,8 @@ class Scope(unittest.TestCase):
         self.git('commit', '-q', '--allow-empty', '-m', message)
         return self.git('rev-parse', 'HEAD')
 
+
+class Scope(GitFixture):
     def scope(self, *edits):
         """The scope of EDITS made on top of the base commit."""
         self.git('reset', '-q', '--hard', self.base)
@@ -135,6 +137,48 @@ class Scope(unittest.TestCase):
         self.base = self.commit('split include')
         self.assertEqual(self.scope(self.edit('crates/a/NOTES.md')), 'full')
         self.assertEqual(self.scope(self.edit('README.md')), 'docs')
+
+
+class TargetCache(GitFixture):
+    helper = Path(__file__).resolve().with_name('target-cache.py')
+    unchanged = 946684800
+
+    def cache(self, operation, check=True):
+        return subprocess.run([sys.executable, self.helper, operation, 'target'],
+                              cwd=self.root, capture_output=True, check=check)
+
+    def test_dirty_record_preserves_previous_cache_index(self):
+        self.cache('record')
+        index = self.root / 'target/.sources'
+        previous = index.read_bytes()
+        self.write('README.md', 'dirty')
+        self.assertNotEqual(self.cache('record', check=False).returncode, 0)
+        self.assertEqual(index.read_bytes(), previous)
+
+    def test_restored_target_without_record_is_discarded(self):
+        self.write('target/old', 'stale artifact')
+        self.cache('apply')
+        self.assertFalse((self.root / 'target').exists())
+        self.cache('apply')
+
+    def test_apply_compares_modes_and_contents_and_dates_links_separately(self):
+        self.git('config', 'core.filemode', 'true')
+        link = self.root / 'link'
+        link.symlink_to('README.md')
+        self.commit('add link')
+        self.cache('record')
+        edited = self.root / 'README.md'
+        executable = self.root / 'xtask/src/main.rs'
+        edited.write_text('new contents')
+        executable.chmod(0o755)
+        self.git('add', 'README.md', 'xtask/src/main.rs')
+        self.cache('apply')
+        self.assertEqual(link.lstat().st_mtime, self.unchanged)
+        self.assertEqual((self.root / 'docs/status.md').stat().st_mtime, self.unchanged)
+        self.assertGreater(edited.stat().st_mtime, self.unchanged)
+        self.assertGreater(executable.stat().st_mtime, self.unchanged)
+        self.assertFalse((self.root / 'target/.sources').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
