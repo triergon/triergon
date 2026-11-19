@@ -250,12 +250,11 @@ one AVC track and one ADTS AAC track. AVC starts on a timed IDR with an
 access-unit delimiter. AAC needs an initial PES timestamp, then advances
 by the exact ADTS duration when an anchor is absent. Source timestamps stay
 available alongside the playback clocks. Completed units can be delivered
-before the end of input. Each AVC access unit, here and in HLS segments, gets
-storage of exactly its size, and the reader keeps its assembly buffer for the
-next unit; where the pool cannot hold that copy, the assembly buffer itself
-becomes the unit's storage. Each advance can process several internal steps within
-the caller's work budget. A source that spends its remaining work before a
-reply is ready leaves the request pending for the next advance. Start a new
+before the end of input. The AVC reader transfers its assembly buffer to each
+completed unit in progressive and HLS playback. It copies only the delimiter
+lookahead into the next buffer. Each advance can process several internal steps
+within the caller's work budget. A source that spends its remaining work before
+a reply is ready leaves the request pending for the next advance. Start a new
 reader to begin at another offset.
 Input requests prefer a TS188 boundary within the cursor's window limit. Short
 replies continue through the ordinary packet carry path.

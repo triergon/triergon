@@ -97,23 +97,48 @@ const INVERSE: [[i32; 8]; 8] = {
     basis
 };
 
-/// Forward DCT of an 8×8 block of samples or residuals in raster order.
+/// Storage order of the forward transform's input, before it returns raster coefficients.
+#[inline]
+pub(crate) const fn fdct_input_index(row: usize, column: usize) -> usize {
+    if cfg!(target_arch = "arm") {
+        column * 8 + row
+    } else {
+        row * 8 + column
+    }
+}
+
+/// Forward DCT of an 8×8 block loaded with [`fdct_input_index`].
+/// The output coefficients are in raster order on every target.
 pub(crate) fn fdct(block: &mut [i32; 64]) {
-    // On 32-bit ARM the transposed row pass vectorises across columns.
     #[cfg(target_arch = "arm")]
-    {
-        transpose(block);
-        columns_in_place(block, BITS - PASS, fdct_1d);
-        transpose(block);
-    }
+    fdct_transposed(block);
     #[cfg(not(target_arch = "arm"))]
-    for row in block.as_chunks_mut::<8>().0 {
-        *row = fdct_1d(*row, BITS - PASS);
+    {
+        for row in block.as_chunks_mut::<8>().0 {
+            *row = fdct_1d(*row, BITS - PASS);
+        }
+        columns_in_place(block, BITS + PASS, fdct_1d);
     }
+}
+
+#[cfg(any(target_arch = "arm", test))]
+#[inline]
+fn fdct_transposed(block: &mut [i32; 64]) {
+    // The input load puts each spatial row in a column. Run the row pass
+    // down those columns, then restore raster order for the second pass.
+    columns_in_place(block, BITS - PASS, fdct_1d);
+    transpose(block);
     columns_in_place(block, BITS + PASS, fdct_1d);
 }
 
-#[cfg(target_arch = "arm")]
+#[cfg(test)]
+pub(crate) fn fdct_raster(block: &mut [i32; 64]) {
+    #[cfg(target_arch = "arm")]
+    transpose(block);
+    fdct(block);
+}
+
+#[cfg(any(target_arch = "arm", test))]
 #[inline(always)]
 fn transpose(block: &mut [i32; 64]) {
     for r in 0..8 {
@@ -253,7 +278,7 @@ mod tests {
             let input: [i32; 64] = std::array::from_fn(|_| rng.next(-255, 255));
             let wanted = reference_fdct(&input);
             let mut got = input;
-            fdct(&mut got);
+            fdct_raster(&mut got);
             for i in 0..64 {
                 assert!(
                     (got[i] as f64 - wanted[i]).abs() <= 1.0,
@@ -314,8 +339,23 @@ mod tests {
     #[test]
     fn forward_rows_equal_the_butterfly() {
         let mut rng = Lcg(5);
-        for _ in 0..20_000 {
-            let input: [i32; 64] = std::array::from_fn(|_| rng.next(-255, 255));
+        let constants = [-255, -1, 0, 1, 255].map(|sample| [sample; 64]);
+        let impulses = (0..64).flat_map(|at| {
+            [-255, 255].map(|sample| {
+                let mut block = [0; 64];
+                block[at] = sample;
+                block
+            })
+        });
+        let checkerboard =
+            std::array::from_fn(|i| if (i / 8 + i % 8) % 2 == 0 { 255 } else { -255 });
+        let random = (0..20_000).map(|_| std::array::from_fn(|_| rng.next(-255, 255)));
+        let inputs = constants
+            .into_iter()
+            .chain(impulses)
+            .chain([checkerboard])
+            .chain(random);
+        for input in inputs {
             let mut rows = [0; 64];
             for (out, row) in rows.chunks_exact_mut(8).zip(input.chunks_exact(8)) {
                 out.copy_from_slice(&fdct_1d(row.try_into().unwrap(), BITS - PASS));
@@ -328,8 +368,13 @@ mod tests {
                 }
             }
             let mut got = input;
-            fdct(&mut got);
+            fdct_raster(&mut got);
             assert_eq!(got, wanted, "{input:?}");
+
+            // Exercise the ARM layout on hosts where the encoder loads raster rows.
+            let mut transposed = std::array::from_fn(|i| input[(i % 8) * 8 + i / 8]);
+            fdct_transposed(&mut transposed);
+            assert_eq!(transposed, wanted, "{input:?}");
         }
     }
 
@@ -361,7 +406,7 @@ mod tests {
     #[test]
     fn constant_block_dc() {
         let mut b = [128; 64];
-        fdct(&mut b);
+        fdct_raster(&mut b);
         assert_eq!(b[0], 1024);
         assert!(b[1..].iter().all(|&v| v == 0));
         let mut r = [0; 64];

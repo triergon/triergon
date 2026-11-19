@@ -35,7 +35,7 @@ fn code(
     }
     let mut expected = [0; 64];
     let mut coefficients = *residual;
-    dct::fdct(&mut coefficients);
+    dct::fdct_raster(&mut coefficients);
     e.quant.inter(&coefficients, q, &mut expected);
     e.levels.fill([0; 64]);
     let mut bytes = Vec::new();
@@ -175,7 +175,7 @@ fn fixed_transform_magnitude_is_bounded_by_ceil_sad_over_four() {
             .sum::<u32>()
             .div_ceil(4);
         let mut coefficients = input;
-        dct::fdct(&mut coefficients);
+        dct::fdct_raster(&mut coefficients);
         assert!(coefficients.iter().all(|v| v.unsigned_abs() <= bound));
     }
 }

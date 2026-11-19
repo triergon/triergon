@@ -1,0 +1,56 @@
+{
+ "name": "gate-run-armv7-c30b9c80-20261118-221127-shard-4",
+ "path": "gate-run-armv7-c30b9c80-20261118-221127-shard-4",
+ "retention": "retained",
+ "reason": "Capture parity, runtime and kernel-bound memory at c30b9c80 on 32-bit ARMv7.",
+ "key": "evidence/gate-runs/c30b9c80f4828eb1409e1a59bce0fe6d49668ffa-armv7-20261118-221127/shard-4/5d92b8d778cff9dd03cd9179a2eec9802f0766a14b8f1da75a34aeb270c1c215.tar.zst",
+ "sha256": "5d92b8d778cff9dd03cd9179a2eec9802f0766a14b8f1da75a34aeb270c1c215",
+ "bytes": 423458531,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b9dcf59e85c02a07396dcbb4441685084f476cab29497b9e5caae66030321297",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "b3c7797809a36f91030468c424efe92ab6564d812deaf32f1434332213f298be",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "037bcedd4693c0867ba575e2bf5a6df17ef2b9318e7087d62405f28a20ae0da2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "729ced22ad1bedcaeecda0bfa984f92a5b823c77ae8f30ca5d3be9ca0a3fb80b",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "869ff1d56178eadd56705a256bc59ef1e4e7c8278aad2d1349253244986532c6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "7529676facb4f43c6e6740cebd96a291d8b0a968c630020df9ca090d0fc86c5f",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "c30b9c80f4828eb1409e1a59bce0fe6d49668ffa"
+ ]
+}
