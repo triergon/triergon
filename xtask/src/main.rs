@@ -36,6 +36,7 @@ mod references;
 mod sha256;
 mod shape;
 mod stats;
+mod subtitle_fixtures;
 mod toml;
 mod transport_fixtures;
 mod walk;
@@ -72,6 +73,7 @@ commands:
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
+  subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
                  matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
@@ -211,6 +213,7 @@ fn main() -> ExitCode {
         Some("check-revisions") => check_revisions(&root),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
+        Some("subtitle-fixtures") => subtitle_fixtures::main(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
         Some("link-order") => link_order(&root, &args[1..]),

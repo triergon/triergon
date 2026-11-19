@@ -295,6 +295,14 @@ resource limit becomes an explicit, reviewed rule for that case.
   the DVD cases the subtitles reference flags. The decoder follows FFmpeg built
   with GCC for 32-bit ARM hard-float, and such a case is open on
   AArch64.
+  For text, host text, PGS capsules, DVB and teletext, `cargo xtask
+  subtitle-fixtures verify FEATURE REFERENCE` runs the independent FFmpeg worker
+  over the authored inputs and checks the complete manifest byte for byte.
+  Use `record` to write the manifest once every fold succeeds. For
+  `subtitle-text-host`, both commands take `--target TRIPLE` and use that
+  target's reference. Recording preserves the other targets' folds.
+  The [subtitle worker guide](../crates/subtitle-worker/README.md#recording-and-verifying-subtitle-fixtures)
+  lists the workers and input roots.
   Pins are recorded with the feature's `worker_operation`, the operation
   `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
   reference with these pins names the features in `cases_from` (`raster-simd`

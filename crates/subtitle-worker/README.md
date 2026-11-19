@@ -97,3 +97,23 @@ forced flag, stride, index plane, palette and the palette value of every pixel. 
 fold is the digest of the byte transcript stored as `expected.bin` beside each case
 in `crates/subtitles/tests/native-compatibility-gold/`, and a test checks all 229
 in work slices of any size. The corpus is `harness/features/subtitle-pgs-capsules/`.
+
+## Recording and verifying subtitle fixtures
+
+`cargo xtask subtitle-fixtures verify FEATURE REFERENCE` runs the independent
+FFmpeg worker on every authored case in order. It checks the complete manifest,
+including input SHA-256s, decoder arguments, packet counts, folded byte counts
+and digests. Use `record` in place of `verify` to write the manifest after all
+folds succeed.
+
+| Feature | Reference in `target/harness/` | Operation | Input location |
+| --- | --- | --- | --- |
+| `subtitle-text`, `subtitle-text-host` | `ffmpeg-formats-worker` | `subtitle-text-fold` | Repository fixtures |
+| `subtitle-pgs-capsules` | `ffmpeg-formats-worker` | `pgs-fold` | Repository PGS capsules |
+| `subtitle-dvb`, `subtitle-teletext` | `ffmpeg-subtitles-worker` | `sub-fold` | `.research/subtitle-corpus` |
+
+For `subtitle-text-host`, pass `--target TRIPLE` for the reference worker's
+target. Recording replaces that target's fold in each case and preserves the
+others. `--corpus DIR` selects the input root and `--manifest FILE` selects the
+manifest to check or write. The text capsule and broadcast stream authors
+continue to generate their input bytes and enumerate their cases in Python.
