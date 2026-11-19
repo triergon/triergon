@@ -181,7 +181,11 @@ descriptors are 16 bytes.
   from several slices when the first slice contains its header prefix.
 - DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
   resync, termination frames or DTS-HD extension parsing. HCRC is reported, not
-  checked.
+  checked. `DtsHeaderInspector` and `inspect_dts_header_bits` expose the raw
+  seven-bit NBLKS code once complete. Their `coded_window_samples` view is
+  `32 × (NBLKS + 1)` core samples per channel for codes 5 through 127.
+  `normal_window` additionally requires a normal frame, SHORT=31, a normal
+  block count (7, 15, 31, 63 or 127), a known sample rate and version 0–7.
 
 ## Conformance
 
