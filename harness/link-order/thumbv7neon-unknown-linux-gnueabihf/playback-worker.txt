@@ -48,7 +48,7 @@ triergon_core::bytes::charge_replacement
 <alloc::raw_vec::RawVecInner>::finish_grow
 triergon_core::bytes::settle_replacement
 <triergon_core::bytes::BudgetVec<u8>>::try_extend_from_slice
-core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::cues::Cue>>>
+core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_mpegts::SourceRange>>>
 <triergon_core::bytes::BudgetVec<u8>>::freeze
 <triergon_isobmff::boxes::BoxView>::new
 <triergon_core::bytes::Bytes as core::ops::deref::Deref>::deref
@@ -353,7 +353,6 @@ core::slice::sort::shared::smallsort::insertion_sort_shift_left::<triergon_playb
 <core::slice::iter::Windows<triergon_playback::engines::TsNativeTrack> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&[triergon_playback::engines::TsNativeTrack], <triergon_playback::engines::Engine>::ts_native_program_v1::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>
 core::ptr::drop_glue::<triergon_playback::engines::TsNativeTracks>
 <triergon_core::bytes::BudgetVec<core::option::Option<triergon_playback::player::Output>>>::reallocate
-<triergon_playback::engines::TsEngine>::poll::<triergon_playback::engines::BackendStep>
 <triergon_mpegts::stream::TransportStream>::poll
 <triergon_mpegts::framer::TransportFramer>::poll_bound_carrier::<false, false>
 <triergon_mpegts::framer::TransportFramer>::complete
@@ -409,9 +408,10 @@ triergon_mpegts::pes::timestamp
 <triergon_core::bytes::BudgetVec<triergon_mpegts::SourceRange>>::try_reserve_exact
 <triergon_core::bytes::BudgetVec<triergon_mpegts::SourceRange>>::try_push
 core::ptr::drop_glue::<core::option::Option<triergon_mpegts::pes::PesHeader>>
-<triergon_core::bytes::BudgetVec<triergon_mpegts::demux_pes::DemuxSpan>>::try_reserve_exact
+<triergon_mpegts::demux_pes::pes_list::PesList<triergon_mpegts::demux_pes::DemuxSpan>>::try_reserve_exact
 <triergon_core::bytes::BudgetVec<triergon_mpegts::demux_pes::DemuxSpan>>::reallocate
 <triergon_core::bytes::Bytes>::into_slice
+<triergon_mpegts::demux_pes::pes_list::PesList<triergon_mpegts::demux_pes::DemuxSpan>>::try_push
 <triergon_core::bytes::BudgetVec<triergon_mpegts::demux_pes::DemuxSpan>>::try_push
 <triergon_mpegts::pes::PesAssembler>::push
 <triergon_mpegts::stream::TransportStream>::poll_pes
@@ -420,6 +420,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_mpegts::pes::PesHeader>>
 <triergon_core::bytes::BudgetVec<triergon_mpegts::pes::PesSpan>>::reallocate
 <triergon_mpegts::pes::PesAssembler>::retain_body_carrier
 <triergon_mpegts::pes::PesAssembler>::append_body_carrier
+<triergon_mpegts::demux_pes::pes_list::PesList<triergon_mpegts::SourceRange>>::try_reserve_exact
 <triergon_playback::engines::TsEngine>::project_pending_packet::<triergon_playback::engines::BackendStep>
 <triergon_mpegts::demux_clock::DemuxClock>::project_header
 <triergon_mpegts::demux_pes::DemuxSpan as core::convert::AsRef<[u8]>>::as_ref
@@ -429,6 +430,7 @@ triergon_mpegts::clock::source_timestamp
 core::ptr::drop_glue::<triergon_mpegts::pes::Pes>
 <triergon_mpegts::psi::section::Section>::repeated
 <triergon_core::bytes::BudgetVec<triergon_mpegts::SourceRange>>::grow_for_push
+<triergon_playback::engines::TsEngine>::end_entity::<triergon_playback::engines::BackendStep>
 <triergon_mpegts::stream::TransportStream>::eof
 core::ptr::drop_glue::<triergon_playback::engines::TsEngine>
 core::ptr::drop_glue::<triergon_mpegts::stream::PsiRoute>
@@ -459,6 +461,7 @@ playback_worker::hls::run::{closure#1}
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::admit
 <triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::on_event
 triergon_playback::hls_segment::select_tracks
+<triergon_playback::engines::TsEngine>::next_native_update
 <triergon_playback::hls_avc::AvcTsReader as triergon_playback::hls_segment::lanes::LaneAssembler>::bind
 <triergon_playback::hls_aac::HlsAac as triergon_playback::hls_segment::lanes::LaneAssembler>::bind
 <triergon_playback::engines::TsEngine>::offer_native_transport
@@ -470,7 +473,6 @@ triergon_playback::hls_segment::select_tracks
 <triergon_playback::hls_avc::AvcTsReader>::push
 triergon_playback::hls_pes::clock_describes
 <triergon_playback::hls_avc::AvcTsClock>::from_demux
-<triergon_mpegts::demux_pes::DemuxPacket as triergon_playback::ts_payload::PesInput>::into_payload
 core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_avc::PendingPes>>
 <triergon_playback::hls_avc::AvcTsReader as triergon_playback::hls_segment::lanes::LaneAssembler>::poll
 <triergon_playback::hls_avc::AvcTsReader>::step
@@ -488,6 +490,7 @@ triergon_framing::nal_syntax::skip_avc_scaling_matrix::<triergon_bitstream::rbsp
 triergon_playback::hls_avc::remember::<u8, triergon_playback::hls_avc::syntax::pps>
 <triergon_core::bytes::BudgetVec<triergon_playback::hls_avc::ParameterSet<u8>>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_playback::hls_avc::ParameterSet<u8>>>::reallocate
+<triergon_mpegts::demux_pes::compact::PayloadCursor>::into_spans
 <triergon_mpegts::pes::PesAssembler>::emit::<false>
 triergon_playback::hls_avc::syntax::slice_picture
 <triergon_playback::hls_avc::AvcTsReader>::emit
@@ -502,9 +505,8 @@ triergon_playback::hls_segment::reserve_one::<triergon_playback::hls_segment::La
 triergon_playback::hls_pes::pes_time
 core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_aac::PendingPes>>
 <triergon_playback::hls_aac::HlsAac>::poll
-<triergon_playback::hls_aac::PendingPes>::current
+<triergon_mpegts::demux_pes::compact::DemuxSpanViews>::next_bytes
 <triergon_mpegts::demux_pes::compact::PayloadCursor>::remaining_spans
-<triergon_mpegts::demux_pes::compact::DemuxSpanViews as core::iter::traits::iterator::Iterator>::next
 <triergon_mpegts::demux_pes::compact::PayloadCursor>::drain_remaining::<<triergon_playback::hls_aac::PendingPes>::try_coalesce::{closure#3}>
 <triergon_mpegts::demux_pes::compact::PayloadCursor>::retire_current
 <triergon_core::bytes::BytesView>::into_bytes
@@ -514,6 +516,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_playback::hls_aac::PendingP
 core::ptr::drop_glue::<triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::shutdown
 core::ptr::drop_glue::<triergon_playback::hls_avc::AvcTsReader>
+core::ptr::drop_glue::<triergon_playback::ts_payload::SpentLists>
 core::ptr::drop_glue::<triergon_playback::hls_aac::HlsAac>
 <triergon_playback::hls_segment::SegmentReader<triergon_playback::input::ByteSource, triergon_playback::hls_avc::AvcTsReader, triergon_playback::hls_aac::HlsAac>>::take_with::<triergon_playback::hls_clock::HlsParserOnlyAudioClock, <triergon_playback::hls_segment::HlsSegmentReader<triergon_playback::input::ByteSource>>::take_parser_only::{closure#0}>
 <triergon_core::time::Time>::to_nanoseconds
@@ -618,6 +621,7 @@ core::ptr::drop_glue::<triergon_matroska::incremental::Phase>
 <triergon_matroska::incremental::ElementReader>::begin::<triergon_matroska::incremental::typed_bridge::CompactDelivery>
 <triergon_core::input::InputCursor>::read_discard
 <triergon_matroska::incremental::typed_bridge::CompactDelivery as triergon_matroska::incremental::EnvelopeDelivery>::leaf
+core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::cues::Cue>>>
 <triergon_matroska::typed::reader::Reader>::start_leaf_projected::<triergon_matroska::typed::reader::projection::TypedProjection>
 core::ptr::drop_glue::<triergon_matroska::typed::reader::State>
 <triergon_matroska::matroska::typed::header::EbmlJob>::step
@@ -683,8 +687,8 @@ core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::SharedBy
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization_bytes
 <triergon_framing::avc_config::AvcConfigParser>::new
 <triergon_framing::avc_config::AvcConfigParser>::step
-<triergon_core::bytes::BudgetVec<triergon_framing::avc_config::AvcNalDescriptor>>::reallocate
-<triergon_framing::avc_config::AvcConfigParser>::publish
+<triergon_framing::avc_config::AvcConfigParser>::advance
+<triergon_framing::avc_config::AvcConfigParser>::publication_ready
 triergon_playback::hls_avc::syntax::startup_sps
 triergon_playback::hls_avc::syntax::read_hrd
 core::ptr::drop_glue::<triergon_framing::avc_config::AvcConfiguration>
@@ -701,7 +705,6 @@ core::ptr::drop_glue::<triergon_framing::aac_config::AacAscParser>
 <triergon_playback::matroska_feed::discovery::MatroskaCompactDiscovery<triergon_playback::input::ByteSource>>::finish
 <triergon_playback::matroska_feed::MatroskaFeedSetup>::new
 <triergon_playback::matroska_feed::MatroskaFeedSetup>::step
-core::ptr::drop_glue::<triergon_framing::avc_config::AvcConfigParser>
 core::ptr::drop_glue::<triergon_playback::matroska_feed::MatroskaFeedSetup>
 playback_worker::matroska_video::session::{closure#6}
 core::ptr::drop_glue::<triergon_matroska::typed::Event>
@@ -783,16 +786,20 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
 <triergon_framing::hevc_config::HvcConfigParser>::new
 <triergon_framing::hevc_config::HvcConfigParser>::step
-<triergon_core::bytes::BudgetVec<triergon_framing::hevc_config::HvcArrayDescriptor>>::reallocate
+<triergon_framing::hevc_config::HvcConfigParser>::advance
 triergon_playback::raw_video::config::hevc::startup_sps
 <triergon_playback::raw_video::config::hevc::Rbsp>::bounded
 triergon_playback::raw_video::config::hevc::vps
+<triergon_framing::hevc_config::HvcConfigNal>::length_field_bytes
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
+<triergon_matroska::matroska::Track>::legacy_aac_profile
+<triergon_matroska::matroska::LegacyAacProfile>::from_codec_id
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::new
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::step
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>
+triergon_playback::raw_video::config::hevc::vps_timing
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::FeedCodec>
 playback_worker::matroska_audio::run

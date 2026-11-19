@@ -129,8 +129,8 @@ core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::SharedBy
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization_bytes
 <triergon_framing::avc_config::AvcConfigParser>::new
 <triergon_framing::avc_config::AvcConfigParser>::step
-<triergon_core::bytes::BudgetVec<triergon_framing::avc_config::AvcNalDescriptor>>::reallocate
-<triergon_framing::avc_config::AvcConfigParser>::publish
+<triergon_framing::avc_config::AvcConfigParser>::advance
+<triergon_framing::avc_config::AvcConfigParser>::publication_ready
 triergon_playback::hls_avc::syntax::startup_sps
 <triergon_bitstream::rbsp::Rbsp as triergon_bitstream::checked::BitSource>::exp_golomb
 <triergon_playback::hls_avc::syntax::Rbsp>::bounded
@@ -158,7 +158,6 @@ core::ptr::drop_glue::<triergon_framing::aac_config::AacAscParser>
 <triergon_playback::matroska_feed::discovery::MatroskaCompactDiscovery<triergon_playback::input::ByteSource>>::finish
 <triergon_playback::matroska_feed::MatroskaFeedSetup>::new
 <triergon_playback::matroska_feed::MatroskaFeedSetup>::step
-core::ptr::drop_glue::<triergon_framing::avc_config::AvcConfigParser>
 core::ptr::drop_glue::<triergon_playback::matroska_feed::MatroskaFeedSetup>
 playback_worker::matroska_video::session::{closure#6}
 core::ptr::drop_glue::<triergon_playback::engines::RawEvent>
@@ -263,7 +262,7 @@ core::ptr::drop_glue::<triergon_matroska::typed::reader::seeking::ScanBoundary>
 <triergon_matroska::incremental::ElementReader>::admit_typed_leaf
 <triergon_framing::hevc_config::HvcConfigParser>::new
 <triergon_framing::hevc_config::HvcConfigParser>::step
-<triergon_core::bytes::BudgetVec<triergon_framing::hevc_config::HvcArrayDescriptor>>::reallocate
+<triergon_framing::hevc_config::HvcConfigParser>::advance
 triergon_playback::raw_video::config::hevc::startup_sps
 triergon_playback::raw_video::config::hevc::sps_prefix
 triergon_playback::raw_video::config::hevc::skip_profile_tier_level
@@ -273,16 +272,20 @@ triergon_playback::raw_video::config::hevc::skip_profile_tier_level
 <triergon_playback::raw_video::config::hevc::Rbsp>::flag
 <triergon_playback::raw_video::config::hevc::Rbsp>::bounded
 triergon_playback::raw_video::config::hevc::vps
+<triergon_framing::hevc_config::HvcConfigNal>::length_field_bytes
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfiguration>
 core::ptr::drop_glue::<triergon_framing::hevc_config::HvcConfigParser>
+<triergon_matroska::matroska::Track>::legacy_aac_profile
+<triergon_matroska::matroska::LegacyAacProfile>::from_codec_id
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::new
 <triergon_matroska::matroska::typed::configuration::Configuration>::initialization
 <triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>::step
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbySetup>
+triergon_playback::raw_video::config::hevc::vps_timing
 <triergon_bitstream::rbsp::Rbsp>::skip
-<triergon_bitstream::rbsp::Rbsp>::refill
 triergon_playback::raw_video::config::hevc::sps_timing
 triergon_playback::raw_video::config::hevc::skip_short_term_sets
+<triergon_bitstream::rbsp::Rbsp>::refill
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::MatroskaHevcDolbyFeed>
 core::ptr::drop_glue::<triergon_playback::matroska_feed::hevc_dolby::FeedCodec>
 playback_worker::matroska_audio::run
