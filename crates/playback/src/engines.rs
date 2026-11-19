@@ -2104,6 +2104,11 @@ impl TsEngine {
 
     fn poll<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
         if let Some(at) = self.native_update_at.take()
+            && self
+                .native_tracks
+                .as_slice()
+                .get(at..)
+                .is_some_and(|tracks| tracks.iter().any(|track| track.update.is_some()))
             && let Some(event) = self.next_native_update(at)
         {
             return T::project(event);
