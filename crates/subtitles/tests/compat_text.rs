@@ -124,6 +124,25 @@ fn document_timestamp_width_selects_the_decimal_bounds() {
 }
 
 #[test]
+fn wide_webvtt_unsigned_overflow_precedes_negation() {
+    for (field, start) in [
+        ("-18446744073709551615", 1000),
+        ("-18446744073709551616", -1000),
+    ] {
+        let source = format!("WEBVTT\n\n00:{field}.000 --> 00:03.000\nA\n\n");
+        assert_eq!(
+            read_with_width(
+                source.as_bytes(),
+                document::Syntax::WebVtt,
+                1,
+                Some(document::TimestampFieldWidth::Bits64)
+            ),
+            [cue(start, 3000 - start, "A")],
+        );
+    }
+}
+
+#[test]
 fn utf16_subrip_keeps_the_selected_signed_minimum() {
     let source = "1\n00:00:-9223372036854775809,000 --> 00:00:01,000\nA\n";
     let mut utf16 = vec![0xff, 0xfe];
