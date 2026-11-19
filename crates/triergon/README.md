@@ -60,8 +60,12 @@ reading as soon as a fixed container signature selects the format. Matroska need
 four bytes, Ogg five and ISO BMFF eight. A native FLAC marker also suffices once
 higher-priority container signatures are ruled out. Frame-based and ID3-prefixed
 inputs use the elementary probe once at EOF or 64 KiB, whichever comes first.
-The seekable adapter rewinds the source. The sequential adapter replays every
-consumed byte and releases its charged prefix after the last byte is replayed.
+The seekable adapter rewinds the source. Before reading a pipe, the sequential
+adapter reserves room for the largest replay the pool can admit, up to 64 KiB
+with elementary readers or 389 bytes without them. A caller holding that room
+can release it and retry the same pipe. Fixed signatures allocate only the bytes
+consumed. Longer elementary probes use one buffer. The sequential adapter
+releases its retained capacity after replaying the last byte.
 
 ## Supported
 

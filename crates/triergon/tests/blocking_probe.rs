@@ -238,3 +238,56 @@ fn last_probe_byte_confirms_late_mpeg_audio_and_replay_releases_its_charge() {
     ));
     assert_eq!(small.used(), base);
 }
+
+#[cfg(feature = "elementary")]
+#[test]
+fn sequential_budget_pressure_leaves_the_pipe_at_the_signature() {
+    let mut frames = vec![0x21; 65536];
+    for at in [200, 617, 1034] {
+        frames[at..at + 4].copy_from_slice(&[0xff, 0xfb, 0x90, 0x64]);
+    }
+    for (input, expected) in [
+        (&b"fLaC\x00\x00\x00\x22"[..], Probe::Flac),
+        (&frames, Probe::MpegAudio),
+    ] {
+        let pool = Budget::new(Budget::control_storage_bytes() + 65536).unwrap();
+        let mut pipe = input;
+        for available in [0, 32768] {
+            let held = pool.reserve(pool.available() - available).unwrap();
+            assert!(matches!(
+                open_sequential(&mut pipe, &pool),
+                Err(Error::Backpressure { .. })
+            ));
+            assert_eq!(pipe.len(), input.len());
+            drop(held);
+        }
+        let opened = open_sequential(&mut pipe, &pool).unwrap();
+        assert!(matches!(
+            (opened.reader(), expected),
+            (AnyReader::Flac(_), Probe::Flac) | (AnyReader::MpegAudio(_), Probe::MpegAudio)
+        ));
+        let mut bytes = Vec::new();
+        opened.into_inner().read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, input);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[cfg(feature = "elementary")]
+#[test]
+fn seekable_elementary_probe_fits_a_single_window_in_the_pool() {
+    let base = Budget::control_storage_bytes();
+    let pool = Budget::new(base + 65536).unwrap();
+    let mut bytes = vec![0x21; 65536];
+    for at in [200, 617, 1034] {
+        bytes[at..at + 4].copy_from_slice(&[0xff, 0xfb, 0x90, 0x64]);
+    }
+    let mut file = Cursor::new(bytes);
+    for _ in 0..2 {
+        let opened = open_blocking(&mut file, &pool).unwrap();
+        assert!(matches!(opened.reader(), AnyReader::MpegAudio(_)));
+        assert_eq!(opened.into_inner().position(), 0);
+        assert_eq!(pool.used(), base);
+    }
+    assert_eq!(pool.peak(), base + 65536);
+}

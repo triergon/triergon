@@ -4,7 +4,7 @@ use triergon_core::signature::{
     self,
     TransportSync::{M2ts192, Ts188},
 };
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use triergon_core::{Budget, Error, Reservation, Result};
 
 /// What the first bytes of a source look like.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,21 +104,63 @@ fn elementary(bytes: &[u8]) -> Probe {
     }
 }
 
-/// Probe fixed signatures on the stack. Only a sequential reader needs to
-/// retain these bytes. Frame-based probing also needs temporary storage.
+const LIMIT: usize = 64 * 1024;
+
+/// A replay allocation and the reservation covering its capacity.
+#[derive(Debug)]
+pub(super) struct Prefix {
+    pub(super) bytes: Vec<u8>,
+    charge: Reservation,
+}
+
+impl Prefix {
+    // Allocate once, after the signature or the first block tells us how much
+    // space to use. A pipe can already hold the reservation for this allocation.
+    fn allocate(&mut self, capacity: usize) -> Result<()> {
+        self.charge.resize_to(capacity)?;
+        self.bytes
+            .try_reserve_exact(capacity)
+            .map_err(|_| Error::Allocation)?;
+        self.charge.resize_to(self.bytes.capacity())
+    }
+}
+
+/// Probe fixed signatures on the stack. Only pipes need to retain these bytes.
 pub(super) struct ProbeBuffer {
     header: [u8; M2ts192.prefix_len()],
     used: usize,
-    extended: BudgetVec<u8>,
+    prefix: Prefix,
+    maximum: usize,
 }
 
 impl ProbeBuffer {
     pub(super) fn new(pool: &Budget) -> Self {
+        let bound = if cfg!(feature = "elementary") {
+            LIMIT
+        } else {
+            M2ts192.prefix_len()
+        };
         Self {
             header: [0; M2ts192.prefix_len()],
             used: 0,
-            extended: BudgetVec::new(pool),
+            prefix: Prefix {
+                bytes: Vec::new(),
+                charge: Reservation::empty(pool),
+            },
+            maximum: bound.min(pool.limit() - Budget::control_storage_bytes()),
         }
+    }
+
+    /// A pipe cannot put bytes back if its allocation is refused midway.
+    /// Claim its possible replay capacity before the first irreversible read.
+    pub(super) fn identify_pipe(&mut self, source: &mut impl Read) -> Result<Probe> {
+        self.prefix.charge.resize_to(self.maximum)?;
+        let kind = self.identify(source)?;
+        if self.prefix.bytes.is_empty() {
+            // Return unused headroom before the selected reader is constructed.
+            self.prefix.charge.resize_to(self.used.min(self.maximum))?;
+        }
+        Ok(kind)
     }
 
     pub(super) fn identify(&mut self, source: &mut impl Read) -> Result<Probe> {
@@ -137,49 +179,56 @@ impl ProbeBuffer {
                     if !cfg!(feature = "elementary") || bytes.starts_with(b"fLaC") {
                         return Ok(elementary(bytes));
                     }
-                    self.extended.try_extend_from_slice(bytes)?;
-                    return read_elementary(source, &mut self.extended);
+                    return self.read_elementary(source);
                 }
             }
         }
     }
 
-    pub(super) fn into_replay(mut self) -> Result<BudgetVec<u8>> {
-        if self.extended.is_empty() {
-            self.extended
-                .try_extend_from_slice(&self.header[..self.used])?;
+    pub(super) fn into_replay(mut self) -> Result<Prefix> {
+        if self.prefix.bytes.is_empty() {
+            self.prefix.allocate(self.used)?;
+            self.prefix
+                .bytes
+                .extend_from_slice(&self.header[..self.used]);
         }
-        Ok(self.extended)
+        Ok(self.prefix)
     }
-}
 
-/// Search the full bounded prefix once. A later MPEG audio or FLAC candidate
-/// can change which elementary stream a shorter prefix appears to contain.
-fn read_elementary(source: &mut impl Read, prefix: &mut BudgetVec<u8>) -> Result<Probe> {
-    const LIMIT: usize = 64 * 1024;
-    let mut block = [0; 4096];
-    while prefix.len() < LIMIT {
-        // End at block boundaries so amortised capacity growth stops at LIMIT.
-        let want = block.len() - prefix.len() % block.len();
-        let mut used = 0;
-        while used < want {
-            let count = read(source, &mut block[used..want])?;
-            if count == 0 {
-                break;
+    /// Search the full bounded prefix once. Buffer the first block on the stack
+    /// so a short input needs only its actual length. A longer input takes one
+    /// allocation and never has to charge both an old and a replacement window.
+    fn read_elementary(&mut self, source: &mut impl Read) -> Result<Probe> {
+        let mut block = [0; 4096];
+        block[..self.used].copy_from_slice(&self.header[..self.used]);
+        let mut used = self.used;
+        loop {
+            let want = block.len().min(LIMIT - self.prefix.bytes.len());
+            while used < want {
+                let count = read(source, &mut block[used..want])?;
+                if count == 0 {
+                    break;
+                }
+                used += count;
             }
-            used += count;
-        }
-        // A tighter pool can grant an exact intermediate capacity. Cap later
-        // growth even if capacity is available on the next iteration.
-        if prefix.capacity() <= LIMIT / 2 {
-            prefix.try_reserve(used)?;
-        }
-        prefix.try_extend_from_slice(&block[..used])?;
-        if used < want {
-            break;
+            let end = self.prefix.bytes.len() + used;
+            if end > self.maximum {
+                return Err(Error::Limit {
+                    requested: end,
+                    maximum: self.maximum,
+                });
+            }
+            if self.prefix.bytes.is_empty() {
+                self.prefix
+                    .allocate(if used < want { used } else { self.maximum })?;
+            }
+            self.prefix.bytes.extend_from_slice(&block[..used]);
+            if used < want || end == LIMIT {
+                return Ok(elementary(&self.prefix.bytes));
+            }
+            used = 0;
         }
     }
-    Ok(elementary(prefix))
 }
 
 fn read(source: &mut impl Read, out: &mut [u8]) -> Result<usize> {

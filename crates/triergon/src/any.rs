@@ -15,14 +15,14 @@
     )),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
-use crate::probe::{Probe, ProbeBuffer, probe};
+use crate::probe::{Prefix, Probe, ProbeBuffer, probe};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, PacketInfo, RandomAccess, ReaderStep, SeekRequest, TrackId, TrackInfo,
     Trim,
 };
 use triergon_core::{
-    Budget, BudgetVec, Error, InputRequest, InputToken, InputWindow, Result, SourceCapabilities,
+    Budget, Error, InputRequest, InputToken, InputWindow, Result, SourceCapabilities,
     SourceFailure, SourceId, Step, TimeBase, WorkBudget,
 };
 
@@ -272,9 +272,9 @@ pub fn open_blocking<S: std::io::Read + std::io::Seek>(
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
     let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
-    let kind = ProbeBuffer::new(pool).identify(&mut source)?;
+    let kind = ProbeBuffer::new(pool).identify(&mut source);
     source.rewind().map_err(|e| Error::Io(e.kind()))?;
-    let reader = AnyReader::from_probe(kind, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::from_probe(kind?, pool, SourceId(1), capabilities)?;
     Ok(triergon_core::blocking::Blocking::seekable(
         reader, source, pool,
     ))
@@ -287,7 +287,7 @@ pub fn open_sequential<S: std::io::Read>(
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, Replayed<S>>> {
     let mut prefix = ProbeBuffer::new(pool);
-    let kind = prefix.identify(&mut source)?;
+    let kind = prefix.identify_pipe(&mut source)?;
     let capabilities = SourceCapabilities {
         length: None,
         random_access: false,
@@ -307,7 +307,7 @@ pub fn open_sequential<S: std::io::Read>(
 /// once it has been read.
 #[derive(Debug)]
 pub struct Replayed<S> {
-    prefix: Option<BudgetVec<u8>>,
+    prefix: Option<Prefix>,
     at: usize,
     rest: S,
 }
@@ -315,10 +315,10 @@ pub struct Replayed<S> {
 impl<S: std::io::Read> std::io::Read for Replayed<S> {
     fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
         if let Some(prefix) = &self.prefix {
-            let count = out.len().min(prefix.len() - self.at);
-            out[..count].copy_from_slice(&prefix[self.at..self.at + count]);
+            let count = out.len().min(prefix.bytes.len() - self.at);
+            out[..count].copy_from_slice(&prefix.bytes[self.at..self.at + count]);
             self.at += count;
-            if self.at == prefix.len() {
+            if self.at == prefix.bytes.len() {
                 self.prefix = None;
             }
             return Ok(count);
