@@ -1,0 +1,57 @@
+{
+ "name": "gate-run-armv7-97759e39-20261119-223513-shard-2",
+ "path": "gate-run-armv7-97759e39-20261119-223513-shard-2",
+ "retention": "retained",
+ "reason": "32-bit ARMv7 subtitle worker parity, timing and kernel-bound memory on c6g.4xlarge.",
+ "key": "evidence/gate-runs/97759e39b2f02611b5d22ae39f97547303198cac-armv7-20261119-223513/shard-2/8add82a4f8b0f7597ca7db5779add68f6ad75ef45156282ea602ac11c834904a.tar.zst",
+ "sha256": "8add82a4f8b0f7597ca7db5779add68f6ad75ef45156282ea602ac11c834904a",
+ "bytes": 58216535,
+ "results": [
+  {
+   "path": "memory/subtitle-dvd/gate-result.json",
+   "command": "report --memory",
+   "key": "45c75bd6a9321748836f86a22a68da5596ebe3329469d7783ceff9321a316a3d",
+   "status": 0,
+   "report_sha256": "6f825c673ed57a35aa18c4b24f51b2fd1cbb39c74b4f8c669efc90dcdbad41fc",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "b437738bc78361095de0b8f8f54a592ea5967353597f7bab900bce864c2a9792",
+   "status": 0,
+   "report_sha256": "0aab0c42025bd8601bd52f92087d932f40b11c7c6aad06870c65f2daca6cc2f0",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "541c61c651e37980fa6db479b54c35d01fd9c32ec2d822e38f06a67d8b0e01cf",
+   "status": 0,
+   "report_sha256": "e52f57d0fbbb63f1389ebf035fdca5a213a620adb9431e4421046b2682086f46",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "02567d50c7a5befbcbcc2dffbe7a0a6c10d97df719e1ffb5cb32c905ffa9ea82",
+   "status": 0,
+   "report_sha256": "2af729377c735b757d86b225a030e744cff3d66a28af6fdd5473c18271b6e6c6",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd/gate-result.json",
+   "command": "grade",
+   "key": "957e7bf47a7510933d154025736891d7fc43db2dbaeb7a90b126b67bd2a66707",
+   "status": 0,
+   "report_sha256": "3dd776fb59b340c9303a4db84e1fc2678b39d449b642debd2e9392d062591ae1"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "08a760205fb434e9c70b6c9de0768b779f2ebc9169f91dc318e5bc6fd8799694",
+   "status": 0,
+   "report_sha256": "0776a933c0dfbc859f0a94f25d55344adf53e0128576940b06986d3651ede095"
+  }
+ ]
+}

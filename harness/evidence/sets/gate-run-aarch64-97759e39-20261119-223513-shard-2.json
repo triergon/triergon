@@ -1,0 +1,57 @@
+{
+ "name": "gate-run-aarch64-97759e39-20261119-223513-shard-2",
+ "path": "gate-run-aarch64-97759e39-20261119-223513-shard-2",
+ "retention": "retained",
+ "reason": "Linux AArch64 subtitle worker parity, timing and kernel-bound memory on c6g.4xlarge.",
+ "key": "evidence/gate-runs/97759e39b2f02611b5d22ae39f97547303198cac-aarch64-20261119-223513/shard-2/a72dc94e64a249464ab0d8853b2ac9d60d6feff66d8f598d7077cf5ebc79c2ad.tar.zst",
+ "sha256": "a72dc94e64a249464ab0d8853b2ac9d60d6feff66d8f598d7077cf5ebc79c2ad",
+ "bytes": 65604648,
+ "results": [
+  {
+   "path": "memory/subtitle-dvd/gate-result.json",
+   "command": "report --memory",
+   "key": "9e820ea3e11a4065050030462cb06a2cdade4a064b51f16ed33103975e40ce02",
+   "status": 0,
+   "report_sha256": "fbb2e4bc8c5d79d27951ad0d708e91e556bb57e9942957d63737b1b46fa25e73",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "700bc9798c5efc90258435c123a3c762fe3e4ebb9022424b401707dd28720035",
+   "status": 0,
+   "report_sha256": "4ef84e68293a5b5851e0330ea85e80992bbbe37ac19a8d5ed8787c5f42c0c2ec",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvd/gate-result.json",
+   "command": "report --benchmark",
+   "key": "17f4945ec551364895ff4d9603cecbd5ef99cce48267a63fc8f30258c26eae3d",
+   "status": 0,
+   "report_sha256": "c3ad23cafc38dc26a8658086f3a702a1ddc646a33f3b50760bfbaef843710d91",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "9b7d20f35fe1e7c013e3f3ff9c27c1fd785c445049e09610de3fbceeb796672f",
+   "status": 0,
+   "report_sha256": "2c994be8cfa8d2c79bbb50ad8219237b317f7e8fbed545518dca000b2354a579",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-dvd/gate-result.json",
+   "command": "grade",
+   "key": "5d01346e56035f844bd54a7f537371ac2cef74ae54254f0d4c50291c5eacbcd7",
+   "status": 0,
+   "report_sha256": "bcae408d89664bcb881589b832b9f15bb2b5157db1cade3133405c9faa8d98e9"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "c8c1227d87aab37857c122187793d94676c485d232347a4093e5cd759f615eae",
+   "status": 0,
+   "report_sha256": "362de1d1f2c76bd8a4a2c094e08dafee73cac1c26e75fc75f2e622d55ee461cb"
+  }
+ ]
+}
