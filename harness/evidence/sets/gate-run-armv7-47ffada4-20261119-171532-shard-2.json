@@ -1,0 +1,58 @@
+{
+ "name": "gate-run-armv7-47ffada4-20261119-171532-shard-2",
+ "path": "gate-run-armv7-47ffada4-20261119-171532-shard-2",
+ "retention": "retained",
+ "reason": "Linked worker gates with the Matroska, CELT and PGS changes together.",
+ "key": "evidence/gate-runs/47ffada46db5406b434e37ff4e5ab01a031365a9-armv7-20261119-171532/shard-2/47a1d2641925a0901435e48bc512143a2a8e525d0b27f0915bedf00d4f55d438.tar.zst",
+ "sha256": "47a1d2641925a0901435e48bc512143a2a8e525d0b27f0915bedf00d4f55d438",
+ "bytes": 57532159,
+ "results": [
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "1dc3f4e19d78aa77ed041aa71c575690d0099322f6a93cc243aed786c22c1b54",
+   "status": 0,
+   "report_sha256": "cf2cdd8f68e726ba16b60f304f2299b5709e5c4448306fa419499bf55ff75082",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c416f67012bd2dd8336a1ad2756ff363dbde993c9a090b645b886f703ecb8c90",
+   "status": 0,
+   "report_sha256": "c45ee6381519d1a58b07d66ab29392849e1cb0ad1c62cd526259bb46ad37ed29",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/matroska-startup-seek/gate-result.json",
+   "command": "grade",
+   "key": "f4fe2737a257f2a3fd27e0a7d9c0e63e4480ea88b0a6e42b9b88c57d58623478",
+   "status": 0,
+   "report_sha256": "60b8dac28403db09e3c5c473140ca461c0651aa0b9a506e8871a9bc032dec27e"
+  },
+  {
+   "path": "graded/ts-program/gate-result.json",
+   "command": "grade",
+   "key": "cab2332d476bbb517f62d1e7a3875e0b21006fa5818c0b758a669b4d174ea146",
+   "status": 0,
+   "report_sha256": "5fd28cea978fd5d4528f135d28efcaec5bf73884d288d35f49574cf177d0504c"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "c5246638f60afc28ec0b54ad4361ef6e7a96fa95d3e47e34595f6d480eb56f59",
+   "status": 0,
+   "report_sha256": "9325130c6051068f8c1a743dd0a87404ee7641615fb2cfe6262514a83f732ee1"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "e44dbdf961b7bb74a7fdeb307265b914c2807a4549495f9a07885bc2a37cf008",
+   "status": 0,
+   "report_sha256": "ee6532184642ecbb1afd7a6ef1b96cad513bb0c089455121395c4e2b07b7671c"
+  }
+ ],
+ "source_revisions": [
+  "47ffada46db5406b434e37ff4e5ab01a031365a9"
+ ]
+}

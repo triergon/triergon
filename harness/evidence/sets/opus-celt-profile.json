@@ -1,0 +1,44 @@
+{
+ "name": "opus-celt-profile",
+ "path": "opus-celt-profile",
+ "retention": "retained",
+ "reason": "AArch64 Opus file decoding counts, profiles, PCM identities and timing comparisons.",
+ "key": "evidence/opus-celt-profile/1b1e2a6965261ad3310ef4101a0e57a1a913d6bf771c2f533b3005bbf8fcc73e.tar.zst",
+ "sha256": "1b1e2a6965261ad3310ef4101a0e57a1a913d6bf771c2f533b3005bbf8fcc73e",
+ "bytes": 168677,
+ "results": [
+  {
+   "path": "memory-screen/report/gate-result.json",
+   "command": "codecs memory",
+   "key": "0b7a1570656881c6be6516d46048faf9f5703fb48280f398206d84366b956b80",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "pcm-floor/report/gate-result.json",
+   "command": "codecs time",
+   "key": "7dcba0c905b7850b1ad165df46a43a89f517235d7a52712d64aa191a227e0792",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "pulse-lookup/report/gate-result.json",
+   "command": "codecs time",
+   "key": "7b71a66e24371ed27beecfa42bd8f43942bf08092d2fdf254b00755fd46c97ed",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "pvq-energy/report/gate-result.json",
+   "command": "codecs time",
+   "key": "194d0151cc9b07ece9f6f6a3cb8093b88d017bf4ec95995c50d5eb63a2800aad",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "31d2994522f116b4404916cb51f82b03a29c158f",
+  "5bacc1387b475e35a7babb98664cba227db69fe4",
+  "19ad7c0cb92dcd8f20cf2bb2e459dd785ba3fa2f"
+ ]
+}

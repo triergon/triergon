@@ -30,19 +30,20 @@ fn word(raw: &[u8], at: usize) -> u16 {
 pub(super) fn microseconds(clock: PacketClock) -> Option<i64> {
     let pts = clock.pts.filter(|&pts| pts != i64::MIN)?;
     // `pts * num / den` seconds, rounded to the nearest microsecond with ties
-    // away from zero; the exact rational path covers what i128 cannot.
-    let (num, den) = (clock.timebase.numerator(), clock.timebase.denominator());
-    let scaled = i128::from(pts)
-        .checked_mul(i128::from(num) * 1_000_000)
-        .map(|n| {
-            let den = i128::from(den);
-            let away = 2 * (n % den).abs() >= den;
-            n / den + i128::from(away) * n.signum()
-        });
-    let value = match scaled {
-        Some(value) => i64::try_from(value).ok(),
-        None => clock.receiver_microseconds().ok().flatten(),
+    // away from zero, in 64-bit arithmetic while the product fits; the exact
+    // rational path covers the rest.
+    let fits = || {
+        let scale = i64::try_from(clock.timebase.numerator())
+            .ok()?
+            .checked_mul(1_000_000)?;
+        let den = i64::try_from(clock.timebase.denominator()).ok()?;
+        let n = pts.checked_mul(scale)?;
+        // `2 * |rest| >= den`, without doubling.
+        let rest = (n % den).unsigned_abs();
+        let away = rest >= den.unsigned_abs() - rest;
+        Some(n / den + i64::from(away) * n.signum())
     };
+    let value = fits().or_else(|| clock.receiver_microseconds().ok().flatten());
     value.filter(|&value| value != i64::MIN)
 }
 
@@ -610,6 +611,12 @@ mod tests {
             i64::MAX,
             i64::MIN + 1,
             -8_589_934_591,
+            // Either side of the products that fit in 64 bits.
+            i64::MAX / 1_000_000,
+            i64::MAX / 1_000_000 + 1,
+            i64::MIN / 1_000_000,
+            i64::MIN / 1_000_000 - 1,
+            i64::MAX / 1_001_000_000 + 1,
         ];
         for (num, den) in bases {
             for pts in values.into_iter().chain(-500..500) {

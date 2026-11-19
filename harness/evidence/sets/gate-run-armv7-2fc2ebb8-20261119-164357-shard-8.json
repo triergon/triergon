@@ -1,0 +1,90 @@
+{
+ "name": "gate-run-armv7-2fc2ebb8-20261119-164357-shard-8",
+ "path": "gate-run-armv7-2fc2ebb8-20261119-164357-shard-8",
+ "retention": "retained",
+ "reason": "Matroska seek, playback and linked worker gates with the CELT decoding changes.",
+ "key": "evidence/gate-runs/2fc2ebb8b30ba97544c9a07a4111fecaa0695c13-armv7-20261119-164357/shard-8/1f8225e238e0ce543d069df8e0b8ddab8d28f0c282d9564afd0ef35ce32f0f5a.tar.zst",
+ "sha256": "1f8225e238e0ce543d069df8e0b8ddab8d28f0c282d9564afd0ef35ce32f0f5a",
+ "bytes": 39745067,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "9801c3bf7860de585b6b6bd242380d77130053ec79a83b0b8c187dfd8f497374",
+   "status": 0,
+   "report_sha256": "ab41c7d1fc8b45cbc89f9ce1c7b17e6e424d1fb1ecee9fd1fbd191d43ce7cf38",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-demux/gate-result.json",
+   "command": "report --memory",
+   "key": "3dd6abda82d1d51b62069a61688fb5d0c3139eab6a59b178dcc6d57ce119932e",
+   "status": 0,
+   "report_sha256": "f6e158df501e2da331ca280f4ba36d6fd9d8ffefb694f36c4ade88e5b8f75fe1",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "96b2e291540690dc6e2fc310237bedcdf776980e0f7651476e30f5117a06de64",
+   "status": 0,
+   "report_sha256": "a2886a41521954175c1e6d5fc685215d6b8a7c42514f40b9e43c615d9b5ea2de",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/codec-workloads-4/gate-result.json",
+   "command": "codecs memory",
+   "key": "dcf41a84c980c003d5ae334511496933c6ddfbc7307ea0e37794491eddc64463",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ff39af1dff72f62d255d3b38443395caf92678f9f3f463f1742a35220c4aec51",
+   "status": 0,
+   "report_sha256": "219e99267a7e64ef9d6c40c3dcf9b907dae165692ed0280a69564740b43ea624",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-demux/gate-result.json",
+   "command": "report --benchmark",
+   "key": "21ef2f0362d5c6275fa55ad8ce1050cf4a7b248593a71cd6774c8b76a1632c7a",
+   "status": 0,
+   "report_sha256": "df13ecdf9b6da407c6e60dd259f21b1714e14390f54bf012e5f6856ebd52c0c5",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "94e2c572dca283e3516f20074e3b8d64cff108c65d3c90568c56d58e19d4bcee",
+   "status": 0,
+   "report_sha256": "f7f538694f5536ea40c9093bf95f5754782d75bf39fc654f84a9548d0f5763d3",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "a224510043adc552acd50a5d47e4e76d42f094541b8dde28af28ddfd24c83592",
+   "status": 0,
+   "report_sha256": "bff4ad988e5823a00918b3dfa56d7d006b9687dc0e45b4df142516558511e21f"
+  },
+  {
+   "path": "graded/matroska-demux/gate-result.json",
+   "command": "grade",
+   "key": "2b34fca6ee499b27402f1b612aec217cad0f542ed6630dee2e24e4a967bbcd37",
+   "status": 0,
+   "report_sha256": "75cf75a5a99d4a477f24f667a4800933138565e4f93562dabe278b6c3d767286"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "1c07d97c53674fd99d764f9409156ababd36bab98ad698119034fca3514df594",
+   "status": 0,
+   "report_sha256": "9c9d9a44cf8a03ac947b2af5bd340be933c0af252ce861b5a4ef1adc5bdc1b00"
+  }
+ ],
+ "source_revisions": [
+  "2fc2ebb8b30ba97544c9a07a4111fecaa0695c13"
+ ]
+}
