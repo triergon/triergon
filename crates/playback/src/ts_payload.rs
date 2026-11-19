@@ -1,10 +1,10 @@
 //! Shared admission facts for owned and borrowed-range PES delivery.
 
-use triergon_core::{Budget, SourceLocation};
+use triergon_core::{Budget, BudgetVec, SourceLocation};
 use triergon_mpegts::{
-    PesHeader, SourceEpochs,
+    PesHeader, SourceEpochs, SourceRange,
     compat::pes::{
-        CompactDemuxPacket, CompactPayload, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+        CompactDemuxPacket, CompactPayload, DemuxPacket, DemuxPayloadKind, DemuxProfile, DemuxSpan,
     },
 };
 
@@ -33,7 +33,16 @@ impl PesFacts<'_> {
 
 pub(crate) trait PesInput {
     fn facts(&self) -> PesFacts<'_>;
-    fn into_payload(self) -> CompactPayload;
+    /// The payload, and the header source ranges a reader does not read.
+    fn into_parts(self) -> (CompactPayload, BudgetVec<SourceRange>);
+}
+
+/// The lists of the PES a reader consumed last, kept until the reader's owner
+/// hands them back to the observer that emitted them.
+#[derive(Debug, Default)]
+pub(crate) struct SpentLists {
+    pub spans: Option<BudgetVec<DemuxSpan>>,
+    pub header: Option<BudgetVec<SourceRange>>,
 }
 
 impl PesInput for DemuxPacket {
@@ -55,8 +64,11 @@ impl PesInput for DemuxPacket {
             header_budget: self.header_source_ranges.budget(),
         }
     }
-    fn into_payload(self) -> CompactPayload {
-        CompactPayload::from_spans(self.spans)
+    fn into_parts(self) -> (CompactPayload, BudgetVec<SourceRange>) {
+        (
+            CompactPayload::from_spans(self.spans),
+            self.header_source_ranges,
+        )
     }
 }
 
@@ -79,7 +91,7 @@ impl PesInput for CompactDemuxPacket {
             header_budget: self.header_source_ranges.budget(),
         }
     }
-    fn into_payload(self) -> CompactPayload {
-        self.payload
+    fn into_parts(self) -> (CompactPayload, BudgetVec<SourceRange>) {
+        (self.payload, self.header_source_ranges)
     }
 }

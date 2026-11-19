@@ -5,6 +5,7 @@ use crate::{
     hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsClock, AvcTsReader, AvcTsStep},
     hls_dolby::HlsDolby,
     hls_hevc::{HlsHevc, HlsHevcPicture},
+    ts_payload::SpentLists,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, Time, WorkBudget};
@@ -28,6 +29,10 @@ pub(super) trait LaneAssembler: Sized {
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<Self::Unit>>;
     fn unit_bytes(unit: &Self::Unit) -> usize;
+    /// The lists of the last consumed PES, for its observer to reuse.
+    fn take_spent(&mut self) -> SpentLists {
+        SpentLists::default()
+    }
 }
 
 pub(super) trait VideoPicture {
@@ -80,6 +85,10 @@ impl LaneAssembler for AvcTsReader {
     fn unit_bytes(unit: &Self::Unit) -> usize {
         unit.feed_spans().map(<[u8]>::len).sum()
     }
+
+    fn take_spent(&mut self) -> SpentLists {
+        Self::take_spent(self)
+    }
 }
 
 impl LaneAssembler for HlsAac {
@@ -107,6 +116,10 @@ impl LaneAssembler for HlsAac {
 
     fn unit_bytes(unit: &Self::Unit) -> usize {
         unit.bytes.len()
+    }
+
+    fn take_spent(&mut self) -> SpentLists {
+        Self::take_spent(self)
     }
 }
 
@@ -227,6 +240,13 @@ impl LaneAssembler for VideoAssembler {
             Picture::Hevc(unit) => unit.feed_size(),
         }
     }
+
+    fn take_spent(&mut self) -> SpentLists {
+        match self {
+            Self::Avc(reader) => reader.take_spent(),
+            Self::Hevc(_) => SpentLists::default(),
+        }
+    }
 }
 
 /// Complete feed bytes and the exact audio frame clock before playlist mapping.
@@ -302,6 +322,13 @@ impl LaneAssembler for AudioAssembler {
 
     fn unit_bytes(unit: &Self::Unit) -> usize {
         unit.bytes.len()
+    }
+
+    fn take_spent(&mut self) -> SpentLists {
+        match self {
+            Self::Aac(reader) => reader.take_spent(),
+            Self::Dolby(_) => SpentLists::default(),
+        }
     }
 }
 

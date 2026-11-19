@@ -1712,6 +1712,38 @@ impl TransportStream {
         self.discard_faulted_route(error)
     }
 
+    /// Reports a carrier the framer rejected and discards every partial table
+    /// and PES, which the lost bytes may belong to.
+    #[cold]
+    fn framing_fault(&mut self, input: &InputCursor, error: Error) -> TraceEvent {
+        let location = SourceLocation {
+            source: input.source(),
+            offset: self
+                .framer
+                .pending_or_last_packet_offset()
+                .unwrap_or_else(|| input.position().saturating_sub(self.format.bytes() as u64)),
+        };
+        let rejected = self.framer.take_rejection();
+        self.framer.discard();
+        self.pat.assembler.discard();
+        if let Some(pmt) = self.pmt.as_mut() {
+            pmt.assembler.discard();
+        }
+        for route in self.routes.as_mut_slice() {
+            if let Some(assembler) = route.assembler.as_mut() {
+                assembler.discard(route.epochs);
+            }
+        }
+        TraceEvent::Diagnostic(TraceFault {
+            kind: FaultKind::Transport,
+            pid: None,
+            location,
+            error,
+            rejected,
+        })
+    }
+
+    #[cold]
     fn discard_faulted_route(&mut self, error: Error) -> TraceEvent {
         let pid = self.packet.as_ref().map(|packet| packet.pid);
         let kind = if matches!(self.route, Route::Pes(_)) {
@@ -1807,6 +1839,8 @@ impl TransportStream {
             Err(error) => Ok(Some(self.discard_faulted_route(error))),
         }
     }
+    /// Drains every assembler once the input has logically ended.
+    #[cold]
     fn eof(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<TraceEvent>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -2282,30 +2316,7 @@ impl TransportStream {
                         return Ok(Step::End(location));
                     }
                     Err(error) if matches!(error, Error::Invalid(_) | Error::Truncated) => {
-                        let location = SourceLocation {
-                            source: input.source(),
-                            offset: self.framer.pending_or_last_packet_offset().unwrap_or_else(
-                                || input.position().saturating_sub(self.format.bytes() as u64),
-                            ),
-                        };
-                        let rejected = self.framer.take_rejection();
-                        self.framer.discard();
-                        self.pat.assembler.discard();
-                        if let Some(pmt) = self.pmt.as_mut() {
-                            pmt.assembler.discard();
-                        }
-                        for route in self.routes.as_mut_slice() {
-                            if let Some(assembler) = route.assembler.as_mut() {
-                                assembler.discard(route.epochs);
-                            }
-                        }
-                        return Ok(ready(TraceEvent::Diagnostic(TraceFault {
-                            kind: FaultKind::Transport,
-                            pid: None,
-                            location,
-                            error,
-                            rejected,
-                        })));
+                        return Ok(ready(self.framing_fault(input, error)));
                     }
                     Err(error) => return Err(error),
                 }

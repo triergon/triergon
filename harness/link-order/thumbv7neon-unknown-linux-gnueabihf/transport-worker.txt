@@ -248,9 +248,11 @@ core::ptr::drop_glue::<core::option::Option<triergon_mpegts::demux_transport::Tr
 <triergon_mpegts::demux_pes::DemuxObserver>::reserve
 <triergon_core::bytes::BudgetVec<triergon_mpegts::SourceRange>>::try_reserve_exact
 <triergon_core::bytes::BudgetVec<triergon_mpegts::SourceRange>>::try_push
-<triergon_core::bytes::BudgetVec<triergon_mpegts::demux_pes::DemuxSpan>>::try_reserve_exact
+<triergon_mpegts::demux_pes::pes_list::PesList<triergon_mpegts::demux_pes::DemuxSpan>>::try_reserve_exact
 <triergon_core::bytes::BudgetVec<triergon_mpegts::demux_pes::DemuxSpan>>::reallocate
+<triergon_mpegts::demux_pes::pes_list::PesList<triergon_mpegts::demux_pes::DemuxSpan>>::try_push
 <triergon_core::bytes::BudgetVec<triergon_mpegts::demux_pes::DemuxSpan>>::try_push
+<triergon_mpegts::demux_pes::pes_list::PesList<triergon_mpegts::SourceRange>>::try_reserve_exact
 transport_worker::ts::fold_payload::<core::iter::adapters::map::Map<core::slice::iter::Iter<triergon_mpegts::demux_pes::DemuxSpan>, <triergon_mpegts::demux_pes::DemuxSpan as core::convert::AsRef<[u8]>>::as_ref>>
 core::ptr::drop_glue::<triergon_mpegts::demux_pes::DemuxPacket>
 <triergon_mpegts::demux_transport::malformed::MalformedInputCompletion>::seal_physical_end

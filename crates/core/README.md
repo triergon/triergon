@@ -101,7 +101,15 @@ is written: one claim charges the capacity and the header `freeze` adds, so fill
 within that capacity and freezing it charge nothing more.
 `BudgetVecIntoIter<T>::as_slice()` borrows the remaining elements in traversal
 order without advancing or allocating. The iterator keeps its capacity charged
-until it drops, including after its last element is consumed.
+until it drops, including after its last element is consumed. Reclaiming hands
+an allocation back for reuse: `BudgetVecIntoIter::reclaim()` and
+`Bytes::try_reclaim()` drop or discard the contents and return an empty
+`BudgetVec` that keeps the capacity and is charged for exactly it, so a consumer
+can return a used-up vector or frozen buffer to its producer to fill again
+without allocating. `try_reclaim` fails, returning the bytes intact, while
+another handle shares the allocation. `BudgetVec::fits_reuse_for(len)` states
+the size rule for keeping such an allocation: at most twice the item it serves,
+the slack amortised doubling already allows.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
 packets or views cannot be converted back into it. `used()` and `peak()` report
 requested capacity, not RSS or allocator overhead.

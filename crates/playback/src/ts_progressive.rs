@@ -6,7 +6,7 @@ use crate::{
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
-    ts_payload::PesInput,
+    ts_payload::{PesInput, SpentLists},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{InputCursor, InputRequest, Time, WorkBudget};
@@ -224,6 +224,8 @@ pub struct TsProgressiveReader<S: Source> {
     audio: Option<HlsAac>,
     saw_video: bool,
     audio_times: Option<(Time, NextAudioTime)>,
+    #[cfg(test)]
+    reuse_storage: bool,
 }
 
 impl<S: Source> TsProgressiveReader<S> {
@@ -249,6 +251,8 @@ impl<S: Source> TsProgressiveReader<S> {
             audio: None,
             saw_video: false,
             audio_times: None,
+            #[cfg(test)]
+            reuse_storage: true,
         })
     }
 
@@ -345,6 +349,8 @@ impl<S: Source> TsProgressiveReader<S> {
                     }
                     AvcTsStep::Yield => {}
                     AvcTsStep::NeedInput if self.phase == Phase::Video => {
+                        let lists = video.take_spent();
+                        self.reuse_pes_lists(|tracks| tracks.video, lists);
                         self.phase = Phase::Read;
                     }
                     AvcTsStep::End if self.phase == Phase::DrainVideo => {
@@ -370,6 +376,8 @@ impl<S: Source> TsProgressiveReader<S> {
                     }
                     AssemblyStep::Yield => {}
                     AssemblyStep::NeedPayload if self.phase == Phase::Audio => {
+                        let lists = audio.take_spent();
+                        self.reuse_pes_lists(|tracks| tracks.audio, lists);
                         self.phase = Phase::Read;
                     }
                     AssemblyStep::Finished if self.phase == Phase::DrainAudio => {
@@ -513,6 +521,35 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(())
     }
 
+    /// Takes back a unit the caller has finished with, so its track's reader
+    /// can assemble a later unit in its storage. Handing a video unit back
+    /// right after the next one arrives lets the video reader assemble units
+    /// without allocating; dropping units instead gives the same outputs and
+    /// work.
+    pub fn reuse_unit(&mut self, unit: TsProgressiveUnit) {
+        #[cfg(test)]
+        if !self.reuse_storage {
+            return;
+        }
+        if let (TsProgressiveUnit::Video(unit), Some(video)) = (unit, self.video.as_mut()) {
+            video.reuse_unit(unit);
+        }
+    }
+
+    /// The observer of a track allocates nothing for its next PES when it gets
+    /// back the lists of the one a reader has just consumed.
+    fn reuse_pes_lists(&mut self, track: impl Fn(&Tracks) -> TrackKey, lists: SpentLists) {
+        #[cfg(test)]
+        if !self.reuse_storage {
+            return;
+        }
+        if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref())
+            && let TrackKey::Ts { pid, .. } = track(tracks)
+        {
+            transport.engine.reuse_pes_lists(pid, lists);
+        }
+    }
+
     fn required_pid(&self, pid: u16) -> bool {
         pid == 0
             || self.pat.is_some_and(|pat| pat.pmt_pid == pid)
@@ -611,6 +648,7 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
 
     #[test]
@@ -975,6 +1013,95 @@ mod tests {
                         read(false, quantum, window, private_audio),
                         read(true, quantum, window, private_audio),
                         "work {quantum}, window {window}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn reused_storage_keeps_every_output_and_work_boundary() {
+        // Like the progressive worker, hold two units per track and hand the
+        // oldest back when a third arrives. Reused storage is at most twice
+        // the item it serves, so the peak may rise by at most one unit.
+        fn read(
+            wire: &[u8],
+            reuse: bool,
+            quantum: u64,
+            window: usize,
+        ) -> (Vec<(String, u64)>, usize, usize) {
+            let pool = Budget::new(8 << 20).unwrap();
+            let id = SourceId(37);
+            let caps = SourceCapabilities {
+                length: Some(wire.len() as u64),
+                random_access: false,
+            };
+            let source =
+                crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, wire).unwrap(), window)
+                    .unwrap();
+            let input = InputCursor::new(&pool, id, caps, window).unwrap();
+            let mut reader =
+                TsProgressiveReader::new(input, source, TsProgressiveLimits::default()).unwrap();
+            reader.reuse_storage = reuse;
+            let cancel = AtomicBool::new(false);
+            let mut trace = Vec::new();
+            let mut held: [VecDeque<TsProgressiveUnit>; 2] = Default::default();
+            let mut peak = 0;
+            let mut largest = 0;
+            loop {
+                let mut work = WorkBudget::new(quantum);
+                let step = reader.advance(&mut work, &cancel).unwrap();
+                let tag = match &step {
+                    TsProgressiveStep::Unit(TsProgressiveUnit::Video(video)) => format!(
+                        "video {:?} {} {:?}",
+                        video.clock,
+                        video.idr,
+                        video.feed_spans().flatten().collect::<Vec<_>>()
+                    ),
+                    TsProgressiveStep::Unit(TsProgressiveUnit::Audio {
+                        frame,
+                        presentation,
+                    }) => format!("audio {presentation:?} {:?}", frame.bytes.as_ref()),
+                    other => format!("{other:?}"),
+                };
+                trace.push((tag, work.spent()));
+                peak = peak.max(pool.used());
+                match step {
+                    TsProgressiveStep::Unit(unit) => {
+                        if let TsProgressiveUnit::Video(video) = &unit {
+                            largest = largest.max(video.source_bytes().len());
+                        }
+                        let track =
+                            &mut held[usize::from(matches!(unit, TsProgressiveUnit::Audio { .. }))];
+                        track.push_back(unit);
+                        if track.len() > 2
+                            && let Some(oldest) = track.pop_front()
+                        {
+                            reader.reuse_unit(oldest);
+                        }
+                    }
+                    TsProgressiveStep::End => {
+                        drop((reader, held));
+                        assert_eq!(pool.used(), Budget::control_storage_bytes());
+                        return (trace, peak, largest);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        for wire in [
+            include_bytes!("../tests/fixtures/hls/baseline-stereo.ts").as_slice(),
+            include_bytes!("../tests/fixtures/hls/bframes-multislice.ts").as_slice(),
+        ] {
+            for quantum in [1, 31, 4096] {
+                for window in [188, 4096] {
+                    let (reused, reused_peak, largest) = read(wire, true, quantum, window);
+                    let (fresh, fresh_peak, _) = read(wire, false, quantum, window);
+                    assert_eq!(reused, fresh, "work {quantum}, window {window}");
+                    assert!(
+                        reused_peak <= fresh_peak + largest,
+                        "peak {reused_peak} above {fresh_peak} and a {largest}-byte unit: \
+                         work {quantum}, window {window}"
                     );
                 }
             }

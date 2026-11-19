@@ -26,10 +26,13 @@ mod audio;
 mod compact;
 mod cutter;
 mod dvb;
+mod pes_list;
 pub use audio::{PrivateAudioCarriage, PrivateAudioDescriptors};
 pub use compact::{CompactPayload, DemuxSpanView, DemuxSpanViews, PayloadCursor};
 pub use cutter::{CutPes, PesCutter, pcr_bounded_pts};
 pub use dvb::DvbSubtitlesDescriptors;
+pub(crate) use pes_list::ListGrowth;
+use pes_list::PesList;
 
 /// Explicit single-program/single-PID profile from validated source signalling.
 /// Plain pushes reject entity transitions; the explicit media transaction and
@@ -378,8 +381,8 @@ pub struct DemuxObserver {
     corrupt: bool,
     payload_extent: PayloadExtent,
     header_ranges: BudgetVec<SourceRange>,
-    spans: BudgetVec<DemuxSpan>,
-    output_header: BudgetVec<SourceRange>,
+    spans: PesList<DemuxSpan>,
+    output_header: PesList<SourceRange>,
     growth: Option<Growth>,
     emission: Option<Emission>,
     fault: Option<Error>,
@@ -490,8 +493,8 @@ impl DemuxObserver {
             demux_input: None,
             payload_format: PayloadFormat::Owned,
             header_ranges: BudgetVec::new(&budget),
-            spans: BudgetVec::new(&budget),
-            output_header: BudgetVec::new(&budget),
+            spans: PesList::new(&budget),
+            output_header: PesList::new(&budget),
             budget,
             limits,
             pending: None,
@@ -775,11 +778,11 @@ impl DemuxObserver {
         debug_assert!(self.spans.is_empty());
         self.header_ranges
             .capacity()
-            .checked_add(self.output_header.capacity())
+            .checked_add(self.output_header.allocated())
             .and_then(|count| count.checked_mul(size_of::<SourceRange>()))
             .and_then(|bytes| {
                 self.spans
-                    .capacity()
+                    .allocated()
                     .checked_mul(size_of::<DemuxSpan>())
                     .and_then(|spans| bytes.checked_add(spans))
             })
@@ -1175,10 +1178,8 @@ impl DemuxObserver {
     pub(crate) fn prepare_payload_run_growth(
         &self,
         growth: &Growth,
-    ) -> Option<BudgetVec<DemuxSpan>> {
-        let mut replacement = BudgetVec::new(&self.budget);
-        replacement.try_reserve_exact(growth.target).ok()?;
-        Some(replacement)
+    ) -> Option<ListGrowth<DemuxSpan>> {
+        self.spans.prepare_growth(growth.target)
     }
 
     /// Commit preflighted carriers from one shared window. The arena already
@@ -1189,12 +1190,11 @@ impl DemuxObserver {
         start: SourceLocation,
         context: SourceContext,
         first_counter: u8,
-        replacement: Option<BudgetVec<DemuxSpan>>,
+        growth: Option<ListGrowth<DemuxSpan>>,
         mut record_last: impl FnMut(&[u8]),
     ) -> Result<()> {
-        if let Some(mut replacement) = replacement {
-            replacement.try_append(&mut self.spans)?;
-            self.spans = replacement;
+        if let Some(growth) = growth {
+            self.spans.commit_growth(growth)?;
         }
         let count = bytes.len() / TS188_BYTES;
         debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));
@@ -1371,6 +1371,20 @@ impl DemuxObserver {
         })
     }
 
+    /// Hands back the span list of a packet this observer emitted once its
+    /// payload has been consumed ([`PayloadCursor::into_spans`]), so the next
+    /// PES fills it without allocating. Admission, payload runs and growth
+    /// work are those of a new list; only the allocation is kept. A list from
+    /// another pool, or one handed back while spans are being assembled, is
+    /// dropped.
+    pub fn reuse_payload_spans(&mut self, spans: BudgetVec<DemuxSpan>) {
+        self.spans.reuse(spans);
+    }
+    /// Hands back the header source ranges of a packet this observer emitted,
+    /// as [`reuse_payload_spans`](Self::reuse_payload_spans) does its spans.
+    pub fn reuse_header_ranges(&mut self, ranges: BudgetVec<SourceRange>) {
+        self.output_header.reuse(ranges);
+    }
     /// Select compact payload delivery on a fresh, inactive observer. Ordinary
     /// polling remains the default; compact delivery uses the explicit methods below.
     pub fn enable_compact_payloads(&mut self) -> Result<()> {
@@ -1653,17 +1667,10 @@ impl DemuxObserver {
             boundary: emission.boundary,
             payload_kind: emission.kind,
             source_header: header,
-            header_source_ranges: std::mem::replace(
-                &mut self.output_header,
-                BudgetVec::new(&self.budget),
-            ),
+            header_source_ranges: self.output_header.take(),
             time_header_applies: self.time_header_applies,
             payload_len: self.payload_len(),
-            payload: CompactPayload::new(
-                std::mem::replace(&mut self.spans, BudgetVec::new(&self.budget)),
-                span_count,
-                self.groups_payload_runs(),
-            ),
+            payload: CompactPayload::new(self.spans.take(), span_count, self.groups_payload_runs()),
         };
         self.reset_payload_extent();
         self.corrupt = false;
@@ -2192,8 +2199,8 @@ mod tests {
             corrupt: bool,
             payload_len: usize,
             header_ranges: BudgetVec<SourceRange>,
-            spans: BudgetVec<DemuxSpan>,
-            output_header: BudgetVec<SourceRange>,
+            spans: PesList<DemuxSpan>,
+            output_header: PesList<SourceRange>,
             growth: Option<Growth>,
             emission: Option<Emission>,
             fault: Option<Error>,
