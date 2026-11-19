@@ -75,18 +75,24 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
             return Err(Error::Unsupported("HEVC discovery NAL layer"));
         };
         let payload = &nal[2..];
-        match nal_unit_type {
-            32 if vps_set.is_none() => vps_set = Some(payload),
-            33 if sps_set.is_none() => sps_set = Some(payload),
-            34 if pps_set.is_none() => pps_set = Some(pps(payload)?),
-            39 | 40 => {}
+        let parameter_set = match nal_unit_type {
+            32 => &mut vps_set,
+            33 => &mut sps_set,
+            34 => &mut pps_set,
+            39 | 40 => continue,
             _ => return Err(Error::Unsupported("HEVC discovery parameter-set chain")),
+        };
+        // An exact repeat identifies the same active chain (H.265 §7.4.2.4.2).
+        match *parameter_set {
+            None => *parameter_set = Some(payload),
+            Some(previous) if previous == payload => {}
+            Some(_) => return Err(Error::Unsupported("HEVC discovery parameter-set chain")),
         }
     }
     let vps_set = vps_set.ok_or(Error::Invalid("HEVC discovery VPS"))?;
     let sps_set = sps_set.ok_or(Error::Invalid("HEVC discovery SPS"))?;
     let (sps_id, sps_vps, reorder) = startup_sps(sps_set)?;
-    let (pps_id, pps_sps) = pps_set.ok_or(Error::Invalid("HEVC discovery PPS"))?;
+    let (pps_id, pps_sps) = pps(pps_set.ok_or(Error::Invalid("HEVC discovery PPS"))?)?;
     if vps(vps_set)? != sps_vps || sps_id != pps_sps {
         return Err(Error::Invalid("HEVC discovery parameter-set reference"));
     }
@@ -476,6 +482,38 @@ impl<'a> Rbsp<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_accepts_only_identical_parameter_set_repeats() {
+        // The three configuration NALs from hevc-repeated-parameter-sets.mkv.
+        let vps = [
+            0x40, 0x01, 0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00,
+            0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x02, 0x40,
+        ];
+        let sps = [
+            0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03, 0x00,
+            0x00, 0x03, 0x00, 0x1e, 0xa0, 0x20, 0x83, 0x16, 0x5b, 0xa4, 0xa4, 0xc2, 0xf0, 0x16,
+            0x80, 0x80, 0x00, 0x00, 0x03, 0x00, 0x80, 0x00, 0x00, 0x0c, 0x04,
+        ];
+        let pps = [0x44, 0x01, 0xc0, 0x73, 0xc0, 0x89];
+        let nals = [vps.as_slice(), sps.as_slice(), pps.as_slice()];
+        let single = startup_chain(nals.into_iter()).unwrap();
+        let repeated = startup_chain(nals.into_iter().flat_map(|nal| [nal, nal])).unwrap();
+        assert_eq!(repeated.vps, single.vps);
+        assert_eq!(repeated.sps, single.sps);
+        assert_eq!(repeated.pps_id, single.pps_id);
+        assert_eq!(repeated.reorder, single.reorder);
+
+        for nal in nals {
+            let mut changed = nal.to_vec();
+            *changed.last_mut().unwrap() ^= 1;
+            let distinct = nals.into_iter().chain([changed.as_slice()]);
+            assert!(matches!(
+                startup_chain(distinct),
+                Err(Error::Unsupported("HEVC discovery parameter-set chain"))
+            ));
+        }
+    }
 
     #[test]
     fn reads_and_skips_unaligned_fields_across_emulation_prevention() {

@@ -180,12 +180,14 @@ case is lower on both heap and total RSS. Sets
 `gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
 plans, step records and logs.
 
-The playback tests cover HEVC startup with exact parameter-set repeats and
-matching truncations of each parameter set that prevent startup. At `6bbb2cb7`,
-all 289 cases in the nine playback gate groups passed parity, runtime and
-kernel-bound heap and total RSS on both targets. Linux AArch64's largest runtime
-bound is 1.0528 for progressive `reordered-48000`, with worst heap 0.8877 and
-total RSS 0.8499. The 32-bit ARMv7 bounds are 0.9999, 0.7849 and 0.9670,
+The playback tests cover exact HEVC parameter-set repeats in the configuration
+record and before the first slice. Conflicting entries in the configuration
+record and matching truncations of each parameter set prevent startup.
+
+At `6bbb2cb7`, all 289 cases in the nine playback gate groups passed parity,
+runtime and kernel-bound heap and total RSS on both targets. The largest Linux
+AArch64 runtime bound is 1.0528 for progressive `reordered-48000`, with worst
+heap 0.8877 and total RSS 0.8499. The 32-bit ARMv7 bounds are 0.9999, 0.7849 and 0.9670,
 respectively. The four playback archives in the measured revisions table hold
 the corresponding build identities and per-case evidence.
 
