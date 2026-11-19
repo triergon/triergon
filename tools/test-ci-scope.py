@@ -172,6 +172,8 @@ class TargetCache(GitFixture):
         edited.write_text('new contents')
         executable.chmod(0o755)
         self.git('add', 'README.md', 'xtask/src/main.rs')
+        for path in (edited, executable):
+            os.utime(path, (self.unchanged, self.unchanged))
         self.cache('apply')
         self.assertEqual(link.lstat().st_mtime, self.unchanged)
         self.assertEqual((self.root / 'docs/status.md').stat().st_mtime, self.unchanged)
