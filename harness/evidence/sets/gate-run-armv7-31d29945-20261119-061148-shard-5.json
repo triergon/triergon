@@ -1,0 +1,108 @@
+{
+ "name": "gate-run-armv7-31d29945-20261119-061148-shard-5",
+ "path": "gate-run-armv7-31d29945-20261119-061148-shard-5",
+ "retention": "retained",
+ "reason": "",
+ "key": "evidence/gate-runs/31d2994522f116b4404916cb51f82b03a29c158f-armv7-20261119-061148/shard-5/f6a0da077ddbf709f03885b371c89895d8ba91e844242c4fc5a16fdc01a13214.tar.zst",
+ "sha256": "f6a0da077ddbf709f03885b371c89895d8ba91e844242c4fc5a16fdc01a13214",
+ "bytes": 406751474,
+ "results": [
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "f4fee18f7cb38c0b89b7efe568f3898d793a721fa1cb3a477c0808a110e44553",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "9102fdf17610efc1d6847b02862b31e1a853c2efe33178f83e002b1e11ed2a52",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "86edc576ac782d1a071d36933c8af15a5bd57db92996eda7497c77e47db83d41",
+   "status": 0,
+   "report_sha256": "49aa992994bb30ceb6a38355556dbc5e2a9fd1d36de5c4575c37546961f062ca",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "42593f25f53233207eec8a37baeb7c4063d49931675e62688187799814f6eca4",
+   "status": 0,
+   "report_sha256": "8e79a6027278519fd4ae2dae44bd0456ca0f3191a08a390eb894c3c4b6bdd314",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-cues-preroll/gate-result.json",
+   "command": "report --memory",
+   "key": "0c02cf9f3df42db53468e7deba3179ef1d0d91b027886d27d4c0e41327e41379",
+   "status": 0,
+   "report_sha256": "cd10d8a51d42836b8e15a1b2a0cba38bf9ca3c0c6f00b62cdd9924f7660607b3",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7d684a1224c4b0d61d6cdc5cfa88f570ded1019d2784d99bda93342098bb904d",
+   "status": 0,
+   "report_sha256": "f8af8fbd47a0ba397bf42e9e3573187239140aa5191df995b84056e2822aa937",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "5c7f9ec7704858e3bdfe776d7a99efc5e7ca2804df19060e6cd264c6b4b3ea18",
+   "status": 0,
+   "report_sha256": "4ffa2ffef4129db34dc540704b0ec076c7f27854232ab0b5f3970be104e89b71",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-cues-preroll/gate-result.json",
+   "command": "report --benchmark",
+   "key": "45f9e829a1b04ee85b62c3a8a38101b2359de3b24876f475affcf553b91fc534",
+   "status": 0,
+   "report_sha256": "c301eef231c678b9a12347c28fedb0c8afe6f73120104b162607178d268a7704",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "9627dcfda91c7b9113abf722a26b5c01943a5dcfea5170bd8ae6de99bca2cc95",
+   "status": 0,
+   "report_sha256": "4420a0f9770d821e9eeeabe7db320a791284b0d8ac7bf53bc60b92af944255ca"
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "b206de2c5e597bbc3e6093277e50a1b7e9e49b8789bbc333ee510970fb8256c6",
+   "status": 0,
+   "report_sha256": "7997bca9a53840a507dbea9def38e5febaa1c54f3f091958d5a77f1c9060d932"
+  },
+  {
+   "path": "graded/matroska-cues-preroll/gate-result.json",
+   "command": "grade",
+   "key": "eb37f0e08576d235f5c9db8113bb75372b5ac12be488f65ac2367293cd65f692",
+   "status": 0,
+   "report_sha256": "96f7ce1f29de45199ed8df660c3a718041e805bab0ad88210843887284d9b5ba"
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "8056198ad519fc257faa9dd6cc3b7875e5cddd53a79fc42be3afa3cb79ce9308",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "45848edada1f90a4293077c63a9e56fbd3b8af81168410cdfa514ccde5f62719",
+   "status": 0,
+   "report_sha256": null
+  }
+ ]
+}
