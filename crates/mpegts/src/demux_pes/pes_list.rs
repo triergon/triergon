@@ -122,8 +122,7 @@ impl<T> PesList<T> {
     /// Adopts `list`'s allocation for the next fill when this list holds
     /// nothing and `list` is larger, charged to the same pool and of a size
     /// comparable to what a new list grew to for the last PES. The planned
-    /// capacity is unchanged;
-    /// `list`'s elements are dropped either way.
+    /// capacity is unchanged; `list`'s elements are dropped either way.
     pub(super) fn reuse(&mut self, mut list: BudgetVec<T>) {
         list.clear();
         if self.items.is_empty()
