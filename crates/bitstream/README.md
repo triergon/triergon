@@ -32,6 +32,11 @@ assert_eq!(reader.read(8), 0);
 assert!(reader.overrun());
 ```
 
+[`RiceReader::rice`] checks the exclusive bit limit for each code. A failed
+read leaves the reader at the start of that code. A decoder validating a whole
+partition can use [`RiceReader::rice_in_partition`] and call [`RiceReader::past_end`]
+once before accepting any of its values.
+
 ## Checked reads
 
 [`BitCursor`] reads MSB-first bits of a slice and fails at its end. Headers and parameter

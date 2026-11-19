@@ -59,7 +59,8 @@ pub(crate) fn read<S: Sample>(
             }
             parameter => read_rice(&mut bits, parameter, end, partition)?,
         }
-        if bits.position() > end {
+        // Cached Rice codes and escaped fields defer the end check to here.
+        if bits.past_end(end) {
             return Err(PAST_THE_END);
         }
         rest = tail;
@@ -113,12 +114,12 @@ fn read_rice_groups<S: Sample, const GROUP: usize>(
     for group in &mut groups {
         bits.refill();
         for x in group {
-            *x = S::from(unfold(bits.rice(k, end).ok_or(PAST_THE_END)?));
+            *x = S::from(unfold(bits.rice_in_partition(k, end).ok_or(PAST_THE_END)?));
         }
     }
     for x in groups.into_remainder() {
         bits.refill();
-        *x = S::from(unfold(bits.rice(k, end).ok_or(PAST_THE_END)?));
+        *x = S::from(unfold(bits.rice_in_partition(k, end).ok_or(PAST_THE_END)?));
     }
     Ok(())
 }
@@ -132,6 +133,23 @@ fn unfold(folded: u32) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn truncated_rice_partition_rejects_even_a_cached_last_code() {
+        // Method 0, partition order 0, Rice parameter 2, then codes 1|11 (-2).
+        let data = [0x00, 0xbf, 0xff, 0x80];
+        for len in [4, 5] {
+            // Exercise both a full group and a trailing single code.
+            let end = 10 + 3 * len;
+            let mut samples = [0_i32; 5];
+            let mut short = CachedBitReader::with_end(&data, end - 1);
+            assert_eq!(read(&mut short, 0, &mut samples[..len]), Err(PAST_THE_END));
+            let mut exact = CachedBitReader::with_end(&data, end);
+            read(&mut exact, 0, &mut samples[..len]).unwrap();
+            assert_eq!(exact.position(), end);
+            assert_eq!(&samples[..len], &[-2; 5][..len]);
+        }
+    }
 
     #[test]
     fn unfold_covers_the_32_bit_range() {
