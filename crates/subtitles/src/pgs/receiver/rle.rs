@@ -51,17 +51,29 @@ pub(crate) fn decode(encoded: &[u8], rows: usize, plane: &mut [u8]) -> bool {
     filled == plane.len()
 }
 
-/// Short runs are written as one fixed block: any bytes past the run are
-/// rewritten by the runs that follow, since a plane is only accepted once
-/// every pixel after `filled` has been written in order.
-const BLOCK: usize = 64;
+/// Runs of up to `SHORT` pixels are written as whole blocks: any bytes past
+/// the run are rewritten by the runs that follow, since a plane is only
+/// accepted once every pixel after `filled` has been written in order.
+const SHORT: usize = 64;
+
+/// The most bytes of one colour the target stores inline. On 32-bit ARM a
+/// longer fill of a non-zero byte becomes a call to the C library's `memset`,
+/// so a short run there takes one or two half blocks.
+const BLOCK: usize = if cfg!(target_arch = "arm") { 32 } else { SHORT };
 
 /// `run` pixels of `colour` at `filled`, or nothing if they would pass the end.
 #[inline]
 fn fill(plane: &mut [u8], filled: &mut usize, colour: u8, run: usize) {
-    if run <= BLOCK && *filled + BLOCK <= plane.len() {
-        plane[*filled..*filled + BLOCK].copy_from_slice(&[colour; BLOCK]);
-    } else if let Some(target) = plane.get_mut(*filled..*filled + run) {
+    let at = *filled;
+    if run <= SHORT
+        && let Some(short) = plane.get_mut(at..at + SHORT)
+    {
+        short[..BLOCK].copy_from_slice(&[colour; BLOCK]);
+        // A separate store, so that the two are never merged into one fill.
+        if run > BLOCK {
+            short[SHORT - BLOCK..].copy_from_slice(&[colour; BLOCK]);
+        }
+    } else if let Some(target) = plane.get_mut(at..at + run) {
         target.fill(colour);
     } else {
         return;
@@ -117,6 +129,26 @@ mod tests {
             plane(&[1, 1, 1, 1, 0, 0, 2, 2, 2, 2, 0, 0, 3, 3, 0, 0], 8),
             Some(vec![1, 1, 1, 1, 2, 2, 2, 2])
         );
+    }
+
+    #[test]
+    fn runs_of_every_length_fill_in_order() {
+        // Runs of 1 to 140 pixels in turn, each with its own colour, end to
+        // end, so that every block path ends at and near the plane's end.
+        for last in 1..=140_u8 {
+            let mut encoded = Vec::new();
+            let mut expected = Vec::new();
+            for run in 1..=last {
+                let colour = run;
+                let run = usize::from(run);
+                encoded.extend([0, 0xc0 | (run >> 8) as u8, run as u8, colour]);
+                expected.extend(std::iter::repeat_n(colour, run));
+            }
+            encoded.extend([0, 0]);
+            let mut out = vec![0xee; expected.len()];
+            assert!(decode(&encoded, 1, &mut out), "{last}");
+            assert_eq!(out, expected, "{last}");
+        }
     }
 
     #[test]
