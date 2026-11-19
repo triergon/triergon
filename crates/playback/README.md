@@ -131,8 +131,10 @@ in order.
 
 **Matroska HEVC discovery.** Startup requires one distinct parameter set of
 each type. It accepts byte-identical repeats in CodecPrivate and before the
-first slice of an access unit after checking the single-layer VPS and SPS
-through their timing fields and the base PPS through its extension flags.
+first slice of an access unit. Configuration array types must match parameter
+set NAL headers. For repeats, the single-layer VPS is checked through its
+trailing bits, the SPS through its timing fields, and the base PPS through its
+extension flags.
 
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization

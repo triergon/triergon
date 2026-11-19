@@ -1204,6 +1204,17 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
         MatroskaDiscoveryStep,
     };
 
+    let configuration = include_bytes!("fixtures/mkv-feed/hevc-repeated-configuration.mkv");
+    let pps_array = [34, 0, 2, 0, 6, 0x44, 0x01, 0xc0, 0x73, 0xc0, 0x89];
+    let array_offset = configuration
+        .windows(pps_array.len())
+        .position(|window| window == pps_array)
+        .expect("repeated PPS array");
+    let mut pps_declared_as_sei = configuration.to_vec();
+    pps_declared_as_sei[array_offset] = 39;
+    let mut sei_declared_as_pps = configuration.to_vec();
+    sei_declared_as_pps[array_offset + 5] = 39 << 1;
+
     for (fixture, expected) in [
         (
             include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv").as_slice(),
@@ -1226,6 +1237,8 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
                 .as_slice(),
             MatroskaDiscoveryCutoff::SourceEnd,
         ),
+        (&pps_declared_as_sei, MatroskaDiscoveryCutoff::SourceEnd),
+        (&sei_declared_as_pps, MatroskaDiscoveryCutoff::SourceEnd),
     ] {
         let (engine, source, _) = matroska_source(
             fixture,

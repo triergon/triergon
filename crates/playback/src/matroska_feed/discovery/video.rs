@@ -245,9 +245,9 @@ impl Setup {
 }
 
 fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
-    let chain = hevc::startup_chain(view.nals().map(|nal| nal.source_bytes()))?;
     let mut hevc_parameter_sets = [0; 3];
     for nal in view.nals() {
+        nal.check_parameter_set_declaration()?;
         let kind = nal.header().nal_unit_type();
         if (32..=34).contains(&kind) {
             let offset = nal.source_range().start - nal.length_field_bytes().len();
@@ -255,6 +255,7 @@ fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
                 u16::try_from(offset).map_err(|_| Error::Overflow)?;
         }
     }
+    let chain = hevc::startup_chain(view.nals().map(|nal| nal.source_bytes()))?;
     Ok(Chain {
         codec: Codec::Hevc,
         length: view.length_size(),

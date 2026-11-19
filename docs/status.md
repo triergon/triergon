@@ -189,8 +189,9 @@ plans, step records and logs.
 
 The playback tests cover exact and conflicting HEVC parameter-set entries in
 the configuration record. The slice-only fixtures verify that exact repeats
-preserve packet clocks and a repeated truncated VPS prevents startup. The
-in-band fixtures also cover matching truncations of each parameter set.
+preserve packet clocks. A truncated VPS and a parameter-set array whose type
+disagrees with its NAL header prevent startup. The in-band fixtures also cover
+matching truncations of each parameter set.
 
 At `6bbb2cb7`, all 289 cases in the nine playback gate groups passed parity,
 runtime and kernel-bound heap and total RSS on both targets. The largest Linux
