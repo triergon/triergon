@@ -448,7 +448,7 @@ playback_worker::hls::run::{closure#1}
 <triergon_playback::engines::TsEngine>::native_segment
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::with_queue
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::read_output
-<triergon_mpegts::stream::TransportStream>::poll_feed_with_payload_runs::<<triergon_playback::engines::TsEngine>::poll_feed_stream::{closure#0}>
+<triergon_mpegts::stream::TransportStream>::poll_feed_inner::<false, false, &mut <triergon_playback::engines::TsEngine>::poll_feed_stream::{closure#0}>
 <triergon_mpegts::framer::TransportFramer>::release_unused_windows
 <triergon_playback::io::SourceOwner<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::poll
 <triergon_playback::player::Player<triergon_playback::hls_segment::LimitedSource<triergon_playback::input::ByteSource>>>::provide
