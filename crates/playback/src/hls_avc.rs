@@ -421,6 +421,28 @@ impl AvcTsReader {
         std::mem::take(&mut self.spent)
     }
 
+    /// Takes back a unit the caller has finished with. When no other handle
+    /// shares its storage, that storage is larger than the assembly buffer and
+    /// the buffer holds no more than a start code's lookahead, as it does
+    /// right after a unit is published, the storage becomes the assembly
+    /// buffer. Later units of a similar size are then assembled without
+    /// allocating. Otherwise the unit is dropped. Outputs and work are the
+    /// same either way.
+    pub fn reuse_unit(&mut self, unit: AvcTsAccessUnit) {
+        let AvcTsAccessUnit { source, .. } = unit;
+        if self.bytes.len() > LOOKAHEAD || !source.belongs_to(&self.pool) {
+            return;
+        }
+        let Ok(mut storage) = source.try_reclaim() else {
+            return;
+        };
+        if storage.capacity() > self.bytes.capacity()
+            && storage.try_extend_from_slice(self.bytes.as_slice()).is_ok()
+        {
+            self.bytes = storage;
+        }
+    }
+
     /// Seal only after definitive segment EOF. Already provided bytes drain.
     pub fn finish(&mut self) {
         self.ended = true;

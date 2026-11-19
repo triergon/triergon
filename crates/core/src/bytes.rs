@@ -213,6 +213,22 @@ impl Bytes {
         }
         Ok(BytesWriter(self.storage))
     }
+    /// A uniquely owned allocation back as an empty vector that keeps its
+    /// capacity and is charged for exactly that capacity; the shared-owner
+    /// header's charge returns to the pool. Whatever range this view covers,
+    /// its bytes are discarded. A shared allocation is returned intact.
+    pub fn try_reclaim(self) -> std::result::Result<BudgetVec<u8>, Self> {
+        let Storage {
+            mut data,
+            mut charge,
+        } = Arc::try_unwrap(self.storage).map_err(|storage| Self {
+            storage,
+            range: self.range,
+        })?;
+        data.clear();
+        charge.shrink_by(charge.bytes().saturating_sub(data.capacity()));
+        Ok(BudgetVec { data, charge })
+    }
     /// Refills a uniquely owned allocation in place: `fill` gets its first `len` bytes
     /// and returns how many it wrote (at most `len`), which become this view. The bytes
     /// hold earlier contents, or zero where nothing was written yet; capacity and charge
@@ -793,6 +809,30 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 mod tests {
     use super::{BudgetVec, Bytes, BytesView, nonzero_prefix_len};
     use crate::Budget;
+
+    #[test]
+    fn a_unique_allocation_comes_back_empty_with_its_capacity_and_charge() {
+        let pool = Budget::new(4096).unwrap();
+        let mut vector = BudgetVec::new(&pool);
+        vector.try_reserve_exact(64).unwrap();
+        vector.try_extend_from_slice(&[7; 40]).unwrap();
+        let storage = vector.as_slice().as_ptr();
+        let used = pool.used();
+        let bytes = vector.freeze().unwrap().into_slice(0..32).unwrap();
+        let alias = bytes.clone();
+        let bytes = bytes.try_reclaim().unwrap_err();
+        assert_eq!(bytes.as_ref(), [7; 32]);
+        drop(alias);
+        let mut reclaimed = bytes.try_reclaim().unwrap();
+        assert!(reclaimed.is_empty());
+        assert_eq!(reclaimed.capacity(), 64);
+        assert_eq!(pool.used(), used);
+        reclaimed.try_extend_from_slice(&[1; 64]).unwrap();
+        assert_eq!(reclaimed.as_slice().as_ptr(), storage);
+        assert_eq!(pool.used(), used);
+        drop(reclaimed);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 
     #[test]
     fn a_traversed_vector_comes_back_with_its_allocation_and_charge() {

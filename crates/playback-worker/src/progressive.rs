@@ -141,10 +141,10 @@ impl RetainedStream {
         held: Held,
         input: &InputFacts,
         out: &mut Option<&mut dyn Write>,
-    ) -> Result<()> {
+    ) -> Result<TsProgressiveUnit> {
         self.across_read += u64::from(input.reads > held.acquired_at_read);
         self.retired_before_eof += u64::from(!input.eof);
-        match held.unit {
+        match &held.unit {
             TsProgressiveUnit::Video(video) => {
                 let clock = video.clock.ok_or("missing AVC clock")?;
                 let size = video.feed_spans().map(<[u8]>::len).sum::<usize>();
@@ -184,7 +184,7 @@ impl RetainedStream {
                     .ok_or("missing AAC channels")?;
                 let [pn, pd] = pair(frame.pts)?;
                 let [dn, dd] = pair(frame.dts)?;
-                let [tn, td] = pair(Some(presentation))?;
+                let [tn, td] = pair(Some(*presentation))?;
                 let [sn, sd] = pair(Some(frame.duration))?;
                 self.fields(
                     'a',
@@ -210,19 +210,22 @@ impl RetainedStream {
         if let Some(out) = out.as_deref_mut() {
             writeln!(out)?;
         }
-        Ok(())
+        Ok(held.unit)
     }
 
+    /// Holds `unit` and returns the oldest held unit, retired, when the queue
+    /// was full.
     fn enqueue(
         &mut self,
         unit: TsProgressiveUnit,
         input: &InputFacts,
         out: &mut Option<&mut dyn Write>,
-    ) -> Result<()> {
+    ) -> Result<Option<TsProgressiveUnit>> {
         self.first.get_or_insert(input.bytes);
-        if let Some(oldest) = self.queue[self.head].take() {
-            self.retire(oldest, input, out)?;
-        }
+        let retired = match self.queue[self.head].take() {
+            Some(oldest) => Some(self.retire(oldest, input, out)?),
+            None => None,
+        };
         self.queue[self.head] = Some(Held {
             unit,
             acquired_at_read: input.reads,
@@ -232,7 +235,7 @@ impl RetainedStream {
             .high
             .max(self.queue.iter().filter(|slot| slot.is_some()).count());
         self.count += 1;
-        Ok(())
+        Ok(retired)
     }
 
     fn drain(&mut self, input: &InputFacts, out: &mut Option<&mut dyn Write>) -> Result<()> {
@@ -343,7 +346,9 @@ fn operation(
                 if let Some(out) = out.as_deref_mut() {
                     writeln!(out, "o {}", ['v', 'a'][stream])?;
                 }
-                streams[stream].enqueue(unit, &input, &mut out)?;
+                if let Some(retired) = streams[stream].enqueue(unit, &input, &mut out)? {
+                    reader.reuse_unit(retired);
+                }
             }
             TsProgressiveStep::Yield => {}
             TsProgressiveStep::End => break,

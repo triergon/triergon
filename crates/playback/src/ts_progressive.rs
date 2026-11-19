@@ -225,7 +225,7 @@ pub struct TsProgressiveReader<S: Source> {
     saw_video: bool,
     audio_times: Option<(Time, NextAudioTime)>,
     #[cfg(test)]
-    reuse_lists: bool,
+    reuse_storage: bool,
 }
 
 impl<S: Source> TsProgressiveReader<S> {
@@ -252,7 +252,7 @@ impl<S: Source> TsProgressiveReader<S> {
             saw_video: false,
             audio_times: None,
             #[cfg(test)]
-            reuse_lists: true,
+            reuse_storage: true,
         })
     }
 
@@ -521,11 +521,26 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(())
     }
 
+    /// Takes back a unit the caller has finished with, so its track's reader
+    /// can assemble a later unit in its storage. Handing a video unit back
+    /// right after the next one arrives lets the video reader assemble units
+    /// without allocating; dropping units instead gives the same outputs and
+    /// work.
+    pub fn reuse_unit(&mut self, unit: TsProgressiveUnit) {
+        #[cfg(test)]
+        if !self.reuse_storage {
+            return;
+        }
+        if let (TsProgressiveUnit::Video(unit), Some(video)) = (unit, self.video.as_mut()) {
+            video.reuse_unit(unit);
+        }
+    }
+
     /// The observer of a track allocates nothing for its next PES when it gets
     /// back the lists of the one a reader has just consumed.
     fn reuse_pes_lists(&mut self, track: impl Fn(&Tracks) -> TrackKey, lists: SpentLists) {
         #[cfg(test)]
-        if !self.reuse_lists {
+        if !self.reuse_storage {
             return;
         }
         if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref())
@@ -633,6 +648,7 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::VecDeque;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
 
     #[test]
@@ -1004,8 +1020,15 @@ mod tests {
     }
 
     #[test]
-    fn reused_pes_lists_keep_every_output_and_work_boundary() {
-        fn read(wire: &[u8], reuse: bool, quantum: u64, window: usize) -> Vec<(String, u64)> {
+    fn reused_storage_keeps_every_output_and_work_boundary() {
+        // Like the progressive worker, hold two units per track and hand the
+        // oldest back when a third arrives.
+        fn read(
+            wire: &[u8],
+            reuse: bool,
+            quantum: u64,
+            window: usize,
+        ) -> (Vec<(String, u64)>, usize) {
             let pool = Budget::new(8 << 20).unwrap();
             let id = SourceId(37);
             let caps = SourceCapabilities {
@@ -1018,9 +1041,11 @@ mod tests {
             let input = InputCursor::new(&pool, id, caps, window).unwrap();
             let mut reader =
                 TsProgressiveReader::new(input, source, TsProgressiveLimits::default()).unwrap();
-            reader.reuse_lists = reuse;
+            reader.reuse_storage = reuse;
             let cancel = AtomicBool::new(false);
             let mut trace = Vec::new();
+            let mut held: [VecDeque<TsProgressiveUnit>; 2] = Default::default();
+            let mut peak = 0;
             loop {
                 let mut work = WorkBudget::new(quantum);
                 let step = reader.advance(&mut work, &cancel).unwrap();
@@ -1038,10 +1063,24 @@ mod tests {
                     other => format!("{other:?}"),
                 };
                 trace.push((tag, work.spent()));
-                if matches!(step, TsProgressiveStep::End) {
-                    drop(reader);
-                    assert_eq!(pool.used(), Budget::control_storage_bytes());
-                    return trace;
+                peak = peak.max(pool.used());
+                match step {
+                    TsProgressiveStep::Unit(unit) => {
+                        let track =
+                            &mut held[usize::from(matches!(unit, TsProgressiveUnit::Audio { .. }))];
+                        track.push_back(unit);
+                        if track.len() > 2
+                            && let Some(oldest) = track.pop_front()
+                        {
+                            reader.reuse_unit(oldest);
+                        }
+                    }
+                    TsProgressiveStep::End => {
+                        drop((reader, held));
+                        assert_eq!(pool.used(), Budget::control_storage_bytes());
+                        return (trace, peak);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -1051,10 +1090,12 @@ mod tests {
         ] {
             for quantum in [1, 31, 4096] {
                 for window in [188, 4096] {
-                    assert_eq!(
-                        read(wire, true, quantum, window),
-                        read(wire, false, quantum, window),
-                        "work {quantum}, window {window}"
+                    let (reused, reused_peak) = read(wire, true, quantum, window);
+                    let (fresh, fresh_peak) = read(wire, false, quantum, window);
+                    assert_eq!(reused, fresh, "work {quantum}, window {window}");
+                    assert!(
+                        reused_peak <= fresh_peak,
+                        "peak {reused_peak} above {fresh_peak}: work {quantum}, window {window}"
                     );
                 }
             }
