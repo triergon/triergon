@@ -10,11 +10,26 @@ use triergon_subtitles::compat::{ass, document};
 type Folded = (i64, i64, Vec<u8>, Option<Vec<u8>>, Option<Vec<u8>>);
 
 fn read(source: &[u8], syntax: document::Syntax, quantum: u64) -> Vec<Folded> {
+    read_with_width(source, syntax, quantum, None)
+}
+
+fn read_with_width(
+    source: &[u8],
+    syntax: document::Syntax,
+    quantum: u64,
+    width: Option<document::TimestampFieldWidth>,
+) -> Vec<Folded> {
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
     let bytes = Bytes::copy_from_slice(&pool, source).unwrap();
-    let mut reader =
-        document::Reader::new(&pool, bytes, syntax, document::Limits::default()).unwrap();
+    let limits = document::Limits::default();
+    let mut reader = match width {
+        Some(width) => {
+            document::Reader::with_timestamp_field_width(&pool, bytes, syntax, limits, width)
+        }
+        None => document::Reader::new(&pool, bytes, syntax, limits),
+    }
+    .unwrap();
     let cancel = AtomicBool::new(false);
     let mut cues = Vec::new();
     for _ in 0..1_000_000 {
@@ -77,6 +92,50 @@ fn subrip_durations_are_32_bit_and_nul_ends_the_document() {
     assert_eq!(
         read(source, document::Syntax::SubRip, 7),
         [cue(0, -698_567_296, "A")]
+    );
+}
+
+#[test]
+fn document_timestamp_width_selects_the_decimal_bounds() {
+    let cases: [(&[u8], document::Syntax, i64); 2] = [
+        (
+            b"1\n00:00:4294967297,000 --> 00:00:4294967298,000\nA\n",
+            document::Syntax::SubRip,
+            i64::from(i32::MAX) * 1000,
+        ),
+        (
+            b"WEBVTT\n\n00:4294967297.000 --> 00:4294967298.000\nA\n\n",
+            document::Syntax::WebVtt,
+            -1000,
+        ),
+    ];
+    for (source, syntax, narrow_start) in cases {
+        assert_eq!(read(source, syntax, 1), [cue(narrow_start, 0, "A")]);
+        assert_eq!(
+            read_with_width(
+                source,
+                syntax,
+                1,
+                Some(document::TimestampFieldWidth::Bits64)
+            ),
+            [cue(1000, 1000, "A")],
+        );
+    }
+}
+
+#[test]
+fn utf16_subrip_keeps_the_selected_signed_minimum() {
+    let source = "1\n00:00:-9223372036854775809,000 --> 00:00:01,000\nA\n";
+    let mut utf16 = vec![0xff, 0xfe];
+    utf16.extend(source.encode_utf16().flat_map(u16::to_le_bytes));
+    assert_eq!(
+        read_with_width(
+            &utf16,
+            document::Syntax::SubRip,
+            2,
+            Some(document::TimestampFieldWidth::Bits64)
+        ),
+        [cue(0, 1000, "A")],
     );
 }
 

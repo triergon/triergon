@@ -439,16 +439,27 @@ fn document(
     quantum: u64,
 ) -> Work {
     let mut work = Work::new(quantum);
-    let read = document::Reader::new(pool, raw.clone(), syntax, document::Limits::default())
-        .and_then(|mut reader| {
-            loop {
-                match reader.poll(&mut work.budget(), cancel)? {
-                    document::Status::Yield => {}
-                    document::Status::Cue(cue) => fold_cue(&mut work, &cue, syntax),
-                    document::Status::Finished => return Ok(()),
-                }
+    let width = if cfg!(target_pointer_width = "32") {
+        document::TimestampFieldWidth::Bits32
+    } else {
+        document::TimestampFieldWidth::Bits64
+    };
+    let read = document::Reader::with_timestamp_field_width(
+        pool,
+        raw.clone(),
+        syntax,
+        document::Limits::default(),
+        width,
+    )
+    .and_then(|mut reader| {
+        loop {
+            match reader.poll(&mut work.budget(), cancel)? {
+                document::Status::Yield => {}
+                document::Status::Cue(cue) => fold_cue(&mut work, &cue, syntax),
+                document::Status::Finished => return Ok(()),
             }
-        });
+        }
+    });
     work.byte(if read.is_ok() { b'Z' } else { b'F' });
     work
 }
@@ -521,15 +532,32 @@ mod tests {
     /// it, in work slices of any size, and leaves its pool as it found it.
     #[test]
     fn every_case_folds_as_the_reference_recorded_it() {
+        check_corpus(
+            include_str!("../../../harness/features/subtitle-text/corpus.json"),
+            |case| case.get("expected").unwrap(),
+        );
+    }
+
+    #[test]
+    fn oversized_fields_match_the_recorded_width() {
+        let target = if cfg!(target_pointer_width = "32") {
+            "thumbv7neon-unknown-linux-gnueabihf"
+        } else {
+            "aarch64-unknown-linux-gnu"
+        };
+        check_corpus(
+            include_str!("../../../harness/features/subtitle-text-host/corpus.json"),
+            |case| case.get("expected_by_target").unwrap().get(target).unwrap(),
+        );
+    }
+
+    fn check_corpus(source: &str, expected: impl Fn(&json::Value) -> &json::Value) {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let corpus = json::parse_strict(include_str!(
-            "../../../harness/features/subtitle-text/corpus.json"
-        ))
-        .unwrap();
+        let corpus = json::parse_strict(source).unwrap();
         let cases = corpus.get("cases").unwrap().as_array().unwrap();
         for case in cases {
             let text = |key: &str| case.get(key).unwrap().as_str().unwrap();
-            let expected = case.get("expected").unwrap();
+            let expected = expected(case);
             let kind = case.get("arguments").unwrap().as_array().unwrap()[0]
                 .as_str()
                 .unwrap();
