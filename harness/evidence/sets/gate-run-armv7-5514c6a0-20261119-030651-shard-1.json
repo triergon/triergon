@@ -1,0 +1,122 @@
+{
+ "name": "gate-run-armv7-5514c6a0-20261119-030651-shard-1",
+ "path": "gate-run-armv7-5514c6a0-20261119-030651-shard-1",
+ "retention": "retained",
+ "reason": "Playback startup and continuation on 32-bit ARMv7",
+ "key": "evidence/gate-runs/5514c6a0f0118bcbaecabd1e8ac35f9b8597d094-armv7-20261119-030651/shard-1/d38be11c82dfa02587f849970ce4d0822ea477ac9047ac464607183cf3bbffd2.tar.zst",
+ "sha256": "d38be11c82dfa02587f849970ce4d0822ea477ac9047ac464607183cf3bbffd2",
+ "bytes": 25281749,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "03d449ac1f0ab04cc4ca9c8e62e7b1b337bc35c4603fefb9f79c1f360437325d",
+   "status": 0,
+   "report_sha256": "6920f8582b8634730aba2f59a7f60536c79aec2db2ea54b94481f71474d62f85",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "22403ee1f8e72b1c5c3927be4166efbaa8b4fe40ba20ee782a8319f3c25c544d",
+   "status": 0,
+   "report_sha256": "854e47979b30dd3601560554a52b8c976b91790dd19de2d4d34235a7f5af0579",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "ebb4bde90e0b9614a171f5cae9da01367c438dd3bc011c9d649ca70b7e73347a",
+   "status": 0,
+   "report_sha256": "34c45e13eaeeedbb155ecf0d0eaf5c327b64b91f4182a86639fabba12ee14a0e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/matroska-audio-clocks/gate-result.json",
+   "command": "report --memory",
+   "key": "46ded9cb1b7c9d60957cce9d58e96424614156a8855957995704c3e5c1162532",
+   "status": 0,
+   "report_sha256": "834a8a3ba5c64967bd8b4ebd6a16d3b17a83d1adc650d80afef7cfcfdf56d300",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "fa174337116f950e86d78d149921711abd94b4dffd087a2bc1715e65806a8caf",
+   "status": 0,
+   "report_sha256": "e1cd9203dfdfb3503e214c743e90134f170906698ffe501ef92c8f56786d7b63",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "ecb2f9b592208ff28457f8b0c06183805503a7d962a89755027622dc4632aa69",
+   "status": 0,
+   "report_sha256": "468006f91756dae37aa6937eaa53c2f0193d5045cfad4938a8c18efa9a56a185",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c46bd4f3210866adccc0250b7bbf052e0d2044ef8897e1046cc1b7a3fb2d4e7c",
+   "status": 0,
+   "report_sha256": "731fb1cdcb6a87cbf2912a21e2bbfd878084be01c6718db14ada5dcf3b4ec882",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "abb807d72e2fa7d03a2797d27c11f37a4105a919715179448c3ab2962beb6885",
+   "status": 0,
+   "report_sha256": "50b66eafa35f191b783330ef604fbf47663a8792aa6fa4d2fca16e794841c1b2",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/matroska-audio-clocks/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4f349052dceb2f56a5f6aff6b009eb48e34a965886d003fdc54122530ae350b6",
+   "status": 0,
+   "report_sha256": "29748130a03005e3060d4198fd19e00e069d9a284cf1d292aaed6ec5ab0dce13",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "851e3c03e85ebdae5b5e0cc6564caae7470d166e6ed7025223d3bee8459a2a01",
+   "status": 0,
+   "report_sha256": "43e7b6720af8106a2759323316366c122ed82a1770b06ced94f8a88879562b93",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "8f6e040e816acae8a7c56d6c8129641d897bcaf036822c7d22fde266ee892171",
+   "status": 0,
+   "report_sha256": "84aac0c220ce2b783b2822de2adc57ae33547021208275eeb9bb0bee130c89ca"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "dbdd13d20b107453fe6b16a95b1d90f94703a563f2a8c9acf846779e505e17ce",
+   "status": 0,
+   "report_sha256": "ab21b37ddf7d2320f81f3efb9a03aaef31e6add9b6486acb2be643d92741d250"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "e14a41aefaf34080cb66e5461a2c104cc413dcadaf2c8302773570dee6dda1e9",
+   "status": 0,
+   "report_sha256": "5dba7437277a1817cbea29191a0703e9d1ee5c95f4f8fe72fa45f868b3a6c66b"
+  },
+  {
+   "path": "graded/matroska-audio-clocks/gate-result.json",
+   "command": "grade",
+   "key": "87c9340680b51b881c8205d721441221ccfceb5b618b1856a63644540c1c852b",
+   "status": 0,
+   "report_sha256": "0441b8ebff75b0eeb64902952d78f3907bf761a48d6eac4556e251634796c4ba"
+  }
+ ],
+ "source_revisions": [
+  "5514c6a0f0118bcbaecabd1e8ac35f9b8597d094"
+ ]
+}
