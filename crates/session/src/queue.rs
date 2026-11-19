@@ -107,6 +107,12 @@ impl UnitQueue {
     pub fn is_empty(&self) -> bool {
         self.units.is_empty()
     }
+    #[cfg(all(test, feature = "codecs"))]
+    pub(super) fn retained_payload_bytes(&self) -> usize {
+        self.units.iter().map(|unit| unit.data.len()).sum::<usize>()
+            + self.spare.as_ref().map_or(0, |spare| spare.len())
+    }
+
     #[cfg(test)]
     pub fn len(&self) -> usize {
         self.units.len()

@@ -172,3 +172,45 @@ impl AudioSession {
         }
     }
 }
+
+#[cfg(all(test, feature = "codecs"))]
+mod tests {
+    use super::*;
+    use crate::{AudioCodec, audio_decoder};
+
+    #[test]
+    fn decoded_payload_storage_is_released_on_reset_failure_and_end() {
+        let mut lane = AudioSession::new(QueueLimits::AUDIO);
+        let head = b"OpusHead\x01\x02\0\0\x80\xbb\0\0\0\0\0";
+        let packet = [0xfc, 0xff, 0xfe];
+        let mut block = PcmBlock::default();
+        lane.load(Some(audio_decoder(AudioCodec::Opus, head).unwrap()));
+        lane.feed(&packet, None).unwrap();
+        assert_eq!(lane.pull(None, 0, &mut block), 1);
+        assert_eq!(lane.state(), SessionState::Starved);
+        assert_eq!(lane.queue.retained_payload_bytes(), packet.len());
+        lane.stop();
+        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+
+        // Hold the invalid second packet behind its PTS so the spare and
+        // queued allocation are both live at the time the decoder fails.
+        lane.feed(&packet, Some(0)).unwrap();
+        lane.feed(&[0xff], Some(1)).unwrap();
+        assert_eq!(lane.pull(Some(0), 0, &mut block), 1);
+        assert_eq!(lane.queue.retained_payload_bytes(), packet.len() + 1);
+        assert_eq!(lane.pull(Some(1), 0, &mut block), 1);
+        assert!(matches!(lane.state(), SessionState::Failed(_)));
+        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+
+        lane.stop();
+        lane.feed(&packet, Some(0)).unwrap();
+        lane.feed(&packet, Some(1)).unwrap();
+        assert_eq!(lane.pull(Some(0), 0, &mut block), 1);
+        assert_eq!(lane.queue.retained_payload_bytes(), 2 * packet.len());
+        lane.end_of_stream();
+        assert_eq!(lane.queue.retained_payload_bytes(), packet.len());
+        assert_eq!(lane.pull(None, 0, &mut block), 1);
+        assert_eq!(lane.state(), SessionState::Ended);
+        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+    }
+}
