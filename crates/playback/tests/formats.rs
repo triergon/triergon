@@ -2031,9 +2031,8 @@ fn private_audio_player(
         64,
     )
     .unwrap();
-    let engine = Engine::ts_native_private_audio_v1(
+    let engine = compat::pes::open_private_audio(
         input,
-        PacketFormat::Ts188,
         1,
         triergon_mpegts::ParseLimits::default(),
         SourceTimePolicy::RelativeEpochZero,
