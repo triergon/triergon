@@ -1204,6 +1204,31 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
         MatroskaDiscoveryStep,
     };
 
+    let configuration = include_bytes!("fixtures/mkv-feed/hevc-repeated-configuration.mkv");
+    let pps_array = [34, 0, 2, 0, 6, 0x44, 0x01, 0xc0, 0x73, 0xc0, 0x89];
+    let array_offset = configuration
+        .windows(pps_array.len())
+        .position(|window| window == pps_array)
+        .expect("repeated PPS array");
+    let vps = [
+        0x40, 0x01, 0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x02, 0x40,
+    ];
+    let mut missing_vps_stop_bit = configuration.to_vec();
+    let mut copies = 0;
+    for (offset, nal) in configuration.windows(vps.len()).enumerate() {
+        if nal == vps {
+            // Keep the extension flag and clear only rbsp_stop_one_bit.
+            missing_vps_stop_bit[offset + vps.len() - 1] = 0;
+            copies += 1;
+        }
+    }
+    assert_eq!(copies, 2);
+    let mut pps_declared_as_sei = configuration.to_vec();
+    pps_declared_as_sei[array_offset] = 39;
+    let mut sei_declared_as_pps = configuration.to_vec();
+    sei_declared_as_pps[array_offset + 5] = 39 << 1;
+
     for (fixture, expected) in [
         (
             include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv").as_slice(),
@@ -1221,6 +1246,14 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
             include_bytes!("fixtures/mkv-feed/hevc-truncated-sps.mkv").as_slice(),
             MatroskaDiscoveryCutoff::SourceEnd,
         ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-repeated-truncated-vps-configuration.mkv")
+                .as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
+        (&missing_vps_stop_bit, MatroskaDiscoveryCutoff::SourceEnd),
+        (&pps_declared_as_sei, MatroskaDiscoveryCutoff::SourceEnd),
+        (&sei_declared_as_pps, MatroskaDiscoveryCutoff::SourceEnd),
     ] {
         let (engine, source, _) = matroska_source(
             fixture,
@@ -1245,6 +1278,72 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
             )
             .expect("HEVC discovery stalled");
         assert_eq!(cutoff, expected);
+    }
+}
+
+#[test]
+fn hevc_repeated_configuration_preserves_packet_clocks() {
+    use triergon_playback::matroska_feed::{
+        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits,
+        MatroskaDiscoveryStep,
+    };
+
+    let clocks = |input: &[u8]| {
+        let (engine, source, pool) = matroska_source(
+            input,
+            7,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        );
+        let cancel = AtomicBool::new(false);
+        let mut discovery = MatroskaCompactDiscovery::for_av_feed(
+            engine,
+            source,
+            Selection::All,
+            PlayerPolicy::default(),
+            MatroskaDiscoveryLimits::default(),
+        )
+        .unwrap();
+        let cutoff = (0..10_000)
+            .find_map(
+                |_| match discovery.poll(&mut WorkBudget::new(32), &cancel).unwrap() {
+                    MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
+                    MatroskaDiscoveryStep::Progress(_) => None,
+                },
+            )
+            .expect("HEVC discovery stalled");
+        assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
+        let mut discovered = discovery.finish().unwrap();
+        let mut events: Vec<_> = discovered.prefix.into_outputs().collect();
+        events.extend(collect_with_work(&mut discovered.player, 17));
+        let configuration = events
+            .iter()
+            .find_map(|output| match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                _ => None,
+            })
+            .unwrap();
+        let feed = hevc_dolby_setup(&pool, configuration, 0);
+        let mut clock = feed.native_hevc_clock().unwrap().unwrap();
+        events
+            .iter()
+            .filter(|output| output.event().track().is_some())
+            .map(|output| {
+                let packet = hevc_dolby_frame(&feed, output);
+                let timing = clock.observe(&packet).unwrap();
+                (timing.pts_ns, timing.dts_ns, timing.duration_ns)
+            })
+            .collect::<Vec<_>>()
+    };
+    let single = clocks(include_bytes!(
+        "fixtures/mkv-feed/hevc-single-configuration.mkv"
+    ));
+    assert_eq!(single.len(), 6);
+    for fixture in [
+        include_bytes!("fixtures/mkv-feed/hevc-repeated-configuration.mkv").as_slice(),
+        include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv").as_slice(),
+        include_bytes!("fixtures/mkv-feed/hevc-repeated-configuration-in-band.mkv").as_slice(),
+    ] {
+        assert_eq!(clocks(fixture), single);
     }
 }
 

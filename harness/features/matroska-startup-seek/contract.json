@@ -7,6 +7,7 @@
   "reference": "ffmpeg-video-native",
   "contract": [
     "Matroska open, stream discovery and first-video-track selection through the playback engine",
+    "HEVC startup with byte-identical copies of the VPS, SPS and PPS in CodecPrivate",
     "selected AVC or HEVC packets with native PTS, DTS and duration, through a clean end of file and teardown",
     "backward seek after discovery and after reading to the end of file, at 0, 0.7, 1.42 and 2.7 seconds",
     "seekable preloaded input read in 4 KiB windows; every demuxed track is read in the timed operation",
@@ -24,6 +25,7 @@
     "startup-hevc-b3",
     "startup-hevc-mixed",
     "startup-hevc-no-default-duration",
+    "startup-hevc-repeated-configuration",
     "startup-hevc-vps-timed-no-default",
     "seek-avc-seek-0-fresh",
     "seek-avc-seek-0-eof",

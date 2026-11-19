@@ -45,7 +45,7 @@ impl MatroskaAvcClock<'_> {
             return Err(Error::Invalid("native AVC clock feed association"));
         }
         self.clock
-            .observe(packet.source, unit.source_nals(), |_| None)
+            .observe(packet.source, unit.source_nals(), |_| Ok(false), |_| None)
     }
 }
 
@@ -74,6 +74,7 @@ impl DecodeClock {
         &mut self,
         source: &Packet,
         nals: impl Iterator<Item = &'a [u8]>,
+        repeated_parameter_set: impl FnMut(&[u8]) -> Result<bool>,
         fallback_duration: impl FnOnce(u64) -> Option<u64>,
     ) -> Result<MatroskaPacketTiming> {
         if !self.valid {
@@ -84,7 +85,7 @@ impl DecodeClock {
             self.valid = false;
             return Err(Error::Unsupported("native video clock laced sample"));
         }
-        if let Err(error) = self.validate_picture(nals) {
+        if let Err(error) = self.validate_picture(nals, repeated_parameter_set) {
             self.valid = false;
             return Err(error);
         }
@@ -106,7 +107,11 @@ impl DecodeClock {
         })
     }
 
-    fn validate_picture<'a>(&self, nals: impl Iterator<Item = &'a [u8]>) -> Result<()> {
+    fn validate_picture<'a>(
+        &self,
+        nals: impl Iterator<Item = &'a [u8]>,
+        mut repeated_parameter_set: impl FnMut(&[u8]) -> Result<bool>,
+    ) -> Result<()> {
         let mut picture = false;
         for (index, nal) in nals.enumerate() {
             if index == 128 {
@@ -114,6 +119,9 @@ impl DecodeClock {
                     requested: index + 1,
                     maximum: 128,
                 });
+            }
+            if !picture && repeated_parameter_set(nal)? {
+                continue;
             }
             let Some((first, random_access, pps)) =
                 picture_nal(self.codec, nal, self.reorder != 0)?

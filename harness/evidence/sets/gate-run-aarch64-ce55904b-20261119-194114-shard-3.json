@@ -1,0 +1,99 @@
+{
+ "name": "gate-run-aarch64-ce55904b-20261119-194114-shard-3",
+ "path": "gate-run-aarch64-ce55904b-20261119-194114-shard-3",
+ "retention": "retained",
+ "reason": "Native playback gates with matched HEVC repeats and validated VPS timing.",
+ "key": "evidence/gate-runs/ce55904b842a6ddad77e90688a8ec4528438f576-aarch64-20261119-194114/shard-3/8d7f7af8ed4ba98344ee6206ca3f2358d4a4d907faabd4203233f5a2057307e8.tar.zst",
+ "sha256": "8d7f7af8ed4ba98344ee6206ca3f2358d4a4d907faabd4203233f5a2057307e8",
+ "bytes": 24835737,
+ "results": [
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "6ffddfa1b2e916590b80a391bb1b307315d90d1e323f9999ed3ec66fc2934fc9",
+   "status": 0,
+   "report_sha256": "31b77ce4a6e6ce13a47738c8c44373d62f6e23cd4445b7dfb6caa348bb028ec0",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/raw-annex-b/gate-result.json",
+   "command": "report --memory",
+   "key": "4fc2224671dd370e1f09b042d0df367a6f7dba9618ecc74cd7c8d3d502b4b6ae",
+   "status": 0,
+   "report_sha256": "b94bcc28d6c7021d069dd458ba51b20b6c551b8aaef6dc6175b26d03adb42127",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/hls-segments/gate-result.json",
+   "command": "report --memory",
+   "key": "9764370fbdcaf5aa757d8dd6342c4e875001ce770a8753d3c8f8ccd001857c9b",
+   "status": 0,
+   "report_sha256": "b73f27ff7dae0b8893a17ea03a90386f04a2df1ad3ba9c9a879605a983641880",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/progressive/gate-result.json",
+   "command": "report --memory",
+   "key": "63aa1fcd79804c2a7086c5ea5f47469eafef335390cc3b690a0187a80e6e828d",
+   "status": 0,
+   "report_sha256": "dfc54df5fc416d6a5322b35dc88d36a6e5b30f846fec8d8c72bd057c3dddc363",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2e177f6cf4be68d8ea6367a297e7cf9055342172294af7ac85ae4c9a6049fe56",
+   "status": 0,
+   "report_sha256": "f20c378f5a32dd8308ae6d3209797fb467585f0f36d4a6f4cd4877ff686602a8",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/raw-annex-b/gate-result.json",
+   "command": "report --benchmark",
+   "key": "fa1c6b659337ea4670064678cc6090e24b0a04827f7c9ab3c8eec59dee3cd8da",
+   "status": 0,
+   "report_sha256": "365cddd1de49c8f0f2a822f644cd4df7af0e37a1e489a55cec5a1f90a5ee16f3",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/hls-segments/gate-result.json",
+   "command": "report --benchmark",
+   "key": "8e2deb0ee6b46238d3129424b34c18656bb66b54c8de56dcc4f6fd80533da588",
+   "status": 0,
+   "report_sha256": "9fb40c6a947a1d95246c60a96fd876d00440a4c7a618e3531d8ffa8d100bec6e",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/progressive/gate-result.json",
+   "command": "report --benchmark",
+   "key": "0f8dace66c4c173c087239fc4f5a1b8cd9d21179131b0bf1d0ceace998c4a0d0",
+   "status": 0,
+   "report_sha256": "1396f0ced0e08ea9b9402509100e5cf514d45ad8a0118c3030f34bc3ae7ae3ee",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "60a98c7816957b0a43995853175b5a9938026f1fabc5498dd05eadfa504ba3db",
+   "status": 0,
+   "report_sha256": "3a70dc30e6d24cc79b2acd5efc122a1ca3b7f5386c21f06e32905e34e87cda62"
+  },
+  {
+   "path": "graded/raw-annex-b/gate-result.json",
+   "command": "grade",
+   "key": "5f5449381c2aa23a12d72d1b122013734b6551c97ff9876cbb4feaedb651d0e4",
+   "status": 0,
+   "report_sha256": "913cb3b485a2cb7d47ad3922e35d8d4975f0ce3ae51f5f6a2947698d8ff7d51c"
+  },
+  {
+   "path": "graded/hls-segments/gate-result.json",
+   "command": "grade",
+   "key": "31bbbf1b28a5cf91690791f9ba4739d0611f49148876a41b55c62e2157802684",
+   "status": 0,
+   "report_sha256": "6bd56ef5e9b9da1f52fe6a64093560e30afdd1e6c85723c739dec1956248ba36"
+  }
+ ],
+ "source_revisions": [
+  "ce55904b842a6ddad77e90688a8ec4528438f576"
+ ]
+}

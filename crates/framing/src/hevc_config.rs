@@ -858,6 +858,17 @@ impl<'a> HvcConfigNal<'a> {
     pub fn type_matches_declaration(&self) -> bool {
         self.header().nal_unit_type() == self.descriptor.declared_type
     }
+
+    /// Require matching array and header types when either names a VPS, SPS or PPS.
+    pub fn check_parameter_set_declaration(&self) -> Result<()> {
+        if ((32..=34).contains(&self.declared_nal_type())
+            || self.header().parameter_set_kind().is_some())
+            && !self.type_matches_declaration()
+        {
+            return Err(Error::Invalid("hvcC parameter-set declaration"));
+        }
+        Ok(())
+    }
 }
 
 /// ```compile_fail,E0505

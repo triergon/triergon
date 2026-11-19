@@ -178,6 +178,22 @@
       }
     },
     {
+      "id": "startup-hevc-repeated-configuration",
+      "profile": "startup-hevc-repeated-configuration",
+      "file": "startup-hevc-repeated-configuration.case",
+      "sha256": "2e33cea75ea17aecf6bbe708f78a9e3bb7f0d52d0ecb3d119a252d0368859040",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-repeated-configuration.mkv",
+      "source_sha256": "903d54e0d60099646f0aea2d84810a3115c2b0ee1d9df6bb8a5bf136d3caa930",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 6,
+        "bytes": 1905,
+        "digest": 18210929823774702280
+      }
+    },
+    {
       "id": "startup-hevc-vps-timed-no-default",
       "profile": "startup-hevc-vps-timed-no-default",
       "file": "startup-hevc-vps-timed-no-default.case",

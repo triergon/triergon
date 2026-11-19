@@ -54,6 +54,7 @@ fn sps_prefix(bits: &mut Rbsp<'_>) -> Result<(u8, Sps, u8)> {
 pub(crate) struct StartupChain<'a> {
     pub vps: &'a [u8],
     pub sps: &'a [u8],
+    pub pps: &'a [u8],
     pub pps_id: u8,
     pub reorder: u8,
 }
@@ -62,6 +63,8 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
     let mut vps_set = None;
     let mut sps_set = None;
     let mut pps_set = None;
+    let mut picture_parameter_set_ids = None;
+    let mut repeats = false;
     for (index, nal) in nals.enumerate() {
         if index == 16 || nal.len() > 4096 {
             return Err(Error::Unsupported("HEVC clock parameter-set extent"));
@@ -75,32 +78,62 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
             return Err(Error::Unsupported("HEVC discovery NAL layer"));
         };
         let payload = &nal[2..];
-        match nal_unit_type {
-            32 if vps_set.is_none() => vps_set = Some(payload),
-            33 if sps_set.is_none() => sps_set = Some(payload),
-            34 if pps_set.is_none() => pps_set = Some(pps(payload)?),
-            39 | 40 => {}
+        let parameter_set = match nal_unit_type {
+            32 => &mut vps_set,
+            33 => &mut sps_set,
+            34 => &mut pps_set,
+            39 | 40 => continue,
             _ => return Err(Error::Unsupported("HEVC discovery parameter-set chain")),
+        };
+        // An exact repeat identifies the same active chain (H.265 §7.4.2.4.2).
+        match *parameter_set {
+            None => {
+                if nal_unit_type == 34 {
+                    picture_parameter_set_ids = Some(pps(payload)?);
+                }
+                *parameter_set = Some(payload);
+            }
+            Some(previous) if previous == payload => repeats = true,
+            Some(_) => return Err(Error::Unsupported("HEVC discovery parameter-set chain")),
         }
     }
     let vps_set = vps_set.ok_or(Error::Invalid("HEVC discovery VPS"))?;
     let sps_set = sps_set.ok_or(Error::Invalid("HEVC discovery SPS"))?;
     let (sps_id, sps_vps, reorder) = startup_sps(sps_set)?;
-    let (pps_id, pps_sps) = pps_set.ok_or(Error::Invalid("HEVC discovery PPS"))?;
+    let (pps_set, (pps_id, pps_sps)) = pps_set
+        .zip(picture_parameter_set_ids)
+        .ok_or(Error::Invalid("HEVC discovery PPS"))?;
     if vps(vps_set)? != sps_vps || sps_id != pps_sps {
         return Err(Error::Invalid("HEVC discovery parameter-set reference"));
+    }
+    if repeats {
+        check_repeat_prefixes(vps_set, sps_set, pps_set)?;
     }
     Ok(StartupChain {
         vps: vps_set,
         sps: sps_set,
+        pps: pps_set,
         pps_id,
         reorder,
     })
 }
 
+/// Identify the active chain's three supported parameter-set headers.
+pub(crate) fn parameter_set_payload(nal: &[u8]) -> Option<(usize, &[u8])> {
+    let (header, payload) = nal.split_first_chunk::<2>()?;
+    // The chain admits layer zero and temporal ID zero.
+    let [kind @ (0x40 | 0x42 | 0x44), 1] = *header else {
+        return None;
+    };
+    Some((usize::from((kind - 0x40) >> 1), payload))
+}
+
 /// Single-layer VPS timing fields through vps_time_scale (H.265 §7.3.2.1).
 pub(crate) fn vps_timing(payload: &[u8]) -> Result<Option<(u32, u32)>> {
-    let mut bits = Rbsp::new(payload);
+    read_vps_timing(&mut Rbsp::new(payload))
+}
+
+fn read_vps_timing(bits: &mut Rbsp<'_>) -> Result<Option<(u32, u32)>> {
     bits.skip(6)?; // VPS identifier and base-layer flags.
     if bits.fixed(6)? != 0 || bits.fixed(3)? != 0 {
         return Err(Error::Unsupported("HEVC clock VPS layers"));
@@ -109,7 +142,7 @@ pub(crate) fn vps_timing(payload: &[u8]) -> Result<Option<(u32, u32)>> {
     if bits.fixed(16)? != 0xffff {
         return Err(Error::Invalid("HEVC VPS reserved bits"));
     }
-    skip_profile_tier_level(&mut bits, 0)?;
+    skip_profile_tier_level(bits, 0)?;
     bits.skip(1)?; // vps_sub_layer_ordering_info_present_flag
     let buffering = bits.bounded(15)?;
     bits.bounded(buffering)?; // vps_max_num_reorder_pics
@@ -121,6 +154,75 @@ pub(crate) fn vps_timing(payload: &[u8]) -> Result<Option<(u32, u32)>> {
         return Ok(None);
     }
     Ok(Some((bits.fixed(32)?, bits.fixed(32)?)))
+}
+
+/// Check the remaining single-layer VPS syntax through rbsp_trailing_bits.
+fn check_vps(payload: &[u8]) -> Result<()> {
+    let mut bits = Rbsp::new(payload);
+    if let Some((units, scale)) = read_vps_timing(&mut bits)? {
+        // Both clock fields are positive when timing is present (H.265 §7.4.3.1).
+        if units == 0 || scale == 0 {
+            return Err(Error::Invalid("HEVC VPS timing"));
+        }
+        if bits.flag()? {
+            bits.bounded(u32::MAX - 1)?; // vps_num_ticks_poc_diff_one_minus1
+        }
+        if bits.bounded(1)? != 0 {
+            // With one layer set, index zero is available only to an internal base layer.
+            bits.bounded(0)?;
+            if payload[0] & 8 == 0 {
+                return Err(Error::Invalid("HEVC VPS HRD layer set"));
+            }
+            skip_vps_hrd(&mut bits)?;
+        }
+    }
+    let extension = bits.flag()?;
+    if bits.0.stop_bit_consumed() {
+        return Err(Error::Truncated);
+    }
+    let mut stop = bits.flag()?;
+    while extension && !bits.0.stop_bit_consumed() {
+        stop = bits.flag()?;
+    }
+    if !stop || !bits.0.stop_bit_consumed() {
+        return Err(Error::Invalid("HEVC VPS trailing bits"));
+    }
+    Ok(())
+}
+
+/// One HRD structure with common parameters and one temporal sublayer (Annex E.2.2).
+fn skip_vps_hrd(bits: &mut Rbsp<'_>) -> Result<()> {
+    let nal = bits.flag()?;
+    let vcl = bits.flag()?;
+    let sub_picture = (nal || vcl) && bits.flag()?;
+    if nal || vcl {
+        if sub_picture {
+            bits.skip(19)?; // Sub-picture clock and delay parameters.
+        }
+        bits.skip(8)?; // Bit rate and CPB size scales.
+        if sub_picture {
+            bits.skip(4)?; // CPB size DU scale.
+        }
+        bits.skip(15)?; // Initial removal, access-unit removal and output delay lengths.
+    }
+    let fixed_rate = bits.flag()? || bits.flag()?;
+    let low_delay = if fixed_rate {
+        bits.ue()?; // elemental_duration_in_tc_minus1
+        false
+    } else {
+        bits.flag()?
+    };
+    let entries = if low_delay { 1 } else { bits.bounded(31)? + 1 };
+    for _ in 0..entries * (u32::from(nal) + u32::from(vcl)) {
+        bits.ue()?; // bit_rate_value_minus1
+        bits.ue()?; // cpb_size_value_minus1
+        if sub_picture {
+            bits.ue()?; // cpb_size_du_value_minus1
+            bits.ue()?; // bit_rate_du_value_minus1
+        }
+        bits.flag()?; // cbr_flag
+    }
+    Ok(())
 }
 
 /// Base-layer startup facts through sps_max_num_reorder_pics.
@@ -323,7 +425,7 @@ fn pps_ids(bits: &mut Rbsp<'_>) -> Result<(u8, u8)> {
 }
 
 pub(crate) fn check_repeat_prefixes(vps: &[u8], sps: &[u8], pps: &[u8]) -> Result<()> {
-    vps_timing(vps)?;
+    check_vps(vps)?;
     sps_timing(sps)?;
     check_pps_prefix(pps)
 }
@@ -476,6 +578,89 @@ impl<'a> Rbsp<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn startup_accepts_only_identical_parameter_set_repeats() {
+        // The three configuration NALs from hevc-repeated-parameter-sets.mkv.
+        let vps = [
+            0x40, 0x01, 0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00,
+            0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x02, 0x40,
+        ];
+        let sps = [
+            0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03, 0x00,
+            0x00, 0x03, 0x00, 0x1e, 0xa0, 0x20, 0x83, 0x16, 0x5b, 0xa4, 0xa4, 0xc2, 0xf0, 0x16,
+            0x80, 0x80, 0x00, 0x00, 0x03, 0x00, 0x80, 0x00, 0x00, 0x0c, 0x04,
+        ];
+        let pps = [0x44, 0x01, 0xc0, 0x73, 0xc0, 0x89];
+        let nals = [vps.as_slice(), sps.as_slice(), pps.as_slice()];
+        let single = startup_chain(nals.into_iter()).unwrap();
+        let repeated = startup_chain(nals.into_iter().flat_map(|nal| [nal, nal])).unwrap();
+        assert_eq!(repeated.vps, single.vps);
+        assert_eq!(repeated.sps, single.sps);
+        assert_eq!(repeated.pps_id, single.pps_id);
+        assert_eq!(repeated.reorder, single.reorder);
+
+        for (index, nal) in nals.into_iter().enumerate() {
+            let mut truncated = nals;
+            truncated[index] = &nal[..nal.len() - 1];
+            let repeated = truncated.into_iter().flat_map(|nal| [nal, nal]);
+            assert!(matches!(startup_chain(repeated), Err(Error::Truncated)));
+        }
+
+        for nal in nals {
+            let mut changed = nal.to_vec();
+            *changed.last_mut().unwrap() ^= 1;
+            let distinct = nals.into_iter().chain([changed.as_slice()]);
+            assert!(matches!(
+                startup_chain(distinct),
+                Err(Error::Unsupported("HEVC discovery parameter-set chain"))
+            ));
+        }
+
+        let malformed_pps = [0x44, 0x01, 0x00];
+        assert!(matches!(
+            startup_chain([vps.as_slice(), malformed_pps.as_slice()].into_iter()),
+            Err(Error::Truncated)
+        ));
+    }
+
+    #[test]
+    fn repeated_vps_checks_the_timed_suffix_and_hrd() {
+        // A timing-present VPS with one NAL HRD entry and no extension data.
+        let vps = [
+            0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03,
+            0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x03, 0x00, 0x00, 0x03, 0x03, 0xe9, 0x00, 0x00,
+            0x5d, 0xc0, 0xd6, 0x00, 0x00, 0x03, 0x00, 0xf9,
+        ];
+        assert_eq!(vps_timing(&vps), Ok(Some((1001, 24_000))));
+        assert_eq!(check_vps(&vps), Ok(()));
+        assert_eq!(check_vps(&vps[..vps.len() - 1]), Err(Error::Truncated));
+
+        // Low-delay VCL HRD with sub-picture fields and multi-byte extension data.
+        let extended = [
+            0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03,
+            0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x03, 0x00, 0x00, 0x03, 0x03, 0xe9, 0x00, 0x00,
+            0x5d, 0xc0, 0x2b, 0x00, 0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x00, 0xfa, 0x81, 0x01,
+        ];
+        assert_eq!(vps_timing(&extended), Ok(Some((1001, 24_000))));
+        assert_eq!(check_vps(&extended), Ok(()));
+    }
+
+    #[test]
+    fn repeated_vps_refuses_a_zero_timing_field() {
+        // Both control VPSs have the original HRD entry and trailing bits.
+        let prefix = [
+            0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03,
+            0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x03,
+        ];
+        let zero_tick = [0, 0, 3, 0, 0, 3, 0, 0, 0x5d, 0xc0];
+        let zero_scale = [0, 0, 3, 3, 0xe9, 0, 0, 3, 0, 0];
+        let suffix = [0xd6, 0, 0, 3, 0, 0xf9];
+        for clock in [zero_tick, zero_scale] {
+            let vps = [prefix.as_slice(), clock.as_slice(), suffix.as_slice()].concat();
+            assert_eq!(check_vps(&vps), Err(Error::Invalid("HEVC VPS timing")));
+        }
+    }
 
     #[test]
     fn reads_and_skips_unaligned_fields_across_emulation_prevention() {

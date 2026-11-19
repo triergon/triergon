@@ -21,13 +21,8 @@ impl HevcAnnexBConfig {
     pub fn new(record: HvcConfiguration) -> Result<Self> {
         let mut parameter_bytes = 0;
         for nal in record.nals() {
-            let declared_parameter = is_parameter_set(&nal);
-            if (declared_parameter || nal.header().parameter_set_kind().is_some())
-                && !nal.type_matches_declaration()
-            {
-                return Err(Error::Invalid("hvcC parameter-set declaration"));
-            }
-            if declared_parameter {
+            nal.check_parameter_set_declaration()?;
+            if is_parameter_set(&nal) {
                 parameter_bytes = add_nal_bytes(parameter_bytes, nal.source_bytes().len())?;
             }
         }

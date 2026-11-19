@@ -129,10 +129,14 @@ buffered AAC or AVC packet through the same selection and configuration checks
 as the live feed. A caller can inspect the prefix before delivering its events
 in order.
 
-**Matroska HEVC discovery.** An access unit can repeat the VPS, SPS and PPS
-from CodecPrivate before its first slice. Startup accepts exact repeats of
-the single parameter-set chain after checking the single-layer VPS and SPS
-through their timing fields and the base PPS through its extension flags.
+**Matroska HEVC discovery.** Startup requires one distinct parameter set of
+each type. It accepts byte-identical repeats in CodecPrivate and before the
+first slice of an access unit. Configuration array types must match parameter
+set NAL headers. Repeated VPS timing requires positive tick units and time
+scale when those fields are present. The single-layer VPS is checked through
+its trailing bits, the SPS through its timing fields, and the base PPS through
+its extension flags. The native packet clock also accepts matching in-band
+sets before a picture's first slice.
 
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization

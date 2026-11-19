@@ -95,6 +95,23 @@ byte. SHA-256 `78ffcd772e5a5616cc83ba91fa1057c913e78f1e248e40479356339c408402bf`
 Both use EBML Voids for the removed bytes. These four fixtures are
 dual-licensed MIT or Apache-2.0.
 
+`hevc-single-configuration.mkv`, `hevc-repeated-configuration.mkv` and
+`hevc-repeated-truncated-vps-configuration.mkv` derive from
+`hevc-repeated-parameter-sets.mkv`. Keep Info, Tracks and Clusters, remove the
+VPS, SPS and PPS from each SimpleBlock and update the element sizes. Omit CRCs
+in changed elements. The single configuration keeps the original CodecPrivate.
+The repeated configurations list each parameter set twice in its existing array.
+The truncated variant keeps the two-byte NAL header and first payload byte of
+each VPS copy. All three fixtures share the same six slice packets and are
+dual-licensed MIT or Apache-2.0.
+
+`hevc-repeated-configuration-in-band.mkv` takes Info and Tracks from the
+repeated configuration and Clusters from `hevc-repeated-parameter-sets.mkv`.
+It uses an unknown-size Segment and omits the seek index. Both forms of repeat
+are present, and all six picture clocks match the slice-only control. The
+fixture is dual-licensed MIT or Apache-2.0. SHA-256
+`36e4490bcb67c97bd93a9853490fc6bb3b01d0c260e75867f6c8c9100d9de01e`.
+
 `hevc-indexed-seek.mkv` contains 64 synthetic 96×64 pictures at 24 fps
 with a closed eight-picture GOP, two B pictures, 280 ms cluster limit
 and Cues at the front. A seek to 700 ms resolves to the 667 ms keyframe

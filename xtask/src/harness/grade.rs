@@ -1733,7 +1733,7 @@ mod tests {
             ("matroska-cues-preroll", 21),
             ("matroska-colour", 33),
             ("matroska-segment-metadata", 48),
-            ("matroska-startup-seek", 44),
+            ("matroska-startup-seek", 45),
             ("hls-segments", 71),
             ("packet-framing", 135),
             ("isobmff-open-index", 1020),

@@ -2883,7 +2883,7 @@ mod tests {
         };
         assert_eq!(
             playback_capsules(&paths).unwrap(),
-            "Built 44 playback capsules"
+            "Built 45 playback capsules"
         );
         let capsule =
             fs::read(out.join(".research/startup-seek-fixtures/seek-hevc-seek-700-eof.case"))

@@ -1,0 +1,21 @@
+{
+ "name": "gate-run-armv7-ce55904b-20261119-194218-shard-1",
+ "path": "gate-run-armv7-ce55904b-20261119-194218-shard-1",
+ "retention": "retained",
+ "reason": "Native playback gates with matched HEVC repeats and validated VPS timing.",
+ "key": "evidence/gate-runs/ce55904b842a6ddad77e90688a8ec4528438f576-armv7-20261119-194218/shard-1/aa851af69e1b3514da32811692fb2c01fbe3ccc512b2ce3056f3e85f7edcfaf9.tar.zst",
+ "sha256": "aa851af69e1b3514da32811692fb2c01fbe3ccc512b2ce3056f3e85f7edcfaf9",
+ "bytes": 496851,
+ "results": [
+  {
+   "path": "tests/release/gate-result.json",
+   "command": "gate test",
+   "key": "6803d3c068db7feafbb5c075f92d11f55a99b6b3f9b185d8a8cbc115d76d7739",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "ce55904b842a6ddad77e90688a8ec4528438f576"
+ ]
+}
