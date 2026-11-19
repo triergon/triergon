@@ -718,7 +718,7 @@ impl Encoder {
             for r in 0..8 {
                 let row = &src[(y + r) * stride + x..(y + r) * stride + x + 8];
                 for c in 0..8 {
-                    coeffs[r * 8 + c] = row[c] as i32;
+                    coeffs[dct::fdct_input_index(r, c)] = row[c] as i32;
                 }
             }
             dct::fdct(&mut coeffs);
@@ -834,7 +834,7 @@ impl Encoder {
                     let p: &[u8; 8] = pred[b][r * 8..r * 8 + 8].try_into().unwrap();
                     for c in 0..8 {
                         let d = i16::from(row[c]) - i16::from(p[c]);
-                        coeffs[r * 8 + c] = i32::from(d);
+                        coeffs[dct::fdct_input_index(r, c)] = i32::from(d);
                         columns[c] += d.unsigned_abs();
                     }
                 }
