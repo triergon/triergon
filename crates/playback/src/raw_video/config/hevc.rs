@@ -54,6 +54,7 @@ fn sps_prefix(bits: &mut Rbsp<'_>) -> Result<(u8, Sps, u8)> {
 pub(crate) struct StartupChain<'a> {
     pub vps: &'a [u8],
     pub sps: &'a [u8],
+    pub pps: &'a [u8],
     pub pps_id: u8,
     pub reorder: u8,
 }
@@ -111,9 +112,20 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
     Ok(StartupChain {
         vps: vps_set,
         sps: sps_set,
+        pps: pps_set,
         pps_id,
         reorder,
     })
+}
+
+/// Identify the active chain's three supported parameter-set headers.
+pub(crate) fn parameter_set_payload(nal: &[u8]) -> Option<(usize, &[u8])> {
+    let (header, payload) = nal.split_first_chunk::<2>()?;
+    // The chain admits layer zero and temporal ID zero.
+    let [kind @ (0x40 | 0x42 | 0x44), 1] = *header else {
+        return None;
+    };
+    Some((usize::from((kind - 0x40) >> 1), payload))
 }
 
 /// Single-layer VPS timing fields through vps_time_scale (H.265 §7.3.2.1).
@@ -147,7 +159,11 @@ fn read_vps_timing(bits: &mut Rbsp<'_>) -> Result<Option<(u32, u32)>> {
 /// Check the remaining single-layer VPS syntax through rbsp_trailing_bits.
 fn check_vps(payload: &[u8]) -> Result<()> {
     let mut bits = Rbsp::new(payload);
-    if read_vps_timing(&mut bits)?.is_some() {
+    if let Some((units, scale)) = read_vps_timing(&mut bits)? {
+        // Both clock fields are positive when timing is present (H.265 §7.4.3.1).
+        if units == 0 || scale == 0 {
+            return Err(Error::Invalid("HEVC VPS timing"));
+        }
         if bits.flag()? {
             bits.bounded(u32::MAX - 1)?; // vps_num_ticks_poc_diff_one_minus1
         }
@@ -628,6 +644,22 @@ mod tests {
         ];
         assert_eq!(vps_timing(&extended), Ok(Some((1001, 24_000))));
         assert_eq!(check_vps(&extended), Ok(()));
+    }
+
+    #[test]
+    fn repeated_vps_refuses_a_zero_timing_field() {
+        // Both control VPSs have the original HRD entry and trailing bits.
+        let prefix = [
+            0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03,
+            0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x03,
+        ];
+        let zero_tick = [0, 0, 3, 0, 0, 3, 0, 0, 0x5d, 0xc0];
+        let zero_scale = [0, 0, 3, 3, 0xe9, 0, 0, 3, 0, 0];
+        let suffix = [0xd6, 0, 0, 3, 0, 0xf9];
+        for clock in [zero_tick, zero_scale] {
+            let vps = [prefix.as_slice(), clock.as_slice(), suffix.as_slice()].concat();
+            assert_eq!(check_vps(&vps), Err(Error::Invalid("HEVC VPS timing")));
+        }
     }
 
     #[test]

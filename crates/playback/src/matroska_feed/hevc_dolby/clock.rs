@@ -14,6 +14,8 @@ use triergon_framing::{Codec, HevcAnnexBConfig};
 pub struct MatroskaHevcClock<'feed> {
     association: &'feed Association,
     config: &'feed HevcAnnexBConfig,
+    parameter_sets: [&'feed [u8]; 3],
+    repeat_prefixes_validated: bool,
     period: Option<(u32, u32)>,
     clock: DecodeClock,
 }
@@ -34,6 +36,8 @@ impl MatroskaHevcDolbyFeed {
         Ok(Some(MatroskaHevcClock {
             association: &self.association,
             config,
+            parameter_sets: [chain.vps, chain.sps, chain.pps],
+            repeat_prefixes_validated: false,
             period,
             clock: DecodeClock::new(Codec::Hevc, chain.pps_id, chain.reorder),
         }))
@@ -41,8 +45,9 @@ impl MatroskaHevcDolbyFeed {
 }
 
 impl MatroskaHevcClock<'_> {
-    /// Project one complete checked sample. A parameter-set change or
-    /// unsupported sample ends this clock's continuity.
+    /// Project one complete checked sample. Matching parameter sets may
+    /// repeat before the first slice. A changed set or unsupported sample
+    /// ends this clock's continuity.
     pub fn observe(
         &mut self,
         packet: &MatroskaHevcDolbyPacket<'_>,
@@ -55,10 +60,25 @@ impl MatroskaHevcClock<'_> {
         {
             return Err(Error::Invalid("native HEVC clock feed association"));
         }
-        self.clock
-            .observe(packet.source, unit.source_nals(), |tick_ns| {
-                self.period.and_then(|period| duration_ns(period, tick_ns))
-            })
+        self.clock.observe(
+            packet.source,
+            unit.source_nals(),
+            |nal| {
+                let Some((index, payload)) = hevc::parameter_set_payload(nal) else {
+                    return Ok(false);
+                };
+                if self.parameter_sets[index] != payload {
+                    return Ok(false);
+                }
+                if !self.repeat_prefixes_validated {
+                    let [vps, sps, pps] = self.parameter_sets;
+                    hevc::check_repeat_prefixes(vps, sps, pps)?;
+                    self.repeat_prefixes_validated = true;
+                }
+                Ok(true)
+            },
+            |tick_ns| self.period.and_then(|period| duration_ns(period, tick_ns)),
+        )
     }
 }
 

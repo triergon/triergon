@@ -1210,6 +1210,20 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
         .windows(pps_array.len())
         .position(|window| window == pps_array)
         .expect("repeated PPS array");
+    let vps = [
+        0x40, 0x01, 0x0c, 0x01, 0xff, 0xff, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x03, 0x00, 0x1e, 0xba, 0x02, 0x40,
+    ];
+    let mut missing_vps_stop_bit = configuration.to_vec();
+    let mut copies = 0;
+    for (offset, nal) in configuration.windows(vps.len()).enumerate() {
+        if nal == vps {
+            // Keep the extension flag and clear only rbsp_stop_one_bit.
+            missing_vps_stop_bit[offset + vps.len() - 1] = 0;
+            copies += 1;
+        }
+    }
+    assert_eq!(copies, 2);
     let mut pps_declared_as_sei = configuration.to_vec();
     pps_declared_as_sei[array_offset] = 39;
     let mut sei_declared_as_pps = configuration.to_vec();
@@ -1237,6 +1251,7 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
                 .as_slice(),
             MatroskaDiscoveryCutoff::SourceEnd,
         ),
+        (&missing_vps_stop_bit, MatroskaDiscoveryCutoff::SourceEnd),
         (&pps_declared_as_sei, MatroskaDiscoveryCutoff::SourceEnd),
         (&sei_declared_as_pps, MatroskaDiscoveryCutoff::SourceEnd),
     ] {
@@ -1323,12 +1338,13 @@ fn hevc_repeated_configuration_preserves_packet_clocks() {
         "fixtures/mkv-feed/hevc-single-configuration.mkv"
     ));
     assert_eq!(single.len(), 6);
-    assert_eq!(
-        clocks(include_bytes!(
-            "fixtures/mkv-feed/hevc-repeated-configuration.mkv"
-        )),
-        single
-    );
+    for fixture in [
+        include_bytes!("fixtures/mkv-feed/hevc-repeated-configuration.mkv").as_slice(),
+        include_bytes!("fixtures/mkv-feed/hevc-repeated-parameter-sets.mkv").as_slice(),
+        include_bytes!("fixtures/mkv-feed/hevc-repeated-configuration-in-band.mkv").as_slice(),
+    ] {
+        assert_eq!(clocks(fixture), single);
+    }
 }
 
 #[test]

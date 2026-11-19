@@ -268,17 +268,16 @@ fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
 
 impl Sample {
     fn repeats_parameter_set(&mut self, chain: &Chain, packet: &Packet, nal: &[u8]) -> bool {
-        let Some(&header) = nal.first() else {
-            return false;
-        };
-        let kind = (header >> 1) & 0x3f;
-        if chain.codec != Codec::Hevc || !(32..=34).contains(&kind) {
+        if chain.codec != Codec::Hevc {
             return false;
         }
+        let Some((index, _)) = hevc::parameter_set_payload(nal) else {
+            return false;
+        };
         let Some(record) = packet.configuration.initialization(packet.packet.track) else {
             return false;
         };
-        if chain.hevc_parameter_set(record.data, usize::from(kind - 32)) != Some(nal) {
+        if chain.hevc_parameter_set(record.data, index) != Some(nal) {
             return false;
         }
         if !self.hevc_repeats_checked {
