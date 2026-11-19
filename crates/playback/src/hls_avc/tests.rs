@@ -316,6 +316,43 @@ fn prefix_anchor_ring_keeps_full_clocks_across_pes_and_wraps() {
 }
 
 #[test]
+fn units_get_exact_storage_while_the_builder_keeps_its_allocation() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let next = [DELIMITER, IDR, &[0x66; 100]].concat();
+    let mut units = Vec::new();
+    push_span(&mut reader, &first);
+    drain(&mut reader, &mut units);
+    push_span(&mut reader, &next);
+    drain(&mut reader, &mut units);
+    assert_eq!(units.len(), 1);
+    let capacity = reader.bytes.capacity();
+    let storage = reader.bytes.as_slice().as_ptr();
+    assert!(capacity >= first.len());
+    for _ in 0..3 {
+        let used = pool.used();
+        push_span(&mut reader, &next);
+        drain(&mut reader, &mut units);
+        assert_eq!(reader.bytes.capacity(), capacity);
+        assert_eq!(reader.bytes.as_slice().as_ptr(), storage);
+        // Only the new unit's own storage is charged; the builder grew nothing.
+        let unit = units.last().unwrap().source_bytes();
+        assert_eq!(
+            pool.used() - used,
+            unit.retained_capacity() + Bytes::owner_overhead_bytes()
+        );
+    }
+    reader.finish();
+    drain(&mut reader, &mut units);
+    assert_eq!(units.len(), 5);
+    for (index, unit) in units.iter().enumerate() {
+        let expected = if index == 0 { &first } else { &next };
+        assert_eq!(unit.source_bytes().as_ref(), expected.as_slice());
+        assert_eq!(unit.source_bytes().retained_capacity(), expected.len());
+    }
+}
+
+#[test]
 fn eof_publication_retries_after_pressure_and_a_partial_next_nal_fails() {
     let (pool, mut reader) = fixture();
     let data = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
@@ -449,8 +486,14 @@ fn pes_extent_hint_preserves_packed_and_split_units_under_pressure() {
         };
         assert_eq!(unit.source_bytes().as_ref(), first);
         assert_eq!(unit.clock, Some(clock(9000)));
-        let capacity = headroom.map_or(packed.len() + LOOKAHEAD, |_| ordinary_growth);
-        assert_eq!(unit.source_bytes().retained_capacity(), capacity);
+        let builder = headroom.map_or(packed.len() + LOOKAHEAD, |_| ordinary_growth);
+        if headroom == Some(ordinary_growth + publication) {
+            // No room for an exact copy: the builder's allocation is the unit's.
+            assert_eq!(unit.source_bytes().retained_capacity(), builder);
+        } else {
+            assert_eq!(unit.source_bytes().retained_capacity(), first.len());
+            assert_eq!(reader.bytes.capacity(), builder);
+        }
         drop(pressure);
 
         let mut units = vec![unit];
