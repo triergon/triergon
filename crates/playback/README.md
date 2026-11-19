@@ -129,11 +129,10 @@ buffered AAC or AVC packet through the same selection and configuration checks
 as the live feed. A caller can inspect the prefix before delivering its events
 in order.
 
-**Matroska HEVC discovery.** Startup accepts byte-identical copies of the
-VPS, SPS and PPS in CodecPrivate. An access unit can repeat those parameter
-sets before its first slice after startup checks the single-layer VPS and
-SPS through their timing fields and the base PPS through its extension flags.
-Startup requires one distinct parameter set of each type.
+**Matroska HEVC discovery.** Startup requires one distinct parameter set of
+each type. It accepts byte-identical repeats in CodecPrivate and before the
+first slice of an access unit after checking the single-layer VPS and SPS
+through their timing fields and the base PPS through its extension flags.
 
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization

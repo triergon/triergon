@@ -180,9 +180,10 @@ case is lower on both heap and total RSS. Sets
 `gate-run-armv7-419a8493-20261117-190751-shard-1` hold the outputs, build identities,
 plans, step records and logs.
 
-The playback tests cover exact HEVC parameter-set repeats in the configuration
-record and before the first slice. Conflicting entries in the configuration
-record and matching truncations of each parameter set prevent startup.
+The playback tests cover exact and conflicting HEVC parameter-set entries in
+the configuration record. The slice-only fixtures verify that exact repeats
+preserve packet clocks and a repeated truncated VPS prevents startup. The
+in-band fixtures also cover matching truncations of each parameter set.
 
 At `6bbb2cb7`, all 289 cases in the nine playback gate groups passed parity,
 runtime and kernel-bound heap and total RSS on both targets. The largest Linux

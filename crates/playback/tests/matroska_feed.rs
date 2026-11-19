@@ -1221,6 +1221,11 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
             include_bytes!("fixtures/mkv-feed/hevc-truncated-sps.mkv").as_slice(),
             MatroskaDiscoveryCutoff::SourceEnd,
         ),
+        (
+            include_bytes!("fixtures/mkv-feed/hevc-repeated-truncated-vps-configuration.mkv")
+                .as_slice(),
+            MatroskaDiscoveryCutoff::SourceEnd,
+        ),
     ] {
         let (engine, source, _) = matroska_source(
             fixture,
@@ -1246,6 +1251,71 @@ fn hevc_discovery_checks_repeated_parameter_sets() {
             .expect("HEVC discovery stalled");
         assert_eq!(cutoff, expected);
     }
+}
+
+#[test]
+fn hevc_repeated_configuration_preserves_packet_clocks() {
+    use triergon_playback::matroska_feed::{
+        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits,
+        MatroskaDiscoveryStep,
+    };
+
+    let clocks = |input: &[u8]| {
+        let (engine, source, pool) = matroska_source(
+            input,
+            7,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        );
+        let cancel = AtomicBool::new(false);
+        let mut discovery = MatroskaCompactDiscovery::for_av_feed(
+            engine,
+            source,
+            Selection::All,
+            PlayerPolicy::default(),
+            MatroskaDiscoveryLimits::default(),
+        )
+        .unwrap();
+        let cutoff = (0..10_000)
+            .find_map(
+                |_| match discovery.poll(&mut WorkBudget::new(32), &cancel).unwrap() {
+                    MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
+                    MatroskaDiscoveryStep::Progress(_) => None,
+                },
+            )
+            .expect("HEVC discovery stalled");
+        assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
+        let mut discovered = discovery.finish().unwrap();
+        let mut events: Vec<_> = discovered.prefix.into_outputs().collect();
+        events.extend(collect_with_work(&mut discovered.player, 17));
+        let configuration = events
+            .iter()
+            .find_map(|output| match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                _ => None,
+            })
+            .unwrap();
+        let feed = hevc_dolby_setup(&pool, configuration, 0);
+        let mut clock = feed.native_hevc_clock().unwrap().unwrap();
+        events
+            .iter()
+            .filter(|output| output.event().track().is_some())
+            .map(|output| {
+                let packet = hevc_dolby_frame(&feed, output);
+                let timing = clock.observe(&packet).unwrap();
+                (timing.pts_ns, timing.dts_ns, timing.duration_ns)
+            })
+            .collect::<Vec<_>>()
+    };
+    let single = clocks(include_bytes!(
+        "fixtures/mkv-feed/hevc-single-configuration.mkv"
+    ));
+    assert_eq!(single.len(), 6);
+    assert_eq!(
+        clocks(include_bytes!(
+            "fixtures/mkv-feed/hevc-repeated-configuration.mkv"
+        )),
+        single
+    );
 }
 
 #[test]

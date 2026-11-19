@@ -62,6 +62,8 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
     let mut vps_set = None;
     let mut sps_set = None;
     let mut pps_set = None;
+    let mut picture_parameter_set_ids = None;
+    let mut repeats = false;
     for (index, nal) in nals.enumerate() {
         if index == 16 || nal.len() > 4096 {
             return Err(Error::Unsupported("HEVC clock parameter-set extent"));
@@ -84,17 +86,27 @@ pub(crate) fn startup_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<
         };
         // An exact repeat identifies the same active chain (H.265 §7.4.2.4.2).
         match *parameter_set {
-            None => *parameter_set = Some(payload),
-            Some(previous) if previous == payload => {}
+            None => {
+                if nal_unit_type == 34 {
+                    picture_parameter_set_ids = Some(pps(payload)?);
+                }
+                *parameter_set = Some(payload);
+            }
+            Some(previous) if previous == payload => repeats = true,
             Some(_) => return Err(Error::Unsupported("HEVC discovery parameter-set chain")),
         }
     }
     let vps_set = vps_set.ok_or(Error::Invalid("HEVC discovery VPS"))?;
     let sps_set = sps_set.ok_or(Error::Invalid("HEVC discovery SPS"))?;
     let (sps_id, sps_vps, reorder) = startup_sps(sps_set)?;
-    let (pps_id, pps_sps) = pps(pps_set.ok_or(Error::Invalid("HEVC discovery PPS"))?)?;
+    let (pps_set, (pps_id, pps_sps)) = pps_set
+        .zip(picture_parameter_set_ids)
+        .ok_or(Error::Invalid("HEVC discovery PPS"))?;
     if vps(vps_set)? != sps_vps || sps_id != pps_sps {
         return Err(Error::Invalid("HEVC discovery parameter-set reference"));
+    }
+    if repeats {
+        check_repeat_prefixes(vps_set, sps_set, pps_set)?;
     }
     Ok(StartupChain {
         vps: vps_set,
@@ -513,6 +525,12 @@ mod tests {
                 Err(Error::Unsupported("HEVC discovery parameter-set chain"))
             ));
         }
+
+        let malformed_pps = [0x44, 0x01, 0x00];
+        assert!(matches!(
+            startup_chain([vps.as_slice(), malformed_pps.as_slice()].into_iter()),
+            Err(Error::Truncated)
+        ));
     }
 
     #[test]
