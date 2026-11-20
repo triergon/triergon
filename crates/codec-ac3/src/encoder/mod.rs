@@ -297,11 +297,8 @@ impl Encoder {
                 && switches[block] == switches[second_block]
                 && !boundaries[block]
                 && !boundaries[second_block];
-            let second = if share {
-                &spectra[second_block * channels..(second_block + 1) * channels]
-            } else {
-                first
-            };
+            let second =
+                share.then(|| &spectra[second_block * channels..(second_block + 1) * channels]);
             sets[set_count].prepare(mode, self.fscod, first, second, mask_scratch)?;
             blocks_per_set[set_count] = 1 + usize::from(share);
             set_for_block[block..block + blocks_per_set[set_count]].fill(set_count);
@@ -404,10 +401,11 @@ impl ExponentSet {
         mode: ChannelMode,
         fscod: u8,
         first: &[[f32; BLOCK]],
-        second: &[[f32; BLOCK]],
+        second: Option<&[[f32; BLOCK]]>,
         mask_scratch: &mut BaCache,
     ) -> Result<(), EncodeError> {
-        for (ch, (first, second)) in first.iter().zip(second).enumerate() {
+        let shared = second.is_some();
+        for (ch, (first, second)) in first.iter().zip(second.unwrap_or(first)).enumerate() {
             let lfe = mode.is_lfe(ch);
             let end = if lfe {
                 LFE_BINS
@@ -416,8 +414,17 @@ impl ExponentSet {
             };
             let group = if lfe || end <= MAX_FULL_BINS / 2 {
                 1
-            } else {
+            } else if shared {
                 2
+            } else {
+                4
+            };
+            // A D45 set codes four bins per exponent. Round up to a complete
+            // group of three exponents so the retained band stays intact.
+            let end = if group == 4 {
+                MIN_FULL_BINS + (end - MIN_FULL_BINS).div_ceil(12) * 12
+            } else {
+                end
             };
             self.ends[ch] = end;
             self.repeats[ch] = group;
@@ -561,22 +568,20 @@ mod tests {
         };
         let first = coefficients(0);
         let second = coefficients(13);
-        let mut pair = ExponentSet::default();
-        pair.prepare(
-            ChannelMode::Surround51,
-            0,
-            &first,
-            &second,
-            &mut BaCache::default(),
-        )
-        .expect("allocation parameters");
+        let mut set = ExponentSet::default();
+        let mut scratch = BaCache::default();
         let mut bap = [[0; BLOCK]; CHANNELS];
-        for snr in 1..1024 {
-            pair.allocate(snr, &mut bap);
-            assert_eq!(
-                pair.mantissa_bits(snr),
-                syntax::allocated_mantissa_bits(&pair.ends, &bap)
-            );
+        for neighbor in [Some(second.as_slice()), None] {
+            set.prepare(ChannelMode::Surround51, 0, &first, neighbor, &mut scratch)
+                .expect("allocation parameters");
+            assert_eq!(set.repeats[0], if neighbor.is_some() { 2 } else { 4 });
+            for snr in 1..1024 {
+                set.allocate(snr, &mut bap);
+                assert_eq!(
+                    set.mantissa_bits(snr),
+                    syntax::allocated_mantissa_bits(&set.ends, &bap)
+                );
+            }
         }
     }
 
