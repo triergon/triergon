@@ -1,0 +1,9 @@
+{
+ "name": "dts-historical-packet-boundaries-24ca7441-aarch64",
+ "path": "dts-historical-packet-boundaries-24ca7441-aarch64",
+ "retention": "retained",
+ "reason": "DTS core packet lengths and bytes from the FFmpeg 9.0.2 filter compared with both header inspectors on seven inputs at 24ca7441 on Linux AArch64.",
+ "key": "evidence/architecture-review-mwo5u537/24ca7441413fc69b5d755d38300c2f3afb0561f9/aarch64/dts-per-packet/43a23f4f819fc44df873353e142a4738d4a8d5a4450aed9c3050523c123974cd.tar.zst",
+ "sha256": "43a23f4f819fc44df873353e142a4738d4a8d5a4450aed9c3050523c123974cd",
+ "bytes": 1200
+}
