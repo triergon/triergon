@@ -21,7 +21,9 @@ demuxer times teletext by the PCR.
 import hashlib
 import json
 import os
+import shutil
 import struct
+import subprocess
 import sys
 
 if __package__:
@@ -798,33 +800,33 @@ def write_streams(directory):
     return written
 
 
-def write_manifest(directory, reference, manifest):
-    """Records the reference worker's `sub-fold` result of every case variant."""
-    import subprocess
-    hashes = write_streams(directory)
+def case_descriptions():
     cases = []
     for name, variants in VARIANTS.items():
         for fmt in ("text", "ass"):
             for suffix, extra in variants:
                 arguments = ["teletext", "opt:txt_format=" + fmt] + extra
-                path = os.path.join(directory, name + ".ts")
-                out = subprocess.run([reference, "sub-fold", path] + arguments,
-                                     capture_output=True, text=True, check=True).stdout
-                fold = json.loads(out.splitlines()[-1])
                 case_id = "-".join(p for p in ("teletext", name, fmt, suffix) if p)
                 cases.append({
                     "id": case_id,
                     "profile": "teletext-" + name,
                     "file": "teletext/" + name + ".ts",
-                    "sha256": hashes[name],
                     "rights": "authored-synthetic",
                     "source": "harness/subtitles/teletext_streams.py",
                     "arguments": arguments,
-                    "expected": {k: fold[k] for k in ("packets", "bytes", "digest")},
                 })
-    with open(manifest, "w") as f:
-        json.dump({"schema": 1, "cases": cases}, f, indent=2)
-        f.write("\n")
+    return cases
+
+
+def write_manifest(directory, reference, manifest):
+    write_streams(directory)
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    cases = case_descriptions()
+    for case in cases:
+        case["input_file"] = os.path.abspath(os.path.join(directory, os.path.basename(case["file"])))
+    subprocess.run(["cargo", "xtask", "subtitle-fixtures", "record", "subtitle-teletext",
+                    shutil.which(reference) or os.path.abspath(reference), "--manifest", os.path.abspath(manifest),
+                    "--cases-stdin"], cwd=root, check=True, text=True, input=json.dumps(cases))
 
 
 def main(argv):
@@ -832,7 +834,9 @@ def main(argv):
     `--fuzz KIND START COUNT [REFERENCE CANDIDATE]` compares fuzz streams."""
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     directory = os.path.join(root, ".research", "subtitle-corpus", "teletext")
-    if len(argv) > 4 and argv[1] == "--fuzz":
+    if argv[1:] == ["--list-cases"]:
+        print(json.dumps(case_descriptions()))
+    elif len(argv) > 4 and argv[1] == "--fuzz":
         import teletext_fuzz
         kind, start, count = argv[2], int(argv[3]), int(argv[4])
         workers = argv[5:7] or [os.path.join(root, "target", "harness", "ffmpeg-subtitles-worker"),
