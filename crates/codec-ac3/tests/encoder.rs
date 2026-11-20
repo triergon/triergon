@@ -364,6 +364,59 @@ fn a_single_attack_switches_the_program_and_keeps_the_previous_block_quiet() {
 }
 
 #[test]
+fn syncframe_partitions_bound_the_opening_blocks_and_final_mantissas() {
+    let mut state = 0x62a1_3bb1_u32;
+    let broadband: [f32; SAMPLES_PER_FRAME] = core::array::from_fn(|_| {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        state as f32 / u32::MAX as f32 - 0.5
+    });
+    let silence = [0.0; SAMPLES_PER_FRAME];
+    let mut late = silence;
+    late[SAMPLES_PER_FRAME - DELAY_SAMPLES..].copy_from_slice(&broadband[..DELAY_SAMPLES]);
+    for rate in SAMPLE_RATES {
+        for (mode, _, _, speakers) in MODES {
+            let mut encoder = Encoder::new(rate, mode).unwrap();
+            let mut decoder = Decoder::new().with_options(DecoderOptions {
+                crc: CrcPolicy::Reject,
+                ..DecoderOptions::default()
+            });
+            decoder.set_trace(true);
+            let mut output = [0; MAX_FRAME_BYTES];
+            let mut decoded = AudioFrame::default();
+            for input in [&silence, &broadband, &silence, &late] {
+                let planes = [&input[..]; 6];
+                let bytes = encoder
+                    .encode(&planes[..speakers.len()], &mut output)
+                    .unwrap();
+                decoded.clear();
+                let info = decoder.decode(&output[..bytes], &mut decoded).unwrap();
+                assert_eq!(info.concealed, None);
+                let trace = &decoder.trace().frames[0];
+                let split = bytes * 5;
+                let opening_end = trace.dithflag_insert_bits[2] - trace.nfchans;
+                let bit = |at: usize| usize::from((output[at / 8] >> (7 - at % 8)) & 1);
+                let skip = trace.blocks[5].dba_bit + 1;
+                let skipped_bits = if bit(skip) == 0 {
+                    0
+                } else {
+                    let length = (skip + 1..skip + 10).fold(0, |n, at| (n << 1) | bit(at));
+                    9 + 8 * length
+                };
+                assert!(
+                    opening_end <= split,
+                    "{rate} Hz {mode:?} at {opening_end}/{split}"
+                );
+                let last_mantissas = skip + 1 + skipped_bits;
+                assert!(
+                    last_mantissas >= split,
+                    "{rate} Hz {mode:?} at {last_mantissas}/{split}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 #[ignore = "requires TRIERGON_FFMPEG and an empty TRIERGON_AC3_OUTPUT directory"]
 fn ffmpeg_interoperability_and_signal_quality() {
     use std::io::{BufWriter, Write};

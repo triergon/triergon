@@ -18,6 +18,8 @@ const MIN_FULL_BINS: usize = 73;
 const MAX_FULL_BINS: usize = 253;
 const BANDWIDTH_DISCARD_FRACTION: f32 = 1.0e-9;
 const LFE_BINS: usize = 7;
+const OPENING_BLOCKS: usize = 2;
+const TRAILER_BITS: usize = 18; // auxdatae, crcrsv and CRC2.
 const MAX_SNR: u16 = 1023;
 const LOWEST_FLOOR_CODE: u8 = 7;
 const PARAMS: BaParams = BaParams {
@@ -26,6 +28,10 @@ const PARAMS: BaParams = BaParams {
     sgaincod: 1,
     dbpbcod: 2,
     floorcod: 4,
+};
+const EMPTY_ALLOCATION: Allocation = Allocation {
+    snr: 0,
+    floor: PARAMS.floorcod,
 };
 
 /// PCM samples consumed per plane and syncframe.
@@ -343,11 +349,8 @@ impl Encoder {
             block += blocks_per_set[set_count];
             set_count += 1;
         }
-        let empty_allocation = Allocation {
-            snr: 0,
-            floor: PARAMS.floorcod,
-        };
         let mut fixed = Bits::count();
+        let mut fixed_opening = 0;
         syntax::header(&mut fixed, self.fscod, size_code, mode);
         for (block, &short) in switches.iter().enumerate() {
             let group = set_for_block[block];
@@ -357,22 +360,30 @@ impl Encoder {
                 mode,
                 block,
                 short,
-                empty_allocation,
+                EMPTY_ALLOCATION,
                 &sets[group],
                 fresh,
             );
+            syntax::skip_field(&mut fixed, 0);
+            if block + 1 == OPENING_BLOCKS {
+                fixed_opening = fixed.position();
+            }
         }
-        // Two zero flag bits (auxdatae and crcrsv) precede the final CRC word.
-        let available = (bytes * 8)
-            .checked_sub(fixed.position() + 18)
-            .ok_or(EncodeError::BitAllocation)?;
         let silent_frame = self.previous_silent[..channels].iter().all(|&quiet| quiet)
             && silent[..channels].iter().flatten().all(|&quiet| quiet);
-        let allocation = if silent_frame {
-            empty_allocation
-        } else {
-            select_allocation(&sets[..set_count], &blocks_per_set, available)
-        };
+        let (allocation, mut padding) = select_allocation(
+            &sets[..set_count],
+            &blocks_per_set,
+            bytes,
+            fixed_opening,
+            fixed.position(),
+            silent_frame,
+        )?;
+        let mut skips = [0; BLOCKS];
+        for skip in skips.iter_mut().rev() {
+            *skip = padding.min(syntax::MAX_SKIP_BITS);
+            padding -= *skip;
+        }
 
         output.fill(0);
         let mut bits = Bits::write_to(output);
@@ -384,6 +395,7 @@ impl Encoder {
             let fresh = index == 0 || group != set_for_block[index - 1];
             let set = &sets[group];
             syntax::block(&mut bits, mode, index, short, allocation, set, fresh);
+            syntax::skip_field(&mut bits, skips[index]);
             if allocation.snr == 0 {
                 continue;
             }
@@ -407,7 +419,7 @@ impl Encoder {
             }
             mantissas.finish(&mut bits);
         }
-        if bits.position() > bytes * 8 - 18 {
+        if bits.position() > bytes * 8 - TRAILER_BITS {
             return Err(EncodeError::BitAllocation);
         }
         syntax::checksum(output);
@@ -638,24 +650,55 @@ fn exponent(peak: f32) -> u8 {
 fn select_allocation(
     sets: &[ExponentSet],
     blocks_per_set: &[usize; BLOCKS],
-    available: usize,
-) -> Allocation {
-    let fits = |allocation| {
+    bytes: usize,
+    fixed_opening: usize,
+    fixed_total: usize,
+    silent: bool,
+) -> Result<(Allocation, usize), EncodeError> {
+    // A/52:2018 5.5 bounds the header and first two blocks to the
+    // first 5/8 and the final mantissas and trailer to the last 3/8.
+    let split = bytes * 5;
+    let end = bytes * 8 - TRAILER_BITS;
+    let opening = split
+        .checked_sub(fixed_opening)
+        .ok_or(EncodeError::BitAllocation)?;
+    let available = end
+        .checked_sub(fixed_total)
+        .ok_or(EncodeError::BitAllocation)?;
+    let fit_padding = |allocation: Allocation| {
         let mut remaining = available;
+        let mut opening = opening;
+        let mut opening_blocks = OPENING_BLOCKS;
+        let mut last_mantissas = 0;
         for (set, &count) in sets.iter().zip(blocks_per_set) {
-            let bits = count * set.mantissa_bits(allocation);
-            if bits > remaining {
-                return false;
-            }
-            remaining -= bits;
+            let mantissas = if allocation.snr == 0 {
+                0
+            } else {
+                set.mantissa_bits(allocation)
+            };
+            remaining = remaining.checked_sub(count * mantissas)?;
+            let leading = opening_blocks.min(count);
+            opening = opening.checked_sub(leading * mantissas)?;
+            opening_blocks -= leading;
+            last_mantissas = mantissas;
         }
-        true
+        // Move unused bits into skip fields before the last mantissas.
+        let before_last = end - remaining - last_mantissas;
+        let padding = syntax::skip_padding(split.saturating_sub(before_last));
+        let later_padding = (BLOCKS - OPENING_BLOCKS) * syntax::MAX_SKIP_BITS;
+        (padding <= remaining && padding.saturating_sub(later_padding) <= opening)
+            .then_some(padding)
     };
+    if silent {
+        return fit_padding(EMPTY_ALLOCATION)
+            .map(|padding| (EMPTY_ALLOCATION, padding))
+            .ok_or(EncodeError::BitAllocation);
+    }
     let mut allocation = Allocation {
         snr: MAX_SNR,
         floor: PARAMS.floorcod,
     };
-    if fits(allocation) {
+    if let Some(mut padding) = fit_padding(allocation) {
         // At the highest SNR offset, a lower floor can increase the
         // precision of quiet coefficients while the frame still has space.
         for floor in PARAMS.floorcod + 1..=LOWEST_FLOOR_CODE {
@@ -663,28 +706,32 @@ fn select_allocation(
                 floor,
                 ..allocation
             };
-            if !fits(next) {
+            let Some(next_padding) = fit_padding(next) else {
                 break;
-            }
+            };
             allocation = next;
+            padding = next_padding;
         }
-        return allocation;
+        return Ok((allocation, padding));
     }
 
-    let mut accepted = 0;
+    let mut accepted = EMPTY_ALLOCATION;
+    let mut padding = None;
     let mut rejected = MAX_SNR;
-    while rejected - accepted > 1 {
-        let snr = (accepted + rejected) / 2;
-        if fits(Allocation { snr, ..allocation }) {
-            accepted = snr;
+    while rejected - accepted.snr > 1 {
+        let snr = (accepted.snr + rejected) / 2;
+        let trial = Allocation { snr, ..allocation };
+        if let Some(trial_padding) = fit_padding(trial) {
+            accepted = trial;
+            padding = Some(trial_padding);
         } else {
             rejected = snr;
         }
     }
-    Allocation {
-        snr: accepted,
-        ..allocation
-    }
+    padding
+        .or_else(|| fit_padding(accepted))
+        .map(|padding| (accepted, padding))
+        .ok_or(EncodeError::BitAllocation)
 }
 
 #[cfg(test)]

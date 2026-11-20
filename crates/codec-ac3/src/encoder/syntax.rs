@@ -9,6 +9,20 @@ use crate::crc16;
 use crate::spec_tables::BAPTAB;
 use crate::tables::BAP_BITS;
 
+const SKIP_LENGTH_BITS: usize = 9;
+pub(super) const MAX_SKIP_BITS: usize = SKIP_LENGTH_BITS + ((1 << SKIP_LENGTH_BITS) - 1) * 8;
+
+pub(super) fn skip_padding(bits: usize) -> usize {
+    let partial = bits % MAX_SKIP_BITS;
+    if partial == 0 {
+        bits
+    } else {
+        bits - partial
+            + SKIP_LENGTH_BITS
+            + partial.saturating_sub(SKIP_LENGTH_BITS).next_multiple_of(8)
+    }
+}
+
 pub(super) struct Bits<'a> {
     data: Option<&'a mut [u8]>,
     position: usize,
@@ -160,7 +174,16 @@ pub(super) fn block(
             bits.put(u32::from(fast_gain(mode.is_lfe(ch))), 3);
         }
     }
-    bits.put(0, 2); // no delta allocation or skipped data
+    bits.put(0, 1); // no delta allocation
+}
+
+pub(super) fn skip_field(bits: &mut Bits<'_>, padding: usize) {
+    bits.put(u32::from(padding != 0), 1);
+    if padding != 0 {
+        let bytes = (padding - SKIP_LENGTH_BITS) / 8;
+        bits.put(bytes as u32, SKIP_LENGTH_BITS);
+        bits.position += bytes * 8; // The output buffer starts with all bits clear.
+    }
 }
 
 // A block has at most 1,536 coefficients. One sum holds the direct bit
