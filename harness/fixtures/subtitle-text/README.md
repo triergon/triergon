@@ -23,3 +23,12 @@ extradata flag byte and `u32`-prefixed extradata), `P` (PTS and duration, each a
 known byte and an `i64`, then a `u32`-prefixed payload) or `F` (flush). The
 SubRip and WebVTT documents of the text fixtures are read in place from
 `crates/subtitles/tests/text-fixtures/fixtures/input/`.
+
+Verify the common text manifest from the checkout root with the formats
+reference built on Linux. For host text, supply the triple of the target
+running the reference. These commands use the AArch64 Linux target.
+
+```sh
+cargo xtask subtitle-fixtures verify subtitle-text target/harness/ffmpeg-formats-worker
+cargo xtask subtitle-fixtures verify subtitle-text-host target/harness/ffmpeg-formats-worker --target aarch64-unknown-linux-gnu
+```
