@@ -32,6 +32,18 @@ pub enum Syntax {
     WebVtt,
 }
 
+/// Width used to read decimal timestamp fields before interpreting their low
+/// 32 bits as signed values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimestampFieldWidth {
+    /// Saturate SubRip fields to signed 32 bits and WebVTT magnitudes to
+    /// unsigned 32 bits, as observed on 32-bit ARMv7.
+    Bits32,
+    /// Use signed and unsigned 64-bit bounds before narrowing, as observed
+    /// on AArch64 Linux.
+    Bits64,
+}
+
 /// Resource bounds of one document.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -148,6 +160,7 @@ pub struct Reader {
     pool: Budget,
     limits: Limits,
     syntax: Syntax,
+    timestamp_width: TimestampFieldWidth,
     /// The document as the parser reads it: the input, or its conversion.
     source: Bytes,
     phase: Phase,
@@ -157,8 +170,25 @@ pub struct Reader {
 }
 
 impl Reader {
-    /// A reader of `document`, read as `syntax` reads it.
+    /// Read `document` with the 32-bit timestamp field policy on every target.
     pub fn new(pool: &Budget, document: Bytes, syntax: Syntax, limits: Limits) -> Result<Self> {
+        Self::with_timestamp_field_width(
+            pool,
+            document,
+            syntax,
+            limits,
+            TimestampFieldWidth::Bits32,
+        )
+    }
+
+    /// Read `document` with the selected timestamp field width.
+    pub fn with_timestamp_field_width(
+        pool: &Budget,
+        document: Bytes,
+        syntax: Syntax,
+        limits: Limits,
+        timestamp_width: TimestampFieldWidth,
+    ) -> Result<Self> {
         if document.len() > limits.document_bytes {
             return Err(Error::Limit {
                 requested: document.len(),
@@ -173,6 +203,7 @@ impl Reader {
             pool: pool.clone(),
             limits,
             syntax,
+            timestamp_width,
             source: document,
             phase,
             entries: Entries {
@@ -216,7 +247,7 @@ impl Reader {
                         let Some(line) = lines.next(source, work) else {
                             return Ok(Status::Yield);
                         };
-                        parser.line(source, line, &mut self.entries)?;
+                        parser.line(source, line, &mut self.entries, self.timestamp_width)?;
                         if line == Line::End {
                             break;
                         }
@@ -233,7 +264,12 @@ impl Reader {
                         match blocks.next(source, work) {
                             None => return Ok(Status::Yield),
                             Some(Block::Text(span))
-                                if webvtt::block(source, span, &mut self.entries)? => {}
+                                if webvtt::block(
+                                    source,
+                                    span,
+                                    &mut self.entries,
+                                    self.timestamp_width,
+                                )? => {}
                             Some(_) => break,
                         }
                     }

@@ -45,6 +45,9 @@ channel counts that change between frames.
   bits per sample the samples go through 16-bit (`(x << (16 - bits)) as i16 / 2^15`),
   above that through 32-bit (`(x << (32 - bits)) as f32 / 2^31`, which rounds 25- to
   32-bit samples to `f32`). `decode_integer` returns the samples themselves.
+- Rice residuals share a cache refill across several samples. The decoder checks
+  the frame bit limit after each partition and rejects a partition whose final
+  code crosses it.
 - LPC prediction accumulates in 32 bits when RFC 9639 section 9.2.5's bound
   (sample bits + coefficient precision + log2 order <= 32) allows it, else in 64 bits;
   fixed predictors always use 32-bit arithmetic, which is exact modulo 2^32.

@@ -12,6 +12,8 @@
 //! refusals are recorded per vector as they happen. Selection (in set or not)
 //! is applied afterwards by the summary, never by skipping inputs here.
 
+mod video;
+
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -287,21 +289,13 @@ fn json_lines(text: &str) -> Vec<Value> {
         .collect()
 }
 
-fn has_error(line: &Value) -> bool {
-    line.get("error").is_some()
-}
-
-fn mentions_unsupported(value: &Value) -> bool {
-    json::to_python(value, None).contains("nsupported")
-}
-
 /// `ffprobe` facts of the first video (or audio) stream; `None` when it finds none.
 fn probe(
     ffprobe: &str,
     path: &str,
     format: Option<&str>,
     audio: bool,
-) -> Result<Option<Value>, Stop> {
+) -> Result<(i64, Option<Value>), Stop> {
     let entries = if audio {
         "stream=sample_rate,channels,channel_layout"
     } else {
@@ -329,177 +323,29 @@ fn probe(
             .and_then(Value::as_array)
             .and_then(|s| s.first().cloned())
     });
-    Ok(stream)
+    Ok((done.code, stream))
 }
 
-/// Position of the first differing sample of two planar YUV 4:2:0 frames.
-fn first_diff(
-    a: &[u8],
-    b: &[u8],
-    width: usize,
-    height: usize,
-    depth: usize,
-) -> Vec<(String, Value)> {
-    let (cw, ch) = (width / 2, height / 2);
-    let planes = [
-        ("Y", 0, width, height),
-        ("U", width * height, cw, ch),
-        ("V", width * height + cw * ch, cw, ch),
-    ];
-    let clip = |data: &[u8], from: usize, to: usize| -> Vec<u8> {
-        data[from.min(data.len())..to.min(data.len())].to_vec()
-    };
-    for (name, offset, pw, ph) in planes {
-        let (from, to) = (offset * depth, (offset + pw * ph) * depth);
-        let (pa, pb) = (clip(a, from, to), clip(b, from, to));
-        if pa != pb {
-            let k = (0..pa.len())
-                .step_by(depth)
-                .find(|&i| clip(&pa, i, i + depth) != clip(&pb, i, i + depth))
-                .unwrap_or(0)
-                / depth;
-            return vec![
-                ("plane".into(), Value::str(name)),
-                ("x".into(), Value::int((k % pw) as i64)),
-                ("y".into(), Value::int((k / pw) as i64)),
-            ];
-        }
-    }
-    Vec::new()
-}
-
-fn errors_head(errors: &[Value]) -> Value {
-    Value::Array(errors.iter().take(3).cloned().collect())
-}
-
-fn video_decoder(a: &Grade, lane: &str, path: &str) -> Result<Value, Stop> {
-    let stream = probe(&a.ffprobe, path, None, false)?;
-    let ours_argv = vec![
-        a.example(lane)?,
-        path.to_owned(),
-        if lane == "h264" { "/dev/stdout" } else { "-" }.to_owned(),
-    ];
-    let pix_fmt = stream.as_ref().and_then(|s| s.get("pix_fmt"));
-    let (Some(stream), Some(pix_fmt)) = (stream.as_ref(), pix_fmt) else {
-        let argv = vec![
-            ours_argv[0].clone(),
-            ours_argv[1].clone(),
-            "/dev/null".into(),
-        ];
-        let done = run_text(&argv, RUN_TIMEOUT)?;
-        let lines = json_lines(&done.stderr);
-        let errors: Vec<Value> = lines.iter().filter(|j| has_error(j)).cloned().collect();
-        return Ok(Value::object([
-            ("status", Value::str("ffmpeg-refused")),
-            ("ffmpeg", Value::str("ffprobe found no decodable stream")),
-            ("ours_rc", Value::int(done.code)),
-            (
-                "ours_frames",
-                Value::int(lines.iter().filter(|j| !has_error(j)).count() as i64),
-            ),
-            ("ours_errors", errors_head(&errors)),
-            (
-                "ours_stderr_tail",
-                Value::str(python::tail(&done.stderr, 300)),
-            ),
-        ]));
-    };
-    let pix_name = pix_fmt
-        .as_str()
-        .ok_or_else(|| Stop::Fatal("pix_fmt is not a string".into()))?;
-    let depth = if pix_name.contains("10") { 2 } else { 1 };
-    let out_format = if depth == 2 { "yuv420p10le" } else { "yuv420p" };
-    let dimension = |key: &str| -> Result<(usize, Value), Stop> {
-        let value = stream
-            .get(key)
-            .cloned()
-            .ok_or_else(|| Stop::Fatal(format!("ffprobe reported no {key}")))?;
-        let number = python::int(&value)
-            .and_then(|n| usize::try_from(n).ok())
-            .ok_or_else(|| Stop::Fatal(format!("ffprobe {key} is not a size")))?;
-        Ok((number, value))
-    };
-    let ((w, width), (h, height)) = (dimension("width")?, dimension("height")?);
-    let size = w * h * 3 / 2 * depth;
-    let reference_argv: Vec<String> = [
-        a.ffmpeg.as_str(),
-        "-nostdin",
-        "-v",
-        "error",
-        "-threads",
-        "1",
-        "-i",
-        path,
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        out_format,
-        "-fps_mode",
-        "passthrough",
-        "-",
-    ]
-    .map(String::from)
-    .to_vec();
-    let mut reference = Frames::spawn(&reference_argv, size, false)?;
-    let mut ours = Frames::spawn(&ours_argv, size, false)?;
-    let (mut n, mut matched) = (0, 0);
-    let mut first: Option<Value> = None;
-    let (mut count_reference, mut count_ours) = (0, 0);
-    loop {
-        let (fa, fb) = (ours.next(), reference.next());
-        count_ours += i64::from(fa.is_some());
-        count_reference += i64::from(fb.is_some());
-        let (Some(fa), Some(fb)) = (fa, fb) else {
-            break;
+/// Run the planar decoder diagnostic on individual streams without a manifest.
+pub(super) fn compare_hevc(
+    decoder: &str,
+    ffmpeg: &str,
+    ffprobe: &str,
+    paths: &[String],
+) -> Result<i32, String> {
+    let mut failed = false;
+    for path in paths {
+        fs::metadata(path).map_err(|e| format!("{path}: {e}"))?;
+        let decoded = match video::decoder(ffprobe, ffmpeg, decoder, "hevc", path) {
+            Ok(row) => row,
+            Err(Stop::Timeout(argv)) => timeout_row(argv),
+            Err(Stop::Fatal(message)) => return Err(message),
         };
-        if fa == fb {
-            matched += 1;
-        } else if first.is_none() {
-            let mut fields = vec![("frame".to_owned(), Value::int(n))];
-            fields.extend(first_diff(&fa, &fb, w, h, depth));
-            first = Some(Value::Object(fields));
-        }
-        n += 1;
+        failed |= decoded.get("status").and_then(Value::as_str) != Some("pass");
+        let row = Value::object([("path", Value::str(path)), ("decoder", decoded)]);
+        println!("{}", json::to_python(&row, None));
     }
-    while ours.next().is_some() {
-        count_ours += 1;
-    }
-    while reference.next().is_some() {
-        count_reference += 1;
-    }
-    let (rc_ours, err_ours, ours_tail) = ours.close(RUN_TIMEOUT)?;
-    let (rc_reference, err_reference, _) = reference.close(RUN_TIMEOUT)?;
-    let partial = ours_tail.len();
-    let lines = json_lines(&err_ours);
-    let errors: Vec<Value> = lines.into_iter().filter(has_error).collect();
-    let unsupported = errors.iter().any(mentions_unsupported);
-    let status = if count_reference == 0 && rc_reference != 0 {
-        "ffmpeg-refused"
-    } else if unsupported && count_ours == 0 {
-        "refused-unsupported"
-    } else if first.is_none() && count_ours == count_reference && rc_ours == 0 && partial == 0 {
-        "pass"
-    } else {
-        "fail"
-    };
-    Ok(Value::object([
-        ("status", Value::str(status)),
-        ("frames_ref", Value::int(count_reference)),
-        ("frames_ours", Value::int(count_ours)),
-        ("frames_equal", Value::int(matched)),
-        ("first_diff", first.unwrap_or(Value::Null)),
-        ("width", width),
-        ("height", height),
-        ("pix_fmt", pix_fmt.clone()),
-        ("ours_rc", Value::int(rc_ours)),
-        ("ffmpeg_rc", Value::int(rc_reference)),
-        ("ours_errors", errors_head(&errors)),
-        ("ours_partial_bytes", Value::int(partial as i64)),
-        (
-            "ffmpeg_stderr_tail",
-            Value::str(python::tail(&err_reference, 300)),
-        ),
-    ]))
+    Ok(i32::from(failed))
 }
 
 /// Little-endian `f32` samples; a length that is not a whole number of
@@ -576,7 +422,7 @@ fn samples_per_channel(bytes: usize, channels: Option<&Value>) -> Result<Value, 
 
 fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, Stop> {
     let format = audio_format(lane)?;
-    let stream = probe(&a.ffprobe, path, format, true)?;
+    let (_, stream) = probe(&a.ffprobe, path, format, true)?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
     let mut reference_argv: Vec<String> = [
         a.ffmpeg.as_str(),
@@ -780,71 +626,9 @@ fn output_path(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, S
     let worker = python::path(a.codec_workers.of(decode));
     if video_extensions(lane).is_some() {
         let argv = |w: &str| vec![w.to_owned(), op.clone(), path.to_owned(), OUT.to_owned()];
-        let mut ours = Frames::spawn(&argv(&worker), CANVAS, true)?;
-        let mut reference = Frames::spawn(&argv(&a.reference), CANVAS, true)?;
-        let (mut n, mut matched, mut worst, mut differing) = (0, 0, 0u8, 0);
-        let mut first: Option<Value> = None;
-        let (mut count_ours, mut count_reference) = (0, 0);
-        loop {
-            let (fa, fb) = (ours.next(), reference.next());
-            count_ours += i64::from(fa.is_some());
-            count_reference += i64::from(fb.is_some());
-            let (Some(fa), Some(fb)) = (fa, fb) else {
-                break;
-            };
-            if fa == fb {
-                matched += 1;
-            } else {
-                let d: Vec<u8> = fa.iter().zip(&fb).map(|(x, y)| x.abs_diff(*y)).collect();
-                worst = worst.max(d.iter().copied().max().unwrap_or(0));
-                differing += 1;
-                if first.is_none() {
-                    let k = d.iter().position(|&x| x != 0).unwrap_or(0);
-                    first = Some(Value::object([
-                        ("frame", Value::int(n)),
-                        ("x", Value::int(((k / 4) % 1920) as i64)),
-                        ("y", Value::int(((k / 4) / 1920) as i64)),
-                        ("channel", Value::str(&"RGBA"[k % 4..k % 4 + 1])),
-                        (
-                            "differing_bytes",
-                            Value::int(d.iter().filter(|&&x| x != 0).count() as i64),
-                        ),
-                    ]));
-                }
-            }
-            n += 1;
-        }
-        while ours.next().is_some() {
-            count_ours += 1;
-        }
-        while reference.next().is_some() {
-            count_reference += 1;
-        }
-        let (rc_ours, err_ours, _) = ours.close(RUN_TIMEOUT)?;
-        let (rc_reference, err_reference, _) = reference.close(RUN_TIMEOUT)?;
-        let status = if count_reference == 0 {
-            "reference-produced-nothing"
-        } else if first.is_none() && count_ours == count_reference {
-            "pass"
-        } else {
-            "fail"
-        };
-        return Ok(Value::object([
-            ("status", Value::str(status)),
-            ("pictures_ref", Value::int(count_reference)),
-            ("pictures_ours", Value::int(count_ours)),
-            ("pictures_equal", Value::int(matched)),
-            ("differing_pictures", Value::int(differing)),
-            ("max_abs", Value::int(worst)),
-            ("first_diff", first.unwrap_or(Value::Null)),
-            ("ours_rc", Value::int(rc_ours)),
-            ("reference_rc", Value::int(rc_reference)),
-            ("ours_stderr_tail", Value::str(python::tail(&err_ours, 300))),
-            (
-                "reference_stderr_tail",
-                Value::str(python::tail(&err_reference, 300)),
-            ),
-        ]));
+        let ours = Frames::spawn(&argv(&worker), CANVAS, true, RUN_TIMEOUT)?;
+        let reference = Frames::spawn(&argv(&a.reference), CANVAS, true, RUN_TIMEOUT)?;
+        return video::output(ours, reference);
     }
     let (o, r) = (tmp.join("ours.s16"), tmp.join("ref.s16"));
     let po = run_text(
@@ -1001,7 +785,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
         } else {
             let tmp = TempDir::new(a.scratch.as_deref())?;
             let decoded = if video_extensions(&lane).is_some() {
-                video_decoder(a, &lane, &path)
+                video::decoder(&a.ffprobe, &a.ffmpeg, &a.example(&lane)?, &lane, &path)
             } else {
                 audio_decoder(a, &lane, &path, &tmp.0)
             };
@@ -1074,24 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn first_difference_names_plane_and_position() {
-        let (w, h) = (4, 2);
-        let a = vec![0u8; w * h * 3 / 2];
-        let mut b = a.clone();
-        b[w * h + 1] = 1;
-        assert_eq!(
-            json::to_python(&Value::Object(first_diff(&a, &b, w, h, 1)), None),
-            r#"{"plane": "U", "x": 1, "y": 0}"#
-        );
-        let mut c = vec![0u8; w * h * 3];
-        c[2 * (w * h + 2) + 1] = 9;
-        assert_eq!(
-            json::to_python(
-                &Value::Object(first_diff(&vec![0; w * h * 3], &c, w, h, 2)),
-                None
-            ),
-            r#"{"plane": "V", "x": 0, "y": 0}"#
-        );
+    fn vector_suffixes() {
         assert_eq!(suffix("a.core.dts"), ".dts");
         assert_eq!(suffix(".bit"), "");
     }

@@ -5,7 +5,7 @@
 use std::ffi::OsString;
 use std::io::Read;
 use std::process::{Child, Command, Stdio};
-use std::thread::JoinHandle;
+use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::time::{Duration, Instant};
 
 use crate::harness::worker;
@@ -82,16 +82,39 @@ pub const OUT: &str = "{out}";
 /// the child as `/dev/fd/0`.
 pub struct Frames {
     child: Child,
-    src: Box<dyn Read + Send>,
-    size: usize,
-    err: Option<JoinHandle<Vec<u8>>>,
-    /// The bytes of the last short read.
-    pub tail: Vec<u8>,
+    reaped: bool,
+    recycle: SyncSender<Vec<u8>>,
+    frames: Receiver<std::io::Result<(Vec<u8>, usize)>>,
+    buffer: Vec<u8>,
+    partial_bytes: Option<usize>,
+    stderr: Receiver<std::io::Result<Vec<u8>>>,
+    deadline: Instant,
     argv: Vec<String>,
 }
 
+/// A fully drained frame stream and the process that wrote it.
+pub struct FrameExit {
+    pub code: i64,
+    pub stderr: String,
+    pub partial_bytes: usize,
+}
+
 impl Frames {
-    pub fn spawn(argv: &[String], size: usize, side: bool) -> Result<Frames, String> {
+    pub fn spawn(
+        argv: &[String],
+        size: usize,
+        side: bool,
+        timeout: Duration,
+    ) -> Result<Frames, String> {
+        let deadline = Instant::now() + timeout;
+        if size == 0 {
+            return Err("a frame must contain at least one byte".into());
+        }
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(size)
+            .map_err(|e| format!("cannot buffer a {size}-byte frame: {e}"))?;
+        buffer.resize(size, 0);
         let argv: Vec<String> = argv
             .iter()
             .map(|a| {
@@ -107,6 +130,8 @@ impl Frames {
         {
             let mut command = Command::new(&argv[0]);
             command.args(&argv[1..]).stderr(Stdio::piped());
+            #[cfg(unix)]
+            std::os::unix::process::CommandExt::process_group(&mut command, 0);
             if side {
                 let (reader, writer) = std::io::pipe().map_err(|e| e.to_string())?;
                 command.stdin(writer).stdout(Stdio::null());
@@ -118,67 +143,138 @@ impl Frames {
                 src = Box::new(child.stdout.take().expect("piped stdout"));
             }
         }
-        let mut stderr = child.stderr.take().expect("piped stderr");
-        let err = std::thread::spawn(move || {
-            let mut buffer = Vec::new();
-            let _ = stderr.read_to_end(&mut buffer);
-            buffer
+        // Each producer owns one reusable frame. Reading from its pipe on a
+        // separate thread lets the caller enforce the deadline during a short read.
+        let (recycle, buffers) = mpsc::sync_channel::<Vec<u8>>(1);
+        let (ready, frames) = mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let mut src = src;
+            while let Ok(mut frame) = buffers.recv() {
+                let read = read_record(&mut *src, &mut frame);
+                let last = read.as_ref().map_or(true, |&n| n < frame.len());
+                if ready.send(read.map(|n| (frame, n))).is_err() || last {
+                    break;
+                }
+            }
+        });
+        let mut err = child.stderr.take().expect("piped stderr");
+        let (done, stderr) = mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let result = err.read_to_end(&mut bytes).map(|_| bytes);
+            let _ = done.send(result);
         });
         Ok(Frames {
             child,
-            src,
-            size,
-            err: Some(err),
-            tail: Vec::new(),
+            reaped: false,
+            recycle,
+            frames,
+            buffer,
+            partial_bytes: None,
+            stderr,
+            deadline,
             argv,
         })
     }
 
-    /// The next full record; `None` at a short read, whose bytes become `tail`.
-    pub fn next(&mut self) -> Option<Vec<u8>> {
-        let mut buffer = vec![0; self.size];
-        let mut filled = 0;
-        while filled < self.size {
-            match self.src.read(&mut buffer[filled..]) {
-                Ok(0) => break,
-                Ok(n) => filled += n,
-                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(_) => break,
-            }
+    pub fn count_stdout(argv: &[String], timeout: Duration) -> Result<(u64, FrameExit), Stop> {
+        let mut stream = Self::spawn(argv, 64 * 1024, false, timeout)?;
+        let mut bytes = 0;
+        while let Some(chunk) = stream.next()? {
+            bytes += chunk.len() as u64;
         }
-        if filled < self.size {
-            buffer.truncate(filled);
-            self.tail = buffer;
-            None
+        let end = stream.close()?;
+        Ok((bytes + end.partial_bytes as u64, end))
+    }
+
+    fn receive<T>(&self, receiver: &Receiver<std::io::Result<T>>) -> Result<T, Stop> {
+        let timeout = || Stop::Timeout(self.argv.clone());
+        let remaining = self
+            .deadline
+            .checked_duration_since(Instant::now())
+            .ok_or_else(timeout)?;
+        receiver
+            .recv_timeout(remaining)
+            .map_err(|e| match e {
+                mpsc::RecvTimeoutError::Timeout => timeout(),
+                mpsc::RecvTimeoutError::Disconnected => {
+                    Stop::Fatal(format!("{}: reader disconnected", self.argv[0]))
+                }
+            })?
+            .map_err(|e| Stop::Fatal(format!("{} output: {e}", self.argv[0])))
+    }
+
+    /// Borrow the next full record. At EOF keep the short byte count, including on
+    /// subsequent calls while a longer peer is still emitting frames.
+    pub fn next(&mut self) -> Result<Option<&[u8]>, Stop> {
+        if self.partial_bytes.is_some() {
+            return Ok(None);
+        }
+        if !self.buffer.is_empty() {
+            self.recycle
+                .send(std::mem::take(&mut self.buffer))
+                .map_err(|_| Stop::Fatal(format!("{}: frame reader disconnected", self.argv[0])))?;
+        }
+        let (frame, filled) = self.receive(&self.frames)?;
+        self.buffer = frame;
+        if filled < self.buffer.len() {
+            self.partial_bytes = Some(filled);
+            Ok(None)
         } else {
-            Some(buffer)
+            Ok(Some(&self.buffer))
         }
     }
 
-    /// Read what is left into `tail`, wait for the child and return its exit
-    /// code, stderr and the final `tail`.
-    pub fn close(mut self, timeout: Duration) -> Result<(i64, String, Vec<u8>), Stop> {
-        let _ = self.src.read_to_end(&mut self.tail);
-        drop(self.src);
-        let started = Instant::now();
+    /// Finish reading records and collect both process outputs under the same deadline.
+    pub fn close(mut self) -> Result<FrameExit, Stop> {
+        while self.next()?.is_some() {}
+        // Keep the group leader unreaped until all pipe holders have closed them.
+        let stderr = self.receive(&self.stderr)?;
         let status = loop {
             match self.child.try_wait() {
                 Ok(Some(status)) => break status,
-                Ok(None) if started.elapsed() >= timeout => {
-                    let _ = self.child.kill();
-                    let _ = self.child.wait();
-                    return Err(Stop::Timeout(self.argv));
+                Ok(None) if Instant::now() >= self.deadline => {
+                    return Err(Stop::Timeout(self.argv.clone()));
                 }
                 Ok(None) => std::thread::sleep(Duration::from_millis(2)),
                 Err(e) => return Err(Stop::Fatal(e.to_string())),
             }
         };
-        let stderr = self
-            .err
-            .take()
-            .map(|t| t.join().unwrap_or_default())
-            .unwrap_or_default();
-        Ok((exit_code(status), python::decode(&stderr), self.tail))
+        self.reaped = true;
+        Ok(FrameExit {
+            code: exit_code(status),
+            stderr: python::decode(&stderr),
+            partial_bytes: self.partial_bytes.expect("read to EOF"),
+        })
+    }
+}
+
+fn read_record(src: &mut dyn Read, frame: &mut [u8]) -> std::io::Result<usize> {
+    let mut filled = 0;
+    while filled < frame.len() {
+        match src.read(&mut frame[filled..]) {
+            Ok(0) => break,
+            Ok(n) => filled += n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(filled)
+}
+
+impl Drop for Frames {
+    fn drop(&mut self) {
+        // Reap a producer even when spawning or reading its peer failed.
+        if !self.reaped {
+            // A descendant may still hold either pipe after its parent exits.
+            #[cfg(unix)]
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", "--", &format!("-{}", self.child.id())])
+                .stderr(Stdio::null())
+                .status();
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
     }
 }
 
@@ -236,16 +332,24 @@ mod tests {
 
     #[test]
     fn frames_keep_the_last_short_read() {
-        let mut frames = Frames::spawn(&sh("printf abcdefg; echo err >&2"), 3, false).unwrap();
-        assert_eq!(frames.next().as_deref(), Some(&b"abc"[..]));
-        assert_eq!(frames.next().as_deref(), Some(&b"def"[..]));
-        assert_eq!(frames.next(), None);
-        assert_eq!(frames.tail, b"g");
-        // A further read past the end replaces the tail, as Python's does.
-        assert_eq!(frames.next(), None);
-        assert_eq!(frames.tail, b"");
-        let (code, stderr, tail) = frames.close(Duration::from_secs(5)).unwrap();
-        assert_eq!((code, stderr.as_str(), tail.len()), (0, "err\n", 0));
+        let mut frames = Frames::spawn(
+            &sh("printf abcdefg; echo err >&2"),
+            3,
+            false,
+            Duration::from_secs(5),
+        )
+        .unwrap();
+        assert_eq!(frames.next().unwrap(), Some(&b"abc"[..]));
+        assert_eq!(frames.next().unwrap(), Some(&b"def"[..]));
+        for _ in 0..3 {
+            assert_eq!(frames.next().unwrap(), None);
+            assert_eq!(&frames.buffer[..frames.partial_bytes.unwrap()], b"g");
+        }
+        let end = frames.close().unwrap();
+        assert_eq!(
+            (end.code, end.stderr.as_str(), end.partial_bytes),
+            (0, "err\n", 1)
+        );
     }
 
     #[test]
@@ -256,11 +360,41 @@ mod tests {
             "printf wxyz > \"$0\"; echo out".into(),
             OUT.into(),
         ];
-        let mut frames = Frames::spawn(&argv, 2, true).unwrap();
-        assert_eq!(frames.next().as_deref(), Some(&b"wx"[..]));
-        assert_eq!(frames.next().as_deref(), Some(&b"yz"[..]));
-        assert_eq!(frames.next(), None);
-        assert_eq!(frames.close(Duration::from_secs(5)).unwrap().0, 0);
+        let mut frames = Frames::spawn(&argv, 2, true, Duration::from_secs(5)).unwrap();
+        assert_eq!(frames.next().unwrap(), Some(&b"wx"[..]));
+        assert_eq!(frames.next().unwrap(), Some(&b"yz"[..]));
+        assert_eq!(frames.next().unwrap(), None);
+        assert_eq!(frames.close().unwrap().code, 0);
+    }
+
+    #[test]
+    fn partial_picture_cannot_block_a_framed_read_past_its_deadline() {
+        let argv = sh("printf a; sleep 30 & exit 0");
+        let mut frames = Frames::spawn(&argv, 2, false, Duration::from_millis(250)).unwrap();
+        assert!(matches!(frames.next(), Err(Stop::Timeout(command)) if command == argv));
+        // The background child inherited both pipes. Dropping the timed-out
+        // run must release both readers, including the pending frame buffer.
+        let stdout = std::mem::replace(&mut frames.frames, mpsc::channel().1);
+        let stderr = std::mem::replace(&mut frames.stderr, mpsc::channel().1);
+        drop(frames);
+        assert_eq!(
+            stdout
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .unwrap()
+                .1,
+            1
+        );
+        assert!(stderr.recv_timeout(Duration::from_secs(5)).unwrap().is_ok());
+    }
+
+    #[test]
+    fn counting_unframed_stdout_keeps_the_worker_timeout() {
+        let argv = sh("printf x; exec sleep 5");
+        assert!(
+            matches!(Frames::count_stdout(&argv, Duration::from_millis(100)),
+                         Err(Stop::Timeout(command)) if command == argv)
+        );
     }
 
     #[test]

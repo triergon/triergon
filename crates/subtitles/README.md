@@ -100,12 +100,14 @@ left out, time fields have no range and the fraction counts milliseconds, the
 duration is kept in 32 bits; WebVTT blocks end at FFmpeg's line-break runs, a cue's
 `-->` may be on a later line, a cue that does not read ends the document. Cues are
 sorted by start time, one that ends before it starts lasts until the next, and one
-whose start, duration and text repeat the cue before it is dropped. Time fields that
-overflow read as FFmpeg reads them on 32-bit ARMv7: a SubRip field saturates to the
-32-bit signed range, and a WebVTT field's digits stop at 2³² − 1 and read as a 32-bit
-signed number. FFmpeg for AArch64 reads some of them otherwise (a SubRip hour of 2³¹ as
-−2³¹, a WebVTT field of 2³² as 0); the `subtitle-text-host` cases pin both targets. A
-UTF-16 SubRip document is converted as FFmpeg converts it, the first byte of some
+whose start, duration and text repeat the cue before it is dropped.
+`Reader::new` uses the ARMv7 timestamp field width on all platforms. SubRip saturates
+signed fields to 32 bits. WebVTT bounds the magnitude to 32 unsigned bits before
+reading the field as a signed value. Call `Reader::with_timestamp_field_width`
+with `TimestampFieldWidth::Bits64` for the AArch64 Linux interpretation. It uses
+64-bit bounds before reading the low 32 bits as signed. In that mode a SubRip hour
+of 2³¹ reads as −2³¹ and a WebVTT seconds field of 2³² reads as zero. A UTF-16 SubRip
+document is converted as FFmpeg converts it, the first byte of some
 characters after a line break included. A document in another charset is FFmpeg's
 `sub_charenc` case: each cue's text converts on its own with `charset::CharsetJob`
 and the receiver repertoire, so a cue the charset refuses has no text and the

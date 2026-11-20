@@ -9,6 +9,7 @@ mod ass;
 mod capture;
 mod checks;
 mod codecs;
+mod core_time;
 mod corpus;
 mod ebml;
 mod evidence;
@@ -33,9 +34,11 @@ mod pyrandom;
 mod python;
 mod raster;
 mod references;
+mod session_queues;
 mod sha256;
 mod shape;
 mod stats;
+mod subtitle_fixtures;
 mod toml;
 mod transport_fixtures;
 mod walk;
@@ -69,9 +72,12 @@ commands:
   check-revisions
                  every commit docs/status.md cites is reachable from HEAD (needs the
                  full history)
+  core-time      compare exact arithmetic against the independent fraction oracle
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
+  session-queues compare baseline and candidate session queues; --help for usage
   progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
+  subtitle-fixtures record|verify FEATURE REFERENCE [options]   record or verify subtitle folds
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
                  matroska (default), formats, video, subtitles (git revision on the 9.0 branch);
@@ -190,6 +196,7 @@ fn main() -> ExitCode {
             [part] => Part::named(part).and_then(|part| check(&root, Some(part))),
             _ => Err(USAGE.to_owned()),
         },
+        Some("session-queues") => session_queues::main(&root, &args[1..]),
         Some("progressive") => {
             return match progressive_bench::main(&root, &args[1..]) {
                 Ok(code) => ExitCode::from(code as u8),
@@ -209,8 +216,10 @@ fn main() -> ExitCode {
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
         Some("check-revisions") => check_revisions(&root),
+        Some("core-time") => core_time::main(&root, &args[1..]),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
+        Some("subtitle-fixtures") => subtitle_fixtures::main(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
         Some("link-order") => link_order(&root, &args[1..]),
@@ -842,6 +851,7 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
 const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --output FILE
 
 families and options:
+  m2ts INPUT.ts OUTPUT.m2ts   wrap TS188 packets for the program fixtures
   transport-access-units --output ROOT [--record --reference-worker FILE --observations DIR]
            regenerate MPEG-TS access-unit inputs and their reference-pinned corpus
   zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
@@ -851,6 +861,12 @@ families and options:
 /// One corpus variant, for harness tests that need cases beyond the manifests.
 fn fixture(root: &Path, args: &[String]) -> Task {
     let family = args.first().map(String::as_str).ok_or(FIXTURE_USAGE)?;
+    if family == "m2ts" {
+        let [source, target] = &args[1..] else {
+            return Err(FIXTURE_USAGE.into());
+        };
+        return transport_fixtures::program_m2ts(Path::new(source), Path::new(target));
+    }
     if family == "transport-access-units" {
         return transport_fixtures::main(root, &args[1..]);
     }
@@ -1444,13 +1460,12 @@ const CHECK: &[(Part, Step)] = &[
         harness::link_training::check(root)
     }),
     (Part::Variants, |root| {
-        let mut core_time = Command::new("python3");
-        core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
+        let mut args = vec!["--toolchain".to_owned(), NIGHTLY.to_owned()];
         let target = harness::gate_build::worker_target()?;
         if target != harness::gate_build::host()? {
-            core_time.args(["--target", target]);
+            args.extend(["--target".to_owned(), target.to_owned()]);
         }
-        run(core_time.current_dir(root))
+        core_time::main(root, &args)
     }),
 ];
 

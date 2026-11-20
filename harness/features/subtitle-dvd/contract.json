@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "subtitle-dvd",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/subtitle-corpus",
   "operation": "subtitle-decode",
   "candidate": "subtitle-worker",
   "worker_operation": "sub-",

@@ -135,3 +135,5 @@ scripted decoders. A host test in `triergon-playback` (`tests/continuation.rs`)
 reads an AVC/AAC MP4, feeds both sessions through the framing adapters, and
 checks output positions, seek-to-start replay and teardown. Codec conformance
 lives in the codec crates. Gates: [docs/quality.md](../../docs/quality.md).
+
+The [session queue workloads](../../harness/session-queues/README.md) exercise borrowed feeds, byte-limit backpressure, starvation and EOS with decoded AC-3, AAC and AVC output. They compare allocation calls, retained heap, peak heap, RSS and runtime across worker builds.

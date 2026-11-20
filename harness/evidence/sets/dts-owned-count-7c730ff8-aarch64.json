@@ -1,0 +1,9 @@
+{
+ "name": "dts-owned-count-7c730ff8-aarch64",
+ "path": "dts-owned-count-7c730ff8-aarch64",
+ "retention": "retained",
+ "reason": "For PR #334. Native aarch64 five-run instruction controls for public 7c730ff8 versus 3e3ba929, preserving the source revisions, both pairs of executables, manifests, compiler, perf setup, driver and per-control outcomes.",
+ "key": "evidence/architecture-review-mwo5u537/7c730ff883cc4e50f43d5e34fed779716b0319d2/aarch64/owned-dts-count/c3c6541a5415dfb973a8f81df88a6b188b0e5010e151472a1f1e93aeeeefe377.tar.zst",
+ "sha256": "c3c6541a5415dfb973a8f81df88a6b188b0e5010e151472a1f1e93aeeeefe377",
+ "bytes": 1020143
+}

@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-zlib",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/zlib-fixtures",
   "operation": "container-demux-v1",
   "contract": [
     "RFC 1950 checksum and wrapper",

@@ -35,7 +35,6 @@ usage: dvb_streams.py [--recorded] [--manifest [--fixtures]] [OUTPUT_DIR]
        (default: .research/subtitle-corpus/dvb)
 """
 
-import hashlib
 import json
 import os
 import shutil
@@ -43,6 +42,11 @@ import struct
 import subprocess
 import sys
 import zlib
+
+if __package__:
+    from .carriers import crc32_mpeg
+else:
+    from carriers import crc32_mpeg
 
 # ------------------------------------------------------------------ segments
 
@@ -373,16 +377,6 @@ def pes(payload, pts=None, length=True):
     if size > 0xFFFF:
         size = 0
     return b"\x00\x00\x01\xbd" + struct.pack(">H", size) + body
-
-
-def crc32_mpeg(data):
-    crc = 0xFFFFFFFF
-    for byte in data:
-        crc ^= byte << 24
-        for _ in range(8):
-            crc = (crc << 1) ^ 0x04C11DB7 if crc & 0x80000000 else crc << 1
-            crc &= 0xFFFFFFFF
-    return crc
 
 
 def section(table, extension, body):
@@ -1156,14 +1150,30 @@ def conversion_cases():
 # ------------------------------------------------------------------ recorded
 
 
+def clut_names(root):
+    folder = os.path.join(root, "crates/subtitles/tests/explicit-clut-fixtures")
+    with open(os.path.join(folder, "manifest.json")) as manifest:
+        return [row["id"] for row in json.load(manifest)["cases"]]
+
+
+def envelope_names():
+    # The retained original-source envelopes and their two packet carriers.
+    for name in ("dvb-ancillary-pages", "dvb-geometry-window", "dvb-map2to4", "dvb-map2to8",
+                 "dvb-map4to8", "dvb-nonmodifying", "dvb-palette-update-clear",
+                 "dvb-partial-alpha-projection", "dvb2-literals-fields", "dvb2-repeat-top",
+                 "dvb2-run-branches", "dvb4-literals-fields", "dvb4-run-branches",
+                 "dvb8-literals-fields", "dvb8-run-branches"):
+        yield name + "--matroska-segments"
+        if name != "dvb-palette-update-clear":
+            yield name + "--pes-data-field"
+
+
 def recorded(root):
     """The explicit-CLUT case files as one TS each: (name, bytes)."""
     folder = os.path.join(root, "crates", "subtitles", "tests", "explicit-clut-fixtures")
     out = {}
-    for name in sorted(os.listdir(folder)):
-        if not name.endswith(".case"):
-            continue
-        with open(os.path.join(folder, name), "rb") as f:
+    for name in clut_names(root):
+        with open(os.path.join(folder, name + ".case"), "rb") as f:
             data = f.read()
         assert data[:8] == b"SMCE0001"
         bits = data[8]
@@ -1177,7 +1187,7 @@ def recorded(root):
             payload = data[at:at + length]
             at += length + n * 5 + n * 4 * 2 + n * 2 + n * 4
             sets.append((pts, b"\x20\x00" + payload + b"\xff"))
-        out["recorded-" + name[:-5]] = single(sets, services=(("eng", 0x10, 1, 1),))
+        out["recorded-" + name] = single(sets, services=(("eng", 0x10, 1, 1),))
     return out
 
 
@@ -1189,10 +1199,8 @@ def recorded_envelopes():
     out = {}
     if not os.path.isdir(folder):
         return out
-    for name in sorted(os.listdir(folder)):
-        if not (name.startswith("dvb-original-source--") and name.endswith(".bin")):
-            continue
-        with open(os.path.join(folder, name), "rb") as f:
+    for name in envelope_names():
+        with open(os.path.join(folder, "dvb-original-source--" + name + ".bin"), "rb") as f:
             data = f.read()
         assert data[:8] == b"SMDVB001"
         at, sets = 20, []
@@ -1203,7 +1211,7 @@ def recorded_envelopes():
             if not payload.startswith(b"\x20\x00"):
                 payload = b"\x20\x00" + payload + b"\xff"
             sets.append((pts, payload))
-        out["recorded-" + name[len("dvb-original-source--"):-4]] = single(sets)
+        out["recorded-" + name] = single(sets)
     return out
 
 
@@ -1267,23 +1275,13 @@ OPTION_CASES = [
 ]
 
 
-def reference_fold(reference, path, args):
-    out = subprocess.run([reference, "sub-fold", path] + args, capture_output=True, text=True, check=True)
-    fold = json.loads(out.stdout.strip().splitlines()[-1])
-    return {k: fold[k] for k in ("packets", "bytes", "digest")}
-
-
-def manifest(corpus, reference, generated):
-    """corpus.json with the reference's sub-fold of every case."""
+def case_descriptions(generated):
+    """Ordered inputs and decoder options supplied by the fixture author."""
     cases = []
 
     def add(case_id, rel, rights, source, args):
-        path = os.path.join(corpus, rel)
-        cases.append({
-            "id": case_id, "profile": case_id, "file": rel, "sha256": sha256(path), "rights": rights,
-            "source": source, "arguments": ["dvb"] + args,
-            "expected": reference_fold(reference, path, ["dvb"] + args),
-        })
+        cases.append(dict(id=case_id, profile=case_id, file=rel, rights=rights,
+                          source=source, arguments=["dvb"] + args))
 
     for rel in generated:
         name = os.path.basename(rel)
@@ -1301,12 +1299,7 @@ def manifest(corpus, reference, generated):
     for rel in FATE_INPUTS:
         add("fate-" + os.path.basename(rel).rsplit(".", 1)[0], "fate/" + rel, "fetched-not-redistributed",
             "fate-suite/" + rel, [])
-    return {"schema": 1, "cases": cases}
-
-
-def sha256(path):
-    with open(path, "rb") as f:
-        return hashlib.sha256(f.read()).hexdigest()
+    return cases
 
 
 # ------------------------------------------------------------------ output
@@ -1399,6 +1392,14 @@ def main(argv):
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     corpus = os.path.join(root, ".research", "subtitle-corpus")
     out = args[0] if args else os.path.join(corpus, "dvb")
+    if argv[:1] == ["--list-cases"]:
+        streams = set(cases())
+        streams.update("recorded-" + name for name in clut_names(root))
+        streams.update("recorded-" + name for name in envelope_names())
+        generated = ["dvb/" + name + ext for name in sorted(streams)
+                     for ext in ((".ts", ".mkv") if name in MKV_COPIES else (".ts",))]
+        print(json.dumps(case_descriptions(generated)))
+        return
     os.makedirs(out, exist_ok=True)
     streams = cases()
     if record:
@@ -1425,13 +1426,12 @@ def main(argv):
             shutil.copyfile(os.path.join(RESEARCH, "fate-samples", rel), target)
     if write_manifest:
         reference = os.path.join(root, "target", "harness", "ffmpeg-subtitles-worker")
-        data = manifest(corpus, reference, generated)
-        target = os.path.join(root, "harness", "features", "subtitle-dvb", "corpus.json")
-        with open(target, "w") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-        print("%d cases -> %s" % (len(data["cases"]), target))
+        subprocess.run(["cargo", "xtask", "subtitle-fixtures", "record", "subtitle-dvb", reference,
+                        "--corpus", corpus, "--cases-stdin"], cwd=root, check=True, text=True,
+                       input=json.dumps(case_descriptions(generated)))
         if "--fixtures" in argv:
+            with open(os.path.join(root, "harness/features/subtitle-dvb/corpus.json")) as f:
+                data = json.load(f)
             folder = os.path.join(root, "crates", "subtitles", "tests", "dvb-receiver-fixtures")
             print("%d fixture cases -> %s" % (fixtures(corpus, reference, data["cases"], folder), folder))
 

@@ -198,12 +198,7 @@ pub struct TsNativeSelection {
     pub pid: u16,
     pub carriage: RegisteredCarriage,
 }
-/// Opt in to the finite private-audio packet view for one TS188 PID.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TsNativePrivateAudioSelection {
-    pub pid: u16,
-    pub carriage: PrivateAudioCarriage,
-}
+pub use crate::compat::pes::PrivateAudioSelection as TsNativePrivateAudioSelection;
 
 /// Explicit packet interpretation for one selected PID of a TS program.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -664,19 +659,9 @@ impl Engine {
         if format != ts::PacketFormat::Ts188 {
             return Err(Error::Unsupported("native private audio requires TS188"));
         }
-        Self::ts_with_native(
-            input,
-            format,
-            program,
-            limits,
-            policy,
-            TsNativeTrackSelection {
-                pid: selection.pid,
-                carriage: TsNativeCarriage::PrivateAudio(selection.carriage),
-            },
-        )
+        crate::compat::pes::open_private_audio(input, program, limits, policy, selection)
     }
-    fn ts_with_native(
+    pub(crate) fn ts_with_native(
         input: InputCursor,
         format: ts::PacketFormat,
         program: u16,

@@ -5,9 +5,10 @@
 
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::bits_at;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, Step, Time, WorkBudget};
 
-const CORE_SYNC: u32 = 0x7ffe8001;
+pub(super) const CORE_SYNC: u32 = 0x7ffe8001;
 const EXTENSION_SYNC: u32 = 0x64582025;
 const FIELD_COUNT: usize = 27;
 
@@ -154,6 +155,34 @@ impl DtsInspectionIssues {
     pub const fn contains(self, flags: u32) -> bool {
         self.0 & flags == flags
     }
+
+    pub(super) const fn source_status(self) -> DtsInspectionSourceStatus {
+        use DtsInspectionIssues as I;
+        let bits = self.bits();
+        if bits & I::EXTENSION_SUBSTREAM != 0 {
+            DtsInspectionSourceStatus::Unsupported
+        } else if bits & I::NONCANONICAL_SYNC != 0 {
+            DtsInspectionSourceStatus::Invalid
+        } else if bits & I::TRUNCATED != 0 {
+            DtsInspectionSourceStatus::Truncated
+        } else if bits
+            & (I::FIXED_BIT
+                | I::FRAME_SIZE
+                | I::BLOCK_COUNT
+                | I::SAMPLE_RATE_CODE
+                | I::BITRATE_CODE
+                | I::LFE_CODE
+                | I::PCM_RESOLUTION
+                | I::NORMAL_SHORT)
+            != 0
+        {
+            DtsInspectionSourceStatus::Invalid
+        } else if bits & (I::TERMINATION | I::FUTURE_VERSION | I::UNSUPPORTED_EXTENSION) != 0 {
+            DtsInspectionSourceStatus::Unsupported
+        } else {
+            DtsInspectionSourceStatus::NormalHeader
+        }
+    }
 }
 
 /// Caller-supplied identity for an already-owned record. This API does not
@@ -167,6 +196,8 @@ pub struct DtsInspectionViews {
     /// Arithmetic view of coded FSIZE+1, including invalid undersized codes.
     pub declared_frame_bytes: Option<u32>,
     pub core_rate_hz: Option<u32>,
+    /// Core samples per channel from a complete NBLKS in 5..=127, before any
+    /// termination adjustment. Normal-frame restrictions apply to `normal_window`.
     pub coded_window_samples: Option<u32>,
     pub full_bandwidth_channels: Option<u8>,
     pub nominal_bitrate: Option<u32>,
@@ -222,31 +253,7 @@ impl DtsInspection {
             && self.field(DtsCoreField::DialogWord).value().is_some()
     }
     pub const fn source_status(&self) -> DtsInspectionSourceStatus {
-        use DtsInspectionIssues as I;
-        let bits = self.issues.bits();
-        if bits & I::EXTENSION_SUBSTREAM != 0 {
-            DtsInspectionSourceStatus::Unsupported
-        } else if bits & I::NONCANONICAL_SYNC != 0 {
-            DtsInspectionSourceStatus::Invalid
-        } else if bits & I::TRUNCATED != 0 {
-            DtsInspectionSourceStatus::Truncated
-        } else if bits
-            & (I::FIXED_BIT
-                | I::FRAME_SIZE
-                | I::BLOCK_COUNT
-                | I::SAMPLE_RATE_CODE
-                | I::BITRATE_CODE
-                | I::LFE_CODE
-                | I::PCM_RESOLUTION
-                | I::NORMAL_SHORT)
-            != 0
-        {
-            DtsInspectionSourceStatus::Invalid
-        } else if bits & (I::TERMINATION | I::FUTURE_VERSION | I::UNSUPPORTED_EXTENSION) != 0 {
-            DtsInspectionSourceStatus::Unsupported
-        } else {
-            DtsInspectionSourceStatus::NormalHeader
-        }
+        self.issues.source_status()
     }
 }
 
@@ -274,6 +281,7 @@ pub struct DtsHeaderInspector {
     fields: [FieldObservation; FIELD_COUNT],
     current: usize,
     position: u16,
+    field_start: u16,
     source_bits: u16,
     record_end: SourceLocation,
     phase: Phase,
@@ -312,6 +320,7 @@ impl DtsHeaderInspector {
             fields: [FieldObservation::NotReached; FIELD_COUNT],
             current: 0,
             position: 0,
+            field_start: 0,
             source_bits,
             record_end: SourceLocation {
                 source: identity.source,
@@ -371,32 +380,32 @@ impl DtsHeaderInspector {
                     if !work.try_charge(1) {
                         return Ok(DtsInspectionStep::Yield);
                     }
+                    self.position += 1;
+                    let width = field.width();
+                    let observed = self.position - self.field_start;
+                    if observed < u16::from(width) && self.position < self.source_bits {
+                        continue;
+                    }
+                    // A budget yield preserves the cursor. Extract the prefix once,
+                    // when the field is complete or the source ends inside it.
                     let raw = self
                         .raw
                         .as_ref()
                         .ok_or(Error::Invalid("missing DTS inspection source"))?;
-                    let position = usize::from(self.position);
-                    let bit = u32::from((raw.as_ref()[position / 8] >> (7 - position % 8)) & 1);
-                    let (offset, observed_bits, prefix) = match self.fields[self.current] {
-                        FieldObservation::NotReached => (self.position, 1, bit),
-                        FieldObservation::Bits {
-                            offset,
-                            observed_bits,
-                            prefix,
-                            ..
-                        } => (offset, observed_bits + 1, (prefix << 1) | bit),
-                        FieldObservation::NotInSyntax => {
-                            return Err(Error::Invalid("DTS skipped field transition"));
-                        }
-                    };
+                    let prefix = bits_at(
+                        raw.as_ref(),
+                        usize::from(self.field_start),
+                        u32::from(observed),
+                    )
+                    .ok_or(Error::Truncated)?;
                     self.fields[self.current] = FieldObservation::Bits {
-                        offset,
-                        width: field.width(),
-                        observed_bits,
+                        offset: self.field_start,
+                        width,
+                        observed_bits: observed as u8,
                         prefix,
                     };
-                    self.position += 1;
-                    if observed_bits == field.width() {
+                    self.field_start = self.position;
+                    if observed == u16::from(width) {
                         self.current += 1;
                         if field == DtsCoreField::Sync && prefix != CORE_SYNC {
                             self.phase = Phase::Validate;
@@ -412,7 +421,7 @@ impl DtsHeaderInspector {
                     if self.value(DtsCoreField::CrcPresent) == Some(0) {
                         self.fields[DtsCoreField::Hcrc as usize] = FieldObservation::NotInSyntax;
                     }
-                    let (issues, views) = self.validate()?;
+                    let (issues, views) = validate_header(|field| self.value(field))?;
                     self.issues = issues;
                     self.views = Some(views);
                     self.phase = Phase::Publish;
@@ -421,12 +430,10 @@ impl DtsHeaderInspector {
                     if !work.try_charge(1) {
                         return Ok(DtsInspectionStep::Yield);
                     }
-                    let required_bits = if self.value(DtsCoreField::Sync) == Some(CORE_SYNC) {
-                        self.value(DtsCoreField::CrcPresent)
-                            .map(|cpf| if cpf == 0 { 104 } else { 120 })
-                    } else {
-                        None
-                    };
+                    let required_bits = required_header_bits(
+                        self.value(DtsCoreField::Sync),
+                        self.value(DtsCoreField::CrcPresent),
+                    );
                     let output = DtsInspection {
                         raw: self
                             .raw
@@ -451,108 +458,114 @@ impl DtsHeaderInspector {
     fn value(&self, field: DtsCoreField) -> Option<u32> {
         self.fields[field as usize].value()
     }
+}
 
-    fn validate(&self) -> Result<(DtsInspectionIssues, DtsInspectionViews)> {
-        use DtsCoreField as F;
-        use DtsInspectionIssues as I;
-        let mut issues = 0;
-        let sync = self.value(F::Sync);
-        if sync.is_some_and(|value| value != CORE_SYNC) {
-            issues |= I::NONCANONICAL_SYNC;
-        } else if self.value(F::DialogWord).is_none() {
-            issues |= I::TRUNCATED;
-        }
-        if sync == Some(EXTENSION_SYNC) {
-            issues |= I::EXTENSION_SUBSTREAM;
-        }
-        if self.value(F::Fixed).is_some_and(|value| value != 0) {
-            issues |= I::FIXED_BIT;
-        }
-        if self.value(F::FrameSize).is_some_and(|value| value < 95) {
-            issues |= I::FRAME_SIZE;
-        }
-        let normal = self.value(F::Normal);
-        let blocks = self.value(F::BlockCount);
-        if blocks.is_some_and(|value| {
-            value < 5 || (normal == Some(1) && !matches!(value, 7 | 15 | 31 | 63 | 127))
-        }) {
-            issues |= I::BLOCK_COUNT;
-        }
-        if normal == Some(1) && self.value(F::Short).is_some_and(|value| value != 31) {
-            issues |= I::NORMAL_SHORT;
-        }
-        if normal == Some(0) {
-            issues |= I::TERMINATION;
-        }
-        let rate_code = self.value(F::SampleRate);
-        let rate = rate_code.and_then(core_rate);
-        if rate_code.is_some() && rate.is_none() {
-            issues |= I::SAMPLE_RATE_CODE;
-        }
-        let bitrate_code = self.value(F::Rate);
-        let nominal_bitrate = bitrate_code.and_then(bitrate);
-        if bitrate_code.is_some_and(|value| value != 29) && nominal_bitrate.is_none() {
-            issues |= I::BITRATE_CODE;
-        }
-        if self.value(F::Lfe) == Some(3) {
-            issues |= I::LFE_CODE;
-        }
-        if self
-            .value(F::PcmResolution)
-            .is_some_and(|value| !matches!(value, 0 | 1 | 2 | 3 | 5 | 6))
-        {
-            issues |= I::PCM_RESOLUTION;
-        }
-        let version = self.value(F::Version);
-        if version.is_some_and(|value| value > 7) {
-            issues |= I::FUTURE_VERSION;
-        }
-        if self.value(F::Extension) == Some(1)
-            && self
-                .value(F::ExtensionId)
-                .is_some_and(|value| !matches!(value, 0 | 2 | 6))
-        {
-            issues |= I::UNSUPPORTED_EXTENSION;
-        }
-        let coded_window_samples = blocks
-            .filter(|value| *value >= 5)
-            .map(|value| (value + 1) * 32);
-        let normal_window = if normal == Some(1)
-            && self.value(F::Short) == Some(31)
-            && blocks.is_some_and(|value| matches!(value, 7 | 15 | 31 | 63 | 127))
-            && version.is_some_and(|value| value <= 7)
-        {
-            match (coded_window_samples, rate) {
-                (Some(samples), Some(hz)) => Some(Time::new(i128::from(samples), u128::from(hz))?),
-                _ => None,
-            }
-        } else {
-            None
-        };
-        let dialog_gain_db = self.value(F::DialogWord).and_then(|raw| {
-            let raw = i8::try_from(raw).ok()?;
-            match version {
-                Some(6) => Some(-16 - raw),
-                Some(7) => Some(-raw),
-                _ => None,
-            }
-        });
-        const CHANNELS: [u8; 16] = [1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6, 6, 6, 7, 8, 8];
-        let views = DtsInspectionViews {
-            declared_frame_bytes: self.value(F::FrameSize).map(|value| value + 1),
-            core_rate_hz: rate,
-            coded_window_samples,
-            full_bandwidth_channels: self
-                .value(F::AudioMode)
-                .and_then(|value| usize::try_from(value).ok())
-                .and_then(|index| CHANNELS.get(index).copied()),
-            nominal_bitrate,
-            open_bitrate: bitrate_code.map(|value| value == 29),
-            normal_window,
-            dialog_gain_db,
-        };
-        Ok((DtsInspectionIssues(issues), views))
+pub(super) fn required_header_bits(sync: Option<u32>, cpf: Option<u32>) -> Option<u16> {
+    if sync == Some(CORE_SYNC) {
+        cpf.map(|v| if v == 0 { 104 } else { 120 })
+    } else {
+        None
     }
+}
+
+/// Interpret the complete fields available in either header representation.
+pub(super) fn validate_header(
+    value: impl Fn(DtsCoreField) -> Option<u32>,
+) -> Result<(DtsInspectionIssues, DtsInspectionViews)> {
+    use DtsCoreField as F;
+    use DtsInspectionIssues as I;
+    let mut issues = 0;
+    let sync = value(F::Sync);
+    let dialog = value(F::DialogWord);
+    let frame_size = value(F::FrameSize);
+    let short = value(F::Short);
+    if sync.is_some_and(|value| value != CORE_SYNC) {
+        issues |= I::NONCANONICAL_SYNC;
+    } else if dialog.is_none() {
+        issues |= I::TRUNCATED;
+    }
+    if sync == Some(EXTENSION_SYNC) {
+        issues |= I::EXTENSION_SUBSTREAM;
+    }
+    if value(F::Fixed).is_some_and(|value| value != 0) {
+        issues |= I::FIXED_BIT;
+    }
+    if frame_size.is_some_and(|value| value < 95) {
+        issues |= I::FRAME_SIZE;
+    }
+    let normal = value(F::Normal);
+    let blocks = value(F::BlockCount);
+    let coded_window_samples = blocks.filter(|&n| n >= 5).map(|n| (n + 1) * 32);
+    let normal_blocks = matches!(blocks, Some(7 | 15 | 31 | 63 | 127));
+    if blocks.is_some() && (coded_window_samples.is_none() || (normal == Some(1) && !normal_blocks))
+    {
+        issues |= I::BLOCK_COUNT;
+    }
+    if normal == Some(1) && short.is_some_and(|value| value != 31) {
+        issues |= I::NORMAL_SHORT;
+    }
+    if normal == Some(0) {
+        issues |= I::TERMINATION;
+    }
+    let rate_code = value(F::SampleRate);
+    let rate = rate_code.and_then(core_rate);
+    if rate_code.is_some() && rate.is_none() {
+        issues |= I::SAMPLE_RATE_CODE;
+    }
+    let bitrate_code = value(F::Rate);
+    let nominal_bitrate = bitrate_code.and_then(bitrate);
+    if bitrate_code.is_some_and(|value| value != 29) && nominal_bitrate.is_none() {
+        issues |= I::BITRATE_CODE;
+    }
+    if value(F::Lfe) == Some(3) {
+        issues |= I::LFE_CODE;
+    }
+    if value(F::PcmResolution).is_some_and(|value| !matches!(value, 0 | 1 | 2 | 3 | 5 | 6)) {
+        issues |= I::PCM_RESOLUTION;
+    }
+    let version = value(F::Version);
+    if version.is_some_and(|value| value > 7) {
+        issues |= I::FUTURE_VERSION;
+    }
+    if value(F::Extension) == Some(1)
+        && value(F::ExtensionId).is_some_and(|value| !matches!(value, 0 | 2 | 6))
+    {
+        issues |= I::UNSUPPORTED_EXTENSION;
+    }
+    let normal_window = if normal == Some(1)
+        && short == Some(31)
+        && normal_blocks
+        && version.is_some_and(|value| value <= 7)
+    {
+        match (coded_window_samples, rate) {
+            (Some(samples), Some(hz)) => Some(Time::new(i128::from(samples), u128::from(hz))?),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let dialog_gain_db = dialog.and_then(|raw| {
+        let raw = i8::try_from(raw).ok()?;
+        match version {
+            Some(6) => Some(-16 - raw),
+            Some(7) => Some(-raw),
+            _ => None,
+        }
+    });
+    const CHANNELS: [u8; 16] = [1, 2, 2, 2, 2, 3, 3, 4, 4, 5, 6, 6, 6, 7, 8, 8];
+    let views = DtsInspectionViews {
+        declared_frame_bytes: frame_size.map(|value| value + 1),
+        core_rate_hz: rate,
+        coded_window_samples,
+        full_bandwidth_channels: value(F::AudioMode)
+            .and_then(|value| usize::try_from(value).ok())
+            .and_then(|index| CHANNELS.get(index).copied()),
+        nominal_bitrate,
+        open_bitrate: bitrate_code.map(|value| value == 29),
+        normal_window,
+        dialog_gain_db,
+    };
+    Ok((DtsInspectionIssues(issues), views))
 }
 
 fn core_rate(code: u32) -> Option<u32> {

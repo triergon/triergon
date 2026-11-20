@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "mp4-forward",
+  "runner": "cargo xtask report",
   "operation": "mp4-forward-playback",
   "candidate": "playback-worker",
   "worker_operation": "mp4-forward-",
