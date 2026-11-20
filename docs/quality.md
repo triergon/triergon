@@ -488,8 +488,8 @@ Put the 27 authored `.pcm` inputs from the comparison archive in
 [manifest](../harness/features/ac3-encode/corpus.json) fixes each input's SHA-256.
 The two workers preload the input, then measure encoder construction, all 294
 frames, the packet and byte fold, and teardown. At 44.1 kHz the session covers
-two complete cycles of the frame-size adjustment, giving both encoders the
-same total stream size.
+complete frame-size cycles at every bitrate, giving both encoders the same
+total stream size.
 
 With the pinned Matroska and decode reference builds prepared, build the
 encoder workers and run the diagnostic comparison on a gate target:

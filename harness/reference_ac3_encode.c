@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <libavcodec/avcodec.h>
 #include <libavutil/buffer.h>
@@ -175,6 +176,11 @@ static uint64_t nanoseconds(void) {
     return (uint64_t)ts.tv_sec * UINT64_C(1000000000) + (uint64_t)ts.tv_nsec;
 }
 
+static void marker(const char *text) {
+    size_t length = strlen(text);
+    if (write(STDOUT_FILENO, text, length) != (ssize_t)length) fail("marker");
+}
+
 int main(int argc, char **argv) {
     if (argc < 3) fail("operation and input");
     int bench = !strcmp(argv[1], "ac3-encode-bench");
@@ -204,9 +210,9 @@ int main(int argc, char **argv) {
                iterations, nanoseconds() - start, first.packets * iterations,
                first.bytes * iterations, first.digest);
     } else {
-        if (memory && (puts("TRIERGON_BEGIN_V1") == EOF || fflush(stdout))) fail("marker");
+        if (memory) marker("TRIERGON_BEGIN_V1\n");
         Work work = encode(&input, REPEATS, NULL);
-        if (memory && (puts("TRIERGON_END_V1") == EOF || fflush(stdout))) fail("marker");
+        if (memory) marker("TRIERGON_END_V1\n");
         printf("{\"eof\":true,\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 "}\n",
                work.packets, work.bytes, work.digest);
     }
