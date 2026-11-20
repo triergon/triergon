@@ -1639,16 +1639,17 @@ impl Lane {
         };
         let duration90 = duration
             .map(|time| -> Result<Option<i64>> {
-                let n = time
-                    .numerator()
-                    .checked_mul(90_000)
-                    .ok_or(Error::Overflow)?;
-                let d = i128::try_from(time.denominator()).map_err(|_| Error::Overflow)?;
-                if n % d == 0 {
-                    Ok(Some(i64::try_from(n / d).map_err(|_| Error::Overflow)?))
-                } else {
-                    Ok(None)
+                const TICKS_PER_SECOND: u32 = 90_000;
+                // Time is reduced, so the denominator must divide the clock rate.
+                let Ok(denominator) = u32::try_from(time.denominator()) else {
+                    return Ok(None);
+                };
+                if !TICKS_PER_SECOND.is_multiple_of(denominator) {
+                    return Ok(None);
                 }
+                let numerator = i64::try_from(time.numerator()).map_err(|_| Error::Overflow)?;
+                let scale = i64::from(TICKS_PER_SECOND / denominator);
+                Ok(Some(numerator.checked_mul(scale).ok_or(Error::Overflow)?))
             })
             .transpose()?
             .flatten();
