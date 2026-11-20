@@ -43,6 +43,8 @@ The blocking facade stops reading as soon as a container signature selects a rea
 It reserves replay capacity before consuming sequential input and rewinds seekable input.
 Frame-based elementary probing examines up to 64 KiB once.
 
+The [session queue workloads](../harness/session-queues/README.md) cover five real-payload feed patterns and three queue states. Each comparison checks decoded output before measuring paired runtime, peak heap and total RSS.
+
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets, neutral container model with one codec identity | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | fuzzing |
