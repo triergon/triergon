@@ -2,7 +2,7 @@
 use super::sha;
 use crate::harness::{build, gate_build};
 use crate::json::Value;
-use crate::{checks, corpus, prepare};
+use crate::{checks, corpus, json, prepare, sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -33,10 +33,43 @@ fn receipt_path(worker: &Path) -> PathBuf {
     PathBuf::from(path)
 }
 
+fn build_dir(dir: &Path, revision: &str, files: &Value) -> PathBuf {
+    let source = format!("{revision}\n{}", json::to_python(files, None));
+    dir.join("session-queues")
+        .join(sha256::hex(source.as_bytes()))
+}
+
 fn cargo_command(dir: &Path) -> Result<Vec<String>, String> {
     let mut argv = build::cargo_rustc(&WORKER, dir, true)?;
     argv.extend(gate_build::worker_link_arguments()?);
     Ok(argv)
+}
+
+fn linked_name(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|n| n.strip_prefix("session_queue-"))
+        .is_some_and(|hash| hash.len() == 16 && hash.bytes().all(|b| b.is_ascii_hexdigit()))
+}
+
+// The pinned Cargo retains the linked example (and its .d file) here. Read only
+// this source's intermediate directory; the public release path is shared.
+fn linked_worker(cache: &Path) -> Result<PathBuf, String> {
+    let examples = cache.join(gate_build::release_subdir()?).join("examples");
+    let mut binaries = Vec::new();
+    for entry in std::fs::read_dir(&examples).map_err(|e| format!("{}: {e}", examples.display()))? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if linked_name(&path) {
+            binaries.push(path);
+        }
+    }
+    match binaries.as_slice() {
+        [binary] => Ok(binary.clone()),
+        _ => Err(format!(
+            "expected one linked session worker in {}",
+            examples.display()
+        )),
+    }
 }
 
 pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String> {
@@ -76,21 +109,23 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     let dir =
         std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
     let dir = std::path::absolute(dir).map_err(|e| e.to_string())?;
+    let cache = build_dir(&dir, revision.trim(), &files);
     let argv = cargo_command(&dir)?;
     prepare::run(
         Command::new(&argv[0])
             .args(&argv[1..])
             .current_dir(tree)
-            .env("CARGO_INCREMENTAL", "0"),
+            .env("CARGO_INCREMENTAL", "0")
+            .env("CARGO_BUILD_BUILD_DIR", &cache),
     )?;
-    let artifact = dir
-        .join(gate_build::release_subdir()?)
-        .join("examples/session_queue");
-    std::fs::copy(&artifact, dest).map_err(|e| format!("{}: {e}", artifact.display()))?;
+    let binary = linked_worker(&cache)?;
+    std::fs::copy(&binary, dest).map_err(|e| format!("{}: {e}", binary.display()))?;
     let receipt = Value::object([
         ("revision", Value::str(revision.trim())),
         ("target", Value::str(target)),
         ("sha256", Value::str(sha(dest)?)),
+        ("build_dir", Value::str(cache.display().to_string())),
+        ("artifact", Value::str(binary.display().to_string())),
         ("overlay", files),
         ("build", build),
         ("argv", Value::strings(argv)),
@@ -119,15 +154,37 @@ pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
         .find(|pair| pair[0].as_str() == Some("--target-dir"))
         .and_then(|pair| pair[1].as_str())
         .ok_or("missing Cargo target directory")?;
+    let revision = receipt
+        .get("revision")
+        .and_then(Value::as_str)
+        .filter(|r| r.len() == 40 && r.bytes().all(|b| b.is_ascii_hexdigit()))
+        .ok_or("missing library revision in worker build")?;
     if receipt.get("argv") != Some(&Value::strings(cargo_command(Path::new(dir))?)) {
         return Err("Cargo command differs from the worker build for this target".into());
     }
-    if !receipt
-        .get("revision")
+    let cache = build_dir(
+        Path::new(dir),
+        revision,
+        receipt.get("overlay").ok_or("missing workload overlay")?,
+    );
+    if receipt.get("build_dir").and_then(Value::as_str) != cache.to_str() {
+        return Err("intermediate build directory differs from the source identity".into());
+    }
+    let artifact = receipt
+        .get("artifact")
         .and_then(Value::as_str)
-        .is_some_and(|r| r.len() == 40 && r.bytes().all(|b| b.is_ascii_hexdigit()))
+        .map(Path::new)
+        .ok_or("missing linked artifact path")?;
+    if !linked_name(artifact)
+        || artifact.parent()
+            != Some(
+                cache
+                    .join(gate_build::release_subdir()?)
+                    .join("examples")
+                    .as_path(),
+            )
     {
-        return Err("missing library revision in worker build".into());
+        return Err("linked artifact is outside the recorded source build".into());
     }
     let refusals = gate_build::refusals(build, &gate_build::pinned_release(root)?);
     if !refusals.is_empty() {

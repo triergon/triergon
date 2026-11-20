@@ -52,15 +52,15 @@ driver=$(git rev-parse HEAD)
 scratch=$(mktemp -d)
 export CARGO_INCREMENTAL=0
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/target}"
-cargo build --locked --release -p xtask
-runner="$CARGO_TARGET_DIR/release/xtask"
+runner="$scratch/xtask"
+CARGO_BUILD_BUILD_DIR="$CARGO_TARGET_DIR/session-queues/runner-$driver" \
+    cargo rustc --locked --release -p xtask -- --emit="link=$runner"
 for role in baseline candidate; do
     if [ "$role" = baseline ]; then revision=$baseline; else revision=$candidate; fi
     tree="$scratch/$role-src"
     git worktree add --detach "$tree" "$revision"
     git archive "$driver" Cargo.lock crates/session/Cargo.toml \
         crates/session/examples/session_queue | tar -x -C "$tree"
-    touch "$tree/crates/session/src/lib.rs"
     "$runner" session-queues build "$tree" "$scratch/$role"
 done
 "$runner" session-queues check "$scratch/baseline" "$scratch/candidate" "$scratch/work"
@@ -68,7 +68,9 @@ done
 
 The build command uses the shared gate compiler, worker target and linker flags.
 In an armhf user space it passes `--target thumbv7neon-unknown-linux-gnueabihf`
-and copies the example from that target’s release directory. Each worker has an
+and copies the linked example from the intermediates for that source revision
+and overlay. These intermediates live under the shared target directory.
+Each worker has an
 adjacent `.build.json` receipt recording its SHA-256, library revision, overlay
 hashes, target, compiler and build command. Keep each executable with its receipt.
 The comparison checks these identities and saves both receipts in `identity.json`.
