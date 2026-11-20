@@ -96,6 +96,18 @@ impl<'a> RiceReader<'a> {
     /// final code. Use [`Self::rice`] for a checked code.
     #[inline(always)]
     pub fn rice_in_partition(&mut self, k: u32, end: usize) -> Option<u32> {
+        // A short code fits in the high register of the 64-bit cache on 32-bit
+        // targets. Count and extract its bits there to avoid double-word shifts.
+        #[cfg(target_pointer_width = "32")]
+        {
+            let head = (self.cache >> 32) as u32;
+            let zeros = head.leading_zeros();
+            let len = zeros + 1 + k;
+            if len <= self.valid.min(32) {
+                let code = head >> (32 - len);
+                return Some(self.consume_rice(k, zeros, len, code));
+            }
+        }
         let zeros = self.cache.leading_zeros();
         let len = zeros + 1 + k;
         if len > self.valid {
@@ -106,10 +118,15 @@ impl<'a> RiceReader<'a> {
             return value;
         }
         // The top `len` bits are the stop bit followed by the `k` low bits.
-        let code = self.cache >> (64 - len);
+        let code = (self.cache >> (64 - len)) as u32;
+        Some(self.consume_rice(k, zeros, len, code))
+    }
+
+    #[inline(always)]
+    fn consume_rice(&mut self, k: u32, zeros: u32, len: u32, code: u32) -> u32 {
         self.cache <<= len;
         self.valid -= len;
-        Some((zeros << k) | (code as u32 ^ (1 << k)))
+        (zeros << k) | (code ^ (1 << k))
     }
 }
 
@@ -171,6 +188,29 @@ mod tests {
         }
         assert_eq!(bits.rice(3, 71), Some((62 << 3) | 5));
         assert_eq!(bits.position(), 71);
+    }
+
+    #[test]
+    fn cached_codes_cross_the_word_boundary_at_every_bit_alignment() {
+        for offset in 0..8 {
+            for len in [31, 32, 33] {
+                for k in [0, 7, 16, 30] {
+                    let zeros = len - k - 1;
+                    let stop = offset + zeros;
+                    let mut data = [0xff; 8];
+                    for bit in offset..stop {
+                        data[bit / 8] &= !(0x80 >> (bit % 8));
+                    }
+                    let expected = ((zeros as u32) << k) | ((1_u32 << k) - 1);
+                    let mut reader = RiceReader::at(&data, offset);
+                    assert_eq!(reader.rice(k as u32, offset + len - 1), None);
+                    assert_eq!(reader.position(), offset);
+                    assert_eq!(reader.rice(k as u32, offset + len), Some(expected));
+                    assert_eq!(reader.position(), offset + len);
+                    assert_eq!(reader.rice(0, offset + len + 1), Some(0));
+                }
+            }
+        }
     }
 
     #[test]
