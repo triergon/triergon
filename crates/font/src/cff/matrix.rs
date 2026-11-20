@@ -6,22 +6,23 @@
 //! products and sums, so results match it bit for bit.
 
 use super::number::{Operand, POWER_TENS, fixed_dynamic};
-use crate::fixed::ONE;
 use crate::long::{div_fix, mul_div, mul_fix, wrap};
 use crate::read::Reader;
 use triergon_core::{Error, Result};
+
+const ONE: i32 = crate::fixed::ONE as i32;
 
 /// A FontMatrix and the units per em it implies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct FontMatrix {
     /// 16.16: `x' = xx x + xy y + dx`, `y' = yx x + yy y + dy`.
-    xx: i64,
-    xy: i64,
-    yx: i64,
-    yy: i64,
+    xx: i32,
+    xy: i32,
+    yx: i32,
+    yy: i32,
     /// 16.16 as parsed; whole font units once normalised.
-    dx: i64,
-    dy: i64,
+    dx: i32,
+    dy: i32,
     units_per_em: i64,
 }
 
@@ -65,13 +66,13 @@ impl FontMatrix {
             let divisor = POWER_TENS[usize::try_from(max - scale).unwrap_or(0)];
             let half = divisor >> 1;
             let (min, max) = (i64::from(i32::MIN), i64::from(i32::MAX));
-            match value {
+            (match value {
                 0 => 0,
                 v if v < 0 && min + half < v => (v - half) / divisor,
                 v if v < 0 => min / divisor,
                 v if max - half > v => (v + half) / divisor,
                 _ => max / divisor,
-            }
+            }) as i32
         });
         let matrix = Self {
             xx,
@@ -99,8 +100,8 @@ impl FontMatrix {
         if any == 0 || any > 0x7fff_ffff {
             return false;
         }
-        let shift = (any as u32).ilog2().saturating_sub(14);
-        let [xx, xy, yx, yy] = coefficients.map(|v| (v as i32) >> shift);
+        let shift = any.ilog2().saturating_sub(14);
+        let [xx, xy, yx, yy] = coefficients.map(|v| v >> shift);
         let det = xx.wrapping_mul(yy).wrapping_sub(xy.wrapping_mul(yx));
         let frobenius = [xx, xy, yx, yy].iter().fold(0_u32, |sum, v| {
             sum.wrapping_add(v.wrapping_mul(*v).cast_unsigned())
@@ -111,8 +112,8 @@ impl FontMatrix {
     /// Divides by `|yy|` (or `|yx|` when `yy` is zero) and moves that scale into
     /// the units per em; the offsets become whole font units.
     pub(super) fn normalized(mut self) -> Self {
-        let scale = if self.yy == 0 { self.yx } else { self.yy }.abs();
-        if scale != ONE {
+        let scale = i64::from(if self.yy == 0 { self.yx } else { self.yy }).abs();
+        if scale != i64::from(ONE) {
             self.units_per_em = div_fix(self.units_per_em, scale);
             for v in [
                 &mut self.xx,
@@ -122,7 +123,7 @@ impl FontMatrix {
                 &mut self.dx,
                 &mut self.dy,
             ] {
-                *v = div_fix(*v, scale);
+                *v = div_fix(i64::from(*v), scale) as i32;
             }
         }
         self.dx >>= 16;
@@ -138,10 +139,11 @@ impl FontMatrix {
         } else {
             1
         };
-        let val = ONE * scaling;
+        let val = i64::from(ONE) * scaling;
         // `ADD_LONG` of two `FT_MulDiv`s, in 32 bits.
-        let product =
-            |a: i64, b: i64, c: i64, d: i64| wrap(mul_div(a, b, val) + mul_div(c, d, val));
+        let product = |a: i32, b: i32, c: i32, d: i32| {
+            (mul_div(a.into(), b.into(), val) + mul_div(c.into(), d.into(), val)) as i32
+        };
         Self {
             xx: product(top.xx, self.xx, top.xy, self.yx),
             xy: product(top.xx, self.xy, top.xy, self.yy),
@@ -173,11 +175,11 @@ impl FontMatrix {
             (x, y)
         } else {
             (
-                wrap(mul_fix(x, self.xx) + mul_fix(y, self.xy)),
-                wrap(mul_fix(x, self.yx) + mul_fix(y, self.yy)),
+                wrap(mul_fix(x, self.xx as i64) + mul_fix(y, self.xy as i64)),
+                wrap(mul_fix(x, self.yx as i64) + mul_fix(y, self.yy as i64)),
             )
         };
-        (wrap(x + self.dx), wrap(y + self.dy))
+        (wrap(x + self.dx as i64), wrap(y + self.dy as i64))
     }
 
     /// The horizontal advance through the matrix: scaled by `xx`, then moved by
@@ -186,9 +188,9 @@ impl FontMatrix {
         let advance = if self.is_linear_identity() {
             advance
         } else {
-            mul_fix(advance, self.xx)
+            mul_fix(advance, self.xx as i64)
         };
-        wrap(advance + self.dx)
+        wrap(advance + self.dx as i64)
     }
 
     /// The vertical advance through the matrix: scaled by `yy`, then moved by
@@ -197,9 +199,9 @@ impl FontMatrix {
         let advance = if self.is_linear_identity() {
             advance
         } else {
-            mul_fix(advance, self.yy)
+            mul_fix(advance, self.yy as i64)
         };
-        wrap(advance + self.dy)
+        wrap(advance + self.dy as i64)
     }
 }
 
@@ -296,6 +298,29 @@ mod tests {
             ..FontMatrix::identity(1)
         };
         assert!(skewed.is_regular());
+    }
+
+    #[test]
+    fn normalizing_the_lowest_diagonal_widens_before_taking_its_magnitude() {
+        let transform = FontMatrix {
+            yy: i32::MIN,
+            dx: i32::MAX,
+            ..FontMatrix::identity(1000)
+        };
+        let normalized = transform.normalized();
+        let magnitude = 1_i64 << 31;
+        assert_eq!(
+            i64::from(normalized.yy),
+            crate::long::div_fix(i64::from(i32::MIN), magnitude)
+        );
+        assert_eq!(
+            i64::from(normalized.dx),
+            crate::long::div_fix(i64::from(i32::MAX), magnitude) >> 16
+        );
+        assert_eq!(
+            normalized.units_per_em(),
+            crate::long::div_fix(1000, magnitude)
+        );
     }
 
     #[test]

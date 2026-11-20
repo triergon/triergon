@@ -53,7 +53,7 @@ const fn abs(x: Fixed) -> Fixed {
 }
 
 /// `cf2_intToFixed` of a value FreeType keeps in a long.
-const fn int_to_fixed(v: i64) -> Fixed {
+const fn int_to_fixed(v: i32) -> Fixed {
     ((v as u32) << 16).cast_signed()
 }
 
@@ -272,8 +272,8 @@ pub(super) struct HintDict {
     pub(super) family_blues: Deltas<14>,
     pub(super) family_other_blues: Deltas<10>,
     pub(super) blue_scale: i64,
-    pub(super) blue_shift: i64,
-    pub(super) blue_fuzz: i64,
+    pub(super) blue_shift: i32,
+    pub(super) blue_fuzz: i32,
     pub(super) language_group: i32,
     /// The em-box test compares BlueValues before narrowing them to 16.16.
     blue_values_outside_em_box: bool,

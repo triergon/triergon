@@ -403,7 +403,7 @@ impl Cff {
                 op::BLUE_SHIFT => hints.blue_shift = operands[0].integer(),
                 op::BLUE_FUZZ => hints.blue_fuzz = operands[0].integer(),
                 // FreeType stores LanguageGroup in an int.
-                op::LANGUAGE_GROUP => hints.language_group = operands[0].integer() as i32,
+                op::LANGUAGE_GROUP => hints.language_group = operands[0].integer(),
                 _ => {}
             }
             Ok(())
@@ -707,7 +707,7 @@ struct Top {
     vstore: Option<usize>,
     ros: bool,
     synthetic: bool,
-    charstring_type: i64,
+    charstring_type: i32,
     matrix: Option<FontMatrix>,
 }
 
