@@ -649,13 +649,17 @@ impl Cff {
                 };
                 // The lowest glyph of each SID (`cff_charset_compute_cids`).
                 let mut coded = 0;
-                for (code, &sid) in encoding.iter().enumerate() {
+                // Codes below space are unassigned in both predefined encodings.
+                for (code, &sid) in encoding.iter().enumerate().skip(32) {
                     if sid == 0 {
                         continue;
                     }
                     if let Some(glyph) = self.glyph_for_sid(sid).filter(|&g| g != 0) {
                         glyphs[code] = narrow(glyph as usize)?;
                         coded = code + 1;
+                    } else if offset == 0 && usize::from(sid) >= self.glyphs_by_sid.len() {
+                        // Assigned StandardEncoding SIDs are in increasing order.
+                        break;
                     }
                 }
                 (offset as u16, coded)
