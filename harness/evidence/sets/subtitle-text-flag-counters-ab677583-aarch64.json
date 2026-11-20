@@ -1,0 +1,9 @@
+{
+ "name": "subtitle-text-flag-counters-ab677583-aarch64",
+ "path": "subtitle-text-flag-counters-ab677583-aarch64",
+ "retention": "retained",
+ "reason": "Additional 2,000-iteration native instruction controls for the named flagged public-main paired document cases, using the same saved ab677583 and 524bf906 workers, workload pins and operations.",
+ "key": "evidence/architecture-review-mwo5u537/ab677583156519d47463f0f54c4df1a3bcc1dd2a/aarch64/text-flag-counters/2503b7ffeaab87959ebb081258821aa7a1e1d49b8b1d5b4ac0c4240d1c0afeae.tar.zst",
+ "sha256": "2503b7ffeaab87959ebb081258821aa7a1e1d49b8b1d5b4ac0c4240d1c0afeae",
+ "bytes": 2229
+}
