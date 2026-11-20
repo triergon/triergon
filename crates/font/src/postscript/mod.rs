@@ -29,25 +29,39 @@ pub const fn standard_encoding_sid(code: u8) -> u16 {
     STANDARD_ENCODING[code as usize]
 }
 
-/// The CFF standard string of `sid`, a glyph name.
-pub(crate) fn standard_string(sid: u16) -> Option<&'static str> {
-    STANDARD_STRINGS.get(usize::from(sid)).copied()
+// A secondary mapping requires an exact glyph name. A glyph that maps the
+// secondary code directly suppresses it, even if it precedes that name.
+macro_rules! extra_glyphs {
+    ($($id:ident: $name:literal => $code:literal),+ $(,)?) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        enum ExtraGlyph { $($id,)+ }
+
+        impl ExtraGlyph {
+            const CODES: &[u32] = &[$($code,)+];
+
+            const fn named(name: &[u8]) -> Option<Self> {
+                match name { $($name => Some(Self::$id),)+ _ => None }
+            }
+
+            fn mapped(unicode: u32) -> Option<Self> {
+                match unicode { $($code => Some(Self::$id),)+ _ => None }
+            }
+        }
+    };
 }
 
-/// The glyphs FreeType adds a second mapping for (`ft_extra_glyph_unicodes`),
-/// by name, when no glyph maps their code point otherwise.
-const EXTRA_GLYPHS: [(&[u8], u32); 10] = [
-    (b"Delta", 0x0394),
-    (b"Omega", 0x03a9),
-    (b"fraction", 0x2215),
-    (b"hyphen", 0x00ad),
-    (b"macron", 0x02c9),
-    (b"mu", 0x03bc),
-    (b"periodcentered", 0x2219),
-    (b"space", 0x00a0),
-    (b"Tcommaaccent", 0x021a),
-    (b"tcommaaccent", 0x021b),
-];
+extra_glyphs! {
+    Delta: b"Delta" => 0x0394,
+    Omega: b"Omega" => 0x03a9,
+    Fraction: b"fraction" => 0x2215,
+    Hyphen: b"hyphen" => 0x00ad,
+    Macron: b"macron" => 0x02c9,
+    Mu: b"mu" => 0x03bc,
+    PeriodCentered: b"periodcentered" => 0x2219,
+    Space: b"space" => 0x00a0,
+    TCommaAccent: b"Tcommaaccent" => 0x021a,
+    SmallTCommaAccent: b"tcommaaccent" => 0x021b,
+}
 
 /// `ps_unicode_value`: the code point a glyph name stands for, with
 /// [`VARIANT_BIT`] for a suffixed name; zero for none. `uniXXXX` takes exactly
@@ -106,13 +120,18 @@ fn unicode_value(name: &[u8]) -> u32 {
 
 /// `ft_get_adobe_glyph_index`: the code point of `name` in FreeType's
 /// compressed Adobe Glyph List, zero for none.
-fn adobe_glyph_index(name: &[u8]) -> u32 {
-    let list = &ADOBE_GLYPH_LIST;
-    let byte = |i: usize| list.get(i).copied().map_or(0, usize::from);
-    let word = |i: usize| byte(i) << 8 | byte(i + 1);
-    // A name byte from 128 matches no letter of the list, which stores seven
-    // bits, whether C's `char` is signed (x86) or unsigned (ARM).
-    let letter = |c: u8| i32::from(c);
+const fn adobe_glyph_index(name: &[u8]) -> u32 {
+    const fn byte(i: usize) -> usize {
+        // Only offsets in the fixed Adobe Glyph List are followed.
+        if i < ADOBE_GLYPH_LIST.len() {
+            ADOBE_GLYPH_LIST[i] as usize
+        } else {
+            0
+        }
+    }
+    const fn word(i: usize) -> usize {
+        byte(i) << 8 | byte(i + 1)
+    }
     let Some((&first, mut rest)) = name.split_first() else {
         return 0;
     };
@@ -123,11 +142,11 @@ fn adobe_glyph_index(name: &[u8]) -> u32 {
         let mid = (min + max) >> 1;
         let q = word(2 + mid * 2);
         let c2 = (byte(q) & 127) as i32;
-        if c2 == letter(first) {
+        if c2 == first as i32 {
             p = Some(q);
             break;
         }
-        if c2 < letter(first) {
+        if c2 < first as i32 {
             min = mid + 1;
         } else {
             max = mid;
@@ -143,7 +162,7 @@ fn adobe_glyph_index(name: &[u8]) -> u32 {
             };
         };
         rest = after;
-        let c = letter(c);
+        let c = c as i32;
         if byte(p) & 128 != 0 {
             p += 1;
             if c != (byte(p) & 127) as i32 {
@@ -174,6 +193,45 @@ fn adobe_glyph_index(name: &[u8]) -> u32 {
     }
 }
 
+/// A CFF glyph name with its Unicode mapping and possible secondary mapping.
+#[derive(Clone, Copy)]
+pub(crate) struct NameMapping {
+    unicode: u32,
+    extra: Option<ExtraGlyph>,
+}
+
+impl NameMapping {
+    pub(crate) fn custom(name: &[u8]) -> Self {
+        Self {
+            unicode: unicode_value(name),
+            extra: ExtraGlyph::named(name),
+        }
+    }
+
+    pub(crate) fn standard(sid: u16) -> Option<Self> {
+        STANDARD_MAPPINGS.get(usize::from(sid)).copied()
+    }
+}
+
+// TN 5176 Appendix A gives every standard SID a fixed name. None of the
+// standard strings has a Unicode-number spelling or a mapped variant stem.
+static STANDARD_MAPPINGS: [NameMapping; STANDARD_STRINGS.len()] = {
+    let mut mappings = [NameMapping {
+        unicode: 0,
+        extra: None,
+    }; STANDARD_STRINGS.len()];
+    let mut i = 0;
+    while i < mappings.len() {
+        let name = STANDARD_STRINGS[i].as_bytes();
+        mappings[i] = NameMapping {
+            unicode: adobe_glyph_index(name),
+            extra: ExtraGlyph::named(name),
+        };
+        i += 1;
+    }
+    mappings
+};
+
 /// The Unicode charmap FreeType builds from glyph names (`PS_Unicodes`):
 /// (Unicode value with [`VARIANT_BIT`], glyph) pairs sorted by base code
 /// point, a base name before its variants, glyphs in index order otherwise,
@@ -187,34 +245,38 @@ impl UnicodeMap {
     /// `ps_unicodes_init` over the glyph names in index order (`None` for a
     /// glyph without one). `None` when no name maps to a code point, where
     /// FreeType makes no charmap (`No_Unicode_Glyph_Name`).
-    pub(crate) fn new<'n>(
-        names: impl Iterator<Item = Option<&'n [u8]>>,
+    pub(crate) fn new(
+        names: impl Iterator<Item = Option<NameMapping>>,
         budget: &Budget,
     ) -> Result<Option<Self>> {
         let mut maps = BudgetVec::new(budget);
         // Per extra glyph: unseen, a candidate glyph, or mapped otherwise.
-        let mut extra: [Option<Option<u16>>; EXTRA_GLYPHS.len()] = [Some(None); EXTRA_GLYPHS.len()];
+        let mut extra: [Option<Option<u16>>; ExtraGlyph::CODES.len()] =
+            [Some(None); ExtraGlyph::CODES.len()];
         for (glyph, name) in names.enumerate() {
-            let Some(name) = name.filter(|n| !n.is_empty()) else {
+            let Some(NameMapping {
+                unicode,
+                extra: alias,
+            }) = name
+            else {
                 continue;
             };
             let glyph = u16::try_from(glyph).unwrap_or(u16::MAX);
-            if let Some(n) = EXTRA_GLYPHS.iter().position(|&(extra, _)| extra == name)
-                && extra[n] == Some(None)
+            if let Some(n) = alias
+                && extra[n as usize] == Some(None)
             {
-                extra[n] = Some(Some(glyph));
+                extra[n as usize] = Some(Some(glyph));
             }
-            let unicode = unicode_value(name);
             if base(unicode) != 0 {
-                if let Some(n) = EXTRA_GLYPHS.iter().position(|&(_, u)| u == unicode) {
-                    extra[n] = None;
+                if let Some(n) = ExtraGlyph::mapped(unicode) {
+                    extra[n as usize] = None;
                 }
                 maps.try_push((unicode, glyph)).map_err(|e| e.error)?;
             }
         }
         for (n, state) in extra.into_iter().enumerate() {
             if let Some(Some(glyph)) = state {
-                maps.try_push((EXTRA_GLYPHS[n].1, glyph))
+                maps.try_push((ExtraGlyph::CODES[n], glyph))
                     .map_err(|e| e.error)?;
             }
         }
@@ -338,8 +400,8 @@ impl PointerWidth {
 #[cfg(test)]
 mod tests {
     use super::{
-        EXPERT_ENCODING, PointerWidth, STANDARD_ENCODING, UnicodeMap, VARIANT_BIT,
-        adobe_glyph_index, standard_string, unicode_value,
+        EXPERT_ENCODING, NameMapping, PointerWidth, STANDARD_ENCODING, STANDARD_STRINGS,
+        UnicodeMap, VARIANT_BIT, adobe_glyph_index, unicode_value,
     };
     use triergon_core::Budget;
 
@@ -372,8 +434,24 @@ mod tests {
         assert_eq!(unicode_value(b"Delta"), 0x2206);
         assert_eq!(adobe_glyph_index(b"zzz"), 0);
         assert_eq!(adobe_glyph_index(b"ff"), 0xfb00);
-        assert_eq!(standard_string(34), Some("A"));
-        assert_eq!(standard_string(391), None);
+    }
+
+    #[test]
+    fn standard_sids_have_the_mapping_of_their_full_name() {
+        for (sid, name) in STANDARD_STRINGS.iter().enumerate() {
+            let standard = NameMapping::standard(sid as u16).unwrap();
+            let custom = NameMapping::custom(name.as_bytes());
+            assert_eq!(
+                super::base(standard.unicode),
+                super::base(custom.unicode),
+                "{sid} {name}"
+            );
+            if super::base(custom.unicode) != 0 {
+                assert_eq!(standard.unicode, custom.unicode, "{sid} {name}");
+            }
+            assert_eq!(standard.extra, custom.extra, "{sid} {name}");
+        }
+        assert!(NameMapping::standard(391).is_none());
     }
 
     #[test]
@@ -387,9 +465,12 @@ mod tests {
             Some(b"space"),
             Some(b"Delta"),
         ];
-        let map = UnicodeMap::new(names.into_iter(), &budget)
-            .unwrap()
-            .unwrap();
+        let map = UnicodeMap::new(
+            names.into_iter().map(|n| n.map(NameMapping::custom)),
+            &budget,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(map.char_index(0x41), 2);
         assert_eq!(map.char_index(0xa0), 4, "space also maps U+00A0");
         assert_eq!(map.char_index(0x394), 5, "Delta also maps U+0394");
@@ -399,10 +480,47 @@ mod tests {
         assert_eq!(map.char_next(0x2206), (0, 0));
         let none: [Option<&[u8]>; 2] = [Some(b".notdef"), Some(b"glyph1")];
         assert!(
-            UnicodeMap::new(none.into_iter(), &budget)
-                .unwrap()
-                .is_none()
+            UnicodeMap::new(
+                none.into_iter().map(|n| n.map(NameMapping::custom)),
+                &budget
+            )
+            .unwrap()
+            .is_none()
         );
+    }
+
+    #[test]
+    fn direct_mappings_suppress_only_the_exact_secondary_code() {
+        let budget = Budget::new(1 << 16).unwrap();
+        for (name, code) in [
+            ("Delta", 0x394),
+            ("Omega", 0x3a9),
+            ("fraction", 0x2215),
+            ("hyphen", 0xad),
+            ("macron", 0x2c9),
+            ("mu", 0x3bc),
+            ("periodcentered", 0x2219),
+            ("space", 0xa0),
+            ("Tcommaaccent", 0x21a),
+            ("tcommaaccent", 0x21b),
+        ] {
+            let lookup = |names: &[&str]| {
+                UnicodeMap::new(
+                    names
+                        .iter()
+                        .map(|n| Some(NameMapping::custom(n.as_bytes()))),
+                    &budget,
+                )
+                .unwrap()
+                .unwrap()
+                .char_index(code)
+            };
+            let direct = format!("uni{code:04X}");
+            let variant = format!("{direct}.alt");
+            assert_eq!(lookup(&[".notdef", name, name, &variant]), 1, "{name}");
+            assert_eq!(lookup(&[".notdef", name, &direct]), 2, "{name}");
+            assert_eq!(lookup(&[".notdef", &direct, name]), 1, "{name}");
+        }
     }
 
     #[test]
@@ -422,9 +540,12 @@ mod tests {
             Some(b"D"),
             Some(b"E"),
         ];
-        let map = UnicodeMap::new(names.into_iter(), &budget)
-            .unwrap()
-            .unwrap();
+        let map = UnicodeMap::new(
+            names.into_iter().map(|n| n.map(NameMapping::custom)),
+            &budget,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(map.char_index_for(0x41, PointerWidth::Bits32), 4);
         assert_eq!(map.char_index_for(0x41, PointerWidth::Bits64), 3);
         assert_eq!(map.char_index_for(0x42, PointerWidth::Bits32), 5);
