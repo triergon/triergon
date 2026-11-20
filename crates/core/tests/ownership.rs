@@ -276,3 +276,44 @@ fn consuming_vector_keeps_capacity_charged_until_iterator_drops() {
     drop(iter);
     assert_eq!(pool.used(), baseline);
 }
+
+#[test]
+fn retain_filters_in_order_and_keeps_the_vector_capacity_charged() {
+    use std::cell::RefCell;
+
+    #[derive(Debug)]
+    struct Item<'a>(u8, &'a RefCell<Vec<u8>>);
+
+    impl Drop for Item<'_> {
+        fn drop(&mut self) {
+            self.1.borrow_mut().push(self.0);
+        }
+    }
+
+    let budget = Budget::new(4096).unwrap();
+    let baseline = budget.used();
+    let dropped = RefCell::new(Vec::new());
+    let mut items = BudgetVec::new(&budget);
+    for id in 0..6 {
+        items.try_push(Item(id, &dropped)).unwrap();
+    }
+    let capacity = items.capacity();
+    let charge = budget.used();
+    items.retain(|_| true);
+    assert!(dropped.borrow().is_empty());
+    let mut visited = Vec::new();
+    items.retain(|item| {
+        visited.push(item.0);
+        matches!(item.0, 0 | 1 | 4)
+    });
+    assert_eq!(visited, [0, 1, 2, 3, 4, 5]);
+    assert_eq!(*dropped.borrow(), [2, 3, 5]);
+    assert_eq!(items.iter().map(|i| i.0).collect::<Vec<_>>(), [0, 1, 4]);
+    assert_eq!((items.capacity(), budget.used()), (capacity, charge));
+    items.retain(|_| false);
+    assert!(items.is_empty());
+    assert_eq!(*dropped.borrow(), [2, 3, 5, 0, 1, 4]);
+    assert_eq!((items.capacity(), budget.used()), (capacity, charge));
+    drop(items);
+    assert_eq!(budget.used(), baseline);
+}

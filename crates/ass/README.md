@@ -250,7 +250,7 @@ selective style overrides), in the frame and storage size and margins of its
   not); within a layer, events placed by their margins move clear of each
   other and keep their place on later frames (the record lives with the event
   in the `Script`, and a refused frame changes none); fully transparent
-  images are dropped.
+  images are dropped in place, preserving the order of the visible images.
 - **Change detection.** `Frame::change` is what libass's `ass_detect_change`
   reports: `Change::Content` when the image count differs or an image's size,
   stride, colour or bitmap does, `Change::Positions` when only places do,
@@ -402,9 +402,13 @@ font selection (each registered face matched, each gathered face tried),
 shaping (each run's characters and the few characters of context it reads),
 outlines (each one built and its points), layout (a pass per stage over the
 glyphs, and one for every rebalancing pass), drawing (glyph bitmaps,
-composites and vector clips, charged as `triergon-raster` charges them) and
-collision handling (each event against those placed before it in its
-layer, and the merge sort of the placed boxes after each one joins them). The charge grows linearly with the events and their text. Where
+composites and vector clip masks), final image pixels and collision handling (each event against those placed before it in its
+layer, and the merge sort of the placed boxes after each one joins them).
+Even on a cache hit, an overlapping vector clip charges one unit per 16 pixels
+of each row copied and each row span multiplied, rounding each span up.
+A regular clip copies only the intersection. An inverse clip copies the whole
+image and multiplies the intersection. A style-4 background stores and charges
+for one opaque row which `Image::rows` returns for every visible row. Where
 libass would go on drawing, running out is `Error::Policy`; a caller that
 wants libass's unbounded behaviour raises the setting. With the `work-probe`
 feature, a development aid, `Renderer::work_spent` gives what the last frame
