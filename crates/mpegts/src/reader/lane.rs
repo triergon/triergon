@@ -1,3 +1,4 @@
+mod aligned_audio;
 mod dvb;
 mod eac3;
 mod loas;
@@ -5,8 +6,8 @@ mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, Packet, PacketClock, PayloadSource,
-    ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, MpegAudioFrame, Packet,
+    PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -26,7 +27,8 @@ use triergon_core::{
 };
 use triergon_framing::{
     AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
-    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
+    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, MpegAudioHeader, MpegVersion,
+    RawAnnexBReader,
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
@@ -35,7 +37,8 @@ enum Framer {
     Video(RawAnnexBReader),
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
-    Loas(loas::Reader),
+    Loas(aligned_audio::Reader<3, ()>),
+    MpegAudio(aligned_audio::Reader<4, MpegAudioHeader>),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -49,6 +52,7 @@ impl Framer {
             Self::Adts(reader) => reader.input_wait_buffer_capacity(),
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
+            Self::MpegAudio(reader) => reader.input_wait_buffer_capacity(),
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
@@ -71,7 +75,7 @@ impl Framer {
     fn is_audio(&self) -> bool {
         matches!(
             self,
-            Self::Adts(_) | Self::Loas(_) | Self::Ac3(_) | Self::Eac3(_)
+            Self::Adts(_) | Self::Loas(_) | Self::MpegAudio(_) | Self::Ac3(_) | Self::Eac3(_)
         )
     }
     fn new(pool: &Budget, track: &Track, limits: ReaderLimits) -> Result<Self> {
@@ -120,7 +124,16 @@ impl Framer {
             0x11 if limits.latm_packet_policy == latm::PacketPolicy::PreservePes => {
                 Ok(Self::LatmPes)
             }
-            0x11 => Ok(Self::Loas(loas::Reader::new(
+            // H.222.0 Table 2-34 assigns these streams to ISO/IEC 11172-3
+            // and ISO/IEC 13818-3 audio respectively.
+            0x03 | 0x04 => Ok(Self::MpegAudio(aligned_audio::Reader::new(
+                pool,
+                source,
+                caps,
+                limits.maximum_audio_frame_bytes,
+                limits.elementary_input_window,
+            )?)),
+            0x11 => Ok(Self::Loas(aligned_audio::Reader::new(
                 pool,
                 source,
                 caps,
@@ -194,7 +207,21 @@ impl Framer {
         Ok(match self {
             Self::Video(reader) => map(reader.step(work, cancel)?, AccessUnit::Video),
             Self::Adts(reader) => map(reader.step(work, cancel)?, AccessUnit::Adts),
-            Self::Loas(reader) => map(reader.step(work, cancel)?, AccessUnit::Loas),
+            Self::Loas(reader) => map(reader.step(work, cancel, loas::parse)?, |frame| {
+                AccessUnit::Loas(LoasFrame {
+                    bytes: frame.bytes,
+                    offset: frame.offset,
+                })
+            }),
+            Self::MpegAudio(reader) => {
+                map(reader.step(work, cancel, mpeg_audio_header)?, |frame| {
+                    AccessUnit::MpegAudio(MpegAudioFrame {
+                        bytes: frame.bytes,
+                        offset: frame.offset,
+                        header: frame.header,
+                    })
+                })
+            }
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -213,6 +240,7 @@ impl Framer {
             Self::Video(reader) => reader.provide_owned(window),
             Self::Adts(reader) => reader.provide_owned(window),
             Self::Loas(reader) => reader.provide(window),
+            Self::MpegAudio(reader) => reader.provide(window),
             Self::AdtsFragments(reader) => reader.provide_owned(window),
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
@@ -224,12 +252,25 @@ impl Framer {
             Self::Video(reader) => reader.finish(request.source, request.token),
             Self::Adts(reader) => reader.finish(request.source, request.token),
             Self::Loas(reader) => reader.finish(request),
+            Self::MpegAudio(reader) => reader.finish(request),
             Self::AdtsFragments(reader) => reader.finish(request.source, request.token),
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
             Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
         }
     }
+}
+
+fn mpeg_audio_header(bytes: &[u8; 4]) -> Result<(MpegAudioHeader, usize)> {
+    let header = MpegAudioHeader::parse(u32::from_be_bytes(*bytes))
+        .ok_or(Error::Invalid("MPEG audio frame header"))?;
+    if header.version == MpegVersion::Mpeg25 {
+        return Err(Error::Unsupported("MPEG-2.5 audio in MPEG-TS"));
+    }
+    let size = header
+        .frame_bytes()
+        .ok_or(Error::Unsupported("free-format MPEG audio"))?;
+    Ok((header, size))
 }
 
 struct Piece {
@@ -1106,17 +1147,23 @@ impl Lane {
         }
         let source = pending.as_ref().expect("queued PES");
         let pes = source.pes();
-        if self.track.stream().stream_type == 0x11 {
-            if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
-                return Err(Error::Invalid("LATM audio PES stream ID"));
+        let stream_type = self.track.stream().stream_type;
+        if !(0xc0..=0xdf).contains(&pes.header.stream_id) {
+            match stream_type {
+                0x03 | 0x04 => return Err(Error::Invalid("MPEG audio PES stream ID")),
+                0x11 => return Err(Error::Invalid("LATM audio PES stream ID")),
+                _ => (),
             }
-            if pes.payload_len == 0 && matches!(self.framer, Some(Framer::LatmPes)) {
-                return Ok(true);
-            }
+        }
+        if stream_type == 0x11
+            && pes.payload_len == 0
+            && matches!(self.framer, Some(Framer::LatmPes))
+        {
+            return Ok(true);
         }
         if pes.header.stream_id != 0xbd {
             if self.track.stream().descriptor_namespace() == DescriptorNamespace::Atsc
-                && matches!(self.track.stream().stream_type, 0x81 | 0x87)
+                && matches!(stream_type, 0x81 | 0x87)
             {
                 return Err(Error::Invalid("ATSC private audio PES stream ID"));
             }

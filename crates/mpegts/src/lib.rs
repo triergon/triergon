@@ -43,8 +43,8 @@ pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use reader::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, DvbSubtitleTailPolicy, DvbSubtitleUnit,
-    EntityTransition, IncompleteVideo, LoasFrame, Packet, PacketClock, PayloadSource, Reader,
-    ReaderEvent, ReaderLimits, SourceEvent, Track, UnframedAudio,
+    EntityTransition, IncompleteVideo, LoasFrame, MpegAudioFrame, Packet, PacketClock,
+    PayloadSource, Reader, ReaderEvent, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 pub use stream::{
     CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,

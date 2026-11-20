@@ -166,9 +166,16 @@ physical coordinates. Call `finish` on the last entity to drain the logical
 stream. A reset starts the current entity again with fresh transport state.
 The boundary semantics follow [RFC 8216 sections 3 and 4.3.2.3](https://www.rfc-editor.org/rfc/rfc8216#section-3).
 
-The admitted carriages are AVC and HEVC Annex B, single-block ADTS AAC-LC,
-LATM in LOAS, AC-3 and E-AC-3 with explicitly declared DVB or ATSC signalling,
-and DVB subtitle segments.
+The admitted carriages are AVC and HEVC Annex B, MPEG-1 and MPEG-2 audio,
+single-block ADTS AAC-LC, LATM in LOAS, AC-3 and E-AC-3 with explicitly
+declared DVB or ATSC signalling, and DVB subtitle segments.
+
+For MPEG audio, PMT stream types `0x03` and `0x04` select Layer I, II and III
+frame parsing in audio PES packets (`0xc0`–`0xdf`). The reader can assemble a
+frame across PES boundaries and retains its original bytes and PES ranges.
+`MpegAudioFrame::header` exposes the coded layer, rate and sample count.
+The packet's sample duration is exact. Free-format frames and MPEG-2.5 rates
+are unsupported. See [H.222.0 Tables 2-22 and 2-34](https://www.itu.int/rec/T-REC-H.222.0-201808-S/en).
 For ATSC, set `ReaderLimits::descriptor_namespace` to `DescriptorNamespace::Atsc`
 to interpret `0x81` as AC-3 and `0x87` as E-AC-3. Both require PES stream ID
 `0xbd`. ATSC E-AC-3 supports a six-block independent syncframe with its
@@ -180,7 +187,7 @@ See [A/53 Part 3 §5.5.2 and §5.7](https://www.atsc.org/wp-content/uploads/2023
 and [A/52 Annex G §3.3](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf).
 
 Existing framers delimit the complete source bytes before decoder-feed conversion.
-MPEG audio/video, other subtitle carriages and ambiguous private streams currently emit
+MPEG-1/2 video, other subtitle carriages and ambiguous private streams currently emit
 `ReaderEvent::Unsupported`. Their original PMTs and PES remain available as source events.
 For DVB AC-3, an elementary `AC-3` registration can corroborate descriptor `0x6a`.
 
