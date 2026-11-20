@@ -9,11 +9,14 @@
 //! under `harness/shape/probes` that shows it (`cargo xtask shape probe`).
 
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_font::{Font, GlyphId, OutlineFormat};
+use triergon_font::{Font, GlyphId, OutlineFormat, standard_encoding_sid};
 
 /// The argument stack's capacity, CFF2's limit, which HarfBuzz applies to CFF
 /// too. probe: cff-stack, cff2-stack
 const STACK: usize = 513;
+/// The original Type 2 operand limit covers ordinary paths without clearing
+/// the full CFF2 stack on entry to every glyph.
+const SHORT_STACK: usize = 48;
 
 /// The deepest subroutine nesting that runs: an eleventh nested call fails
 /// the glyph, local and global calls counted together. probe:
@@ -24,22 +27,6 @@ const NESTING: u32 = 10;
 /// glyph's or subroutine's bytes counting as one; each component of an
 /// accented glyph counts on its own. probe: cff-limits, cff2-limits
 const OPERATIONS: u32 = 200_000;
-
-/// The standard encoding (TN 5176 Appendix B): the string ID of each code,
-/// for the accented form of `endchar`.
-const STANDARD_ENCODING: [u8; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
-    51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
-    75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96,
-    97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 0, 111, 112, 113, 114, 0,
-    115, 116, 117, 118, 119, 120, 121, 122, 0, 123, 0, 124, 125, 126, 127, 128, 129, 130, 131, 0,
-    132, 133, 0, 134, 135, 136, 137, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 138, 0, 139,
-    0, 0, 0, 0, 140, 141, 142, 143, 0, 0, 0, 0, 0, 144, 0, 0, 0, 145, 0, 0, 146, 147, 148, 149, 0,
-    0, 0, 0,
-];
 
 /// A CFF or CFF2 table's parts that do not depend on the glyph, read once
 /// for a face, whose glyphs' extents it then gives.
@@ -59,9 +46,12 @@ pub(crate) struct Face<'a> {
 /// the Font DICT FDSelect gives the glyph (Font DICT 0 in a CFF2 table
 /// without FDSelect).
 enum Privates<'a> {
-    One([i64; 2]),
+    One {
+        local: Option<Index<'a>>,
+        vsindex: i64,
+    },
     FdArray {
-        select: Option<usize>,
+        select: Select<'a>,
         fonts: Index<'a>,
     },
 }
@@ -98,6 +88,16 @@ impl<'a> Face<'a> {
                 None => None,
             };
             let (fonts, _) = Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, true)?;
+            let privates = if let Some(at) = select {
+                Privates::FdArray {
+                    select: Select::new(table, at, cff2, charstrings.count),
+                    fonts,
+                }
+            } else {
+                let (local, vsindex) =
+                    Program::private(table, dict_find(fonts.get(0)?, 18)?, cff2)?;
+                Privates::One { local, vsindex }
+            };
             let store = match dict_find(top, 24) {
                 Some(v) => {
                     let at = offset(v[1])?;
@@ -113,7 +113,7 @@ impl<'a> Face<'a> {
                 global,
                 charset: None,
                 store,
-                privates: Privates::FdArray { select, fonts },
+                privates,
                 depth,
             });
         }
@@ -123,18 +123,36 @@ impl<'a> Face<'a> {
         let (global, _) = Index::read(table, at, false)?;
         let top = tops.get(0)?;
         let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, false)?;
-        let cid = dict_find(top, 0x0C1E).is_some();
+        // A name-keyed face has no ROS. Its lookup already visits every readable
+        // entry, including the first Private and charset if present.
+        let mut private = None;
+        let mut charset_offset = None;
+        let cid = dict_until(top, |op, operands| {
+            match op {
+                15 if charset_offset.is_none() => charset_offset = Some(operands[1]),
+                18 if private.is_none() => private = Some(operands),
+                _ => {}
+            }
+            op == 0x0C1E
+        })
+        .is_some();
         let privates = if cid {
             Privates::FdArray {
-                select: Some(offset(dict_find(top, 0x0C25)?[1])?),
+                select: Select::new(
+                    table,
+                    offset(dict_find(top, 0x0C25)?[1])?,
+                    cff2,
+                    charstrings.count,
+                ),
                 fonts: Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, false)?.0,
             }
         } else {
-            Privates::One(dict_find(top, 18)?)
+            let (local, vsindex) = Program::private(table, private?, cff2)?;
+            Privates::One { local, vsindex }
         };
-        let charset = (!cid).then(|| Charset {
+        let charset = (!cid).then_some(Charset {
             table,
-            at: dict_find(top, 15).map_or(0, |v| v[1]),
+            at: charset_offset.unwrap_or(0),
             glyphs: charstrings.count,
         });
         Some(Self {
@@ -199,17 +217,13 @@ impl<'a> Face<'a> {
     /// The parts `glyph`'s charstring runs with: the face's, and the local
     /// subroutines and `vsindex` of its Private DICT.
     fn program(&self, glyph: u16) -> Option<Program<'a>> {
-        let private = match self.privates {
-            Privates::One(private) => private,
+        let (local, vsindex) = match self.privates {
+            Privates::One { local, vsindex } => (local, vsindex),
             Privates::FdArray { select, fonts } => {
-                let fd = match select {
-                    Some(at) => fd_select(self.table, at, glyph, self.cff2)?,
-                    None => 0,
-                };
-                dict_find(fonts.get(fd)?, 18)?
+                let fd = select.get(self.table, glyph, self.cff2)?;
+                Program::private(self.table, dict_find(fonts.get(fd)?, 18)?, self.cff2)?
             }
         };
-        let (local, vsindex) = Program::private(self.table, private, self.cff2)?;
         Some(Program {
             cff2: self.cff2,
             charstrings: self.charstrings,
@@ -217,7 +231,7 @@ impl<'a> Face<'a> {
             local,
             charset: self.charset,
             store: self.store,
-            vsindex: if self.cff2 { vsindex } else { 0 },
+            vsindex,
         })
     }
 }
@@ -322,6 +336,11 @@ impl<'a> Index<'a> {
 /// §4), the last one second; a real operand reads as zero. CFF2's `blend`
 /// (23) leaves its operands to the next operator.
 fn dict_find(dict: &[u8], op: u16) -> Option<[i64; 2]> {
+    dict_until(dict, |key, _| key == op)
+}
+
+/// Visit complete DICT entries up to the first match or unreadable operand.
+fn dict_until(dict: &[u8], mut matches: impl FnMut(u16, [i64; 2]) -> bool) -> Option<[i64; 2]> {
     let mut operands = [0_i64; 2];
     let mut at = 0;
     while let Some(&b0) = dict.get(at) {
@@ -336,7 +355,7 @@ fn dict_find(dict: &[u8], op: u16) -> Option<[i64; 2]> {
                 } else {
                     u16::from(b0)
                 };
-                if key == op {
+                if matches(key, operands) {
                     return Some(operands);
                 }
                 operands = [0; 2];
@@ -432,6 +451,82 @@ impl<'a> Program<'a> {
         };
         self.store.and_then(count).unwrap_or(0)
     }
+}
+
+/// A validated range table can be searched in glyph order. Other tables use
+/// the original first-matching-range rule, including readable truncated prefixes.
+#[derive(Clone, Copy)]
+enum Select<'a> {
+    Narrow(&'a [[u8; 3]], [u8; 2]),
+    Wide(&'a [[u8; 6]], [u8; 4]),
+    Raw(usize),
+}
+
+impl<'a> Select<'a> {
+    fn new(table: &'a [u8], at: usize, cff2: bool, glyphs: u32) -> Self {
+        let read = || {
+            let data = table.get(at..)?;
+            match *data.first()? {
+                3 => {
+                    let count = u32::from(u16_at(data, 1)?);
+                    let (rows, end) = ordered_ranges(data.get(3..)?, count, glyphs)?;
+                    Some(Self::Narrow(rows, end))
+                }
+                4 if cff2 => {
+                    let (rows, end) = ordered_ranges(data.get(5..)?, u32_at(data, 1)?, glyphs)?;
+                    Some(Self::Wide(rows, end))
+                }
+                _ => None,
+            }
+        };
+        read().unwrap_or(Self::Raw(at))
+    }
+
+    fn get(self, table: &[u8], glyph: u16, cff2: bool) -> Option<u32> {
+        match self {
+            Self::Narrow(rows, end) => {
+                Some(u32::from(range_for(rows, end, glyph.to_be_bytes())?[2]))
+            }
+            Self::Wide(rows, end) => {
+                let row = range_for(rows, end, u32::from(glyph).to_be_bytes())?;
+                Some(u32::from(u16::from_be_bytes([row[4], row[5]])))
+            }
+            Self::Raw(at) => fd_select(table, at, glyph, cff2),
+        }
+    }
+}
+
+fn ordered_ranges<const N: usize, const W: usize>(
+    data: &[u8],
+    count: u32,
+    glyphs: u32,
+) -> Option<(&[[u8; N]], [u8; W])> {
+    // At most one distinct range can start per addressable glyph. Excess
+    // declarations retain the on-demand reader, even if their bytes are present.
+    if count > glyphs.min(u32::from(u16::MAX) + 1) {
+        return None;
+    }
+    let (data, tail) = data.split_at_checked(usize::try_from(count).ok()?.checked_mul(N)?)?;
+    let rows = data.as_chunks::<N>().0;
+    let end = *tail.first_chunk::<W>()?;
+    // Fixed-width, big-endian glyph IDs have the same byte and numeric order.
+    rows.iter()
+        .map(|r| &r[..W])
+        .chain(std::iter::once(&end[..]))
+        .is_sorted_by(|a, b| a < b)
+        .then_some((rows, end))
+}
+
+fn range_for<const N: usize, const W: usize>(
+    rows: &[[u8; N]],
+    end: [u8; W],
+    glyph: [u8; W],
+) -> Option<&[u8; N]> {
+    if glyph >= end {
+        return None;
+    }
+    let past = rows.partition_point(|r| r[..W] <= glyph[..]);
+    rows.get(past.checked_sub(1)?)
 }
 
 /// The Font DICT FDSelect at `at` gives `glyph` (formats 0 and 3; 4 in
@@ -568,7 +663,7 @@ struct Pen {
 
 /// The state of one charstring, a glyph or a component of an accented one.
 struct State {
-    stack: [f64; STACK],
+    stack: Operands,
     len: usize,
     pen: Pen,
     /// Stems declared before the first hint or counter mask.
@@ -581,6 +676,43 @@ struct State {
     regions: usize,
     indexed: bool,
     blended: bool,
+}
+
+/// Both sizes live on the stack. Once promoted, a glyph and its subroutines
+/// keep the full storage until the glyph returns.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the operand stack never allocates"
+)]
+enum Operands {
+    Short([f64; SHORT_STACK]),
+    Full([f64; STACK]),
+}
+
+impl Operands {
+    fn values(&self) -> &[f64] {
+        match self {
+            Self::Short(values) => values,
+            Self::Full(values) => values,
+        }
+    }
+
+    fn push(&mut self, index: usize, value: f64) -> Step<()> {
+        match self {
+            Self::Short(values) if index < SHORT_STACK => values[index] = value,
+            Self::Short(short) => *self = Self::promote(short, value),
+            Self::Full(values) => *values.get_mut(index).ok_or(Fault::Glyph)? = value,
+        }
+        Ok(())
+    }
+
+    #[cold]
+    fn promote(short: &[f64; SHORT_STACK], value: f64) -> Self {
+        let mut full = [0.0; STACK];
+        full[..SHORT_STACK].copy_from_slice(short);
+        full[SHORT_STACK] = value;
+        Self::Full(full)
+    }
 }
 
 /// How running a piece of charstring ended.
@@ -597,7 +729,7 @@ impl<'a> Run<'_, 'a, '_> {
     /// cff-endchar
     fn glyph(&mut self, charstring: &'a [u8], origin: (f64, f64), accents: bool) -> Step<()> {
         let mut s = State {
-            stack: [0.0; STACK],
+            stack: Operands::Short([0.0; SHORT_STACK]),
             len: 0,
             pen: Pen {
                 x: origin.0,
@@ -675,14 +807,16 @@ impl<'a> Run<'_, 'a, '_> {
                     at += 2;
                     Some(f64::from(v.cast_signed()))
                 }
-                32..=246 => Some(f64::from(b0) - 139.0),
+                32..=246 => Some(f64::from(i32::from(b0) - 139)),
                 247..=254 => {
                     let Some(&b1) = code.get(at) else {
                         return Err(Fault::Glyph);
                     };
                     at += 1;
-                    let v = |first: u8| f64::from(b0 - first) * 256.0 + f64::from(b1) + 108.0;
-                    Some(if b0 < 251 { v(247) } else { -v(251) })
+                    // Both sign ranges encode the same magnitude in four 256-value bands.
+                    let magnitude = u16::from_be_bytes([(b0 - 247) & 3, b1]) + 108;
+                    let value = f64::from(magnitude);
+                    Some(if b0 < 251 { value } else { -value })
                 }
                 255 => {
                     // A 16.16 number cut short ends the charstring, or the
@@ -698,10 +832,7 @@ impl<'a> Run<'_, 'a, '_> {
                 _ => None,
             };
             if let Some(v) = number {
-                if s.len == STACK {
-                    return Err(Fault::Glyph);
-                }
-                s.stack[s.len] = v;
+                s.stack.push(s.len, v)?;
                 s.len += 1;
                 continue;
             }
@@ -794,7 +925,8 @@ impl<'a> Run<'_, 'a, '_> {
             return Err(Fault::Limit(Error::Policy("charstring subroutine depth")));
         }
         s.len -= 1;
-        let index = (s.stack[s.len].trunc() as i64).saturating_add(bias(subroutines.count));
+        let index =
+            (s.stack.values()[s.len].trunc() as i64).saturating_add(bias(subroutines.count));
         u32::try_from(index)
             .ok()
             .and_then(|i| subroutines.get(i))
@@ -812,7 +944,7 @@ impl<'a> Run<'_, 'a, '_> {
         if s.len > 5 || !accents {
             return Err(Fault::Glyph);
         }
-        let [adx, ady, base, accent] = [0, 1, 2, 3].map(|i| s.stack[s.len - 4 + i]);
+        let [adx, ady, base, accent] = [0, 1, 2, 3].map(|i| s.stack.values()[s.len - 4 + i]);
         let base = self.component(base)?;
         let accent = self.component(accent)?;
         self.glyph(base, (0.0, 0.0), false)?;
@@ -823,13 +955,11 @@ impl<'a> Run<'_, 'a, '_> {
     /// the charset; a code outside the encoding or a glyph the charset lacks
     /// fails.
     fn component(&mut self, code: f64) -> Step<&'a [u8]> {
-        let code = usize::try_from(code.trunc() as i64).map_err(|_| Fault::Glyph)?;
-        let sid = *STANDARD_ENCODING.get(code).ok_or(Fault::Glyph)?;
+        let code = u8::try_from(code as i32).map_err(|_| Fault::Glyph)?;
+        let sid = standard_encoding_sid(code);
         let program = self.program;
         let charset = program.charset.as_ref().ok_or(Fault::Glyph)?;
-        let glyph = charset
-            .glyph(u16::from(sid), self.work)?
-            .ok_or(Fault::Glyph)?;
+        let glyph = charset.glyph(sid, self.work)?.ok_or(Fault::Glyph)?;
         program.charstrings.get(glyph).ok_or(Fault::Glyph)
     }
 
@@ -839,7 +969,7 @@ impl<'a> Run<'_, 'a, '_> {
         if s.len == 0 || s.indexed || s.blended {
             return Err(Fault::Glyph);
         }
-        let ivd = s.stack[s.len - 1].trunc();
+        let ivd = s.stack.values()[s.len - 1].trunc();
         if ivd < 0.0 {
             return Err(Fault::Glyph);
         }
@@ -855,7 +985,7 @@ impl<'a> Run<'_, 'a, '_> {
         if s.len == 0 {
             return Err(Fault::Glyph);
         }
-        let n = s.stack[s.len - 1].trunc();
+        let n = s.stack.values()[s.len - 1].trunc();
         if n < 0.0 {
             return Err(Fault::Glyph);
         }
@@ -884,7 +1014,7 @@ impl<'a> Run<'_, 'a, '_> {
             masked,
             ..
         } = s;
-        let a = &stack[..n];
+        let a = &stack.values()[..n];
         match op {
             1 | 3 | 18 | 23 => {
                 if !*masked {
@@ -1150,6 +1280,112 @@ mod tests {
     }
 
     #[test]
+    fn fd_ranges_match_the_first_readable_interval() {
+        use super::{Select, fd_select};
+        for wide in [false, true] {
+            let number = |value: u32| {
+                if wide {
+                    value.to_be_bytes().to_vec()
+                } else {
+                    (value as u16).to_be_bytes().to_vec()
+                }
+            };
+            let make = |starts: &[u32], end: u32| {
+                let mut data = vec![if wide { 4 } else { 3 }];
+                data.extend(number(starts.len() as u32));
+                for (i, &start) in starts.iter().enumerate() {
+                    data.extend(number(start));
+                    if wide {
+                        data.extend((256 + i as u16).to_be_bytes());
+                    } else {
+                        data.push(i as u8);
+                    }
+                }
+                data.extend(number(end));
+                data
+            };
+            for (starts, end, ordered) in [
+                (&[2, 5, 8][..], 12, true),
+                (&[2, 2, 5], 8, false),
+                (&[3, 8, 4], 10, false),
+                (&[2, 5, 8], 7, false),
+                (&[], 10, true),
+            ] {
+                let bytes = make(starts, end);
+                for limit in 0..=bytes.len() {
+                    let table = &bytes[..limit];
+                    let select = Select::new(table, 0, true, 16);
+                    assert_eq!(
+                        !matches!(select, Select::Raw(_)),
+                        ordered && limit == bytes.len()
+                    );
+                    for glyph in (0..=16).chain([u16::MAX]) {
+                        assert_eq!(
+                            select.get(table, glyph, true),
+                            fd_select(table, 0, glyph, true)
+                        );
+                    }
+                }
+            }
+            let bytes = make(&[1, 6], if wide { 65536 } else { 65535 });
+            let select = Select::new(&bytes, 0, true, 65535);
+            assert_eq!(select.get(&bytes, 0, true), None);
+            assert_eq!(
+                select.get(&bytes, 6, true),
+                Some(if wide { 257 } else { 1 })
+            );
+            assert_eq!(select.get(&bytes, 65535, true), wide.then_some(257));
+        }
+    }
+
+    #[test]
+    fn name_keyed_top_dict_keeps_first_readable_entries() -> Result<(), &'static str> {
+        let mut table = cff(&[&[14]], &[], &[]);
+        let (_, after_name) = Index::read(&table, 4, false).ok_or("missing Name INDEX")?;
+        let (top, end) = Index::read(&table, after_name, false).ok_or("missing Top DICT INDEX")?;
+        // Keep the initial long integer and CharStrings operator so all
+        // table offsets stay valid while replacing the rest of the Top DICT.
+        let start = end - top.get(0).ok_or("missing Top DICT")?.len() + 6;
+        for (entries, charset) in [
+            // An operand-less Private is (0, 0). Later duplicates lose.
+            (&[n(4), 15, n(9), 15, 18, n(-1), n(-1), 18][..], Some(4)),
+            // A malformed tail stops the scan, including a later apparent ROS.
+            (&[18, 31, 12, 30], Some(0)),
+            (&[18, 30, 0x11], Some(0)),
+            (&[n(-1), n(-1), 18, 18], None),
+            (&[31, 18], None),
+            // A readable ROS requires FDSelect and FDArray.
+            (&[18, 12, 30], None),
+        ] {
+            table[start..end].fill(0);
+            table[start..start + entries.len()].copy_from_slice(entries);
+            let face = super::Face::read(&table, false, 16);
+            assert_eq!(
+                face.map(|f| f.charset.map(|c| c.at)),
+                charset.map(Some),
+                "{entries:?}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_face_with_one_private_dict_reuses_its_subroutines() {
+        use super::{Face, Privates};
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<crate::OtMetrics<'static>>();
+        let table = cff2(&[&[n(-107), 10], &[n(-107), 10]], &[&[n(3), n(4), 5]]);
+        let face = Face::read(&table, true, 10).unwrap();
+        assert!(matches!(
+            face.privates,
+            Privates::One { local: Some(_), .. }
+        ));
+        for glyph in 0..2 {
+            assert_eq!(run(&table, glyph), Some([0, 4, 3, -4]));
+        }
+    }
+
+    #[test]
     fn an_index_finds_its_objects() {
         let data = index(&[b"ab", b"", b"c"]);
         let (index, end) = Index::read(&data, 0, true).unwrap();
@@ -1158,6 +1394,17 @@ mod tests {
         assert_eq!(index.get(1), Some(&b""[..]));
         assert_eq!(index.get(2), Some(&b"c"[..]));
         assert_eq!(index.get(3), None);
+    }
+
+    #[test]
+    fn index_objects_cannot_extend_past_the_final_offset() {
+        // The font outline reader recovers "abc" from the rest of this table.
+        // The shaping reader bounds both objects by the final offset.
+        let data = [0, 2, 1, 1, 4, 2, b'a', b'b', b'c'];
+        let (index, end) = Index::read(&data, 0, false).unwrap();
+        assert_eq!(end, 7);
+        assert_eq!(index.get(0), None);
+        assert_eq!(index.get(1), None);
     }
 
     #[test]
@@ -1218,6 +1465,47 @@ mod tests {
         assert_eq!(run(&table, 0), Some([0, 20, 25, -20]));
         // The curves end at (40, 40); the line down then shows the end point.
         assert_eq!(run(&table, 1), Some([0, 40, 40, -100]));
+    }
+
+    #[test]
+    fn wide_operands_cross_subroutine_returns_and_keep_exact_limits() {
+        // Each call appends 32 live operands, including when the callee
+        // crosses 48. The caller consumes the complete alternating h/v path.
+        let pairs = [n(2), n(3)];
+        let mut subroutine = pairs.repeat(16);
+        subroutine.push(11);
+        for cff2_format in [false, true] {
+            for width in [47_usize, 48, 49, 63, 64, 65, 512, 513, 514] {
+                let calls = width / 32;
+                let mut glyph = [n(-107), 10].repeat(calls);
+                glyph.extend(pairs.iter().copied().cycle().take(width % 32));
+                glyph.push(6);
+                let table = if cff2_format {
+                    cff2(&[&glyph], &[&subroutine])
+                } else {
+                    glyph.push(14);
+                    cff(&[&glyph], &[], &[&subroutine])
+                };
+                let units = (width + 3 * calls + if width <= 513 { 2 } else { 0 }) as u64;
+                let x = 2 * width.div_ceil(2) as i32;
+                let y = 3 * (width / 2) as i32;
+                let expected = (width <= 513).then_some([0, y, x, -y]);
+                for limit in [units - 1, units, units + 1] {
+                    let mut work = WorkBudget::new(limit);
+                    let result = table_extents(&table, cff2_format, 0, 16, &mut work);
+                    let want = if limit < units {
+                        Err(Error::Policy("charstring work"))
+                    } else {
+                        Ok(expected)
+                    };
+                    assert_eq!(
+                        result, want,
+                        "cff2={cff2_format}, width={width}, limit={limit}"
+                    );
+                    assert_eq!(work.spent(), units.min(limit));
+                }
+            }
+        }
     }
 
     #[test]
@@ -1312,5 +1600,25 @@ mod tests {
             table_extents(&table, false, 0, 16, &mut WorkBudget::new(1 << 20)).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn compact_charstring_integers_position_the_pen_exactly() {
+        let check = |encoded: &[u8], expected| {
+            // Move to the encoded x coordinate, then draw one unit in each axis.
+            let glyph = [encoded, &[22, n(1), n(1), 5]].concat();
+            let table = cff2(&[&glyph], &[]);
+            assert_eq!(run(&table, 0), Some([expected, 1, 1, -1]), "{encoded:?}");
+        };
+        for first in 32..=246 {
+            check(&[first], i32::from(first) - 139);
+        }
+        for band in 0..4 {
+            for low in 0..=255 {
+                let magnitude = 108 + 256 * i32::from(band) + i32::from(low);
+                check(&[247 + band, low], magnitude);
+                check(&[251 + band, low], -magnitude);
+            }
+        }
     }
 }

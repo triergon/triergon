@@ -53,7 +53,7 @@ const fn abs(x: Fixed) -> Fixed {
 }
 
 /// `cf2_intToFixed` of a value FreeType keeps in a long.
-const fn int_to_fixed(v: i64) -> Fixed {
+const fn int_to_fixed(v: i32) -> Fixed {
     ((v as u32) << 16).cast_signed()
 }
 
@@ -226,7 +226,7 @@ impl Mask {
 /// last entry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Deltas<const N: usize> {
-    values: [i64; N],
+    values: [Fixed; N],
     count: usize,
 }
 
@@ -238,11 +238,16 @@ impl<const N: usize> Deltas<N> {
 
     /// `cff_kind_delta_fixed`: the running sums of the first `N` deltas.
     pub(super) fn set(&mut self, deltas: impl Iterator<Item = i64>) {
+        self.set_with(deltas, |_, _| {});
+    }
+
+    fn set_with(&mut self, deltas: impl Iterator<Item = i64>, mut observe: impl FnMut(usize, i64)) {
         let mut sum = 0_i64;
         self.count = 0;
         for (slot, delta) in self.values.iter_mut().zip(deltas) {
             sum = sum.wrapping_add(delta);
-            *slot = sum;
+            observe(self.count, sum);
+            *slot = sum as Fixed;
             self.count += 1;
         }
     }
@@ -253,7 +258,7 @@ impl<const N: usize> Deltas<N> {
         // `N` is even, so an odd count leaves room for the value after it.
         (0..self.count)
             .step_by(2)
-            .map(|i| (self.values[i] as Fixed, self.values[i + 1] as Fixed))
+            .map(|i| (self.values[i], self.values[i + 1]))
     }
 }
 
@@ -262,14 +267,16 @@ impl<const N: usize> Deltas<N> {
 /// 1000.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct HintDict {
-    pub(super) blue_values: Deltas<14>,
+    blue_values: Deltas<14>,
     pub(super) other_blues: Deltas<10>,
     pub(super) family_blues: Deltas<14>,
     pub(super) family_other_blues: Deltas<10>,
     pub(super) blue_scale: i64,
-    pub(super) blue_shift: i64,
-    pub(super) blue_fuzz: i64,
+    pub(super) blue_shift: i32,
+    pub(super) blue_fuzz: i32,
     pub(super) language_group: i32,
+    /// The em-box test compares BlueValues before narrowing them to 16.16.
+    blue_values_outside_em_box: bool,
 }
 
 impl HintDict {
@@ -283,6 +290,7 @@ impl HintDict {
         blue_shift: 0,
         blue_fuzz: 0,
         language_group: 0,
+        blue_values_outside_em_box: false,
     };
 
     /// The defaults `cff_load_private_dict` parses over: BlueScale 0.039625
@@ -293,6 +301,18 @@ impl HintDict {
         blue_fuzz: 1,
         ..Self::ABSENT
     };
+
+    pub(super) fn set_blue_values(&mut self, deltas: impl Iterator<Item = i64>) {
+        let mut outside = true;
+        self.blue_values.set_with(deltas, |index, coordinate| {
+            outside &= match index {
+                0 | 1 => coordinate < i64::from(EM_BOX_BOTTOM),
+                2 | 3 => coordinate > i64::from(EM_BOX_TOP),
+                _ => true,
+            };
+        });
+        self.blue_values_outside_em_box = outside;
+    }
 
     /// What `cff_load_private_dict` corrects after parsing: an even number
     /// of BlueValues, and the defaults for BlueShift and BlueFuzz outside 0 to
@@ -346,11 +366,8 @@ impl Blues {
             em_box: None,
         };
         let blue = &dict.blue_values;
-        let below = |i: usize| blue.values[i] < i64::from(EM_BOX_BOTTOM);
-        let above = |i: usize| blue.values[i] > i64::from(EM_BOX_TOP);
         if dict.language_group == 1
-            && (blue.count == 0
-                || (blue.count == 4 && below(0) && below(1) && above(2) && above(3)))
+            && (blue.count == 0 || (blue.count == 4 && dict.blue_values_outside_em_box))
         {
             // Outward by one so that real hints at the em box do not clash.
             let (bottom, top) = (EM_BOX_BOTTOM - 1, EM_BOX_TOP + 1);
@@ -416,7 +433,7 @@ impl Blues {
                 }
                 // The first FamilyBlues zone is a bottom zone.
                 if family.count >= 2 {
-                    consider(family.values[1] as Fixed, zone);
+                    consider(family.values[1], zone);
                 }
             } else {
                 for (edge, _) in family.pairs().skip(1) {
@@ -948,5 +965,39 @@ impl<'b> Hints<'b> {
         if let Some(h) = &mut self.hinted {
             h.first.copy_from(&h.current);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_em_box_uses_wide_coordinates_before_zone_edges_are_narrowed() {
+        let mut dict = HintDict::DEFAULTS;
+        dict.language_group = 1;
+        let period = 1_i64 << 32;
+        dict.set_blue_values([-period, 0, 2 * period, 0, 1].into_iter());
+        dict.sanitize();
+        assert_eq!(
+            dict.blue_values.pairs().collect::<Vec<_>>(),
+            [(0, 0), (0, 0)]
+        );
+        assert!(Blues::new(&dict, ONE).em_box.is_some());
+
+        let bottom = i64::from(EM_BOX_BOTTOM) - 1;
+        let top = i64::from(EM_BOX_TOP) + 1;
+        dict.set_blue_values([period + bottom, 0, top - (period + bottom), 0].into_iter());
+        dict.sanitize();
+        assert_eq!(dict.blue_values.values[0], EM_BOX_BOTTOM - 1);
+        assert!(Blues::new(&dict, ONE).em_box.is_none());
+    }
+
+    #[test]
+    fn an_odd_replacement_keeps_the_following_zone_edge() {
+        let mut zones = Deltas::<10>::EMPTY;
+        zones.set([i64::MAX, 2].into_iter());
+        zones.set([3].into_iter());
+        assert_eq!(zones.pairs().collect::<Vec<_>>(), [(3, 1)]);
     }
 }

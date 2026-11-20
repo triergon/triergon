@@ -99,11 +99,22 @@ suffixed names as variants after their base, and FreeType's second mappings for
 pointer arithmetic does); then for a name-keyed CFF face whose encoding maps a
 code, the charmap of that encoding (`CharmapKind::CffEncoding`, platform 7): a
 custom encoding of format 0 or 1 with supplements, or the Standard or Expert
-encoding through the charset's lowest glyph of each SID. Subtables of formats 14
+encoding through the charset's lowest glyph of each SID. While building the
+Standard charmap, the reader stops at the first assigned SID above the face's
+maximum. The glyph-name charmap reads a standard SID’s Unicode and secondary
+mappings directly from its fixed CFF name. Custom SIDs use the String INDEX.
+Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
 valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
-another reader selects). Format 4 is read as FreeType reads it: a linear search
+another reader selects). When a name-keyed CFF face can skip glyph-name synthesis,
+the reverse index needs at most 150 slots for StandardEncoding or a custom
+encoding with the supplement bit clear. ExpertEncoding needs at most 379 slots.
+When a face retains a sparse charset of up to 16 glyphs, it can look up a
+string ID directly in that charset.
+A CID-keyed CFF face validates the complete charset and retains the CIDs only
+when it needs them to construct the glyph-name charmap.
+Format 4 is read as FreeType reads it: a linear search
 through segments its validation finds unsorted, else a binary search that for
 overlapping segments takes the first holding the code, and `char_next`'s walk
 from segment to segment.
@@ -159,7 +170,8 @@ than one operand, whose mask bytes then run as charstring, and a mask over more
 than 96 stems fails the glyph, all as in FreeType), local and global subroutines (16 nested
 calls, FreeType's limit; TN 5177 states 10), arithmetic, storage and `random` operators (CFF only, as in
 FreeType), and `seac` accents through StandardEncoding and the charset, the
-accent drawn first. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
+accent drawn first. `standard_encoding_sid` maps a StandardEncoding byte to
+its CFF string ID, including SID 0 for unassigned codes. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
 ExpertSubset, which must cover the glyphs) and a name-keyed face's encoding are
 read when the face is parsed, as FreeType reads them; one it cannot read makes
 the face `Error::Invalid`. Charstrings are evaluated in 16.16 fixed
@@ -192,8 +204,11 @@ number conversions and corrections, so that an entry without its operand makes
 the face `Error::Invalid`) capture horizontal stem edges, and hint maps built from the masks
 move the other stems' edges onto pixel boundaries; each element of the path is
 mapped with the hint map in force when the next one is drawn, as in FreeType.
-The 26.6 points then go through the FontMatrix and are moved by its offset in
-font units, without further scaling. Sizes beyond 2000 pixels per em, which the
+Zone edges occupy one 32-bit 16.16 coordinate each. The face checks the
+ideographic em-box thresholds on the original wide sums before narrowing them.
+The six FontMatrix coordinates and the integer BlueShift and BlueFuzz values
+are retained as signed 32-bit quantities. The 26.6 points go through the
+FontMatrix and are moved by its offset in font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
 scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits.
 DICTs are read as FreeType's `cff_parser_run` reads them: a Top or Font DICT
@@ -446,8 +461,10 @@ lookup depends on; glyph programs, cmap entries, names and kerning pairs are rea
 from the font bytes when asked for. A face retains the shared `Bytes` plus small
 tables charged to the `Budget` it was created with: the supported cmap records, one
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
-records. A face FreeType auto-hints also keeps, once a default load needs
-them, the auto-hinter's style of each glyph, its reverse charmap of accented
+records. Short `cmap` directories use stack storage for up to eight encoding
+records and eight validation entries. Both work arrays charge their requested
+capacity until subtable selection finishes. A face FreeType auto-hints also keeps,
+once a default load needs them, the auto-hinter's style of each glyph, its reverse charmap of accented
 characters and each latin or CJK style's metrics, charged to that budget, as is the
 scratch storage of an auto-hinted load. A face with TrueType programs makes, on
 its first hinted load, the interpreter's function and instruction definitions,
