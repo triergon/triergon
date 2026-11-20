@@ -39,6 +39,10 @@ reference's; on Linux AArch64 three malformed PSI cases of the transport worker,
 code the corpus does not run, held one more 64 KiB window of code; and the ISO BMFF
 worker's operations read only the raw-video and timed-text movies of its comparison.
 
+The blocking facade stops reading as soon as a container signature selects a reader.
+It reserves replay capacity before consuming sequential input and rewinds seekable input.
+Frame-based elementary probing examines up to 64 KiB once.
+
 The [session queue workloads](../harness/session-queues/README.md) cover five real-payload feed patterns and three queue states. Each comparison checks decoded output before measuring paired runtime, peak heap and total RSS.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
