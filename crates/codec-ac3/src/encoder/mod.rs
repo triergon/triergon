@@ -466,20 +466,20 @@ impl ExponentSet {
             // in both directions so each exponent differential is representable.
             let peak = |bin: usize| first[bin].abs().max(second[bin].abs());
             exponents[0] = exponent(peak(0)).min(15);
+            // Clamp the group heads before expanding their repeated values.
             for bin in (1..end).step_by(group) {
                 let max = (bin..bin + group).map(peak).fold(0.0, f32::max);
-                exponents[bin..bin + group].fill(exponent(max));
+                exponents[bin] = exponent(max);
             }
             for bin in (1..end).step_by(group).rev() {
-                let previous = (bin - 1).saturating_sub(group - 1);
-                let limit = exponents[bin] + 2;
-                for exp in &mut exponents[previous..bin] {
-                    *exp = (*exp).min(limit);
-                }
+                let previous = bin.saturating_sub(group);
+                exponents[previous] = exponents[previous].min(exponents[bin] + 2);
             }
+            let mut previous = exponents[0];
             for bin in (1..end).step_by(group) {
-                let value = exponents[bin].min(exponents[bin - 1] + 2);
+                let value = exponents[bin].min(previous + 2);
                 exponents[bin..bin + group].fill(value);
+                previous = value;
             }
             stage_psd(exponents, 0, end, mask_scratch).map_err(|_| EncodeError::BitAllocation)?;
             let params = MaskParams {
@@ -549,17 +549,25 @@ fn full_bandwidth(first: &[f32; BLOCK], second: &[f32; BLOCK]) -> usize {
             .map(|(a, b)| a * a + b * b)
             .sum::<f32>()
     };
-    let floor = energy(0, MAX_FULL_BINS) * 1.0e-9;
-    let mut discarded = 0.0;
+    const DISCARD_FRACTION: f32 = 1.0e-9;
+    // A/52:2018 8.2.3 scales the windowed transform by 2/N. Normalized
+    // input bounds every coefficient by 2 before rounding. Use 4 to bound
+    // the floating-point result, including roundoff in the FFT.
+    const MAX_PAIR_ENERGY: f32 = 2.0 * MAX_FULL_BINS as f32 * 4.0 * 4.0;
     let mut end = MAX_FULL_BINS;
+    let mut discarded = energy(end - 6, end);
+    if discarded > MAX_PAIR_ENERGY * DISCARD_FRACTION {
+        return end;
+    }
+    let floor = energy(0, MAX_FULL_BINS) * DISCARD_FRACTION;
     // Keep complete exponent groups and lose at most 90 dB of energy
     // below the total of the two blocks.
-    while end > MIN_FULL_BINS {
-        discarded += energy(end - 6, end);
-        if discarded > floor {
+    while discarded <= floor {
+        end -= 6;
+        if end == MIN_FULL_BINS {
             break;
         }
-        end -= 6;
+        discarded += energy(end - 6, end);
     }
     end
 }
