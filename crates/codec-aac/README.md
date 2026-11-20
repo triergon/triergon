@@ -171,10 +171,10 @@ pinned nightly and this feature, on both targets; every other worker stays on st
   without its SBR element. Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
-- Gate item `codecs-audio` grades the 39 vectors of the aac lane on Linux AArch64 and 32-bit
-  ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`): 38/39 pass on both at `4213d042`; the open
-  case `aac-sce-in-stereo` differs only in the FR plane FFmpeg leaves unwritten in
-  single-SCE frames.
+- The `codecs-audio` check passes all 39 AAC vectors on Linux AArch64 and
+  32-bit ARMv7 (`thumbv7neon-unknown-linux-gnueabihf`) at `4b87991e`. The
+  `aac-sce-in-stereo` comparison checks both float planes and the stereo
+  output.
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
 - `cargo test -p triergon-codec-aac` runs synthetic ADTS and raw AAC-LC tests. `tests/fate_vectors.rs`
   runs the FATE vectors when `.research/fate-samples/aac/` is present (set
