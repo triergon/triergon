@@ -85,7 +85,7 @@ pub(crate) struct Cff {
     /// The string INDEX, which holds the names of SIDs from 391.
     strings: Index,
     /// The charset: the SID of each glyph, or its CID in a CID-keyed font;
-    /// empty for CFF2, which has none.
+    /// empty for CFF2 and for CID-keyed faces with a Unicode charmap.
     sids: BudgetVec<u16>,
     /// The lowest glyph of each SID of a name-keyed face, [`NO_GLYPH`] for
     /// none (`cff_charset_compute_cids`).
@@ -114,10 +114,10 @@ impl Cff {
     /// the face's `fvar`, zero without one, which decides the region scalars.
     pub(crate) fn parse(
         data: &[u8],
-        table: Table,
-        version: Version,
+        (table, version): (Table, Version),
         units_per_em: u16,
         fvar_axes: u16,
+        unicode_charmap: bool,
         budget: &Budget,
         work: &mut WorkBudget,
     ) -> Result<Self> {
@@ -194,7 +194,8 @@ impl Cff {
         cff.units_per_em = top_matrix.units_per_em();
         cff.cid = top.ros;
         if version == Version::Cff1 {
-            cff.read_charset(bytes, top.charset, work)?;
+            // CID-keyed faces only use their charset to synthesize a missing Unicode charmap.
+            cff.read_charset(bytes, top.charset, !top.ros || !unicode_charmap, work)?;
             // CID-keyed fonts have no glyph names, so neither `seac` nor an
             // encoding.
             if !top.ros {
@@ -570,8 +571,7 @@ impl Cff {
         })
     }
 
-    /// Whether the face has glyph names to build a Unicode charmap from: a
-    /// charset, which CFF2 has not.
+    /// Whether the face retained a CFF charset for glyph-name lookup.
     pub(crate) fn has_charset(&self) -> bool {
         !self.sids.is_empty()
     }
@@ -583,10 +583,18 @@ impl Cff {
 
     /// `cff_charset_load`: the SID of every glyph, from a charset table
     /// (formats 0, 1 and 2) or a predefined one, which must cover the glyphs.
-    fn read_charset(&mut self, table: &[u8], offset: usize, work: &mut WorkBudget) -> Result<()> {
+    fn read_charset(
+        &mut self,
+        table: &[u8],
+        offset: usize,
+        retain: bool,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
         let count = usize::try_from(self.glyph_count).map_err(|_| Error::Overflow)?;
         charge(work, count)?;
-        self.sids.try_reserve_exact(count)?;
+        if retain {
+            self.sids.try_reserve_exact(count)?;
+        }
         let predefined: Option<&[u16]> = match offset {
             0 => Some(&crate::postscript::ISOADOBE_CHARSET),
             1 => Some(&crate::postscript::EXPERT_CHARSET),
@@ -597,19 +605,30 @@ impl Cff {
             let sids = charset.get(..count).ok_or(Error::Invalid(
                 "CFF predefined charset shorter than the font",
             ))?;
-            return self.sids.try_extend_from_slice(sids);
+            if retain {
+                self.sids.try_extend_from_slice(sids)?;
+            }
+            return Ok(());
         }
         let mut r = Reader::at(table, offset)?;
         let format = r.u8()?;
-        self.sids.try_push(0).map_err(|e| e.error)?;
+        if retain {
+            self.sids.try_push(0).map_err(|e| e.error)?;
+        }
+        let mut remaining = count - 1;
         match format {
             0 => {
-                for _ in 1..count {
-                    self.sids.try_push(r.u16()?).map_err(|e| e.error)?;
+                let entries = r.take(2 * remaining)?;
+                if retain {
+                    for &pair in entries.as_chunks::<2>().0 {
+                        self.sids
+                            .try_push(u16::from_be_bytes(pair))
+                            .map_err(|e| e.error)?;
+                    }
                 }
             }
             1 | 2 => {
-                while self.sids.len() < count {
+                while remaining != 0 {
                     let first = r.u16()?;
                     let left = if format == 2 {
                         r.u16()?
@@ -617,13 +636,14 @@ impl Cff {
                         u16::from(r.u8()?)
                     };
                     // FreeType keeps a range from running past SID 65535.
-                    let left = left.min(u16::MAX - first);
-                    for sid in first..=first + left {
-                        if self.sids.len() == count {
-                            break;
+                    let last = first.saturating_add(left);
+                    let taken = remaining.min(usize::from(last - first) + 1);
+                    if retain {
+                        for sid in (first..=last).take(taken) {
+                            self.sids.try_push(sid).map_err(|e| e.error)?;
                         }
-                        self.sids.try_push(sid).map_err(|e| e.error)?;
                     }
+                    remaining -= taken;
                 }
             }
             _ => return Err(Error::Invalid("CFF charset format")),
@@ -992,6 +1012,14 @@ mod tests {
     use crate::{GlyphId, Limits};
     use triergon_core::{Budget, Error, Result, WorkBudget};
 
+    fn parse_test_face(data: &[u8], budget: &Budget, work: &mut WorkBudget) -> Result<Cff> {
+        let table = Table {
+            offset: 0,
+            len: data.len(),
+        };
+        Cff::parse(data, (table, Version::Cff1), 1000, 0, false, budget, work)
+    }
+
     /// A name-keyed CFF table whose glyph 1 is `glyph`, with `private` added
     /// to its Private DICT, at 1000 units per em.
     fn table(glyph: &[Part], private: Vec<u8>) -> Vec<u8> {
@@ -1014,15 +1042,56 @@ mod tests {
         try_points(table, scale, hinted).unwrap()
     }
 
+    #[test]
+    fn a_discarded_charset_validates_the_same_entries_and_charges_the_same_work() {
+        let source = table(&[], Vec::new());
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut face = parse_test_face(&source, &budget, &mut WorkBudget::new(1 << 20)).unwrap();
+        face.glyph_count = 4;
+        let cases: &[(&[u8], Option<[u16; 4]>)] = &[
+            (&[0, 0, 42, 0, 21, 0, 9], Some([0, 42, 21, 9])),
+            (&[1, 0, 42, 4], Some([0, 42, 43, 44])),
+            (&[2, 255, 254, 0, 9, 0, 3, 0, 0], Some([0, 65534, 65535, 3])),
+            (&[0, 0, 42, 0, 21, 0], None),
+            (&[1, 255, 255, 4], None),
+            (&[2, 0, 42, 0], None),
+            (&[3], None),
+            (&[], None),
+        ];
+        for &(encoded, want) in cases {
+            let bytes = [&[0; 3][..], encoded].concat();
+            for retain in [true, false] {
+                face.sids = triergon_core::BudgetVec::new(&budget);
+                let mut work = WorkBudget::new(4);
+                let result = face.read_charset(&bytes, 3, retain, &mut work);
+                assert_eq!(result.is_ok(), want.is_some(), "{encoded:?}");
+                assert_eq!(work.spent(), 4);
+                if !retain {
+                    assert_eq!(face.sids.capacity(), 0);
+                } else if let Some(sids) = want {
+                    assert_eq!(face.sids.as_slice(), sids);
+                }
+                assert!(matches!(
+                    face.read_charset(&bytes, 3, retain, &mut WorkBudget::new(3)),
+                    Err(Error::Policy(_))
+                ));
+            }
+        }
+        // The ISOAdobe charset ends before glyph 230.
+        face.glyph_count = 230;
+        for retain in [true, false] {
+            assert!(
+                face.read_charset(&[], 0, retain, &mut WorkBudget::new(230))
+                    .is_err()
+            );
+        }
+    }
+
     /// The points of glyph 1, or why it does not load.
     fn try_points(table: &[u8], scale: i64, hinted: bool) -> Result<Vec<(i32, i32)>> {
         let budget = Budget::new(1 << 20).unwrap();
         let mut work = WorkBudget::new(1 << 20);
-        let whole = Table {
-            offset: 0,
-            len: table.len(),
-        };
-        let cff = Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parse_test_face(table, &budget, &mut work).unwrap();
         let mut outline = Outline::new(&budget);
         let (glyph, scale) = (GlyphId(1), Scale { x: scale, y: scale });
         let limits = Limits::default();
@@ -1090,11 +1159,7 @@ mod tests {
     fn a_missing_or_empty_private_dict_reads_as_none() {
         let glyph = table(&rectangle(0, &[50]), Vec::new());
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parse_test_face(&glyph, &budget, &mut work).unwrap();
         // Offset zero with a size, size zero, or none: nothing is read.
         for location in [Some((5, 0)), Some((0, 40)), None] {
             let private = cff.private_dict(&glyph, location, &mut work).unwrap();
@@ -1108,11 +1173,7 @@ mod tests {
     fn cff2_points(glyph: &[Part]) -> Result<Vec<(i32, i32)>> {
         let table = table(glyph, Vec::new());
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: table.len(),
-        };
-        let mut cff = Cff::parse(&table, whole, Version::Cff1, 1000, 0, &budget, &mut work)?;
+        let mut cff = parse_test_face(&table, &budget, &mut work)?;
         cff.version = Version::Cff2;
         cff.scalars.try_push(0x10000).map_err(|e| e.error)?;
         cff.variation_data.try_push((0, 1)).map_err(|e| e.error)?;
@@ -1177,11 +1238,7 @@ mod tests {
     fn top_dict_entries_read_as_freetype_reads_them() {
         let glyph = table(&rectangle(0, &[50]), Vec::new());
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parse_test_face(&glyph, &budget, &mut work).unwrap();
         let top =
             |bytes: &[u8]| cff.font_dict_entries(bytes, dict::Kind::Top, &mut WorkBudget::new(100));
         // An offset reads the first of its operands.
@@ -1214,12 +1271,7 @@ mod tests {
     fn a_failed_private_dict_reparse_keeps_what_it_read_unsanitised() {
         let glyph = table(&rectangle(0, &[50]), Vec::new());
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let mut cff =
-            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let mut cff = parse_test_face(&glyph, &budget, &mut work).unwrap();
         cff.version = Version::Cff2;
         // BlueShift 2000, then a blend whose blend vector cannot be built.
         let bytes = [28, 0x07, 0xd0, 12, 10, 139, 139, 140, 23];
@@ -1242,11 +1294,7 @@ mod tests {
         let parse = |private: Vec<u8>| {
             let glyph = table(&rectangle(0, &[50]), private);
             let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-            let whole = Table {
-                offset: 0,
-                len: glyph.len(),
-            };
-            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).map(|_| ())
+            parse_test_face(&glyph, &budget, &mut work).map(|_| ())
         };
         // StdHW, StdVW, ForceBold, ForceBoldThreshold, lenIV,
         // ExpansionFactor, initialRandomSeed, defaultWidthX, nominalWidthX.
