@@ -34,6 +34,11 @@ import subprocess
 import sys
 import zlib
 
+if __package__:
+    from .carriers import crc32_mpeg, ebml_id, ebml_size
+else:
+    from carriers import crc32_mpeg, ebml_id, ebml_size
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 GOLD = os.path.join(ROOT, "crates/subtitles/tests/native-compatibility-gold")
 
@@ -171,17 +176,6 @@ def write_sup(units):
     return bytes(out)
 
 
-def ebml_id(value):
-    return value.to_bytes((value.bit_length() + 7) // 8, "big")
-
-
-def ebml_size(n):
-    for length in range(1, 9):
-        if n < (1 << (7 * length)) - 1:
-            return ((1 << (7 * length)) | n).to_bytes(length, "big")
-    raise ValueError(n)
-
-
 def element(eid, payload):
     return ebml_id(eid) + ebml_size(len(payload)) + payload
 
@@ -206,25 +200,6 @@ def write_mkv(units):
         block = b"\x81" + struct.pack(">hB", 0, 0x80) + b"".join(segments)
         body += element(0x1F43B675, uint(0xE7, ms) + element(0xA3, block))
     return header + element(0x18538067, body)
-
-
-def _crc32_mpeg_entry(byte):
-    crc = byte << 24
-    for _ in range(8):
-        crc = ((crc << 1) ^ (0x04C11DB7 if crc & 0x80000000 else 0)) & 0xFFFFFFFF
-    return crc
-
-
-_CRC32_MPEG = tuple(_crc32_mpeg_entry(byte) for byte in range(256))
-
-
-def crc32_mpeg(data):
-    """CRC-32/MPEG-2 over a PSI section, most significant bit first."""
-    crc = 0xFFFFFFFF
-    for byte in data:
-        crc ^= byte << 24
-        crc = ((crc << 8) & 0xFFFFFFFF) ^ _CRC32_MPEG[(crc >> 24) & 0xFF]
-    return crc
 
 
 def section(table_id, extension, payload):

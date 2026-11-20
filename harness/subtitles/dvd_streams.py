@@ -34,9 +34,9 @@ import sys
 import zlib
 
 if __package__:
-    from .pgs_streams import ebml_id, ebml_size
+    from .carriers import ebml_id, ebml_size
 else:
-    from pgs_streams import ebml_id, ebml_size
+    from carriers import ebml_id, ebml_size
 
 SECTOR = 2048
 

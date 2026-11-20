@@ -45,9 +45,9 @@ import sys
 import zlib
 
 if __package__:
-    from .pgs_streams import crc32_mpeg
+    from .carriers import crc32_mpeg
 else:
-    from pgs_streams import crc32_mpeg
+    from carriers import crc32_mpeg
 
 # ------------------------------------------------------------------ segments
 
