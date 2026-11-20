@@ -1,0 +1,9 @@
+{
+ "name": "flac-rice-0230c88e-armv7",
+ "path": "flac-rice-0230c88e-armv7",
+ "retention": "retained",
+ "reason": "Paired FLAC file decode times and hardware counters at 0230c88e and 3e3ba929 on 32-bit ARMv7 Linux.",
+ "key": "evidence/architecture-review-mwo5u537/0230c88e4bb78677484d7b7d00a9c80e0be66d37/armv7/flac-rice/06e9f4afbc18def659c6b3f58dedd095529deeeb557d5215986385b12364d567.tar.zst",
+ "sha256": "06e9f4afbc18def659c6b3f58dedd095529deeeb557d5215986385b12364d567",
+ "bytes": 7113023
+}
