@@ -1,6 +1,7 @@
 //! Syncframe syntax (A/52:2018 5.3), mantissas (7.3) and CRCs (7.10.1).
 
 use super::{BLOCK, CHANNELS, ChannelMode, LFE_BINS, MIN_FULL_BINS, PARAMS, Pair, fast_gain};
+use crate::bitalloc::Ac3BapCosts;
 use crate::crc16;
 use crate::spec_tables::BAPTAB;
 use crate::tables::BAP_BITS;
@@ -38,12 +39,15 @@ impl<'a> Bits<'a> {
         let Some(data) = &mut self.data else { return };
         let byte = position / 8;
         let offset = position % 8;
-        let count = (offset + width).div_ceil(8);
-        let value = (value << (32 - offset - width)).to_be_bytes();
-        if let Some(dst) = data.get_mut(byte..byte + count) {
-            for (out, byte) in dst.iter_mut().zip(value) {
-                *out |= byte;
-            }
+        debug_assert!((1..=16).contains(&width));
+        // A field of at most 16 bits fits in three bytes at any offset.
+        // The two reserved flag bits and the CRC word leave that much space
+        // at the last field's starting byte, including a grouped patch.
+        if let Some([a, b, c]) = data.get_mut(byte..byte + 3) {
+            let [first, second, third, _] = (value << (32 - offset - width)).to_be_bytes();
+            *a |= first;
+            *b |= second;
+            *c |= third;
         }
     }
 }
@@ -172,14 +176,14 @@ const COSTS: [u64; 16] = {
     costs
 };
 
-pub(super) const COST_BY_ADDRESS: [u64; 64] = {
+pub(super) const BAP_COSTS: Ac3BapCosts = {
     let mut table = [0; 64];
     let mut address = 0;
     while address < table.len() {
         table[address] = COSTS[BAPTAB[address] as usize];
         address += 1;
     }
-    table
+    Ac3BapCosts::new(&table)
 };
 
 pub(super) fn mantissa_bits(sum: u64) -> usize {
@@ -314,6 +318,28 @@ pub(super) fn checksum(frame: &mut [u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fields_fit_before_the_reserved_tail() {
+        for width in 1..=16 {
+            for byte_offset in 0..8 {
+                let mut data = [0; 6];
+                let latest = data.len() * 8 - 18 - width;
+                let start = latest - (latest + 8 - byte_offset) % 8;
+                let value = (0xaaaa_u32 >> (16 - width)) | 1;
+                let mut writer = Bits::write_to(&mut data);
+                writer.patch(start, value, width);
+
+                let mut expected = [0; 6];
+                for i in 0..width {
+                    let at = start + i;
+                    let bit = (value >> (width - 1 - i)) & 1;
+                    expected[at / 8] |= (bit as u8) << (7 - at % 8);
+                }
+                assert_eq!(data, expected);
+            }
+        }
+    }
 
     #[test]
     fn packed_mantissa_cost_matches_grouped_coding() {

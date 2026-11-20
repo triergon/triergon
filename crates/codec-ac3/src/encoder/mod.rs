@@ -8,7 +8,7 @@ use crate::bitalloc::{
 use crate::header::{BITRATE_KBPS, SAMPLE_RATES, ac3_frame_words};
 use crate::imdct::analysis::Analysis;
 use crate::tables::FASTGAIN;
-use syntax::{Bits, COST_BY_ADDRESS, Mantissas, mantissa_bits};
+use syntax::{BAP_COSTS, Bits, Mantissas, mantissa_bits};
 
 const BLOCK: usize = 256;
 const BLOCKS: usize = 6;
@@ -288,12 +288,15 @@ impl Encoder {
             }
             let mut mantissas = Mantissas::default();
             for (ch, channel_coefficients) in coefficients.iter().enumerate() {
-                for bin in 0..pair.ends[ch] {
-                    let code = bap[ch][bin];
+                let codes = &bap[ch][..pair.ends[ch]];
+                for ((&coefficient, &exponent), &code) in channel_coefficients
+                    .iter()
+                    .zip(&pair.exponents[ch])
+                    .zip(codes)
+                {
                     if code != 0 {
-                        let exponent = u32::from(pair.exponents[ch][bin]);
                         let normal =
-                            channel_coefficients[bin] * f32::from_bits((127 + exponent) << 23);
+                            coefficient * f32::from_bits((127 + u32::from(exponent)) << 23);
                         mantissas.push(&mut bits, code, normal);
                     }
                 }
@@ -428,13 +431,19 @@ impl Pair {
 
     fn mantissa_bits(&self, snr: u16) -> usize {
         let offset = snr_offset(snr);
-        let cost = self
-            .masks
-            .iter()
-            .zip(self.ends)
-            .take_while(|&(_, end)| end != 0)
-            .map(|(mask, end)| ac3_bap_cost(mask, end, offset, PARAMS.floorcod, &COST_BY_ADDRESS))
-            .sum();
+        let mut cost = 0;
+        for (ch, (&end, mask)) in self.ends.iter().zip(&self.masks).enumerate() {
+            if end == 0 {
+                break;
+            }
+            let exponents = &self.exponents[ch];
+            let floor = PARAMS.floorcod;
+            cost += if self.repeats[ch] == 2 {
+                ac3_bap_cost::<true>(mask, exponents, end, offset, floor, &BAP_COSTS)
+            } else {
+                ac3_bap_cost::<false>(mask, exponents, end, offset, floor, &BAP_COSTS)
+            };
+        }
         mantissa_bits(cost)
     }
 }

@@ -4,6 +4,8 @@
 use crate::spec_tables::{BAPTAB, BNDSZ, BNDTAB, HEBAPTAB, HTH_0, HTH_1, HTH_2, LATAB, MASKTAB};
 use crate::tables::{DBPBTAB, FASTDEC, FLOORTAB, SLOWDEC, SLOWGAIN};
 
+const ZERO_EXPONENT_PSD: i32 = 3_072;
+
 /// Bit-allocation parametric information (baie fields).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct BaParams {
@@ -105,7 +107,7 @@ pub(crate) fn stage_psd(
         return Err("bit allocation range");
     }
     for bin in start..end {
-        c.psd[bin] = 3072 - ((exps[bin] as i32) << 7);
+        c.psd[bin] = ZERO_EXPONENT_PSD - ((exps[bin] as i32) << 7);
     }
     let psd = &c.psd;
     let mut j = start;
@@ -251,21 +253,94 @@ pub(crate) fn stage_bap(
     });
 }
 
-/// Sum the cost at each AC-3 allocation address without writing a trial BAP plane.
 #[cfg(feature = "encode")]
-pub(crate) fn ac3_bap_cost(
+const EXPONENT_ADDRESS_STEP: usize = 4;
+#[cfg(feature = "encode")]
+const MAX_COST_ADDRESS: i32 = (ZERO_EXPONENT_PSD - FLOORTAB[7]) >> 5;
+#[cfg(feature = "encode")]
+const EXPONENT_VALUES: usize = 256;
+#[cfg(feature = "encode")]
+const COST_ROW_LEN: usize = MAX_COST_ADDRESS as usize / EXPONENT_ADDRESS_STEP + EXPONENT_VALUES;
+
+/// Quantizer costs ordered by exponent for each address residue. An exponent
+/// changes PSD by 128, which is four allocation addresses spaced 32 apart.
+#[cfg(feature = "encode")]
+pub(crate) struct Ac3BapCosts([[u64; COST_ROW_LEN]; EXPONENT_ADDRESS_STEP]);
+
+#[cfg(feature = "encode")]
+impl Ac3BapCosts {
+    pub(crate) const fn new(address_costs: &[u64; 64]) -> Self {
+        assert!(address_costs[0] == 0);
+        let mut by_exponent = [[0; COST_ROW_LEN]; EXPONENT_ADDRESS_STEP];
+        let mut residue = 0;
+        while residue < EXPONENT_ADDRESS_STEP {
+            let mut exponent = 0;
+            while exponent < COST_ROW_LEN {
+                let address =
+                    MAX_COST_ADDRESS - (exponent * EXPONENT_ADDRESS_STEP + residue) as i32;
+                let address = if address < 0 {
+                    0
+                } else if address > 63 {
+                    63
+                } else {
+                    address
+                };
+                by_exponent[residue][exponent] = address_costs[address as usize];
+                exponent += 1;
+            }
+            residue += 1;
+        }
+        Self(by_exponent)
+    }
+
+    #[inline]
+    fn at(&self, address: i32) -> &[u64; EXPONENT_VALUES] {
+        let offset = (MAX_COST_ADDRESS - address) as usize;
+        self.0[offset % EXPONENT_ADDRESS_STEP][offset / EXPONENT_ADDRESS_STEP..]
+            .first_chunk()
+            .expect("AC-3 cost range")
+    }
+}
+
+/// Sum trial costs using one exponent table per critical band.
+#[cfg(feature = "encode")]
+pub(crate) fn ac3_bap_cost<const PAIRED_EXPONENTS: bool>(
     c: &BaCache,
+    exponents: &[u8; 256],
     end: usize,
     snroffset: i32,
     floorcod: u8,
-    costs: &[u64; 64],
+    costs: &Ac3BapCosts,
 ) -> u64 {
     let mut total = 0;
-    visit_bap_bands(c, 0, end, snroffset, floorcod, |_, psd, mask| {
-        total += psd
-            .iter()
-            .map(|&p| costs[bap_address(p, mask)])
-            .sum::<u64>();
+    visit_bap_bands(c, 0, end, snroffset, floorcod, |start, psd, mask| {
+        let address = (ZERO_EXPONENT_PSD - mask) >> 5;
+        if address > 0 {
+            let costs = costs.at(address);
+            let exponents = &exponents[start..start + psd.len()];
+            let cost = |exponent: u8| costs[usize::from(exponent)];
+            if PAIRED_EXPONENTS && exponents.len() > 1 {
+                // AC-3 transmits bin zero on its own. The pairs start at bin
+                // one. A critical band can split a pair at either edge.
+                let (leading, rest) = exponents.split_at(usize::from(start.is_multiple_of(2)));
+                let (pairs, trailing) = rest.as_chunks::<2>();
+                total += 2 * pairs
+                    .iter()
+                    .map(|&[left, right]| {
+                        debug_assert_eq!(left, right);
+                        cost(left)
+                    })
+                    .sum::<u64>();
+                total += leading
+                    .iter()
+                    .chain(trailing)
+                    .copied()
+                    .map(cost)
+                    .sum::<u64>();
+            } else {
+                total += exponents.iter().copied().map(cost).sum::<u64>();
+            }
+        }
     });
     total
 }
