@@ -105,7 +105,8 @@ and `ffprobe` on `PATH`, run
 The comparison uses the second audio stream of `dts.mp4`, `dts.mkv` and
 `dts.mov`, plus the FATE DTS-HD MA sample and its three remuxes in `fate-dts/`.
 It compares the 27 fields between inspectors. For every input packet, the
-reference filter supplies the expected core size and bytes.
+reference filter supplies the expected core size and bytes. The [DTS measurement results](../../docs/status.md#dts-core-header-inspection)
+cover the seven inputs and the native instruction counts for header inspection.
 
 ## Behaviour and limits
 
