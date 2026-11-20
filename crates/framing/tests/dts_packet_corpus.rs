@@ -34,18 +34,33 @@ fn compare_file(path: &Path, stream: &str, packets: usize) {
             ])
             .arg(path),
     );
-    let audio = |filter: &[&str]| {
+    let audio = |filter: &[&str], muxer| {
         output(
             Command::new("ffmpeg")
                 .args(["-nostdin", "-v", "error", "-i"])
                 .arg(path)
                 .args(["-map", &format!("0:{stream}"), "-c:a", "copy"])
                 .args(filter)
-                .args(["-f", "dts", "pipe:1"]),
+                .args(["-f", muxer, "pipe:1"]),
         )
     };
-    let source = audio(&[]);
-    let reference = audio(&["-bsf:a", "dca_core"]);
+    let source = audio(&[], "dts");
+    let filter = ["-bsf:a", "dca_core"];
+    let reference = audio(&filter, "dts");
+    let hashes = audio(&filter, "framehash");
+    // framehash keeps the filter's packet boundaries even when adjacent payloads match.
+    let mut core_sizes = std::str::from_utf8(&hashes)
+        .unwrap()
+        .lines()
+        .filter(|row| !row.is_empty() && !row.starts_with('#'))
+        .map(|row| {
+            row.split(',')
+                .nth(4)
+                .unwrap()
+                .trim()
+                .parse::<usize>()
+                .unwrap()
+        });
     let mut raw = source.as_slice();
     let mut expected = reference.as_slice();
     let budget = Budget::new(128 * 1024).unwrap();
@@ -79,11 +94,13 @@ fn compare_file(path: &Path, stream: &str, packets: usize) {
             assert_eq!(owned.field(field), packed.field(field));
         }
         let length = usize::try_from(owned.views().declared_frame_bytes.unwrap()).unwrap();
-        let (core, remaining) = expected.split_at(length);
+        let core_size = core_sizes.next().expect("missing filtered packet");
+        assert_eq!(length, core_size, "core length at byte {}", identity.offset);
+        let (core, remaining) = expected.split_at(core_size);
         assert_eq!(packet.get(..length), Some(core));
         expected = remaining;
     }
-    assert!(raw.is_empty() && expected.is_empty());
+    assert!(raw.is_empty() && expected.is_empty() && core_sizes.next().is_none());
 }
 
 #[test]

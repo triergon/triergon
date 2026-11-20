@@ -104,8 +104,8 @@ and `ffprobe` on `PATH`, run
 `cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`.
 The comparison uses the second audio stream of `dts.mp4`, `dts.mkv` and
 `dts.mov`, plus the FATE DTS-HD MA sample and its three remuxes in `fate-dts/`.
-It compares both inspectors' 27 fields and the bytes in each declared core
-prefix with the reference core filter.
+It compares the 27 fields between inspectors. For every input packet, the
+reference filter supplies the expected core size and bytes.
 
 ## Behaviour and limits
 
