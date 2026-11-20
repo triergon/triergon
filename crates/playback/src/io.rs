@@ -7,6 +7,10 @@ use crate::{
     input::{Source, SourceReply},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::signature::{
+    self,
+    TransportSync::{M2ts192, Ts188},
+};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceFailure, SourceId, Step, WorkBudget,
@@ -229,6 +233,8 @@ impl<S: Source> Probe<S> {
             4
         } else if self.used < 8 {
             8
+        } else if self.used < CONTAINER_SIGNATURE_BYTES {
+            CONTAINER_SIGNATURE_BYTES
         } else {
             self.prefix.len()
         };
@@ -271,27 +277,27 @@ impl<S: Source> Probe<S> {
         })
     }
 }
-pub(crate) const CONTAINER_SIGNATURE_BYTES: usize = 389;
+pub(crate) const CONTAINER_SIGNATURE_BYTES: usize = M2ts192.prefix_len();
 
-pub(crate) fn detect_container(p: &[u8]) -> Result<Option<Format>> {
-    if p.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
+pub(crate) fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
+    if signature::ebml(prefix) {
         return Ok(Some(Format::Matroska));
     }
-    if p.len() >= 8
-        && [*b"ftyp", *b"styp", *b"moov", *b"free", *b"wide", *b"mdat"]
-            .contains(&p[4..8].try_into().map_err(|_| Error::Truncated)?)
-    {
+    if matches!(
+        signature::opening_box(prefix),
+        Some(b"ftyp" | b"styp" | b"moov" | b"free" | b"wide" | b"mdat")
+    ) {
         return Ok(Some(Format::Mp4));
     }
-    if p.len() < CONTAINER_SIGNATURE_BYTES {
+    // Playback requires the full ambiguity window, even for a shorter prefix
+    // that already has all three TS188 sync bytes.
+    if prefix.len() < CONTAINER_SIGNATURE_BYTES {
         return Ok(None);
     }
-    let ts = p.len() > 376 && [0, 188, 376].into_iter().all(|i| p[i] == 0x47);
-    let m2 = p.len() > 388 && [4, 196, 388].into_iter().all(|i| p[i] == 0x47);
-    match (ts, m2) {
-        (true, false) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188))),
-        (false, true) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192))),
-        (true, true) => Err(Error::Invalid("ambiguous transport signature")),
+    match (Ts188.observed(prefix), M2ts192.observed(prefix)) {
+        (Some(true), Some(false)) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188))),
+        (Some(false), Some(true)) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192))),
+        (Some(true), Some(true)) => Err(Error::Invalid("ambiguous transport signature")),
         _ => Ok(None),
     }
 }
@@ -355,5 +361,31 @@ impl<S: Source> Source for ReplaySource<S> {
     }
     fn close(&mut self) {
         self.inner.close();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Format, detect_container};
+
+    #[test]
+    fn playback_opening_boxes_and_transport_window() {
+        for kind in [b"ftyp", b"styp", b"moov", b"mdat", b"free", b"wide"] {
+            let bytes = [b"\0\0\0\x10".as_slice(), kind].concat();
+            assert_eq!(detect_container(&bytes), Ok(Some(Format::Mp4)));
+        }
+        for kind in [b"moof", b"skip", b"sidx"] {
+            let bytes = [b"\0\0\0\x10".as_slice(), kind].concat();
+            assert_eq!(detect_container(&bytes), Ok(None));
+        }
+        let mut bytes = [0; 389];
+        for at in [0, 188, 376] {
+            bytes[at] = 0x47;
+        }
+        assert_eq!(detect_container(&bytes[..388]), Ok(None));
+        assert_eq!(
+            detect_container(&bytes),
+            Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188)))
+        );
     }
 }

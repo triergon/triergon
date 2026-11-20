@@ -11,10 +11,10 @@
 // Pending: `missing_docs`.
 
 mod any;
+mod probe;
 
-pub use any::{
-    AnyOther, AnyPacket, AnyReader, Probe, Replayed, open_blocking, open_sequential, probe,
-};
+pub use any::{AnyOther, AnyPacket, AnyReader, Replayed, open_blocking, open_sequential};
+pub use probe::{Probe, probe};
 pub use triergon_core::blocking::Blocking;
 pub use triergon_core::container::{
     CodecId, ColourDescription, ColourRange, ContainerReader, ContentLight, Event,
