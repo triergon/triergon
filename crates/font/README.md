@@ -194,6 +194,8 @@ number conversions and corrections, so that an entry without its operand makes
 the face `Error::Invalid`) capture horizontal stem edges, and hint maps built from the masks
 move the other stems' edges onto pixel boundaries; each element of the path is
 mapped with the hint map in force when the next one is drawn, as in FreeType.
+Zone edges occupy one 32-bit 16.16 coordinate each. The face checks the
+ideographic em-box thresholds on the original wide sums before narrowing them.
 The 26.6 points then go through the FontMatrix and are moved by its offset in
 font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
