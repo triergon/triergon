@@ -160,9 +160,17 @@ fn high_byte_valid(table: &[u8], steps: &mut usize) -> Option<()> {
     fits(table.len() >= 4)?;
     let length = usize::from(u16_at(table, 2)?);
     fits(length <= table.len() && length >= 6 + 512)?;
-    let subheaders = (0..256)
-        .map(|n| u16_at(table, 6 + 2 * n).map(|key| usize::from(key >> 3)))
-        .try_fold(0, |most, key| key.map(|key| most.max(key)))?;
+    let keys = table.get(6..)?.first_chunk::<512>()?;
+    let mut highest_key = 0;
+    for block in keys.as_chunks::<16>().0 {
+        // Unused high bytes and single-byte characters have zero keys.
+        if *block != [0; 16] {
+            for key in block.as_chunks::<2>().0 {
+                highest_key = highest_key.max(u16::from_be_bytes(*key));
+            }
+        }
+    }
+    let subheaders = usize::from(highest_key >> 3);
     let glyph_ids = 518 + (subheaders + 1) * 8;
     fits(glyph_ids <= table.len())?;
     *steps += 256 + subheaders;
@@ -1597,6 +1605,23 @@ mod tests {
 
     fn words(values: &[u16]) -> Vec<u8> {
         values.iter().flat_map(|v| v.to_be_bytes()).collect()
+    }
+
+    #[test]
+    fn high_byte_keys_cover_every_subheader_block() {
+        let mut data = words(&[2, 534, 0]);
+        data.resize(534, 0);
+        for high_byte in [0, 7, 8, 127, 128, 254, 255] {
+            let offset = 6 + 2 * high_byte;
+            // The low three bits do not affect the subheader index.
+            data[offset..offset + 2].copy_from_slice(&15_u16.to_be_bytes());
+            let mut steps = 0;
+            assert_eq!(super::high_byte_valid(&data, &mut steps), Some(()));
+            assert_eq!(steps, 257);
+            data[offset..offset + 2].copy_from_slice(&16_u16.to_be_bytes());
+            assert_eq!(super::high_byte_valid(&data, &mut steps), None);
+            data[offset..offset + 2].fill(0);
+        }
     }
 
     /// A `cmap` with one Windows Unicode record pointing at `subtable`.
