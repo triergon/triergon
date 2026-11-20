@@ -148,10 +148,10 @@ pub struct Settings {
     /// shaping, outlines, layout and drawing (glyph bitmaps, composites,
     /// vector clips), and collision handling. Every lookup of a glyph bitmap
     /// or composite in the renderer's caches charges a unit per bitmap, and
-    /// per glyph of a composite; one that finds it charges nothing more, so a
-    /// frame drawn again from the caches spends little, and one that does not
-    /// charges the drawing besides, so a frame drawn anew near the bound may
-    /// now be refused. Running out is
+    /// per glyph of a composite. A miss charges for drawing it. Final vector
+    /// clipping charges one unit per 16 pixels (rounded up per row) copied
+    /// and per 16 multiplied, including on a cache hit. A style-4 background
+    /// charges for one opaque row shared across its height. Running out is
     /// `Error::Policy`, where libass would go on drawing;
     /// [`Settings::DEFAULT_WORK`] by default, and a caller that wants libass's
     /// unbounded behaviour raises it.

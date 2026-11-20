@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-host-bb107837-aarch64",
+ "path": "ass-render-host-bb107837-aarch64",
+ "retention": "retained",
+ "reason": "The four declared AArch64 differences from libass in border-x-overflow and collision-far-tops at 720p and 1080p. The host-dependent grade remains open and has no timing or memory samples.",
+ "key": "evidence/architecture-review-mwo5u537/bb107837ed7545206bf3b55ab297ef58517c5afc/aarch64/combined-public-grade-ass-render-host/37cb175e47cd21554c29eb36e57249199652e4f2ce1811f91e7856d7b0ff7373.tar.zst",
+ "sha256": "37cb175e47cd21554c29eb36e57249199652e4f2ce1811f91e7856d7b0ff7373",
+ "bytes": 1750713
+}

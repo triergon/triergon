@@ -583,7 +583,9 @@ impl Shaper {
             language,
             features,
         };
-        if !self.plans.contains_key(&key) {
+        let plan = if let Some(plan) = self.plans.get(&key) {
+            plan
+        } else {
             if self.plans.len() >= MAX_PLANS {
                 self.plans.clear();
             }
@@ -597,13 +599,13 @@ impl Shaper {
                 &plan_features(features),
                 &self.budget,
             )?;
-            self.plans.insert(key, plan);
-        }
+            self.plans.entry(key).or_insert(plan)
+        };
         let base = context.start;
         triergon_shape::shape(
             &shaper_face,
             &metrics,
-            &self.plans[&key],
+            plan,
             &self.text[context],
             item.start - base..item.end - base,
             &mut self.buffer,

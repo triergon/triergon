@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-95d24c5a-aarch64-grade",
+ "path": "ass-render-95d24c5a-aarch64-grade",
+ "retention": "retained",
+ "reason": "Exact parity and passing runtime, peak heap and kernel-measured total RSS against libass on AArch64 Linux for all 100 portable ASS renderer cases, with 30 timing and 30 memory pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/95d24c5a25a28b8e2286a2031c5888b833a485da/aarch64/integrated-a64-libass-grade/45d1aedce5ca20209d59e8dd131055f0856ad5b01b123b2d17159fd9cddab948.tar.zst",
+ "sha256": "45d1aedce5ca20209d59e8dd131055f0856ad5b01b123b2d17159fd9cddab948",
+ "bytes": 20251170
+}

@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-95d24c5a-aarch64-time",
+ "path": "ass-render-95d24c5a-aarch64-time",
+ "retention": "retained",
+ "reason": "Paired runtime for the 100 portable ASS renderer cases against libass on AArch64 Linux, with pinned outputs and 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/95d24c5a25a28b8e2286a2031c5888b833a485da/aarch64/integrated-a64-libass-time/65cd8b8a02429451fd281e839a07cb82f0783c425144130d91762896f97ccca3.tar.zst",
+ "sha256": "65cd8b8a02429451fd281e839a07cb82f0783c425144130d91762896f97ccca3",
+ "bytes": 7987529
+}

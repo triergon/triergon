@@ -97,6 +97,7 @@ publishes the bytes. `BudgetVec<T>` is the charged mutable
 vector and reads and writes as a slice (`try_filled` builds one filled with a value,
 `try_clone` charges a copy); growth charges old and new buffers together, and a rejected push,
 reserve or `freeze` returns the original value or builder unchanged.
+`retain` filters elements in order and keeps the vector’s capacity charged.
 `BudgetVec::<u8>::try_with_owner_capacity` is for output whose size is known before it
 is written: one claim charges the capacity and the header `freeze` adds, so filling it
 within that capacity and freezing it charge nothing more.

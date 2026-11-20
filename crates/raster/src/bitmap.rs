@@ -1,9 +1,11 @@
 //! Alpha bitmaps and the blends libass combines them with.
 
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use std::ops::Range;
+
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 use crate::geometry::Vector;
-use crate::limits::{Limits, MAX_BITMAP_BYTES};
+use crate::limits::{Limits, MAX_BITMAP_BYTES, charge, row_work};
 
 /// Row alignment: strides are multiples of 16 bytes, as libass's C engine (and
 /// its NEON and SSE2 engines) lay bitmaps out.
@@ -45,9 +47,12 @@ impl Bitmap {
         })
     }
 
-    /// The stride of a `width` × `height` bitmap, with the errors of
-    /// [`Bitmap::new`]: checked before anything that size is allocated.
-    pub(crate) fn stride_within(width: usize, height: usize, limits: &Limits) -> Result<usize> {
+    /// Checks the logical bitmap size and returns its aligned stride without allocating.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same size errors as [`Bitmap::new`].
+    pub fn stride_within(width: usize, height: usize, limits: &Limits) -> Result<usize> {
         let too_large = Error::Limit {
             requested: width.saturating_mul(height),
             maximum: MAX_BITMAP_BYTES,
@@ -134,6 +139,52 @@ impl Bitmap {
         let mut data = BudgetVec::new(budget);
         data.try_extend_from_slice(self.data())?;
         Ok(Self { data, ..*self })
+    }
+
+    /// Copies a window of this bitmap into a bitmap positioned at the origin.
+    /// Charges one pass over the destination before allocating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Invalid` for ranges outside the bitmap or in reverse order,
+    /// `Policy` for insufficient work, and the size and allocation errors of
+    /// [`Bitmap::new`].
+    pub fn copy_region(
+        &self,
+        columns: Range<usize>,
+        rows: Range<usize>,
+        budget: &Budget,
+        limits: &Limits,
+        work: &mut WorkBudget,
+    ) -> Result<Self> {
+        if columns.start > columns.end
+            || columns.end > self.width
+            || rows.start > rows.end
+            || rows.end > self.height
+        {
+            return Err(Error::Invalid("bitmap region"));
+        }
+        let (width, height) = (columns.len(), rows.len());
+        let stride = Self::stride_within(width, height, limits)?;
+        charge(work, row_work(width, height))?;
+        let mut data = BudgetVec::new(budget);
+        data.try_reserve_exact(stride * height)?;
+        if width == self.width {
+            data.try_extend_from_slice(&self.data()[rows.start * stride..rows.end * stride])?;
+        } else if width != 0 {
+            let padding = &[0; ALIGNMENT][..stride - width];
+            for y in rows {
+                data.try_extend_from_slice(&self.row(y)[columns.clone()])?;
+                data.try_extend_from_slice(padding)?;
+            }
+        }
+        Ok(Self {
+            position: Vector::new(0, 0),
+            width,
+            height,
+            stride,
+            data,
+        })
     }
 
     /// Adds `src` with its top-left corner at (`x`, `y`) of this bitmap,
