@@ -13,6 +13,8 @@
 // adopted with an A/B timing run.
 #![allow(clippy::single_match_else)]
 mod bitalloc;
+#[cfg(feature = "encode")]
+pub mod encoder;
 mod error;
 mod header;
 mod imdct;

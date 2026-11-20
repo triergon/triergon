@@ -5,6 +5,9 @@
 use crate::tables::kbd_window;
 use core::f64::consts::PI;
 
+#[cfg(feature = "encode")]
+pub(crate) mod analysis;
+
 /// 1/sqrt(2), the real and imaginary part of the eighth root of unity.
 const H: f32 = core::f32::consts::FRAC_1_SQRT_2;
 

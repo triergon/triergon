@@ -1,7 +1,9 @@
 # triergon-codec-ac3
 
-AC-3 and E-AC-3 decoder written from ATSC A/52:2018 (main body, Annex D alternate bit
-stream information, Annex E). It is a codec-layer crate that depends on
+AC-3 and E-AC-3 decoder and optional AC-3 encoder written from
+[ATSC A/52:2018](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf).
+The decoder covers the main body, Annex D alternate bit stream information and
+Annex E. It is a codec-layer crate that depends on
 [triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `ChannelLayout`,
 `Speaker`, `DownmixLevels`) and [triergon-bitstream](../bitstream/README.md). It decodes one access unit at a time to planar `f32` in FFmpeg's native channel
 order and exports FFmpeg-compatible downmix metadata. It does not downmix or resample.
@@ -32,6 +34,40 @@ charges a caller's `Budget`. `.with_options(DecoderOptions { crc, noise, compat 
 selects the CRC policy (`CrcPolicy::Report` or `Reject`), the noise mode
 (`NoiseMode::Normal` or `Off`) and the output conventions (`Compat::Reference`, the
 default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleaved f32le.
+
+### Encoding PCM
+
+Enable the `encode` feature for AC-3 syncframes at 32, 44.1 or 48 kHz. The encoder
+uses a long transform in every block, with adaptive bandwidth, exponent grouping
+and bit allocation. It supports mono at 192 kbit/s, stereo at 256 kbit/s and 5.1
+at 640 kbit/s. The input plane order for 5.1 is FL, FR, FC, LFE, SL, SR.
+
+```rust
+# #[cfg(feature = "encode")]
+use triergon_codec_ac3::encoder::{
+    ChannelMode, EncodeError, Encoder, MAX_FRAME_BYTES, SAMPLES_PER_FRAME,
+};
+
+# #[cfg(feature = "encode")]
+fn encode_stereo(
+    frames: &[[[f32; SAMPLES_PER_FRAME]; 2]],
+    mut emit: impl FnMut(&[u8]),
+) -> Result<(), EncodeError> {
+    let mut encoder = Encoder::new(48_000, ChannelMode::Stereo)?;
+    let mut output = [0; MAX_FRAME_BYTES];
+    for [left, right] in frames {
+        let bytes = encoder.encode(&[left, right], &mut output)?;
+        emit(&output[..bytes]);
+    }
+    Ok(())
+}
+```
+
+Keep the same encoder between frames. Each call consumes 1,536 samples per
+plane in the range −1 to +1 and can vary in output size at 44.1 kHz. The
+transform starts with 256 samples of silent history. Append zero samples at the
+end to flush the delayed audio and trim the decoded result to the original
+length. `reset` clears the history and restarts the frame-size clock.
 
 ## Supported
 
@@ -118,5 +154,12 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 - Downmix metadata is compared per frame against `ffprobe -show_frames`.
 - `cargo test -p triergon-codec-ac3` runs table, transform, synthetic-frame, bsid 9/10 and
   corruption tests; FATE checks skip when the corpus is absent.
+- With `--features encode`, the tests check frame sizes, CRCs, channel order, signal
+  alignment and error recovery across the encoder's nine rate and layout combinations.
+  The ignored `ffmpeg_interoperability_and_signal_quality` test requires
+  `TRIERGON_FFMPEG` and a new directory in `TRIERGON_AC3_OUTPUT`. It decodes the
+  generated tone and broadband streams with FFmpeg and prints per-channel
+  signal-to-noise ratios at the same bitrate. Short transforms, a broader quality
+  comparison and native performance measurements remain open.
 - Derivation notes and tools: [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).
