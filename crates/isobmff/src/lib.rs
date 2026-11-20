@@ -52,6 +52,8 @@ pub mod reference_trace;
 mod regular;
 mod sidx;
 mod tables;
+#[cfg(feature = "reference-trace")]
+mod transport_window;
 pub use qt_sound::{
     QtPcmEncodingV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0,
 };
