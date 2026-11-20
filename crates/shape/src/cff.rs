@@ -659,14 +659,16 @@ impl<'a> Run<'_, 'a, '_> {
                     at += 2;
                     Some(f64::from(v.cast_signed()))
                 }
-                32..=246 => Some(f64::from(b0) - 139.0),
+                32..=246 => Some(f64::from(i32::from(b0) - 139)),
                 247..=254 => {
                     let Some(&b1) = code.get(at) else {
                         return Err(Fault::Glyph);
                     };
                     at += 1;
-                    let v = |first: u8| f64::from(b0 - first) * 256.0 + f64::from(b1) + 108.0;
-                    Some(if b0 < 251 { v(247) } else { -v(251) })
+                    // Both sign ranges encode the same magnitude in four 256-value bands.
+                    let magnitude = u16::from_be_bytes([(b0 - 247) & 3, b1]) + 108;
+                    let value = f64::from(magnitude);
+                    Some(if b0 < 251 { value } else { -value })
                 }
                 255 => {
                     // A 16.16 number cut short ends the charstring, or the
@@ -1305,5 +1307,25 @@ mod tests {
             table_extents(&table, false, 0, 16, &mut WorkBudget::new(1 << 20)).unwrap(),
             None
         );
+    }
+
+    #[test]
+    fn compact_charstring_integers_position_the_pen_exactly() {
+        let check = |encoded: &[u8], expected| {
+            // Move to the encoded x coordinate, then draw one unit in each axis.
+            let glyph = [encoded, &[22, n(1), n(1), 5]].concat();
+            let table = cff2(&[&glyph], &[]);
+            assert_eq!(run(&table, 0), Some([expected, 1, 1, -1]), "{encoded:?}");
+        };
+        for first in 32..=246 {
+            check(&[first], i32::from(first) - 139);
+        }
+        for band in 0..4 {
+            for low in 0..=255 {
+                let magnitude = 108 + 256 * i32::from(band) + i32::from(low);
+                check(&[247 + band, low], magnitude);
+                check(&[251 + band, low], -magnitude);
+            }
+        }
     }
 }
