@@ -26,7 +26,7 @@ const PARAMS: BaParams = BaParams {
     sdcycod: 2,
     fdcycod: 1,
     sgaincod: 1,
-    dbpbcod: 2,
+    dbpbcod: 3, // A/52:2018 7.2.2.5 raises the mask below the knee.
     floorcod: 4,
 };
 const EMPTY_ALLOCATION: Allocation = Allocation {

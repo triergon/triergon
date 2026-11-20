@@ -39,10 +39,11 @@ default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleave
 
 Enable the `encode` feature for AC-3 syncframes at 32, 44.1 or 48 kHz. The encoder
 uses adaptive bandwidth, exponent grouping and bit allocation. It reuses each
-critical band's exponent counts across bit allocation trials. When the highest
-SNR offset leaves space in the frame, the encoder can lower the masking floor
-to give quieter coefficients more precision. Long transforms keep frequency
-resolution on steady signals. Each full-bandwidth channel uses short transforms
+critical band's exponent counts across bit allocation trials. The masking
+threshold rises for bands below the dB-per-bit knee.
+When the highest SNR offset leaves space in the frame, the encoder can lower
+the masking floor to give quieter coefficients more precision. Long transforms
+keep frequency resolution on steady signals. Each full-bandwidth channel uses short transforms
 at sharp attacks and silence boundaries. A gradual onset in an otherwise steady
 frame can use a long transform to reduce energy outside the coded bandwidth.
 The encoder sends fresh exponents at transform changes and silence boundaries. Wide
