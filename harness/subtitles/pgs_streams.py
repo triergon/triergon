@@ -208,13 +208,22 @@ def write_mkv(units):
     return header + element(0x18538067, body)
 
 
+def _crc32_mpeg_entry(byte):
+    crc = byte << 24
+    for _ in range(8):
+        crc = ((crc << 1) ^ (0x04C11DB7 if crc & 0x80000000 else 0)) & 0xFFFFFFFF
+    return crc
+
+
+_CRC32_MPEG = tuple(_crc32_mpeg_entry(byte) for byte in range(256))
+
+
 def crc32_mpeg(data):
+    """CRC-32/MPEG-2 over a PSI section, most significant bit first."""
     crc = 0xFFFFFFFF
     for byte in data:
         crc ^= byte << 24
-        for _ in range(8):
-            crc = (crc << 1) ^ 0x04C11DB7 if crc & 0x80000000 else crc << 1
-            crc &= 0xFFFFFFFF
+        crc = ((crc << 8) & 0xFFFFFFFF) ^ _CRC32_MPEG[(crc >> 24) & 0xFF]
     return crc
 
 

@@ -24,6 +24,11 @@ import os
 import struct
 import sys
 
+if __package__:
+    from .pgs_streams import crc32_mpeg
+else:
+    from pgs_streams import crc32_mpeg
+
 # ---------------------------------------------------------------- EN 300 706 codes
 
 HAM84 = [0x15, 0x02, 0x49, 0x5E, 0x64, 0x73, 0x38, 0x2F,
@@ -191,16 +196,6 @@ def pes(units, pts=None, data_identifier=0x10, pad=True):
 
 
 # ---------------------------------------------------------------- MPEG-2 TS
-
-def crc32_mpeg(data):
-    crc = 0xFFFFFFFF
-    for byte in data:
-        crc ^= byte << 24
-        for _ in range(8):
-            crc = ((crc << 1) ^ 0x04C11DB7) if crc & 0x80000000 else crc << 1
-            crc &= 0xFFFFFFFF
-    return crc
-
 
 def section(table_id, extension, payload):
     length = 5 + len(payload) + 4
