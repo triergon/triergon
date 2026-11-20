@@ -237,8 +237,42 @@ impl FreeFormat {
                 Step::End(_) => return Err(Error::Truncated),
                 wait => return Ok(wait),
             }
-            if !work.try_charge(1) {
+            // Search spans for sync bytes before testing complete headers.
+            // Take lookahead only from a window already held by the cursor;
+            // an earlier candidate must never wait on a new input window.
+            let limit = maximum.checked_add(HEADER).ok_or(Error::Overflow)?;
+            let extra = if self.buffer.len() == end {
+                input
+                    .buffered()
+                    .len()
+                    .min(limit - end)
+                    .min(512)
+                    .min(usize::try_from(work.remaining() / 2).unwrap_or(usize::MAX))
+            } else {
+                0
+            };
+            if extra != 0 {
+                match input.read_append(&mut self.buffer, extra, work, cancel)? {
+                    Step::Ready(_) => (),
+                    _ => unreachable!("buffered lookahead within the work grant"),
+                }
+            }
+            let last = (self.buffer.len() - HEADER).min(maximum);
+            let search =
+                (last - self.scan + 1).min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
+            if search == 0 {
                 return Ok(Step::Yield);
+            }
+            let sync = self.buffer.as_slice()[self.scan..self.scan + search]
+                .iter()
+                .position(|&byte| byte == 0xff);
+            work.take(sync.map_or(search, |offset| offset + 1) as u64);
+            self.scan = self
+                .scan
+                .checked_add(sync.unwrap_or(search))
+                .ok_or(Error::Overflow)?;
+            if sync.is_none() {
+                continue;
             }
             self.candidate = self
                 .header(self.scan)

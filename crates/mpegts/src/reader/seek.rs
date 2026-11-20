@@ -1,6 +1,9 @@
 //! Bounded source seeks in the exact presentation clock.
 use super::{Packet, Reader, ReaderEvent};
-use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
+use crate::{
+    SourceEpochs, TraceEvent,
+    clock::{SourceTimePolicy, SourceTimestamp},
+};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
     CodecId, Event, PacketInfo, RandomAccess, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt,
@@ -37,19 +40,55 @@ pub(super) struct Seeking {
     phase: Phase,
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum PictureDelivery {
+    Full,
+    Probe,
+    Landing(u64),
+}
+
+pub(super) struct PictureProbe {
+    pub offset: u64,
+    pub epochs: SourceEpochs,
+    pub stamp: Option<SourceTimestamp>,
+    pub random_access: bool,
+    pub has_vcl: bool,
+}
+
 impl Seeking {
     pub(super) fn scan_track(&self) -> Option<TrackId> {
         matches!(self.phase, Phase::Scan(_)).then_some(self.request.track)
     }
+
+    pub(super) fn picture_delivery(&self, track: TrackId) -> PictureDelivery {
+        match self.phase {
+            Phase::Scan(_) => PictureDelivery::Probe,
+            Phase::Replay { landing, .. } if track == self.request.track => {
+                PictureDelivery::Landing(landing.offset)
+            }
+            Phase::Replay { .. } => PictureDelivery::Probe,
+            Phase::Deliver(_) => PictureDelivery::Full,
+        }
+    }
 }
 
 impl Scan {
-    fn observe(&mut self, packet: &Packet, target: Time, policy: SourceTimePolicy) -> Result<()> {
-        let epochs = packet.epochs();
+    fn observe(
+        &mut self,
+        picture: PictureProbe,
+        target: Time,
+        policy: SourceTimePolicy,
+    ) -> Result<()> {
+        let PictureProbe {
+            offset,
+            epochs,
+            stamp,
+            random_access,
+            ..
+        } = picture;
         if *self.epochs.get_or_insert(epochs) != epochs {
             return Err(Error::Unsupported("MPEG-TS seek across source epochs"));
         }
-        let stamp = packet.clock().map(|clock| &clock.pts);
         if let Some(ticks) = stamp.and_then(|pts| pts.ticks90)
             && let Some(previous) = self.previous.replace(ticks)
             && policy == SourceTimePolicy::RelativeEpochZero
@@ -59,14 +98,14 @@ impl Scan {
                 "MPEG-TS seek across an ambiguous clock wrap",
             ));
         }
-        if packet.random_access() == RandomAccess::Sync {
+        if random_access {
             let time = stamp.and_then(|pts| pts.exact).ok_or(Error::Unsupported(
                 "MPEG-TS seek point without a resolved PTS",
             ))?;
             if time <= target && self.landing.is_none_or(|old| time >= old.time) {
                 self.landing = Some(Landing {
                     time,
-                    offset: packet.elementary_range().start,
+                    offset,
                     epochs,
                 });
             }
@@ -76,6 +115,23 @@ impl Scan {
 }
 
 impl Reader {
+    pub(super) fn observe_seek_picture(&mut self, picture: PictureProbe) -> Result<()> {
+        if !picture.has_vcl {
+            return Ok(());
+        }
+        let seek = &mut self.seek.as_mut_slice()[0];
+        match &mut seek.phase {
+            Phase::Scan(scan) => {
+                scan.observe(picture, seek.request.target, self.limits.time_policy)
+            }
+            Phase::Replay { skipped, .. } => {
+                *skipped = true;
+                Ok(())
+            }
+            Phase::Deliver(_) => unreachable!("a seek probe precedes landing"),
+        }
+    }
+
     /// Seek a selected AVC or HEVC track in one length-known, seekable entity.
     /// The reader scans for the previous coded random-access picture, then
     /// replays from the start to preserve transport, clock and PES provenance.
@@ -144,14 +200,11 @@ impl Reader {
                 self.seek = BudgetVec::new(&self.pool);
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
-            let step = self.advance::<false>(work, cancel, |_| ())?;
+            let step = self.advance::<true>(work, cancel, |_| ())?;
             match (&mut self.seek.as_mut_slice()[0].phase, step) {
-                (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
+                (Phase::Scan(_), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track {
-                        if !matches!(packet.access_unit(), super::AccessUnit::Video(_)) {
-                            return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
-                        }
-                        scan.observe(&packet, request.target, self.limits.time_policy)?;
+                        return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
                     }
                 }
                 (Phase::Scan(_), Step::Ready(Event::Other(_))) => {}

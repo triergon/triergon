@@ -6,6 +6,7 @@ mod mpeg_audio;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
+use super::seek::{PictureDelivery, PictureProbe};
 use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, Packet, PacketClock,
     PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
@@ -1020,6 +1021,7 @@ impl Build {
 
 pub(super) enum LaneStep {
     Packet(Packet),
+    PictureProbe(PictureProbe),
     IncompleteVideo(IncompleteVideo),
     LatmPes(latm::PesPacket),
     UnframedAudio(UnframedAudio),
@@ -1201,6 +1203,7 @@ impl Lane {
     pub(super) fn step(
         &mut self,
         draining: bool,
+        picture_delivery: PictureDelivery,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
@@ -1225,7 +1228,7 @@ impl Lane {
                 continue;
             }
             if self.build.is_some() {
-                return self.publish(work, cancel);
+                return self.publish(picture_delivery, work, cancel);
             }
             if let Some(incomplete) = self.incomplete.as_mut() {
                 if incomplete.reader_storage.is_none() {
@@ -1527,8 +1530,33 @@ impl Lane {
         Ok(())
     }
 
-    fn publish(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<LaneStep> {
+    fn finish_build(&mut self, consumed_end: u64) -> Build {
+        let build = self.build.take().expect("prepared publication");
+        self.retire = build.retire;
+        self.last_anchor = build.last_anchor;
+        self.completed += 1;
+        self.published = consumed_end;
+        build
+    }
+
+    fn publish(
+        &mut self,
+        picture_delivery: PictureDelivery,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LaneStep> {
         let build = self.build.as_mut().expect("pending publication");
+        let (range, anchor_offset) = build.unit.range_and_anchor();
+        let probe = if let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
+            let probe_only = match picture_delivery {
+                PictureDelivery::Full => false,
+                PictureDelivery::Probe => true,
+                PictureDelivery::Landing(offset) => offset != range.start,
+            };
+            probe_only.then_some((unit.has_vcl, unit.random_access))
+        } else {
+            None
+        };
         if let BuildOrigins::ReserveTable(count) = build.origins {
             if !work.try_charge(1) {
                 return Ok(LaneStep::Yield);
@@ -1537,13 +1565,12 @@ impl Lane {
             origins.try_reserve_exact(count)?;
             build.origins = BuildOrigins::Ready(PayloadSources::Table(origins));
         }
-        if !build.copy(work, cancel)? {
+        if probe.is_none() && !build.copy(work, cancel)? {
             return Ok(LaneStep::Yield);
         }
         let BuildOrigins::Ready(origins) = &mut build.origins else {
             unreachable!("prepared PES sources");
         };
-        let (range, anchor_offset) = build.unit.range_and_anchor();
         let consumed_end = match &build.unit {
             BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
             _ => range.end,
@@ -1611,6 +1638,23 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
+        let epochs = origins
+            .as_slice()
+            .first()
+            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
+            .pes
+            .pes()
+            .epochs;
+        if let Some((has_vcl, random_access)) = probe {
+            let build = self.finish_build(consumed_end);
+            return Ok(LaneStep::PictureProbe(PictureProbe {
+                offset: range.start,
+                epochs,
+                stamp: build.clock.map(|clock| clock.pts),
+                random_access,
+                has_vcl,
+            }));
+        }
         let (charge, duration) = match &build.unit {
             BuildUnit::Packet(unit) => {
                 (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)
@@ -1647,22 +1691,11 @@ impl Lane {
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let epochs = origins
-            .as_slice()
-            .first()
-            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
-            .pes
-            .pes()
-            .epochs;
-        let build = self.build.take().expect("prepared publication");
+        let build = self.finish_build(consumed_end);
         let recovered_adts = build.recovered_adts_bytes
             || build.clock.as_ref().is_some_and(|clock| {
                 matches!(clock.pes.event(), crate::TraceEvent::UnboundedAdtsPes(_))
             });
-        self.retire = build.retire;
-        self.last_anchor = build.last_anchor;
-        self.completed += 1;
-        self.published = consumed_end;
         let track = self.track.clone();
         let BuildOrigins::Ready(origins) = build.origins else {
             unreachable!("prepared PES sources");

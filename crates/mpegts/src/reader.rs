@@ -583,23 +583,41 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<ReaderStep<Self>>> {
-        match self.lanes.as_mut_slice()[index].step(draining, work, cancel)? {
-            LaneStep::Packet(packet) => Ok(Some(Step::Ready(Self::output(packet)))),
-            LaneStep::IncompleteVideo(video) => Ok(Some(Step::Ready(Event::Other(
-                ReaderEvent::IncompleteVideo(video),
-            )))),
-            LaneStep::LatmPes(packet) => Ok(Some(Step::Ready(Event::Other(ReaderEvent::LatmPes(
-                packet,
-            ))))),
-            LaneStep::UnframedAudio(audio) => Ok(Some(Step::Ready(Event::Other(
-                ReaderEvent::UnframedAudio(audio),
-            )))),
-            LaneStep::Yield => Ok(Some(Step::Yield)),
-            LaneStep::DeferredFragment => {
-                self.deferred_fragment = true;
-                Ok(None)
+        let delivery = self
+            .seek
+            .as_slice()
+            .first()
+            .map_or(seek::PictureDelivery::Full, |seek| {
+                seek.picture_delivery(TrackId(
+                    self.lanes.as_slice()[index].track.stream().pid.into(),
+                ))
+            });
+        loop {
+            match self.lanes.as_mut_slice()[index].step(draining, delivery, work, cancel)? {
+                LaneStep::PictureProbe(picture) => self.observe_seek_picture(picture)?,
+                LaneStep::Packet(packet) => return Ok(Some(Step::Ready(Self::output(packet)))),
+                LaneStep::IncompleteVideo(video) => {
+                    return Ok(Some(Step::Ready(Event::Other(
+                        ReaderEvent::IncompleteVideo(video),
+                    ))));
+                }
+                LaneStep::LatmPes(packet) => {
+                    return Ok(Some(Step::Ready(Event::Other(ReaderEvent::LatmPes(
+                        packet,
+                    )))));
+                }
+                LaneStep::UnframedAudio(audio) => {
+                    return Ok(Some(Step::Ready(Event::Other(ReaderEvent::UnframedAudio(
+                        audio,
+                    )))));
+                }
+                LaneStep::Yield => return Ok(Some(Step::Yield)),
+                LaneStep::DeferredFragment => {
+                    self.deferred_fragment = true;
+                    return Ok(None);
+                }
+                LaneStep::End | LaneStep::NeedPayload => return Ok(None),
             }
-            LaneStep::End | LaneStep::NeedPayload => Ok(None),
         }
     }
     fn advance<const OBSERVING: bool>(
