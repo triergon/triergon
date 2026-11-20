@@ -155,7 +155,7 @@ impl ProbeBuffer {
     /// Claim its possible replay capacity before the first irreversible read.
     pub(super) fn identify_pipe(&mut self, source: &mut impl Read) -> Result<Probe> {
         self.prefix.charge.resize_to(self.maximum)?;
-        let kind = self.identify(source)?;
+        let kind = self.identify(source, None)?;
         if self.prefix.bytes.is_empty() {
             // Return unused headroom before the selected reader is constructed.
             self.prefix.charge.resize_to(self.used.min(self.maximum))?;
@@ -163,7 +163,11 @@ impl ProbeBuffer {
         Ok(kind)
     }
 
-    pub(super) fn identify(&mut self, source: &mut impl Read) -> Result<Probe> {
+    pub(super) fn identify(
+        &mut self,
+        source: &mut impl Read,
+        length: Option<u64>,
+    ) -> Result<Probe> {
         loop {
             let bytes = &self.header[..self.used];
             match container(bytes) {
@@ -179,7 +183,7 @@ impl ProbeBuffer {
                     if !cfg!(feature = "elementary") || bytes.starts_with(b"fLaC") {
                         return Ok(elementary(bytes));
                     }
-                    return self.read_elementary(source);
+                    return self.read_elementary(source, length);
                 }
             }
         }
@@ -198,19 +202,16 @@ impl ProbeBuffer {
     /// Search the full bounded prefix once. Buffer the first block on the stack
     /// so a short input needs only its actual length. A longer input takes one
     /// allocation and never has to charge both an old and a replacement window.
-    fn read_elementary(&mut self, source: &mut impl Read) -> Result<Probe> {
+    fn read_elementary(&mut self, source: &mut impl Read, length: Option<u64>) -> Result<Probe> {
+        let hint = length.unwrap_or(0).min(self.maximum as u64) as usize;
         let mut block = [0; 4096];
         block[..self.used].copy_from_slice(&self.header[..self.used]);
         let mut used = self.used;
-        loop {
-            let want = block.len().min(LIMIT - self.prefix.bytes.len());
-            while used < want {
-                let count = read(source, &mut block[used..want])?;
-                if count == 0 {
-                    break;
-                }
-                used += count;
-            }
+        while self.prefix.bytes.len() < LIMIT {
+            // A file can grow past its hint. Keep the original block boundaries
+            // when checking the pool limit on the remaining bytes.
+            let want = block.len() - self.prefix.bytes.len() % block.len();
+            used += fill(source, &mut block[used..want])?;
             let end = self.prefix.bytes.len() + used;
             if end > self.maximum {
                 return Err(Error::Limit {
@@ -223,12 +224,34 @@ impl ProbeBuffer {
                     .allocate(if used < want { used } else { self.maximum })?;
             }
             self.prefix.bytes.extend_from_slice(&block[..used]);
-            if used < want || end == LIMIT {
-                return Ok(elementary(&self.prefix.bytes));
+            if used < want {
+                break;
+            }
+            if end < hint {
+                // Read a seekable file directly into the reserved prefix.
+                self.prefix.bytes.resize(hint, 0);
+                let actual = end + fill(source, &mut self.prefix.bytes[end..])?;
+                self.prefix.bytes.truncate(actual);
+                if actual < hint {
+                    break;
+                }
             }
             used = 0;
         }
+        Ok(elementary(&self.prefix.bytes))
     }
+}
+
+fn fill(source: &mut impl Read, buffer: &mut [u8]) -> Result<usize> {
+    let mut used = 0;
+    while used < buffer.len() {
+        let count = read(source, &mut buffer[used..])?;
+        if count == 0 {
+            break;
+        }
+        used += count;
+    }
+    Ok(used)
 }
 
 fn read(source: &mut impl Read, out: &mut [u8]) -> Result<usize> {

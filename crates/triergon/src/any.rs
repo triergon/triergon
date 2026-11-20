@@ -272,7 +272,7 @@ pub fn open_blocking<S: std::io::Read + std::io::Seek>(
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
     let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
-    let kind = ProbeBuffer::new(pool).identify(&mut source);
+    let kind = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
     source.rewind().map_err(|e| Error::Io(e.kind()))?;
     let reader = AnyReader::from_probe(kind?, pool, SourceId(1), capabilities)?;
     Ok(triergon_core::blocking::Blocking::seekable(

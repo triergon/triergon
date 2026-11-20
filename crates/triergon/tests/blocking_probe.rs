@@ -14,6 +14,8 @@ struct Fragmented<'a> {
     interrupt: bool,
     end_error: Option<ErrorKind>,
     read_bytes: usize,
+    reported_length: Option<u64>,
+    request_at_4k: Option<usize>,
 }
 
 impl<'a> Fragmented<'a> {
@@ -24,6 +26,8 @@ impl<'a> Fragmented<'a> {
             interrupt: true,
             end_error,
             read_bytes: 0,
+            reported_length: None,
+            request_at_4k: None,
         }
     }
 }
@@ -35,6 +39,9 @@ impl Read for Fragmented<'_> {
             return Err(ErrorKind::Interrupted.into());
         }
         self.interrupt = true;
+        if self.read_bytes == 4096 {
+            self.request_at_4k = Some(out.len());
+        }
         let want = out.len().min(self.chunk);
         let count = self.data.read(&mut out[..want])?;
         if count == 0
@@ -49,6 +56,11 @@ impl Read for Fragmented<'_> {
 
 impl Seek for Fragmented<'_> {
     fn seek(&mut self, to: SeekFrom) -> io::Result<u64> {
+        if to == SeekFrom::End(0)
+            && let Some(length) = self.reported_length
+        {
+            return Ok(length);
+        }
         self.data.seek(to)
     }
 }
@@ -290,4 +302,41 @@ fn seekable_elementary_probe_fits_a_single_window_in_the_pool() {
         assert_eq!(pool.used(), base);
     }
     assert_eq!(pool.peak(), base + 65536);
+}
+
+#[cfg(feature = "elementary")]
+#[test]
+fn seekable_probe_uses_reported_length_only_to_size_the_read() {
+    // Selection requires frames beyond the smallest reported length.
+    let mut bytes = vec![0x21; 9000];
+    for start in [7000, 7417, 7834] {
+        bytes[start..start + 4].copy_from_slice(&[0xff, 0xfb, 0x90, 0x00]);
+    }
+    let pool = Budget::new(Budget::control_storage_bytes() + 65536).unwrap();
+    for (length, request) in [(0, 4096), (4097, 1), (9000, 4904), (u64::MAX, 61440)] {
+        let mut file = Fragmented::new(&bytes, 113, None);
+        file.reported_length = Some(length);
+        let opened = open_blocking(&mut file, &pool).unwrap();
+        assert!(matches!(opened.reader(), AnyReader::MpegAudio(_)));
+        let file = opened.into_inner();
+        assert_eq!(file.data.position(), 0);
+        assert_eq!(file.read_bytes, bytes.len());
+        assert_eq!(file.request_at_4k, Some(request));
+    }
+    // A padded zero would complete the last header after an early EOF.
+    assert_eq!(probe(&bytes[..7838]), Probe::MpegAudio);
+    assert_eq!(probe(&bytes[..7837]), Probe::Unknown);
+    let mut short = Fragmented::new(&bytes[..7837], 113, None);
+    short.reported_length = Some(9000);
+    assert_eq!(
+        open_blocking(&mut short, &pool).err(),
+        Some(Error::Unsupported("source format not recognised"))
+    );
+    assert_eq!(short.data.position(), 0);
+
+    let mut pipe = Fragmented::new(&bytes, 113, None);
+    let opened = open_sequential(&mut pipe, &pool).unwrap();
+    assert!(matches!(opened.reader(), AnyReader::MpegAudio(_)));
+    drop(opened);
+    assert_eq!(pipe.request_at_4k, Some(4096));
 }

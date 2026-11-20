@@ -41,7 +41,8 @@ worker's operations read only the raw-video and timed-text movies of its compari
 
 The blocking facade stops reading as soon as a container signature selects a reader.
 It reserves replay capacity before consuming sequential input and rewinds seekable input.
-Frame-based elementary probing examines up to 64 KiB once.
+Frame-based elementary probing examines up to 64 KiB once. On seekable input,
+the reported length sizes a direct read into the reserved prefix.
 
 The [session queue workloads](../harness/session-queues/README.md) cover five real-payload feed patterns and three queue states. Each comparison checks decoded output before measuring paired runtime, peak heap and total RSS.
 
