@@ -108,6 +108,8 @@ valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
 another reader selects). When a name-keyed CFF face can skip glyph-name synthesis,
 the reverse index needs at most 150 slots for StandardEncoding or a custom
 encoding with the supplement bit clear. ExpertEncoding needs at most 379 slots.
+When a face retains a sparse charset of up to 16 glyphs, it can look up a
+string ID directly in that charset.
 A CID-keyed CFF face validates the complete charset and retains the CIDs only
 when it needs them to construct the glyph-name charmap.
 Format 4 is read as FreeType reads it: a linear search
