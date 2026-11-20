@@ -319,7 +319,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 15] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -359,6 +359,13 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         example: None,
         features: &["aac-simd"],
         nightly: true,
+    },
+    Candidate {
+        name: "ac3-encode-worker",
+        package: "triergon-codec-ac3",
+        example: Some("ac3_encode_worker"),
+        features: &["encode"],
+        nightly: false,
     },
     Candidate {
         name: "capture-worker",
@@ -793,7 +800,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 14] = [
+const PROFILE_REFERENCES: [ProfileReference; 15] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -876,6 +883,16 @@ const PROFILE_REFERENCES: [ProfileReference; 14] = [
             "libavutil",
         ],
         options: RELEASE_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-ac3-encode-worker",
+        source: "harness/reference_ac3_encode.c",
+        record: "ffmpeg-ac3-encode-native",
+        kind: "FFmpeg 9.0.2 AC-3 encoder, fed through the public frame and packet API",
+        libraries: "ac3_encode_reference",
+        packages: &["libavcodec", "libavutil"],
         ..REFERENCE
     },
     ProfileReference {

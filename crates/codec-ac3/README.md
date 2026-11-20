@@ -168,5 +168,9 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
   signal-to-noise ratios at the same bitrate and the peak level in the last
   128 samples of the block before an attack. Broader signal quality and native
   performance measurements remain open.
+- The [encoder measurement contract](../../harness/features/ac3-encode/contract.json)
+  runs all 27 hash-pinned cases on the same preloaded PCM. The
+  `encoder_workers_decode_full_sessions` test decodes the full streams emitted
+  by the measured workers. See [encoder measurements](../../docs/quality.md#ac-3-encoding).
 - Derivation notes and tools: [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).

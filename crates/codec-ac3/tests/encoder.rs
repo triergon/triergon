@@ -1,5 +1,9 @@
 #![cfg(feature = "encode")]
 
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
 use triergon_codec_ac3::encoder::{
     ChannelMode, DELAY_SAMPLES, EncodeError, Encoder, MAX_FRAME_BYTES, SAMPLES_PER_FRAME,
 };
@@ -106,6 +110,39 @@ fn snr(source: impl IntoIterator<Item = f32>, decoded: impl IntoIterator<Item = 
                 (signal + a * a, error + (a - f64::from(b)).powi(2))
             });
     10.0 * (signal / error).log10()
+}
+
+fn checked_run(command: &mut Command) {
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success() && output.stderr.is_empty(),
+        "{command:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn strict_decode(ffmpeg: &std::ffi::OsStr, input: &Path, decoded: &Path) -> Vec<u8> {
+    checked_run(
+        Command::new(ffmpeg)
+            .args([
+                "-v",
+                "error",
+                "-nostdin",
+                "-err_detect",
+                "crccheck+explode",
+                "-f",
+                "ac3",
+                "-i",
+            ])
+            .arg(input)
+            .args(["-c:a", "pcm_f32le", "-f", "f32le"])
+            .arg(decoded),
+    );
+    fs::read(decoded).unwrap()
+}
+
+fn plane_sample(frame: &[u8], channel: usize) -> f32 {
+    f32::from_le_bytes(frame[4 * channel..4 * channel + 4].try_into().unwrap())
 }
 
 /// Ideal long-block LFE reconstruction with the seven transmitted bins and no quantizer.
@@ -297,23 +334,12 @@ fn a_single_attack_switches_the_program_and_keeps_the_previous_block_quiet() {
 #[test]
 #[ignore = "requires TRIERGON_FFMPEG and an empty TRIERGON_AC3_OUTPUT directory"]
 fn ffmpeg_interoperability_and_signal_quality() {
-    use std::fs;
     use std::io::{BufWriter, Write};
-    use std::path::PathBuf;
-    use std::process::Command;
 
     let ffmpeg = std::env::var_os("TRIERGON_FFMPEG").expect("FFmpeg binary");
     let dir = PathBuf::from(std::env::var_os("TRIERGON_AC3_OUTPUT").expect("comparison output"));
     fs::create_dir(&dir).expect("create fresh comparison output");
 
-    let run = |command: &mut Command| {
-        let output = command.output().unwrap();
-        assert!(
-            output.status.success() && output.stderr.is_empty(),
-            "{command:?}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    };
     for rate in SAMPLE_RATES {
         for (mode, bitrate, _, speakers) in MODES {
             for signal in ["tones", "broadband", "attacks"] {
@@ -382,32 +408,20 @@ fn ffmpeg_interoperability_and_signal_quality() {
                     ChannelMode::Stereo => "stereo",
                     ChannelMode::Surround51 => "5.1(side)",
                 };
-                run(Command::new(&ffmpeg)
-                    .args(["-v", "error", "-nostdin", "-f", "f32le", "-ar"])
-                    .arg(rate.to_string())
-                    .args(["-ch_layout", layout, "-i"])
-                    .arg(&pcm)
-                    .args(["-c:a", "ac3", "-b:a"])
-                    .arg(bitrate.to_string())
-                    .arg(&reference));
+                checked_run(
+                    Command::new(&ffmpeg)
+                        .args(["-v", "error", "-nostdin", "-f", "f32le", "-ar"])
+                        .arg(rate.to_string())
+                        .args(["-ch_layout", layout, "-i"])
+                        .arg(&pcm)
+                        .args(["-c:a", "ac3", "-b:a"])
+                        .arg(bitrate.to_string())
+                        .arg(&reference),
+                );
 
-                let quality = |input: &std::path::Path, label: &str| {
+                let quality = |input: &Path, label: &str| {
                     let decoded = dir.join(format!("{name}-{label}.pcm"));
-                    run(Command::new(&ffmpeg)
-                        .args([
-                            "-v",
-                            "error",
-                            "-nostdin",
-                            "-err_detect",
-                            "crccheck+explode",
-                            "-f",
-                            "ac3",
-                            "-i",
-                        ])
-                        .arg(input)
-                        .args(["-c:a", "pcm_f32le", "-f", "f32le"])
-                        .arg(&decoded));
-                    let output = fs::read(decoded).unwrap();
+                    let output = strict_decode(&ffmpeg, input, &decoded);
                     assert_eq!(
                         output.len(),
                         (sample_count + SAMPLES_PER_FRAME) * speakers.len() * 4
@@ -419,11 +433,7 @@ fn ffmpeg_interoperability_and_signal_quality() {
                             let samples = output
                                 .chunks_exact(4 * speakers.len())
                                 .skip(DELAY_SAMPLES)
-                                .map(|frame| {
-                                    f32::from_le_bytes(
-                                        frame[ch * 4..ch * 4 + 4].try_into().unwrap(),
-                                    )
-                                });
+                                .map(|frame| plane_sample(frame, ch));
                             snr(plane.iter().copied(), samples)
                         })
                         .collect::<Vec<_>>();
@@ -448,6 +458,77 @@ fn ffmpeg_interoperability_and_signal_quality() {
                     a.iter().all(|value| *value > 0.0),
                     "{name} lost signal or channel alignment"
                 );
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires the two encoder workers, pinned PCM and FFmpeg"]
+fn encoder_workers_decode_full_sessions() {
+    let ffmpeg = std::env::var_os("TRIERGON_FFMPEG").expect("FFmpeg binary");
+    let dir = PathBuf::from(std::env::var_os("TRIERGON_AC3_OUTPUT").expect("comparison output"));
+    let corpus = PathBuf::from(std::env::var_os("TRIERGON_AC3_INPUTS").expect("pinned PCM"));
+    let candidate = std::env::var_os("TRIERGON_AC3_WORKER").expect("candidate worker");
+    let reference = std::env::var_os("TRIERGON_AC3_REFERENCE").expect("reference worker");
+    fs::create_dir(&dir).expect("create fresh comparison output");
+    for rate in SAMPLE_RATES {
+        for (_, _, _, speakers) in MODES {
+            let channels = speakers.len();
+            let stride = channels * 4;
+            let cycle_bytes = (FRAMES + 1) * SAMPLES_PER_FRAME * stride;
+            for signal in ["tones", "broadband", "attacks"] {
+                let name = format!("{rate}-{channels}-{signal}");
+                let input = corpus.join(format!("{name}.pcm"));
+                let source = fs::read(&input).unwrap();
+                assert_eq!(source.len(), cycle_bytes);
+                let measure = |worker: &std::ffi::OsStr, label: &str| {
+                    let stream = dir.join(format!("{name}-{label}.ac3"));
+                    checked_run(
+                        Command::new(worker)
+                            .arg("ac3-encode-emit")
+                            .arg(&input)
+                            .arg(rate.to_string())
+                            .arg(channels.to_string())
+                            .arg(&stream),
+                    );
+                    let pcm = dir.join(format!("{name}-{label}.pcm"));
+                    let decoded = strict_decode(&ffmpeg, &stream, &pcm);
+                    fs::remove_file(pcm).unwrap();
+                    assert_eq!(decoded.len(), 49 * cycle_bytes);
+                    let scores = (0..channels)
+                        .map(|ch| {
+                            snr(
+                                source
+                                    .chunks_exact(stride)
+                                    .cycle()
+                                    .map(|f| plane_sample(f, ch)),
+                                decoded
+                                    .chunks_exact(stride)
+                                    .skip(DELAY_SAMPLES)
+                                    .map(|f| plane_sample(f, ch)),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    assert!(
+                        scores.iter().all(|value| *value > 0.0),
+                        "{name} {label}: {scores:?}"
+                    );
+                    let peak = (signal == "attacks").then(|| {
+                        decoded
+                            .chunks_exact(cycle_bytes)
+                            .map(|cycle| peak_before_attack(cycle, speakers))
+                            .fold(0.0, f32::max)
+                    });
+                    (fs::metadata(stream).unwrap().len(), scores, peak)
+                };
+                let (candidate_bytes, a, peak_a) = measure(&candidate, "candidate");
+                let (reference_bytes, b, peak_b) = measure(&reference, "reference");
+                assert_eq!(candidate_bytes, reference_bytes, "{name} encoded bytes");
+                println!("{name}\t{a:.2?}\t{b:.2?}");
+                if let (Some(a), Some(b)) = (peak_a, peak_b) {
+                    println!("pre-attack {name} {a:.7e} {b:.7e}");
+                }
             }
         }
     }
