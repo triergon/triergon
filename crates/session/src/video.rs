@@ -187,45 +187,45 @@ mod tests {
 
     #[test]
     fn decoded_payload_storage_is_released_on_reset_failure_and_end() {
-        let mut lane = VideoSession::new(QueueLimits::VIDEO);
-        lane.load(video_decoder(VideoCodec::H264));
+        let mut session = VideoSession::new(QueueLimits::VIDEO);
+        session.load(video_decoder(VideoCodec::H264));
         let delimiter = [0, 0, 1, 9, 0xf0];
-        lane.feed(&delimiter, None).unwrap();
-        assert!(!lane.step(None));
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
-        lane.feed(&delimiter, None).unwrap();
-        assert!(!lane.step(None));
-        assert_eq!(lane.state(), SessionState::Starved);
-        assert_eq!(lane.queue.retained_payload_bytes(), delimiter.len());
-        lane.flush();
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        session.feed(&delimiter, None).unwrap();
+        assert!(!session.step(None));
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
+        session.feed(&delimiter, None).unwrap();
+        assert!(!session.step(None));
+        assert_eq!(session.state(), SessionState::Starved);
+        assert_eq!(session.queue.retained_payload_bytes(), delimiter.len());
+        session.flush();
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
 
         // Warm the spare before the truncated SPS fails.
-        lane.feed(&delimiter, None).unwrap();
-        assert!(!lane.step(None));
-        lane.feed(&delimiter, None).unwrap();
-        lane.feed(&[0, 0, 1, 0x67], None).unwrap();
-        assert!(!lane.step(None));
-        assert!(matches!(lane.state(), SessionState::Failed(_)));
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        session.feed(&delimiter, None).unwrap();
+        assert!(!session.step(None));
+        session.feed(&delimiter, None).unwrap();
+        session.feed(&[0, 0, 1, 0x67], None).unwrap();
+        assert!(!session.step(None));
+        assert!(matches!(session.state(), SessionState::Failed(_)));
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
 
-        lane.flush();
-        lane.feed(&delimiter, None).unwrap();
-        assert!(!lane.step(None));
-        lane.feed(&delimiter, None).unwrap();
-        assert!(!lane.step(None));
-        assert_eq!(lane.queue.retained_payload_bytes(), delimiter.len());
-        lane.end_of_stream();
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
-        assert!(!lane.step(None));
-        assert_eq!(lane.state(), SessionState::Ended);
+        session.flush();
+        session.feed(&delimiter, None).unwrap();
+        assert!(!session.step(None));
+        session.feed(&delimiter, None).unwrap();
+        assert!(!session.step(None));
+        assert_eq!(session.queue.retained_payload_bytes(), delimiter.len());
+        session.end_of_stream();
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
+        assert!(!session.step(None));
+        assert_eq!(session.state(), SessionState::Ended);
 
-        lane.flush();
-        lane.feed(&delimiter, None).unwrap();
-        lane.end_of_stream();
-        assert_eq!(lane.queue.retained_payload_bytes(), delimiter.len());
-        assert!(!lane.step(None));
-        assert_eq!(lane.state(), SessionState::Ended);
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        session.flush();
+        session.feed(&delimiter, None).unwrap();
+        session.end_of_stream();
+        assert_eq!(session.queue.retained_payload_bytes(), delimiter.len());
+        assert!(!session.step(None));
+        assert_eq!(session.state(), SessionState::Ended);
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
     }
 }

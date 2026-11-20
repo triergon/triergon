@@ -180,43 +180,43 @@ mod tests {
 
     #[test]
     fn decoded_payload_storage_is_released_on_reset_failure_and_end() {
-        let mut lane = AudioSession::new(QueueLimits::AUDIO);
+        let mut session = AudioSession::new(QueueLimits::AUDIO);
         let head = b"OpusHead\x01\x02\0\0\x80\xbb\0\0\0\0\0";
         let packet = [0xfc, 0xff, 0xfe];
         let mut block = PcmBlock::default();
-        lane.load(Some(audio_decoder(AudioCodec::Opus, head).unwrap()));
-        lane.feed(&packet, None).unwrap();
-        assert_eq!(lane.pull(None, 0, &mut block), 1);
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
-        lane.feed(&packet, None).unwrap();
-        assert_eq!(lane.pull(None, 0, &mut block), 1);
-        assert_eq!(lane.state(), SessionState::Starved);
-        assert_eq!(lane.queue.retained_payload_bytes(), packet.len());
-        lane.stop();
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        session.load(Some(audio_decoder(AudioCodec::Opus, head).unwrap()));
+        session.feed(&packet, None).unwrap();
+        assert_eq!(session.pull(None, 0, &mut block), 1);
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
+        session.feed(&packet, None).unwrap();
+        assert_eq!(session.pull(None, 0, &mut block), 1);
+        assert_eq!(session.state(), SessionState::Starved);
+        assert_eq!(session.queue.retained_payload_bytes(), packet.len());
+        session.stop();
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
 
         // The invalid packet waits behind its PTS while the spare is live.
-        lane.feed(&packet, None).unwrap();
-        assert_eq!(lane.pull(None, 0, &mut block), 1);
-        lane.feed(&packet, Some(0)).unwrap();
-        lane.feed(&[0xff], Some(1)).unwrap();
-        assert_eq!(lane.pull(Some(0), 0, &mut block), 1);
-        assert_eq!(lane.queue.retained_payload_bytes(), packet.len() + 1);
-        assert_eq!(lane.pull(Some(1), 0, &mut block), 1);
-        assert!(matches!(lane.state(), SessionState::Failed(_)));
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        session.feed(&packet, None).unwrap();
+        assert_eq!(session.pull(None, 0, &mut block), 1);
+        session.feed(&packet, Some(0)).unwrap();
+        session.feed(&[0xff], Some(1)).unwrap();
+        assert_eq!(session.pull(Some(0), 0, &mut block), 1);
+        assert_eq!(session.queue.retained_payload_bytes(), packet.len() + 1);
+        assert_eq!(session.pull(Some(1), 0, &mut block), 1);
+        assert!(matches!(session.state(), SessionState::Failed(_)));
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
 
-        lane.stop();
-        lane.feed(&packet, None).unwrap();
-        assert_eq!(lane.pull(None, 0, &mut block), 1);
-        lane.feed(&packet, Some(0)).unwrap();
-        lane.feed(&packet, Some(1)).unwrap();
-        assert_eq!(lane.pull(Some(0), 0, &mut block), 1);
-        assert_eq!(lane.queue.retained_payload_bytes(), 2 * packet.len());
-        lane.end_of_stream();
-        assert_eq!(lane.queue.retained_payload_bytes(), packet.len());
-        assert_eq!(lane.pull(None, 0, &mut block), 1);
-        assert_eq!(lane.state(), SessionState::Ended);
-        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        session.stop();
+        session.feed(&packet, None).unwrap();
+        assert_eq!(session.pull(None, 0, &mut block), 1);
+        session.feed(&packet, Some(0)).unwrap();
+        session.feed(&packet, Some(1)).unwrap();
+        assert_eq!(session.pull(Some(0), 0, &mut block), 1);
+        assert_eq!(session.queue.retained_payload_bytes(), 2 * packet.len());
+        session.end_of_stream();
+        assert_eq!(session.queue.retained_payload_bytes(), packet.len());
+        assert_eq!(session.pull(None, 0, &mut block), 1);
+        assert_eq!(session.state(), SessionState::Ended);
+        assert_eq!(session.queue.retained_payload_bytes(), 0);
     }
 }
