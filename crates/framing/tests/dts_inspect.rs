@@ -4,6 +4,7 @@ use triergon_core::{Budget, Bytes, Error, SourceId, Time, WorkBudget};
 use triergon_framing::{
     DtsCoreField as F, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity,
     DtsInspectionIssues as I, DtsInspectionSourceStatus as S, DtsInspectionStep, FieldObservation,
+    inspect_dts_header_bits,
 };
 
 fn identity() -> DtsInspectionIdentity {
@@ -113,10 +114,16 @@ fn all_prefix_lengths_preserve_missing_bits_without_zero_padding() {
         );
         for length in 0..=raw.len() {
             let value = inspect(&raw[..length], 1);
+            let packed = inspect_dts_header_bits(&raw, length * 8).unwrap();
+            assert_eq!(packed.views(), value.views());
+            assert_eq!(packed.issues(), value.issues().bits());
+            assert_eq!(packed.source_status(), value.source_status());
+            assert_eq!(packed.required_header_bits(), value.required_header_bits());
             assert_eq!(value.source_bytes().as_ref(), &raw[..length]);
             assert_eq!(value.syntax_complete(), length == raw.len());
             assert_eq!(value.issues().contains(I::TRUNCATED), length < raw.len());
             for field in F::ALL {
+                assert_eq!(packed.field(field), value.field(field));
                 if let FieldObservation::Bits {
                     offset,
                     observed_bits,
@@ -225,6 +232,50 @@ fn validation_collects_independent_issues_instead_of_hiding_later_codes() {
 }
 
 #[test]
+fn coded_and_normal_windows_follow_the_block_count_domain_in_both_inspectors() {
+    for normal in [false, true] {
+        for count in 0..=127 {
+            let raw = authored(
+                false,
+                &[
+                    ("normal", u32::from(normal)),
+                    ("short", if normal { 31 } else { 10 }),
+                    ("nblks", count),
+                ],
+            );
+            let samples = (count >= 5).then_some(32 * (count + 1));
+            let normal_count = matches!(count, 7 | 15 | 31 | 63 | 127);
+            let owned = inspect(&raw, 1);
+            let packed = inspect_dts_header_bits(&raw, raw.len() * 8).unwrap();
+            assert_eq!(owned.field(F::BlockCount).value(), Some(count));
+            assert_eq!(packed.value(F::BlockCount), Some(count));
+            assert_eq!(packed.views(), owned.views());
+            assert_eq!(packed.issues(), owned.issues().bits());
+            assert_eq!(
+                owned.issues().contains(I::BLOCK_COUNT),
+                count < 5 || (normal && !normal_count)
+            );
+            assert_eq!(owned.views().coded_window_samples, samples);
+            assert_eq!(
+                owned.views().normal_window,
+                (normal && normal_count)
+                    .then(|| { Time::new(i128::from(32 * (count + 1)), 48_000).unwrap() })
+            );
+
+            // NBLKS spans bits 39..46. Body bytes beyond the prefix remain available.
+            let partial = inspect_dts_header_bits(&raw, 45).unwrap();
+            assert_eq!(partial.value(F::BlockCount), None);
+            assert_eq!(partial.views().coded_window_samples, None);
+            assert_eq!(partial.issues() & I::BLOCK_COUNT, 0);
+            let complete = inspect_dts_header_bits(&raw, 46).unwrap();
+            assert_eq!(complete.value(F::BlockCount), Some(count));
+            assert_eq!(complete.views().coded_window_samples, samples);
+            assert_eq!(complete.views().normal_window, None);
+        }
+    }
+}
+
+#[test]
 fn normal_count_time_gain_and_open_bitrate_views_are_exact() {
     for (version, expected) in [(5, None), (6, Some(-27)), (7, Some(-11)), (8, None)] {
         let value = inspect(&authored(false, &[("version", version), ("rate", 29)]), 7);
@@ -296,6 +347,44 @@ fn arbitrary_work_quanta_and_zero_work_keep_the_same_source_facts() {
         }
         assert_eq!(other.issues(), expected.issues());
         assert_eq!(other.views(), expected.views());
+    }
+}
+
+#[test]
+fn publication_charges_each_source_bit_then_validation_and_publication() {
+    let plain = authored(false, &[]);
+    let crc = authored(true, &[]);
+    // Skipping absent HCRC costs one unit when the read cursor reaches it.
+    for (raw, charges) in [
+        (&plain[..9], 72 + 2),
+        (&plain[..11], 88 + 1 + 2),
+        (&plain[..], 104 + 1 + 2),
+        (&crc[..], 120 + 2),
+        (&[0; 15][..], 32 + 2),
+    ] {
+        let pool = Budget::new(65536).unwrap();
+        let source = Bytes::copy_from_slice(&pool, raw).unwrap();
+        let mut job = DtsHeaderInspector::new(&pool, identity(), source, 256).unwrap();
+        let cancel = AtomicBool::new(false);
+        for _ in 1..charges {
+            let mut work = WorkBudget::new(1);
+            assert!(matches!(
+                job.step(&mut work, &cancel).unwrap(),
+                DtsInspectionStep::Yield
+            ));
+            assert_eq!(work.spent(), 1);
+        }
+        let mut work = WorkBudget::new(2);
+        assert!(matches!(
+            job.step(&mut work, &cancel).unwrap(),
+            DtsInspectionStep::Ready(_)
+        ));
+        assert_eq!(work.spent(), 1);
+        assert!(matches!(
+            job.step(&mut work, &cancel).unwrap(),
+            DtsInspectionStep::End(_)
+        ));
+        assert_eq!(work.spent(), 1);
     }
 }
 
@@ -421,6 +510,13 @@ fn all_frozen396_inputs_keep_every_independent_complete_raw_field() {
         };
         let value = inspect(&raw, 1);
         assert_eq!(value.source_bytes().as_ref(), raw, "{}", parts[0]);
+        let packed = inspect_dts_header_bits(&raw, raw.len() * 8).unwrap();
+        assert_eq!(
+            packed.source_status(),
+            value.source_status(),
+            "{}",
+            parts[0]
+        );
         let status = match value.source_status() {
             S::NormalHeader => "ok",
             S::Truncated => "truncated",
@@ -432,6 +528,12 @@ fn all_frozen396_inputs_keep_every_independent_complete_raw_field() {
             let fields: Vec<_> = parts[3].split(',').collect();
             assert_eq!(fields.len(), 27);
             for (field, expected) in F::ALL.into_iter().zip(fields) {
+                assert_eq!(
+                    packed.field(field),
+                    value.field(field),
+                    "{} {field:?}",
+                    parts[0]
+                );
                 if expected == "-" {
                     assert_eq!(value.field(field), FieldObservation::NotInSyntax);
                 } else {

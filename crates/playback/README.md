@@ -114,7 +114,7 @@ video and audio tracks.
 | MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
-| TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
+| TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `compat::pes::open_private_audio`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
 | Progressive TS188 | `ts_progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |

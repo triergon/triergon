@@ -271,6 +271,21 @@ fn footer_payloads_preserve_the_terminal_probe_position_instead_of_forcing_eof()
 }
 
 #[test]
+fn absolute_skip_starts_one_byte_beyond_the_forward_discard_bound() {
+    // After reading the first free box's 16-byte probe, one-byte callbacks
+    // leave the buffer end at the cursor. Only the remaining payload counts.
+    for (remaining, seeks) in [(32767, 0), (32768, 0), (32769, 1)] {
+        let source = Source::new(&footer(16 + remaining, 2));
+        let model = source.model(1, 1).unwrap();
+        assert_eq!(model.modeled_absolute_seek_bounds(), (seeks, seeks));
+        assert_eq!(
+            model.modeled_open_state().logical_position,
+            source.length - remaining as u64
+        );
+    }
+}
+
+#[test]
 fn existing_large_free_observations_are_all_retained_after_an_in_source_skip() {
     let mut checked = 0;
     for &(bytes, read, position, ptr, end, _) in cases::OPEN_WINDOWS {

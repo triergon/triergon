@@ -24,3 +24,42 @@ pub mod mov {
         Mp4IndexJob::for_forward_encoded_edits(movie, plans, limits)
     }
 }
+
+/// Packet delivery with a selected transport-stream PES interpretation.
+pub mod pes {
+    use crate::{Engine, Result, TsNativeCarriage, TsNativeTrackSelection};
+    use triergon_core::InputCursor;
+    use triergon_mpegts::{
+        PacketFormat, ParseLimits, clock::SourceTimePolicy, compat::pes::PrivateAudioCarriage,
+    };
+
+    /// Private audio PID and carriage to check against the active program map.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct PrivateAudioSelection {
+        /// Elementary stream PID.
+        pub pid: u16,
+        /// Packet framing associated with this PID.
+        pub carriage: PrivateAudioCarriage,
+    }
+
+    /// Deliver the selected private-audio PES packets from a TS188 source.
+    pub fn open_private_audio(
+        input: InputCursor,
+        program: u16,
+        limits: ParseLimits,
+        policy: SourceTimePolicy,
+        selection: PrivateAudioSelection,
+    ) -> Result<Engine> {
+        Engine::ts_with_native(
+            input,
+            PacketFormat::Ts188,
+            program,
+            limits,
+            policy,
+            TsNativeTrackSelection {
+                pid: selection.pid,
+                carriage: TsNativeCarriage::PrivateAudio(selection.carriage),
+            },
+        )
+    }
+}
