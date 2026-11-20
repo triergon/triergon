@@ -186,7 +186,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
                 "--enable-decoder=pcm_s16le" => {
                     "--enable-decoder=pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,movtext,webvtt"
                 }
-                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub,mpegaudio",
                 other => other,
             }
             .to_owned();
