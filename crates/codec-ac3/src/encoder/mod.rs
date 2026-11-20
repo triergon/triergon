@@ -5,7 +5,6 @@ mod syntax;
 use crate::bitalloc::{BaCache, BaParams, Dba, MaskParams, stage_bap, stage_mask, stage_psd};
 use crate::header::{BITRATE_KBPS, SAMPLE_RATES, ac3_frame_words};
 use crate::imdct::analysis::Analysis;
-use crate::quant::EXP_SCALE;
 use crate::tables::FASTGAIN;
 use syntax::{Bits, Mantissas, mantissa_bits};
 
@@ -282,8 +281,8 @@ impl Encoder {
                 for bin in 0..pair.ends[ch] {
                     let code = bap[ch][bin];
                     if code != 0 {
-                        let exponent = usize::from(pair.exponents[ch][bin]);
-                        let normal = coefficients[ch][bin] / EXP_SCALE[exponent];
+                        let exponent = u32::from(pair.exponents[ch][bin]);
+                        let normal = coefficients[ch][bin] * f32::from_bits((127 + exponent) << 23);
                         mantissas.push(&mut bits, code, normal);
                     }
                 }

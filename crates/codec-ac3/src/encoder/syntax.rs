@@ -150,23 +150,39 @@ pub(super) fn block(
     bits.put(0, 2); // no delta allocation or skipped data
 }
 
-pub(super) fn mantissa_bits(ends: &[usize; CHANNELS], baps: &[[u8; BLOCK]; CHANNELS]) -> usize {
-    let mut counts = [0usize; 16];
-    for (baps, &end) in baps.iter().zip(ends) {
-        for &bap in &baps[..end] {
-            counts[usize::from(bap)] += 1;
-        }
+// A block has at most 1,536 coefficients. One sum holds the direct bit
+// count and the three grouped-quantizer counts with room for every coefficient.
+const DIRECT_BITS: u32 = 15;
+const GROUP_BITS: u32 = 11;
+const COSTS: [u64; 16] = {
+    assert!(CHANNELS * BLOCK * 16 < 1 << DIRECT_BITS);
+    assert!(CHANNELS * BLOCK < 1 << GROUP_BITS);
+    let mut costs = [0; 16];
+    costs[1] = 1 << DIRECT_BITS;
+    costs[2] = 1 << (DIRECT_BITS + GROUP_BITS);
+    costs[3] = 3;
+    costs[4] = 1 << (DIRECT_BITS + 2 * GROUP_BITS);
+    costs[5] = 4;
+    let mut code = 6;
+    while code < costs.len() {
+        costs[code] = BAP_BITS[code] as u64;
+        code += 1;
     }
-    5 * counts[1].div_ceil(3)
-        + 7 * counts[2].div_ceil(3)
-        + 3 * counts[3]
-        + 7 * counts[4].div_ceil(2)
-        + 4 * counts[5]
-        + counts[6..]
-            .iter()
-            .zip(&BAP_BITS[6..])
-            .map(|(&count, &bits)| count * usize::from(bits))
-            .sum::<usize>()
+    costs
+};
+
+pub(super) fn mantissa_bits(ends: &[usize; CHANNELS], baps: &[[u8; BLOCK]; CHANNELS]) -> usize {
+    let sum = baps
+        .iter()
+        .zip(ends)
+        .flat_map(|(plane, &end)| &plane[..end])
+        .map(|&bap| COSTS[usize::from(bap)])
+        .sum::<u64>();
+    let group = |index: u32| {
+        ((sum >> (DIRECT_BITS + GROUP_BITS * index)) & ((1 << GROUP_BITS) - 1)) as usize
+    };
+    let direct = (sum & ((1 << DIRECT_BITS) - 1)) as usize;
+    direct + 5 * group(0).div_ceil(3) + 7 * group(1).div_ceil(3) + 7 * group(2).div_ceil(2)
 }
 
 #[derive(Default)]
@@ -265,4 +281,33 @@ pub(super) fn checksum(frame: &mut [u8]) {
         trailing = crc16(0, &frame[split..crc_at]);
     }
     frame[crc_at..].copy_from_slice(&trailing.to_be_bytes());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packed_mantissa_cost_matches_grouped_coding() {
+        let verify = |ends, planes: &[[u8; BLOCK]; CHANNELS]| {
+            let mut bits = Bits::count();
+            let mut mantissas = Mantissas::default();
+            for (plane, end) in planes.iter().zip(ends) {
+                for &code in &plane[..end] {
+                    if code != 0 {
+                        mantissas.push(&mut bits, code, 0.25);
+                    }
+                }
+            }
+            mantissas.finish(&mut bits);
+            assert_eq!(mantissa_bits(&ends, planes), bits.position());
+        };
+        for code in 0..16 {
+            verify([BLOCK; CHANNELS], &[[code; BLOCK]; CHANNELS]);
+        }
+        let mixed = core::array::from_fn(|channel| {
+            core::array::from_fn(|bin| ((bin + channel) % 16) as u8)
+        });
+        verify([73, 109, 151, 253, 253, 7], &mixed);
+    }
 }
