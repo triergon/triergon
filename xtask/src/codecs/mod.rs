@@ -19,6 +19,8 @@ use std::path::{Path, PathBuf};
 
 use crate::json::Value;
 
+pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
+
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
   aac-access-units --out DIR [--record]

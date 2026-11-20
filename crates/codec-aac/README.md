@@ -124,7 +124,9 @@ pinned nightly and this feature, on both targets; every other worker stays on st
 ## Known differences from FFmpeg
 
 - A configuration-2 frame that carries a single SCE: FFmpeg leaves FR unwritten, so it
-  holds stale buffer contents. This decoder outputs silence on FR.
+  holds stale buffer contents. This decoder outputs silence on FR. The correctness
+  comparison for the pinned `aac-sce-in-stereo.adts` vector initializes both
+  reference planes before decoding and checks every sample of both channels.
 - Some SBR tables (the noise table and the Huffman books other than SBR_F_ENVBAL30) are not
   transcribed from a document. They are validated by the conformance vectors only;
   codewords no vector reaches are unverified. Provenance:
