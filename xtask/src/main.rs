@@ -33,6 +33,7 @@ mod pyrandom;
 mod python;
 mod raster;
 mod references;
+mod session_queues;
 mod sha256;
 mod shape;
 mod stats;
@@ -70,6 +71,7 @@ commands:
                  every commit docs/status.md cites is reachable from HEAD (needs the
                  full history)
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
+  session-queues compare baseline and candidate session queues; --help for usage
   progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
@@ -190,6 +192,7 @@ fn main() -> ExitCode {
             [part] => Part::named(part).and_then(|part| check(&root, Some(part))),
             _ => Err(USAGE.to_owned()),
         },
+        Some("session-queues") => session_queues::main(&root, &args[1..]),
         Some("progressive") => {
             return match progressive_bench::main(&root, &args[1..]) {
                 Ok(code) => ExitCode::from(code as u8),
