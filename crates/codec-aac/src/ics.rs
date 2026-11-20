@@ -7,9 +7,6 @@ use crate::tables::*;
 use std::sync::OnceLock;
 use triergon_bitstream::CachedBitReader;
 
-// window_sequence 0 of the syntax; the decoder only tests for the other three
-#[allow(dead_code)]
-pub(crate) const ONLY_LONG: u8 = 0;
 pub(crate) const LONG_START: u8 = 1;
 pub(crate) const EIGHT_SHORT: u8 = 2;
 pub(crate) const LONG_STOP: u8 = 3;
