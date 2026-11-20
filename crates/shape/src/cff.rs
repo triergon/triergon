@@ -43,9 +43,12 @@ pub(crate) struct Face<'a> {
 /// the Font DICT FDSelect gives the glyph (Font DICT 0 in a CFF2 table
 /// without FDSelect).
 enum Privates<'a> {
-    One([i64; 2]),
+    One {
+        local: Option<Index<'a>>,
+        vsindex: i64,
+    },
     FdArray {
-        select: Option<usize>,
+        select: Select<'a>,
         fonts: Index<'a>,
     },
 }
@@ -82,6 +85,16 @@ impl<'a> Face<'a> {
                 None => None,
             };
             let (fonts, _) = Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, true)?;
+            let privates = if let Some(at) = select {
+                Privates::FdArray {
+                    select: Select::new(table, at, cff2, charstrings.count),
+                    fonts,
+                }
+            } else {
+                let (local, vsindex) =
+                    Program::private(table, dict_find(fonts.get(0)?, 18)?, cff2)?;
+                Privates::One { local, vsindex }
+            };
             let store = match dict_find(top, 24) {
                 Some(v) => {
                     let at = offset(v[1])?;
@@ -97,7 +110,7 @@ impl<'a> Face<'a> {
                 global,
                 charset: None,
                 store,
-                privates: Privates::FdArray { select, fonts },
+                privates,
                 depth,
             });
         }
@@ -110,11 +123,17 @@ impl<'a> Face<'a> {
         let cid = dict_find(top, 0x0C1E).is_some();
         let privates = if cid {
             Privates::FdArray {
-                select: Some(offset(dict_find(top, 0x0C25)?[1])?),
+                select: Select::new(
+                    table,
+                    offset(dict_find(top, 0x0C25)?[1])?,
+                    cff2,
+                    charstrings.count,
+                ),
                 fonts: Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, false)?.0,
             }
         } else {
-            Privates::One(dict_find(top, 18)?)
+            let (local, vsindex) = Program::private(table, dict_find(top, 18)?, cff2)?;
+            Privates::One { local, vsindex }
         };
         let charset = (!cid).then(|| Charset {
             table,
@@ -183,17 +202,13 @@ impl<'a> Face<'a> {
     /// The parts `glyph`'s charstring runs with: the face's, and the local
     /// subroutines and `vsindex` of its Private DICT.
     fn program(&self, glyph: u16) -> Option<Program<'a>> {
-        let private = match self.privates {
-            Privates::One(private) => private,
+        let (local, vsindex) = match self.privates {
+            Privates::One { local, vsindex } => (local, vsindex),
             Privates::FdArray { select, fonts } => {
-                let fd = match select {
-                    Some(at) => fd_select(self.table, at, glyph, self.cff2)?,
-                    None => 0,
-                };
-                dict_find(fonts.get(fd)?, 18)?
+                let fd = select.get(self.table, glyph, self.cff2)?;
+                Program::private(self.table, dict_find(fonts.get(fd)?, 18)?, self.cff2)?
             }
         };
-        let (local, vsindex) = Program::private(self.table, private, self.cff2)?;
         Some(Program {
             cff2: self.cff2,
             charstrings: self.charstrings,
@@ -201,7 +216,7 @@ impl<'a> Face<'a> {
             local,
             charset: self.charset,
             store: self.store,
-            vsindex: if self.cff2 { vsindex } else { 0 },
+            vsindex,
         })
     }
 }
@@ -416,6 +431,82 @@ impl<'a> Program<'a> {
         };
         self.store.and_then(count).unwrap_or(0)
     }
+}
+
+/// A validated range table can be searched in glyph order. Other tables use
+/// the original first-matching-range rule, including readable truncated prefixes.
+#[derive(Clone, Copy)]
+enum Select<'a> {
+    Narrow(&'a [[u8; 3]], [u8; 2]),
+    Wide(&'a [[u8; 6]], [u8; 4]),
+    Raw(usize),
+}
+
+impl<'a> Select<'a> {
+    fn new(table: &'a [u8], at: usize, cff2: bool, glyphs: u32) -> Self {
+        let read = || {
+            let data = table.get(at..)?;
+            match *data.first()? {
+                3 => {
+                    let count = u32::from(u16_at(data, 1)?);
+                    let (rows, end) = ordered_ranges(data.get(3..)?, count, glyphs)?;
+                    Some(Self::Narrow(rows, end))
+                }
+                4 if cff2 => {
+                    let (rows, end) = ordered_ranges(data.get(5..)?, u32_at(data, 1)?, glyphs)?;
+                    Some(Self::Wide(rows, end))
+                }
+                _ => None,
+            }
+        };
+        read().unwrap_or(Self::Raw(at))
+    }
+
+    fn get(self, table: &[u8], glyph: u16, cff2: bool) -> Option<u32> {
+        match self {
+            Self::Narrow(rows, end) => {
+                Some(u32::from(range_for(rows, end, glyph.to_be_bytes())?[2]))
+            }
+            Self::Wide(rows, end) => {
+                let row = range_for(rows, end, u32::from(glyph).to_be_bytes())?;
+                Some(u32::from(u16::from_be_bytes([row[4], row[5]])))
+            }
+            Self::Raw(at) => fd_select(table, at, glyph, cff2),
+        }
+    }
+}
+
+fn ordered_ranges<const N: usize, const W: usize>(
+    data: &[u8],
+    count: u32,
+    glyphs: u32,
+) -> Option<(&[[u8; N]], [u8; W])> {
+    // At most one distinct range can start per addressable glyph. Excess
+    // declarations retain the on-demand reader, even if their bytes are present.
+    if count > glyphs.min(u32::from(u16::MAX) + 1) {
+        return None;
+    }
+    let (data, tail) = data.split_at_checked(usize::try_from(count).ok()?.checked_mul(N)?)?;
+    let rows = data.as_chunks::<N>().0;
+    let end = *tail.first_chunk::<W>()?;
+    // Fixed-width, big-endian glyph IDs have the same byte and numeric order.
+    rows.iter()
+        .map(|r| &r[..W])
+        .chain(std::iter::once(&end[..]))
+        .is_sorted_by(|a, b| a < b)
+        .then_some((rows, end))
+}
+
+fn range_for<const N: usize, const W: usize>(
+    rows: &[[u8; N]],
+    end: [u8; W],
+    glyph: [u8; W],
+) -> Option<&[u8; N]> {
+    if glyph >= end {
+        return None;
+    }
+    let past = rows.partition_point(|r| r[..W] <= glyph[..]);
+    rows.get(past.checked_sub(1)?)
 }
 
 /// The Font DICT FDSelect at `at` gives `glyph` (formats 0 and 3; 4 in
@@ -1131,6 +1222,81 @@ mod tests {
     /// `n` as a one-byte charstring number.
     const fn n(v: i8) -> u8 {
         (v as i16 + 139) as u8
+    }
+
+    #[test]
+    fn fd_ranges_match_the_first_readable_interval() {
+        use super::{Select, fd_select};
+        for wide in [false, true] {
+            let number = |value: u32| {
+                if wide {
+                    value.to_be_bytes().to_vec()
+                } else {
+                    (value as u16).to_be_bytes().to_vec()
+                }
+            };
+            let make = |starts: &[u32], end: u32| {
+                let mut data = vec![if wide { 4 } else { 3 }];
+                data.extend(number(starts.len() as u32));
+                for (i, &start) in starts.iter().enumerate() {
+                    data.extend(number(start));
+                    if wide {
+                        data.extend((256 + i as u16).to_be_bytes());
+                    } else {
+                        data.push(i as u8);
+                    }
+                }
+                data.extend(number(end));
+                data
+            };
+            for (starts, end, ordered) in [
+                (&[2, 5, 8][..], 12, true),
+                (&[2, 2, 5], 8, false),
+                (&[3, 8, 4], 10, false),
+                (&[2, 5, 8], 7, false),
+                (&[], 10, true),
+            ] {
+                let bytes = make(starts, end);
+                for limit in 0..=bytes.len() {
+                    let table = &bytes[..limit];
+                    let select = Select::new(table, 0, true, 16);
+                    assert_eq!(
+                        !matches!(select, Select::Raw(_)),
+                        ordered && limit == bytes.len()
+                    );
+                    for glyph in (0..=16).chain([u16::MAX]) {
+                        assert_eq!(
+                            select.get(table, glyph, true),
+                            fd_select(table, 0, glyph, true)
+                        );
+                    }
+                }
+            }
+            let bytes = make(&[1, 6], if wide { 65536 } else { 65535 });
+            let select = Select::new(&bytes, 0, true, 65535);
+            assert_eq!(select.get(&bytes, 0, true), None);
+            assert_eq!(
+                select.get(&bytes, 6, true),
+                Some(if wide { 257 } else { 1 })
+            );
+            assert_eq!(select.get(&bytes, 65535, true), wide.then_some(257));
+        }
+    }
+
+    #[test]
+    fn a_face_with_one_private_dict_reuses_its_subroutines() {
+        use super::{Face, Privates};
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<crate::OtMetrics<'static>>();
+        let table = cff2(&[&[n(-107), 10], &[n(-107), 10]], &[&[n(3), n(4), 5]]);
+        let face = Face::read(&table, true, 10).unwrap();
+        assert!(matches!(
+            face.privates,
+            Privates::One { local: Some(_), .. }
+        ));
+        for glyph in 0..2 {
+            assert_eq!(run(&table, glyph), Some([0, 4, 3, -4]));
+        }
     }
 
     #[test]
