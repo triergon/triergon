@@ -238,7 +238,13 @@ impl MultibyteDecoder {
                 range: start..next,
             }));
         }
-        if let Some(value) = self.profile.lookup(u16::from(byte)) {
+        // Historical Shift-JIS maps 0x5C to yen and 0x7E to overline.
+        let single = if byte.is_ascii() && self.profile != MultibyteCharset::ShiftJisUnicode {
+            Some(char::from(byte))
+        } else {
+            self.profile.lookup(u16::from(byte))
+        };
+        if let Some(value) = single {
             let start = self.position;
             self.position = next;
             return Ok(DecodeStep::Scalar(DecodedScalar {

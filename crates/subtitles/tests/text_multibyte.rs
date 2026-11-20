@@ -220,7 +220,10 @@ fn low_level(raw: &[u8], profile: M) -> Result<String, Error> {
 
 fn all_short_inputs(index: usize) {
     let (profile, original, _) = PROFILES[index];
-    let table = mapping(profile, original);
+    check_short_inputs(profile, &mapping(profile, original));
+}
+
+fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>) {
     for first in 0u16..256 {
         match table.get(&first) {
             Some(value) => assert_eq!(
@@ -246,6 +249,35 @@ fn all_short_inputs(index: usize) {
                 );
             }
         }
+    }
+}
+
+// These receiver profiles use distinct tables. Compare the public decoder,
+// including the direct ASCII path, with every one- and two-byte table result.
+#[test]
+fn every_receiver_big5_and_cp932_one_and_two_byte_input() {
+    for (profile, records) in [
+        (
+            M::ReceiverBig5Glibc239,
+            include_bytes!("../src/text/charset/mapping-data/receiver_big5_glibc239.bin")
+                .as_slice(),
+        ),
+        (
+            M::ReceiverWindows932Pua,
+            include_bytes!("../src/text/charset/mapping-data/receiver_cp932_pua.bin").as_slice(),
+        ),
+    ] {
+        let (records, remainder) = records.as_chunks::<4>();
+        assert!(remainder.is_empty());
+        let table = records
+            .iter()
+            .map(|&[a, b, c, d]| {
+                let code = u16::from_be_bytes([a, b]);
+                let value = char::from_u32(u32::from(u16::from_be_bytes([c, d]))).unwrap();
+                (code, value)
+            })
+            .collect();
+        check_short_inputs(profile, &table);
     }
 }
 

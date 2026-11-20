@@ -148,7 +148,11 @@ there is no detection from content, language or file name.
 | Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
 | FFmpeg/glibc labels | `compat::charset::receiver_charset` and `receiver_charset_with_glibc_euc_kr` map ASS charset labels to the repertoire the reference build accepts |
 
-The three EUC-KR profiles share one two-byte lookup table. All accept ASCII.
+Standalone ASCII bytes decode directly in the multibyte profiles, except in
+historical Shift-JIS, whose table maps 0x5C to yen and 0x7E to overline.
+After a lead byte, the decoder validates the trail and looks up the pair.
+
+The three EUC-KR profiles share one two-byte lookup table.
 Both receiver profiles additionally map bytes 0x80–0x9F to the C1 controls.
 Only `ReceiverEucKrGlibc239` maps A2 E8 to U+327E.
 
