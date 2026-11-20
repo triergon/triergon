@@ -52,6 +52,8 @@ driver=$(git rev-parse HEAD)
 scratch=$(mktemp -d)
 export CARGO_INCREMENTAL=0
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$PWD/target}"
+cargo build --locked --release -p xtask
+runner="$CARGO_TARGET_DIR/release/xtask"
 for role in baseline candidate; do
     if [ "$role" = baseline ]; then revision=$baseline; else revision=$candidate; fi
     tree="$scratch/$role-src"
@@ -59,15 +61,17 @@ for role in baseline candidate; do
     git archive "$driver" Cargo.lock crates/session/Cargo.toml \
         crates/session/examples/session_queue | tar -x -C "$tree"
     touch "$tree/crates/session/src/lib.rs"
-    cargo build --manifest-path "$tree/Cargo.toml" --locked --release \
-        -p triergon-session --features codecs --example session_queue
-    cp "$CARGO_TARGET_DIR/release/examples/session_queue" "$scratch/$role"
-    git -C "$tree" rev-parse HEAD > "$scratch/$role.revision"
+    "$runner" session-queues build "$tree" "$scratch/$role"
 done
-cargo build --locked --release -p xtask
-runner="$CARGO_TARGET_DIR/release/xtask"
 "$runner" session-queues check "$scratch/baseline" "$scratch/candidate" "$scratch/work"
 ```
+
+The build command uses the shared gate compiler, worker target and linker flags.
+In an armhf user space it passes `--target thumbv7neon-unknown-linux-gnueabihf`
+and copies the example from that target’s release directory. Each worker has an
+adjacent `.build.json` receipt recording its SHA-256, library revision, overlay
+hashes, target, compiler and build command. Keep each executable with its receipt.
+The comparison checks these identities and saves both receipts in `identity.json`.
 
 On an isolated native Linux AArch64 or ARMv7 host, use the ordinary pinned
 worker toolchain and CPU affinity. The memory run uses the prepared

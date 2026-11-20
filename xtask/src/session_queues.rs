@@ -1,11 +1,13 @@
 //! Compare two builds of the same public-session workload with the shared paired runner.
+mod build;
+
 use crate::harness::{comparison, memory, report, timing, worker};
 use crate::json::Value;
 use crate::{checks, corpus, json, sha256};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const USAGE: &str = "usage: cargo xtask session-queues check|time|memory BASE_WORKER CANDIDATE_WORKER NEW_OUTPUT_DIR";
+const USAGE: &str = "usage: cargo xtask session-queues build LIBRARY_TREE NEW_WORKER\n       cargo xtask session-queues check|time|memory BASE_WORKER CANDIDATE_WORKER NEW_OUTPUT_DIR";
 const STAGES: [&str; 4] = ["cycle", "starved", "full", "drain-full"];
 const TIMEOUT: Duration = Duration::from_secs(120);
 const SEED: u64 = 280;
@@ -112,6 +114,11 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         println!("{USAGE}");
         return Ok(());
     }
+    if let [command, tree, worker] = args
+        && command == "build"
+    {
+        return build::stage(root, Path::new(tree), Path::new(worker));
+    }
     let [mode, baseline, candidate, dest] = args else {
         return Err(USAGE.into());
     };
@@ -128,7 +135,14 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     let output = Path::new(dest);
     report::create_output(output)?;
     let manifest = root.join("harness/session-queues/cases.json");
+    let base_build = build::verify(root, &baseline)?;
+    let candidate_build = build::verify(root, &candidate)?;
+    if base_build.get("build") != candidate_build.get("build") {
+        return Err("different compiler or build settings across the pair".into());
+    }
     let identity = Value::object([
+        ("baseline_build", base_build),
+        ("candidate_build", candidate_build),
         ("baseline_sha256", Value::str(sha(&baseline)?)),
         ("candidate_sha256", Value::str(sha(&candidate)?)),
         ("manifest_sha256", Value::str(sha(&manifest)?)),
