@@ -38,9 +38,12 @@ default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleave
 ### Encoding PCM
 
 Enable the `encode` feature for AC-3 syncframes at 32, 44.1 or 48 kHz. The encoder
-uses a long transform in every block, with adaptive bandwidth, exponent grouping
-and bit allocation. It supports mono at 192 kbit/s, stereo at 256 kbit/s and 5.1
-at 640 kbit/s. The input plane order for 5.1 is FL, FR, FC, LFE, SL, SR.
+uses adaptive bandwidth, exponent grouping and bit allocation. Long transforms
+keep frequency resolution on steady signals. A sharp attack switches the
+full-bandwidth channels to short transforms for that block. The LFE uses long
+transforms throughout. The encoder supports mono at 192 kbit/s, stereo at
+256 kbit/s and 5.1 at 640 kbit/s. The input plane order for 5.1 is FL, FR, FC,
+LFE, SL, SR.
 
 ```rust
 # #[cfg(feature = "encode")]
@@ -156,10 +159,14 @@ hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
   corruption tests; FATE checks skip when the corpus is absent.
 - With `--features encode`, the tests check frame sizes, CRCs, channel order, signal
   alignment and error recovery across the encoder's nine rate and layout combinations.
+  The transform tests cover both lengths and the overlap between them. A surround
+  test checks that an attack in one channel leaves the preceding silent block
+  quiet without disrupting the other planes.
   The ignored `ffmpeg_interoperability_and_signal_quality` test requires
   `TRIERGON_FFMPEG` and a new directory in `TRIERGON_AC3_OUTPUT`. It decodes the
-  generated tone and broadband streams with FFmpeg and prints per-channel
-  signal-to-noise ratios at the same bitrate. Short transforms, a broader quality
-  comparison and native performance measurements remain open.
+  generated tone, broadband and attack streams with FFmpeg. It prints per-channel
+  signal-to-noise ratios at the same bitrate and the peak level in the last
+  128 samples of the block before an attack. Broader signal quality and native
+  performance measurements remain open.
 - Derivation notes and tools: [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).

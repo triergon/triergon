@@ -68,13 +68,21 @@ pub(super) fn header(bits: &mut Bits<'_>, fscod: u8, size_code: u8, mode: Channe
     bits.put(0b0000_1000, 8); // origbs, no optional metadata
 }
 
-pub(super) fn block(bits: &mut Bits<'_>, mode: ChannelMode, block: usize, snr: u16, pair: &Pair) {
+pub(super) fn block(
+    bits: &mut Bits<'_>,
+    mode: ChannelMode,
+    block: usize,
+    short: bool,
+    snr: u16,
+    pair: &Pair,
+) {
     let channels = mode.coded_order().len();
     let lfe = mode == ChannelMode::Surround51;
-    let full = channels - usize::from(lfe);
+    let full = mode.full_channels();
     let first = block == 0;
     let update = block.is_multiple_of(2);
-    bits.put(0, 2 * full + 1); // long blocks, no dither, no dynamic range word
+    bits.put(if short { (1 << full) - 1 } else { 0 }, full);
+    bits.put(0, full + 1); // no dither or dynamic range word
     bits.put(u32::from(first), 1); // coupling strategy
     if first {
         bits.put(0, 1); // no coupling

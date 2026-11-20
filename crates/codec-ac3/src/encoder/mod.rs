@@ -70,6 +70,10 @@ impl ChannelMode {
     fn is_lfe(self, channel: usize) -> bool {
         self == Self::Surround51 && channel == CHANNELS - 1
     }
+
+    fn full_channels(self) -> usize {
+        self.coded_order().len() - usize::from(self == Self::Surround51)
+    }
 }
 
 fn fast_gain(lfe: bool) -> u8 {
@@ -215,22 +219,44 @@ impl Encoder {
             pairs,
             bap,
         } = self.work.as_mut();
-        for (coded, &channel) in order.iter().enumerate() {
-            let mut previous = self.previous[coded].as_slice();
-            for (block, next) in input[channel].chunks_exact(BLOCK).enumerate() {
-                self.analysis
-                    .apply(previous, next, &mut spectra[block][coded]);
-                previous = next;
+        let mode = self.mode;
+        let mut switches = [false; BLOCKS];
+        for (block, (spectra, short)) in spectra.iter_mut().zip(&mut switches).enumerate() {
+            let at = block * BLOCK;
+            let pcm = |coded: usize, channel: usize| {
+                let plane = input[channel];
+                let previous = if block == 0 {
+                    self.previous[coded].as_slice()
+                } else {
+                    &plane[at - BLOCK..at]
+                };
+                (previous, &plane[at..at + BLOCK])
+            };
+            // Use one transition for the full-bandwidth channels so decoders retain
+            // their independent overlap history. The LFE transform is always long.
+            *short = order[..mode.full_channels()]
+                .iter()
+                .enumerate()
+                .any(|(coded, &ch)| {
+                    let (previous, next) = pcm(coded, ch);
+                    has_attack(previous, next)
+                });
+            for (coded, &ch) in order.iter().enumerate() {
+                let (previous, next) = pcm(coded, ch);
+                if *short && !mode.is_lfe(coded) {
+                    self.analysis.short(previous, next, &mut spectra[coded]);
+                } else {
+                    self.analysis.long(previous, next, &mut spectra[coded]);
+                }
             }
         }
         for (pair, spectra) in pairs.iter_mut().zip(spectra.chunks_exact(2)) {
-            pair.prepare(self.mode, self.fscod, &spectra[0], &spectra[1])?;
+            pair.prepare(mode, self.fscod, &spectra[0], &spectra[1])?;
         }
-        let mode = self.mode;
         let mut fixed = Bits::count();
         syntax::header(&mut fixed, self.fscod, size_code, mode);
-        for block in 0..BLOCKS {
-            syntax::block(&mut fixed, mode, block, 0, &pairs[block / 2]);
+        for (block, &short) in switches.iter().enumerate() {
+            syntax::block(&mut fixed, mode, block, short, 0, &pairs[block / 2]);
         }
         // Two zero flag bits (auxdatae and crcrsv) precede the final CRC word.
         let available = (bytes * 8)
@@ -241,9 +267,9 @@ impl Encoder {
         output.fill(0);
         let mut bits = Bits::write_to(output);
         syntax::header(&mut bits, self.fscod, size_code, mode);
-        for (index, coefficients) in spectra.iter().enumerate() {
+        for (index, (coefficients, short)) in spectra.iter().zip(switches).enumerate() {
             let pair = &pairs[index / 2];
-            syntax::block(&mut bits, mode, index, snr, pair);
+            syntax::block(&mut bits, mode, index, short, snr, pair);
             if index.is_multiple_of(2) {
                 pair.allocate(snr, bap);
             }
@@ -270,6 +296,32 @@ impl Encoder {
         self.remainder = remainder % sample_rate;
         Ok(bytes)
     }
+}
+
+fn has_attack(previous: &[f32], next: &[f32]) -> bool {
+    const WINDOW: usize = 64;
+    // The second difference emphasizes high frequencies. Its unnormalized
+    // peak has a range of [0, 4], so 0.04 is one percent of full scale.
+    let difference = |a: f32, b: f32, c: f32| ((a + c) - 2.0 * b).abs();
+    let peak = |[a, b]: [f32; 2], samples: &[f32]| {
+        let boundary = difference(a, b, samples[0]).max(difference(b, samples[0], samples[1]));
+        samples
+            .windows(3)
+            .map(|s| difference(s[0], s[1], s[2]))
+            .fold(boundary, f32::max)
+    };
+    let at = BLOCK - WINDOW;
+    let mut last = peak([previous[at - 2], previous[at - 1]], &previous[at..]);
+    let mut before = [previous[BLOCK - 2], previous[BLOCK - 1]];
+    for samples in next.chunks_exact(WINDOW) {
+        let current = peak(before, samples);
+        if current > (16.0 * last).max(0.04) {
+            return true;
+        }
+        last = current;
+        before = [samples[WINDOW - 2], samples[WINDOW - 1]];
+    }
+    false
 }
 
 impl Pair {

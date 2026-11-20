@@ -53,6 +53,49 @@ fn tones(speakers: &[Speaker], rate: u32) -> Vec<Vec<f32>> {
         .collect()
 }
 
+fn burst_start(frame: usize, channel: usize) -> usize {
+    frame * SAMPLES_PER_FRAME + (1 + frame % 3) * DELAY_SAMPLES + 19 + 7 * channel
+}
+
+fn attacks(speakers: &[Speaker], rate: u32) -> Vec<Vec<f32>> {
+    let mut source = tones(speakers, rate);
+    for (channel, (plane, speaker)) in source.iter_mut().zip(speakers).enumerate() {
+        if *speaker == Speaker::LowFrequency {
+            continue;
+        }
+        plane.fill(0.0);
+        for frame in 0..FRAMES {
+            let start = burst_start(frame, channel);
+            for (at, sample) in plane[start..start + 96].iter_mut().enumerate() {
+                let pitch = 0.16 + 0.023 * channel as f64;
+                let phase = core::f64::consts::TAU * pitch * at as f64;
+                *sample = (phase.sin() * (96 - at) as f64 / 192.0) as f32;
+            }
+        }
+    }
+    source
+}
+
+fn peak_before_attack(decoded: &[u8], speakers: &[Speaker]) -> f32 {
+    let mut peak: f32 = 0.0;
+    let stride = 4 * speakers.len();
+    for (ch, &speaker) in speakers.iter().enumerate() {
+        if speaker == Speaker::LowFrequency {
+            continue;
+        }
+        for frame in 0..FRAMES {
+            let block_start = burst_start(frame, ch) / DELAY_SAMPLES * DELAY_SAMPLES;
+            let end = block_start + DELAY_SAMPLES;
+            for at in end - 128..end {
+                let start = at * stride + 4 * ch;
+                let value = f32::from_le_bytes(decoded[start..start + 4].try_into().unwrap());
+                peak = peak.max(value.abs());
+            }
+        }
+    }
+    peak
+}
+
 fn snr(source: impl IntoIterator<Item = f32>, decoded: impl IntoIterator<Item = f32>) -> f64 {
     let (signal, error) =
         source
@@ -198,6 +241,60 @@ fn invalid_input_and_short_output_leave_the_stream_unchanged() {
 }
 
 #[test]
+fn a_single_attack_switches_the_program_and_keeps_the_previous_block_quiet() {
+    for rate in SAMPLE_RATES {
+        let (mode, _, _, speakers) = MODES[2];
+        let mut source = tones(speakers, rate);
+        source[0] = attacks(&speakers[..1], rate).remove(0);
+        let mut encoder = Encoder::new(rate, mode).unwrap();
+        let mut decoder = Decoder::new().with_options(DecoderOptions {
+            crc: CrcPolicy::Reject,
+            ..DecoderOptions::default()
+        });
+        let mut output = [0; MAX_FRAME_BYTES];
+        let mut frame = AudioFrame::default();
+        let mut decoded = vec![Vec::new(); speakers.len()];
+        let mut switched = false;
+        let silence = [0.0; SAMPLES_PER_FRAME];
+        for number in 0..=FRAMES {
+            let at = number * SAMPLES_PER_FRAME;
+            let planes = if number == FRAMES {
+                vec![silence.as_slice(); speakers.len()]
+            } else {
+                source
+                    .iter()
+                    .map(|p| &p[at..at + SAMPLES_PER_FRAME])
+                    .collect()
+            };
+            let bytes = encoder.encode(&planes, &mut output).unwrap();
+            frame.clear();
+            let info = decoder.decode(&output[..bytes], &mut frame).unwrap();
+            assert_eq!(info.concealed, None);
+            switched |= info.features.block_switch;
+            for (out, samples) in decoded.iter_mut().zip(&frame.planes) {
+                out.extend_from_slice(samples);
+            }
+        }
+        assert!(switched, "attack at {rate} Hz");
+        assert!(
+            decoded[0][DELAY_SAMPLES..2 * DELAY_SAMPLES]
+                .iter()
+                .all(|&sample| sample == 0.0)
+        );
+        for (i, (input, output)) in source.iter().zip(&decoded).enumerate() {
+            if speakers[i] == Speaker::LowFrequency {
+                continue;
+            }
+            let aligned = &output[DELAY_SAMPLES..][..input.len()];
+            assert!(
+                snr(input.iter().copied(), aligned.iter().copied()) > 30.0,
+                "misaligned {rate} Hz channel {i}"
+            );
+        }
+    }
+}
+
+#[test]
 #[ignore = "requires TRIERGON_FFMPEG and an empty TRIERGON_AC3_OUTPUT directory"]
 fn ffmpeg_interoperability_and_signal_quality() {
     use std::fs;
@@ -219,14 +316,14 @@ fn ffmpeg_interoperability_and_signal_quality() {
     };
     for rate in SAMPLE_RATES {
         for (mode, bitrate, _, speakers) in MODES {
-            for broadband in [false, true] {
-                let name = format!(
-                    "{rate}-{}-{}",
-                    speakers.len(),
-                    if broadband { "broadband" } else { "tones" }
-                );
-                let mut source = tones(speakers, rate);
-                if broadband {
+            for signal in ["tones", "broadband", "attacks"] {
+                let name = format!("{rate}-{}-{signal}", speakers.len());
+                let mut source = if signal == "attacks" {
+                    attacks(speakers, rate)
+                } else {
+                    tones(speakers, rate)
+                };
+                if signal == "broadband" {
                     let mut random = 0x62a1_3bb1u32;
                     for (plane, speaker) in source.iter_mut().zip(speakers) {
                         if *speaker == Speaker::LowFrequency {
@@ -315,7 +412,7 @@ fn ffmpeg_interoperability_and_signal_quality() {
                         output.len(),
                         (sample_count + SAMPLES_PER_FRAME) * speakers.len() * 4
                     );
-                    source
+                    let scores = source
                         .iter()
                         .enumerate()
                         .map(|(ch, plane)| {
@@ -329,7 +426,9 @@ fn ffmpeg_interoperability_and_signal_quality() {
                                 });
                             snr(plane.iter().copied(), samples)
                         })
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>();
+                    let peak = (signal == "attacks").then(|| peak_before_attack(&output, speakers));
+                    (scores, peak)
                 };
                 assert!(
                     fs::metadata(&candidate)
@@ -339,9 +438,12 @@ fn ffmpeg_interoperability_and_signal_quality() {
                         <= 2,
                     "{name} should use the same bit rate"
                 );
-                let a = quality(&candidate, "candidate");
-                let b = quality(&reference, "reference");
+                let (a, peak_a) = quality(&candidate, "candidate");
+                let (b, peak_b) = quality(&reference, "reference");
                 println!("{name}\t{a:.2?}\t{b:.2?}");
+                if let (Some(a), Some(b)) = (peak_a, peak_b) {
+                    println!("pre-attack {name} {a:.7e} {b:.7e}");
+                }
                 assert!(
                     a.iter().all(|value| *value > 0.0),
                     "{name} lost signal or channel alignment"
