@@ -250,7 +250,7 @@ selective style overrides), in the frame and storage size and margins of its
   not); within a layer, events placed by their margins move clear of each
   other and keep their place on later frames (the record lives with the event
   in the `Script`, and a refused frame changes none); fully transparent
-  images are dropped.
+  images are dropped in place, preserving the order of the visible images.
 - **Change detection.** `Frame::change` is what libass's `ass_detect_change`
   reports: `Change::Content` when the image count differs or an image's size,
   stride, colour or bitmap does, `Change::Positions` when only places do,

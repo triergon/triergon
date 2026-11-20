@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
 use super::bitmaps::{Combined, Composited, SharedBitmap};
@@ -64,6 +64,24 @@ enum Part {
     Shadow,
 }
 
+impl Part {
+    fn bitmap(self, run: &Composited) -> Option<&Bitmap> {
+        match self {
+            Self::Fill => run.fill.as_ref(),
+            Self::Border => run.border.as_ref(),
+            Self::Shadow => run.shadow.as_ref(),
+        }
+    }
+}
+
+/// Pixels made for one image.
+#[derive(Debug)]
+enum OwnedPixels {
+    Bitmap(Bitmap),
+    /// Every row of a style-4 background shows the same opaque pixels.
+    Solid(BudgetVec<u8>),
+}
+
 /// Where an image's pixels come from: a part of a composited run, which
 /// the composite cache gives for an equal key as long as anything holds
 /// it, or pixels made for this image alone, which `blend_vector_clip`
@@ -71,9 +89,7 @@ enum Part {
 #[derive(Clone, Debug)]
 enum Source {
     Run(Kept<Composited>, Part),
-    Own(Arc<Bitmap>),
-    /// Every row of a style-4 background shows the same opaque pixels.
-    Solid(Arc<BudgetVec<u8>>),
+    Own(Arc<OwnedPixels>),
 }
 
 /// One image of a frame: an alpha bitmap to blend in one colour at a frame
@@ -138,14 +154,13 @@ impl Image {
     /// fully covered.
     pub fn rows(&self) -> impl ExactSizeIterator<Item = &[u8]> + '_ {
         let (stride, data) = match &self.source {
-            Source::Run(composite, part) => match part {
-                Part::Fill => composite.fill.as_ref(),
-                Part::Border => composite.border.as_ref(),
-                Part::Shadow => composite.shadow.as_ref(),
-            }
-            .map_or((0, &[][..]), |b| (b.stride(), b.data())),
-            Source::Own(bitmap) => (bitmap.stride(), bitmap.data()),
-            Source::Solid(row) => (0, row.as_slice()),
+            Source::Run(run, part) => part
+                .bitmap(run)
+                .map_or((0, &[][..]), |b| (b.stride(), b.data())),
+            Source::Own(pixels) => match &**pixels {
+                OwnedPixels::Bitmap(b) => (b.stride(), b.data()),
+                OwnedPixels::Solid(row) => (0, row.as_slice()),
+            },
         };
         (0..self.height).map(move |y| {
             let start = (self.row + y) * stride + self.column;
@@ -174,8 +189,8 @@ impl Image {
         self.height = h as usize;
     }
 
-    fn is_transparent(&self) -> bool {
-        self.colour.0 & 0xff == 0xff
+    pub(super) fn is_visible(&self) -> bool {
+        self.colour.0 & 0xff != 0xff
     }
 }
 
@@ -205,6 +220,7 @@ pub(super) fn render_text(
     work: &mut WorkBudget,
     out: &mut BudgetVec<Image>,
 ) -> Result<()> {
+    let start = out.len();
     let mut emit = |run: &Combined,
                     which: Part,
                     bitmap: &Bitmap,
@@ -216,7 +232,7 @@ pub(super) fn render_text(
             .clip
             .parts(bitmap, run.origin, split, &clipping.frame)
         {
-            let mut image = Image {
+            out.try_push(Image {
                 kind,
                 x: part.position.x,
                 y: part.position.y,
@@ -230,11 +246,8 @@ pub(super) fn render_text(
                 row: part.source_y,
                 stride: bitmap.stride(),
                 source: Source::Run(run.composite.clone(), which),
-            };
-            if let Some(mask) = mask {
-                blend_vector_clip(&mut image, bitmap, mask, budget, work)?;
-            }
-            out.try_push(image).map_err(|e| e.error)?;
+            })
+            .map_err(|e| e.error)?;
         }
         Ok(())
     };
@@ -285,6 +298,11 @@ pub(super) fn render_text(
         };
         emit(run, Part::Fill, fill, colours, split, ImageKind::Fill)?;
     }
+    if let Some(mask) = mask {
+        for image in &mut out[start..] {
+            blend_vector_clip(image, mask, budget, work)?;
+        }
+    }
     Ok(())
 }
 
@@ -293,7 +311,6 @@ pub(super) fn render_text(
 /// where they do not.
 fn blend_vector_clip(
     image: &mut Image,
-    source: &Bitmap,
     mask: &ClipMask,
     budget: &Budget,
     work: &mut WorkBudget,
@@ -330,6 +347,12 @@ fn blend_vector_clip(
             h,
         )
     };
+    // Only run parts just emitted by render_text enter the mask pass.
+    let source = match &image.source {
+        Source::Run(run, part) => part.bitmap(run),
+        Source::Own(_) => None,
+    }
+    .ok_or(Error::Invalid("missing run bitmap"))?;
     let mut pixels = source.copy_region(
         x..x + width,
         y..y + height,
@@ -347,7 +370,7 @@ fn blend_vector_clip(
         image.height = h;
         image.stride = pixels.stride();
     }
-    image.source = Source::Own(Arc::new(pixels));
+    image.source = Source::Own(Arc::new(OwnedPixels::Bitmap(pixels)));
     (image.column, image.row) = (0, 0);
     Ok(())
 }
@@ -385,22 +408,6 @@ pub(super) fn background(
         stride,
         column: 0,
         row: 0,
-        source: Source::Solid(Arc::new(row)),
+        source: Source::Own(Arc::new(OwnedPixels::Solid(row))),
     }))
-}
-
-/// Drops the fully transparent images, as libass does when it joins the
-/// events' lists.
-pub(super) fn drop_transparent(images: &mut BudgetVec<Image>) {
-    let mut kept = 0;
-    let slice = images.as_mut_slice();
-    for i in 0..slice.len() {
-        if !slice[i].is_transparent() {
-            slice.swap(kept, i);
-            kept += 1;
-        }
-    }
-    while images.len() > kept {
-        images.pop();
-    }
 }

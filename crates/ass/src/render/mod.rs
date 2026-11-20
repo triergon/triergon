@@ -288,7 +288,7 @@ impl Renderer {
         for (b, record) in boxes.as_slice().iter().zip(self.placed.as_slice()) {
             script.events_mut()[b.event].placed = *record;
         }
-        images::drop_transparent(next);
+        next.retain(Image::is_visible);
         let change = Change::between(&self.last_frame, next);
         std::mem::swap(&mut self.last_frame, next);
         // The previous frame's images go; what they were drawn from may now

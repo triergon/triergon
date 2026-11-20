@@ -482,6 +482,10 @@ impl<T> BudgetVec<T> {
     pub fn truncate(&mut self, len: usize) {
         self.data.truncate(len);
     }
+    /// Keeps the elements that satisfy `keep`, in order, with the same capacity and charge.
+    pub fn retain(&mut self, keep: impl FnMut(&T) -> bool) {
+        self.data.retain(keep);
+    }
     pub fn pop(&mut self) -> Option<T> {
         self.data.pop()
     }
