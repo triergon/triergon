@@ -120,7 +120,19 @@ impl<'a> Face<'a> {
         let (global, _) = Index::read(table, at, false)?;
         let top = tops.get(0)?;
         let (charstrings, _) = Index::read(table, offset(dict_find(top, 17)?[1])?, false)?;
-        let cid = dict_find(top, 0x0C1E).is_some();
+        // A name-keyed face has no ROS. Its lookup already visits every readable
+        // entry, including the first Private and charset if present.
+        let mut private = None;
+        let mut charset_offset = None;
+        let cid = dict_until(top, |op, operands| {
+            match op {
+                15 if charset_offset.is_none() => charset_offset = Some(operands[1]),
+                18 if private.is_none() => private = Some(operands),
+                _ => {}
+            }
+            op == 0x0C1E
+        })
+        .is_some();
         let privates = if cid {
             Privates::FdArray {
                 select: Select::new(
@@ -132,12 +144,12 @@ impl<'a> Face<'a> {
                 fonts: Index::read(table, offset(dict_find(top, 0x0C24)?[1])?, false)?.0,
             }
         } else {
-            let (local, vsindex) = Program::private(table, dict_find(top, 18)?, cff2)?;
+            let (local, vsindex) = Program::private(table, private?, cff2)?;
             Privates::One { local, vsindex }
         };
-        let charset = (!cid).then(|| Charset {
+        let charset = (!cid).then_some(Charset {
             table,
-            at: dict_find(top, 15).map_or(0, |v| v[1]),
+            at: charset_offset.unwrap_or(0),
             glyphs: charstrings.count,
         });
         Some(Self {
@@ -321,6 +333,11 @@ impl<'a> Index<'a> {
 /// §4), the last one second; a real operand reads as zero. CFF2's `blend`
 /// (23) leaves its operands to the next operator.
 fn dict_find(dict: &[u8], op: u16) -> Option<[i64; 2]> {
+    dict_until(dict, |key, _| key == op)
+}
+
+/// Visit complete DICT entries up to the first match or unreadable operand.
+fn dict_until(dict: &[u8], mut matches: impl FnMut(u16, [i64; 2]) -> bool) -> Option<[i64; 2]> {
     let mut operands = [0_i64; 2];
     let mut at = 0;
     while let Some(&b0) = dict.get(at) {
@@ -335,7 +352,7 @@ fn dict_find(dict: &[u8], op: u16) -> Option<[i64; 2]> {
                 } else {
                     u16::from(b0)
                 };
-                if key == op {
+                if matches(key, operands) {
                     return Some(operands);
                 }
                 operands = [0; 2];
@@ -1281,6 +1298,37 @@ mod tests {
             );
             assert_eq!(select.get(&bytes, 65535, true), wide.then_some(257));
         }
+    }
+
+    #[test]
+    fn name_keyed_top_dict_keeps_first_readable_entries() -> Result<(), &'static str> {
+        let mut table = cff(&[&[14]], &[], &[]);
+        let (_, after_name) = Index::read(&table, 4, false).ok_or("missing Name INDEX")?;
+        let (top, end) = Index::read(&table, after_name, false).ok_or("missing Top DICT INDEX")?;
+        // Keep the initial long integer and CharStrings operator so all
+        // table offsets stay valid while replacing the rest of the Top DICT.
+        let start = end - top.get(0).ok_or("missing Top DICT")?.len() + 6;
+        for (entries, charset) in [
+            // An operand-less Private is (0, 0). Later duplicates lose.
+            (&[n(4), 15, n(9), 15, 18, n(-1), n(-1), 18][..], Some(4)),
+            // A malformed tail stops the scan, including a later apparent ROS.
+            (&[18, 31, 12, 30], Some(0)),
+            (&[18, 30, 0x11], Some(0)),
+            (&[n(-1), n(-1), 18, 18], None),
+            (&[31, 18], None),
+            // A readable ROS requires FDSelect and FDArray.
+            (&[18, 12, 30], None),
+        ] {
+            table[start..end].fill(0);
+            table[start..start + entries.len()].copy_from_slice(entries);
+            let face = super::Face::read(&table, false, 16);
+            assert_eq!(
+                face.map(|f| f.charset.map(|c| c.at)),
+                charset.map(Some),
+                "{entries:?}"
+            );
+        }
+        Ok(())
     }
 
     #[test]
