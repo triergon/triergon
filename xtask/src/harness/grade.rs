@@ -570,7 +570,7 @@ fn part_selection(
         );
     }
     let part = Value::str(format!("{}/{count}", index + 1));
-    let selection = crate::isobmff_bench::full_part_selection(root, (index, count))?;
+    let (_, selection) = crate::isobmff_bench::full_part_selection(root, (index, count))?;
     let encoded = Value::Array(
         selection
             .iter()
@@ -1243,12 +1243,11 @@ mod tests {
     #[test]
     fn isobmff_parts_bind_the_registered_selection_and_cover_all_outputs() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let contract =
-            read_json(&root.join("harness/features/isobmff-open-index/contract.json")).unwrap();
         let mut membership = BTreeSet::new();
         for index in 0..3 {
             let requested = (index, 3);
-            let selection = crate::isobmff_bench::full_part_selection(root, requested).unwrap();
+            let (contract, selection) =
+                crate::isobmff_bench::full_part_selection(root, requested).unwrap();
             assert!(selection.iter().all(|&case| membership.insert(case)));
             let report = object(&[
                 ("part", Value::str(format!("{}/3", index + 1))),

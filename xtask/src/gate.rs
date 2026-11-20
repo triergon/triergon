@@ -2065,29 +2065,40 @@ fn collection_selection(
     step: &Step,
     command: &str,
     report: &Value,
-    rows: usize,
+    rows: &[Value],
 ) -> R<Option<Vec<usize>>> {
-    let feature = match command {
-        "isobmff-bench" => "isobmff-open-index",
-        "isobmff-seek" => "isobmff-seek",
-        _ => return Ok(None),
-    };
+    if !matches!(command, "isobmff-bench" | "isobmff-seek") {
+        return Ok(None);
+    }
     let part = flag_value(step, "--part")
         .map(|p| parse_part(&p.to_string_lossy()))
         .transpose()?;
     let root = crate::root();
-    let selected = if command == "isobmff-seek" {
+    let (contract, selected) = if command == "isobmff-seek" {
         crate::isobmff_seek::measurement_selection(&root, part)?
     } else {
         crate::isobmff_bench::full_part_selection(&root, part.unwrap_or((0, 1)))?
     };
     let indices = Value::Array(selected.iter().map(|&i| Value::int(i as i128)).collect());
-    if report.get("contract_id").and_then(Value::as_str) != Some(feature)
+    if report.get("contract_id") != contract.get("id")
         || report.get("part") != Some(&crate::isobmff_bench::part_value(part))
         || report.get("selection") != Some(&indices)
-        || selected.last().is_none_or(|&i| i >= rows)
+        || selected.is_empty()
     {
         return Err("ISO BMFF collection differs from the scheduled measurement selection".into());
+    }
+    let ids = contract
+        .get("required_profiles")
+        .and_then(Value::as_array)
+        .ok_or("ISO BMFF contract lacks required profiles")?;
+    if rows
+        .iter()
+        .map(|row| row.get("id"))
+        .ne(ids.iter().map(Some))
+    {
+        return Err(
+            "ISO BMFF collection differs from the registered case order or membership".into(),
+        );
     }
     Ok(Some(selected))
 }
@@ -2106,7 +2117,7 @@ fn unmeasured_in(step: &Step, report: &Value, key: &str, measured: &str) -> R<Ve
     if external != report.get("case").is_some() {
         return Err(format!("wrong report shape for {command}"));
     }
-    let selection = collection_selection(step, command, report, rows.len())?;
+    let selection = collection_selection(step, command, report, rows)?;
     let mut missing = Vec::new();
     for (index, row) in rows.iter().enumerate() {
         let id = row
@@ -3222,7 +3233,7 @@ done
         let output = crate::walk::scratch("gate-isobmff-completion");
         let shard = full_part_selection(&root, (1, 3)).unwrap();
         let seek = crate::isobmff_seek::measurement_selection(&root, None).unwrap();
-        for (cmd, feature, part, selected, filename) in [
+        for (cmd, feature, part, (contract, selected), filename) in [
             (
                 "isobmff-bench",
                 "isobmff-open-index",
@@ -3236,13 +3247,6 @@ done
             if let Some(part) = part {
                 step.command.extend(owned(&["--part", part]));
             }
-            let contract = crate::checks::read_json(
-                &root
-                    .join("harness/features")
-                    .join(feature)
-                    .join("contract.json"),
-            )
-            .unwrap();
             let profiles = contract
                 .get("required_profiles")
                 .unwrap()
@@ -3286,6 +3290,21 @@ done
                 assert!(check(&wrong).is_err(), "{cmd} {k}");
             }
             let i = selected[0];
+            let j = selected[1];
+            let mut duplicate = rows.clone();
+            field(&mut duplicate[j], "id", profiles[i].clone());
+            let mut reordered = rows.clone();
+            reordered.swap(i, j);
+            let mut wrong_rows = vec![("duplicate ID", duplicate), ("reordered IDs", reordered)];
+            if cmd == "isobmff-seek" {
+                let measured_end = selected.last().unwrap() + 1;
+                assert_eq!(rows.len() - measured_end, 4);
+                wrong_rows.push(("missing trailing refusals", rows[..measured_end].to_vec()));
+            }
+            for (reason, cases) in wrong_rows {
+                field(&mut report, "cases", Value::Array(cases));
+                assert!(check(&report).is_err(), "{cmd}: {reason}");
+            }
             field(&mut rows[i], "timing", Value::Null);
             let other = (0..rows.len())
                 .find(|i| selected.binary_search(i).is_err())

@@ -345,9 +345,14 @@ impl Suite {
     }
 }
 
-/// The registered seek outputs assigned to a gate collection.
-pub(crate) fn measurement_selection(root: &Path, part: Option<(usize, usize)>) -> R<Vec<usize>> {
-    Ok(Suite::load(root)?.timed(part))
+/// The registered contract and its seek output indices assigned to this collection.
+pub(crate) fn measurement_selection(
+    root: &Path,
+    part: Option<(usize, usize)>,
+) -> R<(Value, Vec<usize>)> {
+    let suite = Suite::load(root)?;
+    let selection = suite.timed(part);
+    Ok((suite.contract, selection))
 }
 
 /// The suite's harness inputs, bound to the ISO BMFF worker's build.
