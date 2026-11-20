@@ -1,0 +1,438 @@
+{
+  "schema": 1,
+  "directory": ".research/ac3-encode-inputs",
+  "cases": [
+    {
+      "id": "32000-1-tones",
+      "profile": "32000-1-tones",
+      "file": "32000-1-tones.pcm",
+      "sha256": "67a9867da726d3aaff3ac7ed40391cee6611a69642c0ad7a6e14443b5034352c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 338688,
+        "digest": 3006629851678476085
+      }
+    },
+    {
+      "id": "32000-1-broadband",
+      "profile": "32000-1-broadband",
+      "file": "32000-1-broadband.pcm",
+      "sha256": "1c69901f343d9b81a1682be68941224b61f4ec27e2493796cb5669399d42b7bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 338688,
+        "digest": 3006629851678476085
+      }
+    },
+    {
+      "id": "32000-1-attacks",
+      "profile": "32000-1-attacks",
+      "file": "32000-1-attacks.pcm",
+      "sha256": "86459a5912f7bb8902e88201af4e649c31e0e3d7f859daaa0ede302d55094208",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 338688,
+        "digest": 3006629851678476085
+      }
+    },
+    {
+      "id": "32000-2-tones",
+      "profile": "32000-2-tones",
+      "file": "32000-2-tones.pcm",
+      "sha256": "223094702167c5fd0cb2f274170d5169f815deedf7338958a18b42869458ffec",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 451584,
+        "digest": 4439944223117357061
+      }
+    },
+    {
+      "id": "32000-2-broadband",
+      "profile": "32000-2-broadband",
+      "file": "32000-2-broadband.pcm",
+      "sha256": "e97908e8fe729c29e0865ef669a2af4b65113722816da4502438f2dcf975b030",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 451584,
+        "digest": 4439944223117357061
+      }
+    },
+    {
+      "id": "32000-2-attacks",
+      "profile": "32000-2-attacks",
+      "file": "32000-2-attacks.pcm",
+      "sha256": "10690fbf32ea86632a77e5bc13dbf0fb15e02860e55cac4052e27dff6965910a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 451584,
+        "digest": 4439944223117357061
+      }
+    },
+    {
+      "id": "32000-6-tones",
+      "profile": "32000-6-tones",
+      "file": "32000-6-tones.pcm",
+      "sha256": "644e086fd3d7477c69570e279edde8a50588eb55a9f16718fe021a969b962544",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 1128960,
+        "digest": 4144188577448007493
+      }
+    },
+    {
+      "id": "32000-6-broadband",
+      "profile": "32000-6-broadband",
+      "file": "32000-6-broadband.pcm",
+      "sha256": "63dfbf34c08c535fcc0d975bc25ae0fb2050b0b5c45de355faa162fa475b01d0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 1128960,
+        "digest": 4144188577448007493
+      }
+    },
+    {
+      "id": "32000-6-attacks",
+      "profile": "32000-6-attacks",
+      "file": "32000-6-attacks.pcm",
+      "sha256": "08129a54054ecc6c89c8b1f8c7b43432d441875c1eafbcea4b9b969c9493398c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "32000",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 1128960,
+        "digest": 4144188577448007493
+      }
+    },
+    {
+      "id": "44100-1-tones",
+      "profile": "44100-1-tones",
+      "file": "44100-1-tones.pcm",
+      "sha256": "0603fe28e076634c7c83645c42813d5d0d3d58835028d36458c19580f3f2743e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 245760,
+        "digest": 305917920753846069
+      }
+    },
+    {
+      "id": "44100-1-broadband",
+      "profile": "44100-1-broadband",
+      "file": "44100-1-broadband.pcm",
+      "sha256": "4930d64263fb2a1dc7388dc47e756001a687560f64737afea34d376f5bb8d066",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 245760,
+        "digest": 305917920753846069
+      }
+    },
+    {
+      "id": "44100-1-attacks",
+      "profile": "44100-1-attacks",
+      "file": "44100-1-attacks.pcm",
+      "sha256": "86459a5912f7bb8902e88201af4e649c31e0e3d7f859daaa0ede302d55094208",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 245760,
+        "digest": 305917920753846069
+      }
+    },
+    {
+      "id": "44100-2-tones",
+      "profile": "44100-2-tones",
+      "file": "44100-2-tones.pcm",
+      "sha256": "e252dadfcdc6ae9272044aace09063febd125ea1af4f2040167cd50519146dd5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 327680,
+        "digest": 3012473429568204805
+      }
+    },
+    {
+      "id": "44100-2-broadband",
+      "profile": "44100-2-broadband",
+      "file": "44100-2-broadband.pcm",
+      "sha256": "b7b98407c04c99fefe2e1633c35abeef2a9a3c572024cd5bd2767c90acc8d42c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 327680,
+        "digest": 3012473429568204805
+      }
+    },
+    {
+      "id": "44100-2-attacks",
+      "profile": "44100-2-attacks",
+      "file": "44100-2-attacks.pcm",
+      "sha256": "10690fbf32ea86632a77e5bc13dbf0fb15e02860e55cac4052e27dff6965910a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 327680,
+        "digest": 3012473429568204805
+      }
+    },
+    {
+      "id": "44100-6-tones",
+      "profile": "44100-6-tones",
+      "file": "44100-6-tones.pcm",
+      "sha256": "f39b1b9dd7f7fc3b412218831b0be3874f6bcf10dae8851b043928b822022d63",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 819200,
+        "digest": 2339984703902783301
+      }
+    },
+    {
+      "id": "44100-6-broadband",
+      "profile": "44100-6-broadband",
+      "file": "44100-6-broadband.pcm",
+      "sha256": "f826340e86d510607378c5f9317729afffcf54525fddc9bee183551d8b5c7b7d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 819200,
+        "digest": 2339984703902783301
+      }
+    },
+    {
+      "id": "44100-6-attacks",
+      "profile": "44100-6-attacks",
+      "file": "44100-6-attacks.pcm",
+      "sha256": "0adf916fca35c702928eb23d630d87ced66640205557b9fd3f7c472fb9d4bd86",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "44100",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 819200,
+        "digest": 2339984703902783301
+      }
+    },
+    {
+      "id": "48000-1-tones",
+      "profile": "48000-1-tones",
+      "file": "48000-1-tones.pcm",
+      "sha256": "b6d96211baab0abf5b6ad6b2d32e791400d4c4feff531a8e109764eaffc5c7d6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 225792,
+        "digest": 14189954019278030645
+      }
+    },
+    {
+      "id": "48000-1-broadband",
+      "profile": "48000-1-broadband",
+      "file": "48000-1-broadband.pcm",
+      "sha256": "bdb1cf727da610185d8dbe72361b1ecb52e0adea327206b5206a32eefe6a37b5",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 225792,
+        "digest": 14189954019278030645
+      }
+    },
+    {
+      "id": "48000-1-attacks",
+      "profile": "48000-1-attacks",
+      "file": "48000-1-attacks.pcm",
+      "sha256": "86459a5912f7bb8902e88201af4e649c31e0e3d7f859daaa0ede302d55094208",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "1"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 225792,
+        "digest": 14189954019278030645
+      }
+    },
+    {
+      "id": "48000-2-tones",
+      "profile": "48000-2-tones",
+      "file": "48000-2-tones.pcm",
+      "sha256": "ea02657c9f3bf373fbe013da0f2ce7124096fb34ecf476aeeda706d3c71d8f9e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 301056,
+        "digest": 18366089897093967877
+      }
+    },
+    {
+      "id": "48000-2-broadband",
+      "profile": "48000-2-broadband",
+      "file": "48000-2-broadband.pcm",
+      "sha256": "faf6d34b74fe7ed0ea4de92feefd5e7f4cadaea01eb9d42fbff6e0483a755e73",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 301056,
+        "digest": 18366089897093967877
+      }
+    },
+    {
+      "id": "48000-2-attacks",
+      "profile": "48000-2-attacks",
+      "file": "48000-2-attacks.pcm",
+      "sha256": "10690fbf32ea86632a77e5bc13dbf0fb15e02860e55cac4052e27dff6965910a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "2"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 301056,
+        "digest": 18366089897093967877
+      }
+    },
+    {
+      "id": "48000-6-tones",
+      "profile": "48000-6-tones",
+      "file": "48000-6-tones.pcm",
+      "sha256": "e63965de93edbae308bd5c3a77245cc0d19c42f80c50dbf82e4f4afcacd0cb93",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 752640,
+        "digest": 4902643863050590021
+      }
+    },
+    {
+      "id": "48000-6-broadband",
+      "profile": "48000-6-broadband",
+      "file": "48000-6-broadband.pcm",
+      "sha256": "325f456d1193520c45b938ac85006c7a717196975c7161e075439dc893d469be",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 752640,
+        "digest": 4902643863050590021
+      }
+    },
+    {
+      "id": "48000-6-attacks",
+      "profile": "48000-6-attacks",
+      "file": "48000-6-attacks.pcm",
+      "sha256": "7364bc76be872b68025fea7c503e422e612e54525dc8bb0be5daaf9a21fa08bd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "48000",
+        "6"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 752640,
+        "digest": 4902643863050590021
+      }
+    }
+  ]
+}

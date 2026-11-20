@@ -235,6 +235,11 @@ fn report_contracts(contracts: Vec<crate::harness::features::Contract>) -> R<Vec
         if specialized {
             return Err(format!("{}: scheduled twice", contract.id));
         }
+        if crate::harness::features::gate(&contract.id, &contract.document)?
+            == Some(crate::harness::features::Gate::Diagnostic)
+        {
+            continue;
+        }
         let corpus = contract
             .document
             .get("corpus_directory")
@@ -3105,6 +3110,24 @@ done
                 .iter()
                 .any(|item| item.name == id)
         );
+    }
+
+    #[test]
+    fn diagnostic_reports_are_run_outside_the_gate() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let mut contracts = crate::harness::features::discover(root).unwrap();
+        let id = "diagnostic-report";
+        contracts.push(crate::harness::features::Contract {
+            id: id.into(),
+            path: root.join("harness/features").join(id).join("contract.json"),
+            document: Value::object([
+                ("runner", Value::str("cargo xtask report")),
+                ("gate", Value::str("diagnostic")),
+            ]),
+            compare_order: 0,
+        });
+        let reports = report_contracts(contracts).unwrap();
+        assert!(reports.iter().all(|report| report.id != id));
     }
 
     #[test]

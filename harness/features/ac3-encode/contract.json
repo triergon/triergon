@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "id": "ac3-encode",
+  "gate": "diagnostic",
+  "runner": "cargo xtask report",
+  "operation": "ac3-encode",
+  "candidate": "ac3-encode-worker",
+  "worker_operation": "ac3-encode-",
+  "reference": "ffmpeg-ac3-encode-native",
+  "contract": [
+    "Read six frames of normalized interleaved float32 PCM, including the final silent frame, and put the same PCM in contiguous planes before the measured operation.",
+    "Create a fresh encoder and send the full six-frame input 49 times through one stream. Emit one complete 1536-sample AC-3 syncframe per input frame, then drain and close.",
+    "Cover both complete 44.1 kHz frame-size cycles in the 294-frame session. Match the actual encoded byte and packet counts and the per-packet fold of the rate, bitstream ID, layout and nominal bitrate fields.",
+    "Use the same pinned FFmpeg 9.0.2 release profile as the audio decode comparisons, with planar float input and one thread through its public frame and packet API.",
+    "The packet fold compares the encoded work for timing and memory collection. Output streams for signal comparisons come from ac3-encode-emit and are decoded with strict CRC checking."
+  ],
+  "required_profiles": [
+    "32000-1-tones",
+    "32000-1-broadband",
+    "32000-1-attacks",
+    "32000-2-tones",
+    "32000-2-broadband",
+    "32000-2-attacks",
+    "32000-6-tones",
+    "32000-6-broadband",
+    "32000-6-attacks",
+    "44100-1-tones",
+    "44100-1-broadband",
+    "44100-1-attacks",
+    "44100-2-tones",
+    "44100-2-broadband",
+    "44100-2-attacks",
+    "44100-6-tones",
+    "44100-6-broadband",
+    "44100-6-attacks",
+    "48000-1-tones",
+    "48000-1-broadband",
+    "48000-1-attacks",
+    "48000-2-tones",
+    "48000-2-broadband",
+    "48000-2-attacks",
+    "48000-6-tones",
+    "48000-6-broadband",
+    "48000-6-attacks"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

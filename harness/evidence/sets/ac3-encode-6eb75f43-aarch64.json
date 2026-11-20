@@ -1,0 +1,9 @@
+{
+ "name": "ac3-encode-6eb75f43-aarch64",
+ "path": "ac3-encode-6eb75f43-aarch64",
+ "retention": "retained",
+ "reason": "At 6eb75f43, 27 AC-3 encoding sessions on AArch64 Linux with strict CRC decoding, 30 paired runtime and kernel-bound memory observations per case, and a paired runtime comparison with d015b275.",
+ "key": "evidence/ac3-encoding/6eb75f438e12a6ec39b5431f30d52c1a6f214d48/linux-aarch64/5733e72bff34e85270039b4d1f51badc74a7dbbf2cdb160e9a8d511b384a65f0.tar.zst",
+ "sha256": "5733e72bff34e85270039b4d1f51badc74a7dbbf2cdb160e9a8d511b384a65f0",
+ "bytes": 12932758
+}

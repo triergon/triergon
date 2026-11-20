@@ -1,0 +1,9 @@
+{
+ "name": "ac3-attack-bandwidth-d015b275",
+ "path": "ac3-attack-bandwidth-d015b275",
+ "retention": "retained",
+ "reason": "AC-3 attack comparisons at 32 kHz with coded-band transforms, all transform coefficients and long onset windows, plus matched-bitrate allocation measurements.",
+ "key": "evidence/ac3-encoding/d015b275bebaf0fa2739b05c28120ec345adb025/attack-projection/e2e98d6795be66c261283c31a6de10aeb65c2f4f6551e1e6d21ab0d17eb3e134.tar.zst",
+ "sha256": "e2e98d6795be66c261283c31a6de10aeb65c2f4f6551e1e6d21ab0d17eb3e134",
+ "bytes": 407955
+}

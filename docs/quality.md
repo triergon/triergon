@@ -486,6 +486,55 @@ the workload manifest, both workers, the pinned probe and the numeric rules.
 The measured work includes decoder construction, decoding every
 packet, folding every PCM plane, flushing and teardown. File loading and
 container parsing take place before that work.
+
+### AC-3 encoding
+
+The [AC-3 encoder contract](../harness/features/ac3-encode/contract.json) uses
+the tone, broadband and attack PCM from the encoder's interoperability test.
+Put the 27 authored `.pcm` inputs from the comparison archive in
+`.research/ac3-encode-inputs`, or generate them with the pinned FFmpeg program
+and an unused output directory:
+
+```sh
+TRIERGON_AC3_OUTPUT="$PWD/.research/ac3-encode-inputs" \
+  TRIERGON_FFMPEG="$PWD/.research/reference-decode/install/bin/ffmpeg" \
+  CARGO_INCREMENTAL=0 cargo test --locked --release -p triergon-codec-ac3 \
+  --features encode --test encoder ffmpeg_interoperability_and_signal_quality -- --ignored
+```
+
+The [manifest](../harness/features/ac3-encode/corpus.json) fixes each input's
+SHA-256. The two workers preload the input, then measure encoder construction,
+all 294 frames, the packet and byte fold, and teardown. At 44.1 kHz the session
+covers complete frame-size cycles at every bitrate, giving both encoders the
+same total stream size.
+
+With the pinned Matroska and decode reference builds prepared, build the
+encoder workers and run the diagnostic comparison on a gate target:
+
+```sh
+export CARGO_INCREMENTAL=0
+cargo xtask build-workers --only ac3-encode-worker
+cargo xtask report --contract harness/features/ac3-encode/contract.json \
+  --manifest harness/features/ac3-encode/corpus.json --benchmark --memory \
+  --output .research/ac3-encode-report
+```
+
+For the signal comparison, set `TRIERGON_AC3_INPUTS` to the pinned PCM,
+`TRIERGON_AC3_WORKER` and `TRIERGON_AC3_REFERENCE` to the two built encoders,
+`TRIERGON_FFMPEG` to the pinned decoder program and `TRIERGON_AC3_OUTPUT` to a
+new directory. This test decodes the full session each worker emits with
+strict CRC checking and reports per-channel SNR and the pre-attack peak.
+
+```sh
+CARGO_INCREMENTAL=0 cargo test --locked --release -p triergon-codec-ac3 \
+  --features encode --test encoder encoder_workers_decode_full_sessions -- --ignored --nocapture
+```
+
+The packet fold establishes matching encode work for native timing and memory.
+Audio quality across a broader corpus remains open.
+
+### Fuzzing
+
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
 input (`--timeout-seconds`, 3 by default, or the contract's `timeout_seconds`). With `--contract` it builds that manifest from a prefix feature's cases: the
