@@ -33,11 +33,11 @@ The memory observer takes separate runs through three endpoints.
 - **full** refills that same warm session to its exact byte limit, checks
   backpressure again and holds the occupied queue through the end marker.
 
-An allocation receipt covers the entire lane, including the decoder, output
+An allocation record covers the entire session, including the decoder, output
 buffers and queue metadata. The configured payload bound is in the work record.
 Compare `window_allocation_calls`, `heap_peak_bytes` and
 `heap_live_end - heap_live_start` on each heap pair. The full and starved runs
-expose retention that disappears when EOS releases the lane. The separate RSS
+expose retention that disappears when EOS releases the session. The separate RSS
 observations and bounds use the repository's calibrated observer.
 
 ## Running a comparison
@@ -71,9 +71,9 @@ In an armhf user space it passes `--target thumbv7neon-unknown-linux-gnueabihf`
 and copies the linked example from the intermediates for that source revision
 and overlay. These intermediates live under the shared target directory.
 Each worker has an
-adjacent `.build.json` receipt recording its SHA-256, library revision, overlay
-hashes, target, compiler and build command. Keep each executable with its receipt.
-The comparison checks these identities and saves both receipts in `identity.json`.
+adjacent `.build.json` file recording its SHA-256, library revision, overlay
+hashes, target, compiler and build command. Keep each executable with its build identity.
+The comparison checks these identities and saves both records in `identity.json`.
 
 On an isolated native Linux AArch64 or ARMv7 host, use the ordinary pinned
 worker toolchain and CPU affinity. The memory run uses the prepared

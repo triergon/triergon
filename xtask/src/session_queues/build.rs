@@ -27,7 +27,7 @@ fn overlay(root: &Path) -> Result<Value, String> {
     Ok(Value::Object(files))
 }
 
-fn receipt_path(worker: &Path) -> PathBuf {
+fn identity_path(worker: &Path) -> PathBuf {
     let mut path = worker.as_os_str().to_owned();
     path.push(".build.json");
     PathBuf::from(path)
@@ -73,9 +73,9 @@ fn linked_worker(cache: &Path) -> Result<PathBuf, String> {
 }
 
 pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String> {
-    if dest.exists() || receipt_path(dest).exists() {
+    if dest.exists() || identity_path(dest).exists() {
         return Err(format!(
-            "worker or receipt already exists: {}",
+            "worker or build identity already exists: {}",
             dest.display()
         ));
     }
@@ -120,7 +120,7 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     )?;
     let binary = linked_worker(&cache)?;
     std::fs::copy(&binary, dest).map_err(|e| format!("{}: {e}", binary.display()))?;
-    let receipt = Value::object([
+    let identity = Value::object([
         ("revision", Value::str(revision.trim())),
         ("target", Value::str(target)),
         ("sha256", Value::str(sha(dest)?)),
@@ -130,22 +130,22 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
         ("build", build),
         ("argv", Value::strings(argv)),
     ]);
-    corpus::write_json(&receipt_path(dest), &receipt)
+    corpus::write_json(&identity_path(dest), &identity)
 }
 
 pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
-    let receipt = checks::read_json(&receipt_path(worker))?;
-    if receipt.get("sha256").and_then(Value::as_str) != Some(&sha(worker)?)
-        || receipt.get("target").and_then(Value::as_str) != Some(gate_build::worker_target()?)
-        || receipt.get("overlay") != Some(&overlay(root)?)
+    let identity = checks::read_json(&identity_path(worker))?;
+    if identity.get("sha256").and_then(Value::as_str) != Some(&sha(worker)?)
+        || identity.get("target").and_then(Value::as_str) != Some(gate_build::worker_target()?)
+        || identity.get("overlay") != Some(&overlay(root)?)
     {
         return Err(format!(
-            "{}: binary, target or workload differs from the build receipt",
+            "{}: binary, target or workload differs from the build identity",
             worker.display()
         ));
     }
-    let build = receipt.get("build").ok_or("missing build record")?;
-    let argv = receipt
+    let build = identity.get("build").ok_or("missing build record")?;
+    let argv = identity
         .get("argv")
         .and_then(Value::as_array)
         .ok_or("missing Cargo command")?;
@@ -154,23 +154,23 @@ pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
         .find(|pair| pair[0].as_str() == Some("--target-dir"))
         .and_then(|pair| pair[1].as_str())
         .ok_or("missing Cargo target directory")?;
-    let revision = receipt
+    let revision = identity
         .get("revision")
         .and_then(Value::as_str)
         .filter(|r| r.len() == 40 && r.bytes().all(|b| b.is_ascii_hexdigit()))
         .ok_or("missing library revision in worker build")?;
-    if receipt.get("argv") != Some(&Value::strings(cargo_command(Path::new(dir))?)) {
+    if identity.get("argv") != Some(&Value::strings(cargo_command(Path::new(dir))?)) {
         return Err("Cargo command differs from the worker build for this target".into());
     }
     let cache = build_dir(
         Path::new(dir),
         revision,
-        receipt.get("overlay").ok_or("missing workload overlay")?,
+        identity.get("overlay").ok_or("missing workload overlay")?,
     );
-    if receipt.get("build_dir").and_then(Value::as_str) != cache.to_str() {
+    if identity.get("build_dir").and_then(Value::as_str) != cache.to_str() {
         return Err("intermediate build directory differs from the source identity".into());
     }
-    let artifact = receipt
+    let artifact = identity
         .get("artifact")
         .and_then(Value::as_str)
         .map(Path::new)
@@ -190,5 +190,5 @@ pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
     if !refusals.is_empty() {
         return Err(refusals.join(", "));
     }
-    Ok(receipt)
+    Ok(identity)
 }

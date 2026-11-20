@@ -113,12 +113,12 @@ impl Input {
 
 // Keep both sessions inline so their wrapper adds no heap allocation to the observer.
 #[allow(clippy::large_enum_variant)]
-enum Lane {
+enum Session {
     Audio(AudioSession, PcmBlock),
     Video(VideoSession),
 }
 
-impl Lane {
+impl Session {
     fn new(codec: Codec, limits: QueueLimits) -> Result<Self> {
         match codec {
             Codec::Avc => {
@@ -198,46 +198,47 @@ impl Lane {
     }
 }
 
-fn run(input: &Input, stage: &str, held: &mut Option<Lane>) -> Result<Totals> {
-    let mut lane = Lane::new(input.codec, input.limits)?;
+fn run(input: &Input, stage: &str, held: &mut Option<Session>) -> Result<Totals> {
+    let mut session = Session::new(input.codec, input.limits)?;
     let mut out = Totals {
         digest: input.payload_fold,
         ..Totals::default()
     };
     let n = input.payloads.len();
-    let feed =
-        |lane: &mut Lane, bytes, pts| lane.feed(bytes, pts).map_err(|e| format!("feed: {e:?}"));
-    let fill = |lane: &mut Lane, start: usize| -> Result<()> {
+    let feed = |session: &mut Session, bytes, pts| {
+        session.feed(bytes, pts).map_err(|e| format!("feed: {e:?}"))
+    };
+    let fill = |session: &mut Session, start: usize| -> Result<()> {
         for (i, unit) in input.units().enumerate() {
-            feed(lane, unit, (start + i) as i64)?;
+            feed(session, unit, (start + i) as i64)?;
         }
-        if lane.feed(&input.payloads[0], (start + n) as i64) != Err(FeedError::Backpressure) {
+        if session.feed(&input.payloads[0], (start + n) as i64) != Err(FeedError::Backpressure) {
             return Err("queue admitted a payload beyond the total byte limit".into());
         }
         Ok(())
     };
-    fill(&mut lane, 0)?;
-    lane.drain(&mut out)?;
+    fill(&mut session, 0)?;
+    session.drain(&mut out)?;
     // Retry the rejected unit first, then drain between borrowed feeds.
     for (i, unit) in input.units().enumerate() {
-        feed(&mut lane, unit, (n + i) as i64)?;
-        lane.drain(&mut out)?;
+        feed(&mut session, unit, (n + i) as i64)?;
+        session.drain(&mut out)?;
     }
-    if lane.state() != SessionState::Starved || out.bytes == 0 {
-        return Err("active lane did not decode and reach starvation".into());
+    if session.state() != SessionState::Starved || out.bytes == 0 {
+        return Err("active session did not decode and reach starvation".into());
     }
     if matches!(stage, "full" | "drain-full") {
-        fill(&mut lane, 2 * n)?;
+        fill(&mut session, 2 * n)?;
     }
     if matches!(stage, "cycle" | "drain-full") {
-        lane.end();
-        lane.drain(&mut out)?;
-        if lane.state() != SessionState::Ended {
+        session.end();
+        session.drain(&mut out)?;
+        if session.state() != SessionState::Ended {
             return Err("incomplete session drain".into());
         }
     } else {
-        // Keep the entire lane alive through the observer's END marker.
-        *held = Some(lane);
+        // Keep the entire session alive through the observer's END marker.
+        *held = Some(session);
     }
     Ok(out)
 }
