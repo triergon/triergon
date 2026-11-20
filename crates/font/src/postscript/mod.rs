@@ -438,6 +438,7 @@ mod tests {
 
     #[test]
     fn standard_sids_have_the_mapping_of_their_full_name() {
+        assert_eq!(NameMapping::standard(34).unwrap().unicode, u32::from('A'));
         for (sid, name) in STANDARD_STRINGS.iter().enumerate() {
             let standard = NameMapping::standard(sid as u16).unwrap();
             let custom = NameMapping::custom(name.as_bytes());
