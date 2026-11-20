@@ -39,7 +39,16 @@ impl<'a> RiceReader<'a> {
     #[inline(always)]
     #[must_use]
     pub fn position(&self) -> usize {
-        self.next * 8 - self.valid as usize
+        // The cache can extend past usize::MAX bits while its position still fits.
+        self.next.wrapping_mul(8).wrapping_sub(self.valid as usize)
+    }
+
+    /// Whether the consumed codes or fields extend beyond the exclusive bit limit.
+    #[inline]
+    #[must_use]
+    pub fn past_end(&self, end: usize) -> bool {
+        // Compare next * 8 - valid > end without overflowing a bit offset.
+        self.next > end / 8 + (end % 8 + self.valid as usize) / 8
     }
 
     /// Tops the cache up to at least 56 unread bits.
@@ -59,12 +68,34 @@ impl<'a> RiceReader<'a> {
         value
     }
 
-    /// The next Rice code with parameter `k` (below 32): a unary quotient of zeros ended
-    /// by a one, then `k` low bits, as the value `quotient << k | low`. `None` once the
-    /// code passes bit `end`, or when a code longer than the unread bits holds more than
-    /// 32 bits; a shorter code keeps the low 32 bits of its value.
-    #[inline(always)]
+    /// Reads one Rice code ending at or before the exclusive bit limit `end`.
+    /// The value is the unary quotient shifted left by `k`, plus the `k` low bits.
+    /// Like [`Self::take`], low bits beyond the slice read as zero.
+    ///
+    /// Returns `None` without advancing if `k >= 32`, the code crosses `end`,
+    /// or a code spanning refills exceeds 32 value bits. A code fitting the
+    /// cache retains the low 32 bits of its value.
+    #[inline]
     pub fn rice(&mut self, k: u32, end: usize) -> Option<u32> {
+        if k >= 32 {
+            return None;
+        }
+        let mut next = *self;
+        let value = next.rice_in_partition(k, end)?;
+        if next.past_end(end) {
+            return None;
+        }
+        *self = next;
+        Some(value)
+    }
+
+    /// Reads one Rice code with `k < 32` for a group validated as a whole.
+    /// `end` bounds the search through runs of zero bits. A successful code can
+    /// consume bits past `end`, including a cached stop bit or low bits.
+    /// Discard the group on `None` or if [`Self::past_end`] is true after the
+    /// final code. Use [`Self::rice`] for a checked code.
+    #[inline(always)]
+    pub fn rice_in_partition(&mut self, k: u32, end: usize) -> Option<u32> {
         let zeros = self.cache.leading_zeros();
         let len = zeros + 1 + k;
         if len > self.valid {
@@ -86,6 +117,8 @@ impl<'a> RiceReader<'a> {
 #[cold]
 #[inline(never)]
 fn long_rice(mut reader: RiceReader<'_>, k: u32, end: usize) -> (RiceReader<'_>, Option<u32>) {
+    // A unary stop bit must come from the slice, even when end permits zero padding.
+    let end = end.min(reader.data.len().saturating_mul(8));
     let mut quotient = 0u64;
     loop {
         reader.refill();
@@ -96,13 +129,14 @@ fn long_rice(mut reader: RiceReader<'_>, k: u32, end: usize) -> (RiceReader<'_>,
             break;
         }
         reader.take(32);
-        if reader.position() > end {
+        if reader.past_end(end) {
             return (reader, None);
         }
     }
     reader.refill();
-    let value = (quotient << k) | u64::from(reader.take(k));
-    (reader, u32::try_from(value).ok())
+    let low = reader.take(k);
+    let value = (quotient <= u64::from(u32::MAX >> k)).then_some(((quotient as u32) << k) | low);
+    (reader, value)
 }
 
 /// The eight bytes at `byte`, big-endian, zero past the end of `data`.
@@ -114,6 +148,60 @@ fn load_word(data: &[u8], byte: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checked_codes_respect_the_exact_bit_limit_and_allow_retry() {
+        let data = [0xff; 16];
+        let mut bits = RiceReader::at(&data, 0);
+        assert_eq!(bits.rice(2, 1), None);
+        assert_eq!(bits.rice(2, 2), None);
+        assert_eq!(bits.position(), 0);
+        assert_eq!(bits.rice(2, 3), Some(3));
+        assert_eq!(bits.rice(0, 3), None);
+        assert_eq!(bits.rice(32, 64), None);
+        assert_eq!(bits.position(), 3);
+
+        // Start mid-byte, cross a refill, then end inside the remainder.
+        let mut data = [0; 10];
+        data[8] = 0b0001_1010;
+        let mut bits = RiceReader::at(&data, 5);
+        for end in [36, 67, 70] {
+            assert_eq!(bits.rice(3, end), None);
+            assert_eq!(bits.position(), 5);
+        }
+        assert_eq!(bits.rice(3, 71), Some((62 << 3) | 5));
+        assert_eq!(bits.position(), 71);
+    }
+
+    #[test]
+    fn zero_padding_has_no_unary_stop_bit() {
+        assert_eq!(RiceReader::at(&[0; 8], 0).rice(0, usize::MAX), None);
+        assert_eq!(RiceReader::at(&[], usize::MAX).rice(0, usize::MAX), None);
+        assert_eq!(RiceReader::at(&[1], 0).rice(1, 8), None);
+        assert_eq!(RiceReader::at(&[1], 0).rice(1, 9), Some(14));
+    }
+
+    #[test]
+    fn group_end_check_handles_the_largest_bit_offset() {
+        let mut bits = RiceReader::at(&[], usize::MAX - 1);
+        bits.take(1);
+        assert_eq!(bits.position(), usize::MAX);
+        assert!(!bits.past_end(usize::MAX));
+        bits.take(1);
+        assert!(bits.past_end(usize::MAX));
+    }
+
+    #[test]
+    fn checked_overflow_preserves_the_cached_and_long_code_rules() {
+        // A cached quotient of 2 retains only its low 32 value bits for k=31.
+        assert_eq!(RiceReader::at(&[0x20, 0, 0, 0, 0], 0).rice(31, 34), Some(0));
+        let mut data = [0; 10];
+        data[5] = 0x80;
+        let mut bits = RiceReader::at(&data, 0);
+        assert_eq!(bits.rice(31, 72), None);
+        assert_eq!(bits.position(), 0);
+        assert_eq!(bits.rice(0, 41), Some(40));
+    }
 
     #[test]
     fn codes_and_fields_cross_refills_and_the_end() {
