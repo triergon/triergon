@@ -1,0 +1,126 @@
+{
+ "name": "public-capture-low-deb6105a-aarch64",
+ "path": "public-capture-low-deb6105a-aarch64",
+ "retention": "retained",
+ "reason": "MPEG-1 capture, first eight inputs on AArch64. Contains per-case reference measurements, build and input identities, and the recorded outcomes.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/aarch64/result/1b53faf1a7d7f83e50a90e22fbac8903f7961c544ef48b3a0f58c0091c4d5bce.tar.zst",
+ "sha256": "1b53faf1a7d7f83e50a90e22fbac8903f7961c544ef48b3a0f58c0091c4d5bce",
+ "bytes": 704097449,
+ "results": [
+  {
+   "path": "capture-c01-ui-static-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "2f8cb4523a86d24c26273fccf4aae6054c0c38c02dcc08ebad86bf54723d03a2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "73684ef27f28f1e37c872b83b5d4b5ee9d85b3b1de079b6c3b94f3164648f803",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c01-ui-static-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "82f79a5dbcd35afaf2871693eef674a911ca421d886709d1d094d3ef7b0d8eba",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "dbc209771208727e46bd3082340b30ac67fce418f3d1bc1ae402a044af3178ae",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "72c7c9640c426e802899f5f8bcabaef29721af2b5156bf0c98192b3ce2bff4d3",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "2b4380db12f590fb3a5998c5714c4b82804a5b98f5203c9f1b553afffaa43bb8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "3e391f7e7db5917ea6207c26233024589b28dc2380d49b75d45549a5251a8cb2",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c03-ui-transition-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "6cc2c5b1ebfa2622faaf0a0b1e3b5c9b30693c5e1eaf55b612cffdb035b91abd",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "b1b4a80eb61bba4065f9d6f7142d601e5c76a7ec81e7719d056dc7080fb49ade",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c07-ui-static-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "7fbda99e2d57bb67037cda583be9bf8ceafa88b56b7d681ae3b881eb5d304429",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "91fe3252cdf660c31eecb8494cad4a5e9f06d8239e186745ea3e9f7d0ab652c5",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c04-motion-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "8bc052f19c35617e0551ce2ccb17f552998da54222f023c115004dd1b22fbeaa",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c02-ui-scroll-960/gate-result.json",
+   "command": "capture qualify",
+   "key": "2f50b16e6be5ea2ce5e0098ee4b5d8abb9170cf9e410e08dcf67acfc0d40d584",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c08-ui-scroll-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "012e2e6a8875b6936cd6bb772d8b2fdf409a7404efab41d5dec5d60a545ce09d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c05-noise-960-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "025f3cd022cabe8cea527c1788be3ea3c7bc65c86cf6cb6769870f7737fc78c4",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c06-ui-scroll-960-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "fa3991c635dc4fa45909807a7cc6816f7365cd5c5024c2f406c3895d744671e4",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "deb6105a9644aa95adf6bea2b71c96845d3c6dfb"
+ ]
+}

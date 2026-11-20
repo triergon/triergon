@@ -66,28 +66,30 @@ impl MultibyteCharset {
         Err(Error::Unsupported("explicit multibyte charset label"))
     }
 
-    fn data(self) -> &'static [u8] {
-        match self {
+    // Sorted fixed-width DATA records: two-byte wire code, two-byte scalar.
+    // At most 16 binary-search comparisons for a mapping; no allocation.
+    fn lookup(self, code: u16) -> Option<char> {
+        let data: &[u8] = match self {
             Self::GbkCp936 => include_bytes!("mapping-data/gbk.bin"),
             Self::Big5Unicode => include_bytes!("mapping-data/big5.bin"),
             Self::ShiftJisUnicode => include_bytes!("mapping-data/shift_jis.bin"),
-            Self::EucKr => include_bytes!("mapping-data/euc_kr.bin"),
+            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
+                if let Ok(byte) = u8::try_from(code) {
+                    // ASCII in every profile, plus the receiver profiles' C1 controls.
+                    let last = if self == Self::EucKr { 0x7f } else { 0x9f };
+                    return (byte <= last).then(|| char::from(byte));
+                }
+                if self == Self::ReceiverEucKrGlibc239 && code == 0xa2e8 {
+                    return Some('\u{327e}');
+                }
+                include_bytes!("mapping-data/euc_kr.bin")
+            }
             Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
             Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
             Self::Windows950 => include_bytes!("mapping-data/windows950.bin"),
             Self::ReceiverBig5Glibc239 => include_bytes!("mapping-data/receiver_big5_glibc239.bin"),
-            Self::ReceiverEucKrC1 => include_bytes!("mapping-data/receiver_euc_kr_c1.bin"),
-            Self::ReceiverEucKrGlibc239 => {
-                include_bytes!("mapping-data/receiver_euc_kr_glibc239.bin")
-            }
             Self::ReceiverWindows932Pua => include_bytes!("mapping-data/receiver_cp932_pua.bin"),
-        }
-    }
-
-    // Sorted fixed-width DATA records: two-byte wire code, two-byte scalar.
-    // At most 16 comparisons for the entire 16-bit domain; no allocation.
-    fn lookup(self, code: u16) -> Option<char> {
-        let data = self.data();
+        };
         let mut low = 0;
         let mut high = data.len() / 4;
         while low < high {
@@ -236,7 +238,17 @@ impl MultibyteDecoder {
                 range: start..next,
             }));
         }
-        if let Some(value) = self.profile.lookup(u16::from(byte)) {
+        // Historical Shift-JIS maps 0x5C to yen and 0x7E to overline.
+        let single = if byte.is_ascii() {
+            Some(match (self.profile, byte) {
+                (MultibyteCharset::ShiftJisUnicode, b'\\') => '\u{00a5}',
+                (MultibyteCharset::ShiftJisUnicode, b'~') => '\u{203e}',
+                _ => char::from(byte),
+            })
+        } else {
+            self.profile.lookup(u16::from(byte))
+        };
+        if let Some(value) = single {
             let start = self.position;
             self.position = next;
             return Ok(DecodeStep::Scalar(DecodedScalar {

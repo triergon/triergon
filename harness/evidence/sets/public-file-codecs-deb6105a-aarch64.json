@@ -1,0 +1,42 @@
+{
+ "name": "public-file-codecs-deb6105a-aarch64",
+ "path": "public-file-codecs-deb6105a-aarch64",
+ "retention": "retained",
+ "reason": "Ten audio files decoded and mixed to stereo. Includes the FFmpeg timing and kernel-bound memory measurements, paired comparisons with the preceding build, input and worker identities, and the 187-input FLAC packet and PCM reports.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/aarch64/result/e5d323cd62b44cbb848f0d4a0550005e8f7cde2a27ba479f5fb82d1b04d3f9a5.tar.zst",
+ "sha256": "e5d323cd62b44cbb848f0d4a0550005e8f7cde2a27ba479f5fb82d1b04d3f9a5",
+ "bytes": 6934047,
+ "results": [
+  {
+   "path": "memory/codec-file-workloads-1/gate-result.json",
+   "command": "codecs memory",
+   "key": "43574115f8085f110d6baf66e04890e55c432a343926bbad0bed7979a43d8efc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-3/gate-result.json",
+   "command": "codecs memory",
+   "key": "e75b3e117d567ed2df5721b1201083869ea7dd08d7366836ea28a0039b64d6c8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/codec-file-workloads-2/gate-result.json",
+   "command": "codecs memory",
+   "key": "536370fadfd0511127c692c07ad125d400a85f4727a50cca061a18914d06f1fe",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/codec-file-workloads/gate-result.json",
+   "command": "codecs time",
+   "key": "b3e7256ea5861eae96a91aff41f663b95cf0b491fbd5f878c83b523583fcf564",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "deb6105a9644aa95adf6bea2b71c96845d3c6dfb"
+ ]
+}

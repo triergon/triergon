@@ -1,0 +1,60 @@
+{
+ "name": "subtitle-text-ab677583-armv7",
+ "path": "subtitle-text-ab677583-armv7",
+ "retention": "retained",
+ "reason": "Native armv7 subtitle-text and subtitle-text-host at public ab677583. Includes the independent registered reference timing, memory and grade, all direct public 524bf906 fixed-pair comparisons, and 14 instruction controls.",
+ "key": "evidence/architecture-review-mwo5u537/ab677583156519d47463f0f54c4df1a3bcc1dd2a/armv7/public-charset/0ba2abc898c7608fe5b3ea9a3321f41367bf9bac775469bf423a53f3a5fe14b7.tar.zst",
+ "sha256": "0ba2abc898c7608fe5b3ea9a3321f41367bf9bac775469bf423a53f3a5fe14b7",
+ "bytes": 79467169,
+ "results": [
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "a6384e43c4bf5b7d1fa98e5c78944297adc04171610ea68bfb9d2a9756f64fd9",
+   "status": 0,
+   "report_sha256": "4042ccd37d0ee15e22680dc030c16fd2aff8f30dbc3208c4390403e153a8ea2f",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "39115723fe117b25b90a646751f6b20b2a9aa0bd3aa59112b9f0d54ed7286b0d",
+   "status": 0,
+   "report_sha256": "a815311e9bddb8bbec6d2f893689ab7435452a3a4c9c78ff953905cb76358f6b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "a0a8ef970203b48aa8853b49db557496f5056e727e8f81b82c39b4327f171aca",
+   "status": 0,
+   "report_sha256": "0447f658f359e13df841f43d2a64b8160a5f0505d8995e5826f7e2e60176b310",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f79ad9d4a23ab37b95ec95d1fea81f5d76a8f04acf594bb7672e9ff480ece55d",
+   "status": 0,
+   "report_sha256": "1e752f15d479008c287c806187df449a069c2ee0efd873b25b79471561cb6fea",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "4e8a7e5e857d2ed40984a41232fbb84efccd783647cc07c4c680e9064f476d1f",
+   "status": 0,
+   "report_sha256": "e53e8151863494807f5283e9ffb4c596b90a6b4eca17e3e4ce7a8ef06c0bca1c"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "3053fc5437a1d20dfef623a2561a0807231ea0632b3b8ddd3ac1361855e46626",
+   "status": 0,
+   "report_sha256": "6919fb8e4f860266a132daec351ae1b94cc688752db67122670f17958e60431e"
+  }
+ ],
+ "source_revisions": [
+  "ab677583156519d47463f0f54c4df1a3bcc1dd2a"
+ ]
+}

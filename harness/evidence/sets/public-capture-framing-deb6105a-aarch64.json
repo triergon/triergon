@@ -1,0 +1,158 @@
+{
+ "name": "public-capture-framing-deb6105a-aarch64",
+ "path": "public-capture-framing-deb6105a-aarch64",
+ "retention": "retained",
+ "reason": "MPEG-1 capture, remaining seven inputs, packet framing and MPEG-TS access units on AArch64. Contains per-case reference measurements, build and input identities, and the recorded outcomes.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/aarch64/result/a1f5937bb9e0163be50dc1a24900695b5207b3b07daf6e8c2056ea1bad06a535.tar.zst",
+ "sha256": "a1f5937bb9e0163be50dc1a24900695b5207b3b07daf6e8c2056ea1bad06a535",
+ "bytes": 989454457,
+ "results": [
+  {
+   "path": "capture-c13-motion-960-6m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "8fab65093a2bf5767f64648b9f3bf610e525d44df02555c23a84a8eca3c05c94",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "7a685d6610bd9406a28613e36507ef67f5bf39dfccde49b54685afef1063cdb7",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown/gate-result.json",
+   "command": "capture qualify",
+   "key": "5a9667bbffa49ac326b1a60f87c166feae86e0c966004f69f24c59257e68e22a",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255/gate-result.json",
+   "command": "capture qualify",
+   "key": "acc84c29fbbd0c874d7aa58a148928e11325f2d63be90ad8626342457fe10e7d",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1/gate-result.json",
+   "command": "capture qualify",
+   "key": "aa93de435fc6b1b404208dd419602684acb5b106d90fb56fe445f5b63a676bf6",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "7f53371dee9edb7795ebba1ad3852e6874359816ec66785f2b97323cf17f63ce",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c09-motion-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "1cb3fab3e4e0f107439fdb08c9c07a764b01e10cda4cb16abded585394eeb3e8",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c12-motion-960-1m/gate-result.json",
+   "command": "capture qualify",
+   "key": "b7c61840398ae7d61f29539330e26ab90aca995fc224ff1868aef377b46d79c9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c14-motion-960-rate255-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "232cf382ce7982d5d665c9c570875f39c0cca11fdb8849549704920ced89e2aa",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "memory/mpegts-access-units/gate-result.json",
+   "command": "report --memory",
+   "key": "4dde05f9e30c97676407cc0cc750fb47e9c9d55f6a440e6020da4de5aa5155a8",
+   "status": 0,
+   "report_sha256": "e012bbf5317554b2d9323d4515fb98b8768563801c5591add5a686ba60b88a08",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/framing/gate-result.json",
+   "command": "report --memory",
+   "key": "051b54ca69b5eefb92ca1c67a8966c0a185965a4195cf76ccd1b010b1c04e369",
+   "status": 0,
+   "report_sha256": "5d794cb1600e19e4c03cf163793faaafb7059fb5f1b0cf0b2ff58060b74baf3a",
+   "cases_checked": true
+  },
+  {
+   "path": "capture-c10-ui-transition-480-topdown-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "9b605cc2893ce016545ac9f1e492bb1ef8cab5d07cff939f0c83767e58d4a661",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "benchmark/mpegts-access-units/gate-result.json",
+   "command": "report --benchmark",
+   "key": "91e6c5c0cb528ca2c826b3e6b2c232a2921afebaf1f8e1b71f4bd9f3a2cec751",
+   "status": 0,
+   "report_sha256": "6776c68cee0785f2ed8694653269b6de76d9ea00f64425ae85aa89a43a6078ac",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/framing/gate-result.json",
+   "command": "report --benchmark",
+   "key": "888379c0463aef11817d38ec59401e2e9dfd904666728ff6711f80b6cb0a6905",
+   "status": 0,
+   "report_sha256": "4e1f808d6bbfebef81f4e04d759439adf8933dfb16cce532ead338c0dd067ff0",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mpegts-access-units/gate-result.json",
+   "command": "grade",
+   "key": "6cd5bd95871e3804bd7a09f9c03b6abe07bf52cc3ae3c4de93312939b7922886",
+   "status": 0,
+   "report_sha256": "a0da83d38c2a45ffa7f5fde3fc7c20dc9acb7b59370bf7434d859aab1161de1d"
+  },
+  {
+   "path": "graded/framing/gate-result.json",
+   "command": "grade",
+   "key": "20fa26568eddebdd9864e9129138ec28e1597c8a107fa975dd75f781cde744eb",
+   "status": 1,
+   "report_sha256": "95690f4aafa1f58116251f35a29e9f08d657c9a5df62e72cd0191f1e90a2f871"
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup/gate-result.json",
+   "command": "capture qualify",
+   "key": "f83a8ff232ed46f1368a9eb25673d104ab8f67b0c38e4002b5253c235fca84b0",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c15-noise-480-bottomup-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "705d9512d299a816362496fd1bc6479624e77006d5ac51c1c2923961399c1cd9",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c11-motion-960-rate1-timing/gate-result.json",
+   "command": "capture qualify",
+   "key": "e3b7683053d3c432aff50ec3bba81fa4db0a4975e755089d13b4204d3d6898cc",
+   "status": 0,
+   "report_sha256": null
+  },
+  {
+   "path": "capture-c13-motion-960-6m/gate-result.json",
+   "command": "capture qualify",
+   "key": "8ccf971060ed9c75b81721afcc5eb6041c7903529d90f2fd4e84596f056c4e06",
+   "status": 0,
+   "report_sha256": null
+  }
+ ],
+ "source_revisions": [
+  "deb6105a9644aa95adf6bea2b71c96845d3c6dfb"
+ ]
+}

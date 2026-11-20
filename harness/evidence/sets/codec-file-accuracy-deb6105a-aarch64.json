@@ -1,0 +1,9 @@
+{
+ "name": "codec-file-accuracy-deb6105a-aarch64",
+ "path": "codec-file-accuracy-deb6105a-aarch64",
+ "retention": "retained",
+ "reason": "Decoded PCM and stereo s16 output for all ten file workloads on AArch64, including per-file sample differences, input and worker hashes, and the numeric rules.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/aarch64/registered-file-accuracy/e631aad20bf1545bfbc14704e33fbc916761b5c5885ac5d8a6d316d75257b554.tar.zst",
+ "sha256": "e631aad20bf1545bfbc14704e33fbc916761b5c5885ac5d8a6d316d75257b554",
+ "bytes": 3275746
+}
