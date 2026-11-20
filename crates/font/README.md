@@ -103,7 +103,9 @@ encoding through the charset's lowest glyph of each SID. Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
 valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
-another reader selects). Format 4 is read as FreeType reads it: a linear search
+another reader selects). A CID-keyed CFF face validates the complete charset and
+retains the CIDs only when it needs them to construct the glyph-name charmap.
+Format 4 is read as FreeType reads it: a linear search
 through segments its validation finds unsorted, else a binary search that for
 overlapping segments takes the first holding the code, and `char_next`'s walk
 from segment to segment.
