@@ -1,11 +1,12 @@
 //! Process-level checks of publication and of the input handed to the reference.
 #![cfg(unix)]
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
+use std::sync::mpsc;
+use std::time::Duration;
 
 const CASES: &[u8] = br#"[{"id":"one","profile":"one","file":"input.ts","rights":"authored-synthetic","source":"test","arguments":[]}]"#;
 const FOLD: &str = r#"{"packets":1,"bytes":3,"digest":101,"eof":true}"#;
@@ -23,13 +24,10 @@ impl Fixture {
             &reference,
             r#"#!/bin/sh
 set -eu
-if [ -f hold ]; then
-    touch ready
-    count=0
-    while [ -f hold ] && [ "$count" -lt 300 ]; do
-        sleep 0.05
-        count=$((count+1))
-    done
+if [ -p reference-entered ]; then
+    exec 3>reference-entered
+    IFS= read -r release <reference-release
+    exit 0
 fi
 if [ -f replacement ]; then mv replacement input.ts; fi
 if [ -f override ]; then cat override; else tee received < "$2"; fi
@@ -125,24 +123,71 @@ fn reference_reads_the_hashed_snapshot_when_the_source_is_replaced() {
     }
 }
 
+// Bound blocking IPC so a recorder that fails before reaching the reference, or
+// a leaked manifest lock, fails the test instead of hanging the workspace.
+fn synchronized<T: Send + 'static>(
+    action: impl FnOnce() -> T + Send + 'static,
+) -> Result<T, mpsc::RecvTimeoutError> {
+    let (send, receive) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = send.send(action());
+    });
+    receive.recv_timeout(Duration::from_secs(10))
+}
+
 #[test]
 fn live_writer_excludes_a_competitor_and_process_exit_releases_the_lock() {
     let f = Fixture::new("cancel");
     f.run("record", "subtitle-dvb", None);
     let pins = f.pins();
     fs::write(f.0.join("input.ts"), FOLD.replace("101", "202")).unwrap();
-    fs::write(f.0.join("hold"), []).unwrap();
+    assert!(
+        Command::new("mkfifo")
+            .current_dir(&f.0)
+            .args(["reference-entered", "reference-release"])
+            .status()
+            .unwrap()
+            .success()
+    );
     let mut first = f.start("record", "subtitle-dvb");
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !f.0.join("ready").exists() {
-        assert!(Instant::now() < deadline, "first reference did not start");
-        std::thread::sleep(Duration::from_millis(10));
-    }
-    f.run("record", "subtitle-dvb", Some("locking"));
+    let entered = f.0.join("reference-entered");
+    let mut reference = synchronized(move || fs::File::open(entered))
+        .expect("first recorder did not enter its reference")
+        .unwrap();
+    // Only this writer uses the rendezvous. A wrongly admitted competitor
+    // must finish normally so the refusal assertion can catch it.
+    fs::remove_file(f.0.join("reference-entered")).unwrap();
+    let competitor = f
+        .start("record", "subtitle-dvb")
+        .wait_with_output()
+        .unwrap();
     first.kill().unwrap();
-    first.wait().unwrap();
+    let stopped = first.wait().unwrap();
+
+    // Wait on the same inode while the orphaned reference is still alive.
+    let path = f.0.join("pins.json.record-lock");
+    let released = synchronized(move || {
+        let lock = fs::OpenOptions::new().write(true).open(path)?;
+        lock.lock()?;
+        lock.unlock()
+    });
+    // Let the reference exit even if the recorder leaked the lock.
+    let path = f.0.join("reference-release");
+    synchronized(move || {
+        fs::write(path, b"done\n").unwrap();
+        assert_eq!(reference.read(&mut [0]).unwrap(), 0);
+    })
+    .expect("reference did not exit");
+    released
+        .expect("killed recorder retained the lock")
+        .unwrap();
+    assert!(!stopped.success());
+    let stderr = String::from_utf8(competitor.stderr).unwrap();
+    assert!(
+        !competitor.status.success() && stderr.contains("locking"),
+        "{stderr}"
+    );
     assert_eq!(f.pins(), pins);
-    fs::remove_file(f.0.join("hold")).unwrap();
     f.run("record", "subtitle-dvb", None);
     assert_ne!(f.pins(), pins);
     f.run("verify", "subtitle-dvb", None);
