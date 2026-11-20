@@ -1,8 +1,8 @@
 //! Record reference folds for authored subtitle fixtures and verify their manifests.
-use crate::{json, json::Value, sha256};
+use crate::{json, json::Value, process::TempDir, sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -42,14 +42,12 @@ impl Family {
         }
     }
 
-    fn inventory(self, root: &Path, name: &str, corpus: &Path) -> R<String> {
+    fn inventory(self, root: &Path, name: &str) -> R<String> {
         let mut python = Command::new("python3");
         python.arg("-B").current_dir(root);
         match self {
             Self::Dvb => {
-                python
-                    .args(["harness/subtitles/dvb_streams.py", "--list-cases"])
-                    .arg(corpus);
+                python.args(["harness/subtitles/dvb_streams.py", "--list-cases"]);
             }
             Self::Teletext => {
                 python.args(["harness/subtitles/teletext_streams.py", "--list-cases"]);
@@ -77,7 +75,7 @@ impl Family {
             .next_back()
             .ok_or("reference emitted no fold")?;
         let fold = json::parse_strict(line).map_err(|e| e.to_string())?;
-        if self.repo_inputs() && fold.get("eof") != Some(&Value::Bool(true)) {
+        if fold.get("eof") != Some(&Value::Bool(true)) {
             return Err("reference did not reach the end".into());
         }
         let mut fields = Vec::new();
@@ -135,7 +133,12 @@ impl Recorder<'_> {
                 .and_then(Value::as_str)
                 .unwrap_or(file),
         );
-        let sha = sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        // The worker opens a pathname. Give it the same snapshot that we hash,
+        // keeping the filename for reference demuxers that use its extension.
+        let scratch = TempDir::new(None)?;
+        let sample = scratch.0.join(path.file_name().ok_or("no input filename")?);
+        fs::copy(&path, &sample).map_err(|e| format!("{}: {e}", path.display()))?;
+        let sha = sha256::file_hex(&sample).map_err(|e| format!("{}: {e}", sample.display()))?;
         let args = input
             .get("arguments")
             .and_then(Value::as_array)
@@ -143,7 +146,13 @@ impl Recorder<'_> {
             .iter()
             .map(|arg| arg.as_str().ok_or("non-string worker argument"))
             .collect::<Result<Vec<_>, _>>()?;
-        let expected = self.family.fold(self.reference, &path, &args)?;
+        let expected = self.family.fold(self.reference, &sample, &args)?;
+        if sha256::file_hex(&path).map_err(|e| format!("{}: {e}", path.display()))? != sha {
+            return Err(format!(
+                "{} changed during the reference fold",
+                path.display()
+            ));
+        }
         let mut fields = vec![
             ("id", Value::str(string(input, "id")?)),
             ("profile", Value::str(string(input, "profile")?)),
@@ -153,7 +162,7 @@ impl Recorder<'_> {
         }
         fields.extend([
             ("file", Value::str(file)),
-            ("sha256", Value::str(sha)),
+            ("sha256", Value::str(&sha)),
             ("rights", Value::str(string(input, "rights")?)),
         ]);
         if !self.family.repo_inputs() {
@@ -166,6 +175,12 @@ impl Recorder<'_> {
                 let Some(Value::Object(targets)) = row.get("expected_by_target") else {
                     return Err("missing expected_by_target object".into());
                 };
+                if targets.iter().any(|(name, _)| name != target)
+                    && (string(row, "sha256")? != sha
+                        || row.get("arguments") != input.get("arguments"))
+                {
+                    return Err("input SHA-256 or arguments changed for another target pin".into());
+                }
                 pins.extend(targets.iter().cloned());
             }
             pins.insert(target.to_owned(), expected);
@@ -267,63 +282,64 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
             .map_err(|e| e.to_string())?;
         text
     } else {
-        family.inventory(root, name, &recorder.corpus)?
+        family.inventory(root, name)?
     };
     let inputs = json::parse_strict(&inventory).map_err(|e| format!("case inventory: {e}"))?;
-    // Hold the temporary file while reading the previous target pins so two
-    // recorders cannot both publish an update based on the same old manifest.
-    let temp = manifest.with_extension("json.tmp");
-    let pending = if record {
-        Some(
-            fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temp)
-                .map_err(|e| format!("{}: {e}", temp.display()))?,
-        )
+    // Lock a stable inode across the read/modify/rename transaction. The OS
+    // releases the lock on exit, even when a recorder is killed.
+    let _lock = if record {
+        let mut name = manifest.as_os_str().to_owned();
+        name.push(".record-lock");
+        let lock = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .read(true)
+            .open(name)
+            .map_err(|e| format!("{}: {e}", manifest.display()))?;
+        lock.try_lock()
+            .map_err(|e| format!("locking {}: {e}", manifest.display()))?;
+        Some(lock)
     } else {
         None
     };
-    let result = (|| {
-        let earlier = match fs::read_to_string(&manifest) {
-            Ok(s) => Some(s),
-            Err(e) if record && e.kind() == io::ErrorKind::NotFound => None,
-            Err(e) => return Err(format!("{}: {e}", manifest.display())),
-        };
-        let previous = earlier
-            .as_deref()
-            .map(json::parse_strict)
-            .transpose()
+    let earlier = match fs::read_to_string(&manifest) {
+        Ok(s) => Some(s),
+        Err(e) if record && e.kind() == io::ErrorKind::NotFound => None,
+        Err(e) => return Err(format!("{}: {e}", manifest.display())),
+    };
+    let previous = earlier
+        .as_deref()
+        .map(json::parse_strict)
+        .transpose()
+        .map_err(|e| format!("{}: {e}", manifest.display()))?;
+    let doc = recorder.document(&inputs, previous.as_ref())?;
+    let encoded = json::to_python(&doc, Some(2)) + "\n";
+    if record {
+        let parent = manifest
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let staging = TempDir::new(Some(parent))?;
+        let temp = staging.0.join("manifest");
+        fs::write(&temp, encoded)
+            .and_then(|()| fs::rename(&temp, &manifest))
             .map_err(|e| format!("{}: {e}", manifest.display()))?;
-        let doc = recorder.document(&inputs, previous.as_ref())?;
-        let encoded = json::to_python(&doc, Some(2)) + "\n";
-        if let Some(mut output) = pending {
-            output
-                .write_all(encoded.as_bytes())
-                .map_err(|e| e.to_string())?;
-            drop(output);
-            fs::rename(&temp, &manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
-        } else if earlier.as_deref() != Some(&encoded) {
-            let old = cases(previous.as_ref().ok_or("missing manifest")?)?;
-            for (i, row) in cases(&doc)?.iter().enumerate() {
-                if old.get(i) != Some(row) {
-                    return Err(format!(
-                        "{}: case {} differs at row {}",
-                        manifest.display(),
-                        string(row, "id")?,
-                        i + 1
-                    ));
-                }
+    } else if earlier.as_deref() != Some(&encoded) {
+        let old = cases(previous.as_ref().ok_or("missing manifest")?)?;
+        for (i, row) in cases(&doc)?.iter().enumerate() {
+            if old.get(i) != Some(row) {
+                return Err(format!(
+                    "{}: case {} differs at row {}",
+                    manifest.display(),
+                    string(row, "id")?,
+                    i + 1
+                ));
             }
-            return Err(format!("{}: manifest bytes differ", manifest.display()));
         }
-        println!("{name}: {} cases", cases(&doc)?.len());
-        Ok(())
-    })();
-    if record && result.is_err() {
-        let _ = fs::remove_file(temp);
+        return Err(format!("{}: manifest bytes differ", manifest.display()));
     }
-    result
+    println!("{name}: {} cases", cases(&doc)?.len());
+    Ok(())
 }
 
 #[cfg(all(test, unix))]
@@ -364,33 +380,79 @@ mod tests {
         let file = f.0.join("input");
         let reference = f.0.join("reference");
         let fold = |family: Family, code| family.fold(reference.to_str().unwrap(), &file, &[code]);
-        fs::write(&file, format!("diagnostic\n{FOLD}\n")).unwrap();
-        for family in [Family::Dvb, Family::Teletext] {
+        let complete = FOLD.replacen('{', r#"{"eof":true,"#, 1);
+        for family in [
+            Family::Dvb,
+            Family::Teletext,
+            Family::Text,
+            Family::HostText,
+            Family::PgsCapsules,
+        ] {
+            fs::write(&file, format!("diagnostic\n{complete}\n")).unwrap();
             assert_eq!(
                 fold(family, "0").unwrap(),
                 json::parse_strict(FOLD).unwrap()
             );
             assert!(fold(family, "11").unwrap_err().contains("11"));
+            for incomplete in [FOLD.to_owned(), complete.replace("true", "false")] {
+                fs::write(&file, incomplete).unwrap();
+                assert!(
+                    fold(family, "0")
+                        .unwrap_err()
+                        .contains("did not reach the end")
+                );
+            }
         }
-        for family in [Family::Text, Family::HostText, Family::PgsCapsules] {
-            assert!(
-                fold(family, "0")
-                    .unwrap_err()
-                    .contains("did not reach the end")
-            );
-        }
-        fs::write(&file, format!("{FOLD}\n\n")).unwrap();
+        fs::write(&file, format!("{complete}\n\n")).unwrap();
         assert!(fold(Family::Dvb, "0").is_ok());
         assert!(fold(Family::Teletext, "0").is_err());
         for bad in [
             "",
             "truncated{",
-            r#"{"bytes":2,"digest":2}"#,
-            r#"{"packets":1,"bytes":2,"digest":-1}"#,
+            r#"{"eof":true,"bytes":2,"digest":2}"#,
+            r#"{"eof":true,"packets":1,"bytes":2,"digest":-1}"#,
         ] {
             fs::write(&file, bad).unwrap();
             assert!(fold(Family::Dvb, "0").is_err());
         }
+    }
+
+    #[test]
+    fn dvb_inventory_requires_designated_inputs_and_ignores_unrelated_streams() {
+        let f = Fixture::new();
+        fs::create_dir(f.0.join("dvb")).unwrap();
+        fs::write(f.0.join("dvb/unrelated.ts"), []).unwrap();
+        let root = crate::root();
+        let mut python = Command::new("python3");
+        python
+            .current_dir(&root)
+            .args(["-B", "harness/subtitles/dvb_streams.py", "--list-cases"])
+            .arg(&f.0);
+        let inventory = output(python).unwrap();
+        let inventory = json::parse_strict(&inventory).unwrap();
+        let rows = inventory.as_array().unwrap();
+        let pins =
+            crate::checks::read_json(&root.join("harness/features/subtitle-dvb/corpus.json"))
+                .unwrap();
+        assert_eq!(rows.len(), cases(&pins).unwrap().len());
+        for (row, pin) in rows.iter().zip(cases(&pins).unwrap()) {
+            for field in ["id", "profile", "file", "source", "rights", "arguments"] {
+                assert_eq!(row.get(field), pin.get(field));
+            }
+        }
+        let recorder = Recorder {
+            family: Family::Dvb,
+            reference: "unused",
+            target: None,
+            corpus: f.0.clone(),
+        };
+        let missing = string(&rows[0], "file").unwrap();
+        assert!(
+            recorder
+                .document(&inventory, None)
+                .unwrap_err()
+                .contains(missing)
+        );
     }
 
     #[test]
@@ -424,6 +486,12 @@ print(json.dumps([dict(id=k, profile=k, group="srt", file=k, rights="authored-sy
             )
         };
         run("record", "z").unwrap();
+        let original = fs::read(&input).unwrap();
+        fs::write(&input, r#"{"eof":true,"packets":0,"bytes":0,"digest":11}"#).unwrap();
+        run("record", "z").unwrap();
+        run("verify", "z").unwrap();
+        fs::write(&input, original).unwrap();
+        run("record", "z").unwrap();
         fs::write(
             f.0.join("reference"),
             "#!/bin/sh\nsed 's/20}/21}/' \"$2\"\nexit \"$3\"\n",
@@ -453,8 +521,20 @@ print(json.dumps([dict(id=k, profile=k, group="srt", file=k, rights="authored-sy
         assert_eq!(pins[1].1.get("digest"), Some(&Value::int(20)));
         assert!(run("verify", "absent").is_err());
         fs::write(&input, r#"{"eof":true,"packets":0,"bytes":0,"digest":11}"#).unwrap();
-        assert!(run("verify", "a").is_err());
+        for mode in ["record", "verify"] {
+            assert!(run(mode, "a").unwrap_err().contains("another target"));
+            assert_eq!(fs::read_to_string(&manifest).unwrap(), saved);
+        }
+        fs::write(&input, r#"{"eof":true,"packets":0,"bytes":0,"digest":10}"#).unwrap();
+        let source = fs::read_to_string(&author).unwrap();
+        fs::write(
+            &author,
+            source.replace(r#"arguments=["0"]"#, r#"arguments=["0","changed"]"#),
+        )
+        .unwrap();
+        assert!(run("record", "a").unwrap_err().contains("another target"));
         assert_eq!(fs::read_to_string(&manifest).unwrap(), saved);
+        fs::write(&author, source).unwrap();
         fs::write(&input, r#"{"eof":false,"packets":0,"bytes":0,"digest":10}"#).unwrap();
         assert!(run("record", "a").is_err());
         assert_eq!(fs::read_to_string(&manifest).unwrap(), saved);

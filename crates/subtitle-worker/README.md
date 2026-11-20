@@ -103,8 +103,9 @@ in work slices of any size. The corpus is `harness/features/subtitle-pgs-capsule
 `cargo xtask subtitle-fixtures verify FEATURE REFERENCE` runs the independent
 FFmpeg worker on every authored case in order. It checks the complete manifest,
 including input SHA-256s, decoder arguments, packet counts, folded byte counts
-and digests. Use `record` in place of `verify` to write the manifest after all
-folds succeed.
+and digests. Each worker reads a snapshot of the hashed input and must report
+EOF. If the source SHA-256 differs when the worker returns, the command fails.
+Use `record` in place of `verify` to write the manifest after all folds succeed.
 
 | Feature | Reference in `target/harness/` | Operation | Input location |
 | --- | --- | --- | --- |
@@ -114,6 +115,10 @@ folds succeed.
 
 For `subtitle-text-host`, pass `--target TRIPLE` for the reference worker's
 target. Recording replaces that target's fold in each case and preserves the
-others. `--corpus DIR` selects the input root and `--manifest FILE` selects the
+others when the input SHA-256 and decoder arguments match their recorded values.
+To change those inputs, record every target into a fresh manifest. The recorder
+uses an adjacent `.record-lock` file to serialize writes to the same manifest.
+The operating system releases the lock when the recorder exits.
+`--corpus DIR` selects the input root and `--manifest FILE` selects the
 manifest to check or write. The text capsule and broadcast stream authors
 continue to generate their input bytes and enumerate their cases in Python.

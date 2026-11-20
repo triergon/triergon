@@ -1150,14 +1150,30 @@ def conversion_cases():
 # ------------------------------------------------------------------ recorded
 
 
+def clut_names(root):
+    folder = os.path.join(root, "crates/subtitles/tests/explicit-clut-fixtures")
+    with open(os.path.join(folder, "manifest.json")) as manifest:
+        return [row["id"] for row in json.load(manifest)["cases"]]
+
+
+def envelope_names():
+    # The retained original-source envelopes and their two packet carriers.
+    for name in ("dvb-ancillary-pages", "dvb-geometry-window", "dvb-map2to4", "dvb-map2to8",
+                 "dvb-map4to8", "dvb-nonmodifying", "dvb-palette-update-clear",
+                 "dvb-partial-alpha-projection", "dvb2-literals-fields", "dvb2-repeat-top",
+                 "dvb2-run-branches", "dvb4-literals-fields", "dvb4-run-branches",
+                 "dvb8-literals-fields", "dvb8-run-branches"):
+        yield name + "--matroska-segments"
+        if name != "dvb-palette-update-clear":
+            yield name + "--pes-data-field"
+
+
 def recorded(root):
     """The explicit-CLUT case files as one TS each: (name, bytes)."""
     folder = os.path.join(root, "crates", "subtitles", "tests", "explicit-clut-fixtures")
     out = {}
-    for name in sorted(os.listdir(folder)):
-        if not name.endswith(".case"):
-            continue
-        with open(os.path.join(folder, name), "rb") as f:
+    for name in clut_names(root):
+        with open(os.path.join(folder, name + ".case"), "rb") as f:
             data = f.read()
         assert data[:8] == b"SMCE0001"
         bits = data[8]
@@ -1171,7 +1187,7 @@ def recorded(root):
             payload = data[at:at + length]
             at += length + n * 5 + n * 4 * 2 + n * 2 + n * 4
             sets.append((pts, b"\x20\x00" + payload + b"\xff"))
-        out["recorded-" + name[:-5]] = single(sets, services=(("eng", 0x10, 1, 1),))
+        out["recorded-" + name] = single(sets, services=(("eng", 0x10, 1, 1),))
     return out
 
 
@@ -1183,10 +1199,8 @@ def recorded_envelopes():
     out = {}
     if not os.path.isdir(folder):
         return out
-    for name in sorted(os.listdir(folder)):
-        if not (name.startswith("dvb-original-source--") and name.endswith(".bin")):
-            continue
-        with open(os.path.join(folder, name), "rb") as f:
+    for name in envelope_names():
+        with open(os.path.join(folder, "dvb-original-source--" + name + ".bin"), "rb") as f:
             data = f.read()
         assert data[:8] == b"SMDVB001"
         at, sets = 20, []
@@ -1197,7 +1211,7 @@ def recorded_envelopes():
             if not payload.startswith(b"\x20\x00"):
                 payload = b"\x20\x00" + payload + b"\xff"
             sets.append((pts, payload))
-        out["recorded-" + name[len("dvb-original-source--"):-4]] = single(sets)
+        out["recorded-" + name] = single(sets)
     return out
 
 
@@ -1379,10 +1393,10 @@ def main(argv):
     corpus = os.path.join(root, ".research", "subtitle-corpus")
     out = args[0] if args else os.path.join(corpus, "dvb")
     if argv[:1] == ["--list-cases"]:
-        # The materialised top-level TS files, in the author's order, followed
-        # by their designated Matroska copies. Other inputs have explicit lists.
-        streams = sorted(name[:-3] for name in os.listdir(os.path.join(argv[1], "dvb")) if name.endswith(".ts"))
-        generated = ["dvb/" + name + ext for name in streams
+        streams = set(cases())
+        streams.update("recorded-" + name for name in clut_names(root))
+        streams.update("recorded-" + name for name in envelope_names())
+        generated = ["dvb/" + name + ext for name in sorted(streams)
                      for ext in ((".ts", ".mkv") if name in MKV_COPIES else (".ts",))]
         print(json.dumps(case_descriptions(generated)))
         return
