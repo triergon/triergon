@@ -33,6 +33,13 @@ impl Cff {
     /// The first glyph whose charset SID is `sid`, for `seac`
     /// (`cff_lookup_glyph_by_stdcharcode`).
     pub(super) fn glyph_for_sid(&self, sid: u16) -> Option<u32> {
+        if self.glyphs_by_sid.is_empty() {
+            return self
+                .sids
+                .iter()
+                .position(|&entry| entry == sid)
+                .map(|glyph| glyph as u32);
+        }
         let glyph = *self.glyphs_by_sid.get(usize::from(sid))?;
         (glyph != NO_GLYPH).then_some(u32::from(glyph))
     }
@@ -41,6 +48,11 @@ impl Cff {
     fn index_sids(&mut self, work: &mut WorkBudget) -> Result<()> {
         let most = self.sids.iter().copied().max().map_or(0, usize::from);
         charge(work, self.sids.len() + most)?;
+        // A short, sparse charset already holds every answer in at most 32 bytes.
+        // A dense reverse table would extend through its greatest string ID.
+        if self.sids.len() <= 16 && most >= self.sids.len() {
+            return Ok(());
+        }
         self.glyphs_by_sid.try_resize(most + 1, NO_GLYPH)?;
         for (glyph, &sid) in self.sids.iter().enumerate().rev() {
             // Glyph counts stay below NO_GLYPH.

@@ -242,12 +242,10 @@ impl Cff {
             }
         } else {
             let private = cff.private_dict(bytes, top.private, work)?;
-            cff.font_dicts
-                .try_push(FontDict {
-                    private,
-                    matrix: top_matrix,
-                })
-                .map_err(|e| e.error)?;
+            cff.font_dicts.try_extend_from_slice(&[FontDict {
+                private,
+                matrix: top_matrix,
+            }])?;
         }
         Ok(cff)
     }
@@ -891,6 +889,41 @@ mod tests {
                 assert!(indexed.glyphs_by_sid.len() <= 150);
                 assert_eq!(indexed.sids.capacity(), 0);
             }
+        }
+    }
+
+    #[test]
+    fn sparse_and_dense_charsets_return_the_first_matching_glyph() {
+        for count in [16, 17] {
+            let mut glyphs = vec![34; count - 1];
+            glyphs[1] = u16::MAX;
+            glyphs[2] = 0;
+            let data = CffProgram {
+                glyphs: vec![charstring(&[Op(14)]); count],
+                global: Vec::new(),
+                local: Vec::new(),
+                charset: Some(glyphs),
+                strings: Vec::new(),
+                encoding: Some(vec![0x80, 1, 65, 1, 66, 255, 255]),
+                matrix: None,
+                nominal_width: 0,
+                private: Vec::new(),
+            }
+            .build();
+            let budget = Budget::new(1 << 20).unwrap();
+            let mut work = WorkBudget::new(1 << 20);
+            let face = parse_test_face(&data, &budget, &mut work).unwrap();
+            assert_eq!(face.glyphs_by_sid.is_empty(), count == 16);
+            assert_eq!(face.glyph_for_sid(0), Some(0));
+            assert_eq!(face.glyph_for_sid(34), Some(1));
+            assert_eq!(face.glyph_for_sid(35), None);
+            assert_eq!(face.glyph_for_sid(u16::MAX), Some(2));
+            assert_eq!(face.encoding().unwrap().glyphs[66], 2);
+            assert_eq!(face.font_dicts.capacity(), 1);
+            assert!(matches!(
+                parse_test_face(&data, &budget, &mut WorkBudget::new(work.spent() - 1)),
+                Err(Error::Policy(_))
+            ));
         }
     }
 
