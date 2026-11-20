@@ -214,7 +214,9 @@ selective style overrides), in the frame and storage size and margins of its
   map is tried through each of its charmaps in turn and keeps the one that
   maps it, or the last, for every later lookup and for shaping until another
   such lookup moves it (`ass_font_get_index`). That is how libass draws C1
-  controls (U+0080 to U+009F) through a Macintosh Roman charmap. The retry is
+  controls (U+0080 to U+009F) through a Macintosh Roman charmap. When fallback
+  revisits a charmap that already missed the same character, the renderer
+  reuses the lookup result and charges the visit against the work limit. The retry is
   `Error::Unsupported` for a face with charmaps FreeType lists and
   `triergon-font` does not read, as is any lookup through a charmap whose
   codes libass converts (`Font::text_lookup`). The default font file's face gets an id of its
