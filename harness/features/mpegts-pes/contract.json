@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "mpegts-pes",
+  "runner": "cargo xtask report",
   "operation": "mpegts-pes-packets",
   "candidate": "transport-worker",
   "worker_operation": "ts-",

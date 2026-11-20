@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-demux",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/fixtures",
   "status": "experimental; broader container requirements remain required and pending",
   "operation": "container-demux-v1",
   "reference_flags": [
