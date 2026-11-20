@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "mpegts-access-units",
+  "runner": "cargo xtask report",
   "gate": "required",
   "operation": "mpegts-access-unit-packets",
   "candidate": "transport-worker",

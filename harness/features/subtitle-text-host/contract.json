@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "subtitle-text-host",
+  "runner": "cargo xtask report",
   "gate": "required",
   "operation": "subtitle-text-cues",
   "candidate": "subtitle-worker",

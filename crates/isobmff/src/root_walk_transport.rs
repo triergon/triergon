@@ -2,9 +2,10 @@
 //! Demux observations and reference licensed operational facts support this
 //! separately selected empirical view. No demux implementation body is copied,
 //! translated or linked. Source geometry/bytes remain independently factual.
+use crate::transport_window::{CAPACITY, Revisit, Window};
 use crate::{
     BoxChildren, BoxHeader, BoxStep, BoxView, BuildStatus, DescriptionContext,
-    DescriptionRecoveryTable, EntryRevisit, Limits, ModeledInitialRead, ModeledOpenState, fields,
+    DescriptionRecoveryTable, Limits, ModeledInitialRead, ModeledOpenState, fields,
 };
 use std::{
     ops::Range,
@@ -12,7 +13,7 @@ use std::{
 };
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
-const CAPACITY: u64 = 32768; // Literal original wrapper allocation.
+const CONSUMPTION_BOUNDS: &str = "v4 modeled metadata consumption bounds";
 const DISCARD_BOUND: u64 = 32768; // Separately observed reference forward protocol bound.
 const CHILD_LIMIT: u32 = 16;
 
@@ -71,11 +72,7 @@ impl RootWalkTransportModel {
         self.windows
             .iter()
             .take(self.open.possible_windows as usize)
-            .any(|window| {
-                window.end == source_position
-                    && window.cursor.checked_sub(window.begin) == Some(ptr_offset)
-                    && window.end.checked_sub(window.begin) == Some(end_offset)
-            })
+            .any(|window| window.matches(source_position, ptr_offset, end_offset))
     }
     pub fn models_initial_eof(&self, range: Range<u64>) -> bool {
         self.initial_read_plan(range).is_some()
@@ -134,75 +131,18 @@ impl RootWalkTransportModel {
     }
 }
 
-#[derive(Clone, Copy, Default, Debug)]
-struct Window {
-    cursor: u64,
-    begin: u64,
-    end: u64,
-}
 impl Window {
-    fn consume(&mut self, target: u64, length: u64, maximum: usize) -> Result<()> {
-        if target < self.cursor || target > length {
-            return Err(Error::Unsupported("v4 modeled metadata consumption bounds"));
-        }
-        if target > self.end {
-            let quantum = u64::try_from(maximum)
-                .map_err(|_| Error::Overflow)?
-                .min(CAPACITY);
-            let needed = target.checked_sub(self.end).ok_or(Error::Overflow)?;
-            let fills = needed.checked_add(quantum - 1).ok_or(Error::Overflow)? / quantum;
-            self.begin = self
-                .end
-                .checked_add((fills - 1).checked_mul(quantum).ok_or(Error::Overflow)?)
-                .ok_or(Error::Overflow)?;
-            self.end = self
-                .end
-                .checked_add(fills.checked_mul(quantum).ok_or(Error::Overflow)?)
-                .ok_or(Error::Overflow)?
-                .min(length);
-        }
-        self.cursor = target;
-        Ok(())
-    }
-    fn forward_skip(&mut self, target: u64, length: u64, maximum: usize) -> Result<bool> {
-        if target < self.cursor || target > length {
+    fn forward_skip(&mut self, target: u64, context: DescriptionContext) -> Result<bool> {
+        if target < self.cursor || target > context.physical_length {
             return Err(Error::Unsupported("v4 symbolic source skip bounds"));
         }
         if target > self.end && target.checked_sub(self.end).ok_or(Error::Overflow)? > DISCARD_BOUND
         {
-            *self = Self {
-                cursor: target,
-                begin: target,
-                end: target,
-            };
+            *self = Self::at(target);
             return Ok(true);
         }
-        self.consume(target, length, maximum)?;
+        self.consume(target, context, CONSUMPTION_BOUNDS)?;
         Ok(false)
-    }
-    fn revisit_set(&mut self, target: u64) -> Result<(EntryRevisit, u64, u64, bool)> {
-        if (self.begin..=self.end).contains(&target) {
-            self.cursor = target;
-            return Ok((EntryRevisit::Buffered, target, target, true));
-        }
-        let filled = self.end.checked_sub(self.begin).ok_or(Error::Overflow)?;
-        let gap = self
-            .begin
-            .checked_sub(target)
-            .ok_or(Error::Unsupported("v4 unreviewed forward entry revisit"))?;
-        // The captured entry-revisit protocol uses at most one preceding
-        // filled window. Retain EVERY source-consistent origin in that window;
-        // do not select a half-window threshold or one observed alignment.
-        if gap < filled {
-            Ok((
-                EntryRevisit::OneWindowCallbackSet,
-                self.begin.saturating_sub(filled),
-                target,
-                false,
-            ))
-        } else {
-            Ok((EntryRevisit::DirectCallback, target, target, false))
-        }
     }
 }
 
@@ -289,12 +229,10 @@ pub struct RootWalkTransportBuilder<'a> {
     source_ready: bool,
     action: u8,
     window: Window,
-    revisit: EntryRevisit,
+    revisit: Revisit,
     ready: bool,
     failed: Option<Error>,
     next_anchor: u64,
-    last_anchor: u64,
-    buffered_revisit: bool,
     source_min: Option<u64>,
     source_max: u64,
     windows: u32,
@@ -373,12 +311,10 @@ impl<'a> RootWalkTransportBuilder<'a> {
             source_ready: false,
             action: 0,
             window: Window::default(),
-            revisit: EntryRevisit::Buffered,
+            revisit: Revisit::buffered(0),
             ready: false,
             failed: None,
             next_anchor: 0,
-            last_anchor: 0,
-            buffered_revisit: false,
             source_min: None,
             source_max: 0,
             windows: 0,
@@ -547,31 +483,22 @@ impl<'a> RootWalkTransportBuilder<'a> {
                         .ok_or(Error::Overflow)?
                         .checked_sub(2)
                         .ok_or(Error::Overflow)?,
-                    self.context.physical_length,
-                    self.context.custom_read_maximum,
+                    self.context,
+                    CONSUMPTION_BOUNDS,
                 )?,
                 1 => {
-                    let (kind, first, last, buffered) =
-                        self.window.revisit_set(self.entry.header().start)?;
-                    self.revisit = kind;
-                    self.next_anchor = first;
-                    self.last_anchor = last;
-                    self.buffered_revisit = buffered;
+                    self.revisit = self.window.revisit_set(
+                        self.entry.header().start,
+                        "v4 unreviewed forward entry revisit",
+                    )?;
+                    self.next_anchor = self.revisit.first_anchor;
                 }
                 2 => {
-                    let mut candidate = if self.buffered_revisit {
-                        self.window
-                    } else {
-                        Window {
-                            cursor: self.next_anchor,
-                            begin: self.next_anchor,
-                            end: self.next_anchor,
-                        }
-                    };
+                    let mut candidate = self.revisit.window_at(self.window, self.next_anchor);
                     candidate.consume(
                         self.movie.header().end()?.ok_or(Error::Overflow)?,
-                        self.context.physical_length,
-                        self.context.custom_read_maximum,
+                        self.context,
+                        CONSUMPTION_BOUNDS,
                     )?;
                     self.candidate = Some(candidate);
                     self.tail_at = 0;
@@ -599,11 +526,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                         .ok_or(Error::Invalid("v4 missing symbolic path"))?;
                     match self.tail_phase {
                         0 => {
-                            candidate.consume(
-                                payload.start,
-                                self.context.physical_length,
-                                self.context.custom_read_maximum,
-                            )?;
+                            candidate.consume(payload.start, self.context, CONSUMPTION_BOUNDS)?;
                             self.tail_phase = 1;
                         }
                         1 => {
@@ -618,8 +541,8 @@ impl<'a> RootWalkTransportBuilder<'a> {
                             };
                             candidate.consume(
                                 payload.start.checked_add(probe).ok_or(Error::Overflow)?,
-                                self.context.physical_length,
-                                self.context.custom_read_maximum,
+                                self.context,
+                                CONSUMPTION_BOUNDS,
                             )?;
                             self.tail_phase = 2;
                         }
@@ -627,11 +550,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                             if payload.end == self.context.physical_length {
                                 self.action = 4;
                             } else {
-                                if candidate.forward_skip(
-                                    payload.end,
-                                    self.context.physical_length,
-                                    self.context.custom_read_maximum,
-                                )? {
+                                if candidate.forward_skip(payload.end, self.context)? {
                                     self.candidate_seeks = self
                                         .candidate_seeks
                                         .checked_add(1)
@@ -668,7 +587,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                     self.windows = self.windows.checked_add(1).ok_or(Error::Overflow)?;
                     self.seek_min = self.seek_min.min(self.candidate_seeks);
                     self.seek_max = self.seek_max.max(self.candidate_seeks);
-                    if self.next_anchor == self.last_anchor {
+                    if self.next_anchor == self.revisit.last_anchor {
                         self.ready = true;
                     } else {
                         self.next_anchor =
@@ -706,7 +625,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                     .logical_position
                     .ok_or(Error::Invalid("v4 missing modeled logical end"))?,
                 possible_windows: self.windows,
-                entry_revisit: self.revisit,
+                entry_revisit: self.revisit.kind,
             },
             windows: self.paths,
             root_headers: std::array::from_fn(|i| self.roots.get(i).copied()),

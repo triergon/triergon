@@ -1,15 +1,15 @@
 # M2TS192 program inputs
 
 M2TS192 copies of three synthetic HLS segments in [`../hls`](../hls/README.md), for the
-`ts-program` contract (`harness/features/ts-program/`). `make_m2ts.py` prefixes each
-188-byte transport packet with a four-byte TP_extra_header: copy permission zero and
+`ts-program` contract (`harness/features/ts-program/`). The fixture writer prefixes each
+188-byte transport packet with a four-byte TP_extra_header carrying copy permission zero and
 an arrival time stamp that advances by 2,700 ticks of the 27 MHz clock per packet from
 zero. The transport packets are unchanged.
 
 ```sh
-python3 make_m2ts.py ../hls/replay-avc-aac-00.ts replay-avc-aac-00.m2ts
-python3 make_m2ts.py ../hls/replay-hevc-aac-00.ts replay-hevc-aac-00.m2ts
-python3 make_m2ts.py ../hls/entry-hevc-aac-44100-01.ts entry-hevc-aac-44100-01.m2ts
+cargo xtask fixture m2ts ../hls/replay-avc-aac-00.ts replay-avc-aac-00.m2ts
+cargo xtask fixture m2ts ../hls/replay-hevc-aac-00.ts replay-hevc-aac-00.m2ts
+cargo xtask fixture m2ts ../hls/entry-hevc-aac-44100-01.ts entry-hevc-aac-44100-01.m2ts
 ```
 
 | File | SHA-256 |

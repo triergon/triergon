@@ -2031,9 +2031,8 @@ fn private_audio_player(
         64,
     )
     .unwrap();
-    let engine = Engine::ts_native_private_audio_v1(
+    let engine = compat::pes::open_private_audio(
         input,
-        PacketFormat::Ts188,
         1,
         triergon_mpegts::ParseLimits::default(),
         SourceTimePolicy::RelativeEpochZero,
@@ -2173,6 +2172,89 @@ fn private_audio_mismatch_reports_refusal_and_retains_source_packet() {
             .count(),
         1
     );
+}
+
+#[test]
+fn private_audio_policy_and_legacy_constructor_replay_the_same_packets_after_seek() {
+    let raw = include_bytes!("fixtures/ts/program-private-avc-dvb.ts");
+    let open = |legacy| {
+        let capabilities = SourceCapabilities {
+            length: Some(raw.len() as u64),
+            random_access: true,
+        };
+        let io = byte_input(&pool(), ID, raw, 188, capabilities, 188).unwrap();
+        let audio = compat::pes::PrivateAudioSelection {
+            pid: 257,
+            carriage: triergon_mpegts::compat::pes::PrivateAudioCarriage::DvbAc3Tag,
+        };
+        let limits = triergon_mpegts::ParseLimits::default();
+        let clock = SourceTimePolicy::RelativeEpochZero;
+        let engine = if legacy {
+            Engine::ts_native_private_audio_v1(
+                io.input,
+                PacketFormat::Ts188,
+                1,
+                limits,
+                clock,
+                audio,
+            )
+        } else {
+            compat::pes::open_private_audio(io.input, 1, limits, clock, audio)
+        }
+        .unwrap();
+        let mut player =
+            Player::new(engine, io.source, Selection::All, PlayerPolicy::default()).unwrap();
+        player
+            .set_clock_view(ClockChoice::ExplicitNativeProjection)
+            .unwrap();
+        player
+    };
+    let (mut legacy, mut policy) = (open(true), open(false));
+    for replay in [false, true] {
+        if replay {
+            for player in [&mut legacy, &mut policy] {
+                let video = TrackKey::Ts {
+                    program: 1,
+                    pid: 256,
+                };
+                assert!(
+                    player
+                        .seek_and_select(
+                            video,
+                            Time::new(0, 1).unwrap(),
+                            Selection::All,
+                            &mut WorkBudget::new(128),
+                            &off()
+                        )
+                        .unwrap()
+                );
+            }
+        }
+        let old = collect(&mut legacy, 128).unwrap();
+        let new = collect(&mut policy, 128).unwrap();
+        assert_eq!(
+            (legacy.state(), policy.state()),
+            (State::Ended, State::Ended)
+        );
+        assert_source_pes_match(&old, &new);
+        let audio_packets = |out: &[Output]| {
+            out.iter()
+                .filter_map(|row| match row.event() {
+                    RawEvent::NativeTs { packet, clock } => Some((
+                        row.delivery(),
+                        packet.pid,
+                        clock.pts90,
+                        clock.dts90,
+                        packet.payload().flatten().copied().collect::<Vec<_>>(),
+                    )),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let expected = audio_packets(&old);
+        assert!(!expected.is_empty());
+        assert_eq!(expected, audio_packets(&new));
+    }
 }
 
 #[test]

@@ -36,6 +36,9 @@ The crate exposes two views of the same file:
 Values that only make sense when comparing traces with FFmpeg, such as its return
 codes, log lines and models of its input layer, are compiled only with the
 non-default `reference-trace` feature, under `reference_trace::mov`.
+Its raw-video and root-walk transport models retain every possible buffer
+alignment when revisiting a sample entry. The root-walk model also reports
+bounds on absolute seeks when skipping source boxes.
 
 After packet traversal reaches the end, `replay_track` can build an index for a
 selected track using the sample extents and clock facts already checked during

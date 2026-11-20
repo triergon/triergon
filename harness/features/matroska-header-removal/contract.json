@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-header-removal",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/header-fixtures",
   "operation": "container-demux-v1",
   "contract": [
     "single header-removal encoding, scopes 1/2/3",

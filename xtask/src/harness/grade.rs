@@ -290,33 +290,28 @@ enum Shape {
     External,
 }
 
-fn shape(report: &Value) -> R<Shape> {
-    match (report.get("cases"), report.get("case")) {
-        (Some(Value::Array(_)), None) => {
-            if text(report, "collection_status")? != "complete" {
-                return Err("collection is not complete".into());
-            }
-            Ok(Shape::Corpus)
-        }
-        (None, Some(Value::Object(_))) => {
-            // External-vector reports contain one complete case. Their
-            // collection_status field is optional.
-            if report.get("collection_status").is_some()
-                && text(report, "collection_status")? != "complete"
-            {
-                return Err("external collection is not complete".into());
-            }
-            Ok(Shape::External)
-        }
-        _ => Err("report must contain either cases or one external case".into()),
+/// The two collection formats. Only an external-vector report can omit the
+/// completion marker. Both formats must contain a case.
+fn shaped_rows(report: &Value) -> R<(Shape, &[Value])> {
+    let (shape, rows) = match (report.get("cases"), report.get("case")) {
+        (Some(Value::Array(rows)), None) if !rows.is_empty() => (Shape::Corpus, rows.as_slice()),
+        (None, Some(row @ Value::Object(_))) => (Shape::External, std::slice::from_ref(row)),
+        _ => return Err("report needs a nonempty cases array or one external case".into()),
+    };
+    if (shape == Shape::Corpus || report.get("collection_status").is_some())
+        && text(report, "collection_status")? != "complete"
+    {
+        return Err("the report's collection is incomplete".into());
     }
+    Ok((shape, rows))
 }
 
-fn rows(report: &Value, shape: Shape) -> R<&[Value]> {
-    match shape {
-        Shape::Corpus => array(report, "cases"),
-        Shape::External => Ok(std::slice::from_ref(field(report, "case")?)),
-    }
+fn shape(report: &Value) -> R<Shape> {
+    Ok(shaped_rows(report)?.0)
+}
+
+pub(crate) fn report_rows(report: &Value) -> R<&[Value]> {
+    Ok(shaped_rows(report)?.1)
 }
 
 struct Binding<'a> {
@@ -575,7 +570,7 @@ fn part_selection(
         );
     }
     let part = Value::str(format!("{}/{count}", index + 1));
-    let selection = crate::isobmff_bench::full_part_selection(root, (index, count))?;
+    let (_, selection) = crate::isobmff_bench::full_part_selection(root, (index, count))?;
     let encoded = Value::Array(
         selection
             .iter()
@@ -1022,8 +1017,8 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     }
     current_workers(root, identity, &contract)?;
     let expected = binding.expected(&timed, kind)?;
-    let timed_rows = membership(&expected, rows(&timed, kind)?)?;
-    let memory_rows = membership(&expected, rows(&memory, kind)?)?;
+    let timed_rows = membership(&expected, report_rows(&timed)?)?;
+    let memory_rows = membership(&expected, report_rows(&memory)?)?;
     let selection = part_selection(root, &contract, &timed, &memory, options.isobmff_part)?;
     aliases(&expected, &timed_rows, selection.is_some())?;
     aliases(&expected, &memory_rows, selection.is_some())?;
@@ -1181,9 +1176,9 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
             super::report::publish_json(&destination, &json::to_python(&report, Some(2)))?;
         }
     }
-    let mut code = exit_code(&verdict, rows(&memory, kind)?, options.requirement);
+    let mut code = exit_code(&verdict, report_rows(&memory)?, options.requirement);
     let label = text(&contract, "id")?;
-    if !super::report::ratchet(label, rows(&timed, kind)?, &open) {
+    if !super::report::ratchet(label, report_rows(&timed)?, &open) {
         code = code.max(1);
     }
     // Each case's runtime, heap and total RSS bounds, as the codec bounds are graded.
@@ -1248,12 +1243,11 @@ mod tests {
     #[test]
     fn isobmff_parts_bind_the_registered_selection_and_cover_all_outputs() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let contract =
-            read_json(&root.join("harness/features/isobmff-open-index/contract.json")).unwrap();
         let mut membership = BTreeSet::new();
         for index in 0..3 {
             let requested = (index, 3);
-            let selection = crate::isobmff_bench::full_part_selection(root, requested).unwrap();
+            let (contract, selection) =
+                crate::isobmff_bench::full_part_selection(root, requested).unwrap();
             assert!(selection.iter().all(|&case| membership.insert(case)));
             let report = object(&[
                 ("part", Value::str(format!("{}/3", index + 1))),
@@ -2950,7 +2944,7 @@ mod tests {
         }
         let expected = binding.expected(&report, Shape::External).unwrap();
         assert_eq!(
-            membership(&expected, rows(&report, Shape::External).unwrap())
+            membership(&expected, report_rows(&report).unwrap())
                 .unwrap()
                 .len(),
             1
