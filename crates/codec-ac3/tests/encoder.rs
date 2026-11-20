@@ -383,7 +383,11 @@ fn syncframe_partitions_bound_the_opening_blocks_and_final_mantissas() {
             decoder.set_trace(true);
             let mut output = [0; MAX_FRAME_BYTES];
             let mut decoded = AudioFrame::default();
-            for input in [&silence, &broadband, &silence, &late] {
+            for input in [&silence, &broadband, &silence, &late]
+                .into_iter()
+                .cycle()
+                .take(8)
+            {
                 let planes = [&input[..]; 6];
                 let bytes = encoder
                     .encode(&planes[..speakers.len()], &mut output)
@@ -392,7 +396,8 @@ fn syncframe_partitions_bound_the_opening_blocks_and_final_mantissas() {
                 let info = decoder.decode(&output[..bytes], &mut decoded).unwrap();
                 assert_eq!(info.concealed, None);
                 let trace = &decoder.trace().frames[0];
-                let split = bytes * 5;
+                let words = bytes / 2;
+                let split = 16 * (words / 2 + words / 8);
                 let opening_end = trace.dithflag_insert_bits[2] - trace.nfchans;
                 let bit = |at: usize| usize::from((output[at / 8] >> (7 - at % 8)) & 1);
                 let skip = trace.blocks[5].dba_bit + 1;

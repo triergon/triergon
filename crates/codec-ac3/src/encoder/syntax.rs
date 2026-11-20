@@ -372,9 +372,14 @@ fn reverse_crc(mut crc: u16, mut bytes: usize) -> u16 {
     crc
 }
 
+pub(super) fn first_partition_bytes(frame_bytes: usize) -> usize {
+    // A/52:2018 7.10.1 truncates each term in 16-bit words (Table 7.34).
+    let words = frame_bytes / 2;
+    2 * ((words >> 1) + (words >> 3))
+}
+
 pub(super) fn checksum(frame: &mut [u8]) {
-    let words = frame.len() / 2;
-    let split = 2 * ((words >> 1) + (words >> 3));
+    let split = first_partition_bytes(frame.len());
     // CRC1 precedes the covered data. Unshift the remainder through the region,
     // including the two bytes that will hold CRC1.
     let leading = reverse_crc(crc16(0, &frame[4..split]), split - 2);

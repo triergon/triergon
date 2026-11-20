@@ -51,9 +51,9 @@ exponent sets for a single block use D45, and shared wide sets use D25. The
 LFE uses long transforms throughout. A short transform skips each silent half.
 Blocks with silent input and silent overlap need no transform. A frame with
 silence throughout its input and history needs no mantissas. Bit allocation
-fits the opening blocks and final mantissas into their AC-3 frame partitions
-(A/52:2018 §5.5). Skip fields place padding before the final mantissas when
-needed. The encoder supports mono at 192 kbit/s, stereo at 256 kbit/s and 5.1
+fits the opening blocks and final mantissas into the word-aligned AC-3 frame
+partitions (A/52:2018 §§5.5, 7.10.1). Skip fields place padding before the
+final mantissas when needed. The encoder supports mono at 192 kbit/s, stereo at 256 kbit/s and 5.1
 at 640 kbit/s. The input plane order for 5.1 is FL, FR, FC, LFE, SL, SR.
 
 ```rust

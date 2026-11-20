@@ -657,7 +657,7 @@ fn select_allocation(
 ) -> Result<(Allocation, usize), EncodeError> {
     // A/52:2018 5.5 bounds the header and first two blocks to the
     // first 5/8 and the final mantissas and trailer to the last 3/8.
-    let split = bytes * 5;
+    let split = syntax::first_partition_bytes(bytes) * 8;
     let end = bytes * 8 - TRAILER_BITS;
     let opening = split
         .checked_sub(fixed_opening)
