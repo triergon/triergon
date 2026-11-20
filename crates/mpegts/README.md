@@ -182,8 +182,12 @@ For MPEG audio, PMT stream types `0x03` and `0x04` select Layer I, II and III
 frame parsing in audio PES packets (`0xc0`–`0xdf`). The reader can assemble a
 frame across PES boundaries and retains its original bytes and PES ranges.
 `MpegAudioFrame::header` exposes the coded layer, rate and sample count.
-The packet's sample duration is exact. Free-format frames and MPEG-2.5 rates
-are unsupported. See [H.222.0 Tables 2-22 and 2-34](https://www.itu.int/rec/T-REC-H.222.0-201808-S/en).
+The packet's sample duration is exact. When the bitrate index is zero, the
+reader confirms two consecutive frame spacings with matching version, layer
+and sample rate. It accounts for the original padding slots and bounds each
+frame by `ReaderLimits::maximum_audio_frame_bytes`. The header exposed to the
+caller retains the zero bitrate index. MPEG-2.5 rates are unsupported.
+See [H.222.0 Tables 2-22 and 2-34](https://www.itu.int/rec/T-REC-H.222.0-201808-S/en).
 For ATSC, set `ReaderLimits::descriptor_namespace` to `DescriptorNamespace::Atsc`
 to interpret `0x81` as AC-3 and `0x87` as E-AC-3. Both require PES stream ID
 `0xbd`. ATSC E-AC-3 supports a six-block independent syncframe with its

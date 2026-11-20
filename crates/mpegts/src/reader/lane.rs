@@ -2,12 +2,13 @@ mod aligned_audio;
 mod dvb;
 mod eac3;
 mod loas;
+mod mpeg_audio;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, MpegAudioFrame, Packet,
-    PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, Packet, PacketClock,
+    PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -27,8 +28,7 @@ use triergon_core::{
 };
 use triergon_framing::{
     AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
-    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, MpegAudioHeader, MpegVersion,
-    RawAnnexBReader,
+    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
@@ -38,7 +38,7 @@ enum Framer {
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
     Loas(aligned_audio::Reader<3, ()>),
-    MpegAudio(aligned_audio::Reader<4, MpegAudioHeader>),
+    MpegAudio(mpeg_audio::Reader),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -52,7 +52,7 @@ impl Framer {
             Self::Adts(reader) => reader.input_wait_buffer_capacity(),
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
-            Self::MpegAudio(reader) => reader.input_wait_buffer_capacity(),
+            Self::MpegAudio(reader) => reader.input_wait_buffer_capacity()?,
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
@@ -126,7 +126,7 @@ impl Framer {
             }
             // H.222.0 Table 2-34 assigns these streams to ISO/IEC 11172-3
             // and ISO/IEC 13818-3 audio respectively.
-            0x03 | 0x04 => Ok(Self::MpegAudio(aligned_audio::Reader::new(
+            0x03 | 0x04 => Ok(Self::MpegAudio(mpeg_audio::Reader::new(
                 pool,
                 source,
                 caps,
@@ -213,15 +213,7 @@ impl Framer {
                     offset: frame.offset,
                 })
             }),
-            Self::MpegAudio(reader) => {
-                map(reader.step(work, cancel, mpeg_audio_header)?, |frame| {
-                    AccessUnit::MpegAudio(MpegAudioFrame {
-                        bytes: frame.bytes,
-                        offset: frame.offset,
-                        header: frame.header,
-                    })
-                })
-            }
+            Self::MpegAudio(reader) => map(reader.step(work, cancel)?, AccessUnit::MpegAudio),
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -259,18 +251,6 @@ impl Framer {
             Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
         }
     }
-}
-
-fn mpeg_audio_header(bytes: &[u8; 4]) -> Result<(MpegAudioHeader, usize)> {
-    let header = MpegAudioHeader::parse(u32::from_be_bytes(*bytes))
-        .ok_or(Error::Invalid("MPEG audio frame header"))?;
-    if header.version == MpegVersion::Mpeg25 {
-        return Err(Error::Unsupported("MPEG-2.5 audio in MPEG-TS"));
-    }
-    let size = header
-        .frame_bytes()
-        .ok_or(Error::Unsupported("free-format MPEG audio"))?;
-    Ok((header, size))
 }
 
 struct Piece {

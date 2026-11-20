@@ -42,6 +42,14 @@ impl<const HEADER_BYTES: usize, Header: Copy> Reader<HEADER_BYTES, Header> {
         self.input.provide_owned(window)
     }
 
+    pub(super) fn input(&mut self) -> &mut InputCursor {
+        &mut self.input
+    }
+
+    pub(super) fn maximum(&self) -> usize {
+        self.maximum
+    }
+
     pub(super) fn input_wait_buffer_capacity(&self) -> usize {
         debug_assert!(self.input.buffered_owner().is_none());
         self.buffer.capacity()
