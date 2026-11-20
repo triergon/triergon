@@ -75,14 +75,18 @@ impl Face {
 
     /// libass's last resort for a face selected for `symbol` that does not
     /// map it ("broken font? Trying all charmaps", `ass_font.c:681-692`):
-    /// each charmap is selected in turn, in FreeType's order, and `symbol`
-    /// looked up through it. The face keeps the one that maps it, or the
-    /// last one. A charmap is charged to `work` as it is tried.
-    fn try_every_charmap(&mut self, symbol: u32, work: &mut WorkBudget) -> Result<Option<GlyphId>> {
+    /// visits each charmap in FreeType's order. The face keeps the first
+    /// map that has the symbol, or the last one tried. The initial map
+    /// already missed. Its visit still charges work and selects the map,
+    /// including when the next charge fails.
+    fn retry_charmaps(&mut self, symbol: u32, work: &mut WorkBudget) -> Result<Option<GlyphId>> {
+        let missed = self.charmap;
         for (index, charmap) in self.font.charmaps().enumerate() {
             charge(work, 1)?;
             self.charmap = Some(index);
-            if let Some(glyph) = self.font.text_lookup(charmap)?.glyph(symbol) {
+            if Some(index) != missed
+                && let Some(glyph) = self.font.text_lookup(charmap)?.glyph(symbol)
+            {
                 return Ok(Some(glyph));
             }
         }
@@ -428,13 +432,14 @@ impl Library {
             index
         } else {
             font.faces.try_push(face).map_err(|e| e.error)?;
-            font.faces.len() - 1
+            let index = font.faces.len() - 1;
+            if let Some(glyph) = font.faces[index].glyph(symbol)? {
+                return Ok((index, glyph));
+            }
+            index
         };
-        let face = &mut font.faces[index];
-        let glyph = match face.glyph(symbol)? {
-            Some(glyph) => Some(glyph),
-            None => face.try_every_charmap(symbol, work)?,
-        };
+        // Every existing face was tried above, and a new face just missed too.
+        let glyph = font.faces[index].retry_charmaps(symbol, work)?;
         Ok((index, glyph.unwrap_or(GlyphId(0))))
     }
 
