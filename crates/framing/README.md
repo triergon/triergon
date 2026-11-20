@@ -99,6 +99,14 @@ assert_eq!(decoder_input, [
 | DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
+With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg`
+and `ffprobe` on `PATH`, run
+`cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`.
+The comparison uses the second audio stream of `dts.mp4`, `dts.mkv` and
+`dts.mov`, plus the FATE DTS-HD MA sample and its three remuxes in `fate-dts/`.
+It compares both inspectors' 27 fields and the bytes in each declared core
+prefix with the reference core filter.
+
 ## Behaviour and limits
 
 `AacAdtsCarrier::into_selected_frame` shares the original bytes of a complete,
