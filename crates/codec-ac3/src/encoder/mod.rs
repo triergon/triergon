@@ -16,6 +16,7 @@ const BLOCKS: usize = 6;
 const CHANNELS: usize = 6;
 const MIN_FULL_BINS: usize = 73;
 const MAX_FULL_BINS: usize = 253;
+const BANDWIDTH_DISCARD_FRACTION: f32 = 1.0e-9;
 const LFE_BINS: usize = 7;
 const MAX_SNR: u16 = 1023;
 const LOWEST_FLOOR_CODE: u8 = 7;
@@ -252,6 +253,7 @@ impl Encoder {
         let full_channels = mode.full_channels();
         let mut switches = [0_u8; BLOCKS];
         let mut boundaries = [false; BLOCKS];
+        let mut smooth_openings = 0_u8;
         for (block, (spectra, switch_mask)) in spectra
             .chunks_exact_mut(channels)
             .zip(&mut switches)
@@ -285,14 +287,38 @@ impl Encoder {
                 let history = (self.started || block != 0).then_some(previous);
                 if !lfe && (boundary || has_attack(history, next)) {
                     // One block-switch bit per full-bandwidth channel (A/52:2018 5.4.3.1).
-                    *switch_mask |= 1 << (full_channels - coded - 1);
+                    let flag = 1 << (full_channels - coded - 1);
+                    *switch_mask |= flag;
                     self.analysis.short(
                         (!previous_silent).then_some(previous),
                         (!next_silent).then_some(next),
                         &mut spectra[coded],
                     );
+                    if block == 0 && previous_silent && smooth_onset(next) {
+                        smooth_openings |= flag;
+                    }
                 } else {
                     self.analysis.long(previous, next, &mut spectra[coded]);
+                }
+            }
+        }
+        // The channels share one frame bit budget. Reconsider the opening
+        // window only when the rest of the frame needs no transient windows.
+        if smooth_openings != 0
+            && switches[0] == smooth_openings
+            && switches[1..] == [0; BLOCKS - 1]
+        {
+            for (coded, &ch) in order[..full_channels].iter().enumerate() {
+                let flag = 1 << (full_channels - coded - 1);
+                if smooth_openings & flag != 0
+                    && prefer_long_onset(
+                        &mut self.analysis,
+                        &self.previous[coded],
+                        &input[ch][..BLOCK],
+                        &mut spectra[coded],
+                    )
+                {
+                    switches[0] &= !flag;
                 }
             }
         }
@@ -393,6 +419,39 @@ impl Encoder {
         self.started = true;
         Ok(bytes)
     }
+}
+
+fn smooth_onset(next: &[f32]) -> bool {
+    const SILENCE_THRESHOLD: f32 = 100.0 / 32768.0;
+    // Keep short transforms across a step out of silence or when the first
+    // samples are still quiet and the attack lies inside this block.
+    next[0].abs() <= SILENCE_THRESHOLD
+        && (next[0] != 0.0 || next[1] != 0.0)
+        && !has_attack(None, next)
+}
+
+fn prefer_long_onset(
+    analysis: &mut Analysis,
+    previous: &[f32],
+    next: &[f32],
+    short: &mut [f32; BLOCK],
+) -> bool {
+    // Keep the short window unless the long window reduces out-of-band
+    // energy by more than the bandwidth allowance.
+    let power = |bins: &[f32]| bins.iter().map(|x| x * x).sum::<f32>();
+    let discarded = power(&short[MAX_FULL_BINS..]);
+    let allowance = power(short) * BANDWIDTH_DISCARD_FRACTION;
+    if discarded <= allowance {
+        return false;
+    }
+    let mut long = [0.0; BLOCK];
+    analysis.long(previous, next, &mut long);
+    let long_discarded = 2.0 * power(&long[MAX_FULL_BINS..]); // Twice as many samples.
+    if discarded - long_discarded <= allowance {
+        return false;
+    }
+    *short = long;
+    true
 }
 
 fn has_attack(previous: Option<&[f32]>, next: &[f32]) -> bool {
@@ -549,17 +608,16 @@ fn full_bandwidth(first: &[f32; BLOCK], second: &[f32; BLOCK]) -> usize {
             .map(|(a, b)| a * a + b * b)
             .sum::<f32>()
     };
-    const DISCARD_FRACTION: f32 = 1.0e-9;
     // A/52:2018 8.2.3 scales the windowed transform by 2/N. Normalized
     // input bounds every coefficient by 2 before rounding. Use 4 to bound
     // the floating-point result, including roundoff in the FFT.
     const MAX_PAIR_ENERGY: f32 = 2.0 * MAX_FULL_BINS as f32 * 4.0 * 4.0;
     let mut end = MAX_FULL_BINS;
     let mut discarded = energy(end - 6, end);
-    if discarded > MAX_PAIR_ENERGY * DISCARD_FRACTION {
+    if discarded > MAX_PAIR_ENERGY * BANDWIDTH_DISCARD_FRACTION {
         return end;
     }
-    let floor = energy(0, MAX_FULL_BINS) * DISCARD_FRACTION;
+    let floor = energy(0, MAX_FULL_BINS) * BANDWIDTH_DISCARD_FRACTION;
     // Keep complete exponent groups and lose at most 90 dB of energy
     // below the total of the two blocks.
     while discarded <= floor {
@@ -686,6 +744,30 @@ mod tests {
             (syncframe[at / 8] >> (7 - at % 8)) & 1
         };
         assert_eq!([flag(0), flag(1)], [1, 0]);
+    }
+
+    #[test]
+    fn a_tone_onset_uses_a_long_window_only_for_significant_leakage() {
+        let mode = ChannelMode::Stereo;
+        let phase = core::f32::consts::TAU * 431.0 / 32_000.0;
+        let tone: [f32; SAMPLES_PER_FRAME] =
+            core::array::from_fn(|i| 0.31 * (phase * i as f32).sin());
+        let mut fade = tone;
+        for (i, sample) in fade[..64].iter_mut().enumerate() {
+            let ramp = (core::f32::consts::FRAC_PI_2 * i as f32 / 64.0).sin();
+            *sample *= ramp * ramp;
+        }
+        let mut encoder = Encoder::new(32_000, mode).expect("32 kHz stereo");
+        let mut syncframe = [0; MAX_FRAME_BYTES];
+        encoder
+            .encode(&[&tone, &fade], &mut syncframe)
+            .expect("tone onsets");
+
+        let mut header = Bits::count();
+        syntax::header(&mut header, encoder.fscod, encoder.size_code, mode);
+        let at = header.position();
+        let switch = |bit| (syncframe[bit / 8] >> (7 - bit % 8)) & 1;
+        assert_eq!([switch(at), switch(at + 1)], [0, 1]);
     }
 
     #[test]
