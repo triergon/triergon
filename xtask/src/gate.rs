@@ -218,6 +218,11 @@ fn report_features(root: &Path) -> R<Vec<ReportFeature>> {
 
 fn report_contracts(contracts: Vec<crate::harness::features::Contract>) -> R<Vec<ReportFeature>> {
     let mut special: BTreeSet<_> = COVERED.iter().map(|(id, _)| *id).collect();
+    let mut weights: BTreeMap<_, _> = REPORT_WEIGHTS
+        .iter()
+        .enumerate()
+        .map(|(index, &(id, weight))| (id, (index, weight)))
+        .collect();
     let mut reports = Vec::new();
     for contract in contracts {
         let specialized = special.remove(contract.id.as_str());
@@ -243,10 +248,11 @@ fn report_contracts(contracts: Vec<crate::harness::features::Contract>) -> R<Vec
         let manifest_directory = crate::generators::for_contract(&contract.document)
             .filter(|_| contract.generated())
             .map(|g| g.manifest_directory);
-        let position = REPORT_WEIGHTS.iter().position(|(id, _)| *id == contract.id);
-        let weight = position.map_or(1, |index| REPORT_WEIGHTS[index].1);
+        let (position, weight) = weights
+            .remove(contract.id.as_str())
+            .unwrap_or((usize::MAX, 1));
         reports.push((
-            position.unwrap_or(usize::MAX),
+            position,
             ReportFeature {
                 id: contract.id,
                 corpus,
@@ -259,6 +265,9 @@ fn report_contracts(contracts: Vec<crate::harness::features::Contract>) -> R<Vec
         return Err(format!(
             "gate runner has no registered feature: {special:?}"
         ));
+    }
+    if let Some((id, _)) = weights.first_key_value() {
+        return Err(format!("{id}: planned, but not registered"));
     }
     reports.sort_by_key(|(order, _)| *order);
     Ok(reports.into_iter().map(|(_, report)| report).collect())
@@ -3009,6 +3018,17 @@ done
             "workloads timing: 19 of 20 cases pass",
             "workloads timing: failing: hevc-main10-2160p",
         ])));
+    }
+
+    #[test]
+    fn missing_registered_report_fails_planning() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let mut contracts = crate::harness::features::discover(root).unwrap();
+        contracts.retain(|contract| contract.id != "subtitle-text");
+        assert_eq!(
+            report_contracts(contracts).err().as_deref(),
+            Some("subtitle-text: planned, but not registered")
+        );
     }
 
     #[test]
