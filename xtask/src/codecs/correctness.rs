@@ -37,6 +37,12 @@ fn uses_initialized_aac_reference(lane: &str, name: &str, sha256: &str) -> bool 
     lane == "aac" && name == "aac-sce-in-stereo.adts" && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
 }
 
+fn complete_single_sce_stereo(sample_bytes: usize, outputs: [(i64, usize); 2]) -> bool {
+    const SAMPLES_PER_CHANNEL: usize = 217 * 1024;
+    let bytes = SAMPLES_PER_CHANNEL * 2 * sample_bytes;
+    outputs == [(0, bytes); 2]
+}
+
 fn video_extensions(lane: &str) -> Option<&'static [&'static str]> {
     match lane {
         "h264" => Some(&[".264", ".26l", ".avc", ".h264", ".jsv", ".jvt"]),
@@ -574,6 +580,18 @@ fn audio_decoder(
     let status = |row: &mut Vec<(String, Value)>, status: &str| {
         row.push(("status".into(), Value::str(status)));
     };
+    if initialized_aac
+        && !complete_single_sce_stereo(
+            size_of::<f32>(),
+            [
+                (ours_run.code, candidate.len()),
+                (reference_run.code, reference.len()),
+            ],
+        )
+    {
+        status(&mut row, "fail");
+        return Ok(Value::Object(row));
+    }
     if reference.is_empty() {
         status(&mut row, "ffmpeg-refused");
         return Ok(Value::Object(row));
@@ -617,8 +635,7 @@ fn audio_decoder(
                 && reference_run.code == 0
                 && info.get("errors").and_then(python::int) == Some(0)
                 && (surround_pair_labels
-                    || ours_layout.is_some() && ours_layout == reference_layout)))
-        && (!initialized_aac || reference.len() == 217 * 1024 * 2 * 4);
+                    || ours_layout.is_some() && ours_layout == reference_layout)));
     let stats = if exact {
         let channels = reference_channels.ok_or_else(|| {
             Stop::Fatal("'<=' not supported between instances of 'NoneType' and 'int'".into())
@@ -651,7 +668,13 @@ fn audio_decoder(
     Ok(Value::Object(row))
 }
 
-fn output_path(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, Stop> {
+fn output_path(
+    a: &Grade,
+    lane: &str,
+    path: &str,
+    tmp: &Path,
+    initialized_aac: bool,
+) -> Result<Value, Stop> {
     let decode = operation(lane).ok_or_else(|| unknown(lane))?;
     let op = format!("{decode}-raw");
     let worker = python::path(a.codec_workers.of(decode));
@@ -686,6 +709,12 @@ fn output_path(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, S
             Value::str(python::tail(&pr.stderr, 300)),
         ),
     ];
+    if initialized_aac
+        && !complete_single_sce_stereo(size_of::<i16>(), [(po.code, co.len()), (pr.code, cr.len())])
+    {
+        row.push(("status".into(), Value::str("fail")));
+        return Ok(Value::Object(row));
+    }
     if cr.is_empty() {
         row.push(("status".into(), Value::str("reference-produced-nothing")));
         return Ok(Value::Object(row));
@@ -816,10 +845,10 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             row.push(("status".into(), Value::str("input-hash-mismatch")));
         } else {
             let tmp = TempDir::new(a.scratch.as_deref())?;
+            let initialized_aac = uses_initialized_aac_reference(&lane, &name, &sha256);
             let decoded = if video_extensions(&lane).is_some() {
                 video::decoder(&a.ffprobe, &a.ffmpeg, &a.example(&lane)?, &lane, &path)
             } else {
-                let initialized_aac = uses_initialized_aac_reference(&lane, &name, &sha256);
                 audio_decoder(a, &lane, &path, &tmp.0, initialized_aac)
             };
             row.push((
@@ -835,7 +864,7 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
                 row.push((
                     "output".into(),
-                    match output_path(a, &lane, &path, &output_dir) {
+                    match output_path(a, &lane, &path, &output_dir, initialized_aac) {
                         Ok(value) => value,
                         Err(Stop::Timeout(argv)) => timeout_row(argv),
                         Err(Stop::Fatal(message)) => return Err(message),
@@ -878,6 +907,20 @@ mod tests {
         assert!(!uses_initialized_aac_reference("aac-mov", name, pin));
         assert!(!uses_initialized_aac_reference("aac", "other.adts", pin));
         assert!(!uses_initialized_aac_reference("aac", name, "different"));
+    }
+
+    #[test]
+    fn single_sce_comparison_requires_complete_successful_stereo_output() {
+        for (width, bytes) in [(size_of::<f32>(), 1_777_664), (size_of::<i16>(), 888_832)] {
+            assert!(complete_single_sce_stereo(width, [(0, bytes); 2]));
+            assert!(!complete_single_sce_stereo(width, [(0, 0); 2]));
+            assert!(!complete_single_sce_stereo(
+                width,
+                [(0, bytes - 2 * width); 2]
+            ));
+            assert!(!complete_single_sce_stereo(width, [(1, bytes), (0, bytes)]));
+            assert!(!complete_single_sce_stereo(width, [(0, bytes), (1, bytes)]));
+        }
     }
 
     #[test]

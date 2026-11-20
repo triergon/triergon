@@ -198,10 +198,10 @@ observation per workload and `summary.json`.
   The recorded comparison at `81edf4c0` measured RMS 1.3e-8 on FL and
   RMS 0.0853 (max 0.130) on FR. The stereo s16 output passed with 72
   samples one LSB apart. In the float comparison for this exact input,
-  `ffmpeg-aac-initialized-pcm` initializes both planes before decoding
-  and the grader checks all 222,208 samples in each channel. The
-  stereo s16 comparison and measurement workers keep the ordinary
-  reference.
+  `ffmpeg-aac-initialized-pcm` initializes both planes before decoding.
+  The grader requires successful decoding and all 222,208 samples per
+  channel in both the float and stereo s16 comparisons. The stereo s16
+  comparison and measurement workers keep the ordinary reference.
 - `xll_51_24_48_none.core.dts` carries no DTS core substream, only the lossless
   extension, which FFmpeg decodes (3,072 samples of 5.1) and this decoder does not
   implement; `summarize` counts it out of set, never as a pass.
