@@ -14,6 +14,9 @@ use triergon_font::{Font, GlyphId, OutlineFormat, standard_encoding_sid};
 /// The argument stack's capacity, CFF2's limit, which HarfBuzz applies to CFF
 /// too. probe: cff-stack, cff2-stack
 const STACK: usize = 513;
+/// The original Type 2 operand limit covers ordinary paths without clearing
+/// the full CFF2 stack on entry to every glyph.
+const SHORT_STACK: usize = 48;
 
 /// The deepest subroutine nesting that runs: an eleventh nested call fails
 /// the glyph, local and global calls counted together. probe:
@@ -660,7 +663,7 @@ struct Pen {
 
 /// The state of one charstring, a glyph or a component of an accented one.
 struct State {
-    stack: [f64; STACK],
+    stack: Operands,
     len: usize,
     pen: Pen,
     /// Stems declared before the first hint or counter mask.
@@ -673,6 +676,43 @@ struct State {
     regions: usize,
     indexed: bool,
     blended: bool,
+}
+
+/// Both sizes live on the stack. Once promoted, a glyph and its subroutines
+/// keep the full storage until the glyph returns.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the operand stack never allocates"
+)]
+enum Operands {
+    Short([f64; SHORT_STACK]),
+    Full([f64; STACK]),
+}
+
+impl Operands {
+    fn values(&self) -> &[f64] {
+        match self {
+            Self::Short(values) => values,
+            Self::Full(values) => values,
+        }
+    }
+
+    fn push(&mut self, index: usize, value: f64) -> Step<()> {
+        match self {
+            Self::Short(values) if index < SHORT_STACK => values[index] = value,
+            Self::Short(short) => *self = Self::promote(short, value),
+            Self::Full(values) => *values.get_mut(index).ok_or(Fault::Glyph)? = value,
+        }
+        Ok(())
+    }
+
+    #[cold]
+    fn promote(short: &[f64; SHORT_STACK], value: f64) -> Self {
+        let mut full = [0.0; STACK];
+        full[..SHORT_STACK].copy_from_slice(short);
+        full[SHORT_STACK] = value;
+        Self::Full(full)
+    }
 }
 
 /// How running a piece of charstring ended.
@@ -689,7 +729,7 @@ impl<'a> Run<'_, 'a, '_> {
     /// cff-endchar
     fn glyph(&mut self, charstring: &'a [u8], origin: (f64, f64), accents: bool) -> Step<()> {
         let mut s = State {
-            stack: [0.0; STACK],
+            stack: Operands::Short([0.0; SHORT_STACK]),
             len: 0,
             pen: Pen {
                 x: origin.0,
@@ -792,10 +832,7 @@ impl<'a> Run<'_, 'a, '_> {
                 _ => None,
             };
             if let Some(v) = number {
-                if s.len == STACK {
-                    return Err(Fault::Glyph);
-                }
-                s.stack[s.len] = v;
+                s.stack.push(s.len, v)?;
                 s.len += 1;
                 continue;
             }
@@ -888,7 +925,8 @@ impl<'a> Run<'_, 'a, '_> {
             return Err(Fault::Limit(Error::Policy("charstring subroutine depth")));
         }
         s.len -= 1;
-        let index = (s.stack[s.len].trunc() as i64).saturating_add(bias(subroutines.count));
+        let index =
+            (s.stack.values()[s.len].trunc() as i64).saturating_add(bias(subroutines.count));
         u32::try_from(index)
             .ok()
             .and_then(|i| subroutines.get(i))
@@ -906,7 +944,7 @@ impl<'a> Run<'_, 'a, '_> {
         if s.len > 5 || !accents {
             return Err(Fault::Glyph);
         }
-        let [adx, ady, base, accent] = [0, 1, 2, 3].map(|i| s.stack[s.len - 4 + i]);
+        let [adx, ady, base, accent] = [0, 1, 2, 3].map(|i| s.stack.values()[s.len - 4 + i]);
         let base = self.component(base)?;
         let accent = self.component(accent)?;
         self.glyph(base, (0.0, 0.0), false)?;
@@ -931,7 +969,7 @@ impl<'a> Run<'_, 'a, '_> {
         if s.len == 0 || s.indexed || s.blended {
             return Err(Fault::Glyph);
         }
-        let ivd = s.stack[s.len - 1].trunc();
+        let ivd = s.stack.values()[s.len - 1].trunc();
         if ivd < 0.0 {
             return Err(Fault::Glyph);
         }
@@ -947,7 +985,7 @@ impl<'a> Run<'_, 'a, '_> {
         if s.len == 0 {
             return Err(Fault::Glyph);
         }
-        let n = s.stack[s.len - 1].trunc();
+        let n = s.stack.values()[s.len - 1].trunc();
         if n < 0.0 {
             return Err(Fault::Glyph);
         }
@@ -976,7 +1014,7 @@ impl<'a> Run<'_, 'a, '_> {
             masked,
             ..
         } = s;
-        let a = &stack[..n];
+        let a = &stack.values()[..n];
         match op {
             1 | 3 | 18 | 23 => {
                 if !*masked {
@@ -1427,6 +1465,47 @@ mod tests {
         assert_eq!(run(&table, 0), Some([0, 20, 25, -20]));
         // The curves end at (40, 40); the line down then shows the end point.
         assert_eq!(run(&table, 1), Some([0, 40, 40, -100]));
+    }
+
+    #[test]
+    fn wide_operands_cross_subroutine_returns_and_keep_exact_limits() {
+        // Each call appends 32 live operands, including when the callee
+        // crosses 48. The caller consumes the complete alternating h/v path.
+        let pairs = [n(2), n(3)];
+        let mut subroutine = pairs.repeat(16);
+        subroutine.push(11);
+        for cff2_format in [false, true] {
+            for width in [47_usize, 48, 49, 63, 64, 65, 512, 513, 514] {
+                let calls = width / 32;
+                let mut glyph = [n(-107), 10].repeat(calls);
+                glyph.extend(pairs.iter().copied().cycle().take(width % 32));
+                glyph.push(6);
+                let table = if cff2_format {
+                    cff2(&[&glyph], &[&subroutine])
+                } else {
+                    glyph.push(14);
+                    cff(&[&glyph], &[], &[&subroutine])
+                };
+                let units = (width + 3 * calls + if width <= 513 { 2 } else { 0 }) as u64;
+                let x = 2 * width.div_ceil(2) as i32;
+                let y = 3 * (width / 2) as i32;
+                let expected = (width <= 513).then_some([0, y, x, -y]);
+                for limit in [units - 1, units, units + 1] {
+                    let mut work = WorkBudget::new(limit);
+                    let result = table_extents(&table, cff2_format, 0, 16, &mut work);
+                    let want = if limit < units {
+                        Err(Error::Policy("charstring work"))
+                    } else {
+                        Ok(expected)
+                    };
+                    assert_eq!(
+                        result, want,
+                        "cff2={cff2_format}, width={width}, limit={limit}"
+                    );
+                    assert_eq!(work.spent(), units.min(limit));
+                }
+            }
+        }
     }
 
     #[test]
