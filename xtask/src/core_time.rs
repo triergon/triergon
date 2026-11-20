@@ -117,18 +117,17 @@ fn generate(root: &Path, generator: &str, dir: &Path) -> Result<()> {
 }
 
 // Publish only a complete v2 corpus. Concurrent first runs verify the winner.
-fn edge_corpus(root: &Path, run_name: &std::ffi::OsStr) -> Result<PathBuf> {
-    let lane = root.join(".research/core-time-edge-oracle");
-    let dir = lane.join("v2");
+fn edge_corpus(root: &Path) -> Result<PathBuf> {
+    let cache = root.join(".research/core-time-edge-oracle");
+    let dir = cache.join("v2");
     if !dir.exists() {
-        fs::create_dir_all(&lane)?;
-        let staging = lane.join(run_name);
-        fs::create_dir(&staging)?;
-        generate(root, EDGE, &staging)?;
-        match fs::rename(&staging, &dir) {
+        fs::create_dir_all(&cache)?;
+        let staging = process::TempDir::new(Some(&cache))?;
+        generate(root, EDGE, &staging.0)?;
+        match fs::rename(&staging.0, &dir) {
             Ok(()) => return Ok(dir),
             Err(e) if !dir.exists() => return Err(e.into()),
-            Err(_) => fs::remove_dir_all(staging)?,
+            Err(_) => {}
         }
     }
     generate(root, EDGE, &dir)?;
@@ -479,7 +478,7 @@ fn run(root: &Path, args: &[String]) -> Result<()> {
     generate(root, BASE, &base)?;
     let (baseline, baseline_hash) = manifest::read(root, &base.join("manifest.json"))?;
     let mut cases = inputs(&base, "", &BASE_SUITES, &baseline)?;
-    let edge = edge_corpus(root, out.file_name().ok_or("missing run name")?)?;
+    let edge = edge_corpus(root)?;
     let (supplement, edge_hash) = manifest::read(root, &edge.join("manifest.json"))?;
     if text(&supplement, "corpus_version")? != "core-time-edge-v2" {
         return Err("unexpected edge corpus version".into());
@@ -563,6 +562,22 @@ mod tests {
             }
         }
         assert_eq!(comparison(expected, "x\ny\nz\n", 0, 2).1.len(), 3);
+    }
+
+    #[test]
+    fn failed_edge_generation_removes_its_partial_input() -> Result<()> {
+        let temp = process::TempDir::new(None)?;
+        let root = &temp.0;
+        fs::create_dir(root.join("tools"))?;
+        fs::write(
+            root.join(EDGE),
+            "import pathlib, sys\n(pathlib.Path(sys.argv[-1]) / 'partial.tsv').touch()\nsys.exit(1)\n",
+        )?;
+
+        assert!(edge_corpus(root).is_err());
+        let cache = root.join(".research/core-time-edge-oracle");
+        assert_eq!(fs::read_dir(cache)?.count(), 0);
+        Ok(())
     }
 
     #[test]
