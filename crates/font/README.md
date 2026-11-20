@@ -99,7 +99,9 @@ suffixed names as variants after their base, and FreeType's second mappings for
 pointer arithmetic does); then for a name-keyed CFF face whose encoding maps a
 code, the charmap of that encoding (`CharmapKind::CffEncoding`, platform 7): a
 custom encoding of format 0 or 1 with supplements, or the Standard or Expert
-encoding through the charset's lowest glyph of each SID. Subtables of formats 14
+encoding through the charset's lowest glyph of each SID. While building the
+Standard charmap, the reader stops at the first assigned SID above the face's
+maximum. Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
 valid (0, 5) subtable of either format; `VariationSequences::format14` reads one

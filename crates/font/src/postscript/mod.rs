@@ -338,9 +338,18 @@ impl PointerWidth {
 #[cfg(test)]
 mod tests {
     use super::{
-        PointerWidth, UnicodeMap, VARIANT_BIT, adobe_glyph_index, standard_string, unicode_value,
+        EXPERT_ENCODING, PointerWidth, STANDARD_ENCODING, UnicodeMap, VARIANT_BIT,
+        adobe_glyph_index, standard_string, unicode_value,
     };
     use triergon_core::Budget;
+
+    #[test]
+    fn predefined_encodings_support_the_bounded_charmap_scan() {
+        assert_eq!(STANDARD_ENCODING[..32], [0; 32]);
+        assert_eq!(EXPERT_ENCODING[..32], [0; 32]);
+        let assigned = STANDARD_ENCODING.iter().copied().filter(|&sid| sid != 0);
+        assert!(assigned.is_sorted_by(|a, b| a < b));
+    }
 
     #[test]
     fn names_read_as_freetype_reads_them() {
