@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-startup-seek",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/startup-seek-fixtures",
   "operation": "matroska-video-session",
   "candidate": "playback-matroska-worker",
   "worker_operation": "feed-",

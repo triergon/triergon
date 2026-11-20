@@ -12,11 +12,9 @@
 //! the first. The timing is a start time, then anything up to the first
 //! `-->` after it, in the same line or a later one, then an end time. A time
 //! is `H:M:S.F` or `M:S.F`. Each field is leading white space (which may span
-//! lines), an optional sign and decimal digits. The digits count up to
-//! 2³² − 1 and stop there, a minus negates the count modulo 2³², and the
-//! result reads as a 32-bit signed number: `4294967295` and `-1` read as −1,
-//! `2147483648` as −2³¹. This is what is observed on 32-bit ARMv7. A field has
-//! no range of its own, and the fraction is a count of
+//! lines), an optional sign and decimal digits. A magnitude above the selected
+//! unsigned width reads as −1. Otherwise a minus negates the magnitude and the
+//! low 32 bits read as a signed number. The fraction is a count of
 //! milliseconds whatever its width (`1.5` is 1.005 seconds). Whatever
 //! follows a time's last digit is ignored.
 //!
@@ -31,7 +29,7 @@
 
 use super::lines::Span;
 use super::timestamp::is_space;
-use super::{Entries, Entry};
+use super::{Entries, Entry, TimestampFieldWidth};
 use std::ops::Range;
 use triergon_core::Result;
 
@@ -59,6 +57,7 @@ fn skipped(bytes: &[u8]) -> bool {
 struct Scan<'a> {
     bytes: &'a [u8],
     at: usize,
+    width: TimestampFieldWidth,
 }
 
 impl Scan<'_> {
@@ -78,8 +77,7 @@ impl Scan<'_> {
         Some(())
     }
 
-    /// A field: its digits as a count that stops at 2³² − 1, negated modulo
-    /// 2³² after a minus, read as a 32-bit signed number.
+    /// Read the magnitude with the selected unsigned bound before narrowing.
     fn field(&mut self) -> Option<i64> {
         self.skip(is_space);
         let negative = self.peek() == Some(b'-');
@@ -87,19 +85,23 @@ impl Scan<'_> {
             self.at += 1;
         }
         let digits = self.at;
-        let mut value = Some(0_u32);
+        let mut value = Some(0_u64);
         while let Some(digit) = self.peek().filter(u8::is_ascii_digit) {
             value = value
                 .and_then(|value| value.checked_mul(10))
-                .and_then(|value| value.checked_add(u32::from(digit - b'0')));
+                .and_then(|value| value.checked_add(u64::from(digit - b'0')));
             self.at += 1;
         }
         if self.at == digits {
             return None;
         }
-        let value = match value {
-            Some(value) if negative => value.wrapping_neg(),
-            Some(value) => value,
+        let maximum = match self.width {
+            TimestampFieldWidth::Bits32 => u64::from(u32::MAX),
+            TimestampFieldWidth::Bits64 => u64::MAX,
+        };
+        let value = match value.filter(|&value| value <= maximum) {
+            Some(value) if negative => (value as u32).wrapping_neg(),
+            Some(value) => value as u32,
             None => u32::MAX,
         };
         Some(i64::from(value.cast_signed()))
@@ -143,12 +145,17 @@ fn find(bytes: &[u8], needle: &[u8]) -> Option<usize> {
 
 /// Reads one block (`block` is its byte range in `source`), adding its cue
 /// to `entries` if it is one; `Ok(false)` when the document ends at it.
-pub(super) fn block(source: &[u8], block: Span, entries: &mut Entries) -> Result<bool> {
+pub(super) fn block(
+    source: &[u8],
+    block: Span,
+    entries: &mut Entries,
+    width: TimestampFieldWidth,
+) -> Result<bool> {
     let bytes = block.of(source);
     if skipped(bytes) {
         return Ok(true);
     }
-    let Some(cue) = cue(bytes) else {
+    let Some(cue) = cue(bytes, width) else {
         return Ok(false);
     };
     let range = |range: Range<usize>| block.start + range.start..block.start + range.end;
@@ -172,8 +179,12 @@ struct Cue {
     settings: Option<Range<usize>>,
 }
 
-fn cue(bytes: &[u8]) -> Option<Cue> {
-    let mut scan = Scan { bytes, at: 0 };
+fn cue(bytes: &[u8], width: TimestampFieldWidth) -> Option<Cue> {
+    let mut scan = Scan {
+        bytes,
+        at: 0,
+        width,
+    };
     scan.skip(|byte| !is_break(byte));
     let identifier = if find(&bytes[..scan.at], ARROW).is_some() {
         scan.at = 0;

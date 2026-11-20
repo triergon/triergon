@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "subtitle-pgs-capsules",
+  "runner": "cargo xtask report",
   "operation": "pgs-receiver-display",
   "candidate": "subtitle-capsule-worker",
   "worker_operation": "pgs-",

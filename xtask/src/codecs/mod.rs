@@ -42,6 +42,9 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  grade every vector, or those of the named lanes, by
                  harness/codecs/numeric-rules.json; appends one row each. A lane whose
                  operation has a --codec-worker-for worker decodes with that worker
+  compare-hevc --decoder EXE --ffmpeg FF --ffprobe FP FILE...
+                 stream individual files through the same planar decoder comparison as grade;
+                 print one JSON row per file and return success only for exact matches
   summarize RUN.jsonl OUT.json [--require-pass]
                  classify a grading run against the declared lane selection; with
                  --require-pass fail on any vector that fails and is not a listed open case
@@ -425,6 +428,18 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 rules: correctness::Rules::load(root)?,
             };
             correctness::grade(&grade)?;
+        }
+        "compare-hevc" => {
+            let a = Args::parse(rest, &["decoder", "ffmpeg", "ffprobe"], &[])?;
+            if a.positional.is_empty() {
+                return Err("compare-hevc needs at least one input file".into());
+            }
+            return correctness::compare_hevc(
+                a.required("decoder")?,
+                a.required("ffmpeg")?,
+                a.required("ffprobe")?,
+                &a.positional,
+            );
         }
         "readers" => {
             let a = Args::parse(

@@ -23,7 +23,6 @@
 Run from the repository root. Every input is authored-synthetic and already in
 the repository or derived byte for byte from repository fixtures.
 """
-import hashlib
 import json
 import re
 import struct
@@ -472,43 +471,25 @@ def pgs_inputs():
         yield path.parent.name, path.parent.name.split("--")[0], str(path.relative_to(ROOT)), []
 
 
+def case_descriptions(feature):
+    inputs = {"subtitle-text": text_inputs, "subtitle-text-host": host_inputs,
+              "subtitle-pgs-capsules": pgs_inputs}[feature]()
+    return [dict(id=case_id, profile=case_id, group=group, file=file,
+                 rights="authored-synthetic", arguments=arguments)
+            for case_id, group, file, arguments in inputs]
+
+
 def record(feature, reference, target=None):
-    inputs = {"subtitle-text": text_inputs, "subtitle-text-host": host_inputs}.get(feature, pgs_inputs)()
-    prefix = "subtitle-text-" if feature.startswith("subtitle-text") else "pgs-"
-    path = ROOT / "harness/features" / feature / "corpus.json"
-    earlier = {}
-    if target is not None and path.exists():
-        earlier = {case["id"]: case["expected_by_target"] for case in json.loads(path.read_text())["cases"]}
-    cases = []
-    for case_id, group, file, arguments in inputs:
-        result = subprocess.run(
-            [reference, prefix + "fold", file, *arguments], capture_output=True, check=True
-        )
-        fold = json.loads(result.stdout.decode().strip().splitlines()[-1])
-        if fold.get("eof") is not True:
-            raise SystemExit(f"{case_id}: reference did not reach the end")
-        expected = {key: fold[key] for key in ["packets", "bytes", "digest"]}
-        case = {
-            "id": case_id,
-            "profile": case_id,
-            "group": group,
-            "file": file,
-            "sha256": hashlib.sha256((ROOT / file).read_bytes()).hexdigest(),
-            "rights": "authored-synthetic",
-            "arguments": arguments,
-        }
-        if target is None:
-            case["expected"] = expected
-        else:
-            pins = dict(earlier.get(case_id, {}), **{target: expected})
-            case["expected_by_target"] = dict(sorted(pins.items()))
-        cases.append(case)
-    path.write_text(json.dumps({"schema": 1, "directory": ".", "cases": cases}, indent=2) + "\n")
-    print(f"{feature}: {len(cases)} cases")
+    command = ["cargo", "xtask", "subtitle-fixtures", "record", feature, reference]
+    if target is not None:
+        command.extend(["--target", target])
+    subprocess.run(command, check=True)
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == "capsules":
+    if len(sys.argv) == 3 and sys.argv[1] == "--list-cases":
+        print(json.dumps(case_descriptions(sys.argv[2])))
+    elif len(sys.argv) == 3 and sys.argv[1] == "capsules":
         counts = [mov_text(), mov_text_tags(), tx3g(sys.argv[2]), charset(), ass(), authored()]
         print("mov-text %d, mov-text-tags %d, tx3g %d, charset %d, ass %d, authored %d" % tuple(counts))
     elif len(sys.argv) == 4 and sys.argv[1] == "record" and sys.argv[2] != "subtitle-text-host":

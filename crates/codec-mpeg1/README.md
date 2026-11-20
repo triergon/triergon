@@ -56,7 +56,7 @@ charges a caller's `Budget`.
   400 bit/s units (`Error::BitRate`). Geometry limits (even, 2–4094) are enforced by
   `Geometry::new`.
 - `encode` refuses a picture whose geometry differs from the configuration
-  (`Error::PictureGeometry`) before changing any state. `out` is cleared first.
+  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the contents of `out`.
 - Storage sized from the configuration is charged to the encoder's budget before it
   is allocated: the reference and reconstructed pictures, the previous source
   picture, the macroblock and motion arrays and the coarse planes, the bit writer and the
@@ -65,10 +65,14 @@ charges a caller's `Budget`.
   picture's trial pass (one row). The default `Limits::live_storage_bytes` is
   96 MiB; the largest geometry (4094x4094) at the largest signalled VBV buffer
   (1023 × 16 kbit) needs about 74 MiB. A refused charge is `Error::Budget`, from the
-  constructor or before the picture changes any state.
+  constructor or before coding the picture. Motion search reserves both coarse
+  luma planes together on first use. Repeated source luma skips that reservation
+  and both downsampling passes, including when only chroma changes. After
+  backpressure, `out` still holds its previous bytes. Release space and retry
+  the same input at the same picture index.
 - The input must have its coded padding filled (`Picture::pad_edges`; the pixel
   `Converter` does this).
-- Every call encodes and advances the picture index, also for an unchanged source
+- Every successful call encodes and advances the picture index, also for an unchanged source
   picture (a keepalive). When the whole picture repeats, a macroblock the previous
   picture skipped after its residual quantised to zero is skipped again without
   computing the residual, as long as its quantiser is no finer: its residual is the
@@ -98,7 +102,6 @@ Unit tests cover the VLC tables (prefix-free and complete), DC differentials, es
 levels, reconstruction oddification and saturation, half-sample rounding, motion
 search and bounds, the zero-residual shortcut against the complete transform, the
 inverse transform over a block's nonzero coefficients and the forward rows against a
-butterfly transform, and
-skips reused for a repeated picture against the computed path;
-`tests/encoder.rs` covers configuration and geometry refusal. Gates:
-[docs/quality.md](../../docs/quality.md).
+butterfly transform, and skips reused for a repeated picture against the computed
+path. `tests/encoder.rs` covers configuration, geometry refusal and exact output
+after a budget retry. See the [quality gates](../../docs/quality.md).

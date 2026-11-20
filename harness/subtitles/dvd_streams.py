@@ -33,6 +33,11 @@ import subprocess
 import sys
 import zlib
 
+if __package__:
+    from .carriers import ebml_id, ebml_size
+else:
+    from carriers import ebml_id, ebml_size
+
 SECTOR = 2048
 
 # ------------------------------------------------------------- 2-bit RLE pixels
@@ -578,17 +583,6 @@ def mux(out, name, extension):
 
 
 # ------------------------------------------------------------------ Matroska
-
-def ebml_id(value):
-    return value.to_bytes((value.bit_length() + 7) // 8, "big")
-
-
-def ebml_size(n):
-    for length in range(1, 9):
-        if n < (1 << (7 * length)) - 1:
-            return ((1 << (7 * length)) | n).to_bytes(length, "big")
-    raise ValueError(n)
-
 
 def element(ident, body):
     if isinstance(body, int):

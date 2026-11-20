@@ -1,0 +1,9 @@
+{
+ "name": "flac-rice-0230c88e-aarch64",
+ "path": "flac-rice-0230c88e-aarch64",
+ "retention": "retained",
+ "reason": "Paired FLAC file decode times and hardware counters at 0230c88e and 3e3ba929 on AArch64 Linux.",
+ "key": "evidence/architecture-review-mwo5u537/0230c88e4bb78677484d7b7d00a9c80e0be66d37/aarch64/flac-rice/b3320c7ff3c9d0fd3c9d6f665c7fa41499cf87992c4e12e41277907b4617a49a.tar.zst",
+ "sha256": "b3320c7ff3c9d0fd3c9d6f665c7fa41499cf87992c4e12e41277907b4617a49a",
+ "bytes": 6678899
+}
