@@ -1,6 +1,5 @@
 //! Bounded access-unit queue. A full queue refuses the access unit and the
 //! feeder keeps it (backpressure).
-use crate::Discard;
 use std::collections::VecDeque;
 
 /// Capacity of one lane's pending input.
@@ -38,37 +37,40 @@ pub enum FeedError {
 }
 
 #[derive(Debug)]
-pub(crate) struct Unit {
+pub(crate) struct Unit<D> {
     pub data: Box<[u8]>,
     pub pts: Option<i64>,
-    pub discard: Discard,
+    // Video uses () and carries no audio trim metadata in its queue.
+    pub discard: D,
 }
 
 #[derive(Debug)]
-pub(crate) struct UnitQueue {
+pub(crate) struct UnitQueue<D> {
     limits: QueueLimits,
-    units: VecDeque<Unit>,
+    units: VecDeque<Unit<D>>,
     spare: Option<Box<[u8]>>,
+    last_decoded_len: usize,
     bytes: usize,
 }
 
-impl UnitQueue {
+impl<D: Default> UnitQueue<D> {
     pub fn new(limits: QueueLimits) -> Self {
         Self {
             limits,
             units: VecDeque::new(),
             spare: None,
+            last_decoded_len: 0,
             bytes: 0,
         }
     }
     pub fn push(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
-        self.push_discarding(data, pts, Discard::default())
+        self.push_discarding(data, pts, D::default())
     }
     pub fn push_discarding(
         &mut self,
         data: &[u8],
         pts: Option<i64>,
-        discard: Discard,
+        discard: D,
     ) -> Result<(), FeedError> {
         if data.is_empty() || data.len() > self.limits.unit_bytes {
             return Err(FeedError::Invalid);
@@ -88,16 +90,23 @@ impl UnitQueue {
         self.units.push_back(Unit { data, pts, discard });
         Ok(())
     }
-    pub fn pop(&mut self) -> Option<Unit> {
+    pub fn pop(&mut self) -> Option<Unit<D>> {
         let unit = self.units.pop_front()?;
+        // Another decode supersedes the spare before any new feed can use it.
+        self.spare = None;
         self.bytes -= unit.data.len();
         Some(unit)
     }
-    /// Keep the just-consumed unit's storage for the next borrowed feed.
+    /// Keep a payload only after two successful decodes of the same size.
     pub fn recycle(&mut self, data: Box<[u8]>) {
-        self.spare = Some(data);
+        let len = data.len();
+        if len == self.last_decoded_len {
+            self.spare = Some(data);
+        }
+        self.last_decoded_len = len;
     }
     pub fn release_spare(&mut self) {
+        self.last_decoded_len = 0;
         self.spare = None;
     }
     #[allow(clippy::option_option)] // `None`: empty queue; `Some(None)`: unit without a timestamp.
@@ -130,7 +139,7 @@ mod tests {
 
     #[test]
     fn full_queue_refuses_without_dropping_and_recovers() {
-        let mut queue = UnitQueue::new(QueueLimits {
+        let mut queue = UnitQueue::<()>::new(QueueLimits {
             units: 2,
             bytes: 10,
             unit_bytes: 8,
@@ -154,12 +163,38 @@ mod tests {
     }
 
     #[test]
+    fn different_lengths_and_resets_release_the_spare_and_restart_learning() {
+        let mut queue = UnitQueue::<()>::new(QueueLimits::VIDEO);
+        for len in [8, 4, 8, 4, 4, 6] {
+            queue.push(&[0; 8][..len], None).unwrap();
+        }
+        for expected_spare in [0, 0, 0, 0, 4, 0] {
+            let unit = queue.pop().unwrap();
+            assert!(queue.spare.is_none(), "release before the next decode");
+            queue.recycle(unit.data);
+            assert_eq!(queue.spare.as_ref().map_or(0, |s| s.len()), expected_spare);
+        }
+        queue.clear();
+        queue.push(&[0; 6], None).unwrap();
+        let unit = queue.pop().unwrap();
+        queue.recycle(unit.data);
+        assert!(
+            queue.spare.is_none(),
+            "the previous generation cannot warm this one"
+        );
+    }
+
+    #[test]
     fn same_size_feed_reuses_only_the_consumed_payload_and_preserves_byte_admission() {
-        let mut q = UnitQueue::new(QueueLimits {
+        let mut q = UnitQueue::<()>::new(QueueLimits {
             units: 3,
             bytes: 12,
             unit_bytes: 10,
         });
+        q.push(&[0; 8], None).unwrap();
+        let first = q.pop().unwrap();
+        q.recycle(first.data);
+        assert!(q.spare.is_none());
         q.push(&[1; 8], Some(1)).unwrap();
         q.push(&[2; 4], Some(2)).unwrap();
         let first = q.pop().unwrap();

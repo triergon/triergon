@@ -93,10 +93,11 @@ input).
   oversized units, and units fed after `end_of_stream`, are `FeedError::Invalid`;
   feeding with no decoder or after a failure is `FeedError::Idle`.
   A successful feed copies the borrowed payload once, so the caller can reuse its
-  input immediately. Each lane can reuse the last decoded payload allocation for
-  a unit of the same size. Queued payloads and this spare together fit the byte
-  limit. A differently sized accepted feed releases the spare before allocating,
-  and reset, decoder failure and end of stream release it.
+  input immediately. After two consecutive units decode at the same payload size,
+  the lane can reuse the second allocation for a matching feed. Queued payloads
+  and this spare together fit the byte limit. A differently sized accepted feed,
+  decoding the next queued unit, reset, decoder failure and end of stream release
+  an unused spare. Only audio queue entries carry sample trim metadata.
 - **Video timing.** Each picture keeps the PTS its access unit carried through
   decoder reordering. The session holds at most one converted picture ahead
   of the clock and publishes it when `clock_ns >= pts` (or immediately when

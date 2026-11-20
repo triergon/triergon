@@ -25,7 +25,7 @@ pub struct AudioSession {
     decoder: Option<Box<dyn AudioDecoder>>,
     /// Samples of the decoder's start delay not discarded yet.
     delay: usize,
-    queue: UnitQueue,
+    queue: UnitQueue<Discard>,
     frame: AudioFrame,
     downmix: Downmix,
     // Samples decoded at a new rate while the caller's block held another.
@@ -187,13 +187,17 @@ mod tests {
         lane.load(Some(audio_decoder(AudioCodec::Opus, head).unwrap()));
         lane.feed(&packet, None).unwrap();
         assert_eq!(lane.pull(None, 0, &mut block), 1);
+        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        lane.feed(&packet, None).unwrap();
+        assert_eq!(lane.pull(None, 0, &mut block), 1);
         assert_eq!(lane.state(), SessionState::Starved);
         assert_eq!(lane.queue.retained_payload_bytes(), packet.len());
         lane.stop();
         assert_eq!(lane.queue.retained_payload_bytes(), 0);
 
-        // Hold the invalid second packet behind its PTS so the spare and
-        // queued allocation are both live at the time the decoder fails.
+        // The invalid packet waits behind its PTS while the spare is live.
+        lane.feed(&packet, None).unwrap();
+        assert_eq!(lane.pull(None, 0, &mut block), 1);
         lane.feed(&packet, Some(0)).unwrap();
         lane.feed(&[0xff], Some(1)).unwrap();
         assert_eq!(lane.pull(Some(0), 0, &mut block), 1);
@@ -203,6 +207,8 @@ mod tests {
         assert_eq!(lane.queue.retained_payload_bytes(), 0);
 
         lane.stop();
+        lane.feed(&packet, None).unwrap();
+        assert_eq!(lane.pull(None, 0, &mut block), 1);
         lane.feed(&packet, Some(0)).unwrap();
         lane.feed(&packet, Some(1)).unwrap();
         assert_eq!(lane.pull(Some(0), 0, &mut block), 1);

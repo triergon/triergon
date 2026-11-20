@@ -28,7 +28,7 @@ struct Ahead {
 
 pub struct VideoSession {
     decoder: Option<Box<dyn VideoDecoder>>,
-    queue: UnitQueue,
+    queue: UnitQueue<()>,
     scaler: Scaler,
     ahead: Option<Ahead>,
     spare: Option<Vec<u8>>,
@@ -192,12 +192,17 @@ mod tests {
         let delimiter = [0, 0, 1, 9, 0xf0];
         lane.feed(&delimiter, None).unwrap();
         assert!(!lane.step(None));
+        assert_eq!(lane.queue.retained_payload_bytes(), 0);
+        lane.feed(&delimiter, None).unwrap();
+        assert!(!lane.step(None));
         assert_eq!(lane.state(), SessionState::Starved);
         assert_eq!(lane.queue.retained_payload_bytes(), delimiter.len());
         lane.flush();
         assert_eq!(lane.queue.retained_payload_bytes(), 0);
 
-        // The first send warms the spare before the truncated SPS fails.
+        // Warm the spare before the truncated SPS fails.
+        lane.feed(&delimiter, None).unwrap();
+        assert!(!lane.step(None));
         lane.feed(&delimiter, None).unwrap();
         lane.feed(&[0, 0, 1, 0x67], None).unwrap();
         assert!(!lane.step(None));
@@ -205,6 +210,8 @@ mod tests {
         assert_eq!(lane.queue.retained_payload_bytes(), 0);
 
         lane.flush();
+        lane.feed(&delimiter, None).unwrap();
+        assert!(!lane.step(None));
         lane.feed(&delimiter, None).unwrap();
         assert!(!lane.step(None));
         assert_eq!(lane.queue.retained_payload_bytes(), delimiter.len());
