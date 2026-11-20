@@ -184,6 +184,7 @@ dependencies = [
  "triergon",
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-core",
  "triergon-framing",
 ]
 
@@ -214,6 +215,7 @@ dependencies = [
  "triergon",
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-core",
  "triergon-framing",
 ]
 
@@ -230,6 +232,7 @@ name = "triergon-codec-opus"
 version = "0.0.0"
 dependencies = [
  "triergon",
+ "triergon-bitstream",
  "triergon-codec",
  "triergon-framing",
 ]
@@ -241,6 +244,7 @@ dependencies = [
  "triergon",
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-core",
  "triergon-framing",
 ]
 

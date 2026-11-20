@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 triergon-bitstream = { path = "../bitstream" }
 triergon-codec = { path = "../codec" }
+triergon-core = { path = "../core" }
 triergon-framing = { path = "../framing" }
 
 [dev-dependencies]
