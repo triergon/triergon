@@ -1,0 +1,9 @@
+{
+ "name": "gate-run-armv7-4b87991e-20261120-085417-shard-1",
+ "path": "gate-run-armv7-4b87991e-20261120-085417-shard-1",
+ "retention": "retained",
+ "reason": "AAC, AC-3, E-AC-3 and DTS core correctness on 32-bit ARMv7 at 4b87991e, including both initialized AAC float planes and the stereo output path.",
+ "key": "evidence/gate-runs/4b87991e95092f65e45b6b8f61804eea20f56c20-armv7-20261120-085417/shard-1/6d7e1ae1ea014a6cca46a88dc435be134203e00dbb6479b6298f847383efd238.tar.zst",
+ "sha256": "6d7e1ae1ea014a6cca46a88dc435be134203e00dbb6479b6298f847383efd238",
+ "bytes": 1181277
+}

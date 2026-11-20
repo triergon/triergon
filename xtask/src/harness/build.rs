@@ -793,7 +793,7 @@ const LIBASS: ProfileReference = ProfileReference {
     ..REFERENCE
 };
 
-const PROFILE_REFERENCES: [ProfileReference; 14] = [
+const PROFILE_REFERENCES: [ProfileReference; 15] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -876,6 +876,18 @@ const PROFILE_REFERENCES: [ProfileReference; 14] = [
             "libavutil",
         ],
         options: RELEASE_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: crate::codecs::INITIALIZED_AAC_REFERENCE,
+        source: "harness/reference_aac_pcm.c",
+        record: "ffmpeg-aac-initialized-pcm",
+        kind: "AAC floating-point correctness reference with zero-initialized planes",
+        libraries: "aac_initialized_pcm_reference",
+        packages: CONTAINER_PACKAGES,
+        options: RELEASE_OPTIONS,
+        instrumented: true,
         ..REFERENCE
     },
     ProfileReference {
