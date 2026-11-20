@@ -484,12 +484,21 @@ container parsing take place before that work.
 The [AC-3 encoder contract](../harness/features/ac3-encode/contract.json) uses
 the tone, broadband and attack PCM from the encoder's interoperability test.
 Put the 27 authored `.pcm` inputs from the comparison archive in
-`.research/ac3-encode-inputs`. The
-[manifest](../harness/features/ac3-encode/corpus.json) fixes each input's SHA-256.
-The two workers preload the input, then measure encoder construction, all 294
-frames, the packet and byte fold, and teardown. At 44.1 kHz the session covers
-complete frame-size cycles at every bitrate, giving both encoders the same
-total stream size.
+`.research/ac3-encode-inputs`, or generate them with the pinned FFmpeg program
+and an unused output directory:
+
+```sh
+TRIERGON_AC3_OUTPUT="$PWD/.research/ac3-encode-inputs" \
+  TRIERGON_FFMPEG="$PWD/.research/reference-decode/install/bin/ffmpeg" \
+  CARGO_INCREMENTAL=0 cargo test --locked --release -p triergon-codec-ac3 \
+  --features encode --test encoder ffmpeg_interoperability_and_signal_quality -- --ignored
+```
+
+The [manifest](../harness/features/ac3-encode/corpus.json) fixes each input's
+SHA-256. The two workers preload the input, then measure encoder construction,
+all 294 frames, the packet and byte fold, and teardown. At 44.1 kHz the session
+covers complete frame-size cycles at every bitrate, giving both encoders the
+same total stream size.
 
 With the pinned Matroska and decode reference builds prepared, build the
 encoder workers and run the diagnostic comparison on a gate target:
