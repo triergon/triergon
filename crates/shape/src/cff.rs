@@ -807,7 +807,7 @@ impl<'a> Run<'_, 'a, '_> {
     /// the charset; a code outside the encoding or a glyph the charset lacks
     /// fails.
     fn component(&mut self, code: f64) -> Step<&'a [u8]> {
-        let code = u8::try_from(code.trunc() as i64).map_err(|_| Fault::Glyph)?;
+        let code = u8::try_from(code as i32).map_err(|_| Fault::Glyph)?;
         let sid = standard_encoding_sid(code);
         let program = self.program;
         let charset = program.charset.as_ref().ok_or(Fault::Glyph)?;
