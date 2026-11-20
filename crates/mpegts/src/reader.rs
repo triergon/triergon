@@ -519,7 +519,7 @@ impl Reader {
     ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
         let result = if self.seek.is_empty() {
-            self.advance::<OBSERVING>(work, cancel, observe)
+            self.advance::<OBSERVING, false>(work, cancel, observe)
         } else {
             self.advance_seek(work, cancel)
         };
@@ -620,7 +620,7 @@ impl Reader {
             }
         }
     }
-    fn advance<const OBSERVING: bool>(
+    fn advance<const OBSERVING: bool, const SEEKING: bool>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -668,7 +668,11 @@ impl Reader {
                         self.phase = Phase::Publish;
                         continue;
                     }
-                    return Ok(Self::inline_source(self.raw.take().expect("inline source")));
+                    let raw = self.raw.take().expect("inline source");
+                    if SEEKING {
+                        continue;
+                    }
+                    return Ok(Self::inline_source(raw));
                 }
             }
             if self.pending.is_some() {
@@ -996,6 +1000,14 @@ impl Reader {
                         }
                         TraceEvent::Finished => self.finished = true,
                         _ => (),
+                    }
+                    if SEEKING
+                        && (!matches!(
+                            source.event(),
+                            TraceEvent::Pat(_) | TraceEvent::ProgramMap { .. }
+                        ) || !self.seek.as_slice()[0].publishes_tables())
+                    {
+                        continue;
                     }
                     return Ok(Step::Ready(Event::Other(ReaderEvent::Source(source))));
                 }

@@ -914,6 +914,8 @@ struct Build {
     origins: BuildOrigins,
     origin: usize,
     clock: Option<PacketClock>,
+    picture_epoch: Option<SourceEpochs>,
+    picture_anchor: Option<usize>,
     last_anchor: u64,
     retire: usize,
     recovered_adts_bytes: bool,
@@ -943,6 +945,8 @@ impl Build {
             origins: BuildOrigins::Ready(origins),
             origin: 0,
             clock: None,
+            picture_epoch: None,
+            picture_anchor: None,
             last_anchor,
             retire: 0,
             recovered_adts_bytes: false,
@@ -1539,6 +1543,86 @@ impl Lane {
         build
     }
 
+    fn probe_picture(
+        &mut self,
+        range: Range<u64>,
+        anchor_offset: u64,
+        (has_vcl, random_access): (bool, bool),
+        scan: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LaneStep> {
+        let build = self.build.as_mut().expect("pending picture");
+        let pieces = self.pieces.as_slice();
+        // Track the same source extent and anchor as a delivered packet without
+        // retaining PES owners or computing decode times for discarded pictures.
+        while let Some(piece) = pieces.get(build.origin) {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(LaneStep::Yield);
+            }
+            if piece.range.start < range.end
+                && range.start < piece.range.end
+                && build.picture_epoch.is_none()
+            {
+                build.picture_epoch = Some(piece.source.pes().epochs);
+            }
+            if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
+                build.picture_anchor = Some(build.origin);
+                build.last_anchor = piece.serial;
+            }
+            build.origin += 1;
+        }
+        while let Some(piece) = pieces.get(build.retire) {
+            if piece.range.end > range.end || piece.serial > build.last_anchor {
+                break;
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(LaneStep::Yield);
+            }
+            build.retire += 1;
+        }
+        if !work.try_charge(1) {
+            return Ok(LaneStep::Yield);
+        }
+        let epochs = build
+            .picture_epoch
+            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?;
+        let anchor = build.picture_anchor.map(|index| &pieces[index]);
+        let (ticks, time) = if scan
+            && has_vcl
+            && let Some(anchor) = anchor
+            && !anchor.clock.quarantined
+        {
+            let pts = anchor.source.pes().header.pts_raw33;
+            if self.limits.time_policy == SourceTimePolicy::RelativeEpochZero && !random_access {
+                // The validated raw PTS is sufficient for detecting a wrap.
+                (pts.map(i128::from), None)
+            } else if random_access {
+                let stamp = source_timestamp(pts, anchor.clock.key, self.limits.time_policy)?;
+                (stamp.ticks90, stamp.exact)
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        self.finish_build(range.end);
+        Ok(LaneStep::PictureProbe(PictureProbe {
+            offset: range.start,
+            epochs,
+            ticks,
+            time,
+            random_access,
+            has_vcl,
+        }))
+    }
+
     fn publish(
         &mut self,
         picture_delivery: PictureDelivery,
@@ -1547,16 +1631,22 @@ impl Lane {
     ) -> Result<LaneStep> {
         let build = self.build.as_mut().expect("pending publication");
         let (range, anchor_offset) = build.unit.range_and_anchor();
-        let probe = if let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
-            let probe_only = match picture_delivery {
-                PictureDelivery::Full => false,
-                PictureDelivery::Probe => true,
-                PictureDelivery::Landing(offset) => offset != range.start,
-            };
-            probe_only.then_some((unit.has_vcl, unit.random_access))
-        } else {
-            None
+        let probing = match picture_delivery {
+            PictureDelivery::Full => false,
+            PictureDelivery::Scan | PictureDelivery::Discard => true,
+            PictureDelivery::Landing(offset) => offset != range.start,
         };
+        if probing && let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
+            let flags = (unit.has_vcl, unit.random_access);
+            return self.probe_picture(
+                range,
+                anchor_offset,
+                flags,
+                matches!(picture_delivery, PictureDelivery::Scan),
+                work,
+                cancel,
+            );
+        }
         if let BuildOrigins::ReserveTable(count) = build.origins {
             if !work.try_charge(1) {
                 return Ok(LaneStep::Yield);
@@ -1565,7 +1655,7 @@ impl Lane {
             origins.try_reserve_exact(count)?;
             build.origins = BuildOrigins::Ready(PayloadSources::Table(origins));
         }
-        if probe.is_none() && !build.copy(work, cancel)? {
+        if !build.copy(work, cancel)? {
             return Ok(LaneStep::Yield);
         }
         let BuildOrigins::Ready(origins) = &mut build.origins else {
@@ -1645,16 +1735,6 @@ impl Lane {
             .pes
             .pes()
             .epochs;
-        if let Some((has_vcl, random_access)) = probe {
-            let build = self.finish_build(consumed_end);
-            return Ok(LaneStep::PictureProbe(PictureProbe {
-                offset: range.start,
-                epochs,
-                stamp: build.clock.map(|clock| clock.pts),
-                random_access,
-                has_vcl,
-            }));
-        }
         let (charge, duration) = match &build.unit {
             BuildUnit::Packet(unit) => {
                 (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)

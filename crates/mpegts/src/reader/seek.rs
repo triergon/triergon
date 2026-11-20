@@ -1,9 +1,6 @@
 //! Bounded source seeks in the exact presentation clock.
 use super::{Packet, Reader, ReaderEvent};
-use crate::{
-    SourceEpochs, TraceEvent,
-    clock::{SourceTimePolicy, SourceTimestamp},
-};
+use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
     CodecId, Event, PacketInfo, RandomAccess, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt,
@@ -43,14 +40,16 @@ pub(super) struct Seeking {
 #[derive(Clone, Copy)]
 pub(super) enum PictureDelivery {
     Full,
-    Probe,
+    Scan,
+    Discard,
     Landing(u64),
 }
 
 pub(super) struct PictureProbe {
     pub offset: u64,
     pub epochs: SourceEpochs,
-    pub stamp: Option<SourceTimestamp>,
+    pub ticks: Option<i128>,
+    pub time: Option<Time>,
     pub random_access: bool,
     pub has_vcl: bool,
 }
@@ -60,13 +59,17 @@ impl Seeking {
         matches!(self.phase, Phase::Scan(_)).then_some(self.request.track)
     }
 
+    pub(super) fn publishes_tables(&self) -> bool {
+        matches!(self.phase, Phase::Replay { .. })
+    }
+
     pub(super) fn picture_delivery(&self, track: TrackId) -> PictureDelivery {
         match self.phase {
-            Phase::Scan(_) => PictureDelivery::Probe,
+            Phase::Scan(_) => PictureDelivery::Scan,
             Phase::Replay { landing, .. } if track == self.request.track => {
                 PictureDelivery::Landing(landing.offset)
             }
-            Phase::Replay { .. } => PictureDelivery::Probe,
+            Phase::Replay { .. } => PictureDelivery::Discard,
             Phase::Deliver(_) => PictureDelivery::Full,
         }
     }
@@ -82,14 +85,15 @@ impl Scan {
         let PictureProbe {
             offset,
             epochs,
-            stamp,
+            ticks,
+            time,
             random_access,
             ..
         } = picture;
         if *self.epochs.get_or_insert(epochs) != epochs {
             return Err(Error::Unsupported("MPEG-TS seek across source epochs"));
         }
-        if let Some(ticks) = stamp.and_then(|pts| pts.ticks90)
+        if let Some(ticks) = ticks
             && let Some(previous) = self.previous.replace(ticks)
             && policy == SourceTimePolicy::RelativeEpochZero
             && ticks.abs_diff(previous) >= (crate::clock::PERIOD90 / 2) as u128
@@ -99,7 +103,7 @@ impl Scan {
             ));
         }
         if random_access {
-            let time = stamp.and_then(|pts| pts.exact).ok_or(Error::Unsupported(
+            let time = time.ok_or(Error::Unsupported(
                 "MPEG-TS seek point without a resolved PTS",
             ))?;
             if time <= target && self.landing.is_none_or(|old| time >= old.time) {
@@ -200,7 +204,7 @@ impl Reader {
                 self.seek = BudgetVec::new(&self.pool);
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
-            let step = self.advance::<true>(work, cancel, |_| ())?;
+            let step = self.advance::<true, true>(work, cancel, |_| ())?;
             match (&mut self.seek.as_mut_slice()[0].phase, step) {
                 (Phase::Scan(_), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track {
