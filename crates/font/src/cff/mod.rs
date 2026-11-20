@@ -400,7 +400,7 @@ impl Cff {
             match operator {
                 op::SUBRS => values.subrs = Some(operands[0].unsigned()),
                 op::VSINDEX => values.vsindex = operands[0].unsigned(),
-                op::BLUE_VALUES => hints.blue_values.set(operands.iter().map(fixed)),
+                op::BLUE_VALUES => hints.set_blue_values(operands.iter().map(fixed)),
                 op::OTHER_BLUES => hints.other_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_BLUES => hints.family_blues.set(operands.iter().map(fixed)),
                 op::FAMILY_OTHER_BLUES => {
