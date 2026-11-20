@@ -1,0 +1,9 @@
+{
+ "name": "flac-187-deb6105a-armv7",
+ "path": "flac-187-deb6105a-armv7",
+ "retention": "retained",
+ "reason": "Input hashes and per-file classifications for every one of the 187 FLAC packet, decoded PCM and stereo output comparisons, with worker and report identities.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/armv7/flac-corpus-tables/5b89fd0b6c25642da5aaa77b49989180665e09588fecbc54a6e3a8bc7b73a169.tar.zst",
+ "sha256": "5b89fd0b6c25642da5aaa77b49989180665e09588fecbc54a6e3a8bc7b73a169",
+ "bytes": 14195
+}
