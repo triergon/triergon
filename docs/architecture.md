@@ -128,8 +128,9 @@ performance gates where it touches hot code.
 
 1. **Formats.** The MPEG-TS access-unit reader implements `ContainerReader` and
    is available through `AnyReader`. Its [supported carriages](../crates/mpegts/README.md#access-units)
-   use format-owned track classification. Bounded AVC and HEVC seeking scans and
-   replays one seekable entity. Additional carriages and indexed seeking are open.
+   use format-owned track classification. Bounded AVC and HEVC seeking scans one
+   seekable entity and delivers original packets from the landing. Additional
+   carriages and indexed seeking are open.
 2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
