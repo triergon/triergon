@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "ts-program",
+  "runner": "cargo xtask report",
   "operation": "ts-native-program",
   "candidate": "playback-worker",
   "worker_operation": "ts-program-",

@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "mp4-range",
+  "runner": "cargo xtask report",
   "operation": "mp4-range-playback",
   "gate": "required",
   "candidate": "playback-worker",

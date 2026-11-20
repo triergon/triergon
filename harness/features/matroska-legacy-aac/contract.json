@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "id": "matroska-legacy-aac",
+  "runner": "cargo xtask report",
   "operation": "matroska-audio-clock",
   "candidate": "playback-matroska-worker",
   "worker_operation": "mkv-audio-",

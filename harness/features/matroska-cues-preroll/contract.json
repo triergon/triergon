@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "matroska-cues-preroll",
+  "runner": "cargo xtask report",
+  "corpus_directory": ".research/seek-fixtures",
   "operation": "container-seek-preroll-v1",
   "contract": [
     "bounded Cues/SeekHead lookup",

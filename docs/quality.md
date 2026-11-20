@@ -358,7 +358,7 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 | Family | Compared |
 |---|---|
-| Time | Exact rational arithmetic, rounding and overflow; signed extremes; 32-bit narrowing |
+| Time | `cargo xtask core-time` compares exact rational arithmetic, rounding, overflow, signed extremes and wide arithmetic against independent Python integer and Fraction results in debug and release builds. Workspace tests also cover 32-bit narrowing. |
 | Demux | Track identity and configuration; payload hashes in per-track decode order; signed PTS, DTS, duration and trim; random-access facts; side data, metadata, attachments and chapters |
 | Seek | Landing point, preceding random-access point, preroll and the packets that follow; fresh, repeated, backward and after-EOF seeks; missing indexes; changing input windows; cancellation |
 | Packet framing | Equivalent access units after documented framing normalisation; configuration and payload preserved |
@@ -776,10 +776,11 @@ AC-3, E-AC-3 and DTS, failing on any vector that fails and is not a listed open 
 a codec workload list's timing, a part of its memory (`codecs memory --part
 I/N`, every Nth workload), a capture case (`capture qualify --stage timing`, then
 `--stage memory` from its records under the kernel bound), the checked or the release
-tests, and the font, shaping, rasterising and ASS comparisons. Every registered feature
-is either one of them or named, in `xtask/src/gate.rs`, with the reason it is not gated
-(an on-demand or
-diagnostic feature); `cargo xtask gate plan` and `gate summary` fail on any other. Both
+tests, and the font, shaping, rasterising and ASS comparisons. A contract with
+`"runner": "cargo xtask report"` adds its feature to the plan. Its optional
+`corpus_directory` supplies the gate's `--corpus` argument. Specialized commands and
+on-demand or diagnostic exclusions are listed in `xtask/src/gate.rs`. The planner
+rejects a feature with no runner or exclusion. Both
 targets run every item. `cargo xtask gate plan --shards N`
 splits the items into N shards of about equal planning weight, each for its own host;
 the weights are the minutes each item took on a c6g.4xlarge, the more of the two

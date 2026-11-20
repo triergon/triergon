@@ -1,0 +1,80 @@
+{
+ "name": "gate-run-aarch64-97759e39-20261119-223513-shard-1",
+ "path": "gate-run-aarch64-97759e39-20261119-223513-shard-1",
+ "retention": "retained",
+ "reason": "Linux AArch64 subtitle worker parity, timing and kernel-bound memory on c6g.4xlarge.",
+ "key": "evidence/gate-runs/97759e39b2f02611b5d22ae39f97547303198cac-aarch64-20261119-223513/shard-1/876bd12f93e348403d04f8ce68c6a89f656cd9b9b42748c0b29b67f68e93d96b.tar.zst",
+ "sha256": "876bd12f93e348403d04f8ce68c6a89f656cd9b9b42748c0b29b67f68e93d96b",
+ "bytes": 47769457,
+ "results": [
+  {
+   "path": "memory/subtitle-pgs/gate-result.json",
+   "command": "report --memory",
+   "key": "bb86249ff7e423a090a1b52d7c83445bcfa104aa669d52aefbba261a911bc214",
+   "status": 0,
+   "report_sha256": "0f2e62ad6257a9daffd57953a9f87f2b82b922d4d180bcbc8059f6a26fb2659e",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "c69cfe445c1b5e0d9071f08721706175599bc045cc7b32f87d47c7ab66a5516c",
+   "status": 0,
+   "report_sha256": "4b0f03843c50ba324800b876a15a3b594433d97b9218368319663095251c9079",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "7fb0d6e81d2039248ebc46bbe982dc4365ceedc9adc134bd8315109a3efa2340",
+   "status": 0,
+   "report_sha256": "ee95c01efbc86b71b35c4a1e1eb7ccd6c0b15204c67323fa3fe898107393ad23",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs/gate-result.json",
+   "command": "report --benchmark",
+   "key": "dc0d32062cb8e0c6bf94bdf96edbaa4b961e7753b0ee060e44752ffcb225a37f",
+   "status": 0,
+   "report_sha256": "ff698bcb2ef260afef736cd090c94ec035feb7576bdcfb2d239451ad6fd7071a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "2a6793e2ee08a598177ae711f2cf7bd7be427224988c8f888f7c1b4c33e08c70",
+   "status": 0,
+   "report_sha256": "052284a8339a70fe393e8594d1b8215a29bdee49de8195cc8f2d6760f898bd59",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7577db3b408cdfc8659ef2c50e5bed0ca689c4ab64c996887182990f3bd99361",
+   "status": 0,
+   "report_sha256": "0a12af68eb2fae76636cd1f4717c162ba45edd1a90aeb11d836708afbc921366",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-pgs/gate-result.json",
+   "command": "grade",
+   "key": "f0bd39ecaab3c81340e720eca6305a61a36ff4bd91923cae692d85bf1bf8258a",
+   "status": 0,
+   "report_sha256": "ead9fbac03490c84186d0a3b111d445e45713bd3cd3fc677787381fb47fb9e34"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "81e5386406cdcf546aad57a4e39700c00ef87674d90a727db1c1cedef89e8804",
+   "status": 0,
+   "report_sha256": "bbebc832828218dc18e104db64306ebec4e2c94edc652df159109ab84feda0e1"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "d627bd3477ae4283a2e78a7087ebd4f7dcc749da03dc59ea1345077e14e6a727",
+   "status": 0,
+   "report_sha256": "e6aa1827cd6fd058b72b099085d66783f7a4a98ab2b5fdb4b696691e3219e4a1"
+  }
+ ]
+}

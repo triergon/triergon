@@ -101,5 +101,9 @@ identical output.
   direct matrix product, scans); `tests/conformance.rs` compares MD5s against
   `tests/ffmpeg_ref_md5.txt` when `.research/fate-samples/hevc-conformance/` is
   present (a subset by default, all with `HEVC_CONFORMANCE_FULL=1`) and skips otherwise.
-- Comparison scripts: [harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md).
-  Project-wide gates: [docs/quality.md](../../docs/quality.md).
+- `cargo xtask codecs compare-hevc` streams individual files through the planar
+  comparison used by `codecs grade`. An exact match requires both processes to exit
+  successfully with complete, identical frames. The first mismatch records the frame,
+  plane, sample and 64×64 luma region. [Command and report fields](../../harness/codecs/hevc/STATUS.md).
+- The manifest grade also compares the 1920×1080 RGBA output. If the planar decoder
+  refuses a declared feature, any RGBA output must still match in full. [Project-wide gates](../../docs/quality.md).

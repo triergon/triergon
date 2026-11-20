@@ -206,10 +206,15 @@ specification. Verification:
 - Integration tests in `tests/` cover ownership and charge accounting across
   clone, teardown, reset and cross-thread release; stale-token, foreign-pool and
   source-mismatch rejection; inline and owned windows; and clock boundary widths.
-- `python3 tools/test-core-time.py` (also part of `cargo xtask check`) runs an independent Python
-  `fractions.Fraction`/integer oracle against `examples/time-oracle.rs` in debug
-  and release profiles over a versioned corpus of exact-time and wide-arithmetic
-  cases.
+- `cargo xtask core-time` (also part of `cargo xtask check variants`) compares
+  every output row from `examples/time-oracle.rs` with independent Python
+  `fractions.Fraction` and integer expectations. Each of the debug and release
+  builds runs 34,502 time and 15,024 wide-arithmetic cases plus 1,280 time and
+  429 wide edge cases. The check verifies the input and expected-file SHA-256s.
+  `--toolchain NAME` selects the compiler and `--target TRIPLE` selects a
+  locally executable target. Each run under `.research/core-time-check/runs/`
+  retains the source snapshot, probes, outputs and a report with compiler and
+  Cargo artifact identities. Use `--output DIR` to choose the report directory.
 - Two `compile_fail` doctests on `OwnedInputBytes` prove produced storage
   cannot be turned back into caller input.
 - Container-model unit tests check exact packet time without fabricated values and

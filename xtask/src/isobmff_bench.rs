@@ -555,14 +555,14 @@ impl Suite {
     }
 }
 
-/// Resolve a gate part against the full registered ISO BMFF suite.
-pub(crate) fn full_part_selection(root: &Path, part: (usize, usize)) -> R<Vec<usize>> {
+/// The registered contract and its output indices assigned to this gate part.
+pub(crate) fn full_part_selection(root: &Path, part: (usize, usize)) -> R<(Value, Vec<usize>)> {
     let suite = Suite::load(root)?;
     let selection = suite.part(&suite.selection(false), part);
     if selection.is_empty() {
         return Err("ISO BMFF part has no physical operations".into());
     }
-    Ok(selection)
+    Ok((suite.contract, selection))
 }
 
 /// ISO BMFF harness inputs to include in the shared build's source bindings.

@@ -1,6 +1,8 @@
 {
   "schema": 1,
   "id": "hls-segments",
+  "runner": "cargo xtask report",
+  "corpus_directory": "harness/fixtures/hls",
   "operation": "hls-segment-feed",
   "candidate": "playback-worker",
   "worker_operation": "hls-",
