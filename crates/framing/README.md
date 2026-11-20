@@ -99,6 +99,14 @@ assert_eq!(decoder_input, [
 | DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
+With the DTS packet corpus in `TRIERGON_DTS_CORPUS` and the pinned `ffmpeg`
+and `ffprobe` on `PATH`, run
+`cargo test -p triergon-framing --test dts_packet_corpus -- --ignored`.
+The comparison uses the second audio stream of `dts.mp4`, `dts.mkv` and
+`dts.mov`, plus the FATE DTS-HD MA sample and its three remuxes in `fate-dts/`.
+It compares the 27 fields between inspectors. For every input packet, the
+reference filter supplies the expected core size and bytes.
+
 ## Behaviour and limits
 
 `AacAdtsCarrier::into_selected_frame` shares the original bytes of a complete,
@@ -181,7 +189,11 @@ descriptors are 16 bytes.
   from several slices when the first slice contains its header prefix.
 - DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
   resync, termination frames or DTS-HD extension parsing. HCRC is reported, not
-  checked.
+  checked. `DtsHeaderInspector` and `inspect_dts_header_bits` expose the raw
+  seven-bit NBLKS code once complete. Their `coded_window_samples` view is
+  `32 × (NBLKS + 1)` core samples per channel for codes 5 through 127.
+  `normal_window` additionally requires a normal frame, SHORT=31, a normal
+  block count (7, 15, 31, 63 or 127), a known sample rate and version 0–7.
 
 ## Conformance
 

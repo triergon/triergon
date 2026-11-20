@@ -1,0 +1,9 @@
+{
+ "name": "dts-historical-projections-9784a307-aarch64",
+ "path": "dts-historical-projections-9784a307-aarch64",
+ "retention": "retained",
+ "reason": "Both DTS header inspectors compared with FFmpeg 9.0.2 on Linux AArch64 at 9784a307. Includes the three authored containers and the FATE DTS-HD MA stream in raw, Matroska, MP4 and QuickTime forms.",
+ "key": "evidence/architecture-review-mwo5u537/4e1116ce01fc03abd86d26deccd38ae3b1434569/utility-dts/ff1adcc68ed11f0beb8386d0d927810a974de530b099e24067a61aea6b69df10.tar.gz",
+ "sha256": "ff1adcc68ed11f0beb8386d0d927810a974de530b099e24067a61aea6b69df10",
+ "bytes": 4208
+}
