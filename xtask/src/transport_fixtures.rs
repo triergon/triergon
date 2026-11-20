@@ -352,13 +352,31 @@ impl Transport {
         if !m2ts {
             return self.bytes;
         }
-        let mut out = Vec::new();
-        for (index, packet) in self.bytes.chunks_exact(188).enumerate() {
-            out.extend_from_slice(&(0x8000_0000 | index as u32).to_be_bytes());
-            out.extend_from_slice(packet);
-        }
-        out
+        wrap_m2ts(&self.bytes, |index| 0x8000_0000 | index)
     }
+}
+
+/// Give each whole transport packet the four-byte extra header of its carrier.
+fn wrap_m2ts(input: &[u8], header: impl Fn(u32) -> u32) -> Vec<u8> {
+    let mut output = Vec::with_capacity(input.len() / 188 * 192);
+    for (index, packet) in input.chunks_exact(188).enumerate() {
+        output.extend_from_slice(&header(index as u32).to_be_bytes());
+        output.extend_from_slice(packet);
+    }
+    output
+}
+
+/// Convert a TS188 fixture with 100 microseconds between packet arrivals.
+pub fn program_m2ts(source: &Path, target: &Path) -> R<()> {
+    let bytes = fs::read(source).map_err(|e| format!("{}: {e}", source.display()))?;
+    if bytes.is_empty() || !bytes.len().is_multiple_of(188) {
+        return Err("input is not whole TS188 packets".into());
+    }
+    if let Some(index) = bytes.chunks_exact(188).position(|packet| packet[0] != 0x47) {
+        return Err(format!("packet {index} has no sync byte"));
+    }
+    let output = wrap_m2ts(&bytes, |index| index.wrapping_mul(2700) & 0x3fff_ffff);
+    fs::write(target, output).map_err(|e| format!("{}: {e}", target.display()))
 }
 
 struct Codec {
@@ -1966,6 +1984,30 @@ mod tests {
         put(&mut data, "eof", Value::Bool(false)).unwrap();
         put(&mut observation, "data", data).unwrap();
         assert_ne!(observation_hash(&observation), first);
+    }
+
+    #[test]
+    fn program_carrier_preserves_packets_and_checks_sync_before_writing() {
+        let dir = crate::walk::scratch("program-carrier");
+        fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("input.ts");
+        let dst = dir.join("output.m2ts");
+        let mut input = vec![0x47; 376];
+        input[187] = 0xaf;
+        fs::write(&src, &input).unwrap();
+        program_m2ts(&src, &dst).unwrap();
+        let output = fs::read(&dst).unwrap();
+        assert_eq!(&output[..4], &[0; 4]);
+        assert_eq!(&output[4..192], &input[..188]);
+        assert_eq!(&output[192..196], &2700u32.to_be_bytes());
+        assert_eq!(&output[196..], &input[188..]);
+        input[188] = 0;
+        for invalid in [&input[..0], &input[..187], input.as_slice()] {
+            fs::write(&src, invalid).unwrap();
+            assert!(program_m2ts(&src, &dst).is_err());
+            assert_eq!(fs::read(&dst).unwrap(), output);
+        }
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
