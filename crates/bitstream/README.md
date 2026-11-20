@@ -35,7 +35,8 @@ assert!(reader.overrun());
 [`RiceReader::rice`] checks the exclusive bit limit for each code. A failed
 read leaves the reader at the start of that code. A decoder validating a whole
 partition can use [`RiceReader::rice_in_partition`] and call [`RiceReader::past_end`]
-once before accepting any of its values.
+once before accepting any of its values. On 32-bit targets, a code contained in the upper
+word of the cache can be extracted using a single machine word.
 
 ## Checked reads
 

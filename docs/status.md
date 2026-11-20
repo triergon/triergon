@@ -84,6 +84,13 @@ A gate run that [reuses](quality.md#reuse) a cited result changes no row: the ro
 the revision and set it was measured with, and the run's `gate-result.json` names that
 set as reused.
 
+On c6g.4xlarge, the two registered FLAC files were decoded at `0230c88e` and
+`3e3ba929` in 30 paired runs per target. For 16-bit stereo and 24-bit six-channel
+audio, respectively, median decode time on ARMv7 fell by 16.9% and 7.1%
+(upper time ratios 0.83128 and 0.92973). On AArch64 it rose by 0.34% and 0.20%
+(upper ratios 1.00387 and 1.00237). Every output digest matched. The file-codec
+rows above use FFmpeg as their reference.
+
 At `414b4cb5`, all 418 Matroska and linked playback cases pass on each c6g.4xlarge
 target, including HLS, MP4 forward and range, progressive TS188, raw Annex B and
 MPEG-TS program playback. Runtime uses paired timing and memory is kernel-bound.
@@ -969,6 +976,8 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
+| FLAC file decoding compared with `3e3ba929`, AArch64 Linux | `0230c88e4bb78677484d7b7d00a9c80e0be66d37` | [`b3320c7ff3c9d0fd3c9d6f665c7fa41499cf87992c4e12e41277907b4617a49a`](../harness/evidence/sets/flac-rice-0230c88e-aarch64.json) |
+| FLAC file decoding compared with `3e3ba929`, 32-bit ARMv7 Linux | `0230c88e4bb78677484d7b7d00a9c80e0be66d37` | [`06e9f4afbc18def659c6b3f58dedd095529deeeb557d5215986385b12364d567`](../harness/evidence/sets/flac-rice-0230c88e-armv7.json) |
 | Full gate run, Linux AArch64, shard 1 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`c83c3bf8dc9c9ea81ac8c6d9fe3404c110741c9615b062640a62b2a1ca5dd2f3`](../harness/evidence/sets/gate-run-aarch64-a73350ca-20261116-023216-shard-1.json) |
 | Full gate run, Linux AArch64, shard 2 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`a96d0fda576444bd936a5b163699bf55b31eda4e2858709712488f53ce669992`](../harness/evidence/sets/gate-run-aarch64-a73350ca-20261116-023216-shard-2.json) |
 | Full gate run, Linux AArch64, shard 3 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`1de5483e30e5160b7700d4f021921f08301694290ec9960765329c7635312fdb`](../harness/evidence/sets/gate-run-aarch64-a73350ca-20261116-023216-shard-3.json) |
