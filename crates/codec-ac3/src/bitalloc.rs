@@ -62,6 +62,13 @@ impl Default for BaCache {
     }
 }
 
+#[cfg(feature = "encode")]
+impl BaCache {
+    pub(crate) fn masks(&self) -> &[i32; 50] {
+        &self.mask
+    }
+}
+
 #[inline]
 fn logadd(a: i32, b: i32) -> i32 {
     let c = a - b;
@@ -246,11 +253,35 @@ pub(crate) fn stage_bap(
     bap: &mut [u8; 256],
 ) {
     let table: &[u8; 64] = if hebap { &HEBAPTAB } else { &BAPTAB };
-    visit_bap_bands(c, start, end, snroffset, floorcod, |at, psd, mask| {
-        for (b, &p) in bap[at..at + psd.len()].iter_mut().zip(psd) {
+    visit_bap_bands(&c.mask, start, end, snroffset, floorcod, |bins, mask| {
+        for (b, &p) in bap[bins.clone()].iter_mut().zip(&c.psd[bins]) {
             *b = table[bap_address(p, mask)];
         }
     });
+}
+
+/// AC-3 bit allocation from a retained masking curve and coded exponents.
+#[cfg(feature = "encode")]
+pub(crate) fn ac3_bap_from_exponents(
+    masks: &[i32; 50],
+    exponents: &[u8],
+    snroffset: i32,
+    floorcod: u8,
+    bap: &mut [u8; 256],
+) {
+    visit_bap_bands(
+        masks,
+        0,
+        exponents.len(),
+        snroffset,
+        floorcod,
+        |bins, mask| {
+            for (bap, &exponent) in bap[bins.clone()].iter_mut().zip(&exponents[bins]) {
+                let psd = ZERO_EXPONENT_PSD - (i32::from(exponent) << 7);
+                *bap = BAPTAB[bap_address(psd, mask)];
+            }
+        },
+    );
 }
 
 #[cfg(feature = "encode")]
@@ -371,19 +402,19 @@ impl Ac3BandExponents {
 
     pub(crate) fn cost(
         &self,
-        c: &BaCache,
+        masks: &[i32; 50],
         exponents: &[u8],
         snroffset: i32,
         costs: &Ac3BapCosts,
     ) -> u64 {
         let mut total = 0;
-        for (&exponent, &mask) in exponents.iter().take(SINGLE_BIN_BANDS).zip(&c.mask) {
+        for (&exponent, &mask) in exponents.iter().take(SINGLE_BIN_BANDS).zip(masks) {
             total += costs.at(costs.mask_index(mask, snroffset), exponent);
         }
         let mut counts = self.counts.as_slice();
         for (&length, &mask) in self.lengths[..self.bands]
             .iter()
-            .zip(&c.mask[SINGLE_BIN_BANDS..])
+            .zip(&masks[SINGLE_BIN_BANDS..])
         {
             let (band, rest) = counts.split_at(usize::from(length));
             counts = rest;
@@ -411,20 +442,20 @@ fn bap_address(psd: i32, mask: i32) -> usize {
 
 #[inline]
 fn visit_bap_bands(
-    c: &BaCache,
+    masks: &[i32; 50],
     start: usize,
     end: usize,
     snroffset: i32,
     floorcod: u8,
-    mut visit: impl FnMut(usize, &[i32], i32),
+    mut visit: impl FnMut(core::ops::Range<usize>, i32),
 ) {
     let floor = FLOORTAB[usize::from(floorcod)];
     let mut i = start;
     let mut j = MASKTAB[start] as usize;
     loop {
         let lastbin = (BNDTAB[j] as usize + BNDSZ[j] as usize).min(end);
-        let mask = shifted_mask(c.mask[j], snroffset, floor);
-        visit(i, &c.psd[i..lastbin], mask);
+        let mask = shifted_mask(masks[j], snroffset, floor);
+        visit(i..lastbin, mask);
         i = lastbin;
         j += 1;
         if end <= lastbin {

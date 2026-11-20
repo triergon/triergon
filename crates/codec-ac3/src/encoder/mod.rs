@@ -3,7 +3,8 @@
 mod syntax;
 
 use crate::bitalloc::{
-    Ac3BandExponents, BaCache, BaParams, Dba, MaskParams, stage_bap, stage_mask, stage_psd,
+    Ac3BandExponents, BaCache, BaParams, Dba, MaskParams, ac3_bap_from_exponents, stage_mask,
+    stage_psd,
 };
 use crate::header::{BITRATE_KBPS, SAMPLE_RATES, ac3_frame_words};
 use crate::imdct::analysis::Analysis;
@@ -13,7 +14,6 @@ use syntax::{BAP_COSTS, Bits, Mantissas, mantissa_bits};
 const BLOCK: usize = 256;
 const BLOCKS: usize = 6;
 const CHANNELS: usize = 6;
-const GROUPS: usize = BLOCKS / 2;
 const MIN_FULL_BINS: usize = 73;
 const MAX_FULL_BINS: usize = 253;
 const LFE_BINS: usize = 7;
@@ -114,21 +114,21 @@ impl core::fmt::Display for EncodeError {
 impl std::error::Error for EncodeError {}
 
 #[derive(Debug)]
-struct Pair {
+struct ExponentSet {
     ends: [usize; CHANNELS],
     repeats: [usize; CHANNELS],
     exponents: [[u8; BLOCK]; CHANNELS],
-    masks: [BaCache; CHANNELS],
+    masks: [[i32; 50]; CHANNELS],
     band_exponents: [Ac3BandExponents; CHANNELS],
 }
 
-impl Default for Pair {
+impl Default for ExponentSet {
     fn default() -> Self {
         Self {
             ends: [0; CHANNELS],
             repeats: [1; CHANNELS],
             exponents: [[0; BLOCK]; CHANNELS],
-            masks: core::array::from_fn(|_| BaCache::default()),
+            masks: [[0; 50]; CHANNELS],
             band_exponents: core::array::from_fn(|_| Ac3BandExponents::default()),
         }
     }
@@ -137,7 +137,8 @@ impl Default for Pair {
 #[derive(Debug)]
 struct Work {
     spectra: Box<[[f32; BLOCK]]>,
-    pairs: [Pair; GROUPS],
+    sets: [ExponentSet; BLOCKS],
+    mask_scratch: BaCache,
     bap: [[u8; BLOCK]; CHANNELS],
 }
 
@@ -186,7 +187,8 @@ impl Encoder {
             analysis: Analysis::new(),
             work: Box::new(Work {
                 spectra: vec![[0.0; BLOCK]; BLOCKS * mode.coded_order().len()].into_boxed_slice(),
-                pairs: core::array::from_fn(|_| Pair::default()),
+                sets: core::array::from_fn(|_| ExponentSet::default()),
+                mask_scratch: BaCache::default(),
                 bap: [[0; BLOCK]; CHANNELS],
             }),
         })
@@ -233,13 +235,16 @@ impl Encoder {
 
         let Work {
             spectra,
-            pairs,
+            sets,
+            mask_scratch,
             bap,
         } = self.work.as_mut();
         let mode = self.mode;
         let channels = order.len();
-        let mut switches = [false; BLOCKS];
-        for (block, (spectra, short)) in spectra
+        let full_channels = mode.full_channels();
+        let mut switches = [0_u8; BLOCKS];
+        let mut boundaries = [false; BLOCKS];
+        for (block, (spectra, switch_mask)) in spectra
             .chunks_exact_mut(channels)
             .zip(&mut switches)
             .enumerate()
@@ -254,51 +259,67 @@ impl Encoder {
                 };
                 (previous, &plane[at..at + BLOCK])
             };
-            // Use one transition for the full-bandwidth channels so decoders retain
-            // their independent overlap history. The LFE transform is always long.
-            *short = order[..mode.full_channels()]
-                .iter()
-                .enumerate()
-                .any(|(coded, &ch)| {
-                    if silent[ch][block] {
-                        return false;
-                    }
-                    let (previous, next) = pcm(coded, ch);
-                    let history = (self.started || block != 0).then_some(previous);
-                    has_attack(history, next)
-                });
             for (coded, &ch) in order.iter().enumerate() {
                 let previous_silent = if block == 0 {
                     self.previous_silent[coded]
                 } else {
                     silent[ch][block - 1]
                 };
-                if previous_silent && silent[ch][block] {
+                let next_silent = silent[ch][block];
+                if previous_silent && next_silent {
                     spectra[coded].fill(0.0);
                     continue;
                 }
                 let (previous, next) = pcm(coded, ch);
-                if *short && !mode.is_lfe(coded) {
+                let lfe = mode.is_lfe(coded);
+                let boundary = !lfe && previous_silent != next_silent;
+                boundaries[block] |= boundary;
+                let history = (self.started || block != 0).then_some(previous);
+                if !lfe && (boundary || has_attack(history, next)) {
+                    // One block-switch bit per full-bandwidth channel (A/52:2018 5.4.3.1).
+                    *switch_mask |= 1 << (full_channels - coded - 1);
                     self.analysis.short(previous, next, &mut spectra[coded]);
                 } else {
                     self.analysis.long(previous, next, &mut spectra[coded]);
                 }
             }
         }
-        for (pair, spectra) in pairs.iter_mut().zip(spectra.chunks_exact(2 * channels)) {
-            let (first, second) = spectra.split_at(channels);
-            pair.prepare(mode, self.fscod, first, second)?;
+        let mut blocks_per_set = [0; BLOCKS];
+        let mut set_for_block = [0; BLOCKS];
+        let mut block = 0;
+        let mut set_count = 0;
+        while block < BLOCKS {
+            let first = &spectra[block * channels..(block + 1) * channels];
+            let second_block = block + 1;
+            // A fresh exponent set preserves the spectral envelope at a transform
+            // change or a boundary with silence (A/52:2018 8.2.8).
+            let share = second_block < BLOCKS
+                && switches[block] == switches[second_block]
+                && !boundaries[block]
+                && !boundaries[second_block];
+            let second = if share {
+                &spectra[second_block * channels..(second_block + 1) * channels]
+            } else {
+                first
+            };
+            sets[set_count].prepare(mode, self.fscod, first, second, mask_scratch)?;
+            blocks_per_set[set_count] = 1 + usize::from(share);
+            set_for_block[block..block + blocks_per_set[set_count]].fill(set_count);
+            block += blocks_per_set[set_count];
+            set_count += 1;
         }
         let mut fixed = Bits::count();
         syntax::header(&mut fixed, self.fscod, size_code, mode);
         for (block, &short) in switches.iter().enumerate() {
-            syntax::block(&mut fixed, mode, block, short, 0, &pairs[block / 2]);
+            let group = set_for_block[block];
+            let fresh = block == 0 || group != set_for_block[block - 1];
+            syntax::block(&mut fixed, mode, block, short, 0, &sets[group], fresh);
         }
         // Two zero flag bits (auxdatae and crcrsv) precede the final CRC word.
         let available = (bytes * 8)
             .checked_sub(fixed.position() + 18)
             .ok_or(EncodeError::BitAllocation)?;
-        let snr = select_snr(pairs, available);
+        let snr = select_snr(&sets[..set_count], &blocks_per_set, available);
 
         output.fill(0);
         let mut bits = Bits::write_to(output);
@@ -306,17 +327,19 @@ impl Encoder {
         for (index, (coefficients, short)) in
             spectra.chunks_exact(channels).zip(switches).enumerate()
         {
-            let pair = &pairs[index / 2];
-            syntax::block(&mut bits, mode, index, short, snr, pair);
-            if index.is_multiple_of(2) {
-                pair.allocate(snr, bap);
+            let group = set_for_block[index];
+            let fresh = index == 0 || group != set_for_block[index - 1];
+            let set = &sets[group];
+            syntax::block(&mut bits, mode, index, short, snr, set, fresh);
+            if fresh {
+                set.allocate(snr, bap);
             }
             let mut mantissas = Mantissas::default();
             for (ch, channel_coefficients) in coefficients.iter().enumerate() {
-                let codes = &bap[ch][..pair.ends[ch]];
+                let codes = &bap[ch][..set.ends[ch]];
                 for ((&coefficient, &exponent), &code) in channel_coefficients
                     .iter()
-                    .zip(&pair.exponents[ch])
+                    .zip(&set.exponents[ch])
                     .zip(codes)
                 {
                     if code != 0 {
@@ -375,13 +398,14 @@ fn has_attack(previous: Option<&[f32]>, next: &[f32]) -> bool {
     false
 }
 
-impl Pair {
+impl ExponentSet {
     fn prepare(
         &mut self,
         mode: ChannelMode,
         fscod: u8,
         first: &[[f32; BLOCK]],
         second: &[[f32; BLOCK]],
+        mask_scratch: &mut BaCache,
     ) -> Result<(), EncodeError> {
         for (ch, (first, second)) in first.iter().zip(second).enumerate() {
             let lfe = mode.is_lfe(ch);
@@ -390,16 +414,16 @@ impl Pair {
             } else {
                 full_bandwidth(first, second)
             };
-            self.ends[ch] = end;
             let group = if lfe || end <= MAX_FULL_BINS / 2 {
                 1
             } else {
                 2
             };
+            self.ends[ch] = end;
             self.repeats[ch] = group;
             let exponents = &mut self.exponents[ch];
-            // Shared exponents for two blocks. Fit the peak of each frequency group,
-            // then limit both directions so every differential is representable.
+            // Fit the peak from every block that uses this set. Limit the changes
+            // in both directions so each exponent differential is representable.
             let peak = |bin: usize| first[bin].abs().max(second[bin].abs());
             exponents[0] = exponent(peak(0)).min(15);
             for bin in (1..end).step_by(group) {
@@ -417,8 +441,7 @@ impl Pair {
                 let value = exponents[bin].min(exponents[bin - 1] + 2);
                 exponents[bin..bin + group].fill(value);
             }
-            let mask = &mut self.masks[ch];
-            stage_psd(exponents, 0, end, mask).map_err(|_| EncodeError::BitAllocation)?;
+            stage_psd(exponents, 0, end, mask_scratch).map_err(|_| EncodeError::BitAllocation)?;
             let params = MaskParams {
                 start: 0,
                 end,
@@ -429,7 +452,8 @@ impl Pair {
                 cpl_leak: None,
                 dba: &Dba::default(),
             };
-            stage_mask(&params, mask).map_err(|_| EncodeError::BitAllocation)?;
+            stage_mask(&params, mask_scratch).map_err(|_| EncodeError::BitAllocation)?;
+            self.masks[ch] = *mask_scratch.masks();
             self.band_exponents[ch].prepare(exponents, end);
         }
         Ok(())
@@ -443,13 +467,11 @@ impl Pair {
             if snr == 0 {
                 output[..end].fill(0);
             } else {
-                stage_bap(
+                ac3_bap_from_exponents(
                     &self.masks[ch],
-                    0,
-                    end,
+                    &self.exponents[ch][..end],
                     snr_offset(snr),
                     PARAMS.floorcod,
-                    false,
                     output,
                 );
             }
@@ -502,14 +524,14 @@ fn exponent(peak: f32) -> u8 {
     (126 - binary_exponent).clamp(0, 24) as u8
 }
 
-fn select_snr(pairs: &[Pair; GROUPS], available: usize) -> u16 {
+fn select_snr(sets: &[ExponentSet], blocks_per_set: &[usize; BLOCKS], available: usize) -> u16 {
     let mut accepted = 0;
     let mut rejected = 1024;
     while rejected - accepted > 1 {
         let trial = (accepted + rejected) / 2;
         let mut used = 0;
-        for pair in pairs {
-            used += 2 * pair.mantissa_bits(trial);
+        for (pair, &count) in sets.iter().zip(blocks_per_set) {
+            used += count * pair.mantissa_bits(trial);
             if used > available {
                 break;
             }
@@ -539,9 +561,15 @@ mod tests {
         };
         let first = coefficients(0);
         let second = coefficients(13);
-        let mut pair = Pair::default();
-        pair.prepare(ChannelMode::Surround51, 0, &first, &second)
-            .expect("allocation parameters");
+        let mut pair = ExponentSet::default();
+        pair.prepare(
+            ChannelMode::Surround51,
+            0,
+            &first,
+            &second,
+            &mut BaCache::default(),
+        )
+        .expect("allocation parameters");
         let mut bap = [[0; BLOCK]; CHANNELS];
         for snr in 1..1024 {
             pair.allocate(snr, &mut bap);
@@ -550,6 +578,29 @@ mod tests {
                 syntax::allocated_mantissa_bits(&pair.ends, &bap)
             );
         }
+    }
+
+    #[test]
+    fn silence_boundary_switches_each_channel_independently() {
+        let mode = ChannelMode::Stereo;
+        let steady = [0.25_f32; SAMPLES_PER_FRAME];
+        let silence = [0.0; SAMPLES_PER_FRAME];
+        let mut encoder = Encoder::new(48_000, mode).expect("48 kHz stereo");
+        let mut syncframe = [0; MAX_FRAME_BYTES];
+        encoder
+            .encode(&[&steady, &steady], &mut syncframe)
+            .expect("steady frame");
+        encoder
+            .encode(&[&silence, &steady], &mut syncframe)
+            .expect("one channel becomes silent");
+
+        let mut header = Bits::count();
+        syntax::header(&mut header, encoder.fscod, encoder.size_code, mode);
+        let flag = |channel| {
+            let at = header.position() + channel;
+            (syncframe[at / 8] >> (7 - at % 8)) & 1
+        };
+        assert_eq!([flag(0), flag(1)], [1, 0]);
     }
 
     #[test]

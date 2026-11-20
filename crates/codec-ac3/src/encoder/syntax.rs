@@ -1,7 +1,8 @@
 //! Syncframe syntax (A/52:2018 5.3), mantissas (7.3) and CRCs (7.10.1).
 
 use super::{
-    BLOCK, CHANNELS, ChannelMode, LFE_BINS, MAX_FRAME_BYTES, MIN_FULL_BINS, PARAMS, Pair, fast_gain,
+    BLOCK, CHANNELS, ChannelMode, ExponentSet, LFE_BINS, MAX_FRAME_BYTES, MIN_FULL_BINS, PARAMS,
+    fast_gain,
 };
 use crate::bitalloc::Ac3BapCosts;
 use crate::crc16;
@@ -79,16 +80,16 @@ pub(super) fn block(
     bits: &mut Bits<'_>,
     mode: ChannelMode,
     block: usize,
-    short: bool,
+    short_channels: u8,
     snr: u16,
-    pair: &Pair,
+    set: &ExponentSet,
+    update: bool,
 ) {
     let channels = mode.coded_order().len();
     let lfe = mode == ChannelMode::Surround51;
     let full = mode.full_channels();
     let first = block == 0;
-    let update = block.is_multiple_of(2);
-    bits.put(if short { (1 << full) - 1 } else { 0 }, full);
+    bits.put(u32::from(short_channels), full);
     bits.put(0, full + 1); // no dither or dynamic range word
     bits.put(u32::from(first), 1); // coupling strategy
     if first {
@@ -100,7 +101,7 @@ pub(super) fn block(
             bits.put(0, 4); // no stereo rematrixing
         }
     }
-    for &repeat in &pair.repeats[..full] {
+    for &repeat in &set.repeats[..full] {
         bits.put(
             if update {
                 repeat.trailing_zeros() + 1
@@ -114,14 +115,14 @@ pub(super) fn block(
         bits.put(u32::from(update), 1);
     }
     if update {
-        for &end in &pair.ends[..full] {
+        for &end in &set.ends[..full] {
             bits.put(((end - MIN_FULL_BINS) / 3) as u32, 6);
         }
         for ch in 0..channels {
-            let exp = &pair.exponents[ch];
-            let end = pair.ends[ch];
+            let exp = &set.exponents[ch];
+            let end = set.ends[ch];
             let is_lfe = end == LFE_BINS;
-            let step = pair.repeats[ch];
+            let step = set.repeats[ch];
             bits.put(u32::from(exp[0]), 4);
             let groups = exp[1..end].chunks_exact(3 * step);
             if bits.data.is_none() {
