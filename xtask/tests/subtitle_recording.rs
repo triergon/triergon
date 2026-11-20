@@ -26,6 +26,8 @@ impl Fixture {
 set -eu
 if [ -p reference-entered ]; then
     exec 3>reference-entered
+    IFS= read -r cancel <cancel-writer
+    kill -KILL "$PPID"
     IFS= read -r release <reference-release
     exit 0
 fi
@@ -144,7 +146,7 @@ fn live_writer_excludes_a_competitor_and_process_exit_releases_the_lock() {
     assert!(
         Command::new("mkfifo")
             .current_dir(&f.0)
-            .args(["reference-entered", "reference-release"])
+            .args(["reference-entered", "cancel-writer", "reference-release"])
             .status()
             .unwrap()
             .success()
@@ -161,8 +163,15 @@ fn live_writer_excludes_a_competitor_and_process_exit_releases_the_lock() {
         .start("record", "subtitle-dvb")
         .wait_with_output()
         .unwrap();
-    first.kill().unwrap();
-    let stopped = first.wait().unwrap();
+    // With Cargo's Linux library path, xtask launches a child and waits for
+    // it. The reference's parent is the recorder in both launch modes.
+    let cancel = f.0.join("cancel-writer");
+    let stopped = synchronized(move || {
+        fs::write(cancel, b"cancel\n")?;
+        first.wait()
+    })
+    .expect("recorder did not exit")
+    .unwrap();
 
     // Wait on the same inode while the orphaned reference is still alive.
     let path = f.0.join("pins.json.record-lock");
