@@ -1,0 +1,9 @@
+{
+ "name": "ac3-encode-98af9a96-armv7",
+ "path": "ac3-encode-98af9a96-armv7",
+ "retention": "retained",
+ "reason": "At 98af9a96, 27 AC-3 encoding sessions on 32-bit ARMv7 with strict CRC decoding and 30 paired runtime and kernel-bound memory observations per case.",
+ "key": "evidence/ac3-encoding/98af9a9625df7b0379062da9203c88bdaee6b158/linux-armv7/8f8a690e3e70abe31226ba7fa3c0a66c63df443c829e82912e324f177d5f6cc9.tar.zst",
+ "sha256": "8f8a690e3e70abe31226ba7fa3c0a66c63df443c829e82912e324f177d5f6cc9",
+ "bytes": 10815592
+}
