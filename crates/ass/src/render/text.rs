@@ -251,10 +251,19 @@ impl Text {
         self.chars.clear();
         self.styles.clear();
         let mut last_effect = None;
+        let mut last_font = None;
         while let Some(glyph) = context.next_glyph()? {
             let desc = glyph.state.font();
-            let Some(font) = library.font(&desc, work)? else {
-                return Ok(None);
+            // The first request for this description already marked it used in this frame.
+            let font = match last_font {
+                Some((last, font)) if last == desc => font,
+                _ => {
+                    let Some(font) = library.font(&desc, work)? else {
+                        return Ok(None);
+                    };
+                    last_font = Some((desc, font));
+                    font
+                }
             };
             let (symbol, drawing) = drawing(&glyph);
             let decorations = Decorations {

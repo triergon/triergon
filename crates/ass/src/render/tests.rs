@@ -130,3 +130,54 @@ fn a_shifted_background_keeps_one_row_and_checks_the_full_bitmap_limit() {
         Err(Error::Limit { .. })
     ));
 }
+
+#[test]
+fn consecutive_glyphs_follow_each_change_of_font_description() {
+    let budget = Budget::new(32 << 20).unwrap();
+    let (_, font_data) =
+        include_str!("../../../../harness/fixtures/ass-render/decorations-orientation.ass")
+            .split_once("[Fonts]")
+            .unwrap();
+    let text = format!(
+        "[Script Info]\nScriptType: v4.00+\nPlayResX: 320\nPlayResY: 320\n\
+         [V4+ Styles]\nFormat: Name, Fontname, Fontsize, Bold, Italic\n\
+         Style: Default,Triergon Orientation,20,0,0\n\
+         [Events]\nFormat: Layer, Start, End, Style, Text\n\
+         Dialogue: 0,0:00:00.00,0:00:01.00,Default,AA{{\\b1}}AA{{\\i1}}AA{{\\fn@Triergon Orientation}}AA{{\\fnOther}}AA{{\\r}}AA\n\
+         [Fonts]{font_data}"
+    );
+    let mut script = Script::parse(
+        &budget,
+        text.as_bytes(),
+        &Options {
+            extract_fonts: true,
+            ..Options::default()
+        },
+    )
+    .unwrap();
+    let fonts = Fonts {
+        default_family: Some(b"Triergon Orientation".to_vec()),
+        ..Fonts::default()
+    };
+    let mut renderer = Renderer::new(&budget, &Settings::new(Size::new(320, 320)), &fonts).unwrap();
+    renderer.render(&mut script, 0).unwrap();
+    let expected = [
+        ("Triergon Orientation", 400, 0, false),
+        ("Triergon Orientation", 700, 0, false),
+        ("Triergon Orientation", 700, 100, false),
+        ("Triergon Orientation", 700, 100, true),
+        ("Other", 700, 100, false),
+        ("Triergon Orientation", 400, 0, false),
+    ];
+    let chars = renderer.pipeline.text.chars();
+    assert_eq!(chars.len(), 2 * expected.len());
+    for (pair, (family, weight, slant, vertical)) in chars.chunks_exact(2).zip(expected) {
+        assert_eq!(pair[0].font, pair[1].font);
+        let font = renderer.pipeline.library.get(pair[0].font);
+        assert_eq!(
+            (font.family(), font.weight(), font.slant(), font.vertical()),
+            (family.as_bytes(), weight, slant, vertical)
+        );
+    }
+    assert_eq!(chars[0].font, chars[10].font);
+}
