@@ -1,8 +1,8 @@
 //! Syncframe syntax (A/52:2018 5.3), mantissas (7.3) and CRCs (7.10.1).
 
 use super::{
-    BLOCK, CHANNELS, ChannelMode, ExponentSet, LFE_BINS, MAX_FRAME_BYTES, MIN_FULL_BINS, PARAMS,
-    fast_gain,
+    Allocation, BLOCK, CHANNELS, ChannelMode, ExponentSet, LFE_BINS, MAX_FRAME_BYTES,
+    MIN_FULL_BINS, PARAMS, fast_gain,
 };
 use crate::bitalloc::Ac3BapCosts;
 use crate::crc16;
@@ -81,7 +81,7 @@ pub(super) fn block(
     mode: ChannelMode,
     block: usize,
     short_channels: u8,
-    snr: u16,
+    Allocation { snr, floor }: Allocation,
     set: &ExponentSet,
     update: bool,
 ) {
@@ -150,7 +150,7 @@ pub(super) fn block(
         bits.put(u32::from(PARAMS.fdcycod), 2);
         bits.put(u32::from(PARAMS.sgaincod), 2);
         bits.put(u32::from(PARAMS.dbpbcod), 2);
-        bits.put(u32::from(PARAMS.floorcod), 3);
+        bits.put(u32::from(floor), 3);
     }
     bits.put(u32::from(first), 1); // SNR offsets
     if first {
@@ -184,14 +184,14 @@ const COSTS: [u64; 16] = {
     costs
 };
 
-pub(super) const BAP_COSTS: Ac3BapCosts = {
+pub(super) static BAP_COSTS: Ac3BapCosts = {
     let mut table = [0; 64];
     let mut address = 0;
     while address < table.len() {
         table[address] = COSTS[BAPTAB[address] as usize];
         address += 1;
     }
-    Ac3BapCosts::new(&table, PARAMS.floorcod)
+    Ac3BapCosts::new(&table)
 };
 
 pub(super) fn mantissa_bits(sum: u64) -> usize {

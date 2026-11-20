@@ -3,8 +3,8 @@
 mod syntax;
 
 use crate::bitalloc::{
-    Ac3BandExponents, BaCache, BaParams, Dba, MaskParams, ac3_bap_from_exponents, stage_mask,
-    stage_psd,
+    Ac3BandExponents, BaCache, BaParams, Dba, MAX_AC3_EXPONENT, MaskParams, ac3_bap_from_exponents,
+    stage_mask, stage_psd,
 };
 use crate::header::{BITRATE_KBPS, SAMPLE_RATES, ac3_frame_words};
 use crate::imdct::analysis::Analysis;
@@ -17,6 +17,8 @@ const CHANNELS: usize = 6;
 const MIN_FULL_BINS: usize = 73;
 const MAX_FULL_BINS: usize = 253;
 const LFE_BINS: usize = 7;
+const MAX_SNR: u16 = 1023;
+const LOWEST_FLOOR_CODE: u8 = 7;
 const PARAMS: BaParams = BaParams {
     sdcycod: 2,
     fdcycod: 1,
@@ -112,6 +114,12 @@ impl core::fmt::Display for EncodeError {
 }
 
 impl std::error::Error for EncodeError {}
+
+#[derive(Clone, Copy)]
+struct Allocation {
+    snr: u16,
+    floor: u8,
+}
 
 #[derive(Debug)]
 struct ExponentSet {
@@ -278,7 +286,11 @@ impl Encoder {
                 if !lfe && (boundary || has_attack(history, next)) {
                     // One block-switch bit per full-bandwidth channel (A/52:2018 5.4.3.1).
                     *switch_mask |= 1 << (full_channels - coded - 1);
-                    self.analysis.short(previous, next, &mut spectra[coded]);
+                    self.analysis.short(
+                        (!previous_silent).then_some(previous),
+                        (!next_silent).then_some(next),
+                        &mut spectra[coded],
+                    );
                 } else {
                     self.analysis.long(previous, next, &mut spectra[coded]);
                 }
@@ -305,18 +317,36 @@ impl Encoder {
             block += blocks_per_set[set_count];
             set_count += 1;
         }
+        let empty_allocation = Allocation {
+            snr: 0,
+            floor: PARAMS.floorcod,
+        };
         let mut fixed = Bits::count();
         syntax::header(&mut fixed, self.fscod, size_code, mode);
         for (block, &short) in switches.iter().enumerate() {
             let group = set_for_block[block];
             let fresh = block == 0 || group != set_for_block[block - 1];
-            syntax::block(&mut fixed, mode, block, short, 0, &sets[group], fresh);
+            syntax::block(
+                &mut fixed,
+                mode,
+                block,
+                short,
+                empty_allocation,
+                &sets[group],
+                fresh,
+            );
         }
         // Two zero flag bits (auxdatae and crcrsv) precede the final CRC word.
         let available = (bytes * 8)
             .checked_sub(fixed.position() + 18)
             .ok_or(EncodeError::BitAllocation)?;
-        let snr = select_snr(&sets[..set_count], &blocks_per_set, available);
+        let silent_frame = self.previous_silent[..channels].iter().all(|&quiet| quiet)
+            && silent[..channels].iter().flatten().all(|&quiet| quiet);
+        let allocation = if silent_frame {
+            empty_allocation
+        } else {
+            select_allocation(&sets[..set_count], &blocks_per_set, available)
+        };
 
         output.fill(0);
         let mut bits = Bits::write_to(output);
@@ -327,9 +357,12 @@ impl Encoder {
             let group = set_for_block[index];
             let fresh = index == 0 || group != set_for_block[index - 1];
             let set = &sets[group];
-            syntax::block(&mut bits, mode, index, short, snr, set, fresh);
+            syntax::block(&mut bits, mode, index, short, allocation, set, fresh);
+            if allocation.snr == 0 {
+                continue;
+            }
             if fresh {
-                set.allocate(snr, bap);
+                set.allocate(allocation, bap);
             }
             let mut mantissas = Mantissas::default();
             for (ch, channel_coefficients) in coefficients.iter().enumerate() {
@@ -466,7 +499,7 @@ impl ExponentSet {
         Ok(())
     }
 
-    fn allocate(&self, snr: u16, bap: &mut [[u8; BLOCK]; CHANNELS]) {
+    fn allocate(&self, Allocation { snr, floor }: Allocation, bap: &mut [[u8; BLOCK]; CHANNELS]) {
         for (ch, (output, &end)) in bap.iter_mut().zip(&self.ends).enumerate() {
             if end == 0 {
                 break;
@@ -478,22 +511,27 @@ impl ExponentSet {
                     &self.masks[ch],
                     &self.exponents[ch][..end],
                     snr_offset(snr),
-                    PARAMS.floorcod,
+                    floor,
                     output,
                 );
             }
         }
     }
 
-    fn mantissa_bits(&self, snr: u16) -> usize {
+    fn mantissa_bits(&self, Allocation { snr, floor }: Allocation) -> usize {
         let offset = snr_offset(snr);
         let mut cost = 0;
         for (ch, (&end, mask)) in self.ends.iter().zip(&self.masks).enumerate() {
             if end == 0 {
                 break;
             }
-            cost +=
-                self.band_exponents[ch].cost(mask, &self.exponents[ch][..end], offset, &BAP_COSTS);
+            cost += self.band_exponents[ch].cost(
+                mask,
+                &self.exponents[ch][..end],
+                offset,
+                floor,
+                &BAP_COSTS,
+            );
         }
         mantissa_bits(cost)
     }
@@ -528,28 +566,59 @@ fn full_bandwidth(first: &[f32; BLOCK], second: &[f32; BLOCK]) -> usize {
 
 fn exponent(peak: f32) -> u8 {
     let binary_exponent = ((peak.to_bits() >> 23) & 255) as i32;
-    (126 - binary_exponent).clamp(0, 24) as u8
+    (126 - binary_exponent).clamp(0, i32::from(MAX_AC3_EXPONENT)) as u8
 }
 
-fn select_snr(sets: &[ExponentSet], blocks_per_set: &[usize; BLOCKS], available: usize) -> u16 {
-    let mut accepted = 0;
-    let mut rejected = 1024;
-    while rejected - accepted > 1 {
-        let trial = (accepted + rejected) / 2;
-        let mut used = 0;
-        for (pair, &count) in sets.iter().zip(blocks_per_set) {
-            used += count * pair.mantissa_bits(trial);
-            if used > available {
+fn select_allocation(
+    sets: &[ExponentSet],
+    blocks_per_set: &[usize; BLOCKS],
+    available: usize,
+) -> Allocation {
+    let fits = |allocation| {
+        let mut remaining = available;
+        for (set, &count) in sets.iter().zip(blocks_per_set) {
+            let bits = count * set.mantissa_bits(allocation);
+            if bits > remaining {
+                return false;
+            }
+            remaining -= bits;
+        }
+        true
+    };
+    let mut allocation = Allocation {
+        snr: MAX_SNR,
+        floor: PARAMS.floorcod,
+    };
+    if fits(allocation) {
+        // At the highest SNR offset, a lower floor can increase the
+        // precision of quiet coefficients while the frame still has space.
+        for floor in PARAMS.floorcod + 1..=LOWEST_FLOOR_CODE {
+            let next = Allocation {
+                floor,
+                ..allocation
+            };
+            if !fits(next) {
                 break;
             }
+            allocation = next;
         }
-        if used <= available {
-            accepted = trial;
+        return allocation;
+    }
+
+    let mut accepted = 0;
+    let mut rejected = MAX_SNR;
+    while rejected - accepted > 1 {
+        let snr = (accepted + rejected) / 2;
+        if fits(Allocation { snr, ..allocation }) {
+            accepted = snr;
         } else {
-            rejected = trial;
+            rejected = snr;
         }
     }
-    accepted
+    Allocation {
+        snr: accepted,
+        ..allocation
+    }
 }
 
 #[cfg(test)]
@@ -575,12 +644,15 @@ mod tests {
             set.prepare(ChannelMode::Surround51, 0, &first, neighbor, &mut scratch)
                 .expect("allocation parameters");
             assert_eq!(set.repeats[0], if neighbor.is_some() { 2 } else { 4 });
-            for snr in 1..1024 {
-                set.allocate(snr, &mut bap);
-                assert_eq!(
-                    set.mantissa_bits(snr),
-                    syntax::allocated_mantissa_bits(&set.ends, &bap)
-                );
+            for floor in PARAMS.floorcod..=LOWEST_FLOOR_CODE {
+                for snr in 1..=MAX_SNR {
+                    let allocation = Allocation { snr, floor };
+                    set.allocate(allocation, &mut bap);
+                    assert_eq!(
+                        set.mantissa_bits(allocation),
+                        syntax::allocated_mantissa_bits(&set.ends, &bap)
+                    );
+                }
             }
         }
     }

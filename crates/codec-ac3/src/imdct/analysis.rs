@@ -85,38 +85,55 @@ impl Analysis {
         );
     }
 
-    pub(crate) fn short(&mut self, previous: &[f32], next: &[f32], out: &mut [f32; 256]) {
+    pub(crate) fn short(
+        &mut self,
+        previous: Option<&[f32]>,
+        next: Option<&[f32]>,
+        out: &mut [f32; 256],
+    ) {
         let window = &self.window;
         // The first half uses the forward window and feeds the even coefficient slots.
-        self.short.run(
-            |k| {
-                let (a, b) = (2 * k, 255 - 2 * k);
-                let (c, d) = (127 - 2 * k, 128 + 2 * k);
-                (
-                    previous[c] * window[c] - previous[d] * window[d],
-                    previous[a] * window[a] - previous[b] * window[b],
-                )
-            },
-            |k, (re, im)| {
-                out[2 * (127 - 2 * k)] = re / 128.0;
-                out[4 * k] = -im / 128.0;
-            },
-        );
+        if let Some(previous) = previous {
+            self.short.run(
+                |k| {
+                    let (a, b) = (2 * k, 255 - 2 * k);
+                    let (c, d) = (127 - 2 * k, 128 + 2 * k);
+                    (
+                        previous[c] * window[c] - previous[d] * window[d],
+                        previous[a] * window[a] - previous[b] * window[b],
+                    )
+                },
+                |k, (re, im)| {
+                    out[2 * (127 - 2 * k)] = re / 128.0;
+                    out[4 * k] = -im / 128.0;
+                },
+            );
+        } else {
+            for pair in out.as_chunks_mut::<2>().0 {
+                pair[0] = 0.0;
+            }
+        }
         // The second half reverses the window and uses the other phase in A/52 7.9.4.2.
-        self.short.run(
-            |k| {
-                let (a, b) = (2 * k, 255 - 2 * k);
-                let (c, d) = (127 - 2 * k, 128 + 2 * k);
-                (
-                    -(next[a] * window[b] + next[b] * window[a]),
-                    -(next[c] * window[d] + next[d] * window[c]),
-                )
-            },
-            |k, (re, im)| {
-                out[2 * (127 - 2 * k) + 1] = re / 128.0;
-                out[4 * k + 1] = -im / 128.0;
-            },
-        );
+        if let Some(next) = next {
+            self.short.run(
+                |k| {
+                    let (a, b) = (2 * k, 255 - 2 * k);
+                    let (c, d) = (127 - 2 * k, 128 + 2 * k);
+                    (
+                        -(next[a] * window[b] + next[b] * window[a]),
+                        -(next[c] * window[d] + next[d] * window[c]),
+                    )
+                },
+                |k, (re, im)| {
+                    out[2 * (127 - 2 * k) + 1] = re / 128.0;
+                    out[4 * k + 1] = -im / 128.0;
+                },
+            );
+        } else {
+            for pair in out.as_chunks_mut::<2>().0 {
+                pair[1] = 0.0;
+            }
+        }
     }
 }
 
@@ -155,7 +172,7 @@ mod tests {
             core::array::from_fn(|n| ((n as f32) * 0.31).sin() * 0.6 + (n % 11) as f32 / 100.0);
         let mut analysis = Analysis::new();
         let mut actual = [0.0; 256];
-        analysis.short(&samples[..256], &samples[256..], &mut actual);
+        analysis.short(Some(&samples[..256]), Some(&samples[256..]), &mut actual);
         for (k, value) in actual.iter().enumerate() {
             let half = k % 2;
             let bin = (k - half) / 2;
@@ -178,6 +195,24 @@ mod tests {
     }
 
     #[test]
+    fn short_transform_with_a_silent_half_preserves_coefficients() {
+        let mut analysis = Analysis::new();
+        let silence = [0.0; 256];
+        let signal = core::array::from_fn::<_, 256, _>(|i| (i as f32 * 0.41).sin());
+        for (previous, next) in [(None, Some(&signal[..])), (Some(&signal[..]), None)] {
+            let mut full = [0.0; 256];
+            analysis.short(
+                Some(previous.unwrap_or(&silence)),
+                Some(next.unwrap_or(&silence)),
+                &mut full,
+            );
+            let mut reduced = [1.0; 256];
+            analysis.short(previous, next, &mut reduced);
+            assert_eq!(full, reduced);
+        }
+    }
+
+    #[test]
     fn switching_transforms_preserves_overlap() {
         let mut analysis = Analysis::new();
         let mut synthesis = super::super::Imdct::new();
@@ -192,7 +227,7 @@ mod tests {
             let next: [f32; 256] =
                 core::array::from_fn(|i| ((i + block * 256) as f32 * 0.31).sin());
             if short {
-                analysis.short(&previous, &next, &mut coefficients);
+                analysis.short(Some(&previous), Some(&next), &mut coefficients);
                 synthesis.short(&coefficients, &mut delay, &mut output);
             } else {
                 analysis.long(&previous, &next, &mut coefficients);

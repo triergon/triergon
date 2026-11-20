@@ -285,55 +285,52 @@ pub(crate) fn ac3_bap_from_exponents(
 }
 
 #[cfg(feature = "encode")]
+pub(crate) const MAX_AC3_EXPONENT: u8 = 24;
+#[cfg(feature = "encode")]
 const EXPONENT_ADDRESS_STEP: usize = 4;
 #[cfg(feature = "encode")]
-const COST_LENGTH: usize = (1 + EXPONENT_ADDRESS_STEP) * u8::MAX as usize + 1;
+const MIN_MASK_FLOOR: i32 = FLOORTAB[7];
+#[cfg(feature = "encode")]
+const ZERO_EXPONENT_ADDRESS: usize = ((ZERO_EXPONENT_PSD - MIN_MASK_FLOOR) >> 5) as usize;
+#[cfg(feature = "encode")]
+const MAX_MASK_INDEX: usize =
+    ((FLOORTAB[0] - MIN_MASK_FLOOR + 31) >> 5) as usize + u8::MAX as usize;
+#[cfg(feature = "encode")]
+const COST_LENGTH: usize = MAX_MASK_INDEX + EXPONENT_ADDRESS_STEP * MAX_AC3_EXPONENT as usize + 1;
 
-/// Quantizer costs indexed by the masked level plus four addresses per
-/// exponent. Include the full byte ranges so a lookup needs no clamp.
+/// Quantizer costs indexed by the rounded mask and four addresses per
+/// exponent. One table covers every masking floor.
 #[cfg(feature = "encode")]
 pub(crate) struct Ac3BapCosts {
-    floor: i32,
-    zero_exponent_address: i32,
     entries: [u64; COST_LENGTH],
 }
 
 #[cfg(feature = "encode")]
 impl Ac3BapCosts {
-    pub(crate) const fn new(address_costs: &[u64; 64], floorcod: u8) -> Self {
+    pub(crate) const fn new(address_costs: &[u64; 64]) -> Self {
         assert!(address_costs[0] == 0);
-        let floor = FLOORTAB[floorcod as usize];
-        let zero_exponent_address = (ZERO_EXPONENT_PSD - floor) >> 5;
         let mut entries = [0; COST_LENGTH];
         let mut index = 0;
         while index < entries.len() {
-            let address = zero_exponent_address - index as i32;
-            let address = if address < 0 {
-                0
-            } else if address > 63 {
-                63
-            } else {
-                address
-            };
-            entries[index] = address_costs[address as usize];
+            let address = ZERO_EXPONENT_ADDRESS.saturating_sub(index);
+            entries[index] = address_costs[if address > 63 { 63 } else { address }];
             index += 1;
         }
-        Self {
-            floor,
-            zero_exponent_address,
-            entries,
-        }
+        Self { entries }
     }
 
     #[inline]
-    fn mask_index(&self, mask: i32, snroffset: i32) -> u8 {
-        ((shifted_mask(mask, snroffset, self.floor) - self.floor) >> 5) as u8
+    fn at(&self, mask_index: usize, exponent: u8) -> u64 {
+        self.entries[mask_index + EXPONENT_ADDRESS_STEP * usize::from(exponent)]
     }
+}
 
-    #[inline]
-    fn at(&self, mask_index: u8, exponent: u8) -> u64 {
-        self.entries[usize::from(mask_index) + EXPONENT_ADDRESS_STEP * usize::from(exponent)]
-    }
+#[cfg(feature = "encode")]
+#[inline]
+fn mask_index(mask: i32, snroffset: i32, floor: i32) -> usize {
+    // The PSD is a multiple of 32. Rounding the mask upward gives the
+    // same address as rounding their difference downward.
+    ((shifted_mask(mask, snroffset, floor) - MIN_MASK_FLOOR + 31) >> 5) as usize
 }
 
 // The first 28 critical bands each contain one bin (A/52 Table 7.12).
@@ -376,7 +373,7 @@ impl Default for Ac3BandExponents {
 impl Ac3BandExponents {
     pub(crate) fn prepare(&mut self, exponents: &[u8; 256], end: usize) {
         self.bands = (usize::from(MASKTAB[end - 1]) + 1).saturating_sub(SINGLE_BIN_BANDS);
-        let mut frequencies = [0_u8; 25];
+        let mut frequencies = [0_u8; MAX_AC3_EXPONENT as usize + 1];
         let mut stored = 0;
         for (index, length) in self.lengths[..self.bands].iter_mut().enumerate() {
             let band = SINGLE_BIN_BANDS + index;
@@ -405,11 +402,13 @@ impl Ac3BandExponents {
         masks: &[i32; 50],
         exponents: &[u8],
         snroffset: i32,
+        floorcod: u8,
         costs: &Ac3BapCosts,
     ) -> u64 {
+        let floor = FLOORTAB[usize::from(floorcod)];
         let mut total = 0;
         for (&exponent, &mask) in exponents.iter().take(SINGLE_BIN_BANDS).zip(masks) {
-            total += costs.at(costs.mask_index(mask, snroffset), exponent);
+            total += costs.at(mask_index(mask, snroffset, floor), exponent);
         }
         let mut counts = self.counts.as_slice();
         for (&length, &mask) in self.lengths[..self.bands]
@@ -418,8 +417,8 @@ impl Ac3BandExponents {
         {
             let (band, rest) = counts.split_at(usize::from(length));
             counts = rest;
-            let index = costs.mask_index(mask, snroffset);
-            if i32::from(index) < costs.zero_exponent_address {
+            let index = mask_index(mask, snroffset, floor);
+            if index < ZERO_EXPONENT_ADDRESS {
                 total += band
                     .iter()
                     .map(|entry| costs.at(index, entry.exponent) * u64::from(entry.count))

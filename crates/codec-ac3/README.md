@@ -39,13 +39,16 @@ default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleave
 
 Enable the `encode` feature for AC-3 syncframes at 32, 44.1 or 48 kHz. The encoder
 uses adaptive bandwidth, exponent grouping and bit allocation. It reuses each
-critical band's exponent counts across bit allocation trials. Long transforms
-keep frequency resolution on steady signals. Each full-bandwidth channel
+critical band's exponent counts across bit allocation trials. When the highest
+SNR offset leaves space in the frame, the encoder can lower the masking floor
+to give quieter coefficients more precision. Long transforms keep frequency
+resolution on steady signals. Each full-bandwidth channel
 uses short transforms at sharp attacks and silence boundaries. The encoder
 sends fresh exponents at transform changes and silence boundaries. Wide
 exponent sets for a single block use D45, and shared wide sets use D25. The
-LFE uses long transforms throughout. Blocks with silent input and silent overlap
-need no transform. The encoder supports mono at 192 kbit/s, stereo at
+LFE uses long transforms throughout. A short transform skips each silent half.
+Blocks with silent input and silent overlap need no transform. A frame with
+silence throughout its input and history needs no mantissas. The encoder supports mono at 192 kbit/s, stereo at
 256 kbit/s and 5.1 at 640 kbit/s. The input plane order for 5.1 is FL, FR, FC,
 LFE, SL, SR.
 
