@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-host-bb107837-armv7",
+ "path": "ass-render-host-bb107837-armv7",
+ "retention": "retained",
+ "reason": "All 4 host-dependent ASS renderer cases against libass on 32-bit ARMv7 Linux. The grade includes exact parity and runtime, peak heap and total RSS from 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/bb107837ed7545206bf3b55ab297ef58517c5afc/armv7/combined-public-grade-ass-render-host/b53522b3e783e2c34bf2ffd101734d22a7c2fab21a260eac7c1f0dee6e17f9e8.tar.zst",
+ "sha256": "b53522b3e783e2c34bf2ffd101734d22a7c2fab21a260eac7c1f0dee6e17f9e8",
+ "bytes": 2536810
+}

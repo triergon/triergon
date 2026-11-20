@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-bb107837-aarch64",
+ "path": "ass-render-bb107837-aarch64",
+ "retention": "retained",
+ "reason": "All 100 portable ASS renderer cases against libass on AArch64 Linux. The grade includes exact parity and runtime, peak heap and total RSS from 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/bb107837ed7545206bf3b55ab297ef58517c5afc/aarch64/combined-public-grade-ass-render/85d78d67d014d27916d2234469636e89bc27e75cf81170948124743f4338434e.tar.zst",
+ "sha256": "85d78d67d014d27916d2234469636e89bc27e75cf81170948124743f4338434e",
+ "bytes": 15547118
+}
