@@ -148,6 +148,7 @@ pub struct Encoder {
     size_code: u8,
     word_fraction: u32,
     remainder: u32,
+    started: bool,
     previous: [[f32; BLOCK]; CHANNELS],
     analysis: Analysis,
     work: Box<Work>,
@@ -175,6 +176,7 @@ impl Encoder {
             size_code,
             word_fraction,
             remainder: 0,
+            started: false,
             previous: [[0.0; BLOCK]; CHANNELS],
             analysis: Analysis::new(),
             work: Box::new(Work {
@@ -189,6 +191,7 @@ impl Encoder {
     pub fn reset(&mut self) {
         self.previous.fill([0.0; BLOCK]);
         self.remainder = 0;
+        self.started = false;
     }
 
     /// Encode exactly 1,536 normalized samples per plane into `output`.
@@ -239,7 +242,8 @@ impl Encoder {
                 .enumerate()
                 .any(|(coded, &ch)| {
                     let (previous, next) = pcm(coded, ch);
-                    has_attack(previous, next)
+                    let history = (self.started || block != 0).then_some(previous);
+                    has_attack(history, next)
                 });
             for (coded, &ch) in order.iter().enumerate() {
                 let (previous, next) = pcm(coded, ch);
@@ -294,11 +298,12 @@ impl Encoder {
             self.previous[coded].copy_from_slice(&input[channel][SAMPLES_PER_FRAME - BLOCK..]);
         }
         self.remainder = remainder % sample_rate;
+        self.started = true;
         Ok(bytes)
     }
 }
 
-fn has_attack(previous: &[f32], next: &[f32]) -> bool {
+fn has_attack(previous: Option<&[f32]>, next: &[f32]) -> bool {
     const WINDOW: usize = 64;
     // The second difference emphasizes high frequencies. Its unnormalized
     // peak has a range of [0, 4], so 0.04 is one percent of full scale.
@@ -310,12 +315,19 @@ fn has_attack(previous: &[f32], next: &[f32]) -> bool {
             .map(|s| difference(s[0], s[1], s[2]))
             .fold(boundary, f32::max)
     };
-    let at = BLOCK - WINDOW;
-    let mut last = peak([previous[at - 2], previous[at - 1]], &previous[at..]);
-    let mut before = [previous[BLOCK - 2], previous[BLOCK - 1]];
+    let (mut last, mut before) = if let Some(previous) = previous {
+        let at = BLOCK - WINDOW;
+        (
+            peak([previous[at - 2], previous[at - 1]], &previous[at..]),
+            [previous[BLOCK - 2], previous[BLOCK - 1]],
+        )
+    } else {
+        // Establish the first signal level from input samples.
+        (f32::INFINITY, [0.0; 2])
+    };
     for samples in next.chunks_exact(WINDOW) {
         let current = peak(before, samples);
-        if current > (16.0 * last).max(0.04) {
+        if current > (16.0 * last).max(0.04) && samples.iter().any(|sample| sample.abs() > 0.01) {
             return true;
         }
         last = current;
@@ -454,4 +466,23 @@ fn select_snr(pairs: &[Pair; GROUPS], bap: &mut [[u8; BLOCK]; CHANNELS], availab
         }
     }
     accepted
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attacks_require_input_history_and_signal_after_the_edge() {
+        let steady: [f32; BLOCK] =
+            core::array::from_fn(|i| if i.is_multiple_of(2) { -0.2 } else { 0.2 });
+        let silence = [0.0; BLOCK];
+        assert!(!has_attack(None, &steady));
+        assert!(!has_attack(Some(&[0.4; BLOCK]), &silence));
+
+        let mut attack = silence;
+        attack[64..].fill(0.4);
+        assert!(has_attack(Some(&silence), &attack));
+        assert!(has_attack(None, &attack));
+    }
 }
