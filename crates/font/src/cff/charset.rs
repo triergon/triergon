@@ -171,6 +171,16 @@ impl Cff {
                 };
                 // The lowest glyph of each SID (`cff_charset_compute_cids`).
                 let mut coded = 0;
+                // A small sparse charset retains the SIDs in glyph order and
+                // has no reverse index whose length could bound the scan.
+                let sid_limit = if offset == 0 && self.glyphs_by_sid.is_empty() {
+                    self.sids
+                        .iter()
+                        .max()
+                        .map_or(0, |&sid| usize::from(sid) + 1)
+                } else {
+                    self.glyphs_by_sid.len()
+                };
                 // Codes below space are unassigned in both predefined encodings.
                 for (code, &sid) in encoding.iter().enumerate().skip(32) {
                     if sid == 0 {
@@ -179,7 +189,7 @@ impl Cff {
                     if let Some(glyph) = self.glyph_for_sid(sid).filter(|&g| g != 0) {
                         glyphs[code] = narrow(glyph as usize)?;
                         coded = code + 1;
-                    } else if offset == 0 && usize::from(sid) >= self.glyphs_by_sid.len() {
+                    } else if offset == 0 && usize::from(sid) >= sid_limit {
                         // Assigned StandardEncoding SIDs are in increasing order.
                         break;
                     }

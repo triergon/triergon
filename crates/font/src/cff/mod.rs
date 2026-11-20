@@ -843,6 +843,7 @@ mod tests {
             (Some(vec![1, 1, 100, 3]), false),
             (Some(vec![0x80, 1, 102, 1, 105, 255, 253]), true),
         ] {
+            let standard = encoding.is_none();
             let data = CffProgram {
                 glyphs: vec![charstring(&[Op(14)]); glyphs.len() + 1],
                 global: Vec::new(),
@@ -877,6 +878,10 @@ mod tests {
             .unwrap();
             assert_eq!(full_work.spent(), indexed_work.spent());
             assert_eq!(full.encoding(), indexed.encoding());
+            if standard {
+                assert!(full.glyphs_by_sid.is_empty());
+                assert_eq!(full.encoding().unwrap().glyphs[usize::from(b'A')], 1);
+            }
             assert_eq!(indexed.has_charset(), supplements);
             assert_eq!(indexed.glyph_for_sid(0), Some(0));
             assert_eq!(indexed.glyph_for_sid(34), Some(1));
