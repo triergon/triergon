@@ -15,7 +15,7 @@
     )),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
-use std::io::Read as _;
+use crate::probe::{Prefix, Probe, ProbeBuffer, probe};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, PacketInfo, RandomAccess, ReaderStep, SeekRequest, TrackId, TrackInfo,
@@ -31,83 +31,9 @@ use triergon_core::{
     feature = "matroska",
     feature = "isobmff",
     feature = "mpegts",
-    feature = "ogg",
-    feature = "elementary"
+    feature = "ogg"
 ))]
 const WINDOW: usize = 64 * 1024;
-
-/// What the first bytes of a source look like.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Probe {
-    /// An EBML header (Matroska or WebM).
-    Matroska,
-    /// An ISO BMFF box sequence (`ftyp`, `styp`, `moov`, `moof`, ...).
-    Isobmff,
-    /// 188-byte MPEG transport packets.
-    Ts,
-    /// 192-byte M2TS packets with their four-byte arrival prefixes.
-    M2ts,
-    /// An Ogg page (`OggS`).
-    Ogg,
-    /// Native FLAC (`fLaC`, or a frame header the next one numbers on from), possibly
-    /// after an ID3v2 tag.
-    Flac,
-    /// Two consecutive MPEG audio frames, possibly after an ID3v2 tag.
-    MpegAudio,
-    /// Two consecutive ADTS frames.
-    Adts,
-    /// Two consecutive AC-3 or E-AC-3 syncframes.
-    Ac3,
-    /// Not recognised from these bytes.
-    Unknown,
-}
-
-/// Classify a source from its first bytes. A short prefix may give `Unknown`: an
-/// elementary stream (MPEG audio, ADTS, AC-3) is recognised only once the prefix holds
-/// the start of its second frame, and an ID3v2 tag must fit in it whole.
-pub fn probe(bytes: &[u8]) -> Probe {
-    if bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
-        return Probe::Matroska;
-    }
-    if let Some(kind) = bytes.get(4..8)
-        && matches!(
-            kind,
-            b"ftyp" | b"styp" | b"moov" | b"moof" | b"mdat" | b"free" | b"skip" | b"sidx"
-        )
-    {
-        return Probe::Isobmff;
-    }
-    if bytes.starts_with(b"OggS\0") {
-        return Probe::Ogg;
-    }
-    if bytes.len() > 188 * 2 && bytes[0] == 0x47 && bytes[188] == 0x47 && bytes[376] == 0x47 {
-        return Probe::Ts;
-    }
-    if bytes.len() > 192 * 2 + 4 && bytes[4] == 0x47 && bytes[196] == 0x47 && bytes[388] == 0x47 {
-        return Probe::M2ts;
-    }
-    elementary(bytes)
-}
-
-/// The elementary stream `bytes` starts, when that reader is built in.
-fn elementary(bytes: &[u8]) -> Probe {
-    #[cfg(feature = "elementary")]
-    {
-        use triergon_elementary::Kind;
-        match triergon_elementary::probe(bytes) {
-            Some(Kind::Flac) => Probe::Flac,
-            Some(Kind::MpegAudio) => Probe::MpegAudio,
-            Some(Kind::Adts) => Probe::Adts,
-            Some(Kind::Ac3) => Probe::Ac3,
-            None => Probe::Unknown,
-        }
-    }
-    #[cfg(not(feature = "elementary"))]
-    {
-        let _ = bytes;
-        Probe::Unknown
-    }
-}
 
 /// Every reader the facade can open, one variant per enabled format.
 // Stored inline: a box would add an allocation outside the caller's budget.
@@ -253,7 +179,16 @@ impl AnyReader {
         source: SourceId,
         capabilities: SourceCapabilities,
     ) -> Result<Self> {
-        match probe(prefix) {
+        Self::from_probe(probe(prefix), pool, source, capabilities)
+    }
+
+    fn from_probe(
+        kind: Probe,
+        pool: &Budget,
+        source: SourceId,
+        capabilities: SourceCapabilities,
+    ) -> Result<Self> {
+        match kind {
             #[cfg(feature = "matroska")]
             Probe::Matroska => Ok(Self::Matroska(triergon_matroska::typed::Reader::new(
                 pool,
@@ -331,44 +266,35 @@ impl AnyReader {
     }
 }
 
-/// A reader for whichever format `source` holds, fed from it: the first 64 KiB are
-/// probed, then the source is read from its start.
+/// Probe up to 64 KiB of a seekable source, then feed its reader from the start.
 pub fn open_blocking<S: std::io::Read + std::io::Seek>(
     mut source: S,
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
     let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
-    let mut prefix = Vec::with_capacity(PROBE_BYTES);
-    std::io::Read::by_ref(&mut source)
-        .take(PROBE_BYTES as u64)
-        .read_to_end(&mut prefix)
-        .map_err(|e| Error::Io(e.kind()))?;
+    let kind = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
     source.rewind().map_err(|e| Error::Io(e.kind()))?;
-    let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::from_probe(kind?, pool, SourceId(1), capabilities)?;
     Ok(triergon_core::blocking::Blocking::seekable(
         reader, source, pool,
     ))
 }
 
-/// A reader for whichever format a sequential `source` holds (a pipe): the first 64 KiB
-/// are probed and replayed, and the reader neither seeks nor knows the source's length,
-/// so it behaves as FFmpeg does on a pipe.
+/// Probe up to 64 KiB of a sequential source and replay the consumed prefix.
+/// The reader sees a pipe with unknown length and no random access.
 pub fn open_sequential<S: std::io::Read>(
     mut source: S,
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, Replayed<S>>> {
-    let mut prefix = Vec::with_capacity(PROBE_BYTES);
-    std::io::Read::by_ref(&mut source)
-        .take(PROBE_BYTES as u64)
-        .read_to_end(&mut prefix)
-        .map_err(|e| Error::Io(e.kind()))?;
+    let mut prefix = ProbeBuffer::new(pool);
+    let kind = prefix.identify_pipe(&mut source)?;
     let capabilities = SourceCapabilities {
         length: None,
         random_access: false,
     };
-    let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::from_probe(kind, pool, SourceId(1), capabilities)?;
     let source = Replayed {
-        prefix,
+        prefix: Some(prefix.into_replay()?),
         at: 0,
         rest: source,
     };
@@ -381,29 +307,25 @@ pub fn open_sequential<S: std::io::Read>(
 /// once it has been read.
 #[derive(Debug)]
 pub struct Replayed<S> {
-    prefix: Vec<u8>,
+    prefix: Option<Prefix>,
     at: usize,
     rest: S,
 }
 
 impl<S: std::io::Read> std::io::Read for Replayed<S> {
     fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
-        if self.at < self.prefix.len() {
-            let count = out.len().min(self.prefix.len() - self.at);
-            out[..count].copy_from_slice(&self.prefix[self.at..self.at + count]);
+        if let Some(prefix) = &self.prefix {
+            let count = out.len().min(prefix.bytes.len() - self.at);
+            out[..count].copy_from_slice(&prefix.bytes[self.at..self.at + count]);
             self.at += count;
-            if self.at == self.prefix.len() {
-                self.prefix = Vec::new();
-                self.at = 0;
+            if self.at == prefix.bytes.len() {
+                self.prefix = None;
             }
             return Ok(count);
         }
         self.rest.read(out)
     }
 }
-
-/// Bytes [`open_blocking`] and [`open_sequential`] probe.
-const PROBE_BYTES: usize = 64 * 1024;
 
 impl PacketInfo for AnyPacket {
     #[inline]
