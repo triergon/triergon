@@ -88,18 +88,8 @@ On c6g.4xlarge, the two registered FLAC files were decoded at `0230c88e` and
 `3e3ba929` in 30 paired runs per target. For 16-bit stereo and 24-bit six-channel
 audio, respectively, median decode time on ARMv7 fell by 16.9% and 7.1%
 (upper time ratios 0.83128 and 0.92973). On AArch64 it rose by 0.34% and 0.20%
-(upper ratios 1.00387 and 1.00237). Both files produced the same stereo output as
-`3e3ba929` on each target.
-
-At `deb6105a` the same Rice and FLAC decoder source was measured with the updated
-sequential reader on c6g.4xlarge. Against FFmpeg the upper time ratios for
-16-bit stereo and 24-bit six-channel files were 0.44132 and 0.47770 on AArch64,
-and 0.64485 and 0.73675 on 32-bit ARMv7. Both used less peak heap and total RSS.
-The 187-input FLAC comparison on each target matched 182 packet streams, with
-five previously documented timestamp or recovery differences. Decoded PCM and
-stereo output both passed on 183 inputs. Three streams change format during
-decoding. The remaining stream decodes exactly but FFmpeg produces no stereo
-output with its channel mask.
+(upper ratios 1.00387 and 1.00237). Both output digests matched the preceding build. The file-codec
+rows above use FFmpeg as their reference.
 
 At `414b4cb5`, all 418 Matroska and linked playback cases pass on each c6g.4xlarge
 target, including HLS, MP4 forward and range, progressive TS188, raw Annex B and
@@ -986,10 +976,6 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
-| File audio runtime and memory, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`e5d323cd62b44cbb848f0d4a0550005e8f7cde2a27ba479f5fb82d1b04d3f9a5`](../harness/evidence/sets/public-file-codecs-deb6105a-aarch64.json) |
-| FLAC packet and PCM comparison, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`c943cd76153aa5df738fbedf5fc9625f42cd48b0a86f1bf9b678fae495953d40`](../harness/evidence/sets/flac-187-deb6105a-aarch64.json) |
-| File audio runtime and memory, 32-bit ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`67e67b4a39dc3abf436cc1437c064efa0d7c368655bd2b6e19b3fe9956e2b347`](../harness/evidence/sets/public-file-codecs-deb6105a-armv7.json) |
-| FLAC packet and PCM comparison, 32-bit ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`5b89fd0b6c25642da5aaa77b49989180665e09588fecbc54a6e3a8bc7b73a169`](../harness/evidence/sets/flac-187-deb6105a-armv7.json) |
 | FLAC file decoding compared with `3e3ba929`, AArch64 Linux | `0230c88e4bb78677484d7b7d00a9c80e0be66d37` | [`b3320c7ff3c9d0fd3c9d6f665c7fa41499cf87992c4e12e41277907b4617a49a`](../harness/evidence/sets/flac-rice-0230c88e-aarch64.json) |
 | FLAC file decoding compared with `3e3ba929`, 32-bit ARMv7 Linux | `0230c88e4bb78677484d7b7d00a9c80e0be66d37` | [`06e9f4afbc18def659c6b3f58dedd095529deeeb557d5215986385b12364d567`](../harness/evidence/sets/flac-rice-0230c88e-armv7.json) |
 | Full gate run, Linux AArch64, shard 1 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`c83c3bf8dc9c9ea81ac8c6d9fe3404c110741c9615b062640a62b2a1ca5dd2f3`](../harness/evidence/sets/gate-run-aarch64-a73350ca-20261116-023216-shard-1.json) |

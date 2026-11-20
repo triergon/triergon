@@ -1,9 +1,0 @@
-{
- "name": "flac-187-deb6105a-aarch64",
- "path": "flac-187-deb6105a-aarch64",
- "retention": "retained",
- "reason": "Input hashes and per-file classifications for every one of the 187 FLAC packet, decoded PCM and stereo output comparisons, with worker and report identities.",
- "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/aarch64/flac-corpus-tables/c943cd76153aa5df738fbedf5fc9625f42cd48b0a86f1bf9b678fae495953d40.tar.zst",
- "sha256": "c943cd76153aa5df738fbedf5fc9625f42cd48b0a86f1bf9b678fae495953d40",
- "bytes": 14160
-}
