@@ -337,19 +337,19 @@ impl Operand<'_> {
 
     /// `cff_parse_num`: the operand as an integer, a real truncated toward
     /// negative infinity and a blend rounded to 16 bits.
-    pub(crate) fn integer(self) -> i64 {
+    pub(crate) fn integer(self) -> i32 {
         match self {
             Self::Encoded(bytes) => {
                 let mut r = Reader::new(bytes);
                 match r.u8() {
-                    Ok(30) => Real::read(&mut r).fixed(0) >> 16,
-                    Ok(byte) => dict_integer(byte, &mut r).map_or(0, i64::from),
+                    Ok(30) => (Real::read(&mut r).fixed(0) >> 16) as i32,
+                    Ok(byte) => dict_integer(byte, &mut r).unwrap_or(0),
                     Err(_) => 0,
                 }
             }
             Self::Blended(sum) => {
                 let rounded = ((sum.cast_unsigned() >> 8) + 0x80) >> 8;
-                i64::from((rounded as u16).cast_signed())
+                i32::from((rounded as u16).cast_signed())
             }
         }
     }

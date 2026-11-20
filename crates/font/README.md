@@ -199,8 +199,9 @@ move the other stems' edges onto pixel boundaries; each element of the path is
 mapped with the hint map in force when the next one is drawn, as in FreeType.
 Zone edges occupy one 32-bit 16.16 coordinate each. The face checks the
 ideographic em-box thresholds on the original wide sums before narrowing them.
-The 26.6 points then go through the FontMatrix and are moved by its offset in
-font units, without further scaling. Sizes beyond 2000 pixels per em, which the
+The six FontMatrix coordinates and the integer BlueShift and BlueFuzz values
+are retained as signed 32-bit quantities. The 26.6 points go through the
+FontMatrix and are moved by its offset in font units, without further scaling. Sizes beyond 2000 pixels per em, which the
 hinter refuses, load unhinted and scaled, as FreeType retries them; a 16.16
 scale below 32 fails the glyph. The arithmetic is cf2's, 16.16 in 32 bits.
 DICTs are read as FreeType's `cff_parser_run` reads them: a Top or Font DICT
