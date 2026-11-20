@@ -1,6 +1,9 @@
 //! Bounded source seeks in the exact presentation clock.
-use super::{Packet, Reader, ReaderEvent};
+mod retained;
+
+use super::{AccessUnit, Packet, PacketTracks, Reader, ReaderEvent};
 use crate::{SourceEpochs, TraceEvent, clock::SourceTimePolicy};
+use retained::{Retain, RetainedOutput};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
     CodecId, Event, PacketInfo, RandomAccess, ReaderStep, SeekMethod, SeekPolicy, SeekReceipt,
@@ -30,11 +33,14 @@ enum Phase {
         skipped: bool,
     },
     Deliver(Packet),
+    Retained(RetainedOutput),
 }
 
 pub(super) struct Seeking {
     request: SeekRequest,
     phase: Phase,
+    retain: Option<Retain>,
+    full_scan: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -65,12 +71,13 @@ impl Seeking {
 
     pub(super) fn picture_delivery(&self, track: TrackId) -> PictureDelivery {
         match self.phase {
+            Phase::Scan(_) if self.full_scan => PictureDelivery::Full,
             Phase::Scan(_) => PictureDelivery::Scan,
             Phase::Replay { landing, .. } if track == self.request.track => {
                 PictureDelivery::Landing(landing.offset)
             }
             Phase::Replay { .. } => PictureDelivery::Discard,
-            Phase::Deliver(_) => PictureDelivery::Full,
+            Phase::Deliver(_) | Phase::Retained(_) => PictureDelivery::Full,
         }
     }
 }
@@ -81,7 +88,7 @@ impl Scan {
         picture: PictureProbe,
         target: Time,
         policy: SourceTimePolicy,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let PictureProbe {
             offset,
             epochs,
@@ -112,9 +119,29 @@ impl Scan {
                     offset,
                     epochs,
                 });
+                return Ok(true);
             }
         }
-        Ok(())
+        Ok(false)
+    }
+}
+
+fn seek_result(
+    request: SeekRequest,
+    landing: Landing,
+    scanned_bytes: u64,
+    skipped: bool,
+) -> SeekReceipt {
+    SeekReceipt {
+        requested: request.target,
+        landing: landing.time,
+        discard_until: match request.policy {
+            SeekPolicy::PreviousRandomAccess => landing.time,
+            SeekPolicy::PlaybackPreroll => request.target,
+        },
+        method: SeekMethod::BoundedScan,
+        scanned_bytes,
+        replays_from_start: !skipped,
     }
 }
 
@@ -125,20 +152,21 @@ impl Reader {
         }
         let seek = &mut self.seek.as_mut_slice()[0];
         match &mut seek.phase {
-            Phase::Scan(scan) => {
-                scan.observe(picture, seek.request.target, self.limits.time_policy)
-            }
+            Phase::Scan(scan) => scan
+                .observe(picture, seek.request.target, self.limits.time_policy)
+                .map(|_| ()),
             Phase::Replay { skipped, .. } => {
                 *skipped = true;
                 Ok(())
             }
-            Phase::Deliver(_) => unreachable!("a seek probe precedes landing"),
+            Phase::Deliver(_) | Phase::Retained(_) => unreachable!("a seek probe precedes landing"),
         }
     }
 
     /// Seek a selected AVC or HEVC track in one length-known, seekable entity.
     /// The reader scans for the previous coded random-access picture, then
-    /// replays from the start to preserve transport, clock and PES provenance.
+    /// delivers original transport, clock and PES provenance from the landing.
+    /// Short single-track suffixes can be retained as the reader scans.
     /// The caller supplies any decoder configuration needed at the landing.
     /// Requests from a previously continued entity or with unresolved clock
     /// epochs are refused.
@@ -170,9 +198,13 @@ impl Reader {
         }
         let mut seek = BudgetVec::new(&self.pool);
         seek.try_reserve_exact(1)?;
+        let full_scan = length <= 256 * 1024
+            && matches!(&self.packet_tracks, PacketTracks::Selected(pids) if pids.len() == 1);
         seek.try_push(Seeking {
             request,
             phase: Phase::Scan(Scan::default()),
+            retain: full_scan.then(|| Retain::new(&self.pool)),
+            full_scan,
         })
         .map_err(|rejected| rejected.error)?;
         let input = self.reset()?;
@@ -194,8 +226,18 @@ impl Reader {
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
             }
-            let seek = &self.seek.as_slice()[0];
+            let seek = &mut self.seek.as_mut_slice()[0];
             let request = seek.request;
+            if let Phase::Retained(output) = &mut seek.phase {
+                work.try_charge(1);
+                if let Some(event) = output.next(&mut self.tracks) {
+                    return Ok(Step::Ready(event));
+                }
+                self.seek = BudgetVec::new(&self.pool);
+                return Ok(Step::End(
+                    self.end.ok_or(Error::Invalid("retained seek end"))?,
+                ));
+            }
             if matches!(seek.phase, Phase::Deliver(_)) {
                 work.try_charge(1);
                 let Phase::Deliver(packet) = self.seek.pop().expect("pending packet").phase else {
@@ -204,18 +246,63 @@ impl Reader {
                 self.seek = BudgetVec::new(&self.pool);
                 return Ok(Step::Ready(Event::Packet(packet)));
             }
-            let step = self.advance::<true, true>(work, cancel, |_| ())?;
-            match (&mut self.seek.as_mut_slice()[0].phase, step) {
-                (Phase::Scan(_), Step::Ready(Event::Packet(packet))) => {
+            let step = if seek.retain.is_some() {
+                match self.advance::<false, false>(work, cancel, |_| ()) {
+                    Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. }) => {
+                        self.seek.as_mut_slice()[0].retain = None;
+                        self.storage = None;
+                        continue;
+                    }
+                    step => step?,
+                }
+            } else {
+                self.advance::<true, true>(work, cancel, |_| ())?
+            };
+            let seek = &mut self.seek.as_mut_slice()[0];
+            match (&mut seek.phase, step) {
+                (Phase::Scan(scan), Step::Ready(Event::Packet(packet))) => {
                     if packet.track() == request.track {
-                        return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
+                        let AccessUnit::Video(unit) = packet.access_unit() else {
+                            return Err(Error::Unsupported("MPEG-TS seek requires AVC or HEVC"));
+                        };
+                        let clock = packet.clock();
+                        let better = scan.observe(
+                            PictureProbe {
+                                offset: unit.range.start,
+                                epochs: packet.epochs(),
+                                ticks: clock.and_then(|clock| clock.pts.ticks90),
+                                time: clock.and_then(|clock| clock.pts.exact),
+                                random_access: unit.random_access,
+                                has_vcl: true,
+                            },
+                            request.target,
+                            self.limits.time_policy,
+                        )?;
+                        if let Some(retain) = &mut seek.retain
+                            && !retain.packet(packet, better)
+                        {
+                            seek.retain = None;
+                        }
                     }
                 }
-                (Phase::Scan(_), Step::Ready(Event::Other(_))) => {}
+                (Phase::Scan(_), Step::Ready(Event::Other(event))) => {
+                    if let Some(retain) = &mut seek.retain
+                        && !retain.other(event, !self.tracks.is_empty())
+                    {
+                        seek.retain = None;
+                    }
+                }
                 (Phase::Scan(scan), Step::End(end)) => {
                     let landing = scan.landing.ok_or(Error::Unsupported(
                         "MPEG-TS has no random-access picture at or before the target",
                     ))?;
+                    if let Some(retain) = seek.retain.take() {
+                        let result = seek_result(request, landing, end.offset, retain.skipped);
+                        let tracks =
+                            std::mem::replace(&mut self.tracks, BudgetVec::new(&self.pool));
+                        seek.phase = Phase::Retained(retain.finish(result, tracks));
+                        continue;
+                    }
                     let mut replay =
                         Self::new(&self.pool, self.source, self.caps, self.limits, self.window)?;
                     let input = replay.request()?;
@@ -249,17 +336,7 @@ impl Reader {
                     {
                         return Err(Error::SourceMismatch);
                     }
-                    let receipt = SeekReceipt {
-                        requested: request.target,
-                        landing: landing.time,
-                        discard_until: match request.policy {
-                            SeekPolicy::PreviousRandomAccess => landing.time,
-                            SeekPolicy::PlaybackPreroll => request.target,
-                        },
-                        method: SeekMethod::BoundedScan,
-                        scanned_bytes: *scanned_bytes,
-                        replays_from_start: !*skipped,
-                    };
+                    let receipt = seek_result(request, *landing, *scanned_bytes, *skipped);
                     self.seek.as_mut_slice()[0].phase = Phase::Deliver(packet);
                     return Ok(Step::Ready(Event::Seek(receipt)));
                 }

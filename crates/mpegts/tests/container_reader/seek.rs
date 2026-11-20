@@ -273,3 +273,80 @@ fn seek_refuses_an_ambiguous_period_zero_wrap() {
         ))
     ));
 }
+
+#[test]
+fn retained_seek_matches_replay_packets_tables_and_carrier_order() {
+    let raw = include_bytes!("../../../framing/fixtures/raw-annex-b/avc-aud0.h264");
+    let layout = include_str!("../../../framing/fixtures/raw-annex-b/avc-aud0.packets");
+    let mut ts = sample(0x1b, raw, layout, |i| 90_000 + i as u64 * 3000);
+    ts.tables(&[(0x1b, PID, &[])], 0);
+    let mut traces = Vec::new();
+    for selected in [false, true] {
+        let pool = Budget::new(1 << 20).unwrap();
+        let mut seeking = if selected {
+            Reader::new_with_packet_tracks(
+                &pool,
+                ID,
+                SourceCapabilities {
+                    length: Some(ts.bytes.len() as u64),
+                    random_access: true,
+                },
+                ReaderLimits::default(),
+                4096,
+                &[TrackId(PID.into())],
+            )
+            .unwrap()
+        } else {
+            reader(&pool, &ts.bytes, PacketFormat::Ts188)
+        };
+        let request = seeking
+            .request_seek(SeekRequest {
+                track: TrackId(PID.into()),
+                target: clock(107_000),
+                policy: SeekPolicy::PlaybackPreroll,
+            })
+            .unwrap();
+        let generation = request.token.generation();
+        let mut trace = Vec::new();
+        while let Some(event) = next(&mut seeking, &pool, &ts.bytes, 4096, 4096).unwrap() {
+            let signature = match event {
+                Event::Seek(landing) => {
+                    assert_eq!(
+                        seeking.request().unwrap().token.generation() == generation,
+                        selected
+                    );
+                    format!("seek {landing:?}")
+                }
+                Event::Packet(packet) => format!(
+                    "packet {:?} {:?} {}",
+                    packet.elementary_range(),
+                    packet.pts(),
+                    packet.payload().len()
+                ),
+                Event::Other(ReaderEvent::Transport(packet)) => {
+                    format!("carrier {} {}", packet.source_offset, packet.pid)
+                }
+                Event::Other(ReaderEvent::Continuity { pid, outcome }) => {
+                    format!("continuity {pid} {outcome:?}")
+                }
+                Event::Other(ReaderEvent::Source(source)) => match source.event() {
+                    TraceEvent::Pat(_) => format!("PAT {}", seeking.tracks().len()),
+                    TraceEvent::ProgramMap { active, .. } => {
+                        format!("PMT {active} {}", seeking.tracks().len())
+                    }
+                    TraceEvent::Pes(pes) => {
+                        format!("PES {} {}", pes.elementary_offset, pes.payload_len)
+                    }
+                    TraceEvent::Finished => "end".into(),
+                    _ => continue,
+                },
+                Event::Other(_) => continue,
+            };
+            trace.push(signature);
+        }
+        seeking.close();
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+        traces.push(trace);
+    }
+    assert_eq!(traces[0], traces[1]);
+}

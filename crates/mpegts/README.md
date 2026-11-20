@@ -135,8 +135,9 @@ input-window, work, cancellation, backpressure and reset protocol.
 `Reader::request_seek` scans one seekable, length-known entity for the last
 coded AVC or HEVC random-access picture at or before the requested presentation
 time. It is bounded by `ReaderLimits::maximum_seek_scan_bytes` (64 MiB by default).
-It replays the entity to preserve original packet bytes, clocks and source
-ranges. A seek receipt precedes the landing packet. For `PlaybackPreroll`, the
+It preserves original packet bytes, clocks and source ranges by retaining a
+bounded single-track suffix or by replaying the entity. A seek receipt precedes
+the landing packet. For `PlaybackPreroll`, the
 receipt retains the requested discard time. Decoder setup is the caller's
 responsibility. Seek refuses unresolved random-access timestamps, changes
 of the selected track's source epoch, ambiguous clock wraps, and continued entities.
