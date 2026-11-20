@@ -1,0 +1,9 @@
+{
+ "name": "codec-file-accuracy-deb6105a-armv7",
+ "path": "codec-file-accuracy-deb6105a-armv7",
+ "retention": "retained",
+ "reason": "Decoded PCM and stereo s16 output for all ten file workloads on ARMv7, including per-file sample differences, input and worker hashes, and the numeric rules.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/armv7/registered-file-accuracy/134c96bdecb862c724a3d99b13cde88a3775d8980cf4f0ebc05b9d19590c49f5.tar.zst",
+ "sha256": "134c96bdecb862c724a3d99b13cde88a3775d8980cf4f0ebc05b9d19590c49f5",
+ "bytes": 3476802
+}

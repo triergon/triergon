@@ -108,6 +108,22 @@ A gate run that [reuses](quality.md#reuse) a cited result changes no row: the ro
 the revision and set it was measured with, and the run's `gate-result.json` names that
 set as reused.
 
+The linked workers at `deb6105a` cover 3,092 distinct cases per target across capture,
+framing, containers, file decoding, playback, glyph extents and subtitles. On AArch64,
+3,074 of 3,088 timed cases were as fast as their reference on the upper paired bound;
+3,084 passed the runtime gate, 3,081 used less peak heap and 3,088 used less total RSS.
+Four ASS cases disagreed with libass on overflowing event bounds. On ARMv7, 3,082 of
+3,092 timed cases were as fast as their reference, 3,090 passed runtime, 3,084 used
+less peak heap and 2,957 used less total RSS. All 135 ARMv7 packet-framing resident
+bounds exceeded one. Two glyph-extent cases per target and two AArch64 packet-framing
+cases exceeded the runtime ceiling.
+
+At that revision all ten file-audio inputs passed their numerical comparisons on each
+target. The FLAC corpus contained 182 exact packet comparisons and five documented
+packet differences. It had 183 passing decoded-output comparisons and four open cases.
+These measurements identify the linked binaries at `deb6105a`. The feature tables
+give the published revision for each implementation.
+
 On c6g.4xlarge, the two registered FLAC files were decoded at `0230c88e` and
 `3e3ba929` in 30 paired runs per target. For 16-bit stereo and 24-bit six-channel
 audio, respectively, median decode time on ARMv7 fell by 16.9% and 7.1%
@@ -1005,6 +1021,22 @@ peak heap ≤0.316, total RSS ≤0.7433, all lower).
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
+| MPEG-1 capture, first eight inputs, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`1b53faf1a7d7f83e50a90e22fbac8903f7961c544ef48b3a0f58c0091c4d5bce`](../harness/evidence/sets/public-capture-low-deb6105a-aarch64.json) |
+| MPEG-1 capture, remaining seven inputs, packet framing and MPEG-TS access units, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`a1f5937bb9e0163be50dc1a24900695b5207b3b07daf6e8c2056ea1bad06a535`](../harness/evidence/sets/public-capture-framing-deb6105a-aarch64.json) |
+| MPEG-1 capture, first eight inputs, ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`f87e971033c19cf288c3194dd0104ddcd5d4a2ba09502b39d9fa999a6ed8e380`](../harness/evidence/sets/public-capture-low-deb6105a-armv7.json) |
+| MPEG-1 capture, remaining seven inputs, packet framing and MPEG-TS access units, ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`8455e62a79a0cb6fe176fcfd63ad0c6ffc45faf6519b14bdab5c752efce52e0d`](../harness/evidence/sets/public-capture-framing-deb6105a-armv7.json) |
+| Decoded samples and stereo output for the ten file workloads, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`e631aad20bf1545bfbc14704e33fbc916761b5c5885ac5d8a6d316d75257b554`](../harness/evidence/sets/codec-file-accuracy-deb6105a-aarch64.json) |
+| Decoded samples and stereo output for the ten file workloads, ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`134c96bdecb862c724a3d99b13cde88a3775d8980cf4f0ebc05b9d19590c49f5`](../harness/evidence/sets/codec-file-accuracy-deb6105a-armv7.json) |
+| ISO BMFF open, index, seek, range and forward playback, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`4e0d6ffff6bc3e1e1aee5c2c07a1d21afe172aa0d512fd948983f54310f087c5`](../harness/evidence/sets/public-isobmff-deb6105a-aarch64.json) |
+| ISO BMFF open, index, seek, range and forward playback, ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`fffa1799a6458b7122157ccdaa3cc8be86333ef68c4b280442765299b9d85ec6`](../harness/evidence/sets/public-isobmff-deb6105a-armv7.json) |
+| Transport, HLS, Matroska and elementary playback, fonts and shaping, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`28dd92402d28a4204649361cc42ee28230b3fa00a0a9426525e0261d6a6e0b94`](../harness/evidence/sets/public-playback-graphics-deb6105a-aarch64.json) |
+| Transport, HLS, Matroska and elementary playback, fonts and shaping, ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`7c1f241f500b8d2b54a516aa41ba992cdffb4fb67db18fa39ded669ad2530862`](../harness/evidence/sets/public-playback-graphics-deb6105a-armv7.json) |
+| Subtitle text, DVB, teletext, PGS capsules and ASS rendering, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`f709188baed9ddc04becc5ad8f0aab75cab1d739de64815e39f0ad9f43ff4642`](../harness/evidence/sets/public-subtitle-ass-deb6105a-aarch64.json) |
+| Subtitle text, DVB, teletext, PGS capsules and ASS rendering, ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`664944bb9ad0e1a660fe8f1da1fac76eb60e4a5a9a88a01427dfcfa6f242601c`](../harness/evidence/sets/public-subtitle-ass-deb6105a-armv7.json) |
+| File audio runtime and memory, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`e5d323cd62b44cbb848f0d4a0550005e8f7cde2a27ba479f5fb82d1b04d3f9a5`](../harness/evidence/sets/public-file-codecs-deb6105a-aarch64.json) |
+| FLAC packet and PCM comparison, AArch64 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`c943cd76153aa5df738fbedf5fc9625f42cd48b0a86f1bf9b678fae495953d40`](../harness/evidence/sets/flac-187-deb6105a-aarch64.json) |
+| File audio runtime and memory, 32-bit ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`67e67b4a39dc3abf436cc1437c064efa0d7c368655bd2b6e19b3fe9956e2b347`](../harness/evidence/sets/public-file-codecs-deb6105a-armv7.json) |
+| FLAC packet and PCM comparison, 32-bit ARMv7 Linux | `deb6105a9644aa95adf6bea2b71c96845d3c6dfb` | [`5b89fd0b6c25642da5aaa77b49989180665e09588fecbc54a6e3a8bc7b73a169`](../harness/evidence/sets/flac-187-deb6105a-armv7.json) |
 | FLAC file decoding compared with `3e3ba929`, AArch64 Linux | `0230c88e4bb78677484d7b7d00a9c80e0be66d37` | [`b3320c7ff3c9d0fd3c9d6f665c7fa41499cf87992c4e12e41277907b4617a49a`](../harness/evidence/sets/flac-rice-0230c88e-aarch64.json) |
 | FLAC file decoding compared with `3e3ba929`, 32-bit ARMv7 Linux | `0230c88e4bb78677484d7b7d00a9c80e0be66d37` | [`06e9f4afbc18def659c6b3f58dedd095529deeeb557d5215986385b12364d567`](../harness/evidence/sets/flac-rice-0230c88e-armv7.json) |
 | Full gate run, Linux AArch64, shard 1 of 8 | `a73350cad69905e273984ed479cf8bbff8f54f93` | [`c83c3bf8dc9c9ea81ac8c6d9fe3404c110741c9615b062640a62b2a1ca5dd2f3`](../harness/evidence/sets/gate-run-aarch64-a73350ca-20261116-023216-shard-1.json) |

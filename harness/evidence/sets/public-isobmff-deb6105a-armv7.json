@@ -1,0 +1,124 @@
+{
+ "name": "public-isobmff-deb6105a-armv7",
+ "path": "public-isobmff-deb6105a-armv7",
+ "retention": "retained",
+ "reason": "ISO BMFF open, index, seek, range and forward playback on ARMv7. Contains per-case reference measurements, build and input identities, and the recorded outcomes.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/armv7/result/fffa1799a6458b7122157ccdaa3cc8be86333ef68c4b280442765299b9d85ec6.tar.zst",
+ "sha256": "fffa1799a6458b7122157ccdaa3cc8be86333ef68c4b280442765299b9d85ec6",
+ "bytes": 170339010,
+ "results": [
+  {
+   "path": "memory/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "eb6a1bb3d376c599b9b184886bfe0a17786ccfd7891f284ef442fb18355c7916",
+   "status": 0,
+   "report_sha256": "d135b206b3f5f5f406eb6dd5908584a32de398d063c6c47b373c50ac726d3369",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-forward/gate-result.json",
+   "command": "report --memory",
+   "key": "8d4776d42cf170897748539cdb0dcf7f2f6fab077d94c14b502a8ff89ee15f01",
+   "status": 0,
+   "report_sha256": "21a26eb17ebf2be2ab362dd2dfa874d1851b4aa70203fc13596699164c175ea4",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --memory",
+   "key": "652dc33965b0c410a00b5d80b9e3f364beadafc4395c226c13748b50ecbaef8d",
+   "status": 0,
+   "report_sha256": "85d1eb51e8098d210cc71a9d90746426caac45dcc52a0c7dfc408546aab3aaab",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/mp4-range/gate-result.json",
+   "command": "report --memory",
+   "key": "9dae49f455fdebc138998f43bf6be1e147bc76f7c578ea2ccfbb8fe39ef258c3",
+   "status": 0,
+   "report_sha256": "46796df8eb728f63ed99f1b2c371a126d0dc611056ebd144feeb74121da12149",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "226fcb3c47857cec7a153d872e50587e1a54bff340877ec84217adbb60ff4c11",
+   "status": 0,
+   "report_sha256": "7e53727e487a58c230c5b181de88d7d4ed1b69cbb0f5935844dd681737f5e4ee",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --memory",
+   "key": "262e3badc7f8a58dd4890eac331cf75d9767253fe2d8dd71c9d44b6b18958966",
+   "status": 0,
+   "report_sha256": "c9f8eff3dcf18ff98db9f6f79c289cad91e81aa7e2948a0c79e2a0d07b105d09",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-2/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "552dca7fc6d9c7f45fbc62bd475d938dcd4941bebbb391e18615e0401a912c9d",
+   "status": 0,
+   "report_sha256": "f764e79c65040d30b14210ca318f414a81c7a63790c879a2c58e85286497b60b",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-forward/gate-result.json",
+   "command": "report --benchmark",
+   "key": "607b8205644ec1f88c872fb8c2e448ef467de90f697b6522c02b1d886e605894",
+   "status": 0,
+   "report_sha256": "019751f3561f2ba2b569c0ee69b19845c550c89d32900bd18c3496ed4c4e7a61",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-seek/gate-result.json",
+   "command": "isobmff-seek --benchmark",
+   "key": "b1395fe77035280c9b88b54e9801cacd5aececef64bcc815051a238bed38c091",
+   "status": 0,
+   "report_sha256": "2238205680cac26069551f29c978dba65ca70d60309d6cb79eca875f18775db2",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/mp4-range/gate-result.json",
+   "command": "report --benchmark",
+   "key": "10bd2d2f291f3a72017fd610f4479cf0af79c2c84a98e21a85610f6243400a94",
+   "status": 0,
+   "report_sha256": "44dfb3c671a387be9312c0ea1316c99833fdc5d21e738e53a24c98d556331b01",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-3/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "d3fa85436a05c383baf86b92c1da1a0b363de9ffc4f1e274775a5452153ff67d",
+   "status": 0,
+   "report_sha256": "f80cd9c836ac8113f1c41810ba8623ca3084c372c49b3f835d9d7bad2d2d2313",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/isobmff-1/gate-result.json",
+   "command": "isobmff-bench --benchmark",
+   "key": "3a9aa6d08985fac16b61e5fda4e89d4237dd7906220e72d0bb62f8f64d102482",
+   "status": 0,
+   "report_sha256": "beb4829c53407410a5bdf6381539b92cc884f60ad1de80706524152deb8fa18d",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/mp4-forward/gate-result.json",
+   "command": "grade",
+   "key": "b44e7ade0f4e632307df6baf4b21a98fa64702ff614d931f5e9fe104416e70d8",
+   "status": 0,
+   "report_sha256": "c849f80d1bae46dd0067687e91a405cc968288436c9c638a91cdd50cb2d9ccd6"
+  },
+  {
+   "path": "graded/mp4-range/gate-result.json",
+   "command": "grade",
+   "key": "3b6fc33f0f1c74b228862bef2d40b24306ecc56bd0921ca6eeddd3e284d68c6a",
+   "status": 0,
+   "report_sha256": "9d5db013ee76d636e73cdd34533a9eec4153d51c3b47dfa5d59385233fc66932"
+  }
+ ],
+ "source_revisions": [
+  "deb6105a9644aa95adf6bea2b71c96845d3c6dfb"
+ ]
+}
