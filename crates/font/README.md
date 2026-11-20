@@ -103,11 +103,11 @@ encoding through the charset's lowest glyph of each SID. Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
 valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
-another reader selects). When a name-keyed CFF face has a Unicode charmap and
-its encoding has no supplements, the reader indexes only the standard string IDs
-its encoding or a `seac` can use. A CID-keyed CFF face validates the complete
-charset and retains the CIDs only when it needs them to construct the glyph-name
-charmap.
+another reader selects). When a name-keyed CFF face can skip glyph-name synthesis,
+the reverse index needs at most 150 slots for StandardEncoding or a custom
+encoding with the supplement bit clear. ExpertEncoding needs at most 379 slots.
+A CID-keyed CFF face validates the complete charset and retains the CIDs only
+when it needs them to construct the glyph-name charmap.
 Format 4 is read as FreeType reads it: a linear search
 through segments its validation finds unsorted, else a binary search that for
 overlapping segments takes the first holding the code, and `char_next`'s walk
