@@ -16,7 +16,6 @@ pub mod container;
 mod error;
 mod input;
 mod round;
-pub mod signature;
 mod time;
 mod wide;
 mod work;

@@ -20,8 +20,8 @@ use super::{Cff, Private, Version};
 use crate::Limits;
 use crate::fixed::{div_fix, mul_fix, sqrt_fixed};
 use crate::outline::Outline;
+use crate::postscript::STANDARD_ENCODING;
 use crate::read::Reader;
-use crate::standard_encoding_sid;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -588,8 +588,11 @@ impl<'a, C: Contours, O: Observe> Run<'a, C, O> {
             }
             // FreeType draws the accent, at its offset, before the base.
             for (code, at) in [(seac.accent, (seac.dx, seac.dy)), (seac.base, (0, 0))] {
-                let code = u8::try_from(to_int(code)).map_err(|_| Error::Invalid("seac code"))?;
-                let sid = standard_encoding_sid(code);
+                let code = usize::try_from(to_int(code))
+                    .ok()
+                    .filter(|&c| c < 256)
+                    .ok_or(Error::Invalid("seac code"))?;
+                let sid = STANDARD_ENCODING[code];
                 let component = self
                     .cff
                     .glyph_for_sid(sid)
@@ -1133,7 +1136,7 @@ fn flex(op: CharstringOperator, a: &[Fixed]) -> Result<[[Fixed; 6]; 2]> {
 #[cfg(test)]
 mod tests {
     use super::{CharstringOperator as Op, bias, flex, int, to_int};
-    use crate::standard_encoding_sid;
+    use crate::postscript::STANDARD_ENCODING;
 
     #[test]
     fn bias_flex_numbers_and_standard_codes() {
@@ -1155,9 +1158,9 @@ mod tests {
         );
         // space, A, asciitilde, exclamdown, germandbls.
         assert_eq!(
-            [32, 65, 126, 161, 251].map(standard_encoding_sid),
+            [32, 65, 126, 161, 251].map(|c| STANDARD_ENCODING[c]),
             [1, 34, 95, 96, 149]
         );
-        assert_eq!(standard_encoding_sid(127), 0);
+        assert_eq!(STANDARD_ENCODING[127], 0);
     }
 }

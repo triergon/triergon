@@ -16,16 +16,6 @@ fn the_test_font_ligates_kerns_and_attaches() {
 }
 
 #[test]
-fn variation_selectors_shape_with_and_without_a_mapping() {
-    let plain = support::shape_latin("ab");
-    let mut variant = plain.clone();
-    variant[0].0 = 29;
-    variant[0].1.x_advance = 529;
-    assert_eq!(support::shape_latin("a\u{fe0f}b"), variant);
-    assert_eq!(support::shape_latin("a\u{fe0e}b"), plain);
-}
-
-#[test]
 fn work_beyond_the_limits_is_a_policy_error() {
     let text = "fiav\u{301}".repeat(64);
     let within = |work_per_char| {

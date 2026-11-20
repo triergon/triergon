@@ -431,8 +431,7 @@ impl Pipeline {
         let geometry = room.geometry;
         let opaque_background = evaluated.last.border_style.0 == 4;
         if opaque_background
-            && let Some(image) =
-                background(geometry, evaluated, room.scales, area, &self.budget, work)?
+            && let Some(image) = background(geometry, evaluated, room.scales, area, &self.budget)?
         {
             self.event_images.try_push(image).map_err(|e| e.error)?;
         }
@@ -444,7 +443,6 @@ impl Pipeline {
             !opaque_background,
             mask.as_ref(),
             &self.budget,
-            work,
             &mut self.event_images,
         )
     }
@@ -506,7 +504,6 @@ fn background(
     scales: &Scales,
     event: collisions::Rect,
     budget: &Budget,
-    work: &mut WorkBudget,
 ) -> Result<Option<Image>> {
     let size = |shadow: f64, scale: f64| {
         if shadow > 0.0 {
@@ -528,7 +525,7 @@ fn background(
     );
     let colour = apply_fade(last.colours.back, evaluated.state.fade);
     let canvas = geometry.canvas;
-    images::background(area, (canvas.width, canvas.height), colour, budget, work)
+    images::background(area, (canvas.width, canvas.height), colour, budget)
 }
 
 /// The event's clip rectangle in the frame.
@@ -576,6 +573,3 @@ fn clipping(geometry: &Geometry<'_>, state: &EventState<'_>) -> Clipping {
         },
     }
 }
-
-#[cfg(test)]
-mod tests;

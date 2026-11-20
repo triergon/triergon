@@ -6,12 +6,12 @@
 
 use std::sync::Arc;
 
-use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Result};
 use triergon_raster::{Bitmap, Clip, ClipFrame, Colour, Limits, PlacedBitmap, Rect};
 
 use super::bitmaps::{Combined, Composited, SharedBitmap};
 use super::cache::Kept;
-use crate::{Karaoke, Rgba, charge};
+use crate::{Karaoke, Rgba};
 
 /// What an image draws.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -72,8 +72,6 @@ enum Part {
 enum Source {
     Run(Kept<Composited>, Part),
     Own(Arc<Bitmap>),
-    /// Every row of a style-4 background shows the same opaque pixels.
-    Solid(Arc<BudgetVec<u8>>),
 }
 
 /// One image of a frame: an alpha bitmap to blend in one colour at a frame
@@ -124,6 +122,18 @@ impl Image {
         }
     }
 
+    /// The bitmap the image shows a window of.
+    fn pixels(&self) -> Option<&Bitmap> {
+        match &self.source {
+            Source::Run(composite, part) => match part {
+                Part::Fill => composite.fill.as_ref(),
+                Part::Border => composite.border.as_ref(),
+                Part::Shadow => composite.shadow.as_ref(),
+            },
+            Source::Own(bitmap) => Some(bitmap),
+        }
+    }
+
     /// The width in pixels.
     pub const fn width(&self) -> usize {
         self.width
@@ -137,16 +147,9 @@ impl Image {
     /// The alpha rows, top to bottom, each [`Image::width`] bytes: 255 is
     /// fully covered.
     pub fn rows(&self) -> impl ExactSizeIterator<Item = &[u8]> + '_ {
-        let (stride, data) = match &self.source {
-            Source::Run(composite, part) => match part {
-                Part::Fill => composite.fill.as_ref(),
-                Part::Border => composite.border.as_ref(),
-                Part::Shadow => composite.shadow.as_ref(),
-            }
-            .map_or((0, &[][..]), |b| (b.stride(), b.data())),
-            Source::Own(bitmap) => (bitmap.stride(), bitmap.data()),
-            Source::Solid(row) => (0, row.as_slice()),
-        };
+        let (stride, data) = self
+            .pixels()
+            .map_or((0, &[][..]), |b| (b.stride(), b.data()));
         (0..self.height).map(move |y| {
             let start = (self.row + y) * stride + self.column;
             &data[start..start + self.width]
@@ -202,9 +205,9 @@ pub(super) fn render_text(
     with_shadows: bool,
     mask: Option<&ClipMask>,
     budget: &Budget,
-    work: &mut WorkBudget,
     out: &mut BudgetVec<Image>,
 ) -> Result<()> {
+    let start = out.len();
     let mut emit = |run: &Combined,
                     which: Part,
                     bitmap: &Bitmap,
@@ -216,7 +219,7 @@ pub(super) fn render_text(
             .clip
             .parts(bitmap, run.origin, split, &clipping.frame)
         {
-            let mut image = Image {
+            out.try_push(Image {
                 kind,
                 x: part.position.x,
                 y: part.position.y,
@@ -230,11 +233,8 @@ pub(super) fn render_text(
                 row: part.source_y,
                 stride: bitmap.stride(),
                 source: Source::Run(run.composite.clone(), which),
-            };
-            if let Some(mask) = mask {
-                blend_vector_clip(&mut image, bitmap, mask, budget, work)?;
-            }
-            out.try_push(image).map_err(|e| e.error)?;
+            })
+            .map_err(|e| e.error)?;
         }
         Ok(())
     };
@@ -285,71 +285,76 @@ pub(super) fn render_text(
         };
         emit(run, Part::Fill, fill, colours, split, ImageKind::Fill)?;
     }
+    if let Some(mask) = mask {
+        for image in &mut out.as_mut_slice()[start..] {
+            blend_vector_clip(image, mask, budget)?;
+        }
+    }
     Ok(())
 }
 
 /// `blend_vector_clip` on one image: multiplied by the clip (or its inverse)
 /// where they overlap, into new pixels; a regular clip leaves an empty image
 /// where they do not.
-fn blend_vector_clip(
-    image: &mut Image,
-    source: &Bitmap,
-    mask: &ClipMask,
-    budget: &Budget,
-    work: &mut WorkBudget,
-) -> Result<()> {
+fn blend_vector_clip(image: &mut Image, mask: &ClipMask, budget: &Budget) -> Result<()> {
     let (ax, ay) = (image.x, image.y);
+    let (aw, ah) = (image.width as i32, image.height as i32);
     let clip = &*mask.bitmap.bitmap;
     let origin = mask.bitmap.origin;
     let bx = origin.x.wrapping_add(clip.position.x);
     let by = origin.y.wrapping_add(clip.position.y);
+    let (bw, bh) = (clip.width() as i32, clip.height() as i32);
     let left = ax.max(bx);
     let top = ay.max(by);
-    let right = (i64::from(ax) + image.width as i64).min(i64::from(bx) + clip.width() as i64);
-    let bottom = (i64::from(ay) + image.height as i64).min(i64::from(by) + clip.height() as i64);
-    if right <= i64::from(left) || bottom <= i64::from(top) {
-        if !mask.inverse {
+    let right = (ax + aw).min(bx + bw);
+    let bottom = (ay + ah).min(by + bh);
+    let (w, h) = (right - left, bottom - top);
+    let disjoint = ax + aw < bx || ay + ah < by || ax > bx + bw || ay > by + bh || h == 0 || w == 0;
+    if mask.inverse {
+        if disjoint {
+            return Ok(());
+        }
+        let mut pixels = copy(image, 0, 0, image.width, image.height, budget)?;
+        pixels.multiply_inverse(clip, bx - ax, by - ay);
+        image.source = Source::Own(Arc::new(pixels));
+        (image.column, image.row) = (0, 0);
+    } else {
+        if disjoint {
             image.width = 0;
             image.height = 0;
             image.stride = 0;
+            return Ok(());
         }
-        return Ok(());
-    }
-    let w = (right - i64::from(left)) as usize;
-    let h = (bottom - i64::from(top)) as usize;
-    // Both passes are bounded before allocating: only the overlap is
-    // multiplied, but an inverse clip keeps the rest of the image as well.
-    charge(work, w.div_ceil(16).saturating_mul(h))?;
-    let (x, y, width, height) = if mask.inverse {
-        (image.column, image.row, image.width, image.height)
-    } else {
-        (
-            image.column + (left - ax) as usize,
-            image.row + (top - ay) as usize,
-            w,
-            h,
-        )
-    };
-    let mut pixels = source.copy_region(
-        x..x + width,
-        y..y + height,
-        budget,
-        &Limits::default(),
-        work,
-    )?;
-    if mask.inverse {
-        pixels.multiply_inverse(clip, bx - ax, by - ay);
-    } else {
+        let (aleft, atop) = ((left - ax) as usize, (top - ay) as usize);
+        let mut pixels = copy(image, aleft, atop, w as usize, h as usize, budget)?;
         pixels.multiply(clip, bx - left, by - top);
+        let stride = pixels.stride();
+        image.source = Source::Own(Arc::new(pixels));
+        (image.column, image.row) = (0, 0);
         image.x = left;
         image.y = top;
-        image.width = w;
-        image.height = h;
-        image.stride = pixels.stride();
+        image.width = w as usize;
+        image.height = h as usize;
+        image.stride = stride;
     }
-    image.source = Source::Own(Arc::new(pixels));
-    (image.column, image.row) = (0, 0);
     Ok(())
+}
+
+/// The `width` × `height` pixels of `image` from (`x`, `y`) as a bitmap of
+/// their own.
+fn copy(
+    image: &Image,
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    budget: &Budget,
+) -> Result<Bitmap> {
+    let mut bitmap = Bitmap::new(budget, width, height, &Limits::default())?;
+    for (dst, src) in bitmap.rows_mut().zip(image.rows().skip(y)) {
+        dst[..width].copy_from_slice(&src[x..x + width]);
+    }
+    Ok(bitmap)
 }
 
 /// `add_background`: the box of a `BorderStyle` 4 event, its positive shadow
@@ -359,7 +364,6 @@ pub(super) fn background(
     frame: (i32, i32),
     colour: Rgba,
     budget: &Budget,
-    work: &mut WorkBudget,
 ) -> Result<Option<Image>> {
     let clamp = |v: i32, max: i32| v.clamp(0, max);
     let left = clamp(area.x_min, frame.0);
@@ -370,22 +374,21 @@ pub(super) fn background(
     if w < 1 || h < 1 {
         return Ok(None);
     }
-    let (width, height) = (w as usize, h as usize);
-    let stride = Bitmap::stride_within(width, height, &Limits::default())?;
-    charge(work, width.div_ceil(16))?;
-    let mut row = BudgetVec::new(budget);
-    row.try_resize(width, 0xff)?;
+    let mut bitmap = Bitmap::new(budget, w as usize, h as usize, &Limits::default())?;
+    for row in bitmap.rows_mut() {
+        row.fill(0xff);
+    }
     Ok(Some(Image {
         kind: ImageKind::Background,
         x: left,
         y: top,
         colour,
-        width,
-        height,
-        stride,
+        width: w as usize,
+        height: h as usize,
+        stride: bitmap.stride(),
         column: 0,
         row: 0,
-        source: Source::Solid(Arc::new(row)),
+        source: Source::Own(Arc::new(bitmap)),
     }))
 }
 

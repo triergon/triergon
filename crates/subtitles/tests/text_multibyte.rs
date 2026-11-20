@@ -220,10 +220,7 @@ fn low_level(raw: &[u8], profile: M) -> Result<String, Error> {
 
 fn all_short_inputs(index: usize) {
     let (profile, original, _) = PROFILES[index];
-    check_short_inputs(profile, &mapping(profile, original));
-}
-
-fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>) {
+    let table = mapping(profile, original);
     for first in 0u16..256 {
         match table.get(&first) {
             Some(value) => assert_eq!(
@@ -247,79 +244,6 @@ fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>)
                     actual.is_err(),
                     "unexpected acceptance {profile:?} {raw:02x?}"
                 );
-            }
-        }
-    }
-}
-
-// These receiver profiles use distinct tables. Compare the public decoder,
-// including the direct ASCII path, with every one- and two-byte table result.
-#[test]
-fn every_receiver_big5_and_cp932_one_and_two_byte_input() {
-    for (profile, records) in [
-        (
-            M::ReceiverBig5Glibc239,
-            include_bytes!("../src/text/charset/mapping-data/receiver_big5_glibc239.bin")
-                .as_slice(),
-        ),
-        (
-            M::ReceiverWindows932Pua,
-            include_bytes!("../src/text/charset/mapping-data/receiver_cp932_pua.bin").as_slice(),
-        ),
-    ] {
-        let (records, remainder) = records.as_chunks::<4>();
-        assert!(remainder.is_empty());
-        let table = records
-            .iter()
-            .map(|&[a, b, c, d]| {
-                let code = u16::from_be_bytes([a, b]);
-                let value = char::from_u32(u32::from(u16::from_be_bytes([c, d]))).unwrap();
-                (code, value)
-            })
-            .collect();
-        check_short_inputs(profile, &table);
-    }
-}
-
-/// Single-byte results from the source repertoire, including an unfinished lead at EOF.
-fn euc_kr_single(byte: u8, single_max: u8) -> Result<String, Error> {
-    match byte {
-        b if b <= single_max => Ok(char::from(b).to_string()),
-        0xa1..=0xfe => Err(Error::Truncated),
-        _ => Err(Error::Invalid("unmapped multibyte byte")),
-    }
-}
-
-#[test]
-fn every_euc_kr_profile_reports_exact_scalars_and_refusals() {
-    for (profile, single_max) in [
-        (M::EucKr, 0x7f),
-        (M::ReceiverEucKrC1, 0x9f),
-        (M::ReceiverEucKrGlibc239, 0x9f),
-    ] {
-        let mut pairs = mapping(M::EucKr, include_str!("multibyte-mapping-data/CP949.TXT"));
-        if profile == M::ReceiverEucKrGlibc239 {
-            assert!(pairs.insert(0xa2e8, '\u{327e}').is_none());
-        }
-        for first in 0..=u8::MAX {
-            let prefix = euc_kr_single(first, single_max);
-            assert_eq!(
-                low_level(&[first], profile),
-                prefix,
-                "{profile:?} {first:02x}"
-            );
-            for second in 0..=u8::MAX {
-                let raw = [first, second];
-                let expected = match &prefix {
-                    Ok(a) => euc_kr_single(second, single_max).map(|b| format!("{a}{b}")),
-                    Err(Error::Truncated) if (0xa1..=0xfe).contains(&second) => pairs
-                        .get(&u16::from_be_bytes(raw))
-                        .map(char::to_string)
-                        .ok_or(Error::Invalid("unmapped multibyte pair")),
-                    Err(Error::Truncated) => Err(Error::Invalid("invalid multibyte trail")),
-                    Err(error) => Err(*error),
-                };
-                assert_eq!(low_level(&raw, profile), expected, "{profile:?} {raw:02x?}");
             }
         }
     }

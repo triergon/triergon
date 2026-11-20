@@ -243,26 +243,13 @@ fn cmap() -> Vec<u8> {
     for _ in &segments {
         be16(&mut sub, 0);
     }
-    // Format 14: 'a' with VS16 maps to alternate 'a' (glyph 29).
     let mut t = Vec::new();
     be16(&mut t, 0);
-    be16(&mut t, 2);
-    be16(&mut t, 0);
-    be16(&mut t, 5);
-    t.extend((20 + sub.len() as u32).to_be_bytes());
+    be16(&mut t, 1);
     be16(&mut t, 3);
     be16(&mut t, 1);
-    t.extend(20_u32.to_be_bytes());
+    t.extend(12_u32.to_be_bytes());
     t.extend(sub);
-    be16(&mut t, 14);
-    t.extend(30_u32.to_be_bytes()); // subtable length
-    t.extend(1_u32.to_be_bytes()); // one selector
-    t.extend([0, 0xfe, 0x0f]);
-    t.extend(0_u32.to_be_bytes()); // no default ranges
-    t.extend(21_u32.to_be_bytes()); // non-default mappings
-    t.extend(1_u32.to_be_bytes());
-    t.extend([0, 0, b'a']);
-    be16(&mut t, 29);
     t
 }
 

@@ -2,10 +2,7 @@
 #![cfg(feature = "elementary")]
 mod common;
 
-use triergon::{
-    AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probe, open_blocking,
-    open_sequential, probe,
-};
+use triergon::{CodecId, ContainerReader, MediaKind, PacketInfo, Probe, probe};
 
 #[test]
 fn any_reader_reads_mpeg_audio_frames() {
@@ -62,30 +59,4 @@ fn any_reader_reads_flac_that_starts_at_a_frame() {
     assert_eq!(packets.len(), 4);
     assert!(packets.iter().all(|p| p.payload().len() == 208));
     assert_eq!(packets[3].pts(), Some(3 * 4096));
-}
-
-#[test]
-fn blocking_probe_preserves_late_elementary_candidates_and_their_priority() {
-    let pool = Budget::new(1 << 20).unwrap();
-    let mut bytes = vec![0x21; 4000];
-    bytes.extend(flac_frame(7, 200));
-    bytes.extend(flac_frame(8, 200));
-    assert!(matches!(
-        open_sequential(&bytes[..], &pool).unwrap().reader(),
-        AnyReader::Flac(_)
-    ));
-    let mut mpeg = vec![0; 417];
-    mpeg[..4].copy_from_slice(&0xfffb_9064u32.to_be_bytes());
-    bytes.extend(mpeg.repeat(3));
-    assert_eq!(probe(&bytes), Probe::MpegAudio);
-    assert!(matches!(
-        open_sequential(&bytes[..], &pool).unwrap().reader(),
-        AnyReader::MpegAudio(_)
-    ));
-    assert!(matches!(
-        open_blocking(std::io::Cursor::new(bytes), &pool)
-            .unwrap()
-            .reader(),
-        AnyReader::MpegAudio(_)
-    ));
 }

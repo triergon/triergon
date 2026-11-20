@@ -38,7 +38,6 @@ pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, MacStyle, Os2};
 pub use name::{Language, NameChars, NameId, NameRecord, Platform};
 pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
-pub use postscript::standard_encoding_sid;
 pub use sized::{Band, Load, SizeMetrics, SizedFont};
 pub use store::{Built, Store, StoreKey};
 pub use synthesis::{Orientation, Synthesis};

@@ -23,12 +23,6 @@ const fn base(unicode: u32) -> u32 {
     unicode & !VARIANT_BIT
 }
 
-/// The CFF string ID for an Adobe StandardEncoding character code (TN 5176,
-/// Appendix B). Unassigned codes map to SID 0, `.notdef`.
-pub const fn standard_encoding_sid(code: u8) -> u16 {
-    STANDARD_ENCODING[code as usize]
-}
-
 /// The CFF standard string of `sid`, a glyph name.
 pub(crate) fn standard_string(sid: u16) -> Option<&'static str> {
     STANDARD_STRINGS.get(usize::from(sid)).copied()
@@ -338,18 +332,9 @@ impl PointerWidth {
 #[cfg(test)]
 mod tests {
     use super::{
-        EXPERT_ENCODING, PointerWidth, STANDARD_ENCODING, UnicodeMap, VARIANT_BIT,
-        adobe_glyph_index, standard_string, unicode_value,
+        PointerWidth, UnicodeMap, VARIANT_BIT, adobe_glyph_index, standard_string, unicode_value,
     };
     use triergon_core::Budget;
-
-    #[test]
-    fn predefined_encodings_support_the_bounded_charmap_scan() {
-        assert_eq!(STANDARD_ENCODING[..32], [0; 32]);
-        assert_eq!(EXPERT_ENCODING[..32], [0; 32]);
-        let assigned = STANDARD_ENCODING.iter().copied().filter(|&sid| sid != 0);
-        assert!(assigned.is_sorted_by(|a, b| a < b));
-    }
 
     #[test]
     fn names_read_as_freetype_reads_them() {

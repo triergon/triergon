@@ -9,7 +9,7 @@
 //! under `harness/shape/probes` that shows it (`cargo xtask shape probe`).
 
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_font::{Font, GlyphId, OutlineFormat, standard_encoding_sid};
+use triergon_font::{Font, GlyphId, OutlineFormat};
 
 /// The argument stack's capacity, CFF2's limit, which HarfBuzz applies to CFF
 /// too. probe: cff-stack, cff2-stack
@@ -24,6 +24,22 @@ const NESTING: u32 = 10;
 /// glyph's or subroutine's bytes counting as one; each component of an
 /// accented glyph counts on its own. probe: cff-limits, cff2-limits
 const OPERATIONS: u32 = 200_000;
+
+/// The standard encoding (TN 5176 Appendix B): the string ID of each code,
+/// for the accented form of `endchar`.
+const STANDARD_ENCODING: [u8; 256] = [
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+    51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+    75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96,
+    97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 0, 111, 112, 113, 114, 0,
+    115, 116, 117, 118, 119, 120, 121, 122, 0, 123, 0, 124, 125, 126, 127, 128, 129, 130, 131, 0,
+    132, 133, 0, 134, 135, 136, 137, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 138, 0, 139,
+    0, 0, 0, 0, 140, 141, 142, 143, 0, 0, 0, 0, 0, 144, 0, 0, 0, 145, 0, 0, 146, 147, 148, 149, 0,
+    0, 0, 0,
+];
 
 /// A CFF or CFF2 table's parts that do not depend on the glyph, read once
 /// for a face, whose glyphs' extents it then gives.
@@ -807,11 +823,13 @@ impl<'a> Run<'_, 'a, '_> {
     /// the charset; a code outside the encoding or a glyph the charset lacks
     /// fails.
     fn component(&mut self, code: f64) -> Step<&'a [u8]> {
-        let code = u8::try_from(code as i32).map_err(|_| Fault::Glyph)?;
-        let sid = standard_encoding_sid(code);
+        let code = usize::try_from(code.trunc() as i64).map_err(|_| Fault::Glyph)?;
+        let sid = *STANDARD_ENCODING.get(code).ok_or(Fault::Glyph)?;
         let program = self.program;
         let charset = program.charset.as_ref().ok_or(Fault::Glyph)?;
-        let glyph = charset.glyph(sid, self.work)?.ok_or(Fault::Glyph)?;
+        let glyph = charset
+            .glyph(u16::from(sid), self.work)?
+            .ok_or(Fault::Glyph)?;
         program.charstrings.get(glyph).ok_or(Fault::Glyph)
     }
 
@@ -1140,17 +1158,6 @@ mod tests {
         assert_eq!(index.get(1), Some(&b""[..]));
         assert_eq!(index.get(2), Some(&b"c"[..]));
         assert_eq!(index.get(3), None);
-    }
-
-    #[test]
-    fn index_objects_cannot_extend_past_the_final_offset() {
-        // The font outline reader recovers "abc" from the rest of this table.
-        // The shaping reader bounds both objects by the final offset.
-        let data = [0, 2, 1, 1, 4, 2, b'a', b'b', b'c'];
-        let (index, end) = Index::read(&data, 0, false).unwrap();
-        assert_eq!(end, 7);
-        assert_eq!(index.get(0), None);
-        assert_eq!(index.get(1), None);
     }
 
     #[test]

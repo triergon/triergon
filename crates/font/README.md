@@ -99,9 +99,7 @@ suffixed names as variants after their base, and FreeType's second mappings for
 pointer arithmetic does); then for a name-keyed CFF face whose encoding maps a
 code, the charmap of that encoding (`CharmapKind::CffEncoding`, platform 7): a
 custom encoding of format 0 or 1 with supplements, or the Standard or Expert
-encoding through the charset's lowest glyph of each SID. While building the
-Standard charmap, the reader stops at the first assigned SID above the face's
-maximum. Subtables of formats 14
+encoding through the charset's lowest glyph of each SID. Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
 valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
@@ -161,8 +159,7 @@ than one operand, whose mask bytes then run as charstring, and a mask over more
 than 96 stems fails the glyph, all as in FreeType), local and global subroutines (16 nested
 calls, FreeType's limit; TN 5177 states 10), arithmetic, storage and `random` operators (CFF only, as in
 FreeType), and `seac` accents through StandardEncoding and the charset, the
-accent drawn first. `standard_encoding_sid` maps a StandardEncoding byte to
-its CFF string ID, including SID 0 for unassigned codes. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
+accent drawn first. The charset (formats 0, 1 and 2, or ISOAdobe, Expert and
 ExpertSubset, which must cover the glyphs) and a name-keyed face's encoding are
 read when the face is parsed, as FreeType reads them; one it cannot read makes
 the face `Error::Invalid`. Charstrings are evaluated in 16.16 fixed

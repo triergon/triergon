@@ -59,7 +59,6 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `Rounding` |
 | Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
-| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Work | `WorkBudget` |
 | Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |
