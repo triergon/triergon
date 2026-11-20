@@ -101,7 +101,9 @@ code, the charmap of that encoding (`CharmapKind::CffEncoding`, platform 7): a
 custom encoding of format 0 or 1 with supplements, or the Standard or Expert
 encoding through the charset's lowest glyph of each SID. While building the
 Standard charmap, the reader stops at the first assigned SID above the face's
-maximum. Subtables of formats 14
+maximum. The glyph-name charmap reads a standard SID’s Unicode and secondary
+mappings directly from its fixed CFF name. Custom SIDs use the String INDEX.
+Subtables of formats 14
 and 15, which FreeType lists but cannot select, are left out of the list and
 read as variation sequences instead (`variation_sequences`, FreeType's first
 valid (0, 5) subtable of either format; `VariationSequences::format14` reads one
@@ -459,8 +461,10 @@ lookup depends on; glyph programs, cmap entries, names and kerning pairs are rea
 from the font bytes when asked for. A face retains the shared `Bytes` plus small
 tables charged to the `Budget` it was created with: the supported cmap records, one
 Private DICT per CFF FDArray entry, variation region scalars and kern subtable
-records. A face FreeType auto-hints also keeps, once a default load needs
-them, the auto-hinter's style of each glyph, its reverse charmap of accented
+records. Short `cmap` directories use stack storage for up to eight encoding
+records and eight validation entries. Both work arrays charge their requested
+capacity until subtable selection finishes. A face FreeType auto-hints also keeps,
+once a default load needs them, the auto-hinter's style of each glyph, its reverse charmap of accented
 characters and each latin or CJK style's metrics, charged to that budget, as is the
 scratch storage of an auto-hinted load. A face with TrueType programs makes, on
 its first hinted load, the interpreter's function and instruction definitions,

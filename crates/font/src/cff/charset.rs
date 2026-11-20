@@ -1,6 +1,7 @@
 //! CFF1 charsets, glyph names and Adobe encodings (Adobe Technical Note 5176).
 
 use super::{Cff, Encoding, NO_GLYPH};
+use crate::postscript::NameMapping;
 use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
@@ -61,22 +62,24 @@ impl Cff {
         Ok(())
     }
 
-    /// The glyph names in index order, as FreeType reads them for its
+    /// The glyph-name mappings in index order, as FreeType reads them for its
     /// Unicode charmap (`cff_sid_to_glyph_name`): each glyph's charset SID as
     /// a standard string below 391, else as an object of the string INDEX,
     /// up to a NUL; `None` beyond the strings. A CID-keyed font's CIDs are
     /// read as SIDs too. Empty for CFF2.
-    pub(crate) fn glyph_names<'a>(
+    pub(crate) fn glyph_name_mappings<'a>(
         &'a self,
         data: &'a [u8],
-    ) -> impl Iterator<Item = Option<&'a [u8]>> + 'a {
+    ) -> impl Iterator<Item = Option<NameMapping>> + 'a {
         let table = self.table.bytes(data);
         self.sids.iter().map(move |&sid| match sid {
             0xffff => None,
-            0..=390 => crate::postscript::standard_string(sid).map(str::as_bytes),
+            0..=390 => NameMapping::standard(sid),
             _ => {
                 let name = self.strings.get(table, u32::from(sid - 391)).ok()?;
-                Some(&name[..name.iter().position(|&b| b == 0).unwrap_or(name.len())])
+                Some(NameMapping::custom(
+                    &name[..name.iter().position(|&b| b == 0).unwrap_or(name.len())],
+                ))
             }
         })
     }

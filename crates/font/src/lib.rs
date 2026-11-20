@@ -372,7 +372,7 @@ impl Font {
         let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
         let name_map = match &outlines {
             Outlines::Cff(cff) if !unicode && cff.has_charset() => {
-                postscript::UnicodeMap::new(cff.glyph_names(bytes), budget)?
+                postscript::UnicodeMap::new(cff.glyph_name_mappings(bytes), budget)?
             }
             _ => None,
         };
