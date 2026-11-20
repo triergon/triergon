@@ -5,6 +5,7 @@
 
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::bits_at;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, Step, Time, WorkBudget};
 
 pub(super) const CORE_SYNC: u32 = 0x7ffe8001;
@@ -280,6 +281,7 @@ pub struct DtsHeaderInspector {
     fields: [FieldObservation; FIELD_COUNT],
     current: usize,
     position: u16,
+    field_start: u16,
     source_bits: u16,
     record_end: SourceLocation,
     phase: Phase,
@@ -318,6 +320,7 @@ impl DtsHeaderInspector {
             fields: [FieldObservation::NotReached; FIELD_COUNT],
             current: 0,
             position: 0,
+            field_start: 0,
             source_bits,
             record_end: SourceLocation {
                 source: identity.source,
@@ -377,32 +380,32 @@ impl DtsHeaderInspector {
                     if !work.try_charge(1) {
                         return Ok(DtsInspectionStep::Yield);
                     }
+                    self.position += 1;
+                    let width = field.width();
+                    let observed = self.position - self.field_start;
+                    if observed < u16::from(width) && self.position < self.source_bits {
+                        continue;
+                    }
+                    // A budget yield preserves the cursor. Extract the prefix once,
+                    // when the field is complete or the source ends inside it.
                     let raw = self
                         .raw
                         .as_ref()
                         .ok_or(Error::Invalid("missing DTS inspection source"))?;
-                    let position = usize::from(self.position);
-                    let bit = u32::from((raw.as_ref()[position / 8] >> (7 - position % 8)) & 1);
-                    let (offset, observed_bits, prefix) = match self.fields[self.current] {
-                        FieldObservation::NotReached => (self.position, 1, bit),
-                        FieldObservation::Bits {
-                            offset,
-                            observed_bits,
-                            prefix,
-                            ..
-                        } => (offset, observed_bits + 1, (prefix << 1) | bit),
-                        FieldObservation::NotInSyntax => {
-                            return Err(Error::Invalid("DTS skipped field transition"));
-                        }
-                    };
+                    let prefix = bits_at(
+                        raw.as_ref(),
+                        usize::from(self.field_start),
+                        u32::from(observed),
+                    )
+                    .ok_or(Error::Truncated)?;
                     self.fields[self.current] = FieldObservation::Bits {
-                        offset,
-                        width: field.width(),
-                        observed_bits,
+                        offset: self.field_start,
+                        width,
+                        observed_bits: observed as u8,
                         prefix,
                     };
-                    self.position += 1;
-                    if observed_bits == field.width() {
+                    self.field_start = self.position;
+                    if observed == u16::from(width) {
                         self.current += 1;
                         if field == DtsCoreField::Sync && prefix != CORE_SYNC {
                             self.phase = Phase::Validate;

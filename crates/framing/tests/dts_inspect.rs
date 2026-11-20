@@ -351,6 +351,44 @@ fn arbitrary_work_quanta_and_zero_work_keep_the_same_source_facts() {
 }
 
 #[test]
+fn publication_charges_each_source_bit_then_validation_and_publication() {
+    let plain = authored(false, &[]);
+    let crc = authored(true, &[]);
+    // Skipping absent HCRC costs one unit when the read cursor reaches it.
+    for (raw, charges) in [
+        (&plain[..9], 72 + 2),
+        (&plain[..11], 88 + 1 + 2),
+        (&plain[..], 104 + 1 + 2),
+        (&crc[..], 120 + 2),
+        (&[0; 15][..], 32 + 2),
+    ] {
+        let pool = Budget::new(65536).unwrap();
+        let source = Bytes::copy_from_slice(&pool, raw).unwrap();
+        let mut job = DtsHeaderInspector::new(&pool, identity(), source, 256).unwrap();
+        let cancel = AtomicBool::new(false);
+        for _ in 1..charges {
+            let mut work = WorkBudget::new(1);
+            assert!(matches!(
+                job.step(&mut work, &cancel).unwrap(),
+                DtsInspectionStep::Yield
+            ));
+            assert_eq!(work.spent(), 1);
+        }
+        let mut work = WorkBudget::new(2);
+        assert!(matches!(
+            job.step(&mut work, &cancel).unwrap(),
+            DtsInspectionStep::Ready(_)
+        ));
+        assert_eq!(work.spent(), 1);
+        assert!(matches!(
+            job.step(&mut work, &cancel).unwrap(),
+            DtsInspectionStep::End(_)
+        ));
+        assert_eq!(work.spent(), 1);
+    }
+}
+
+#[test]
 fn inspection_requires_no_new_pool_allocation_even_with_full_budget_pressure() {
     let pool = Budget::new(65536).unwrap();
     let raw = authored(true, &[]);
