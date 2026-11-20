@@ -39,7 +39,7 @@ reference's; on Linux AArch64 three malformed PSI cases of the transport worker,
 code the corpus does not run, held one more 64 KiB window of code; and the ISO BMFF
 worker's operations read only the raw-video and timed-text movies of its comparison.
 
-The [session queue workloads](../harness/session-queues/README.md) cover five real-payload feed patterns and three queue states. Native runtime and memory comparisons are pending.
+The [session queue workloads](../harness/session-queues/README.md) cover five real-payload feed patterns and three queue states. Each comparison checks decoded output before measuring paired runtime, peak heap and total RSS.
 
 | Area | Implemented | Verified against the reference | Runtime | Memory | Open |
 |---|---|---|---|---|---|
