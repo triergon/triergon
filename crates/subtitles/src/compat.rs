@@ -99,7 +99,7 @@ pub mod document {
     //! sort.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::text::demuxer::{Cue, Limits, Reader, Status, Syntax};
+    pub use crate::text::demuxer::{Cue, Limits, Reader, Status, Syntax, TimestampFieldWidth};
 }
 
 pub mod ass {
