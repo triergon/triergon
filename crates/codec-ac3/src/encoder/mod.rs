@@ -258,6 +258,7 @@ impl Encoder {
         let channels = order.len();
         let full_channels = mode.full_channels();
         let mut switches = [0_u8; BLOCKS];
+        let mut attack_peaks = [None; CHANNELS];
         let mut boundaries = [false; BLOCKS];
         let mut smooth_openings = 0_u8;
         for (block, (spectra, switch_mask)) in spectra
@@ -276,6 +277,7 @@ impl Encoder {
                 (previous, &plane[at..at + BLOCK])
             };
             for (coded, &ch) in order.iter().enumerate() {
+                let tail_peak = &mut attack_peaks[coded];
                 let previous_silent = if block == 0 {
                     self.previous_silent[coded]
                 } else {
@@ -283,6 +285,7 @@ impl Encoder {
                 };
                 let next_silent = silent[ch][block];
                 if previous_silent && next_silent {
+                    *tail_peak = Some(0.0);
                     spectra[coded].fill(0.0);
                     continue;
                 }
@@ -291,7 +294,13 @@ impl Encoder {
                 let boundary = !lfe && previous_silent != next_silent;
                 boundaries[block] |= boundary;
                 let history = (self.started || block != 0).then_some(previous);
-                if !lfe && (boundary || has_attack(history, next)) {
+                let attack = if lfe || boundary {
+                    *tail_peak = None;
+                    boundary
+                } else {
+                    has_attack(history, next, tail_peak)
+                };
+                if attack {
                     // One block-switch bit per full-bandwidth channel (A/52:2018 5.4.3.1).
                     let flag = 1 << (full_channels - coded - 1);
                     *switch_mask |= flag;
@@ -439,7 +448,7 @@ fn smooth_onset(next: &[f32]) -> bool {
     // samples are still quiet and the attack lies inside this block.
     next[0].abs() <= SILENCE_THRESHOLD
         && (next[0] != 0.0 || next[1] != 0.0)
-        && !has_attack(None, next)
+        && !has_attack(None, next, &mut None)
 }
 
 fn prefer_long_onset(
@@ -466,29 +475,31 @@ fn prefer_long_onset(
     true
 }
 
-fn has_attack(previous: Option<&[f32]>, next: &[f32]) -> bool {
+fn has_attack(previous: Option<&[f32]>, next: &[f32], tail_peak: &mut Option<f32>) -> bool {
     const WINDOW: usize = 64;
-    // The second difference emphasizes high frequencies. Its unnormalized
-    // peak has a range of [0, 4], so 0.04 is one percent of full scale.
-    let difference = |a: f32, b: f32, c: f32| ((a + c) - 2.0 * b).abs();
+    // Normalized finite PCM keeps every difference in [-4, 4]. Comparing
+    // absolute float bit patterns allows an integer maximum reduction.
+    let difference = |a: f32, b: f32, c: f32| (((a + c) - 2.0 * b).to_bits()) & 0x7fff_ffff;
     let peak = |[a, b]: [f32; 2], samples: &[f32]| {
         let boundary = difference(a, b, samples[0]).max(difference(b, samples[0], samples[1]));
-        samples
+        let peak = samples
             .windows(3)
-            .map(|s| difference(s[0], s[1], s[2]))
-            .fold(boundary, f32::max)
+            .map(|samples| difference(samples[0], samples[1], samples[2]))
+            .fold(boundary, u32::max);
+        f32::from_bits(peak)
     };
+    let cached = tail_peak.take();
     let (mut last, mut before) = if let Some(previous) = previous {
         let at = BLOCK - WINDOW;
         (
-            peak([previous[at - 2], previous[at - 1]], &previous[at..]),
+            cached.unwrap_or_else(|| peak([previous[at - 2], previous[at - 1]], &previous[at..])),
             [previous[BLOCK - 2], previous[BLOCK - 1]],
         )
     } else {
         // Establish the first signal level from input samples.
         (f32::INFINITY, [0.0; 2])
     };
-    for samples in next.chunks_exact(WINDOW) {
+    for samples in next.as_chunks::<WINDOW>().0 {
         let current = peak(before, samples);
         if current > (16.0 * last).max(0.04) && samples.iter().any(|sample| sample.abs() > 0.01) {
             return true;
@@ -496,6 +507,9 @@ fn has_attack(previous: Option<&[f32]>, next: &[f32]) -> bool {
         last = current;
         before = [samples[WINDOW - 2], samples[WINDOW - 1]];
     }
+    // The next block uses this same window as its history. A detected attack
+    // may return before the tail, leaving it to be computed when needed.
+    *tail_peak = Some(last);
     false
 }
 
@@ -822,12 +836,17 @@ mod tests {
         let steady: [f32; BLOCK] =
             core::array::from_fn(|i| if i.is_multiple_of(2) { -0.2 } else { 0.2 });
         let silence = [0.0; BLOCK];
-        assert!(!has_attack(None, &steady));
-        assert!(!has_attack(Some(&[0.4; BLOCK]), &silence));
+        let mut tail_peak = None;
+        assert!(!has_attack(None, &steady, &mut tail_peak));
+        assert_eq!(tail_peak, Some(0.8));
+        assert!(!has_attack(Some(&steady), &silence, &mut tail_peak));
+        assert_eq!(tail_peak, Some(0.0));
+        assert!(!has_attack(Some(&[0.4; BLOCK]), &silence, &mut None));
 
         let mut attack = silence;
         attack[64..].fill(0.4);
-        assert!(has_attack(Some(&silence), &attack));
-        assert!(has_attack(None, &attack));
+        assert!(has_attack(Some(&silence), &attack, &mut tail_peak));
+        assert_eq!(tail_peak, None);
+        assert!(has_attack(None, &attack, &mut None));
     }
 }
