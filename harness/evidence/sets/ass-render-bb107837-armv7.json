@@ -1,0 +1,9 @@
+{
+ "name": "ass-render-bb107837-armv7",
+ "path": "ass-render-bb107837-armv7",
+ "retention": "retained",
+ "reason": "All 100 portable ASS renderer cases against libass on 32-bit ARMv7 Linux. The grade includes exact parity and runtime, peak heap and total RSS from 30 pairs per case.",
+ "key": "evidence/architecture-review-mwo5u537/bb107837ed7545206bf3b55ab297ef58517c5afc/armv7/combined-public-grade-ass-render/a4cfdc19b4ee10336d6d0e16de75e1c804dc79479aadd641eddc66abefc561ce.tar.zst",
+ "sha256": "a4cfdc19b4ee10336d6d0e16de75e1c804dc79479aadd641eddc66abefc561ce",
+ "bytes": 14534530
+}
