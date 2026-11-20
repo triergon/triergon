@@ -28,7 +28,9 @@ fn overlay(root: &Path) -> Result<Value, String> {
 }
 
 fn receipt_path(worker: &Path) -> PathBuf {
-    worker.with_added_extension("build.json")
+    let mut path = worker.as_os_str().to_owned();
+    path.push(".build.json");
+    PathBuf::from(path)
 }
 
 fn cargo_command(dir: &Path) -> Result<Vec<String>, String> {
