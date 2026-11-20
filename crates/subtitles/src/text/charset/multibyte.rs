@@ -239,8 +239,12 @@ impl MultibyteDecoder {
             }));
         }
         // Historical Shift-JIS maps 0x5C to yen and 0x7E to overline.
-        let single = if byte.is_ascii() && self.profile != MultibyteCharset::ShiftJisUnicode {
-            Some(char::from(byte))
+        let single = if byte.is_ascii() {
+            Some(match (self.profile, byte) {
+                (MultibyteCharset::ShiftJisUnicode, b'\\') => '\u{00a5}',
+                (MultibyteCharset::ShiftJisUnicode, b'~') => '\u{203e}',
+                _ => char::from(byte),
+            })
         } else {
             self.profile.lookup(u16::from(byte))
         };
