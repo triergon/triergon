@@ -11,7 +11,7 @@
 
 use super::lines::{Line, Span};
 use super::timestamp;
-use super::{Entries, Entry};
+use super::{Entries, Entry, TimestampFieldWidth};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
 /// The cue being read; its text runs from `text_start` to the end of the
@@ -43,12 +43,18 @@ impl Parser {
     }
 
     /// Reads one line.
-    pub(super) fn line(&mut self, source: &[u8], line: Line, entries: &mut Entries) -> Result<()> {
+    pub(super) fn line(
+        &mut self,
+        source: &[u8],
+        line: Line,
+        entries: &mut Entries,
+        width: TimestampFieldWidth,
+    ) -> Result<()> {
         let Line::Text(span) = line else {
             return self.close(false, entries);
         };
         let content = span.of(source);
-        if let Some((start_ms, end_ms)) = timestamp::subrip(content) {
+        if let Some((start_ms, end_ms)) = timestamp::subrip(content, width) {
             self.close(true, entries)?;
             self.cue = Some(Open {
                 start_ms,
