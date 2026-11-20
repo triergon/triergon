@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "avc-earliest-picture",
+      "profile": "avc-earliest-picture",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc.ts",
+      "sha256": "8c0e8f659fc8b4eeb9094a2d201a5fc80c95e023f4f8f052ad80f8c03c03bb87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "90000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 9221,
+        "digest": 5679831116521932256
+      }
+    },
+    {
+      "id": "avc-between-keyframes",
+      "profile": "avc-between-keyframes",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc.ts",
+      "sha256": "8c0e8f659fc8b4eeb9094a2d201a5fc80c95e023f4f8f052ad80f8c03c03bb87",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "112000",
+        "previous"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 5917,
+        "digest": 8730301069862370463
+      }
+    },
+    {
+      "id": "hevc-m2ts-preroll",
+      "profile": "hevc-m2ts-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/hevc.m2ts",
+      "sha256": "20320afc50e97b5806a556808171dcfc220747797a9133d5882616ec2ae80163",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192",
+        "7",
+        "256",
+        "121000",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 5523,
+        "digest": 14828060183821136300
+      }
+    },
+    {
+      "id": "avc-late-preroll",
+      "profile": "avc-late-preroll",
+      "file": "harness/features/mpegts-previous-picture/inputs/avc-many-pictures.ts",
+      "sha256": "b0483c8a2b1928352ef004955164321c2fd1c2e4d19dd863ebc99d4fc0d08ec8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "7",
+        "256",
+        "425500",
+        "preroll"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 27663,
+        "digest": 76181891715901544
+      }
+    }
+  ]
+}

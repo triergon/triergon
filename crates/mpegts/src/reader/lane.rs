@@ -2,12 +2,14 @@ mod aligned_audio;
 mod dvb;
 mod eac3;
 mod loas;
+mod mpeg_audio;
 mod unframed_audio;
 
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
+use super::seek::{PictureDelivery, PictureProbe};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, MpegAudioFrame, Packet,
-    PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, IncompleteVideo, LoasFrame, Packet, PacketClock,
+    PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -27,8 +29,7 @@ use triergon_core::{
 };
 use triergon_framing::{
     AacAdtsCarrierLimits, AacAdtsCarrierReader, AacAdtsStreamLimits, AacAdtsStreamReader,
-    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, MpegAudioHeader, MpegVersion,
-    RawAnnexBReader,
+    Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, Codec, RawAnnexBReader,
 };
 
 // Keep concrete readers inline; their containing BudgetVec charges the whole state.
@@ -38,7 +39,7 @@ enum Framer {
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
     Loas(aligned_audio::Reader<3, ()>),
-    MpegAudio(aligned_audio::Reader<4, MpegAudioHeader>),
+    MpegAudio(mpeg_audio::Reader),
     LatmPes,
     Ac3(Ac3FrameReader),
     Eac3(eac3::Reader),
@@ -52,7 +53,7 @@ impl Framer {
             Self::Adts(reader) => reader.input_wait_buffer_capacity(),
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
-            Self::MpegAudio(reader) => reader.input_wait_buffer_capacity(),
+            Self::MpegAudio(reader) => reader.input_wait_buffer_capacity()?,
             Self::Ac3(reader) => reader.input_wait_buffer_capacity(),
             Self::Eac3(reader) => reader.input_wait_storage()?,
             // Direct PES carriages do not keep a pending unit between inputs.
@@ -126,7 +127,7 @@ impl Framer {
             }
             // H.222.0 Table 2-34 assigns these streams to ISO/IEC 11172-3
             // and ISO/IEC 13818-3 audio respectively.
-            0x03 | 0x04 => Ok(Self::MpegAudio(aligned_audio::Reader::new(
+            0x03 | 0x04 => Ok(Self::MpegAudio(mpeg_audio::Reader::new(
                 pool,
                 source,
                 caps,
@@ -213,15 +214,7 @@ impl Framer {
                     offset: frame.offset,
                 })
             }),
-            Self::MpegAudio(reader) => {
-                map(reader.step(work, cancel, mpeg_audio_header)?, |frame| {
-                    AccessUnit::MpegAudio(MpegAudioFrame {
-                        bytes: frame.bytes,
-                        offset: frame.offset,
-                        header: frame.header,
-                    })
-                })
-            }
+            Self::MpegAudio(reader) => map(reader.step(work, cancel)?, AccessUnit::MpegAudio),
             Self::AdtsFragments(reader) => map(reader.step(work, cancel)?, |carrier| match carrier
                 .into_selected_frame()
             {
@@ -259,18 +252,6 @@ impl Framer {
             Self::Dvb(_) | Self::LatmPes => unreachable!("this route uses validated PES input"),
         }
     }
-}
-
-fn mpeg_audio_header(bytes: &[u8; 4]) -> Result<(MpegAudioHeader, usize)> {
-    let header = MpegAudioHeader::parse(u32::from_be_bytes(*bytes))
-        .ok_or(Error::Invalid("MPEG audio frame header"))?;
-    if header.version == MpegVersion::Mpeg25 {
-        return Err(Error::Unsupported("MPEG-2.5 audio in MPEG-TS"));
-    }
-    let size = header
-        .frame_bytes()
-        .ok_or(Error::Unsupported("free-format MPEG audio"))?;
-    Ok((header, size))
 }
 
 struct Piece {
@@ -933,6 +914,8 @@ struct Build {
     origins: BuildOrigins,
     origin: usize,
     clock: Option<PacketClock>,
+    picture_epoch: Option<SourceEpochs>,
+    picture_anchor: Option<usize>,
     last_anchor: u64,
     retire: usize,
     recovered_adts_bytes: bool,
@@ -962,6 +945,8 @@ impl Build {
             origins: BuildOrigins::Ready(origins),
             origin: 0,
             clock: None,
+            picture_epoch: None,
+            picture_anchor: None,
             last_anchor,
             retire: 0,
             recovered_adts_bytes: false,
@@ -1040,6 +1025,7 @@ impl Build {
 
 pub(super) enum LaneStep {
     Packet(Packet),
+    PictureProbe(PictureProbe),
     IncompleteVideo(IncompleteVideo),
     LatmPes(latm::PesPacket),
     UnframedAudio(UnframedAudio),
@@ -1221,6 +1207,7 @@ impl Lane {
     pub(super) fn step(
         &mut self,
         draining: bool,
+        picture_delivery: PictureDelivery,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
@@ -1245,7 +1232,7 @@ impl Lane {
                 continue;
             }
             if self.build.is_some() {
-                return self.publish(work, cancel);
+                return self.publish(picture_delivery, work, cancel);
             }
             if let Some(incomplete) = self.incomplete.as_mut() {
                 if incomplete.reader_storage.is_none() {
@@ -1547,8 +1534,119 @@ impl Lane {
         Ok(())
     }
 
-    fn publish(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<LaneStep> {
+    fn finish_build(&mut self, consumed_end: u64) -> Build {
+        let build = self.build.take().expect("prepared publication");
+        self.retire = build.retire;
+        self.last_anchor = build.last_anchor;
+        self.completed += 1;
+        self.published = consumed_end;
+        build
+    }
+
+    fn probe_picture(
+        &mut self,
+        range: Range<u64>,
+        anchor_offset: u64,
+        (has_vcl, random_access): (bool, bool),
+        scan: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LaneStep> {
+        let build = self.build.as_mut().expect("pending picture");
+        let pieces = self.pieces.as_slice();
+        // Track the same source extent and anchor as a delivered packet without
+        // retaining PES owners or computing decode times for discarded pictures.
+        while let Some(piece) = pieces.get(build.origin) {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(LaneStep::Yield);
+            }
+            if piece.range.start < range.end
+                && range.start < piece.range.end
+                && build.picture_epoch.is_none()
+            {
+                build.picture_epoch = Some(piece.source.pes().epochs);
+            }
+            if piece.range.start <= anchor_offset && piece.serial > build.last_anchor {
+                build.picture_anchor = Some(build.origin);
+                build.last_anchor = piece.serial;
+            }
+            build.origin += 1;
+        }
+        while let Some(piece) = pieces.get(build.retire) {
+            if piece.range.end > range.end || piece.serial > build.last_anchor {
+                break;
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(LaneStep::Yield);
+            }
+            build.retire += 1;
+        }
+        if !work.try_charge(1) {
+            return Ok(LaneStep::Yield);
+        }
+        let epochs = build
+            .picture_epoch
+            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?;
+        let anchor = build.picture_anchor.map(|index| &pieces[index]);
+        let (ticks, time) = if scan
+            && has_vcl
+            && let Some(anchor) = anchor
+            && !anchor.clock.quarantined
+        {
+            let pts = anchor.source.pes().header.pts_raw33;
+            if self.limits.time_policy == SourceTimePolicy::RelativeEpochZero && !random_access {
+                // The validated raw PTS is sufficient for detecting a wrap.
+                (pts.map(i128::from), None)
+            } else if random_access {
+                let stamp = source_timestamp(pts, anchor.clock.key, self.limits.time_policy)?;
+                (stamp.ticks90, stamp.exact)
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        self.finish_build(range.end);
+        Ok(LaneStep::PictureProbe(PictureProbe {
+            offset: range.start,
+            epochs,
+            ticks,
+            time,
+            random_access,
+            has_vcl,
+        }))
+    }
+
+    fn publish(
+        &mut self,
+        picture_delivery: PictureDelivery,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<LaneStep> {
         let build = self.build.as_mut().expect("pending publication");
+        let (range, anchor_offset) = build.unit.range_and_anchor();
+        let probing = match picture_delivery {
+            PictureDelivery::Full => false,
+            PictureDelivery::Scan | PictureDelivery::Discard => true,
+            PictureDelivery::Landing(offset) => offset != range.start,
+        };
+        if probing && let BuildUnit::Packet(AccessUnit::Video(unit)) = &build.unit {
+            let flags = (unit.has_vcl, unit.random_access);
+            return self.probe_picture(
+                range,
+                anchor_offset,
+                flags,
+                matches!(picture_delivery, PictureDelivery::Scan),
+                work,
+                cancel,
+            );
+        }
         if let BuildOrigins::ReserveTable(count) = build.origins {
             if !work.try_charge(1) {
                 return Ok(LaneStep::Yield);
@@ -1563,7 +1661,6 @@ impl Lane {
         let BuildOrigins::Ready(origins) = &mut build.origins else {
             unreachable!("prepared PES sources");
         };
-        let (range, anchor_offset) = build.unit.range_and_anchor();
         let consumed_end = match &build.unit {
             BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
             _ => range.end,
@@ -1631,6 +1728,13 @@ impl Lane {
         if !work.try_charge(1) {
             return Ok(LaneStep::Yield);
         }
+        let epochs = origins
+            .as_slice()
+            .first()
+            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
+            .pes
+            .pes()
+            .epochs;
         let (charge, duration) = match &build.unit {
             BuildUnit::Packet(unit) => {
                 (Shared::<PacketData>::reserve(&self.pool)?, unit.duration()?)
@@ -1667,22 +1771,11 @@ impl Lane {
             .map(i64::try_from)
             .transpose()
             .map_err(|_| Error::Overflow)?;
-        let epochs = origins
-            .as_slice()
-            .first()
-            .ok_or(Error::Invalid("MPEG-TS AU has no source extent"))?
-            .pes
-            .pes()
-            .epochs;
-        let build = self.build.take().expect("prepared publication");
+        let build = self.finish_build(consumed_end);
         let recovered_adts = build.recovered_adts_bytes
             || build.clock.as_ref().is_some_and(|clock| {
                 matches!(clock.pes.event(), crate::TraceEvent::UnboundedAdtsPes(_))
             });
-        self.retire = build.retire;
-        self.last_anchor = build.last_anchor;
-        self.completed += 1;
-        self.published = consumed_end;
         let track = self.track.clone();
         let BuildOrigins::Ready(origins) = build.origins else {
             unreachable!("prepared PES sources");

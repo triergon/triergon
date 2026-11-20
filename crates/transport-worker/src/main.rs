@@ -4,6 +4,7 @@
 mod ts;
 mod ts_au;
 mod ts_input;
+mod ts_matched;
 
 use std::process::ExitCode;
 
@@ -15,13 +16,15 @@ mod runner {
 
 fn dispatch(args: &[String]) -> runner::Result<()> {
     let mode = args.first().map_or("", String::as_str);
-    if mode.starts_with(ts_au::PREFIX) {
+    if let Some(kind) = ts_matched::Kind::for_mode(mode) {
+        ts_matched::run(kind, args)
+    } else if mode.starts_with(ts_au::PREFIX) {
         ts_au::run(args)
     } else if mode.starts_with(ts::PREFIX) {
         ts::run(args)
     } else {
         Err(
-            "usage: transport-worker PREFIX{fold,bench,memory} FILE ...; prefixes: ts-au-, ts-"
+            "usage: transport-worker PREFIX{fold,bench,memory} FILE ...; prefixes: ts-au-, ts-, ts-seek-, ts-free-audio-"
                 .into(),
         )
     }

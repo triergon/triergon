@@ -19,6 +19,8 @@ mod latm;
 mod mpeg_audio;
 #[path = "container_reader/opaque_video.rs"]
 mod opaque_video;
+#[path = "container_reader/seek.rs"]
+mod seek;
 #[path = "container_reader/unframed_audio.rs"]
 mod unframed_audio;
 
