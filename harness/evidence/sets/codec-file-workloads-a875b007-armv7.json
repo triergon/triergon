@@ -1,0 +1,9 @@
+{
+ "name": "codec-file-workloads-a875b007-armv7",
+ "path": "codec-file-workloads-a875b007-armv7",
+ "retention": "retained",
+ "reason": "Thirty-pair measurements for ten audio file workloads on ARMv7. Includes timing against main and FFmpeg, sampled peak live heap and kernel-bound total RSS, main and candidate stereo PCM, independent decoder and output grades, workload hashes and worker identities.",
+ "key": "evidence/architecture-review-mwo5u537/a875b00735f363b4ed42f476efa0ff86e5c11e05/armv7/file-355-final/f925c8674cc15e9de783d1078ccf13fc4795b715a4852a2a1a7c4e2e5382b1a5.tar.zst",
+ "sha256": "f925c8674cc15e9de783d1078ccf13fc4795b715a4852a2a1a7c4e2e5382b1a5",
+ "bytes": 151274708
+}

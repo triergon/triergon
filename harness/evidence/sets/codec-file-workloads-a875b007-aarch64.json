@@ -1,0 +1,9 @@
+{
+ "name": "codec-file-workloads-a875b007-aarch64",
+ "path": "codec-file-workloads-a875b007-aarch64",
+ "retention": "retained",
+ "reason": "Thirty-pair measurements for ten audio file workloads on AArch64. Includes timing against main and FFmpeg, sampled peak live heap and kernel-bound total RSS, main and candidate stereo PCM, independent decoder and output grades, workload hashes and worker identities.",
+ "key": "evidence/architecture-review-mwo5u537/a875b00735f363b4ed42f476efa0ff86e5c11e05/aarch64/file-355-final/56502f9ba3f07c84008c8eb83a410a4d164a92a583e386d1f504805d166ceef4.tar.zst",
+ "sha256": "56502f9ba3f07c84008c8eb83a410a4d164a92a583e386d1f504805d166ceef4",
+ "bytes": 164628517
+}
