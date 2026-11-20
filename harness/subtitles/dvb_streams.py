@@ -44,6 +44,11 @@ import subprocess
 import sys
 import zlib
 
+if __package__:
+    from .carriers import crc32_mpeg
+else:
+    from carriers import crc32_mpeg
+
 # ------------------------------------------------------------------ segments
 
 PCS, RCS, CDS, ODS, DDS, DSS, ACS, EDS, STUFFING = 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x80, 0xFF
@@ -373,16 +378,6 @@ def pes(payload, pts=None, length=True):
     if size > 0xFFFF:
         size = 0
     return b"\x00\x00\x01\xbd" + struct.pack(">H", size) + body
-
-
-def crc32_mpeg(data):
-    crc = 0xFFFFFFFF
-    for byte in data:
-        crc ^= byte << 24
-        for _ in range(8):
-            crc = (crc << 1) ^ 0x04C11DB7 if crc & 0x80000000 else crc << 1
-            crc &= 0xFFFFFFFF
-    return crc
 
 
 def section(table, extension, body):
