@@ -143,7 +143,7 @@ fn consecutive_glyphs_follow_each_change_of_font_description() {
          [V4+ Styles]\nFormat: Name, Fontname, Fontsize, Bold, Italic\n\
          Style: Default,Triergon Orientation,20,0,0\n\
          [Events]\nFormat: Layer, Start, End, Style, Text\n\
-         Dialogue: 0,0:00:00.00,0:00:01.00,Default,AA{{\\b1}}AA{{\\i1}}AA{{\\fn@Triergon Orientation}}AA{{\\fnOther}}AA{{\\r}}AA\n\
+         Dialogue: 0,0:00:00.00,0:00:01.00,Default,AA{{\\b1}}AA{{\\i1}}AA{{\\fn@Triergon Orientation}}AA{{\\fn@Other}}AA{{\\r}}AA\n\
          [Fonts]{font_data}"
     );
     let mut script = Script::parse(
@@ -166,7 +166,7 @@ fn consecutive_glyphs_follow_each_change_of_font_description() {
         ("Triergon Orientation", 700, 0, false),
         ("Triergon Orientation", 700, 100, false),
         ("Triergon Orientation", 700, 100, true),
-        ("Other", 700, 100, false),
+        ("Other", 700, 100, true),
         ("Triergon Orientation", 400, 0, false),
     ];
     let chars = renderer.pipeline.text.chars();
