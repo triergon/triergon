@@ -1,0 +1,175 @@
+{
+ "name": "public-subtitle-ass-deb6105a-armv7",
+ "path": "public-subtitle-ass-deb6105a-armv7",
+ "retention": "retained",
+ "reason": "Subtitle text, DVB, teletext, PGS capsules and ASS rendering on ARMv7. Contains per-case reference measurements, build and input identities, and the recorded outcomes.",
+ "key": "evidence/architecture-review-mwo5u537/deb6105a9644aa95adf6bea2b71c96845d3c6dfb/armv7/result/664944bb9ad0e1a660fe8f1da1fac76eb60e4a5a9a88a01427dfcfa6f242601c.tar.zst",
+ "sha256": "664944bb9ad0e1a660fe8f1da1fac76eb60e4a5a9a88a01427dfcfa6f242601c",
+ "bytes": 122468982,
+ "results": [
+  {
+   "path": "memory/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --memory",
+   "key": "15ea9de8d47588580fe3cea5f261321dbebfcb5223d593cd8e949b199ae9b845",
+   "status": 0,
+   "report_sha256": "971a3811ffc1e0ef742a2714bf097d5be650cd29255cdbbf4d5c293e1b3d0dd4",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text-host/gate-result.json",
+   "command": "report --memory",
+   "key": "543a6164a3f2c5a1523d6f1d0104a2bed1d7a3504b946f8e78f7f1c832f132b0",
+   "status": 0,
+   "report_sha256": "c35fd70d9538b4b0b4c361db3832d307bbcef4b905f0fcee1f1ed1a84017bd65",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-teletext/gate-result.json",
+   "command": "report --memory",
+   "key": "17eddd15a2959f0ef7129d711e8b6c8545147a5f16abac6206e1dad53bf623f4",
+   "status": 0,
+   "report_sha256": "60b3b3a962e0845f70ac165667ae9b21a2b1a6f8ee179cfe81d5b26443dc3eaf",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ass-render-host/gate-result.json",
+   "command": "report --memory",
+   "key": "a90a96f09badd6e94645c513a8331e95b4d2339bf4f673c7f9afa15a010cb248",
+   "status": 0,
+   "report_sha256": "924a9c6c829fd27db0b2b9c6ea356f38e85b9dea2968ae403d26f5a3932e278d",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-text/gate-result.json",
+   "command": "report --memory",
+   "key": "33ce1cf39d7d5b8f4924a12b5a54b79ab6320ef79f4779f1383e8bf7ddc7401a",
+   "status": 0,
+   "report_sha256": "fa2656ebee2307d9b4974d9ddc2140843438e7da260ca57923aff20e4eb8d4f4",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/ass-render/gate-result.json",
+   "command": "report --memory",
+   "key": "42c08f14d9e0faeff59cf13d95ac9420d720d4ae13919b1a27a04e20cac9a1fc",
+   "status": 0,
+   "report_sha256": "138aac07ed90d9ba4afb709cc21b91263ec55bd85377b93e666666c1e3aebb47",
+   "cases_checked": true
+  },
+  {
+   "path": "memory/subtitle-dvb/gate-result.json",
+   "command": "report --memory",
+   "key": "1ead5ee8a22c1f2145ebab3b64493ce3dc14924c950ec28a2c3d4a28abafa910",
+   "status": 0,
+   "report_sha256": "aeae7ec7cf1b09dfd71e3ab7ce2fcaec23e424f5503ccaf347dd3a1a105706f4",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-pgs-capsules/gate-result.json",
+   "command": "report --benchmark",
+   "key": "d60abdb8cde174038f7fdd0ac98758d14b4e65a01ae39bb80c516c485f418e4a",
+   "status": 0,
+   "report_sha256": "8a04fdd7171b363ae5a7e36a05223c358b4c2e94e0ba2519b76666ecb8416c2a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "6b49eafd477f017157b8d4199e9cb0fab26bd67a429f5e8b4c482c9cad883ae2",
+   "status": 0,
+   "report_sha256": "808a5be4e15c1d9a39f30eeb3558a78265963de821a6bf14802e6d85cea852b1",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-teletext/gate-result.json",
+   "command": "report --benchmark",
+   "key": "4c82b7e1ad63e037b25562fe75be4b09c2a5562baa738d664e51d72718b40d74",
+   "status": 0,
+   "report_sha256": "23c3c5821255957b9020d87c6f31e9cccba349170e954c5f94e0d201005089c9",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render-host/gate-result.json",
+   "command": "report --benchmark",
+   "key": "c40256bffc97f25ecedf4edd54412054f11dd72d89d6ed7c9689ab1073727f1d",
+   "status": 0,
+   "report_sha256": "9c021e8795c3020afeebffe794a8f5a427010c871d1cd7f56734982cbd15f8ad",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-text/gate-result.json",
+   "command": "report --benchmark",
+   "key": "f0007acefc2c169fd07181e7a43c3796b16bd947269109eda37d55898bf5a073",
+   "status": 0,
+   "report_sha256": "62fb69d8ef9dee2241dd6be9932ce6c65e6a32e57e97b858c9dff15adc4f230a",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/ass-render/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7b28ca604c85947387060433937305c8a915804001c72abdf016b5c2201096cf",
+   "status": 0,
+   "report_sha256": "32c02d57b7b5c6d4248b97afdad9a675e717ad792bd2619d3875032d7e8a7093",
+   "cases_checked": true
+  },
+  {
+   "path": "benchmark/subtitle-dvb/gate-result.json",
+   "command": "report --benchmark",
+   "key": "7636e7abf7b2c0b3811fb116a70283509d47341445ba3d35ed98ed7cf47df55f",
+   "status": 0,
+   "report_sha256": "d2605ea23297b44b71bd5aee8ccdb3fb7226758a2c9c6a61f35a21e28337a3e6",
+   "cases_checked": true
+  },
+  {
+   "path": "graded/subtitle-pgs-capsules/gate-result.json",
+   "command": "grade",
+   "key": "c177ecc689e149c66e7c47683d8ccea30f4c422693b46e3fdfe0ef3b49472af4",
+   "status": 0,
+   "report_sha256": "55e2da1c68107762cd5e7e91c684aeb70fe6ed9dfcb4e4c3f9ccf336a117ef10"
+  },
+  {
+   "path": "graded/subtitle-text-host/gate-result.json",
+   "command": "grade",
+   "key": "0e9bcdc11677f78c9c1dd0772f46191cdb6c53c6c45220999a82278c3a81296f",
+   "status": 0,
+   "report_sha256": "740924b8f576dde199297c1d0735684a88115771f74d8554cbc3548577484d33"
+  },
+  {
+   "path": "graded/subtitle-teletext/gate-result.json",
+   "command": "grade",
+   "key": "eee64f4e6f4fdf38372f5e4948d23e54e1ccd79cd47bf9221c357c509e8c74e4",
+   "status": 0,
+   "report_sha256": "c288df690a9eda4c28d2cd01a99cf11e38a694d540fc4ffb1ea062bf87b02e19"
+  },
+  {
+   "path": "graded/ass-render-host/gate-result.json",
+   "command": "grade",
+   "key": "d22adac53a31cab80df211b9b1e9f3c5930a53b9ef1cb97c7612262645044345",
+   "status": 0,
+   "report_sha256": "b29e2533eb724175862468793df097708f8b2bdaae146b8ac0c3ec4bd8a42df6"
+  },
+  {
+   "path": "graded/subtitle-text/gate-result.json",
+   "command": "grade",
+   "key": "53669530d75216a6f525dbcaa5e44b7aca46d3d967879571fcd0adbc3f58ecfe",
+   "status": 0,
+   "report_sha256": "35fe8684c07ae780c4e46494e79aa4322c10b283b95201c5be802390030c3f2c"
+  },
+  {
+   "path": "graded/ass-render/gate-result.json",
+   "command": "grade",
+   "key": "59eb3989e906b33adea5f47d034389bdd03afca186e9b3b46564b6a3febe3098",
+   "status": 0,
+   "report_sha256": "34416675afcb822f6fd79bb0f797349db70a6c9be5d328b0238ae0bbea10c0c5"
+  },
+  {
+   "path": "graded/subtitle-dvb/gate-result.json",
+   "command": "grade",
+   "key": "23f609b76ffdc42f444420cdc25e98915fe64bf7a13ffdd27be3f2f74bb6d459",
+   "status": 0,
+   "report_sha256": "0d818eafb8c1ff7af83b2cdce43023737a1cb886deb740d666ac39cee87891dc"
+  }
+ ],
+ "source_revisions": [
+  "deb6105a9644aa95adf6bea2b71c96845d3c6dfb"
+ ]
+}
