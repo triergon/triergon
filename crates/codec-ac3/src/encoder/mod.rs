@@ -3,7 +3,7 @@
 mod syntax;
 
 use crate::bitalloc::{
-    BaCache, BaParams, Dba, MaskParams, ac3_bap_cost, stage_bap, stage_mask, stage_psd,
+    Ac3BandExponents, BaCache, BaParams, Dba, MaskParams, stage_bap, stage_mask, stage_psd,
 };
 use crate::header::{BITRATE_KBPS, SAMPLE_RATES, ac3_frame_words};
 use crate::imdct::analysis::Analysis;
@@ -119,6 +119,7 @@ struct Pair {
     repeats: [usize; CHANNELS],
     exponents: [[u8; BLOCK]; CHANNELS],
     masks: [BaCache; CHANNELS],
+    band_exponents: [Ac3BandExponents; CHANNELS],
 }
 
 impl Default for Pair {
@@ -128,6 +129,7 @@ impl Default for Pair {
             repeats: [1; CHANNELS],
             exponents: [[0; BLOCK]; CHANNELS],
             masks: core::array::from_fn(|_| BaCache::default()),
+            band_exponents: core::array::from_fn(|_| Ac3BandExponents::default()),
         }
     }
 }
@@ -151,6 +153,7 @@ pub struct Encoder {
     remainder: u32,
     started: bool,
     previous: [[f32; BLOCK]; CHANNELS],
+    previous_silent: [bool; CHANNELS],
     analysis: Analysis,
     work: Box<Work>,
 }
@@ -179,6 +182,7 @@ impl Encoder {
             remainder: 0,
             started: false,
             previous: [[0.0; BLOCK]; CHANNELS],
+            previous_silent: [true; CHANNELS],
             analysis: Analysis::new(),
             work: Box::new(Work {
                 spectra: vec![[0.0; BLOCK]; BLOCKS * mode.coded_order().len()].into_boxed_slice(),
@@ -191,6 +195,7 @@ impl Encoder {
     /// Clear transform history and restart the frame-size clock at a discontinuity.
     pub fn reset(&mut self) {
         self.previous.fill([0.0; BLOCK]);
+        self.previous_silent.fill(true);
         self.remainder = 0;
         self.started = false;
     }
@@ -210,12 +215,20 @@ impl Encoder {
         let output = output
             .get_mut(..bytes)
             .ok_or(EncodeError::OutputLength { needed: bytes })?;
-        if input
-            .iter()
-            .flat_map(|plane| plane.iter())
-            .any(|sample| !(-1.0..=1.0).contains(sample))
-        {
-            return Err(EncodeError::InvalidSample);
+        let mut silent = [[false; BLOCKS]; CHANNELS];
+        for (plane, blocks) in input.iter().zip(&mut silent) {
+            let (samples, _) = plane.as_chunks::<BLOCK>();
+            for (samples, silent) in samples.iter().zip(blocks) {
+                // Positive f32 bit patterns increase with magnitude. NaNs and
+                // infinities have larger patterns than every allowed sample.
+                let peak = samples
+                    .iter()
+                    .fold(0, |peak, sample| peak.max(sample.to_bits() & 0x7fff_ffff));
+                if peak > 1.0_f32.to_bits() {
+                    return Err(EncodeError::InvalidSample);
+                }
+                *silent = peak == 0;
+            }
         }
 
         let Work {
@@ -247,11 +260,23 @@ impl Encoder {
                 .iter()
                 .enumerate()
                 .any(|(coded, &ch)| {
+                    if silent[ch][block] {
+                        return false;
+                    }
                     let (previous, next) = pcm(coded, ch);
                     let history = (self.started || block != 0).then_some(previous);
                     has_attack(history, next)
                 });
             for (coded, &ch) in order.iter().enumerate() {
+                let previous_silent = if block == 0 {
+                    self.previous_silent[coded]
+                } else {
+                    silent[ch][block - 1]
+                };
+                if previous_silent && silent[ch][block] {
+                    spectra[coded].fill(0.0);
+                    continue;
+                }
                 let (previous, next) = pcm(coded, ch);
                 if *short && !mode.is_lfe(coded) {
                     self.analysis.short(previous, next, &mut spectra[coded]);
@@ -309,6 +334,7 @@ impl Encoder {
         syntax::checksum(output);
         for (coded, &channel) in order.iter().enumerate() {
             self.previous[coded].copy_from_slice(&input[channel][SAMPLES_PER_FRAME - BLOCK..]);
+            self.previous_silent[coded] = silent[channel][BLOCKS - 1];
         }
         self.remainder = remainder % sample_rate;
         self.started = true;
@@ -404,6 +430,7 @@ impl Pair {
                 dba: &Dba::default(),
             };
             stage_mask(&params, mask).map_err(|_| EncodeError::BitAllocation)?;
+            self.band_exponents[ch].prepare(exponents, end);
         }
         Ok(())
     }
@@ -436,13 +463,8 @@ impl Pair {
             if end == 0 {
                 break;
             }
-            let exponents = &self.exponents[ch];
-            let floor = PARAMS.floorcod;
-            cost += if self.repeats[ch] == 2 {
-                ac3_bap_cost::<true>(mask, exponents, end, offset, floor, &BAP_COSTS)
-            } else {
-                ac3_bap_cost::<false>(mask, exponents, end, offset, floor, &BAP_COSTS)
-            };
+            cost +=
+                self.band_exponents[ch].cost(mask, &self.exponents[ch][..end], offset, &BAP_COSTS);
         }
         mantissa_bits(cost)
     }

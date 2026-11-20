@@ -1,6 +1,8 @@
 //! Syncframe syntax (A/52:2018 5.3), mantissas (7.3) and CRCs (7.10.1).
 
-use super::{BLOCK, CHANNELS, ChannelMode, LFE_BINS, MIN_FULL_BINS, PARAMS, Pair, fast_gain};
+use super::{
+    BLOCK, CHANNELS, ChannelMode, LFE_BINS, MAX_FRAME_BYTES, MIN_FULL_BINS, PARAMS, Pair, fast_gain,
+};
 use crate::bitalloc::Ac3BapCosts;
 use crate::crc16;
 use crate::spec_tables::BAPTAB;
@@ -120,16 +122,21 @@ pub(super) fn block(
             let end = pair.ends[ch];
             let is_lfe = end == LFE_BINS;
             let step = pair.repeats[ch];
-            let mut previous = i32::from(exp[0]);
             bits.put(u32::from(exp[0]), 4);
-            for group in exp[1..end].chunks_exact(3 * step) {
-                let mut code = 0;
-                for &exponent in group.iter().step_by(step) {
-                    let exponent = i32::from(exponent);
-                    code = 5 * code + (exponent - previous + 2) as u32;
-                    previous = exponent;
+            let groups = exp[1..end].chunks_exact(3 * step);
+            if bits.data.is_none() {
+                bits.position += groups.len() * 7;
+            } else {
+                let mut previous = i32::from(exp[0]);
+                for group in groups {
+                    let mut code = 0;
+                    for &exponent in group.iter().step_by(step) {
+                        let exponent = i32::from(exponent);
+                        code = 5 * code + (exponent - previous + 2) as u32;
+                        previous = exponent;
+                    }
+                    bits.put(code, 7);
                 }
-                bits.put(code, 7);
             }
             if !is_lfe {
                 bits.put(0, 2); // gainrng is unused
@@ -183,7 +190,7 @@ pub(super) const BAP_COSTS: Ac3BapCosts = {
         table[address] = COSTS[BAPTAB[address] as usize];
         address += 1;
     }
-    Ac3BapCosts::new(&table)
+    Ac3BapCosts::new(&table, PARAMS.floorcod)
 };
 
 pub(super) fn mantissa_bits(sum: u64) -> usize {
@@ -279,32 +286,74 @@ fn round_mantissa(sample: f32) -> i32 {
     }
 }
 
-const REVERSE_CRC_BYTE: [u16; 256] = {
-    let mut table = [0; 256];
-    let mut i = 0;
-    while i < table.len() {
-        let mut crc = i as u16;
+const REVERSE_CRC_POWERS: usize = MAX_FRAME_BYTES.next_power_of_two().ilog2() as usize;
+
+const fn reverse_crc_byte(mut crc: u16) -> u16 {
+    let mut bit = 0;
+    while bit < 8 {
+        let feedback = crc & 1;
+        crc = ((crc ^ (feedback * 0x8005)) >> 1) | (feedback << 15);
+        bit += 1;
+    }
+    crc
+}
+
+#[inline]
+const fn apply_crc_shift(table: &[[u16; 16]; 4], crc: u16) -> u16 {
+    table[0][(crc & 15) as usize]
+        ^ table[1][((crc >> 4) & 15) as usize]
+        ^ table[2][((crc >> 8) & 15) as usize]
+        ^ table[3][(crc >> 12) as usize]
+}
+
+// A reverse shift is linear over GF(2). Square each shift to cover twice as
+// many zero bytes and store its contribution from each of the four nibbles.
+const REVERSE_CRC_SHIFTS: [[[u16; 16]; 4]; REVERSE_CRC_POWERS] = {
+    let mut table = [[[0; 16]; 4]; REVERSE_CRC_POWERS];
+    let mut basis = [0; 16];
+    let mut bit = 0;
+    while bit < basis.len() {
+        basis[bit] = reverse_crc_byte(1 << bit);
+        bit += 1;
+    }
+    let mut power = 0;
+    while power < table.len() {
+        let mut nibble = 0;
+        while nibble < 4 {
+            let mut value = 1_usize;
+            while value < 16 {
+                let lowest = value.trailing_zeros() as usize;
+                table[power][nibble][value] =
+                    table[power][nibble][value & (value - 1)] ^ basis[nibble * 4 + lowest];
+                value += 1;
+            }
+            nibble += 1;
+        }
         let mut bit = 0;
-        while bit < 8 {
-            let feedback = crc & 1;
-            crc = ((crc ^ (feedback * 0x8005)) >> 1) | (feedback << 15);
+        while bit < basis.len() {
+            basis[bit] = apply_crc_shift(&table[power], basis[bit]);
             bit += 1;
         }
-        table[i] = crc;
-        i += 1;
+        power += 1;
     }
     table
 };
 
+fn reverse_crc(mut crc: u16, mut bytes: usize) -> u16 {
+    while bytes != 0 {
+        let power = bytes.trailing_zeros() as usize;
+        bytes &= bytes - 1;
+        crc = apply_crc_shift(&REVERSE_CRC_SHIFTS[power], crc);
+    }
+    crc
+}
+
 pub(super) fn checksum(frame: &mut [u8]) {
     let words = frame.len() / 2;
     let split = 2 * ((words >> 1) + (words >> 3));
-    let mut leading = crc16(0, &frame[4..split]);
     // CRC1 precedes the covered data. Unshift the remainder through the region,
     // including the two bytes that will hold CRC1.
-    for _ in 2..split {
-        leading = (leading >> 8) ^ REVERSE_CRC_BYTE[usize::from(leading as u8)];
-    }
+    let leading = reverse_crc(crc16(0, &frame[4..split]), split - 2);
     frame[2..4].copy_from_slice(&leading.to_be_bytes());
     let crc_at = frame.len() - 2;
     let mut trailing = crc16(0, &frame[split..crc_at]);
@@ -318,6 +367,18 @@ pub(super) fn checksum(frame: &mut [u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn crc_reverse_shifts_match_each_byte() {
+        for bit in 0..16 {
+            let original = 1 << bit;
+            let mut expected = original;
+            for bytes in 0..MAX_FRAME_BYTES {
+                assert_eq!(reverse_crc(original, bytes), expected);
+                expected = reverse_crc_byte(expected);
+            }
+        }
+    }
 
     #[test]
     fn fields_fit_before_the_reserved_tail() {

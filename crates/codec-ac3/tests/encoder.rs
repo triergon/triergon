@@ -247,23 +247,55 @@ fn syncframes_round_trip_every_rate_and_program() {
 }
 
 #[test]
+fn signed_zero_preserves_padding_and_transform_history() {
+    let mut positive = Encoder::new(44_100, ChannelMode::Mono).unwrap();
+    let mut negative = Encoder::new(44_100, ChannelMode::Mono).unwrap();
+    let pcm = tones(MODES[0].3, 44_100);
+    let tone = &pcm[0][..SAMPLES_PER_FRAME];
+    let silence = [0.0; SAMPLES_PER_FRAME];
+    let negative_zero = [-0.0; SAMPLES_PER_FRAME];
+    let mut a = [0; MAX_FRAME_BYTES];
+    let mut b = [0; MAX_FRAME_BYTES];
+    for (x, y) in [
+        (&silence[..], &negative_zero[..]),
+        (tone, tone),
+        (&silence[..], &negative_zero[..]),
+        (tone, tone),
+    ] {
+        let a_len = positive.encode(&[x], &mut a).unwrap();
+        let b_len = negative.encode(&[y], &mut b).unwrap();
+        assert_eq!(&a[..a_len], &b[..b_len]);
+    }
+}
+
+#[test]
 fn invalid_input_and_short_output_leave_the_stream_unchanged() {
     let mut encoder = Encoder::new(44_100, ChannelMode::Mono).unwrap();
     let mut reference = Encoder::new(44_100, ChannelMode::Mono).unwrap();
     let pcm = tones(MODES[0].3, 44_100);
     let planes = [&pcm[0][..SAMPLES_PER_FRAME]];
     let mut damaged = planes[0].to_vec();
-    damaged[SAMPLES_PER_FRAME - 1] = f32::NAN;
     let mut out = [0xa5; MAX_FRAME_BYTES];
     let mut expected = [0xa5; MAX_FRAME_BYTES];
     assert_eq!(
         encoder.encode(&planes, &mut out[..2]),
         Err(EncodeError::OutputLength { needed: 834 })
     );
-    assert_eq!(
-        encoder.encode(&[&damaged], &mut out),
-        Err(EncodeError::InvalidSample)
-    );
+    let over = 1.0_f32.next_up();
+    for sample in [
+        f32::NAN,
+        -f32::NAN,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        over,
+        -over,
+    ] {
+        damaged[SAMPLES_PER_FRAME - 1] = sample;
+        assert_eq!(
+            encoder.encode(&[&damaged], &mut out),
+            Err(EncodeError::InvalidSample)
+        );
+    }
     assert_eq!(
         encoder.encode(&[&[]], &mut out),
         Err(EncodeError::InputShape)

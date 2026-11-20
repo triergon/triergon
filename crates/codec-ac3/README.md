@@ -38,10 +38,12 @@ default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleave
 ### Encoding PCM
 
 Enable the `encode` feature for AC-3 syncframes at 32, 44.1 or 48 kHz. The encoder
-uses adaptive bandwidth, exponent grouping and bit allocation. Long transforms
+uses adaptive bandwidth, exponent grouping and bit allocation. It reuses each
+critical band's exponent counts across bit allocation trials. Long transforms
 keep frequency resolution on steady signals. A sharp attack switches the
 full-bandwidth channels to short transforms for that block. The LFE uses long
-transforms throughout. The encoder supports mono at 192 kbit/s, stereo at
+transforms throughout. Blocks with silent input and silent overlap need no
+transform. The encoder supports mono at 192 kbit/s, stereo at
 256 kbit/s and 5.1 at 640 kbit/s. The input plane order for 5.1 is FL, FR, FC,
 LFE, SL, SR.
 
