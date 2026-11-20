@@ -1,6 +1,7 @@
 //! Source access units composed from the transport reader and existing framers.
 mod lane;
 mod model;
+mod seek;
 use crate::clock::{ClockKey, SourceTimePolicy};
 use crate::compat::adts::{self, PacketPolicy};
 use crate::compat::annex_b::VideoEofPolicy;
@@ -84,6 +85,8 @@ pub struct ReaderLimits {
     pub maximum_access_units: usize,
     pub maximum_pes_per_access_unit: usize,
     pub elementary_input_window: usize,
+    /// Largest single entity examined by a seek. Zero disables seeking.
+    pub maximum_seek_scan_bytes: u64,
     /// Period-zero timestamps by default. Every lifted value carries its
     /// SourceTimeStatus; no missing DTS or per-frame timestamp is synthesized.
     pub time_policy: SourceTimePolicy,
@@ -108,6 +111,7 @@ impl Default for ReaderLimits {
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,
+            maximum_seek_scan_bytes: 64 * 1024 * 1024,
             time_policy: SourceTimePolicy::RelativeEpochZero,
         }
     }
@@ -164,6 +168,8 @@ pub struct Reader {
     failure: Option<Error>,
     deferred_fragment: bool,
     storage: Option<StorageScan>,
+    seek: BudgetVec<seek::Seeking>,
+    continued_entity: bool,
 }
 
 impl std::fmt::Debug for Reader {
@@ -276,6 +282,8 @@ impl Reader {
             failure: None,
             deferred_fragment: false,
             storage: None,
+            seek: BudgetVec::new(pool),
+            continued_entity: false,
         })
     }
     /// Frame access units only for the supplied elementary PIDs.
@@ -321,12 +329,24 @@ impl Reader {
         Ok(reader)
     }
 
-    fn frames_track(&self, pid: u16) -> bool {
+    fn selected_track(&self, pid: u16) -> bool {
         match &self.packet_tracks {
             PacketTracks::All => true,
             PacketTracks::Selected(selection) => selection.as_slice().binary_search(&pid).is_ok(),
             PacketTracks::Closed => false,
         }
+    }
+
+    fn frames_track(&self, pid: u16) -> bool {
+        if let Some(track) = self
+            .seek
+            .as_slice()
+            .first()
+            .and_then(seek::Seeking::scan_track)
+        {
+            return track == TrackId(pid.into());
+        }
+        self.selected_track(pid)
     }
 
     pub(crate) fn continuity_source(&self) -> Option<(&InputCursor, Option<&TransportStream>)> {
@@ -383,6 +403,9 @@ impl Reader {
         transition: EntityTransition,
     ) -> Result<()> {
         self.healthy()?;
+        if !self.seek.is_empty() {
+            return Err(Error::Unsupported("MPEG-TS seek across entities"));
+        }
         if self.next_entity.is_some() || self.end.is_some() {
             return Err(Error::Invalid(
                 "MPEG-TS entity completion already specified",
@@ -398,6 +421,7 @@ impl Reader {
             capabilities,
             transition,
         });
+        self.continued_entity = true;
         Ok(())
     }
     pub fn fail(
@@ -457,6 +481,7 @@ impl Reader {
         self.boundary = None;
         self.next_entity = None;
         self.storage = None;
+        self.seek = BudgetVec::new(&self.pool);
     }
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         self.step_observing::<false>(work, cancel, |_| ())
@@ -467,6 +492,7 @@ impl Reader {
     ///
     /// The callback borrows each carrier within the caller's work grant. The
     /// reader preserves the input, yield and backpressure protocol of [Self::step].
+    /// During a seek, the callback resumes after the landing packet.
     pub fn step_with_carriers(
         &mut self,
         work: &mut WorkBudget,
@@ -492,7 +518,12 @@ impl Reader {
         observe: impl FnMut(CarrierObservation<'_>),
     ) -> Result<ReaderStep<Self>> {
         self.healthy()?;
-        match self.advance::<OBSERVING>(work, cancel, observe) {
+        let result = if self.seek.is_empty() {
+            self.advance::<OBSERVING>(work, cancel, observe)
+        } else {
+            self.advance_seek(work, cancel)
+        };
+        match result {
             Err(Error::Backpressure {
                 requested,
                 available,
@@ -1112,9 +1143,8 @@ impl ContainerReader for Reader {
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         Self::step(self, work, cancel)
     }
-    fn request_seek(&mut self, _request: SeekRequest) -> Result<InputRequest> {
-        self.healthy()?;
-        Err(Error::Unsupported("MPEG-TS access-unit seeking"))
+    fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
+        Self::request_seek(self, request)
     }
     fn track_count(&self) -> usize {
         self.tracks.len()

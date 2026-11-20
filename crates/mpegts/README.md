@@ -8,7 +8,7 @@ continuity, assembles PSI sections and PAT/PMT tables, and assembles PES
 packets with their raw timestamps. `Reader` composes those source facts with
 the existing framers to implement `ContainerReader` over complete access units.
 A PES is a byte run, never an access-unit packet. Decoding belongs to the codec
-crates. The crate does no I/O and does not seek. The `mux` module writes a
+crates. The crate does no I/O. The `mux` module writes a
 single-program stream for one video elementary stream ([Writing TS](#writing-ts)).
 
 The crate exposes two views:
@@ -130,8 +130,16 @@ reuse the parser's original bytes.
 opens a sequential TS188 source. Set `ReaderLimits::format` for M2TS192, and
 `program` to select a program explicitly. Without a selection, the PAT must
 contain exactly one media program. `ContainerReader` supplies the normal
-input-window, work, cancellation, backpressure and reset protocol. Seeking
-returns `Error::Unsupported` without changing reader state.
+input-window, work, cancellation, backpressure and reset protocol.
+
+`Reader::request_seek` scans one seekable, length-known entity for the last
+coded AVC or HEVC random-access picture at or before the requested presentation
+time. It is bounded by `ReaderLimits::maximum_seek_scan_bytes` (64 MiB by default).
+It replays the entity to preserve original packet bytes, clocks and source
+ranges. A seek receipt precedes the landing packet. For `PlaybackPreroll`, the
+receipt retains the requested discard time. Decoder setup is the caller's
+responsibility. Seek refuses unresolved random-access timestamps, changes
+of the selected track's source epoch, ambiguous clock wraps, and continued entities.
 
 Use `Reader::new_with_packet_tracks` when the caller has already chosen the
 elementary PIDs. Only those PIDs allocate access-unit framers and produce
@@ -616,7 +624,7 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
   stream type and stream ID (`DemuxScope`). Contexts outside the observed
   profile return `Error::Unsupported`.
 - **Not handled.** SI tables beyond PAT/PMT (their packets are still reported),
-  ATSC/Blu-ray signalling, descrambling, seeking, multi-program PES output.
+  ATSC/Blu-ray signalling, descrambling, multi-program PES output.
 
 ## Conformance
 
