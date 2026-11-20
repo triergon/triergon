@@ -910,9 +910,8 @@ fn items(out: &str, full: bool, target: &str, release: &str, capture: &[String])
         });
     }
 
-    let mut core_time = owned(&[
-        "python3",
-        "tools/test-core-time.py",
+    let mut core_time = xtask(&[
+        "core-time",
         "--toolchain",
         crate::NIGHTLY,
         "--output",

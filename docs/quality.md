@@ -350,7 +350,7 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 | Family | Compared |
 |---|---|
-| Time | Exact rational arithmetic, rounding and overflow; signed extremes; 32-bit narrowing |
+| Time | `cargo xtask core-time` compares exact rational arithmetic, rounding, overflow, signed extremes and wide arithmetic against independent Python integer and Fraction results in debug and release builds. Workspace tests also cover 32-bit narrowing. |
 | Demux | Track identity and configuration; payload hashes in per-track decode order; signed PTS, DTS, duration and trim; random-access facts; side data, metadata, attachments and chapters |
 | Seek | Landing point, preceding random-access point, preroll and the packets that follow; fresh, repeated, backward and after-EOF seeks; missing indexes; changing input windows; cancellation |
 | Packet framing | Equivalent access units after documented framing normalisation; configuration and payload preserved |

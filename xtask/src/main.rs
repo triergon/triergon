@@ -9,6 +9,7 @@ mod ass;
 mod capture;
 mod checks;
 mod codecs;
+mod core_time;
 mod corpus;
 mod ebml;
 mod evidence;
@@ -69,6 +70,7 @@ commands:
   check-revisions
                  every commit docs/status.md cites is reachable from HEAD (needs the
                  full history)
+  core-time      compare exact arithmetic against the independent fraction oracle
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
@@ -209,6 +211,7 @@ fn main() -> ExitCode {
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
         Some("check-revisions") => check_revisions(&root),
+        Some("core-time") => core_time::main(&root, &args[1..]),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
@@ -1444,13 +1447,12 @@ const CHECK: &[(Part, Step)] = &[
         harness::link_training::check(root)
     }),
     (Part::Variants, |root| {
-        let mut core_time = Command::new("python3");
-        core_time.args(["tools/test-core-time.py", "--toolchain", NIGHTLY]);
+        let mut args = vec!["--toolchain".to_owned(), NIGHTLY.to_owned()];
         let target = harness::gate_build::worker_target()?;
         if target != harness::gate_build::host()? {
-            core_time.args(["--target", target]);
+            args.extend(["--target".to_owned(), target.to_owned()]);
         }
-        run(core_time.current_dir(root))
+        core_time::main(root, &args)
     }),
 ];
 
