@@ -3,7 +3,7 @@
 
 use super::{CPL, E, LFE, NoiseMode, Substream};
 use crate::noise::Rng;
-use crate::quant::{EXP_SCALE, GroupTables};
+use crate::quant::{EXP_SCALE, GroupTables, round_to_i32};
 use crate::spec_tables::{
     VQ_HEBAP1, VQ_HEBAP2, VQ_HEBAP3, VQ_HEBAP4, VQ_HEBAP5, VQ_HEBAP6, VQ_HEBAP7,
 };
@@ -230,17 +230,6 @@ impl Substream {
             self.icoef[ch][bin] = round_to_i32(src[bin]) >> self.exps[ch][bin];
         }
     }
-}
-
-/// `x.round() as i32`: nearest, halves away from zero, saturating, NaN to zero. ARMv7
-/// has no rounding instruction, so `f32::round` is a library call there; the conversion
-/// toward zero is one instruction. `x - t` is exact: for |x| < 2^23 both are multiples of
-/// the ulp of `x` and differ by less than 1, and above that `x` is an integer.
-#[inline]
-fn round_to_i32(x: f32) -> i32 {
-    let t = x as i32;
-    let f = x - t as f32;
-    t.saturating_add(i32::from(f >= 0.5) - i32::from(f <= -0.5))
 }
 
 static AHT_IDCT: std::sync::LazyLock<[[f32; 6]; 6]> =

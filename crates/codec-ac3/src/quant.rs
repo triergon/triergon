@@ -1,6 +1,17 @@
 //! Mantissa dequantization tables (A/52:2018 7.3, Tables 7.19-7.23) and the Annex E
 //! AHT inverse transform (3.4.5).
 
+/// `x.round() as i32`: nearest, halves away from zero, saturating, NaN to zero. ARMv7
+/// has no rounding instruction, so `f32::round` is a library call there. Conversion
+/// toward zero is one instruction. `x - t` is exact for |x| < 2^23, and larger finite
+/// values are already integers.
+#[inline]
+pub(crate) fn round_to_i32(x: f32) -> i32 {
+    let t = x as i32;
+    let f = x - t as f32;
+    t.saturating_add(i32::from(f >= 0.5) - i32::from(f <= -0.5))
+}
+
 /// Ungrouped symmetric quantizer levels for bap 1..=5 (Tables 7.19-7.23):
 /// value(code) = (2 * code - (levels - 1)) / levels.
 #[cfg(test)]

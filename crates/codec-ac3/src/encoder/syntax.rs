@@ -2,6 +2,7 @@
 
 use super::{BLOCK, CHANNELS, ChannelMode, LFE_BINS, MIN_FULL_BINS, PARAMS, Pair, fast_gain};
 use crate::crc16;
+use crate::spec_tables::BAPTAB;
 use crate::tables::BAP_BITS;
 
 pub(super) struct Bits<'a> {
@@ -171,18 +172,37 @@ const COSTS: [u64; 16] = {
     costs
 };
 
-pub(super) fn mantissa_bits(ends: &[usize; CHANNELS], baps: &[[u8; BLOCK]; CHANNELS]) -> usize {
-    let sum = baps
-        .iter()
-        .zip(ends)
-        .flat_map(|(plane, &end)| &plane[..end])
-        .map(|&bap| COSTS[usize::from(bap)])
-        .sum::<u64>();
+pub(super) const COST_BY_ADDRESS: [u64; 64] = {
+    let mut table = [0; 64];
+    let mut address = 0;
+    while address < table.len() {
+        table[address] = COSTS[BAPTAB[address] as usize];
+        address += 1;
+    }
+    table
+};
+
+pub(super) fn mantissa_bits(sum: u64) -> usize {
     let group = |index: u32| {
         ((sum >> (DIRECT_BITS + GROUP_BITS * index)) & ((1 << GROUP_BITS) - 1)) as usize
     };
     let direct = (sum & ((1 << DIRECT_BITS) - 1)) as usize;
     direct + 5 * group(0).div_ceil(3) + 7 * group(1).div_ceil(3) + 7 * group(2).div_ceil(2)
+}
+
+#[cfg(test)]
+pub(super) fn allocated_mantissa_bits(
+    ends: &[usize; CHANNELS],
+    planes: &[[u8; BLOCK]; CHANNELS],
+) -> usize {
+    mantissa_bits(
+        planes
+            .iter()
+            .zip(ends)
+            .flat_map(|(plane, &end)| &plane[..end])
+            .map(|&code| COSTS[usize::from(code)])
+            .sum(),
+    )
 }
 
 #[derive(Default)]
@@ -210,7 +230,7 @@ impl Mantissas {
             _ => {
                 let width = usize::from(BAP_BITS[usize::from(bap)]);
                 let half = 1_i32 << (width - 1);
-                let value = ((sample * half as f32).round() as i32).clamp(-half, half - 1);
+                let value = round_mantissa(sample * half as f32).clamp(-half, half - 1);
                 return bits.put((value as u32) & ((1 << width) - 1), width);
             }
         };
@@ -242,9 +262,17 @@ impl Mantissas {
 }
 
 fn symmetric(sample: f32, levels: u32) -> u32 {
-    ((sample * levels as f32 + (levels - 1) as f32) * 0.5)
-        .round()
-        .clamp(0.0, (levels - 1) as f32) as u32
+    let top = (levels - 1) as i32;
+    round_mantissa((sample * levels as f32 + top as f32) * 0.5).clamp(0, top) as u32
+}
+
+#[inline]
+fn round_mantissa(sample: f32) -> i32 {
+    if cfg!(target_arch = "arm") {
+        crate::quant::round_to_i32(sample)
+    } else {
+        sample.round() as i32
+    }
 }
 
 const REVERSE_CRC_BYTE: [u16; 256] = {
@@ -300,7 +328,7 @@ mod tests {
                 }
             }
             mantissas.finish(&mut bits);
-            assert_eq!(mantissa_bits(&ends, planes), bits.position());
+            assert_eq!(allocated_mantissa_bits(&ends, planes), bits.position());
         };
         for code in 0..16 {
             verify([BLOCK; CHANNELS], &[[code; BLOCK]; CHANNELS]);

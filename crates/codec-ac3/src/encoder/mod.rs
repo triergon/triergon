@@ -2,11 +2,13 @@
 
 mod syntax;
 
-use crate::bitalloc::{BaCache, BaParams, Dba, MaskParams, stage_bap, stage_mask, stage_psd};
+use crate::bitalloc::{
+    BaCache, BaParams, Dba, MaskParams, ac3_bap_cost, stage_bap, stage_mask, stage_psd,
+};
 use crate::header::{BITRATE_KBPS, SAMPLE_RATES, ac3_frame_words};
 use crate::imdct::analysis::Analysis;
 use crate::tables::FASTGAIN;
-use syntax::{Bits, Mantissas, mantissa_bits};
+use syntax::{Bits, COST_BY_ADDRESS, Mantissas, mantissa_bits};
 
 const BLOCK: usize = 256;
 const BLOCKS: usize = 6;
@@ -132,7 +134,7 @@ impl Default for Pair {
 
 #[derive(Debug)]
 struct Work {
-    spectra: [[[f32; BLOCK]; CHANNELS]; BLOCKS],
+    spectra: Box<[[f32; BLOCK]]>,
     pairs: [Pair; GROUPS],
     bap: [[u8; BLOCK]; CHANNELS],
 }
@@ -179,7 +181,7 @@ impl Encoder {
             previous: [[0.0; BLOCK]; CHANNELS],
             analysis: Analysis::new(),
             work: Box::new(Work {
-                spectra: [[[0.0; BLOCK]; CHANNELS]; BLOCKS],
+                spectra: vec![[0.0; BLOCK]; BLOCKS * mode.coded_order().len()].into_boxed_slice(),
                 pairs: core::array::from_fn(|_| Pair::default()),
                 bap: [[0; BLOCK]; CHANNELS],
             }),
@@ -222,8 +224,13 @@ impl Encoder {
             bap,
         } = self.work.as_mut();
         let mode = self.mode;
+        let channels = order.len();
         let mut switches = [false; BLOCKS];
-        for (block, (spectra, short)) in spectra.iter_mut().zip(&mut switches).enumerate() {
+        for (block, (spectra, short)) in spectra
+            .chunks_exact_mut(channels)
+            .zip(&mut switches)
+            .enumerate()
+        {
             let at = block * BLOCK;
             let pcm = |coded: usize, channel: usize| {
                 let plane = input[channel];
@@ -253,8 +260,9 @@ impl Encoder {
                 }
             }
         }
-        for (pair, spectra) in pairs.iter_mut().zip(spectra.chunks_exact(2)) {
-            pair.prepare(mode, self.fscod, &spectra[0], &spectra[1])?;
+        for (pair, spectra) in pairs.iter_mut().zip(spectra.chunks_exact(2 * channels)) {
+            let (first, second) = spectra.split_at(channels);
+            pair.prepare(mode, self.fscod, first, second)?;
         }
         let mut fixed = Bits::count();
         syntax::header(&mut fixed, self.fscod, size_code, mode);
@@ -265,24 +273,27 @@ impl Encoder {
         let available = (bytes * 8)
             .checked_sub(fixed.position() + 18)
             .ok_or(EncodeError::BitAllocation)?;
-        let snr = select_snr(pairs, bap, available);
+        let snr = select_snr(pairs, available);
 
         output.fill(0);
         let mut bits = Bits::write_to(output);
         syntax::header(&mut bits, self.fscod, size_code, mode);
-        for (index, (coefficients, short)) in spectra.iter().zip(switches).enumerate() {
+        for (index, (coefficients, short)) in
+            spectra.chunks_exact(channels).zip(switches).enumerate()
+        {
             let pair = &pairs[index / 2];
             syntax::block(&mut bits, mode, index, short, snr, pair);
             if index.is_multiple_of(2) {
                 pair.allocate(snr, bap);
             }
             let mut mantissas = Mantissas::default();
-            for ch in 0..order.len() {
+            for (ch, channel_coefficients) in coefficients.iter().enumerate() {
                 for bin in 0..pair.ends[ch] {
                     let code = bap[ch][bin];
                     if code != 0 {
                         let exponent = u32::from(pair.exponents[ch][bin]);
-                        let normal = coefficients[ch][bin] * f32::from_bits((127 + exponent) << 23);
+                        let normal =
+                            channel_coefficients[bin] * f32::from_bits((127 + exponent) << 23);
                         mantissas.push(&mut bits, code, normal);
                     }
                 }
@@ -340,15 +351,15 @@ impl Pair {
         &mut self,
         mode: ChannelMode,
         fscod: u8,
-        first: &[[f32; BLOCK]; CHANNELS],
-        second: &[[f32; BLOCK]; CHANNELS],
+        first: &[[f32; BLOCK]],
+        second: &[[f32; BLOCK]],
     ) -> Result<(), EncodeError> {
-        for ch in 0..mode.coded_order().len() {
+        for (ch, (first, second)) in first.iter().zip(second).enumerate() {
             let lfe = mode.is_lfe(ch);
             let end = if lfe {
                 LFE_BINS
             } else {
-                full_bandwidth(&first[ch], &second[ch])
+                full_bandwidth(first, second)
             };
             self.ends[ch] = end;
             let group = if lfe || end <= MAX_FULL_BINS / 2 {
@@ -360,7 +371,7 @@ impl Pair {
             let exponents = &mut self.exponents[ch];
             // Shared exponents for two blocks. Fit the peak of each frequency group,
             // then limit both directions so every differential is representable.
-            let peak = |bin: usize| first[ch][bin].abs().max(second[ch][bin].abs());
+            let peak = |bin: usize| first[bin].abs().max(second[bin].abs());
             exponents[0] = exponent(peak(0)).min(15);
             for bin in (1..end).step_by(group) {
                 let max = (bin..bin + group).map(peak).fold(0.0, f32::max);
@@ -402,12 +413,11 @@ impl Pair {
             if snr == 0 {
                 output[..end].fill(0);
             } else {
-                let offset = (i32::from(snr) - (15 << 4)) << 2;
                 stage_bap(
                     &self.masks[ch],
                     0,
                     end,
-                    offset,
+                    snr_offset(snr),
                     PARAMS.floorcod,
                     false,
                     output,
@@ -415,6 +425,22 @@ impl Pair {
             }
         }
     }
+
+    fn mantissa_bits(&self, snr: u16) -> usize {
+        let offset = snr_offset(snr);
+        let cost = self
+            .masks
+            .iter()
+            .zip(self.ends)
+            .take_while(|&(_, end)| end != 0)
+            .map(|(mask, end)| ac3_bap_cost(mask, end, offset, PARAMS.floorcod, &COST_BY_ADDRESS))
+            .sum();
+        mantissa_bits(cost)
+    }
+}
+
+fn snr_offset(snr: u16) -> i32 {
+    (i32::from(snr) - (15 << 4)) << 2
 }
 
 fn full_bandwidth(first: &[f32; BLOCK], second: &[f32; BLOCK]) -> usize {
@@ -445,15 +471,14 @@ fn exponent(peak: f32) -> u8 {
     (126 - binary_exponent).clamp(0, 24) as u8
 }
 
-fn select_snr(pairs: &[Pair; GROUPS], bap: &mut [[u8; BLOCK]; CHANNELS], available: usize) -> u16 {
+fn select_snr(pairs: &[Pair; GROUPS], available: usize) -> u16 {
     let mut accepted = 0;
     let mut rejected = 1024;
     while rejected - accepted > 1 {
         let trial = (accepted + rejected) / 2;
         let mut used = 0;
         for pair in pairs {
-            pair.allocate(trial, bap);
-            used += 2 * mantissa_bits(&pair.ends, bap);
+            used += 2 * pair.mantissa_bits(trial);
             if used > available {
                 break;
             }
@@ -470,6 +495,31 @@ fn select_snr(pairs: &[Pair; GROUPS], bap: &mut [[u8; BLOCK]; CHANNELS], availab
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trial_cost_matches_allocated_mantissas_at_every_snr() {
+        let coefficients = |offset: usize| {
+            core::array::from_fn::<_, CHANNELS, _>(|channel| {
+                core::array::from_fn(|bin| {
+                    let exponent = 126 - (bin * 17 + channel * 13 + offset) % 24;
+                    f32::from_bits((exponent as u32) << 23)
+                })
+            })
+        };
+        let first = coefficients(0);
+        let second = coefficients(13);
+        let mut pair = Pair::default();
+        pair.prepare(ChannelMode::Surround51, 0, &first, &second)
+            .expect("allocation parameters");
+        let mut bap = [[0; BLOCK]; CHANNELS];
+        for snr in 1..1024 {
+            pair.allocate(snr, &mut bap);
+            assert_eq!(
+                pair.mantissa_bits(snr),
+                syntax::allocated_mantissa_bits(&pair.ends, &bap)
+            );
+        }
+    }
 
     #[test]
     fn attacks_require_input_history_and_signal_after_the_edge() {

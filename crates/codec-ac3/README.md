@@ -66,11 +66,13 @@ fn encode_stereo(
 }
 ```
 
-Keep the same encoder between frames. Each call consumes 1,536 samples per
-plane in the range −1 to +1 and can vary in output size at 44.1 kHz. The
-transform starts with 256 samples of silent history. Append zero samples at the
-end to flush the delayed audio and trim the decoded result to the original
-length. `reset` clears the history and restarts the frame-size clock.
+Keep the same encoder between frames. It reuses its working storage, with
+transform coefficients stored only for the configured channels. Each call
+consumes 1,536 samples per plane in the range −1 to +1 and can vary in output
+size at 44.1 kHz. The transform starts with 256 samples of silent history. Append
+zero samples at the end to flush the delayed audio and trim the decoded result
+to the original length. `reset` clears the history and restarts the frame-size
+clock.
 
 ## Supported
 

@@ -243,21 +243,54 @@ pub(crate) fn stage_bap(
     hebap: bool,
     bap: &mut [u8; 256],
 ) {
-    let floor = FLOORTAB[floorcod as usize];
     let table: &[u8; 64] = if hebap { &HEBAPTAB } else { &BAPTAB };
+    visit_bap_bands(c, start, end, snroffset, floorcod, |at, psd, mask| {
+        for (b, &p) in bap[at..at + psd.len()].iter_mut().zip(psd) {
+            *b = table[bap_address(p, mask)];
+        }
+    });
+}
+
+/// Sum the cost at each AC-3 allocation address without writing a trial BAP plane.
+#[cfg(feature = "encode")]
+pub(crate) fn ac3_bap_cost(
+    c: &BaCache,
+    end: usize,
+    snroffset: i32,
+    floorcod: u8,
+    costs: &[u64; 64],
+) -> u64 {
+    let mut total = 0;
+    visit_bap_bands(c, 0, end, snroffset, floorcod, |_, psd, mask| {
+        total += psd
+            .iter()
+            .map(|&p| costs[bap_address(p, mask)])
+            .sum::<u64>();
+    });
+    total
+}
+
+#[inline]
+fn bap_address(psd: i32, mask: i32) -> usize {
+    ((psd - mask) >> 5).clamp(0, 63) as usize
+}
+
+#[inline]
+fn visit_bap_bands(
+    c: &BaCache,
+    start: usize,
+    end: usize,
+    snroffset: i32,
+    floorcod: u8,
+    mut visit: impl FnMut(usize, &[i32], i32),
+) {
+    let floor = FLOORTAB[usize::from(floorcod)];
     let mut i = start;
     let mut j = MASKTAB[start] as usize;
     loop {
         let lastbin = (BNDTAB[j] as usize + BNDSZ[j] as usize).min(end);
-        let mut m = c.mask[j] - snroffset - floor;
-        if m < 0 {
-            m = 0;
-        }
-        m &= 0x1fe0;
-        m += floor;
-        for (b, &p) in bap[i..lastbin].iter_mut().zip(c.psd[i..lastbin].iter()) {
-            *b = table[((p - m) >> 5).clamp(0, 63) as usize];
-        }
+        let mask = ((c.mask[j] - snroffset - floor).max(0) & 0x1fe0) + floor;
+        visit(i, &c.psd[i..lastbin], mask);
         i = lastbin;
         j += 1;
         if end <= lastbin {
