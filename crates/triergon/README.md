@@ -4,8 +4,8 @@ The consumer boundary of the workspace. It re-exports the shared vocabulary and 
 neutral container model of [triergon-core](../core/README.md), classifies a source
 from its first bytes (`probe`), opens it as one closed reader enum (`AnyReader`), and
 exposes each format crate behind its own Cargo feature. It is a composition-layer
-crate that depends on triergon-core and the enabled format crates. It parses nothing
-itself and does no I/O.
+crate that depends on triergon-core and the enabled format crates. Those crates parse
+container packets. The blocking adapters handle I/O for callers that supply a reader.
 
 ## Usage
 
@@ -55,7 +55,17 @@ then asks for input and delivers `Event::Seek(SeekReceipt)` before the next pack
 `open_blocking(source, &pool)` does the probing and input handling for a
 `std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
 `next_packet` and `seek`; `open_sequential` does the same for a pipe, which the readers
-then treat as FFmpeg treats one (no seeking, no known length).
+then treat as FFmpeg treats one (no seeking, no known length). Both adapters stop
+reading as soon as a fixed container signature selects the format. Matroska needs
+four bytes, Ogg five and ISO BMFF eight. A native FLAC marker also suffices once
+higher-priority container signatures are ruled out. Frame-based and ID3-prefixed
+inputs use the elementary probe once at EOF or 64 KiB, whichever comes first.
+The seekable adapter rewinds the source. Before reading a pipe, the sequential
+adapter reserves room for the largest replay the pool can admit, up to 64 KiB
+with elementary readers or 389 bytes without them. A caller holding that room
+can release it and retry the same pipe. Fixed signatures allocate only the bytes
+consumed. Longer elementary probes use one buffer. The sequential adapter
+releases its retained capacity after replaying the last byte.
 
 ## Supported
 
@@ -86,7 +96,8 @@ The meaning of each type is documented in
   (`1A 45 DF A3`), `Probe::Isobmff` when bytes 4–8 are `ftyp`, `styp`, `moov`,
   `moof`, `mdat`, `free`, `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47`
   sit at offsets 0, 188 and 376 (at least 377 bytes). `Probe::M2ts` checks sync
-  at offsets 4, 196 and 388 behind the original arrival prefixes.
+  at offsets 4, 196 and 388 behind the original arrival prefixes. When both patterns
+  match, the facade selects TS188.
   `Probe::Ogg` is an `OggS` page. With the `elementary` feature,
   `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a frame header that a
   second one continues) and MPEG audio, ADTS and AC-3 by two frames that agree, after
@@ -132,4 +143,5 @@ checks TS188/M2TS192 dispatch, full source AUs and unchanged PES payload bytes.
 `tests/any_reader_isobmff.rs` reads and seeks an
 authored MP4 through `AnyReader`; `tests/any_reader_ogg.rs` and
 `tests/any_reader_elementary.rs` read authored Ogg Opus, MPEG audio and headerless FLAC
-streams with their trims. Gates: [docs/quality.md](../../docs/quality.md).
+streams with their trims. `tests/blocking_probe.rs` checks short reads, interruptions,
+reader features, container precedence and budgeted prefix replay. Gates: [docs/quality.md](../../docs/quality.md).
