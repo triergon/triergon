@@ -108,6 +108,9 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   `.research/fate-samples/h264-conformance/` is present (`H264_VECTOR` selects one)
   and skips otherwise. `examples/fuzz.rs` mutates the vectors to check for panics, and
   `tests/fuzz_regressions.rs` rebuilds earlier fuzz findings from the same vectors.
+- `cargo xtask codecs grade` compares the planar decoder output and the RGBA worker
+  output. Each requires matching complete pictures and two successful process exits.
+  The report records both exit codes and any trailing bytes on either side.
 - Scaling and inverse transforms wrap on overflow, as FFmpeg's `int` arithmetic does.
   A conforming stream never overflows, so this only affects corrupt input.
 - Project-wide gates: [docs/quality.md](../../docs/quality.md).
