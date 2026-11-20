@@ -2,6 +2,7 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::{self, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -136,16 +137,16 @@ fn edge_corpus(root: &Path, run_name: &std::ffi::OsStr) -> Result<PathBuf> {
 
 struct Input {
     name: String,
-    vectors: PathBuf,
+    vectors: Vec<u8>,
     expected: String,
     pin: &'static Suite,
 }
 
-// Hash the same expected bytes that both profiles will compare.
+// Keep the exact input and expected bytes checked against the manifest for both profiles.
 fn inputs(
     dir: &Path,
     prefix: &str,
-    suites: &'static [Suite; 2],
+    suites: &'static [Suite],
     manifest: &Value,
 ) -> Result<Vec<Input>> {
     let counts = Value::object(suites.iter().map(|s| (s.name, Value::int(s.rows as i128))));
@@ -163,10 +164,14 @@ fn inputs(
     for pin in suites {
         let vectors = format!("vectors-{}.tsv", pin.name);
         let expected = format!("expected-{}.tsv", pin.name);
-        if files.get(vectors.as_str()) != Some(&pin.vectors)
+        if files.remove(vectors.as_str()) != Some(pin.vectors)
             || files.remove(expected.as_str()) != Some(pin.expected)
         {
             return Err(format!("missing or changed TSV identity: {prefix}{}", pin.name).into());
+        }
+        let vectors = fs::read(dir.join(vectors))?;
+        if sha256::hex(&vectors) != pin.vectors {
+            return Err(format!("vector-file hash mismatch: {prefix}{}", pin.name).into());
         }
         let expected = fs::read_to_string(dir.join(expected))?;
         if sha256::hex(expected.as_bytes()) != pin.expected {
@@ -174,7 +179,7 @@ fn inputs(
         }
         inputs.push(Input {
             name: format!("{prefix}{}", pin.name),
-            vectors: dir.join(vectors),
+            vectors,
             expected,
             pin,
         });
@@ -292,24 +297,42 @@ fn artifact(messages: &str, manifest: &Path) -> Result<PathBuf> {
     probe.ok_or_else(|| "no time-oracle example executable in Cargo output".into())
 }
 
-fn run_probe(probe: &Path, input: &Path, observed: &Path, stderr: &Path) -> Result<i64> {
+fn run_probe(probe: &Path, input: &[u8], observed: &Path, stderr: &Path) -> Result<i64> {
     let mut child = Command::new(probe)
-        .stdin(File::open(input)?)
+        .stdin(Stdio::piped())
         .stdout(File::create(observed)?)
         .stderr(File::create(stderr)?)
         .spawn()?;
-    let start = Instant::now();
-    loop {
-        if let Some(status) = child.try_wait()? {
-            return Ok(process::exit_code(status));
+    let mut stdin = child.stdin.take().ok_or("missing probe stdin")?;
+    std::thread::scope(|scope| {
+        // Feed in parallel so a probe that stops reading still reaches the deadline.
+        let feed = scope.spawn(move || stdin.write_all(input));
+        let start = Instant::now();
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if start.elapsed() < Duration::from_secs(60) => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                result => {
+                    let _ = child.kill();
+                    child.wait()?;
+                    result?;
+                    return Err(format!(
+                        "{} timed out writing {}",
+                        probe.display(),
+                        observed.display()
+                    )
+                    .into());
+                }
+            }
+        };
+        let written = feed.join().map_err(|_| "probe input thread panicked")?;
+        if status.success() {
+            written?;
         }
-        if start.elapsed() >= Duration::from_secs(60) {
-            let _ = child.kill();
-            child.wait()?;
-            return Err(format!("{} timed out on {}", probe.display(), input.display()).into());
-        }
-        std::thread::sleep(Duration::from_millis(5));
-    }
+        Ok(process::exit_code(status))
+    })
 }
 
 fn comparison(expected: &str, actual: &str, code: i64, count: usize) -> (usize, Vec<Value>, bool) {
@@ -349,7 +372,7 @@ fn profile(
     let probe = out.join(format!("{profile}-time-oracle"));
     fs::copy(&artifact, &probe)?;
     let executable = sha256::file_hex(&probe)?;
-    // The frozen file supplies every row; Cargo's artifact must still match at the end.
+    // Cargo's artifact must still match the executable used for every row.
     let mut cases = Vec::new();
     let mut passed = true;
     for input in inputs {
@@ -540,6 +563,48 @@ mod tests {
             }
         }
         assert_eq!(comparison(expected, "x\ny\nz\n", 0, 2).1.len(), 3);
+    }
+
+    #[test]
+    fn both_profiles_receive_the_verified_vectors_after_path_replacement() -> Result<()> {
+        let temp = process::TempDir::new(None)?;
+        let dir = &temp.0;
+        const ABC: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        const SUITE: Suite = Suite {
+            name: "time",
+            rows: 1,
+            vectors: ABC,
+            expected: ABC,
+        };
+        let mut files = Vec::new();
+        for name in ["vectors-time.tsv", "expected-time.tsv"] {
+            fs::write(dir.join(name), b"abc")?;
+            files.push(Value::object([
+                ("path", Value::str(name)),
+                ("sha256", Value::str(ABC)),
+            ]));
+        }
+        let manifest = Value::object([
+            ("row_counts", Value::object([("time", Value::int(1))])),
+            ("files", Value::Array(files)),
+        ]);
+        let inputs = inputs(dir, "", &[SUITE], &manifest)?;
+        fs::write(dir.join("vectors-time.tsv"), b"replacement")?;
+        let input = &inputs[0];
+        for profile in ["debug", "release"] {
+            let out = dir.join(profile);
+            assert_eq!(
+                run_probe(
+                    Path::new("/bin/cat"),
+                    &input.vectors,
+                    &out,
+                    &dir.join("err")
+                )?,
+                0
+            );
+            check_hash(&out, input.pin.vectors)?;
+        }
+        Ok(())
     }
 
     #[test]
