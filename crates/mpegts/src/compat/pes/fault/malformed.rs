@@ -37,12 +37,25 @@ impl MalformedInputKind {
     }
 }
 
+/// The carrier a reported discard is about.
+#[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the accepted carrier stays inline, as in the option this replaces"
+)]
+enum DiscardedCarrier {
+    /// The transport inspector accepted it; only its PES syntax is malformed.
+    Accepted(TransportPacket),
+    /// The transport inspector rejected it: its original bytes, prefix included.
+    Rejected(Bytes),
+}
+
 /// One reported discard. Rejected carriers stay in the unchanged source fault;
 /// an accepted carrier with invalid PES syntax remains separately inspectable.
 #[derive(Debug)]
 pub struct MalformedInputFact {
     kind: MalformedInputKind,
-    carrier: Option<TransportPacket>,
+    carrier: DiscardedCarrier,
     input: SourceContext,
     fault: TraceFault,
     diagnostic: SourceContext,
@@ -54,7 +67,10 @@ impl MalformedInputFact {
     }
     /// The carrier, when the transport inspector accepted it and only its PES syntax is malformed.
     pub fn accepted_transport(&self) -> Option<&TransportPacket> {
-        self.carrier.as_ref()
+        match &self.carrier {
+            DiscardedCarrier::Accepted(packet) => Some(packet),
+            DiscardedCarrier::Rejected(_) => None,
+        }
     }
     /// The source's diagnostic for the malformation; a rejected carrier's bytes stay in it.
     pub fn source_fault(&self) -> &TraceFault {
@@ -69,21 +85,11 @@ impl MalformedInputFact {
         self.diagnostic
     }
     /// The carrier's original bytes, prefix included.
-    #[expect(
-        clippy::expect_used,
-        reason = "a recovered carrier without a parsed packet always retains its rejection"
-    )]
     pub fn source_bytes(&self) -> &Bytes {
-        self.carrier.as_ref().map_or_else(
-            || {
-                self.fault
-                    .rejected
-                    .as_ref()
-                    .expect("retained rejection")
-                    .bytes()
-            },
-            |packet| &packet.source,
-        )
+        match &self.carrier {
+            DiscardedCarrier::Accepted(packet) => &packet.source,
+            DiscardedCarrier::Rejected(bytes) => bytes,
+        }
     }
 }
 
@@ -586,7 +592,7 @@ impl MalformedInputCompletion {
             self.after_discard = true;
             return Ok(MalformedSourceDisposition::Reported(MalformedInputFact {
                 kind: pending.kind,
-                carrier: Some(pending.packet),
+                carrier: DiscardedCarrier::Accepted(pending.packet),
                 input: pending.context,
                 fault: fault.clone(),
                 diagnostic: context,
@@ -647,7 +653,7 @@ impl MalformedInputCompletion {
         self.after_discard = true;
         Ok(MalformedSourceDisposition::Reported(MalformedInputFact {
             kind,
-            carrier: None,
+            carrier: DiscardedCarrier::Rejected(rejected.bytes().clone()),
             input: context,
             fault: fault.clone(),
             diagnostic: context,
