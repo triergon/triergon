@@ -200,7 +200,6 @@ enum State {
 /// This parser does not expose incremental external input/generation or certify
 /// record versions, reserved-bit values, ISO grammar or SPS/RBSP semantics.
 pub struct DeclaredConfigParser<'a> {
-    pool: Budget,
     source: SourceId,
     codec: Codec,
     sample_width: LengthSize,
@@ -264,7 +263,6 @@ impl<'a> DeclaredConfigParser<'a> {
         check_limit(raw.len(), limits.maximum_record_bytes)?;
         check_limit(arrays.len(), limits.maximum_arrays)?;
         Ok(Self {
-            pool: pool.clone(),
             source,
             codec,
             sample_width,
@@ -447,16 +445,19 @@ impl<'a> DeclaredConfigParser<'a> {
                     self.phase = Phase::StartArray;
                 }
                 Phase::Finish => {
-                    let output = DeclaredConfiguration {
+                    let State::Reading { raw, arrays, nals } =
+                        std::mem::replace(&mut self.state, State::Complete)
+                    else {
+                        unreachable!("the parser is reading")
+                    };
+                    return Ok(BuildStep::Ready(DeclaredConfiguration {
                         source: self.source,
                         codec: self.codec,
-                        raw: raw.clone(),
+                        raw,
                         sample_width: self.sample_width,
-                        arrays: std::mem::replace(arrays, BudgetVec::new(&self.pool)),
-                        nals: std::mem::replace(nals, BudgetVec::new(&self.pool)),
-                    };
-                    self.state = State::Complete;
-                    return Ok(BuildStep::Ready(output));
+                        arrays,
+                        nals,
+                    }));
                 }
             }
         }
