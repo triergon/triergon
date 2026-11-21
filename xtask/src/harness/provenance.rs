@@ -43,6 +43,7 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "harness/content_oracle.py",
         "harness/colour_oracle.py",
         "harness/catalogue_oracle.py",
+        "harness/zlib_oracle.py",
         "harness/reference.c",
         "harness/reference_digest.h",
         "harness/reference_catalogue.h",
@@ -504,6 +505,23 @@ pub fn source_identity_error(root: &Path, identity: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_module_the_oracle_entry_imports_is_bound() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let inputs = shared_inputs(root).unwrap();
+        let entry = fs::read_to_string(root.join("harness/oracles.py")).unwrap();
+        let modules: Vec<_> = entry
+            .lines()
+            .filter_map(|line| line.strip_prefix("from ."))
+            .filter_map(|line| line.split_once(" import"))
+            .map(|(module, _)| format!("harness/{module}.py"))
+            .collect();
+        assert_eq!(modules.len(), 5);
+        for module in modules {
+            assert!(inputs.contains(&module), "missing source binding: {module}");
+        }
+    }
 
     #[test]
     fn the_media_worker_graph_binds_its_sources_and_inputs() {
