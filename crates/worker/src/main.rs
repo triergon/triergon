@@ -1,5 +1,6 @@
 //! Isolated harness adapter. Serialization and process startup are outside timed work.
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![cfg_attr(not(test), no_main)]
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
 #![allow(clippy::redundant_closure_for_method_calls)]
@@ -7,6 +8,7 @@ mod catalogue;
 use std::{
     fmt::Write as _,
     io::{self, Cursor, Read},
+    process::ExitCode,
     sync::atomic::AtomicBool,
     time::Instant,
 };
@@ -405,11 +407,25 @@ fn run(
     Ok((packets, bytes, std::hint::black_box(digest)))
 }
 
-fn main() {
+#[cfg_attr(test, allow(dead_code))]
+fn worker_main() -> ExitCode {
     if let Err(e) = entry() {
         eprintln!("{e}");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
+    ExitCode::SUCCESS
+}
+
+/// C's entry point, the one exception to the worker's `deny(unsafe_code)`
+/// (`triergon-worker-entry`).
+#[cfg(not(test))]
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+extern "C" fn main(
+    _argc: std::ffi::c_int,
+    _argv: *const *const std::ffi::c_char,
+) -> std::ffi::c_int {
+    triergon_worker_entry::enter(worker_main)
 }
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
