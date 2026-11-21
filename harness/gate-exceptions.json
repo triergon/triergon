@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan and every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on). `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
+  "about": "What the gates require and every exception to them, counted from the feature contracts, the gate plan, every list under harness/ whose name starts with open_ (an entry counts once for each case it names, under each gate target it is open on) and the public features of each crate in harness/not-compared.json that no contract compares. `cargo xtask check-design` counts them again: a change that drops a requirement or adds an exception must change this file too.",
   "counts": {
     "features": 62,
     "required_by_check": 32,
@@ -37,6 +37,13 @@
           "aarch64-unknown-linux-gnu": 4
         }
       }
+    },
+    "not_compared": {
+      "triergon-ass": 1,
+      "triergon-font": 1,
+      "triergon-framing": 13,
+      "triergon-raster": 0,
+      "triergon-shape": 0
     }
   }
 }

@@ -97,11 +97,19 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     errors.extend(runtime_mentions(root));
     errors.extend(policy_values(root));
     errors.extend(contract_fields(root));
-    let exceptions = data
-        .iter()
-        .find(|(path, _)| path == crate::exceptions::FILE)
-        .map(|(_, record)| record);
-    errors.extend(crate::exceptions::check(exceptions, &data));
+    let document = |file: &str| {
+        data.iter()
+            .find(|(path, _)| path == file)
+            .map(|(_, document)| document)
+    };
+    errors.extend(crate::exceptions::check(
+        document(crate::exceptions::FILE),
+        &data,
+    ));
+    errors.extend(crate::exceptions::not_compared_errors(
+        root,
+        document(crate::exceptions::NOT_COMPARED),
+    ));
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));

@@ -209,6 +209,11 @@ fn design_reports_invalid_json_and_gate_changes() {
     )
     .unwrap();
     stated_policy(&root);
+    fs::write(
+        root.join(crate::exceptions::NOT_COMPARED),
+        r#"{"crates": {}}"#,
+    )
+    .unwrap();
     let missing = design(&root).unwrap_err();
     assert_eq!(
         missing,
@@ -222,7 +227,7 @@ fn design_reports_invalid_json_and_gate_changes() {
     .unwrap();
     let ok = design(&root).unwrap();
     assert!(
-        ok.starts_with("Design integrity OK: 3 harness data files, 1 unmapped FATE identities.")
+        ok.starts_with("Design integrity OK: 4 harness data files, 1 unmapped FATE identities.")
     );
     fs::write(root.join("harness/sub/bad.json"), "{").unwrap();
     fs::write(

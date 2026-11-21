@@ -1,18 +1,29 @@
 //! The recorded counts of what the gates require and of every exception to them.
 //!
 //! Data alone loosens a gate when a contract's `gate` leaves `required`, when a
-//! feature leaves the gate plan, or when a list whose name starts with `open_` (a
+//! feature leaves the gate plan, when a list whose name starts with `open_` (a
 //! contract's `open_cases` and `open_bounds`, a workload list's `open_workloads`, a
-//! vector manifest's `open_cases`) gains an entry. `harness/gate-exceptions.json`
-//! records how many of each the repository holds, and `cargo xtask check-design`
-//! counts them again: a change that loosens anything changes that file too.
+//! vector manifest's `open_cases`, the status page's `open_cells`) gains an entry, or
+//! when a crate's list of public features no contract compares
+//! ([`NOT_COMPARED`]) grows. `harness/gate-exceptions.json` records how many of each
+//! the repository holds, and `cargo xtask check-design` counts them again: a change
+//! that loosens anything changes that file too.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::Path;
 
 use crate::json::Value;
 
 /// The record, relative to the repository root.
 pub const FILE: &str = "harness/gate-exceptions.json";
+
+/// The public features each library crate's README describes that no feature
+/// contract compares with its reference, relative to the repository root: by crate
+/// name, each feature's short stable `name`, the public items it is reached through
+/// (`entry_points`) and what a comparison would need (`needs`). A crate listed with
+/// none was reviewed and has none.
+pub const NOT_COMPARED: &str = "harness/not-compared.json";
 
 /// The counts of `data`, the parsed JSON files under `harness/` by their path from
 /// the repository root. An open entry counts once for each case it names, under
@@ -54,7 +65,113 @@ pub fn counted(data: &[(String, Value)]) -> Value {
         ("gated_by_another_command", Value::int(dedicated as i64)),
         ("not_gated", Value::int(excluded as i64)),
         ("open", Value::Object(open)),
+        ("not_compared", not_compared(data)),
     ])
+}
+
+/// How many features each crate of [`NOT_COMPARED`] lists.
+fn not_compared(data: &[(String, Value)]) -> Value {
+    let crates = data
+        .iter()
+        .find(|(path, _)| path == NOT_COMPARED)
+        .and_then(|(_, list)| list.get("crates"));
+    match crates {
+        Some(Value::Object(crates)) => Value::object(crates.iter().map(|(name, features)| {
+            let count = features.as_array().map_or(0, <[Value]>::len);
+            (name.clone(), Value::int(count as i64))
+        })),
+        _ => Value::Object(Vec::new()),
+    }
+}
+
+/// Why [`NOT_COMPARED`] is not a well-formed list: each crate a library package under
+/// `crates/` names, listed once, each of its features once, by a lowercase name of
+/// letters, digits and `-`, with at least one entry point and a one-line `needs`.
+pub fn not_compared_errors(root: &Path, list: Option<&Value>) -> Vec<String> {
+    let Some(list) = list else {
+        return vec![format!("{NOT_COMPARED}: missing")];
+    };
+    let Some(Value::Object(crates)) = list.get("crates") else {
+        return vec![format!("{NOT_COMPARED}: no crates object")];
+    };
+    let libraries = library_crates(root);
+    let mut errors = Vec::new();
+    let mut seen = BTreeSet::new();
+    for (name, features) in crates {
+        let at = format!("{NOT_COMPARED}: {name}");
+        if !seen.insert(name) {
+            errors.push(format!("{at}: listed twice"));
+        }
+        if !libraries.contains(name) {
+            errors.push(format!("{at}: not a library crate under crates/"));
+        }
+        let Some(features) = features.as_array() else {
+            errors.push(format!("{at}: not a list of features"));
+            continue;
+        };
+        let mut names = BTreeSet::new();
+        for feature in features {
+            let text = |key: &str| feature.get(key).and_then(Value::as_str);
+            let Some(feature_name) = text("name").filter(|n| is_name(n)) else {
+                errors.push(format!(
+                    "{at}: a feature's name is lowercase letters, digits and `-`"
+                ));
+                continue;
+            };
+            let at = format!("{at}: {feature_name}");
+            if !names.insert(feature_name) {
+                errors.push(format!("{at}: listed twice"));
+            }
+            let entry_points = feature.get("entry_points").and_then(Value::as_array);
+            if entry_points.is_none_or(|points| {
+                points.is_empty()
+                    || points
+                        .iter()
+                        .any(|point| point.as_str().is_none_or(|p| p.trim().is_empty()))
+            }) {
+                errors.push(format!("{at}: entry_points names no public item"));
+            }
+            if text("needs").is_none_or(|needs| needs.trim().is_empty() || needs.contains('\n')) {
+                errors.push(format!(
+                    "{at}: needs is one line saying what a comparison would need"
+                ));
+            }
+            if let Value::Object(fields) = feature
+                && let Some((key, _)) = fields
+                    .iter()
+                    .find(|(key, _)| !["name", "entry_points", "needs"].contains(&key.as_str()))
+            {
+                errors.push(format!("{at}: no field {key}"));
+            }
+        }
+    }
+    errors
+}
+
+fn is_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('-')
+        && name
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'-'))
+}
+
+/// The package names of the library crates under `crates/`: each directory with a
+/// manifest and a `src/lib.rs`.
+fn library_crates(root: &Path) -> BTreeSet<String> {
+    let Ok(entries) = fs::read_dir(root.join("crates")) else {
+        return BTreeSet::new();
+    };
+    entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|dir| dir.join("src/lib.rs").is_file())
+        .filter_map(|dir| {
+            let manifest = fs::read_to_string(dir.join("Cargo.toml")).ok()?;
+            let manifest = crate::toml::parse(&manifest).ok()?;
+            Some(manifest.get("package")?.get("name")?.as_str()?.to_owned())
+        })
+        .collect()
 }
 
 fn is_contract(path: &str) -> bool {
@@ -225,5 +342,73 @@ mod tests {
             Some(&Value::Object(Vec::new()))
         );
         assert_eq!(check(None, &base).len(), 1);
+    }
+
+    #[test]
+    fn an_uncompared_feature_changes_its_crates_count() {
+        let list = |features: &str| {
+            data(&[(
+                NOT_COMPARED,
+                &format!(r#"{{"crates": {{"triergon-core": [{features}], "triergon-ogg": []}}}}"#),
+            )])
+        };
+        let feature = r#"{"name": "a", "entry_points": ["A"], "needs": "a reference of A"}"#;
+        let base = list(feature);
+        let record = Value::object([("counts", counted(&base))]);
+        assert_eq!(
+            counted(&base).get("not_compared"),
+            Some(&Value::object([
+                ("triergon-core", Value::int(1)),
+                ("triergon-ogg", Value::int(0))
+            ]))
+        );
+        let grown = list(&format!(
+            r#"{feature}, {{"name": "b", "entry_points": ["B"], "needs": "x"}}"#
+        ));
+        let errors = check(Some(&record), &grown);
+        assert!(
+            errors.len() == 1 && errors[0].contains("not_compared / triergon-core: records 1"),
+            "{errors:?}"
+        );
+    }
+
+    #[test]
+    fn an_uncompared_feature_is_named_once_in_a_library_crate_with_what_it_needs() {
+        let root = crate::root();
+        let well_formed = parse(
+            r#"{"crates": {"triergon-core": [
+                {"name": "a-1", "entry_points": ["Time"], "needs": "a reference of A"}]}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            not_compared_errors(&root, Some(&well_formed)),
+            Vec::<String>::new()
+        );
+        assert_eq!(not_compared_errors(&root, None).len(), 1);
+        let errors = not_compared_errors(
+            &root,
+            Some(
+                &parse(
+                    r#"{"crates": {"codec-worker-x": [], "triergon-core": [
+                    {"name": "A", "entry_points": ["X"], "needs": "x"},
+                    {"name": "b", "entry_points": [], "needs": "x"},
+                    {"name": "c", "entry_points": ["C"], "needs": "two\nlines"},
+                    {"name": "d", "entry_points": ["D"], "needs": "x", "note": "x"},
+                    {"name": "d", "entry_points": ["D"], "needs": "x"}]}}"#,
+                )
+                .unwrap(),
+            ),
+        );
+        assert_eq!(
+            errors,
+            [
+                "harness/not-compared.json: codec-worker-x: not a library crate under crates/",
+                "harness/not-compared.json: triergon-core: a feature's name is lowercase letters, digits and `-`",
+                "harness/not-compared.json: triergon-core: b: entry_points names no public item",
+                "harness/not-compared.json: triergon-core: c: needs is one line saying what a comparison would need",
+                "harness/not-compared.json: triergon-core: d: no field note",
+                "harness/not-compared.json: triergon-core: d: listed twice",
+            ]
+        );
     }
 }

@@ -1,0 +1,88 @@
+{
+  "about": "Public features a library crate's README describes that no feature contract under harness/features/ compares with its reference, by crate: each by a short stable name, the public items it is reached through and what a comparison would need. A crate listed with no features was reviewed and has none; a crate not listed is not reviewed yet. A feature leaves its list when a contract compares it. `cargo xtask check-design` checks the list and holds the count per crate to harness/gate-exceptions.json, so a feature left uncompared is recorded as visibly as a loosened gate.",
+  "crates": {
+    "triergon-ass": [
+      {
+        "name": "renderer-settings",
+        "entry_points": ["Settings::margins", "Settings::use_margins", "Settings::pixel_aspect", "Settings::font_scale", "Settings::line_spacing", "Settings::line_position"],
+        "needs": "ass-render fixtures rendered with each setting changed from its default, against libass configured with the same values"
+      }
+    ],
+    "triergon-font": [
+      {
+        "name": "store",
+        "entry_points": ["Store", "StoreKey", "Built"],
+        "needs": "a worker operation whose output depends on what the store keeps under its budget; no reference exposes an equivalent cache"
+      }
+    ],
+    "triergon-framing": [
+      {
+        "name": "nal-length-prefixed-reading",
+        "entry_points": ["nal::NalReader with nal::Framing::LengthPrefixed"],
+        "needs": "a worker operation reading length-prefixed NAL units from MP4 and Matroska samples, folded against the reference's units; only Annex B reading is compared (raw-annex-b, mpegts-access-units)"
+      },
+      {
+        "name": "nal-configuration-inputs",
+        "entry_points": ["nal::AnnexBConfigParser", "nal::DeclaredConfigParser", "nal::Configuration::declared_record", "nal::AnnexBWriter"],
+        "needs": "a corpus of Annex B and declared parameter sets with a reference projection of the configuration each gives and of its Annex B form"
+      },
+      {
+        "name": "hevc-hvcc-prefix-inspection",
+        "entry_points": ["hevc::inspect_config_prefix"],
+        "needs": "a corpus of whole and truncated hvcC records with a reference view of the fields the prefix inspection reports"
+      },
+      {
+        "name": "hevc-record-writing",
+        "entry_points": ["hevc::HvcAnnexBWriter", "hevc::HvcDecoderConfigWriter"],
+        "needs": "a worker operation writing hvcC records and their Annex B form, compared byte for byte with the reference's conversion of the same samples"
+      },
+      {
+        "name": "av1-obu-reading",
+        "entry_points": ["av1::Av1ObuReader"],
+        "needs": "a worker operation reading OBUs incrementally, folded against the reference's OBUs of the same temporal units"
+      },
+      {
+        "name": "vp9-configuration",
+        "entry_points": ["vp9::Vp9ConfigParser"],
+        "needs": "a VP9 corpus with a reference view of the configuration the parser reads"
+      },
+      {
+        "name": "aac-configuration-views",
+        "entry_points": ["aac::AacAscScopeParser", "aac::decoder_configuration_view", "aac::decoder_channel_view"],
+        "needs": "a reference view of AudioSpecificConfig at both extents and of the decoder configuration and channel views it gives"
+      },
+      {
+        "name": "aac-adts-buffer-parsing",
+        "entry_points": ["aac::AacAdtsParser"],
+        "needs": "a worker operation parsing ADTS frames from complete buffers, compared with the reference's frames and headers"
+      },
+      {
+        "name": "eac3-bsi",
+        "entry_points": ["ac3::Eac3BsiParser"],
+        "needs": "an E-AC-3 corpus with a reference view of every bitstream information field"
+      },
+      {
+        "name": "dts-core-inspection",
+        "entry_points": ["dts::DtsCoreFrameReader", "dts::DtsHeaderInspector", "dts::inspect_header_bits"],
+        "needs": "a feature contract and worker operation for what the opt-in dts_packet_corpus test compares with the pinned FFmpeg outside the gate"
+      },
+      {
+        "name": "dts-core-extent",
+        "entry_points": ["dts::probe_frame_extent"],
+        "needs": "a reference of each core frame's declared extent over the DTS corpus"
+      },
+      {
+        "name": "dts-packings",
+        "entry_points": ["dts::Dts14BitUnpacker", "dts::DtsPackedPayloadJob", "dts::Dts14SyncReader", "dts::Dts14CarrierReader", "dts::DtsNormalSourceReader"],
+        "needs": "14-bit and packed DTS inputs with a reference of the normal frames they carry"
+      },
+      {
+        "name": "dts-reference-trace",
+        "entry_points": ["reference_trace::dts::ParserOperation", "reference_trace::dts::FactAssociationJob", "reference_trace::dts::ParserHints"],
+        "needs": "a worker operation that runs this comparison projection against the reference"
+      }
+    ],
+    "triergon-raster": [],
+    "triergon-shape": []
+  }
+}
