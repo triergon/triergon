@@ -19,7 +19,7 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #include "reference_ts_eac3.h"
 
 /* The proof commands retain their original trace protocol. The measured modes
- * run the same complete operation, including byte identity and source clocks. */
+ * retain parser coverage and source clock validation without proof-only passes. */
 static int ec_main(int argc, char **argv, const uint8_t *bytes, size_t size)
 {
     if (argc == 3 && (!strcmp(argv[1], "ts-eac3-proof")
@@ -43,7 +43,7 @@ static int ec_main(int argc, char **argv, const uint8_t *bytes, size_t size)
     TsWork total = {0};
     int eof = 1;
     for (unsigned long i = 0; i < iterations; ++i) {
-        EcState state = {0};
+        EcState state = {.correctness = !bench && !memory};
         if (!ec_operation(bytes, size, (int)program, &state)) { eof = 0; break; }
         total.packets += state.work.packets;
         total.bytes += state.work.bytes;

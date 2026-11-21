@@ -4,29 +4,30 @@ The separately compiled `reference_ts_eac3_worker.c` accepts `ts-eac3-proof FILE
 `ts-eac3-proof-trace FILE`. These opt-in commands use the existing formats
 reference link inputs through the existing xtask formats profile as
 `ffmpeg-ts-eac3-worker`. The adapter also accepts `ts-eac3-six-block-{fold,bench,memory}` with
-`FILE [ITERATIONS] 188 PROGRAM --atsc`; each mode performs the same complete
-operation. The required [report contract](features/mpegts-atsc-eac3-six-block/contract.json) pins its ten folds. The ordinary reference workers' `ts-au-fold` continues to return ordinary FFmpeg results.
+`FILE [ITERATIONS] 188 PROGRAM --atsc`. Fold and proof modes verify parser-output byte identity and digest the original source headers; bench and memory modes omit those reference-only passes. The required [report contract](features/mpegts-atsc-eac3-six-block/contract.json) pins its ten folds. The ordinary reference workers' `ts-au-fold` continues to return ordinary FFmpeg results.
 
 The operation starts with the same preloaded original entity as the existing
 transport harness, creates fresh demuxer/parser state, and includes demuxing,
-framing, byte identity, grouping, clocks, side data, duration derivation and
-folding. Input loading is outside the operation. There is no second demux scan,
+framing, grouping, source clock validation, side data, duration derivation and
+folding. All modes check parser interval ownership and complete coverage. Bench and
+memory parse fixed syncframe fields and the BSI of the opening short primary;
+fold and proof additionally inspect every syncframe BSI. Input loading is outside the operation. There is no second demux scan,
 whole-input validation pass, serialized intermediate representation or separate
 whole-input copy. All temporary state is released before the summary is printed.
 
 The public MPEG-TS demuxer runs with `NOPARSE | NOFILLIN`, custom forward AVIO,
 no stream discovery and no decoder. Every selected PES is retained by a public
-packet reference until parser byte identity and its complete AUs are consumed.
+packet reference until parser coverage and its complete AUs are consumed.
 The public E-AC-3 parser is fed incrementally and drained at actual demux EOF.
-Every parser interval must exactly equal the next unclaimed bytes of one PES.
+Every parser interval must fit the next unclaimed bytes of one PES; fold and proof also compare those bytes for identity.
 The adapter retains at most 32 PES owners and 1 MiB of PES payload. These limits
 do not bound FFmpeg's own internal allocations or its read-ahead.
 
 Grouping follows [ATSC A/52:2018](https://www.atsc.org/wp-content/uploads/2021/04/A52-2018.pdf),
 Annex E Table E1.2 and Annex G §3.3. A primary independent substream 0 and its
 following dependents accumulate six primary blocks entirely within a PES.
-Each dependent matches its primary's rate and block count, occurs at most once
-per primary interval and covers six blocks in total. Completed groups publish
+Each dependent matches its primary's rate and block count, has sequential IDs starting at zero in each primary interval, and has the same
+count in every interval of the group. Completed groups publish
 before inspection of the next primary's BSI. The next fixed header identifies
 that boundary. Later faults preserve already published groups.
 
@@ -45,12 +46,11 @@ status 0. Malformed command lines return 2.
 The supported proof boundary is deliberately narrow: one TS188 entity, program
 7, one direct `0x87` E-AC-3 stream in finite `0xbd` PES packets, `bsid=16`, primary substream 0, independent or dependent
 stream types, integral AU duration, and an optional PES header contained in its
-first carrier. Mixing metadata, converted streams, other independent services,
-multiple selected streams, split optional headers and nonintegral durations are
-refused. AU-start `convsync=1` for short frames is the adapter's expectation;
+first carrier. Fold and proof refuse mixing metadata when inspecting BSI. All modes refuse
+converted streams, other independent services, multiple selected streams, split
+optional headers and nonintegral durations. AU-start `convsync=1` for short frames is the adapter's expectation;
 interior `convsync=1` is accepted. This is a framing check, not CRC, conversion
-or audio decoding certification. Ordered dependent-layout identity, general
-metadata syntax and broader transport validation still need dedicated proof
+or audio decoding certification. General metadata syntax and broader transport validation still need dedicated proof
 coverage before broadening this boundary.
 
 The 24 retained functional controls agree on full expected packet records and

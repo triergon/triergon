@@ -101,7 +101,9 @@ remain open on both inputs.
 The [six-block ATSC E-AC-3 comparison](../harness/features/mpegts-atsc-eac3-six-block/contract.json)
 groups independent and dependent syncframes within each PES. The matched
 public parser comparison passes all ten authored packet folds. Ordinary
-parser grouping differs on all ten folds. Native measurements remain open.
+parser grouping differs on all ten folds. Fold and proof retain byte-identity and
+source-header digest checks; timed and memory modes omit those extra passes.
+Native measurements remain open.
 
 ## Subtitle text comparisons
 

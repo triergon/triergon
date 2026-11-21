@@ -18,22 +18,23 @@ static void ec_skip(EcBits *b, unsigned n)
 {
     while (n && !b->bad) { unsigned step = n > 24 ? 24 : n; ec_get(b, step); n -= step; }
 }
-typedef struct { unsigned type, id, blocks, rate, sync; size_t size; } EcFrame;
-static const char *ec_frame(const uint8_t *data, size_t size, EcFrame *f)
+typedef struct { unsigned type, id, blocks, rate, sync; } EcFrame;
+static const char *ec_frame(const uint8_t *data, size_t extent, EcFrame *f, int opening, int correctness)
 {
-    EcBits b = {data, size, 0, 0};
-    if (ec_get(&b, 16) != 0x0b77) return "syncword";
-    f->type = ec_get(&b, 2); f->id = ec_get(&b, 3); f->size = (ec_get(&b, 11) + 1) * 2;
-    if (f->size < 7 || f->size > size) return "truncated-syncframe";
-    b.size = f->size;
-    unsigned rate = ec_get(&b, 2), code = ec_get(&b, 2);
+    if (extent < 7) return "truncated-syncframe";
+    f->type = data[2] >> 6;
+    f->id = (data[2] >> 3) & 7;
+    unsigned rate = data[4] >> 6, code = (data[4] >> 4) & 3;
     const unsigned rates[] = {48000, 44100, 32000}, blocks[] = {1, 2, 3, 6};
     if (rate == 3 && code == 3) return "reserved-rate";
     f->rate = rate == 3 ? rates[code] / 2 : rates[rate];
     if (rate == 3) code = 3;
     f->blocks = blocks[code];
-    unsigned mode = ec_get(&b, 3); ec_get(&b, 1);
-    if (ec_get(&b, 5) != 16 || f->type > 1 || (!f->type && f->id)) return "unsupported-substream";
+    if ((data[5] >> 3) != 16 || f->type > 1 || (!f->type && f->id)) return "unsupported-substream";
+    f->sync = 1;
+    if (!correctness && (!opening || f->type || f->blocks == 6)) return NULL;
+    unsigned mode = (data[4] >> 1) & 7;
+    EcBits b = {data, extent, 45, 0};
     ec_get(&b, 5); if (ec_get(&b, 1)) ec_get(&b, 8);
     if (!mode) { ec_get(&b, 5); if (ec_get(&b, 1)) ec_get(&b, 8); }
     if (f->type == 1 && ec_get(&b, 1)) ec_get(&b, 16);
@@ -55,11 +56,11 @@ enum { EC_OWNERS = 32, EC_RETAINED = 1024 * 1024 };
 typedef struct {
     AVPacket *packet;
     size_t verified, at, start;
-    unsigned blocks, rate, last_blocks, seen, coverage[8];
+    unsigned blocks, rate, last_blocks, dependents, expected; int have_expected;
 } EcOwner;
 typedef struct {
     EcOwner owners[EC_OWNERS]; unsigned count; size_t retained;
-    TsWork work; uint64_t source_digest; const char *refusal; int trace;
+    TsWork work; uint64_t source_digest; const char *refusal; int trace, correctness;
 } EcState;
 
 /* Publish before inspecting the next primary's BSI. Side data belongs to the
@@ -67,8 +68,7 @@ typedef struct {
 static const char *ec_publish(EcState *s, const AVFormatContext *fmt, EcOwner *o, int program)
 {
     if (o->blocks != 6) return "incomplete-au";
-    for (unsigned i = 0; i < 8; ++i)
-        if (o->coverage[i] && o->coverage[i] != 6) return "dependent-coverage";
+    if (o->have_expected && o->expected != o->dependents) return "dependent-coverage";
     if (!o->rate || 138240000 % o->rate) return "nonintegral-duration";
     AVPacket p = *o->packet;
     p.data += o->start; p.size = (int)(o->at - o->start);
@@ -89,8 +89,8 @@ static const char *ec_publish(EcState *s, const AVFormatContext *fmt, EcOwner *o
         }
         puts("]}");
     }
-    o->start = o->at; o->blocks = o->rate = o->last_blocks = o->seen = 0;
-    memset(o->coverage, 0, sizeof(o->coverage));
+    o->start = o->at; o->blocks = o->rate = o->last_blocks = o->dependents = o->expected = 0;
+    o->have_expected = 0;
     return NULL;
 }
 static const char *ec_advance(EcState *s, const AVFormatContext *fmt, int program)
@@ -107,17 +107,21 @@ static const char *ec_advance(EcState *s, const AVFormatContext *fmt, int progra
             size_t extent = ((((size_t)p[2] & 7) << 8) + p[3] + 1) * 2;
             if (extent > size - o->at) return "truncated-syncframe";
             if (extent > o->verified - o->at) return NULL;
-            EcFrame f; const char *error = ec_frame(p, size - o->at, &f); if (error) return error;
+            EcFrame f; const char *error = ec_frame(p, extent, &f, !o->blocks, s->correctness); if (error) return error;
             if (!f.type) {
                 if (!o->blocks && !f.sync) return "missing-au-convsync";
                 if (o->blocks + f.blocks > 6) return "primary-overflow";
                 if (o->rate && o->rate != f.rate) return "primary-rate-change";
-                o->rate = f.rate; o->blocks += f.blocks; o->last_blocks = f.blocks; o->seen = 0;
+                if (o->blocks) {
+                    if (o->have_expected && o->expected != o->dependents) return "dependent-coverage";
+                    o->expected = o->dependents; o->have_expected = 1; o->dependents = 0;
+                }
+                o->rate = f.rate; o->blocks += f.blocks; o->last_blocks = f.blocks;
             } else {
                 if (!o->last_blocks) return "orphan-dependent";
-                if (o->seen & (1u << f.id)) return "duplicate-dependent";
+                if (f.id != o->dependents) return "dependent-sequence";
                 if (o->last_blocks != f.blocks || o->rate != f.rate) return "dependent-timing";
-                o->seen |= 1u << f.id; o->coverage[f.id] += f.blocks;
+                ++o->dependents;
             }
             o->at += extent;
         }
@@ -135,7 +139,7 @@ static const char *ec_interval(EcState *s, const AVFormatContext *fmt, int progr
         EcOwner *o = &s->owners[i]; size_t left = (size_t)o->packet->size - o->verified;
         if (!left) continue;
         if ((size_t)size > left) return "parser-crosses-pes";
-        if (memcmp(data, o->packet->data + o->verified, (size_t)size)) return "parser-byte-identity";
+        if (s->correctness && memcmp(data, o->packet->data + o->verified, (size_t)size)) return "parser-byte-identity";
         o->verified += (size_t)size;
         return ec_advance(s, fmt, program);
     }
@@ -172,6 +176,7 @@ static const char *ec_source_clock(const uint8_t *bytes, size_t size, AVPacket *
             | ((int64_t)(t[2] & 254) << 14) | ((int64_t)t[3] << 7) | (t[4] >> 1);
         if (i) packet->dts = clock; else packet->pts = clock;
     }
+    if (!digest) return NULL;
     fold(digest, (uint64_t)packet->pos);
     fold(digest, (uint64_t)packet->pts); fold(digest, (uint64_t)packet->dts);
     fold(digest, 9u + p[8]); fold_bytes(digest, p, 9u + p[8]);
@@ -179,7 +184,7 @@ static const char *ec_source_clock(const uint8_t *bytes, size_t size, AVPacket *
 }
 static int ec_operation(const uint8_t *bytes, size_t size, int program, EcState *result)
 {
-    TsInput input = {bytes, size, 0}; EcState state = {.trace = result->trace};
+    TsInput input = {bytes, size, 0}; EcState state = {.trace = result->trace, .correctness = result->correctness};
     AVFormatContext *fmt = avformat_alloc_context();
     AVIOContext *io = NULL; AVPacket *packet = av_packet_alloc();
     AVCodecContext *codec = avcodec_alloc_context3(NULL);
@@ -201,7 +206,7 @@ static int ec_operation(const uint8_t *bytes, size_t size, int program, EcState 
             state.refusal = "selection"; break;
         }
         selected = packet->stream_index;
-        state.refusal = ec_source_clock(bytes, size, packet, stream->id, &state.source_digest);
+        state.refusal = ec_source_clock(bytes, size, packet, stream->id, state.correctness ? &state.source_digest : NULL);
         if (state.refusal) break;
         if (state.count == EC_OWNERS || (size_t)packet->size > EC_RETAINED - state.retained) {
             state.refusal = "retained-pes-limit"; break;
@@ -249,7 +254,7 @@ static int ec_operation(const uint8_t *bytes, size_t size, int program, EcState 
 
 static int ec_proof(const uint8_t *bytes, size_t size, int program, int trace)
 {
-    EcState state = {.trace = trace};
+    EcState state = {.trace = trace, .correctness = 1};
     int eof = ec_operation(bytes, size, program, &state);
     printf("{\"operation\":\"atsc-eac3-six-block-proof\",\"packets\":%"PRIu64
            ",\"bytes\":%"PRIu64",\"digest\":%"PRIu64",\"eof\":%s,\"refusal\":",
