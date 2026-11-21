@@ -1,0 +1,2 @@
+# Invalid charset sequences and trailing bytes are part of the input.
+*.assp -text -diff

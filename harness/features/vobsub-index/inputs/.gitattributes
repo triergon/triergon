@@ -1,0 +1,3 @@
+# The index corpus includes exact CRLF line endings.
+*.idx -text
+crlf.idx -diff
