@@ -347,15 +347,41 @@ pub(crate) struct Ps {
     start_re: [[f32; 4]; MAX_PAR],
     start_im: [[f32; 4]; MAX_PAR],
     status: Status,
-    /// The stereo synthesis, held by the single channel elements PS applies to.
-    synth: Option<Synth>,
+}
+
+/// What a single channel element holds to output Parametric Stereo: the stereo synthesis
+/// and the right channel's QMF matrix of 38 slots.
+#[derive(Debug)]
+pub(crate) struct Stereo {
+    synth: Synth,
+    pub(crate) right: BudgetVec<[Cpx; 64]>,
+}
+
+impl Stereo {
+    pub(crate) fn new(budget: &Budget) -> Result<Stereo> {
+        Ok(Stereo {
+            synth: Synth::new(budget)?,
+            right: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+        })
+    }
+
+    /// Drop the signal history (after a discontinuity).
+    pub(crate) fn reset(&mut self) {
+        self.synth.reset();
+    }
+
+    /// Return to the state of `new`.
+    pub(crate) fn renew(&mut self) {
+        self.synth.reset();
+        self.right.fill([Cpx::default(); 64]);
+    }
 }
 
 impl Ps {
     /// PS state of an SBR element. Every element reads the PS extensions it carries; only a
-    /// single channel element (`synthesis`) holds the stereo synthesis that applies them.
-    pub(crate) fn new(budget: &Budget, synthesis: bool) -> Result<Ps> {
-        Ok(Ps {
+    /// single channel element holds the [`Stereo`] output that applies them.
+    pub(crate) fn new() -> Ps {
+        Ps {
             header: Header::default(),
             seen_header: false,
             active: false,
@@ -379,16 +405,12 @@ impl Ps {
             start_re: [[0.0; 4]; MAX_PAR],
             start_im: [[0.0; 4]; MAX_PAR],
             status: Status::Absent,
-            synth: synthesis.then(|| Synth::new(budget)).transpose()?,
-        })
+        }
     }
 
     /// Drop the signal history and the stored matrices (after a discontinuity); the next
     /// PS frame starts as the first one of a stream.
     pub(crate) fn reset(&mut self) {
-        if let Some(synth) = &mut self.synth {
-            synth.reset();
-        }
         self.store_re = [[[0.0; 4]; MAX_PAR]; MAX_ENV];
         self.store_im = [[[0.0; 4]; MAX_PAR]; MAX_ENV];
         self.start_re = [[0.0; 4]; MAX_PAR];
@@ -824,9 +846,11 @@ impl Ps {
         true
     }
 
-    /// Run the PS on one frame: `x` (38 slots) becomes the left channel, `x_r` the right.
+    /// Run the PS on one frame: `x` (38 slots) becomes the left channel, `stereo.right`
+    /// the right.
     #[inline(never)] // kept out of the SBR loops, which run without PS too
-    pub(crate) fn apply(&mut self, x: &mut BudgetVec<[Cpx; 64]>, x_r: &mut BudgetVec<[Cpx; 64]>) {
+    pub(crate) fn apply(&mut self, stereo: &mut Stereo, x: &mut BudgetVec<[Cpx; 64]>) {
+        let Stereo { synth, right: x_r } = stereo;
         let status = std::mem::replace(&mut self.status, Status::Absent);
         let run = match status {
             Status::Run => true,
@@ -843,12 +867,12 @@ impl Ps {
         // repeat of it) restarts the decorrelator and the ducking, and the IPD/OPD smoothing
         // history starts again from index 0 (o20, o21)
         if self.changed() {
-            self.synthesis().restart();
+            synth.restart();
             self.phase_history = [[[0; MAX_PAR]; 2]; 2];
         }
-        self.matrices();
+        self.matrices(synth);
         let big = self.frame.big;
-        self.synthesis().run(big, &mut x[..], &mut x_r[..]);
+        synth.run(big, &mut x[..], &mut x_r[..]);
     }
 
     fn changed(&self) -> bool {
@@ -856,7 +880,7 @@ impl Ps {
     }
 
     /// The frame's per-slot matrices into the synthesis scratch.
-    fn matrices(&mut self) {
+    fn matrices(&mut self, synth: &mut Synth) {
         let f = self.frame;
         let pars = layouts()[usize::from(f.big)].pars;
         let image_pars = layouts()[usize::from(f.big)].image_pars;
@@ -913,7 +937,7 @@ impl Ps {
             let last = usize::from(f.last_slot[e]);
             if last + 1 > first {
                 let width = (last + 1 - first) as f32;
-                let matrix = &mut self.synthesis().matrix;
+                let matrix = &mut synth.matrix;
                 for slot in first..=last {
                     let w = (slot + 1 - first) as f32 / width;
                     let row = &mut matrix[slot];
@@ -938,14 +962,7 @@ impl Ps {
                 first = last + 1;
             }
         }
-        self.synthesis().complex = has_phase;
-    }
-
-    /// The stereo synthesis, which `apply` needs: PS applies to single channel elements only.
-    fn synthesis(&mut self) -> &mut Synth {
-        self.synth
-            .as_mut()
-            .expect("PS applies to single channel elements")
+        synth.complex = has_phase;
     }
 
     /// Smoothed row phases (cos, sin) of envelope `e` in the first `phased` parameter bands,

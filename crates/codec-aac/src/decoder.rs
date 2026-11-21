@@ -970,10 +970,10 @@ impl Core {
                 }
                 continue;
             }
-            if self.sbr_active {
+            // Every element has its SBR state once SBR runs.
+            if let (true, Some(s)) = (self.sbr_active, e.sbr.as_mut()) {
                 let ps = self.ps_active && e.kind == ID_SCE;
                 let nch = if e.kind == ID_CPE { 2 } else { 1 };
-                let s = e.sbr.as_mut().unwrap();
                 let (o0, o1) = e.out.split_at_mut(1);
                 s.process(
                     &mut o0[0],

@@ -280,9 +280,10 @@ pub(crate) struct Sbr {
     data_ok: bool,
     pub(crate) ps: ps::Ps,
     ps_seen: bool,
+    /// The Parametric Stereo output of a single channel element.
+    stereo: Option<ps::Stereo>,
     // scratch
     x: BudgetVec<[Cpx; 64]>,
-    x_r: BudgetVec<[Cpx; 64]>,
     /// Development aid: the 38 QMF slots handed to Parametric Stereo in the last frame
     /// (re, im interleaved; empty when PS did not run).
     #[cfg(feature = "inspect")]
@@ -302,10 +303,10 @@ impl Sbr {
             coupling: false,
             ch: [Chan::new(budget, true)?, Chan::new(budget, pair)?],
             data_ok: false,
-            ps: ps::Ps::new(budget, !pair)?,
+            ps: ps::Ps::new(),
             ps_seen: false,
+            stereo: (!pair).then(|| ps::Stereo::new(budget)).transpose()?,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
-            x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], if pair { 0 } else { 38 })?,
             #[cfg(feature = "inspect")]
             ps_input: Vec::new(),
         })
@@ -316,6 +317,9 @@ impl Sbr {
             c.reset_signal();
         }
         self.ps.reset();
+        if let Some(stereo) = &mut self.stereo {
+            stereo.reset();
+        }
     }
 
     /// Return to the state of `new` in place, header and frequency tables included.
@@ -331,8 +335,8 @@ impl Sbr {
             data_ok,
             ps,
             ps_seen,
+            stereo,
             x,
-            x_r,
             #[cfg(feature = "inspect")]
                 ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
@@ -347,8 +351,10 @@ impl Sbr {
         *data_ok = false;
         ps.renew();
         *ps_seen = false;
+        if let Some(stereo) = stereo {
+            stereo.renew();
+        }
         x.fill([Cpx::default(); 64]);
-        x_r.fill([Cpx::default(); 64]);
     }
 
     /// sbr_extension_data(): returns true when a PS extension was found.
@@ -643,7 +649,7 @@ impl Sbr {
                 ch.kx_prev = kx;
                 ch.m_prev = 0;
             }
-            if c == 0 && ps {
+            if let (0, true, Some(stereo)) = (c, ps, &mut self.stereo) {
                 // look-ahead slots (low band only) for the PS hybrid filters
                 for i in 32..38 {
                     let row = &mut self.x[i];
@@ -663,26 +669,26 @@ impl Sbr {
                 }
                 // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
-                    self.ps.apply(&mut self.x, &mut self.x_r);
+                    self.ps.apply(stereo, &mut self.x);
                     if !ready {
                         // without its SBR element the frame's PS output above kx is zero,
                         // the decorrelated signal of earlier frames included (observed
                         // behaviour: probes o00, o31, o32 in
                         // harness/codecs/aac/ps/signal/open, all with kx = 32)
-                        for row in self.x[..32].iter_mut().chain(self.x_r[..32].iter_mut()) {
+                        for row in self.x[..32].iter_mut().chain(stereo.right[..32].iter_mut()) {
                             row[kx..].fill(Cpx::default());
                         }
                     }
                 } else {
                     // no PS data yet: both outputs carry the mono signal
                     for i in 0..32 {
-                        self.x_r[i] = self.x[i];
+                        stereo.right[i] = self.x[i];
                     }
                 }
                 for (x, out) in self.x[..32].iter().zip(l.chunks_exact_mut(64)) {
                     self.ch[0].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
-                for (x, out) in self.x_r[..32].iter().zip(r.chunks_exact_mut(64)) {
+                for (x, out) in stereo.right[..32].iter().zip(r.chunks_exact_mut(64)) {
                     self.ch[1].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
                 continue;
