@@ -1469,13 +1469,12 @@ impl<M> NalPacketJob<'_, M> {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<NalPacketOutput<M>>> {
         let mut ready = None;
-        match self.step_into(work, cancel, &mut ready)? {
-            NalPacketProgress::Yield => Ok(BuildStep::Yield),
-            NalPacketProgress::Complete => Ok(BuildStep::Complete),
-            NalPacketProgress::Ready => Ok(BuildStep::Ready(
-                ready.ok_or(Error::Invalid("missing published packet"))?,
-            )),
-        }
+        let progress = self.step_into(work, cancel, &mut ready)?;
+        Ok(match ready {
+            Some(output) => BuildStep::Ready(output),
+            None if progress == NalPacketProgress::Complete => BuildStep::Complete,
+            None => BuildStep::Yield,
+        })
     }
     /// Publish a complete output directly into an empty caller-owned slot.
     /// Occupied slots are rejected before any job, work or owner change and do

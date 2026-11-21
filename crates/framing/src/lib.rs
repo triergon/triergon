@@ -158,14 +158,13 @@ pub enum ConfigProgress {
 }
 
 impl ConfigProgress {
-    /// The [`BuildStep`] of a parser that published into `ready`.
-    pub(crate) fn into_build_step<T>(self, ready: Option<T>) -> Result<BuildStep<T>> {
-        match self {
-            Self::Ready => ready
-                .map(BuildStep::Ready)
-                .ok_or(Error::Invalid("missing published configuration")),
-            Self::Yield => Ok(BuildStep::Yield),
-            Self::Complete => Ok(BuildStep::Complete),
+    /// The [`BuildStep`] of a parser that published into `ready`: the value the slot
+    /// received, or the progress without one.
+    pub(crate) fn into_build_step<T>(self, ready: Option<T>) -> BuildStep<T> {
+        match ready {
+            Some(value) => BuildStep::Ready(value),
+            None if self == Self::Complete => BuildStep::Complete,
+            None => BuildStep::Yield,
         }
     }
 }

@@ -458,8 +458,7 @@ impl AvcConfigParser {
         cancel: &AtomicBool,
     ) -> Result<BuildStep<AvcConfiguration>> {
         let mut ready = None;
-        self.step_into(work, cancel, &mut ready)?
-            .into_build_step(ready)
+        Ok(self.step_into(work, cancel, &mut ready)?.into_build_step(ready))
     }
 
     /// Publishes into an empty caller-provided slot without returning the record. An
