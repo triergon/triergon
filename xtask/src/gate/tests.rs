@@ -211,12 +211,11 @@ fn capture_memory_steps_alone_share_a_batch() {
 #[cfg(unix)]
 #[test]
 fn a_batch_runs_once_and_records_each_step_by_its_result() {
-    use std::os::unix::fs::PermissionsExt;
     let dir = crate::walk::scratch("gate-batch");
     // Writes a gate result in each --out but the one named `silent`, failing in
     // the one named `fails`, and prints its arguments and a verdict line per case.
     let program = dir.join("qualify.sh");
-    fs::write(
+    crate::walk::write_script(
         &program,
         r#"#!/bin/sh
 echo "$@"
@@ -232,9 +231,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 "#,
-    )
-    .unwrap();
-    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    );
     let output = dir.join("run");
     // An earlier run's result is not this run's.
     fs::create_dir_all(output.join("silent")).unwrap();

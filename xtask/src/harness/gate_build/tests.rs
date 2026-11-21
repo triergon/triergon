@@ -1,5 +1,4 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 
 use super::*;
 
@@ -109,12 +108,10 @@ fn another_compiler_is_refused() {
 fn a_compiler_ahead_on_the_search_path_is_seen() {
     let directory = scratch("path");
     let fake = directory.join("rustc");
-    fs::write(
+    crate::walk::write_script(
         &fake,
         "#!/bin/sh\necho rustc 1.101.0-nightly\necho release: 1.101.0-nightly\n",
-    )
-    .unwrap();
-    fs::set_permissions(&fake, fs::Permissions::from_mode(0o755)).unwrap();
+    );
     let found = compiler(&directory, Some(directory.as_os_str())).unwrap();
     let reasons = refusals(&record("rustc", Some(Value::str(found))), PIN);
     fs::remove_dir_all(&directory).unwrap();

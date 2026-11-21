@@ -280,7 +280,6 @@ fn labels_are_bounded_lowercase_identifiers() {
 #[cfg(unix)]
 #[test]
 fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
-    use std::os::unix::fs::PermissionsExt;
     let root = crate::walk::scratch("fuzz-campaign");
     fs::create_dir_all(root.join(".research")).unwrap();
     fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
@@ -294,8 +293,7 @@ fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
     }
     let worker = |name: &str, body: &str| {
         let path = root.join(name);
-        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        crate::walk::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
         path
     };
     let candidate = worker("candidate", "printf '{\"n\": 1.50}'");
@@ -369,7 +367,6 @@ fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
 #[cfg(unix)]
 #[test]
 fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
-    use std::os::unix::fs::PermissionsExt;
     let root = crate::walk::scratch("fuzz-arguments");
     fs::create_dir_all(root.join(".research")).unwrap();
     fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
@@ -383,8 +380,7 @@ fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
     }
     let worker = |name: &str, body: &str| {
         let path = root.join(name);
-        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        crate::walk::write_script(&path, &format!("#!/bin/sh\n{body}\n"));
         path
     };
     // `fold INPUT ARGUMENTS...`: echo the arguments; a mutated input hangs.

@@ -345,7 +345,6 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct Fixture(PathBuf);
@@ -361,8 +360,7 @@ mod tests {
             fs::create_dir(&dir).unwrap();
             // Each test controls both the child's final stdout line and its exit.
             let script = dir.join("reference");
-            fs::write(&script, "#!/bin/sh\ncat \"$2\"\nexit \"$3\"\n").unwrap();
-            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+            crate::walk::write_script(&script, "#!/bin/sh\ncat \"$2\"\nexit \"$3\"\n");
             Self(dir)
         }
     }

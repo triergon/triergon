@@ -35,6 +35,32 @@ fn visit(root: &Path, dir: &Path, keep: &dyn Fn(&Path) -> bool, out: &mut Vec<Pa
     }
 }
 
+/// Writes `text` to `path` as an executable script for a test to run, through a
+/// child process, so that no descriptor of this process ever holds the file open for
+/// writing. A process another thread spawns inherits every open descriptor until it
+/// executes its program, and Linux refuses to execute a file some process holds open
+/// for writing (`ETXTBSY`): a script this process wrote and closed can still be
+/// refused while other tests spawn processes.
+#[cfg(test)]
+pub fn write_script(path: &Path, text: &str) {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new("sh")
+        .args(["-c", "cat > \"$0\" && chmod 755 \"$0\""])
+        .arg(path)
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("run sh");
+    child
+        .stdin
+        .take()
+        .expect("piped stdin")
+        .write_all(text.as_bytes())
+        .expect("write the script");
+    let status = child.wait().expect("wait for sh");
+    assert!(status.success(), "writing {}: {status}", path.display());
+}
+
 /// A fresh, empty scratch directory for tests.
 #[cfg(test)]
 pub fn scratch(name: &str) -> PathBuf {

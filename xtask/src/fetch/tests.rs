@@ -173,15 +173,12 @@ fn oversize_and_failed_transfers_are_refused() {
 #[cfg(unix)]
 #[test]
 fn rsync_receiver_cannot_write_past_the_limit() {
-    use std::os::unix::fs::PermissionsExt;
     let dir = crate::walk::scratch("rsync-limit");
     let fake = dir.join("rsync");
-    fs::write(
+    crate::walk::write_script(
         &fake,
         "#!/bin/sh\nfor last; do :; done\nhead -c 8192 /dev/zero > \"$last\"\n",
-    )
-    .unwrap();
-    fs::set_permissions(&fake, fs::Permissions::from_mode(0o700)).unwrap();
+    );
     let inherited = std::env::var_os("PATH").unwrap_or_default();
     let path =
         std::env::join_paths(std::iter::once(dir.clone()).chain(std::env::split_paths(&inherited)))
